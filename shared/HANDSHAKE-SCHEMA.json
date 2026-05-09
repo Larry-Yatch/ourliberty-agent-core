@@ -1,0 +1,117 @@
+{
+    "$schema": "https://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/Larry-Yatch/ourliberty-agent-core/shared/HANDSHAKE-SCHEMA.json",
+    "title": "Inter-Agent Dispatch Handshake",
+    "description": "Schema for inbox task JSON files. Backward-compatible: existing dispatch code paths already produce valid tasks. Optional fields are never required for acceptance.",
+    "type": "object",
+    "required": ["prompt", "source"],
+    "properties": {
+        "prompt": {
+            "type": "string",
+            "minLength": 10,
+            "description": "The full task description. Never summarized — include all context needed."
+        },
+        "source": {
+            "type": "string",
+            "enum": [
+                "joe", "kelly",
+                "atlas", "prism", "sage", "main", "nova", "ember", "mula",
+                "atlas-result", "prism-result", "sage-result", "main-result", "nova-result", "ember-result", "mula-result",
+                "webhook", "telegram-webhook", "watchdog", "auto-retry", "auto-iterate", "blackboard", "system-test", "parallel-test", "cron",
+                "unknown",
+                "council-contribution", "council-approval", "council-adversarial",
+                "sage-milestone", "atlas-milestone", "continuation", "wave2-3-autopilot", "system-sweep",
+                "orchestrator", "ship_completion_watcher", "concierge-dispatch", "cycle-recovery",
+                "backlog-promoter"
+            ],
+            "description": "Who initiated this task."
+        },
+        "reply_chat_id": {
+            "type": ["integer", "null"],
+            "description": "Telegram chat ID for result delivery. Null only for internal system tasks."
+        },
+        "timeout": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 14400,
+            "description": "Task timeout in seconds. 0 = no timeout."
+        },
+        "original_request": {
+            "type": "string",
+            "description": "Optional. Preserves Joe's verbatim request when Atlas packages with strategic context. Ensures nothing is lost in handoff."
+        },
+        "strategic_context": {
+            "type": "object",
+            "description": "Optional. Atlas adds this when dispatching to downstream agents.",
+            "properties": {
+                "priority": { "enum": ["P0", "P1", "P2"] },
+                "why_now": { "type": "string" },
+                "success_criteria": { "type": "array", "items": { "type": "string" } },
+                "effort_estimate": { "enum": ["XS", "S", "M", "L", "XL"] },
+                "mission_alignment": { "type": "string" }
+            }
+        },
+        "references": {
+            "type": "object",
+            "description": "Optional. Pointers to relevant context.",
+            "properties": {
+                "design_bible_sections": { "type": "array", "items": { "type": "string" } },
+                "prior_sweeps": { "type": "array", "items": { "type": "string" } },
+                "related_prs": { "type": "array", "items": { "type": ["string", "integer"] } },
+                "knowledge_files": { "type": "array", "items": { "type": "string" } }
+            }
+        },
+        "wireframes": {
+            "type": "array",
+            "description": "Optional. Produced by dispatch_with_wireframes.py.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "index": { "type": "integer" },
+                    "title": { "type": "string" },
+                    "url": { "type": "string" },
+                    "github_blob_url": { "type": "string" },
+                    "local_path": { "type": "string" }
+                }
+            }
+        },
+        "pr_number": {
+            "type": ["integer", "string"],
+            "description": "Optional. Included on fix-pr-* tasks."
+        },
+        "iteration": {
+            "type": "integer",
+            "description": "Optional. Retry counter for auto-retry logic."
+        },
+        "reason": {
+            "type": "string",
+            "description": "Optional. Explanation on retry or continuation tasks."
+        },
+        "requeue_count": {
+            "type": "integer",
+            "description": "Optional. Failure retry counter (max 3)."
+        },
+        "not_before": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Optional. Cooldown timestamp for requeued tasks. null means no cooldown."
+        },
+        "system_prompt": {
+            "type": ["string", "null"],
+            "description": "Optional. System prompt override (inline)."
+        },
+        "system_prompt_file": {
+            "type": ["string", "null"],
+            "description": "Optional. System prompt override (file path)."
+        },
+        "model": {
+            "type": ["string", "null"],
+            "description": "Optional. Model override for this task (must be >= sonnet-4.6)."
+        },
+        "dedup_identity": {
+            "type": "string",
+            "description": "Optional. Explicit dedup key when auto-extraction is wrong."
+        }
+    },
+    "additionalProperties": true
+}
