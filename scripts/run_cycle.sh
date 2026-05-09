@@ -45,7 +45,7 @@ cd "$PULSE_DIR"
 # /cycle we want a fresh-ish read each iteration so it picks up changes to
 # cycle-prompt.md cleanly. Pulse's continuity is in the journal, not the
 # Claude Code session.
-if claude --print --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "${LOG_DIR}/cycle.last-output.json" 2>&1; then
+if claude --print --model claude-sonnet-4-6 --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "${LOG_DIR}/cycle.last-output.json" 2>&1; then
     log "/cycle iteration completed successfully"
 else
     log "/cycle iteration failed (non-zero exit); see ${LOG_DIR}/cycle.last-output.json"
