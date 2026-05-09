@@ -36,7 +36,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 # Allow writes only where bot needs them
-ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.config/anthropic /home/larry/.local /home/larry/.cache
+ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
