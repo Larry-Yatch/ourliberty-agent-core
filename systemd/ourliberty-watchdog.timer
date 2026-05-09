@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Ourliberty watchdog every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=ourliberty-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,41 @@
+[Unit]
+Description=Ourliberty Pulse — Telegram bridge to Pulse (Observer / /cycle agent), for direct chat queries; the timer drives autonomous /cycle invocations
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/operating-manual.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core/agents/pulse
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="AGENT=pulse"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/agent_telegram_bot.py
+
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=10
+
+MemoryMax=2G
+TasksMax=64
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pulse
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.config/anthropic /home/larry/.local /home/larry/.cache
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

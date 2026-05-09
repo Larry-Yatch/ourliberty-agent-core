@@ -1,0 +1,46 @@
+[Unit]
+Description=Ourliberty Beacon — Telegram bridge to Beacon (Strategy/Architect agent)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/operating-manual.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core/agents/beacon
+EnvironmentFile=/home/larry/credentials/.env.larry
+# Claude Code OAuth token, model preferences, etc. live in the user's HOME
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/beacon_telegram_bot.py
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=10
+
+# Resource limits — modest; bumps can come if needed
+MemoryMax=2G
+TasksMax=64
+
+# Output to journald (view with: journalctl -u ourliberty-beacon-bot -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-beacon
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# Allow writes only where bot needs them
+ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.config/anthropic /home/larry/.local /home/larry/.cache
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

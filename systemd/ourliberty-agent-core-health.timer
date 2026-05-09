@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Ourliberty agent-core health check every 30 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=ourliberty-agent-core-health.service
+
+[Install]
+WantedBy=timers.target

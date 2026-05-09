@@ -1,0 +1,35 @@
+[Unit]
+Description=Ourliberty /cycle — Pulse runs one cycle iteration
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/cycle-prompt.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core/agents/pulse
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper script handles concurrency lock + invokes claude with /cycle
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_cycle.sh
+
+# Cycle should not run forever — 5 min hard cap (a single iteration shouldn't take this long)
+TimeoutStartSec=600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-cycle
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.config/anthropic /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true

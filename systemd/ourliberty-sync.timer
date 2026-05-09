@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Ourliberty agent-core sync hourly
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+Persistent=true
+Unit=ourliberty-sync.service
+
+[Install]
+WantedBy=timers.target

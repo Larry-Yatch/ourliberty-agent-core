@@ -1,0 +1,15 @@
+[Unit]
+Description=Run Ourliberty /cycle every 30 minutes
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/cycle-prompt.md
+
+[Timer]
+# First run 5 min after boot (let other services settle)
+OnBootSec=5min
+# Then every 30 minutes from previous start
+OnUnitActiveSec=30min
+# If the system was off when a run was due, run on boot
+Persistent=true
+Unit=ourliberty-cycle.service
+
+[Install]
+WantedBy=timers.target
