@@ -1,0 +1,77 @@
+{
+  "$schema_version": "1.0.0",
+  "description": "Per-agent model routing. Telegram chat uses telegram_model; inbox/work tasks use inbox_model; if a call fails, fallback_model is tried. Pinned explicitly to model IDs to avoid alias ambiguity.",
+  "default": {
+    "telegram_model": "claude-sonnet-4-6",
+    "inbox_model": "claude-opus-4-7",
+    "fallback_model": "claude-sonnet-4-6"
+  },
+  "agents": {
+    "beacon": {
+      "name": "Beacon",
+      "role": "Strategy / Architect",
+      "telegram_model": "claude-opus-4-7",
+      "inbox_model": "claude-opus-4-7",
+      "fallback_model": "claude-sonnet-4-6",
+      "note": "Opus everywhere — spec authoring is judgment-heavy and the spec is the contract. Don't economize."
+    },
+    "forge": {
+      "name": "Forge",
+      "role": "Engineering / Builder",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-opus-4-7",
+      "fallback_model": "claude-sonnet-4-6",
+      "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake."
+    },
+    "mirror": {
+      "name": "Mirror",
+      "role": "Adversarial Review",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-opus-4-7",
+      "fallback_model": "claude-sonnet-4-6",
+      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries."
+    },
+    "pulse": {
+      "name": "Pulse",
+      "role": "Self-healing Observer / /cycle",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-sonnet-4-6",
+      "fallback_model": "claude-opus-4-7",
+      "note": "Sonnet for routine cycles (cheap polling). Pulse can self-escalate to Opus when investigating a recurring pattern. Default cycle frequency starts at 30 min; tune as we earn trust."
+    },
+    "aide": {
+      "name": "Aide",
+      "role": "Executive Assistant (Phase E)",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-sonnet-4-6",
+      "fallback_model": "claude-opus-4-7",
+      "note": "EA tasks are mostly mechanical (drafting emails, scheduling, calendar holds). Sonnet handles them well. Opus reserved for ambiguous prioritization calls.",
+      "status": "planned"
+    },
+    "scout": {
+      "name": "Scout",
+      "role": "Researcher (Phase 2)",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-opus-4-7",
+      "fallback_model": "claude-sonnet-4-6",
+      "note": "Sonnet for chat / Q&A. Opus for actual deep research (competitive analysis, technical deep-dives). Scout's output quality matters — research that misleads is worse than no research.",
+      "status": "planned"
+    },
+    "compass": {
+      "name": "Compass",
+      "role": "Planner / Dispatcher (Phase 2)",
+      "telegram_model": "claude-sonnet-4-6",
+      "inbox_model": "claude-opus-4-7",
+      "fallback_model": "claude-sonnet-4-6",
+      "note": "Sequencing across multiple in-flight projects is judgment work. Opus default.",
+      "status": "planned"
+    }
+  },
+  "_history": [
+    {
+      "date": "2026-05-08",
+      "change": "Initial creation. Beacon/Forge/Mirror/Pulse defined; Aide/Scout/Compass placeholdered.",
+      "author": "Claude (via Larry's session)"
+    }
+  ]
+}

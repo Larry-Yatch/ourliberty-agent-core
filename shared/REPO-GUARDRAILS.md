@@ -59,17 +59,26 @@ The `ourliberty-agent-core` repo on the VM is a deploy source, not a development
 1. **Always on `main`.** No feature branches in this repo. Direct commits to `main` only — solo private config repo, no PR overhead. If you need to draft a change, use a separate working copy on Larry's Mac, not the VM clone.
 2. **Working tree always clean.** Direct edits to files in this repo MUST be committed in the same session. Long-lived uncommitted changes block sync and silently cause runtime drift.
 
-## Authority matrix (per-agent — populated as agents come online)
+## Authority matrix (per-agent — expanded as agents come online)
 
 | Agent | T0 sandbox | T1 internal | Cross-org | Status |
 |---|---|---|---|---|
-| **Beacon** (Architect) | Read + Comment | Read | — | Phase B |
-| **Forge** (Builder) | Read + PR + Merge (Mirror gate) | Read | — | Phase C |
-| **Mirror** (Reviewer) | Read + Review approval | Read | — | Phase C |
-| **Pulse** (Observer) | Read; opens issues only | Read | — | Phase D |
-| **Aide** (EA) | — (no code authority) | — | Google Workspace via OAuth | Phase E |
-| **Scout** (Researcher) | Read | Read | Web reads | Phase 2 |
-| **Compass** (Planner) | Read + Comment | Read | — | Phase 2 |
+| **Beacon** (Architect) | Read freely; write **specs/notes only** (`agents/beacon/specs/`, `drafts/`); never write production code | Read | — | ✅ live (Phase B) |
+| **Forge** (Builder) | Read + branch + commit + PR; **does not merge** (Mirror gate); direct commits to `main` allowed only on `ourliberty-agent-core` for config-only changes | Read | — | Persona ready, not yet wired to Telegram (Phase C activation pending) |
+| **Mirror** (Reviewer) | Read + review (approve / request-changes); **required reviewer** before merge in Loose mode; can post issues for systemic findings | Read | — | Persona ready, not yet wired (Phase C activation pending) |
+| **Pulse** (Observer / `/cycle`) | Read; can open issues + dispatch tasks to other agents; **narrow auto-fix allow-list** (see `agents/pulse/TOOLS.md`); never auto-merges code | Read for diagnostic only | — | Persona ready, not yet wired (Phase D activation pending) |
+| **Aide** (EA) | — (no code authority) | — | Google Workspace via OAuth (Gmail / Calendar / Docs / Sheets / Drive); drafts only, no auto-send to external recipients without per-task approval | Phase E |
+| **Scout** (Researcher) | Read | Read | Web reads, no writes | Phase 2 |
+| **Compass** (Planner) | Read + comment + dispatch to other agents | Read | — | Phase 2 |
+
+### Cross-cutting rules (apply to every agent)
+
+- **No agent commits secrets.** Ever. The pre-commit hook (when added in Phase D) will block known token patterns. Until then, the discipline is human.
+- **No agent touches `~/credentials/`** beyond reading from the env when launched.
+- **No agent touches another agent's `~/agents/memory/<other-agent>/`.** Each agent owns its own memory; cross-agent communication goes through inboxes/outboxes per HANDSHAKE-SCHEMA.
+- **No agent runs `git push --force` or `git reset --hard origin/<branch>`** without explicit Larry approval. These are destructive on shared branches.
+- **No agent modifies `.github/workflows/*`** without explicit Larry approval. Workflow changes affect everything downstream.
+- **No agent deletes branches** other than its own short-lived working branches (and only after the corresponding PR is merged or closed).
 
 ## Red flag patterns (stop and ask Larry)
 
