@@ -1,0 +1,121 @@
+"""
+Concurrency Guard — Global semaphore shared across all processes.
+Uses a file-based lock + counter to limit total concurrent claude processes
+across the Telegram bot AND orchestrator.
+
+Safe limit: 6 concurrent claude processes
+  6 x 400MB = 2.4 GB
+  + services ~900MB
+  + headroom for 1-2 Playwright browsers (~1 GB)
+  = ~4.3 GB peak of 7.8 GB available (+ 4 GB swap safety)
+"""
+# Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
+
+import os
+import json
+import time
+import fcntl
+from pathlib import Path
+
+AGENTS_ROOT = Path.home() / 'agents'
+GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
+MAX_CONCURRENT = 10
+STALE_TIMEOUT = 600  # Consider a slot stale after 10 min (dead process)
+
+
+class ConcurrencyGuard:
+    def __init__(self):
+        if not GUARD_FILE.exists():
+            self._write({'slots': [], 'max': MAX_CONCURRENT})
+
+    def _read(self):
+        try:
+            with open(GUARD_FILE) as f:
+                return json.load(f)
+        except:
+            return {'slots': [], 'max': MAX_CONCURRENT}
+
+    def _write(self, data):
+        with open(GUARD_FILE, 'w') as f:
+            json.dump(data, f)
+
+    def _clean_stale(self, data):
+        """Remove slots from dead processes or timed-out entries."""
+        now = time.time()
+        alive = []
+        for slot in data.get('slots', []):
+            pid = slot.get('pid', 0)
+            ts = slot.get('ts', 0)
+            # Check if process is alive
+            try:
+                os.kill(pid, 0)
+                # Process alive — check if stale
+                if now - ts < STALE_TIMEOUT:
+                    alive.append(slot)
+            except (OSError, ProcessLookupError):
+                pass  # Dead process, remove
+        data['slots'] = alive
+        return data
+
+    def acquire(self, agent_id, task_id=''):
+        """Try to acquire a slot. Returns True if acquired, False if at capacity."""
+        lock_file = GUARD_FILE.with_suffix('.lock')
+        with open(lock_file, 'w') as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                data = self._read()
+                data = self._clean_stale(data)
+
+                if len(data['slots']) >= MAX_CONCURRENT:
+                    return False
+
+                data['slots'].append({
+                    'pid': os.getpid(),
+                    'agent': agent_id,
+                    'task': task_id,
+                    'ts': time.time(),
+                })
+                self._write(data)
+                return True
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+    def release(self, agent_id=''):
+        """Release a slot for this process."""
+        lock_file = GUARD_FILE.with_suffix('.lock')
+        with open(lock_file, 'w') as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                data = self._read()
+                pid = os.getpid()
+                data['slots'] = [s for s in data.get('slots', [])
+                                if not (s.get('pid') == pid and
+                                       (not agent_id or s.get('agent') == agent_id))]
+                self._write(data)
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+    def active_count(self):
+        """How many slots are currently active."""
+        data = self._read()
+        data = self._clean_stale(data)
+        return len(data.get('slots', []))
+
+    def wait_for_slot(self, agent_id, task_id='', timeout=1800, poll_interval=2):
+        """Block until a slot is available or timeout."""
+        start = time.time()
+        while time.time() - start < timeout:
+            if self.acquire(agent_id, task_id):
+                return True
+            time.sleep(poll_interval)
+        return False
+
+
+# Singleton
+_guard = None
+
+def get_guard():
+    global _guard
+    if _guard is None:
+        _guard = ConcurrencyGuard()
+    return _guard

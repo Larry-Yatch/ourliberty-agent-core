@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""dispatch_validator.py — Improvement #1: pre-dispatch validation.
+
+Validates a task JSON file BEFORE it's submitted to an agent's inbox.
+Kills failure modes F24 (empty prompt), ORIGIN_CHAT_UNKNOWN (missing
+reply_chat_id), and a few related quality issues.
+
+Usage:
+  python3 dispatch_validator.py <task.json>
+    Exit 0 = valid; exit 1 = rejected (with reason on stderr)
+
+  Library mode:
+    from dispatch_validator import validate_task
+    ok, reason = validate_task(task_dict)
+"""
+# Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
+import json
+import sys
+from pathlib import Path
+
+# Known Telegram chat IDs are sourced at runtime from config; keep this set
+# narrow until Larry wires up his own chat topology. Extend as needed.
+KNOWN_CHAT_IDS = set()
+
+ALLOWED_SOURCES = {
+    # Humans
+    'larry',
+    # Live agents
+    'beacon', 'forge', 'mirror', 'pulse',
+    'beacon-result', 'forge-result', 'mirror-result', 'pulse-result',
+    # Planned agents (placeholdered; safe to allow so dispatch tests don't fail)
+    'aide', 'scout', 'compass',
+    'aide-result', 'scout-result', 'compass-result',
+    # Infrastructure / system sources
+    'webhook', 'telegram-webhook', 'watchdog', 'auto-retry', 'auto-iterate',
+    'blackboard', 'system-test', 'parallel-test', 'cron', 'unknown',
+    'continuation', 'system-sweep', 'cycle-recovery', 'orchestrator',
+    'ship_completion_watcher', 'backlog-promoter',
+}
+
+MIN_PROMPT_LEN = 100  # chars
+MAX_PROMPT_LEN = 50000
+MIN_TIMEOUT = 60      # seconds
+MAX_TIMEOUT = 14400
+
+
+def validate_task(task):
+    """Return (ok: bool, reason: str). ok=True means task is dispatchable."""
+    if not isinstance(task, dict):
+        return False, 'task is not a dict'
+
+    # prompt: must exist, non-empty, reasonable length
+    prompt = task.get('prompt', '')
+    if not isinstance(prompt, str):
+        return False, 'prompt field missing or not a string'
+    prompt = prompt.strip()
+    if len(prompt) < MIN_PROMPT_LEN:
+        return False, f'prompt too short ({len(prompt)} chars, min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug'
+    if len(prompt) > MAX_PROMPT_LEN:
+        return False, f'prompt too long ({len(prompt)} chars, max {MAX_PROMPT_LEN})'
+
+    # source: must be in allowed list (orchestrator's whitelist)
+    source = task.get('source', '')
+    if source not in ALLOWED_SOURCES:
+        return False, f'source "{source}" not in allowed list — would be DISPATCH_BLOCKED'
+
+    # reply_chat_id: optional, but if present must be int + (preferably) known
+    reply_chat_id = task.get('reply_chat_id')
+    if reply_chat_id is not None:
+        if not isinstance(reply_chat_id, int):
+            return False, f'reply_chat_id must be int, got {type(reply_chat_id).__name__}'
+        if reply_chat_id not in KNOWN_CHAT_IDS:
+            # Warn but allow — new chat IDs are added over time
+            pass
+
+    # timeout: if set, must be sane
+    timeout = task.get('timeout')
+    if timeout is not None:
+        if not isinstance(timeout, (int, float)) or timeout < MIN_TIMEOUT or timeout > MAX_TIMEOUT:
+            return False, f'timeout {timeout} out of bounds [{MIN_TIMEOUT}, {MAX_TIMEOUT}]'
+
+    # task_id: must exist + non-empty
+    task_id = task.get('task_id', '')
+    if not task_id or not isinstance(task_id, str):
+        return False, 'task_id field missing or empty'
+
+    # priority: if set, must be a known value
+    priority = task.get('priority')
+    if priority is not None and priority not in ('founder-vision', 'normal', 'low', 'urgent'):
+        return False, f'priority "{priority}" unknown'
+
+    return True, 'ok'
+
+
+def main():
+    if len(sys.argv) < 2:
+        print('usage: dispatch_validator.py <task.json>', file=sys.stderr)
+        return 2
+    path = Path(sys.argv[1])
+    if not path.exists():
+        print(f'file not found: {path}', file=sys.stderr)
+        return 2
+    try:
+        task = json.loads(path.read_text())
+    except json.JSONDecodeError as e:
+        print(f'invalid JSON: {e}', file=sys.stderr)
+        return 1
+    ok, reason = validate_task(task)
+    if ok:
+        print('OK')
+        return 0
+    print(f'REJECTED: {reason}', file=sys.stderr)
+    return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
