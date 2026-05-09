@@ -6,7 +6,7 @@ Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/run
 # First run 5 min after boot (let other services settle)
 OnBootSec=5min
 # Then every 30 minutes from previous start
-OnUnitActiveSec=30min
+OnUnitActiveSec=1h
 # If the system was off when a run was due, run on boot
 Persistent=true
 Unit=ourliberty-cycle.service
