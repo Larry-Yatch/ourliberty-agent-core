@@ -2,7 +2,7 @@
 
 This is the day-to-day manual for running, using, and troubleshooting Larry's agent system. Read top-to-bottom on first pass. After that it's a reference — jump to whatever section you need.
 
-**Last updated:** 2026-05-08 (Phase B — Beacon online via Telegram)
+**Last updated:** 2026-05-08 (Phase B — Beacon online via Telegram; Phase C/D personas + /cycle infrastructure committed, awaiting Larry-side activation)
 
 ---
 
@@ -66,6 +66,11 @@ This is the day-to-day manual for running, using, and troubleshooting Larry's ag
 | **`beacon_telegram_bot.sh`** | The launcher script that starts the Python bot inside a tmux session. | `~/agent-core/scripts/beacon_telegram_bot.sh` |
 | **`.env.larry`** | Environment file with your secrets (bot token, chat ID, etc). | `~/credentials/.env.larry` |
 | **Beacon** | The Strategy/Architect agent. A persona defined in 6 markdown files. | `~/agent-core/agents/beacon/*.md` |
+| **Forge** | The Engineering/Builder agent. Persona ready, bot not yet wired. | `~/agent-core/agents/forge/*.md` |
+| **Mirror** | The Adversarial Reviewer agent. Persona ready, bot not yet wired. | `~/agent-core/agents/mirror/*.md` |
+| **Pulse** | The Self-healing Observer + `/cycle` runner. Persona ready, bot+timer not yet activated. | `~/agent-core/agents/pulse/*.md` |
+| **/cycle** | Pulse's iteration spec — what to check, what to fix, how to journal. | `~/agent-core/runbooks/cycle-prompt.md` |
+| **systemd units** | Production replacements for tmux launchers — auto-restart on crash, auto-start on boot. Awaiting installation. | `~/agent-core/systemd/*.service`, `*.timer` |
 
 ---
 
@@ -105,10 +110,10 @@ Next message will start a new session.
 - Reference previous conversations and notes
 
 **Can't (yet):**
-- Write code (Forge does that — Forge doesn't exist yet, that's Phase C)
-- Open PRs / merge code (also Forge / Mirror — Phase C)
-- Watch the system itself (Pulse — Phase D)
-- Send emails or interact with Google Workspace (Aide — Phase E)
+- Write code (Forge does that — Forge's persona exists in the repo as of 2026-05-08, but no Telegram bot is wired and no Build Loop has been run yet. Phase C activation is needed.)
+- Open PRs / merge code (also Forge / Mirror — same status: personas ready, not yet wired)
+- Watch the system itself (Pulse — persona + `/cycle` infrastructure committed; Anthropic API key + systemd timer activation pending)
+- Send emails or interact with Google Workspace (Aide — Phase E, persona not yet authored)
 
 If you ask Beacon to do something outside her scope, she'll tell you she can't and (usually) suggest the right next step.
 
@@ -575,12 +580,68 @@ DROPLET STATUS:            (from Mac) ping -c 3 134.209.44.80
 | When | What | What changes for you |
 |---|---|---|
 | Phase A.12 (small follow-up) | Daily cron mirroring upstream gm-agent-core into your mirror | Nothing visible day-to-day |
-| Stabilization session | Bot becomes a systemd service | Bot survives droplet reboots automatically. Manual start commands above still work. |
+| Stabilization session | Bot becomes a systemd service (units already in `systemd/`; install via `systemd/INSTALL.md`) | Bot survives droplet reboots automatically. Manual start commands above still work as fallback. |
 | Stabilization session | Dedicated agent-only Claude Max | Beacon's quota stops competing with your personal Claude Code use |
-| Phase C | Forge + Mirror agents added | Two more Telegram bots; build pipeline goes live; you can ask Beacon to draft a spec, then ask Forge to implement |
-| Phase D | Pulse + `/cycle` self-healing | A new dashboard/log of what `/cycle` is finding and fixing automatically; rare DMs from Pulse when something needs you |
+| Phase C activation | Forge + Mirror Telegram bots wired | Two more Telegram bots; build pipeline goes live; you can ask Beacon to draft a spec, then ask Forge to implement, Mirror reviews and gates merge |
+| Phase D activation | Pulse + `/cycle` self-healing wired (Anthropic API key + systemd timer) | A new journal at `runbooks/cycle-journal.md` showing what `/cycle` is finding and fixing automatically; rare DMs from Pulse when something needs you |
 | Phase E | Aide (EA) added | A different bot that handles Gmail/Calendar work; separate Telegram channel |
 | Phase F | Mini Brains prototype shipped | First real prototype repo with a handoff package |
+
+## Appendix C — Phase C / D quick activation reference
+
+When you're ready to activate Forge + Mirror + Pulse + `/cycle`:
+
+### Phase C activation (build pipeline)
+
+1. **BotFather:** create `Forge` and `Mirror` Telegram bots. Save tokens.
+2. **On droplet:** install tokens via the helper script pattern:
+   ```
+   bash ~/install_beacon_creds.sh   # extend or duplicate this for forge + mirror
+   ```
+   Or hand-edit `~/credentials/.env.larry`:
+   - `TELEGRAM_BOT_TOKEN_FORGE=<paste>`
+   - `TELEGRAM_BOT_TOKEN_MIRROR=<paste>`
+3. **Install systemd units:**
+   ```
+   sudo cp ~/agent-core/systemd/ourliberty-forge-bot.service /etc/systemd/system/
+   sudo cp ~/agent-core/systemd/ourliberty-mirror-bot.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now ourliberty-forge-bot.service
+   sudo systemctl enable --now ourliberty-mirror-bot.service
+   ```
+4. **Set GitHub branch protection** on T0 prototype repos (when they exist) so Mirror is required reviewer. (One-time per repo; details in Phase C plan.)
+5. **Test:** ask Beacon to draft a hello-world spec. Send the spec to Forge. Forge opens a PR. Mirror reviews. Merge happens.
+
+### Phase D activation (`/cycle`)
+
+1. **Anthropic API key:** create at console.anthropic.com (with billing). Store in `~/credentials/.env.larry` as `ANTHROPIC_API_KEY=...`
+2. **BotFather:** create `Pulse` Telegram bot. Save token. Add to `.env.larry` as `TELEGRAM_BOT_TOKEN_PULSE`.
+3. **Install systemd units:**
+   ```
+   sudo cp ~/agent-core/systemd/ourliberty-pulse-bot.service /etc/systemd/system/
+   sudo cp ~/agent-core/systemd/ourliberty-cycle.service /etc/systemd/system/
+   sudo cp ~/agent-core/systemd/ourliberty-cycle.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now ourliberty-pulse-bot.service
+   ```
+4. **Run `/cycle` once manually** with you watching, before enabling the timer:
+   ```
+   sudo systemctl start ourliberty-cycle.service
+   journalctl -u ourliberty-cycle.service -n 100
+   cat ~/agent-core/runbooks/cycle-journal.md
+   ```
+5. **If looking good:** enable the timer:
+   ```
+   sudo systemctl enable --now ourliberty-cycle.timer
+   ```
+6. **Stabilization timers** (also worth enabling around the same time):
+   ```
+   sudo systemctl enable --now ourliberty-sync.timer
+   sudo systemctl enable --now ourliberty-agent-core-health.timer
+   sudo systemctl enable --now ourliberty-watchdog.timer  # only after watchdog has been observed for ≥ 1 day
+   ```
+
+See `systemd/INSTALL.md` for the full reference (verifying units, hardening notes, rollback to tmux).
 
 ---
 
