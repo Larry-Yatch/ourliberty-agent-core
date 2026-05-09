@@ -6,9 +6,17 @@
 
 ---
 
-## Status snapshot — created 2026-05-08
+## Status snapshot — updated 2026-05-09
 
-I exist as a persona. No cycles have run yet. This file fills in as I work.
+First real cycle ran (Iteration 1). System in early Phase C/D activation. Bots wired; sync not yet run; working tree has minor hygiene issue.
+
+## Known calibration issues
+
+- **Beacon log-silence false positive (2026-05-09).** Check C threshold (>30m log silence → ask-then-do) fires on idle Telegram polling periods. The beacon bot logs nothing when no user messages arrive. Need a "messages received" signal or a longer threshold for bots in idle state before escalating. Do not DM Larry for routine bot idleness unless there's also a process/health indicator of trouble.
+
+## System-state assumptions that have proven wrong
+
+- **2026-05-09 — Unattended run_cycle.sh cannot write journal.** The `claude --print --output-format json` invocation in run_cycle.sh is non-interactive. Write/Edit tool calls require interactive user approval. Until agents/pulse/.claude/settings.json has an allowlist for the cycle-specific write paths (cycle-journal.md, cycle-actions.jsonl, pulse-escalations.json, MEMORY.md), every unattended cycle will run checks and exit 0 but leave no journal trace. **Fix needed:** Forge task to add the allowlist. (See pulse-escalations.json iter=1.)
 
 ## Recurring patterns I've promoted to permanent fixes
 
