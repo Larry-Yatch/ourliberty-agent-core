@@ -2,53 +2,85 @@
 
 This is the day-to-day manual for running, using, and troubleshooting Larry's agent system. Read top-to-bottom on first pass. After that it's a reference — jump to whatever section you need.
 
-**Last updated:** 2026-05-08 (Phase B — Beacon online via Telegram; Phase C/D personas + /cycle infrastructure committed, awaiting Larry-side activation)
+**Last updated:** 2026-05-11 (Phase D2 — shared inbox watcher live; all 4 agents reachable via Telegram + JSON inbox dispatch; `/cycle` running every 4h with cost capture + auto-commit)
+
+---
+
+## How this document is organized
+
+This file has two parts. They serve different readers, so they're kept distinct.
+
+- **Part I — Operating Manual (§0 through Appendix C):** Reference for using the system today. Organized by topic. Updated in place each phase. Read this when you need to do something or diagnose something.
+- **Part II — Build Narrative & Decisions Log:** Chronological story of how the system came to be. Phase-by-phase, append-only. Read this when you need to understand *why* something is the way it is, or what we ruled out along the way.
+
+When we ship a new phase, both parts get updates: Part I gets new operational content woven in; Part II gets a new phase entry appended.
+
+---
+
+# Part I — Operating Manual
 
 ---
 
 ## 0. The 30-second mental model
 
 ```
-   ┌────────────────┐                ┌──────────────────────┐
-   │  Your phone    │  Telegram msg  │  Telegram's servers  │
-   │  (Telegram)    ├───────────────>│  (api.telegram.org)  │
-   └────────────────┘                └──────────┬───────────┘
-                                                │ getUpdates poll
-                                                ▼
-   ┌────────────────────────────────────────────────────────────┐
-   │  Droplet: ourliberty-agents-01 @ 134.209.44.80             │
-   │  ┌──────────────────────────────────────────────────────┐  │
-   │  │  tmux session: beacon-bot                            │  │
-   │  │  ┌────────────────────────────────────────────────┐  │  │
-   │  │  │  beacon_telegram_bot.py                        │  │  │
-   │  │  │   • polls Telegram for messages                │  │  │
-   │  │  │   • spawns: claude --print --resume "<msg>"    │  │  │
-   │  │  │     in ~/agent-core/agents/beacon/             │  │  │
-   │  │  │   • posts reply back to Telegram               │  │  │
-   │  │  └────────────────────────────────────────────────┘  │  │
-   │  └──────────────────────────────────────────────────────┘  │
-   │                                                            │
-   │  ~/credentials/.env.larry  ← bot token, chat ID            │
-   │  ~/agent-core/             ← source repo (cloned, kept     │
-   │                              current via git pull)         │
-   │  ~/agents/                 ← runtime: state, logs, memory  │
-   └────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ Anthropic API call
-                                      ▼
-                              ┌───────────────┐
-                              │  Claude Opus  │
-                              │  (Larry's Max)│
-                              └───────────────┘
+   Two ways to dispatch work into the system:
+
+   1. INTERACTIVE (Telegram) — for conversation with one agent
+   ┌────────────────┐    Telegram     ┌──────────────────────┐
+   │  Your phone    ├────────────────>│  Telegram's servers  │
+   └────────────────┘                 └──────────┬───────────┘
+                                                 │ getUpdates poll
+                                                 ▼
+                              ┌─────────────────────────────────┐
+                              │  ourliberty-<agent>-bot.service │
+                              │  (1 per agent: beacon/forge/    │
+                              │   mirror/pulse — systemd-       │
+                              │   managed, auto-restart)        │
+                              │   spawns: claude --print        │
+                              │   --resume in agent's CWD       │
+                              └─────────────────────────────────┘
+
+   2. SCHEDULED / AUTONOMOUS — for inter-agent and timed work
+   ┌─────────────────────────────┐
+   │ ourliberty-cycle.timer (4h) │ → Pulse runs /cycle Health Check
+   │ ourliberty-sync.timer (1h)  │ → pulls origin/main into ~/agent-core
+   │ ...health.timer (30m)       │ → enforces working-copy discipline
+   └─────────────────────────────┘
+
+   3. INTER-AGENT (D2) — for one agent to assign work to another
+   ┌──────────────────────────────────────────────────────────────┐
+   │  ~/agents/inboxes/<agent>/<task>.json                        │
+   │                       │ polled every 5s                      │
+   │                       ▼                                      │
+   │  ourliberty-inbox-watcher.service                            │
+   │   • validates task (dispatch_validator.py)                   │
+   │   • acquires lease "inbox:<agent>" (one per agent in flight) │
+   │   • spawns: claude --print --model <inbox_model> in CWD      │
+   │   • writes ~/agents/outboxes/<agent>/<task>.json             │
+   │   • appends ~/agents/blackboard/costs.jsonl                  │
+   │   • archives task to inboxes/<agent>/.archive/               │
+   └──────────────────────────────────────────────────────────────┘
+
+   All three paths run on:
+   Droplet: ourliberty-agents-01 @ 134.209.44.80
+   ~/credentials/.env.larry  ← bot tokens (mode 600, never committed)
+   ~/agent-core/             ← source repo (synced from origin/main)
+   ~/agents/                 ← runtime state, logs, inboxes, outboxes
 ```
 
-**In English:** You send a Telegram message. The bot (a Python script running on your droplet inside a tmux session) sees it via long-polling, runs Claude Code with Beacon's prompt files, gets the response, sends it back through Telegram.
+**In English:** Three ways work happens in the system.
+1. You Telegram an agent → its bot runs Claude Code with that agent's prompts → you get a reply.
+2. A timer fires → systemd starts a script → Claude Code runs `/cycle` or `sync` → result is journaled.
+3. One agent (or you) drops a JSON file into another agent's inbox → the watcher picks it up within 5s → that agent runs the task → result lands in its outbox.
 
-**Key idea:** The tmux session keeps the bot alive even when you're not SSHed in. As long as the droplet is running, the bot is running.
+**Key idea:** Every agent has the same shape (prompt files, a Telegram bot, an inbox/outbox). What changes between agents is the persona (the markdown in `agents/<name>/`) and the model routing (`config/agent-models.json`). The infrastructure is uniform; the personalities are what make Beacon different from Forge.
 
 ---
 
 ## 1. The pieces, named
+
+### Hosting & access
 
 | Piece | What it is | Where it lives |
 |---|---|---|
@@ -57,65 +89,94 @@ This is the day-to-day manual for running, using, and troubleshooting Larry's ag
 | **Domain** | A friendly name pointing to the droplet. | `agents.ourliberty.dev` (DNS A record in Cloudflare) |
 | **SSH** | How you log into the droplet from your Mac. | `ssh larry@134.209.44.80` |
 | **`larry` user** | Your account on the droplet. Has sudo (admin) access without password prompts. | `/home/larry/` on the droplet |
-| **`~/agent-core/`** | The source code repo, cloned to the droplet. Updated via `git pull`. | `/home/larry/agent-core/` |
-| **`~/agents/`** | Runtime state — logs, memory, agent-specific working files. **Never touched by `git pull`.** | `/home/larry/agents/` |
-| **`~/credentials/`** | Where secrets live. Mode 700 (only you can read). | `/home/larry/credentials/.env.larry` |
-| **tmux** | A terminal multiplexer. Keeps the bot running after you log out. | Ubuntu package, already installed |
-| **`beacon-bot`** | The tmux session name where the bot runs. | `tmux ls` to see it |
-| **`beacon_telegram_bot.py`** | The Python script that bridges Telegram and Beacon. | `~/agent-core/scripts/beacon_telegram_bot.py` |
-| **`beacon_telegram_bot.sh`** | The launcher script that starts the Python bot inside a tmux session. | `~/agent-core/scripts/beacon_telegram_bot.sh` |
-| **`.env.larry`** | Environment file with your secrets (bot token, chat ID, etc). | `~/credentials/.env.larry` |
-| **Beacon** | The Strategy/Architect agent. A persona defined in 6 markdown files. | `~/agent-core/agents/beacon/*.md` |
-| **Forge** | The Engineering/Builder agent. Persona ready, bot not yet wired. | `~/agent-core/agents/forge/*.md` |
-| **Mirror** | The Adversarial Reviewer agent. Persona ready, bot not yet wired. | `~/agent-core/agents/mirror/*.md` |
-| **Pulse** | The Self-healing Observer + `/cycle` runner. Persona ready, bot+timer not yet activated. | `~/agent-core/agents/pulse/*.md` |
-| **/cycle** | Pulse's iteration spec — what to check, what to fix, how to journal. | `~/agent-core/runbooks/cycle-prompt.md` |
-| **systemd units** | Production replacements for tmux launchers — auto-restart on crash, auto-start on boot. Awaiting installation. | `~/agent-core/systemd/*.service`, `*.timer` |
+
+### Directories (on the droplet)
+
+| Piece | What it is | Where it lives |
+|---|---|---|
+| **`~/agent-core/`** | The source code repo, cloned to the droplet. Synced from `origin/main` every hour. | `/home/larry/agent-core/` |
+| **`~/agents/`** | Runtime state — logs, memory, inboxes, outboxes, blackboard. **Never touched by `git pull`.** | `/home/larry/agents/` |
+| **`~/agents/inboxes/<agent>/`** | Task drop zone. Watcher polls every 5s. Subdirs: `.archive/` (consumed), `.invalid/` (rejected by validator + `.reason` sidecar). | `/home/larry/agents/inboxes/{beacon,forge,mirror,pulse}/` |
+| **`~/agents/outboxes/<agent>/`** | Where the watcher writes the agent's reply + metadata after running a task. | `/home/larry/agents/outboxes/{beacon,forge,mirror,pulse}/` |
+| **`~/agents/blackboard/`** | Shared inter-agent files. Most importantly: `costs.jsonl` (every Claude invocation), `pulse-escalations.json` (Pulse's open findings), `agent-core-sync.json` (sync timer status). | `/home/larry/agents/blackboard/` |
+| **`~/agents/state/`** | Runtime state — bot session continuity (`*_telegram_sessions.json`), dispatch leases, the cycle lock. | `/home/larry/agents/state/` |
+| **`~/agents/logs/`** | Per-bot Telegram bot logs, watcher log, cycle log. (systemd units also write to journalctl.) | `/home/larry/agents/logs/` |
+| **`~/credentials/`** | Where secrets live. Mode 700 (only you can read). | `/home/larry/credentials/.env.larry` (mode 600) |
+
+### Agents (personas + bots)
+
+All four agents follow the same shape: a `~/agent-core/agents/<name>/` directory with 6 markdown prompt files (CLAUDE / IDENTITY / SOUL / TOOLS / USER / MEMORY) plus a systemd-managed Telegram bot.
+
+| Agent | Role | Telegram model | Inbox model | Status |
+|---|---|---|---|---|
+| **Beacon** 🪔 | Strategy / Architect — drafts specs from your intent | Opus | Opus | Live |
+| **Forge** ⚒️ | Builder — turns approved specs into code & PRs | Sonnet | Opus | Live (Build Loop not yet auto-triggered) |
+| **Mirror** 🪞 | Adversarial Reviewer — gates merges, severity-tags findings | Sonnet | Opus | Live (PR-aware dispatch coming in D4) |
+| **Pulse** 💓 | Self-healing Observer — runs `/cycle`, escalates, dispatches fixes | Sonnet | Sonnet | Live (auto-cycle every 4h) |
+
+Future agents (per North Star / build plan): **Aide** (EA, Phase E), **Scout** (researcher, Phase 2), **Compass** (planner, Phase 2), **Ledger** (cost/CFO, Phase F+). Personas not yet authored.
+
+### Infrastructure (D1–D2)
+
+| Piece | What it is | Where it lives |
+|---|---|---|
+| **systemd bot services** | One service per agent: `ourliberty-{beacon,forge,mirror,pulse}-bot.service`. Auto-restart on crash, auto-start on boot. | `/etc/systemd/system/` (source in `~/agent-core/systemd/`) |
+| **`/cycle`** | Pulse's iteration spec — what to check, what to fix, how to journal. Run by `ourliberty-cycle.timer` every 4h. | `~/agent-core/runbooks/cycle-prompt.md` |
+| **`run_cycle.sh`** | Wraps `claude --print` for `/cycle`. Also (D2) captures cost to `costs.jsonl` and auto-commits Pulse's journal/MEMORY changes back to the repo. | `~/agent-core/scripts/run_cycle.sh` |
+| **`sync_agent_core.sh`** | Atomic-swap sync from `origin/main` to live runtime. Run by `ourliberty-sync.timer` every 1h. | `~/agent-core/scripts/sync_agent_core.sh` |
+| **`agent_core_health_check.py`** | Enforces working-copy discipline (always on `main`, always clean). Run by `ourliberty-agent-core-health.timer` every 30m. | `~/agent-core/scripts/agent_core_health_check.py` |
+| **Inbox watcher (D2)** | `ourliberty-inbox-watcher.service`. One process, four threads (one per agent). Polls inboxes every 5s; one in-flight task per agent (lease-protected). | `~/agent-core/scripts/inbox_watcher.py` |
+| **`dispatch_validator.py`** | Pre-dispatch validation: `task_id` required, `prompt` ≥ 100 chars, `source` in allowed set. Stricter than HANDSHAKE-SCHEMA — kills the F24 empty-prompt bug class. | `~/agent-core/scripts/dispatch_validator.py` |
+| **`dispatch_lease.py`** | Restart-safe concurrency primitive (flock + nonce + TTL + boot-id PID-reuse guard). Used by the watcher to ensure one task per agent at a time. | `~/agent-core/scripts/dispatch_lease.py` |
+| **`agent-models.json`** | Per-agent model routing. Tells the watcher which Claude model to use for each agent's inbox tasks. | `~/agent-core/config/agent-models.json` |
+| **HANDSHAKE-SCHEMA** | JSON schema for inbox task files. Optional fields are documented here; required ones live in `dispatch_validator.py`. | `~/agent-core/shared/HANDSHAKE-SCHEMA.json` |
+| **`.env.larry`** | Environment file with your secrets (4× bot tokens, allowed chat IDs). | `~/credentials/.env.larry` |
 
 ---
 
-## 2. Daily use — talking to Beacon
+## 2. Daily use — Telegram chat with the agents
 
 ### From your phone, anywhere
 
-Open Telegram. Find your bot (the username you gave BotFather). Send a message. Wait 5–30 seconds. Beacon replies.
+Open Telegram. Each agent has its own bot — one for Beacon, Forge, Mirror, Pulse. Find the bot you want to talk to and send a message. Wait 5–30 seconds. Reply lands.
 
-That's it. **You don't need to be at your computer.** As long as the droplet and the bot are running, Telegram works.
+That's it. **You don't need to be at your computer.** As long as the droplet and the bot service are running (they're systemd-managed with `Restart=on-failure`), Telegram works.
 
-### Conversation continuity
+### Conversation continuity (per bot)
 
-The bot uses `claude --resume` per chat. That means **all your messages to Beacon are in one continuing conversation**, even days apart. Beacon remembers what you discussed last week.
+Each bot uses `claude --resume` per chat. That means **all your messages to a given agent are in one continuing conversation**, even days apart. Each agent has her own continuity, separate from the others.
 
-The session ID is stored at `~/agents/state/beacon_telegram_sessions.json` on the droplet (one entry per chat ID).
+Session IDs live at `~/agents/state/<agent>_telegram_sessions.json` on the droplet (one entry per chat ID per agent).
 
 ### When to start a new conversation
 
-Almost never. Beacon's memory across messages is the whole point. If you ever need to truly start fresh (rare):
+Almost never. The continuity is the whole point. If you ever need to truly start fresh with one agent:
 
 ```bash
 ssh larry@134.209.44.80
-rm ~/agents/state/beacon_telegram_sessions.json
-bash ~/agent-core/scripts/beacon_telegram_bot.sh   # restart bot
+rm ~/agents/state/beacon_telegram_sessions.json   # or forge/mirror/pulse
+sudo systemctl restart ourliberty-beacon-bot.service
 ```
 
-Next message will start a new session.
+Next message starts a new session.
 
-### What Beacon can and can't do
+### Who to talk to about what
 
-**Can:**
-- Have a real conversation about ideas, design, architecture
-- Ask you clarifying questions
-- Produce structured specs (using the template in `agents/beacon/TOOLS.md`)
-- Read any file in `~/agent-core/` and any of your GitHub repos
-- Reference previous conversations and notes
+| Question / intent | Talk to |
+|---|---|
+| "I have an idea — help me think through it / draft a spec" | **Beacon** 🪔 |
+| "Implement this spec" (after Beacon has it drafted) | **Forge** ⚒️ |
+| "Review this PR / does this match the spec?" | **Mirror** 🪞 |
+| "How's the system doing? What did /cycle find?" | **Pulse** 💓 (or just read `runbooks/cycle-journal.md`) |
+| Operational ops (restart a bot, check costs, ssh in) | Nobody — do it yourself or ask me in Claude Code |
 
-**Can't (yet):**
-- Write code (Forge does that — Forge's persona exists in the repo as of 2026-05-08, but no Telegram bot is wired and no Build Loop has been run yet. Phase C activation is needed.)
-- Open PRs / merge code (also Forge / Mirror — same status: personas ready, not yet wired)
-- Watch the system itself (Pulse — persona + `/cycle` infrastructure committed; Anthropic API key + systemd timer activation pending)
-- Send emails or interact with Google Workspace (Aide — Phase E, persona not yet authored)
+If you ask the wrong agent (e.g. ask Forge for a strategic decision), they'll usually redirect you. The personas are written to know their lane.
 
-If you ask Beacon to do something outside her scope, she'll tell you she can't and (usually) suggest the right next step.
+### What's still done by humans (i.e., you) today
+
+- **Approving a Beacon-drafted plan before Forge gets it.** D3 will automate the DM-Larry-for-approval flow; until then, you copy/paste from Beacon's chat into Forge's chat.
+- **Dispatching a Pulse finding into Beacon's queue.** D2 (this phase) gives Pulse the *format* to dispatch via inbox JSON, but the auto-dispatch from `/cycle` output isn't wired yet — Pulse writes escalations to `~/agents/blackboard/pulse-escalations.json` and a human reads them.
+- **Telling Mirror to review a Forge PR.** D4 will auto-trigger this; until then, you Telegram Mirror with the PR number.
 
 ---
 
@@ -178,79 +239,80 @@ Now SSH sends a keepalive every 60s, and gives up after 5 missed ones (5 minutes
 
 ---
 
-## 4. Bot lifecycle
+## 4. Service lifecycle — all the systemd units
 
-### Is the bot running?
+The system runs as a collection of systemd-managed services. They survive droplet reboots, auto-restart on crash, and are started/stopped/checked the same way.
 
-```bash
-tmux ls
-```
+### The cast
 
-Expected output:
+| Unit | What it does | Cadence |
+|---|---|---|
+| `ourliberty-beacon-bot.service` | Beacon Telegram bot | continuous |
+| `ourliberty-forge-bot.service` | Forge Telegram bot | continuous |
+| `ourliberty-mirror-bot.service` | Mirror Telegram bot | continuous |
+| `ourliberty-pulse-bot.service` | Pulse Telegram bot | continuous |
+| `ourliberty-inbox-watcher.service` | Shared inbox watcher (all 4 agents) | continuous, polls 5s |
+| `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
+| `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
+| `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
+| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled — enable after cycle observed ≥ 1 day)* | every 5m |
 
-```
-beacon-bot: 1 windows (created Fri May  8 19:25:38 2026)
-```
-
-If you see `no server running on...` or `beacon-bot` is missing, the bot is NOT running. Start it.
-
-### Starting the bot
-
-```bash
-bash ~/agent-core/scripts/beacon_telegram_bot.sh
-```
-
-The launcher will:
-1. Verify `~/credentials/.env.larry` has `TELEGRAM_BOT_TOKEN_BEACON` and `TELEGRAM_ALLOWED_CHAT_IDS` set (refuses to start if missing)
-2. Kill any existing `beacon-bot` tmux session (so it's safe to rerun)
-3. Start a fresh tmux session called `beacon-bot` running the Python bot
-4. Print confirmation
-
-You should see:
-
-```
-Bot running in tmux session 'beacon-bot'.
-View live:  tmux attach -t beacon-bot   (Ctrl-b d to detach)
-Tail log:   tail -f ~/agents/logs/beacon_telegram_bot.log
-Stop:       tmux kill-session -t beacon-bot
-```
-
-### Stopping the bot
-
-```bash
-tmux kill-session -t beacon-bot
-```
-
-That's it. The bot stops immediately. Telegram messages sent while the bot is down will be queued by Telegram and delivered when you start it again (within Telegram's retention window — usually 24 hours).
-
-### Restarting the bot
-
-After a code change or if the bot is acting weird:
-
-```bash
-cd ~/agent-core && git pull
-bash ~/agent-core/scripts/beacon_telegram_bot.sh
-```
-
-The launcher kills the existing session and starts fresh, so you don't need to manually stop first.
-
-### After a droplet reboot
-
-**This is currently the biggest weakness.** The bot is running in tmux, which doesn't survive reboots. If the droplet reboots (rare, but unattended-upgrades occasionally triggers one), the bot is gone.
-
-**Symptom:** You send a Telegram message and get no reply, even after a few minutes.
-
-**Fix:**
+### What's running right now?
 
 ```bash
 ssh larry@134.209.44.80
-tmux ls   # confirms beacon-bot is missing
-bash ~/agent-core/scripts/beacon_telegram_bot.sh
+systemctl list-units 'ourliberty-*' --type=service
+systemctl list-timers 'ourliberty-*'
 ```
 
-**Permanent fix coming:** In Phase D, we'll convert the bot to a systemd service so it auto-starts on boot.
+### Is a specific service running?
 
-### How to know if the droplet is up at all
+```bash
+systemctl status ourliberty-beacon-bot.service       # or forge/mirror/pulse/inbox-watcher/...
+```
+
+Look for `Active: active (running)` and a recent `Main PID:`.
+
+### Start / stop / restart
+
+```bash
+sudo systemctl start ourliberty-beacon-bot.service
+sudo systemctl stop ourliberty-beacon-bot.service
+sudo systemctl restart ourliberty-beacon-bot.service
+
+# After updating a unit file (e.g. you edited it in the repo):
+sudo cp ~/agent-core/systemd/ourliberty-beacon-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart ourliberty-beacon-bot.service
+```
+
+### Pulling new code and restarting
+
+When code changes hit `origin/main`, the hourly sync timer picks them up automatically within ~60 min. If you want it sooner, or you want to restart a service after the pull:
+
+```bash
+ssh larry@134.209.44.80
+cd ~/agent-core && git pull --ff-only
+# If bot Python changed:
+sudo systemctl restart 'ourliberty-*-bot.service'
+# If inbox_watcher.py changed:
+sudo systemctl restart ourliberty-inbox-watcher.service
+# If only agent persona .md files changed: nothing — next invocation picks them up
+```
+
+### After a droplet reboot
+
+Nothing for you to do. All services are `enabled` (auto-start on boot). Telegram messages sent during the boot window are queued by Telegram for ~24 hours and delivered when bots come back.
+
+To confirm everything came up after a reboot:
+
+```bash
+ssh larry@134.209.44.80
+systemctl list-units 'ourliberty-*' --type=service
+# All should show "active (running)"
+```
+
+### How to know if the droplet itself is up
 
 From your Mac:
 
@@ -258,81 +320,101 @@ From your Mac:
 ping -c 3 134.209.44.80
 ```
 
-If you get replies, droplet is alive. If timeouts, the droplet is down — check the DigitalOcean web dashboard.
+Replies → droplet alive. Timeouts → check the DigitalOcean web dashboard.
 
 ---
 
-## 5. tmux — what it is, the 5 commands you actually need
+## 5. tmux — for ad-hoc droplet work
 
-**tmux** is a "terminal multiplexer." Think of it as a way to keep a terminal session running on the droplet even after you disconnect. The bot lives inside a tmux session so it doesn't die when you log out.
+**tmux** is a "terminal multiplexer" — it keeps a terminal session running on the droplet even after you disconnect. The agent bots no longer use it (they're systemd services now), but tmux is still useful when you want to run a long manual task on the droplet without keeping your laptop tethered.
 
 ### The 5 commands
 
 | Command | What it does |
 |---|---|
 | `tmux ls` | List all running tmux sessions |
-| `tmux attach -t beacon-bot` | Attach (jump into) the beacon-bot session — see what it's doing live |
-| Press `Ctrl-b` then `d` (sequentially) | Detach from the session — leaves it running, returns you to your normal shell |
-| `tmux kill-session -t beacon-bot` | Stop the bot |
-| `tmux new -s scratch` | Start a new session called `scratch` (useful if you want to run something long-lived manually) |
+| `tmux new -s scratch` | Start a new session called `scratch` |
+| `tmux attach -t scratch` | Re-attach to it later |
+| Press `Ctrl-b` then `d` (sequentially) | Detach (leaves it running, returns you to your normal shell) |
+| `tmux kill-session -t scratch` | Stop the session |
 
-### The one gotcha
-
-When you're attached to the bot's tmux session, **don't press Ctrl-C** — that kills the bot. Press **Ctrl-b** then **d** to detach safely.
-
-If you accidentally Ctrl-C'd, just relaunch with `bash ~/agent-core/scripts/beacon_telegram_bot.sh`.
+Use case: starting a `tail -f journalctl -u ourliberty-*-bot` on the droplet so you can keep an eye on it while you do other things, or running a long Python interactive session for debugging.
 
 ---
 
 ## 6. Logs — where to look and what to expect
 
-### The two log files
+Two log surfaces:
+1. **`journalctl`** — the systemd journal, the canonical log for every service. Persisted across reboots, queryable by unit + time.
+2. **Per-service log files** in `~/agents/logs/` — what the Python scripts write directly. Same content as journalctl for bots; a useful tail target.
 
-```
-~/agents/logs/beacon_telegram_bot.log        # what the Python bot writes
-~/agents/logs/beacon_telegram_bot.tmux.log   # captured tmux output
-```
-
-### Reading the log
+### The most-used commands
 
 ```bash
-# Last 50 lines
-tail -50 ~/agents/logs/beacon_telegram_bot.log
+# Tail one service live
+journalctl -u ourliberty-beacon-bot.service -f
+journalctl -u ourliberty-inbox-watcher.service -f
+journalctl -u ourliberty-cycle.service -f
 
-# Live tail — watch as new lines come in (Ctrl-C to stop watching)
+# Last 100 lines from a service (no follow)
+journalctl -u ourliberty-pulse-bot.service -n 100 --no-pager
+
+# What's happened across ALL ourliberty services in the last hour
+journalctl --since "1 hour ago" -u 'ourliberty-*' --no-pager
+
+# Search for errors across everything
+journalctl --since "1 day ago" -u 'ourliberty-*' --no-pager | grep -i error
+
+# File-based tail (alternative)
 tail -f ~/agents/logs/beacon_telegram_bot.log
-
-# Search for errors
-grep -i error ~/agents/logs/beacon_telegram_bot.log | tail -20
+tail -f ~/agents/logs/inbox_watcher.log
+tail -f ~/agents/logs/cycle.log
 ```
 
 ### What "normal" looks like
 
+**Bot:**
 ```
 [2026-05-08T19:25:39-0600] Beacon bot starting (cwd=/home/larry/agent-core/agents/beacon, allowed=[7998341473])
 [2026-05-08T19:26:14-0600] <- 7998341473: 'Hello Beacon — read in.'
 [2026-05-08T19:26:39-0600] -> 7998341473: 'Read in. Beacon, strategy/architect for Larry...'
 ```
+- `<-` incoming from you. `->` reply going back.
 
-- `<-` means an incoming message from you
-- `->` means Beacon's reply going back
+**Inbox watcher:**
+```
+[2026-05-11T22:00:23+00:00] inbox_watcher: [pulse] start task=d2-smoke-... model=claude-sonnet-4-6 file=d2-smoke-....json
+[2026-05-11T22:00:27+00:00] inbox_watcher: [pulse] done task=d2-smoke-... success=True duration=3.92s cost=$0.033
+```
+
+**Cycle:**
+```
+[2026-05-11T...] run_cycle: Starting /cycle iteration; PULSE_DIR=...
+[2026-05-11T...] run_cycle: /cycle iteration completed successfully
+[2026-05-11T...] run_cycle: cost record appended to /home/larry/agents/blackboard/costs.jsonl
+[2026-05-11T...] run_cycle: auto-commit: pushed to origin/main
+```
 
 ### What's NOT normal
 
-- `[claude exit 1]` followed by error text → Claude Code failed to run (auth issue, quota issue, syntax issue in your message)
-- `ignored unauthorized chat 1234567` → Someone OTHER than you tried to talk to the bot. Not an emergency, but worth knowing — your `TELEGRAM_ALLOWED_CHAT_IDS` correctly blocked them.
+- `claude exit 1` followed by `No conversation found with session ID:` → known issue (cold-start bug, all 4 bots, watch-listed by Pulse). Bot auto-retries without `--resume` and recovers. Repeat occurrences (≥3 cycles) trigger a permanent fix dispatch.
+- `validator rejected ...: prompt too short` in the inbox watcher log → a dispatcher wrote a bad task. The task is now in `.invalid/` with a `.reason` sidecar. Read the sidecar to see what was wrong.
+- `ignored unauthorized chat 1234567` → Someone other than you tried to talk to a bot. Your `TELEGRAM_ALLOWED_CHAT_IDS` correctly blocked them.
 - `URL error... timed out` → Network blip with Telegram. Bot retries automatically.
-- `[Beacon timed out after 10 min]` → Beacon spent 10+ min on a single message. Either it was a heavy task or something hung. Restart the bot if it persists.
+- `[<Agent> timed out after 10 min]` → A single message took 10+ min. Either it was heavy or something hung. Restart that bot if recurring.
+- `status=226/NAMESPACE` in `journalctl` → systemd hardening blocked a path the service needs. Look for an offending `ReadWritePaths` line in the unit file. (We hit this once already with `~/.config/anthropic` — fixed.)
 
-### Log size
+### Log rotation
 
-The log grows. Roughly 1 KB per message exchange. After months of use, run:
+systemd's journal rotates automatically. The file-based logs in `~/agents/logs/` don't yet. After months of use:
 
 ```bash
-# Archive old log, start fresh
+# Manually archive a noisy log
 mv ~/agents/logs/beacon_telegram_bot.log ~/agents/logs/beacon_telegram_bot.log.$(date +%Y%m%d)
-bash ~/agent-core/scripts/beacon_telegram_bot.sh   # restart picks up the new file
+sudo systemctl restart ourliberty-beacon-bot.service   # picks up the new file
 ```
+
+(A small follow-up is to add a `logrotate.d` config for `~/agents/logs/*.log`.)
 
 ---
 
@@ -390,7 +472,54 @@ cd ~/agent-core
 git log -1 --oneline
 ```
 
-Shows the latest commit on your droplet. Compare to GitHub's `main` branch to see if you're behind.
+Shows the latest commit on your droplet. Compare to GitHub's `main` branch to see if you're behind. (The hourly sync timer should keep you within ~60 min of `origin/main`.)
+
+### Dispatching a task to an agent via the inbox
+
+When you want an agent to do something but you're not at Telegram (or you want the result in a JSON file, not a chat reply), drop a task into the agent's inbox. The watcher picks it up within 5s.
+
+```bash
+ssh larry@134.209.44.80
+TASK_ID="my-task-$(date -u +%Y%m%dT%H%M%SZ)"
+cat > ~/agents/inboxes/beacon/${TASK_ID}.json <<EOF
+{
+  "task_id": "${TASK_ID}",
+  "source": "larry",
+  "dedup_identity": "my-task-canonical-slug",
+  "prompt": "<at least 100 chars of substantive context — what you want, why, success criteria>",
+  "timeout": 3600
+}
+EOF
+```
+
+What happens next:
+- Within 5s, the watcher validates the task and starts the agent.
+- The agent runs in its own CWD with its persona loaded.
+- The result lands at `~/agents/outboxes/<agent>/${TASK_ID}.json`.
+- The original task is moved to `~/agents/inboxes/<agent>/.archive/`.
+- A cost record is appended to `~/agents/blackboard/costs.jsonl`.
+
+If you got the format wrong (prompt too short, `task_id` missing, etc.), the file lands in `~/agents/inboxes/<agent>/.invalid/` with a `.reason` sidecar explaining what was rejected.
+
+Format reference lives in `runbooks/cycle-prompt.md` §8 ("Dispatch task format"). Validator rules are in `scripts/dispatch_validator.py`.
+
+### Watching costs
+
+Every Claude invocation that goes through the inbox watcher or `/cycle` appends one line to `~/agents/blackboard/costs.jsonl`:
+
+```bash
+# Today's spend by agent
+jq -r 'select(.ts > "'$(date -u -d 'today 0:00' +%Y-%m-%dT00:00:00)'") | "\(.agent) \(.cost_usd)"' ~/agents/blackboard/costs.jsonl \
+  | awk '{a[$1]+=$2} END {for (k in a) printf "%-10s $%.2f\n", k, a[k]}'
+
+# Last 10 invocations
+tail -10 ~/agents/blackboard/costs.jsonl | jq -c '{ts, agent, model, cost: .cost_usd, dur: .duration_sec}'
+
+# Total since costs.jsonl was created
+jq -s 'map(.cost_usd // 0) | add' ~/agents/blackboard/costs.jsonl
+```
+
+This file is the canonical cost source — the future Ledger agent (Phase F+) will mine it for weekly summaries.
 
 ---
 
@@ -440,16 +569,39 @@ Bracketed paste is a terminal feature that tells the shell "these characters cam
 
 ### "I send a Telegram message and get no reply"
 
-1. **Is the bot running?** SSH in, `tmux ls`. If `beacon-bot` is missing → start it.
+1. **Is the bot service running?** SSH in: `systemctl status ourliberty-beacon-bot.service`. If `inactive (dead)` or `failed` → `sudo systemctl restart` and check `journalctl -u ourliberty-beacon-bot.service -n 50`.
 2. **Is the droplet up?** From your Mac: `ping 134.209.44.80`. If timeouts → check DO dashboard.
 3. **Is your chat ID still allow-listed?** SSH in: `grep ALLOWED ~/credentials/.env.larry`. Should show your numeric ID.
-4. **Did Claude Code's auth expire?** SSH in, `cd ~/agent-core/agents/beacon && claude --print "say ok"`. If it errors with auth issues → run `claude` interactively, log in again, then restart the bot.
-5. **Tail the log live, send a fresh message, watch:**
+4. **Did Claude Code's auth expire?** SSH in: `cd ~/agent-core/agents/beacon && claude --print "say ok"`. If it errors with auth issues → run `claude` interactively, log in again, then `sudo systemctl restart 'ourliberty-*-bot.service'`.
+5. **Tail the journal live, send a fresh message, watch:**
    ```bash
-   tail -f ~/agents/logs/beacon_telegram_bot.log
+   journalctl -u ourliberty-beacon-bot.service -f
    # Then send a Telegram message from your phone
    ```
-   You should see `<- ...` appear within 1–2 seconds. If not, the bot isn't seeing your message.
+   You should see `<- ...` appear within 1–2 seconds. If not, the bot isn't seeing your message — Telegram polling issue.
+
+### "I dropped a task in the inbox but nothing happened"
+
+1. **Is the watcher running?** `systemctl status ourliberty-inbox-watcher.service`. If not → `sudo systemctl restart`.
+2. **Did the task get rejected?** Look in `~/agents/inboxes/<agent>/.invalid/`. If your task is there, read the `.reason` sidecar.
+3. **Is the agent already busy with an earlier task?** The watcher only runs one task per agent at a time (lease primitive). `ls ~/agents/state/dispatch-leases/` — if `inbox:<agent>.lease` exists, that agent is processing something.
+4. **Watch the watcher log live:**
+   ```bash
+   journalctl -u ourliberty-inbox-watcher.service -f
+   # Should see `[<agent>] start task=...` within 5s of dropping the file
+   ```
+5. **Did your file write atomically?** If you used a tool that writes-then-renames, fine. If you `>` redirected and the file was created in two writes, the watcher might have seen it mid-write. Re-drop with `scp` or `mv` from a temp file.
+
+### "The /cycle journal isn't getting committed"
+
+`run_cycle.sh` auto-commits four paths only: `runbooks/cycle-journal.md`, `runbooks/cycle-actions.jsonl`, `agents/pulse/MEMORY.md`, `agents/pulse/memory/`. If Pulse writes anywhere else, the tree stays dirty and `agent_core_health_check.py` will flag it.
+
+To diagnose:
+```bash
+cd ~/agent-core && git status
+# Anything outside the four paths above? That's the issue.
+```
+Either: (a) commit it by hand and tell me to add it to the auto-commit whitelist, or (b) restore it if it was unintentional.
 
 ### "Beacon's responses are weird, generic, off-character"
 
@@ -479,22 +631,28 @@ Claude Code failed for some reason. Look at the next few lines for the error:
 
 Set up `ServerAliveInterval` on your Mac. See § 3.
 
-### "Bot crashed and won't start"
+### "A service won't start (status=failed)"
 
 ```bash
-# Check for syntax errors
-python3 -m py_compile ~/agent-core/scripts/beacon_telegram_bot.py
-# If output is empty, syntax is fine. If errors, that's the issue.
+# What does systemd say?
+systemctl status ourliberty-beacon-bot.service     # or whichever
+journalctl -u ourliberty-beacon-bot.service -n 50 --no-pager
+
+# Common failure: status=226/NAMESPACE → ReadWritePaths referenced a path that doesn't exist
+# Look at the unit file and confirm every path in ReadWritePaths= exists
+
+# Check for Python syntax errors
+python3 -m py_compile ~/agent-core/scripts/agent_telegram_bot.py
+python3 -m py_compile ~/agent-core/scripts/inbox_watcher.py
 
 # Check env vars are set (without exposing values)
-grep -E '^(TELEGRAM_BOT_TOKEN_BEACON|TELEGRAM_ALLOWED_CHAT_IDS)=' ~/credentials/.env.larry | \
-    sed 's|TELEGRAM_BOT_TOKEN_BEACON=.*|TELEGRAM_BOT_TOKEN_BEACON=<set>|'
-# Should show both as <set>= or with a value
+grep -E '^(TELEGRAM_BOT_TOKEN_|TELEGRAM_ALLOWED_CHAT_IDS)' ~/credentials/.env.larry | sed 's|=.*|=<set>|'
 
-# Try running the bot in foreground (not tmux) to see errors directly
+# Try running the bot in foreground to see errors directly
+sudo systemctl stop ourliberty-beacon-bot.service
 set -a; . ~/credentials/.env.larry; set +a
-python3 ~/agent-core/scripts/beacon_telegram_bot.py
-# Errors will print to your terminal. Ctrl-C to stop.
+AGENT=beacon python3 ~/agent-core/scripts/agent_telegram_bot.py
+# Ctrl-C to stop, then re-enable: sudo systemctl start ourliberty-beacon-bot.service
 ```
 
 ### "Telegram says my bot's token is invalid"
@@ -507,17 +665,30 @@ The token in `.env.larry` doesn't match what BotFather has. Either:
 
 ## 10. Cost monitoring
 
+### The canonical source: `~/agents/blackboard/costs.jsonl`
+
+Every Claude invocation through the inbox watcher or `/cycle` appends one record here. Each line:
+
+```json
+{"ts":"...","agent":"pulse","task_id":"...","model":"...","cost_usd":0.034,"input_tokens":3,"output_tokens":46,"cache_read":12736,"cache_creation":7476,"duration_sec":3.92,"source":"inbox-watcher"}
+```
+
+Quick queries (jq one-liners) live in §7 "Watching costs".
+
+The future **Ledger** agent (Phase F+) will roll this up into weekly summaries and flag anomalies. Until she exists, you check it yourself when you want to know.
+
 ### Anthropic (Claude Code / API)
 
 - **Where:** [console.anthropic.com](https://console.anthropic.com) → Usage
-- **Currently using:** Your personal Claude Max OAuth (no per-request charge — you pay the monthly Max sub). Quota is per Max account.
-- **Future (Phase D):** A separate Anthropic API key with billing for orchestrator scripts (`/cycle`, watchdog). Those will appear as API charges.
+- **Currently using:** Larry's personal Claude Max OAuth on the droplet. Quota is per Max account. Both the Telegram bots and the inbox watcher share this auth.
+- **Cycle baseline:** ~$0.84 / cycle on Sonnet 4.6 → ~$5/day at the current 4h cadence → ~$150/mo. Inbox-dispatched tasks add to this proportional to volume.
+- **Open follow-up:** dedicated agent-only Max account so Larry's personal Claude Code doesn't share quota with the droplet bots.
 
 ### DigitalOcean
 
 - **Where:** [cloud.digitalocean.com](https://cloud.digitalocean.com) → Billing
 - **Current monthly:** ~$58 (droplet $48 + backups $9.60)
-- **What to watch for:** Bandwidth overages (we have 6 TB/mo — should never hit). Snapshot count growing (each snapshot costs storage).
+- **What to watch for:** Bandwidth overages (6 TB/mo budget — should never hit). Snapshot count growing.
 
 ### Cloudflare
 
@@ -527,7 +698,7 @@ The token in `.env.larry` doesn't match what BotFather has. Either:
 
 - Free.
 
-### Total expected monthly: ~$58 + Anthropic spend, currently ~$0 incremental from Beacon (within Max plan).
+### Total expected monthly: ~$58 droplet + ~$150 Anthropic (cycles) + whatever inbox dispatches cost. Currently ~$210/mo all-in.
 
 ---
 
@@ -553,7 +724,17 @@ The token in `.env.larry` doesn't match what BotFather has. Either:
 | **`tmux session`** | A named, long-running terminal that survives disconnects. Our bot lives inside one called `beacon-bot`. |
 | **`git pull`** | Download new commits from GitHub into your local clone. |
 | **Beacon** | Strategy/Architect agent. First agent in the system. Personality defined in `agents/beacon/*.md`. |
-| **Forge / Mirror / Pulse / Aide / Scout / Compass** | Future agents — see README. Don't exist yet. |
+| **Forge / Mirror / Pulse** | Live agents (D1 activation). Personality in `agents/<name>/*.md`, bot under systemd. |
+| **Aide / Scout / Compass / Ledger** | Planned future agents. Personas not yet authored. |
+| **HANDSHAKE** | The JSON schema for tasks that flow between agents via inboxes. Lives at `shared/HANDSHAKE-SCHEMA.json`. Optional fields documented there; required ones in `scripts/dispatch_validator.py`. |
+| **Inbox / Outbox** | Per-agent directories under `~/agents/{inboxes,outboxes}/<agent>/`. Dropping a JSON task in an inbox triggers the watcher to run that agent on it. The result lands in the outbox. |
+| **Inbox watcher** | The shared daemon (`ourliberty-inbox-watcher.service`) that polls all four inboxes and runs `claude --print` on valid tasks. |
+| **`/cycle`** | Pulse's self-healing iteration. Reads system state, classifies findings, takes safe auto-fixes, writes a journal entry. Runs every 4h via systemd timer. |
+| **Cycle journal** | `runbooks/cycle-journal.md` — chronological record of every cycle iteration. Pulse appends; humans (or the auto-commit hook in `run_cycle.sh`) commit. |
+| **Escalation** | A Pulse finding that wasn't auto-fixed and needs human attention. Lives in `~/agents/blackboard/pulse-escalations.json`. |
+| **Lease** | A restart-safe "I'm working on this" claim. The watcher uses `inbox:<agent>` leases to ensure one task per agent at a time. Implementation in `scripts/dispatch_lease.py`. |
+| **Dispatch validator** | The strict pre-flight check on inbox tasks (`scripts/dispatch_validator.py`). Stricter than HANDSHAKE-SCHEMA — designed to kill the F24 empty-prompt bug class. |
+| **Working-copy discipline** | The rule that `~/agent-core/` is always on `main`, always clean, never has uncommitted changes. Enforced every 30 min by `agent_core_health_check.py`. |
 
 ---
 
@@ -561,88 +742,219 @@ The token in `.env.larry` doesn't match what BotFather has. Either:
 
 ```
 SSH IN:                    ssh larry@134.209.44.80
-START BOT:                 bash ~/agent-core/scripts/beacon_telegram_bot.sh
-STOP BOT:                  tmux kill-session -t beacon-bot
-IS BOT RUNNING?:           tmux ls
-WATCH BOT LIVE:            tmux attach -t beacon-bot   (Ctrl-b d to detach)
-TAIL LOG:                  tail -f ~/agents/logs/beacon_telegram_bot.log
-PULL NEW CODE:             cd ~/agent-core && git pull
-RESTART AFTER CODE PULL:   bash ~/agent-core/scripts/beacon_telegram_bot.sh
-EDIT CREDENTIALS:          nano ~/credentials/.env.larry  (Ctrl-O save, Ctrl-X exit)
-TALK TO BEACON DIRECTLY:   cd ~/agent-core/agents/beacon && claude
+ALL SERVICES STATUS:       systemctl list-units 'ourliberty-*' --type=service
+ALL TIMERS STATUS:         systemctl list-timers 'ourliberty-*'
+RESTART ONE BOT:           sudo systemctl restart ourliberty-beacon-bot.service   # or forge/mirror/pulse
+RESTART ALL BOTS:          sudo systemctl restart 'ourliberty-*-bot.service'
+RESTART WATCHER:           sudo systemctl restart ourliberty-inbox-watcher.service
+RUN CYCLE NOW:             sudo systemctl start ourliberty-cycle.service
+TAIL ONE SERVICE LIVE:     journalctl -u ourliberty-beacon-bot.service -f
+TAIL CYCLE OUTPUT:         tail -f ~/agents/logs/cycle.log
+TAIL WATCHER:              tail -f ~/agents/logs/inbox_watcher.log
+PULL NEW CODE:             cd ~/agent-core && git pull --ff-only
+EDIT CREDENTIALS:          nano ~/credentials/.env.larry   (Ctrl-O save, Ctrl-X exit)
+TALK TO AGENT DIRECTLY:    cd ~/agent-core/agents/<agent> && claude
+TODAY'S COST:              jq -r '.cost_usd' ~/agents/blackboard/costs.jsonl | awk '{s+=$1} END {printf "$%.2f\n", s}'
+SEE PULSE ESCALATIONS:     cat ~/agents/blackboard/pulse-escalations.json | jq
+SEE LATEST CYCLE:          tail -50 ~/agent-core/runbooks/cycle-journal.md
 DROPLET STATUS:            (from Mac) ping -c 3 134.209.44.80
 ```
 
 ---
 
-## Appendix B — Things that will come and what they mean
+## Appendix B — Roadmap (what's still ahead)
 
-| When | What | What changes for you |
+| Phase | What | What changes for you |
 |---|---|---|
-| Phase A.12 (small follow-up) | Daily cron mirroring upstream gm-agent-core into your mirror | Nothing visible day-to-day |
-| Stabilization session | Bot becomes a systemd service (units already in `systemd/`; install via `systemd/INSTALL.md`) | Bot survives droplet reboots automatically. Manual start commands above still work as fallback. |
-| Stabilization session | Dedicated agent-only Claude Max | Beacon's quota stops competing with your personal Claude Code use |
-| Phase C activation | Forge + Mirror Telegram bots wired | Two more Telegram bots; build pipeline goes live; you can ask Beacon to draft a spec, then ask Forge to implement, Mirror reviews and gates merge |
-| Phase D activation | Pulse + `/cycle` self-healing wired (Anthropic API key + systemd timer) | A new journal at `runbooks/cycle-journal.md` showing what `/cycle` is finding and fixing automatically; rare DMs from Pulse when something needs you |
-| Phase E | Aide (EA) added | A different bot that handles Gmail/Calendar work; separate Telegram channel |
-| Phase F | Mini Brains prototype shipped | First real prototype repo with a handoff package |
+| **D3** (next) | Beacon ↔ Pulse dialogue; Beacon → Larry approval gate via Telegram; Beacon → Forge dispatch | First end-to-end autonomous Build Loop: Pulse finds → Beacon plans → DMs you for approval → Forge implements → Mirror reviews. You stop being the message bus between agents. |
+| **D4** | Mirror dispatch on PR open; Beacon → Larry completion summary | Mirror gets PRs without you having to Telegram her; you get a "shipped" DM from Beacon when a loop closes. |
+| **D5** (probable stabilization) | Auto-commit whitelist tuning; cycle cost-attribution fix; logrotate for `~/agents/logs/` | Less ops drag. |
+| **E** | Aide (Executive Assistant) added | New bot for Gmail/Calendar/inbox triage. Separate Telegram channel. |
+| **F** | Mini Brains prototype shipped | First real prototype repo with a handoff package — RAG + meaning layer. |
+| **F+** | Ledger agent (Accountant/CFO) added | Weekly cost summaries, anomaly alerts, optimization specs dispatched through the normal pipeline. Needs spend history (which we're now capturing in `costs.jsonl`). |
+| **Phase 2** | Scout (research) + Compass (planner) added | Two more agents covering research and sequencing across multiple in-flight projects. |
 
-## Appendix C — Phase C / D quick activation reference
+Notes on what stays open even within D2:
+- A.12 daily cron mirroring upstream `gm-agent-core` into the mirror repo
+- Dedicated agent-only Claude Max account
+- `ourliberty-watchdog.timer` enable (after ≥1 day of cycle observation)
+- `agent_runner.py` path/sweep-ledger fixes (only matters when used in dispatch)
+- Trim redundant glob patterns in `~/.claude/settings.json` once we know which one matches
 
-When you're ready to activate Forge + Mirror + Pulse + `/cycle`:
+## Appendix C — Re-bootstrapping from scratch (DR reference)
 
-### Phase C activation (build pipeline)
+If you ever need to rebuild the system on a fresh droplet (e.g., DigitalOcean account migration, or the droplet is unrecoverable), the canonical sources are:
 
-1. **BotFather:** create `Forge` and `Mirror` Telegram bots. Save tokens.
-2. **On droplet:** install tokens via the helper script pattern:
-   ```
-   bash ~/install_beacon_creds.sh   # extend or duplicate this for forge + mirror
-   ```
-   Or hand-edit `~/credentials/.env.larry`:
-   - `TELEGRAM_BOT_TOKEN_FORGE=<paste>`
-   - `TELEGRAM_BOT_TOKEN_MIRROR=<paste>`
-3. **Install systemd units:**
-   ```
-   sudo cp ~/agent-core/systemd/ourliberty-forge-bot.service /etc/systemd/system/
-   sudo cp ~/agent-core/systemd/ourliberty-mirror-bot.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now ourliberty-forge-bot.service
-   sudo systemctl enable --now ourliberty-mirror-bot.service
-   ```
-4. **Set GitHub branch protection** on T0 prototype repos (when they exist) so Mirror is required reviewer. (One-time per repo; details in Phase C plan.)
-5. **Test:** ask Beacon to draft a hello-world spec. Send the spec to Forge. Forge opens a PR. Mirror reviews. Merge happens.
+- **Infrastructure provisioning:** `systemd/INSTALL.md` in this repo — exact `sudo cp` + `daemon-reload` + `enable --now` sequence per unit.
+- **Order of activation:** Part II of this document (the build narrative) — gives you the right sequence (Phase A foundations → Phase B Beacon → Phase C Forge/Mirror → Phase D Pulse+/cycle → Phase D2 inbox watcher).
+- **Credentials to recreate:**
+  - 4× Telegram bot tokens (BotFather: `/mybots` → token, or `/revoke` then `/token`)
+  - GitHub: `gh auth login` on the new droplet
+  - Claude Code: `claude` interactively
+  - DigitalOcean: API token already in your password manager
+- **Files that ARE NOT in the repo** (must be re-created or restored from backup):
+  - `~/credentials/.env.larry` — bot tokens, allowed chat IDs
+  - `~/agents/state/*_telegram_sessions.json` — session continuity (loss = fresh conversation, not catastrophic)
+  - `~/agents/blackboard/pulse-escalations.json` — open findings (loss = Pulse re-discovers on next cycle)
+  - `~/agents/blackboard/costs.jsonl` — cost history (loss = Ledger has less data to mine)
 
-### Phase D activation (`/cycle`)
-
-1. **Anthropic API key:** create at console.anthropic.com (with billing). Store in `~/credentials/.env.larry` as `ANTHROPIC_API_KEY=...`
-2. **BotFather:** create `Pulse` Telegram bot. Save token. Add to `.env.larry` as `TELEGRAM_BOT_TOKEN_PULSE`.
-3. **Install systemd units:**
-   ```
-   sudo cp ~/agent-core/systemd/ourliberty-pulse-bot.service /etc/systemd/system/
-   sudo cp ~/agent-core/systemd/ourliberty-cycle.service /etc/systemd/system/
-   sudo cp ~/agent-core/systemd/ourliberty-cycle.timer /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now ourliberty-pulse-bot.service
-   ```
-4. **Run `/cycle` once manually** with you watching, before enabling the timer:
-   ```
-   sudo systemctl start ourliberty-cycle.service
-   journalctl -u ourliberty-cycle.service -n 100
-   cat ~/agent-core/runbooks/cycle-journal.md
-   ```
-5. **If looking good:** enable the timer:
-   ```
-   sudo systemctl enable --now ourliberty-cycle.timer
-   ```
-6. **Stabilization timers** (also worth enabling around the same time):
-   ```
-   sudo systemctl enable --now ourliberty-sync.timer
-   sudo systemctl enable --now ourliberty-agent-core-health.timer
-   sudo systemctl enable --now ourliberty-watchdog.timer  # only after watchdog has been observed for ≥ 1 day
-   ```
-
-See `systemd/INSTALL.md` for the full reference (verifying units, hardening notes, rollback to tmux).
+Backups: DO snapshots are enabled. They cover everything including `~/credentials/` and `~/agents/`.
 
 ---
 
-*This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit it directly when you learn something new about how the system behaves — that's how the manual gets better over time.*
+# Part II — Build Narrative & Decisions Log
+
+This section is the chronological story of how the system came to be. Each phase entry captures (a) what we built, (b) why, (c) the decisions made and what we rejected, and (d) how we verified it.
+
+New phases append at the end. Earlier phases are not edited — if something changed later (e.g., Phase B was tmux, then migrated to systemd in D1), the change is described in the later phase's entry, not retroactively patched into the earlier one. This way the doc reads as a timeline of decisions rather than a revisionist snapshot.
+
+---
+
+## Phase A — Foundations (2026-05-08, ~3 hours)
+
+**What we built:** A hardened DigitalOcean droplet (`ourliberty-agents-01`, 8GB/4vCPU, Ubuntu 24.04), a registered domain (`ourliberty.dev`) with DNS pointing at it, a foundation repo (`Larry-Yatch/ourliberty-agent-core`) bootstrapped with README + .gitignore + HANDSHAKE-SCHEMA + NORTH-STAR + REPO-GUARDRAILS + .env.example. Larry's `larry@sealteamleaders.com` account on the droplet has NOPASSWD sudo; root SSH disabled; UFW open on 22/80/443 only; fail2ban + unattended-upgrades running.
+
+**Why:** Larry needed a sandbox separate from Marvin (Nick's system) and Pocket Agent (his Mac-only EA). The shape we picked: `gm-agent-core`-style on a Linux VM, optimized for the prototype-to-handoff loop. Everything else flows from those two choices.
+
+**Decisions made:**
+- **DigitalOcean over AWS/GCP:** simpler billing, simpler UI, one VM is all we need. No K8s.
+- **Ubuntu 24.04 over Debian:** longer LTS window, friendlier `apt` ecosystem, what `gm-agent-core` upstream is tested on.
+- **Cloudflare for DNS, not registrar lock-in:** keep portability.
+- **Working-copy discipline as a rule from day 1:** `~/agent-core/` is always on `main`, always clean. Drift is the enemy of self-healing.
+
+**Decisions deferred:**
+- A.12 (daily cron mirroring upstream `gm-agent-core`) — easy, not blocking, still open.
+- Dedicated agent-only Claude Max account — still uses Larry's personal Max.
+
+**Verified:** SSH works, droplet stays up across reboots, DNS resolves, repo clones cleanly.
+
+---
+
+## Phase B — Beacon online (2026-05-08, same session)
+
+**What we built:** Beacon (the Strategy/Architect agent) with her 6 prompt files (IDENTITY/SOUL/CLAUDE/TOOLS/USER/MEMORY, ~3.2k words total). A Telegram bot (`scripts/beacon_telegram_bot.py`) running in a tmux session named `beacon-bot` on the droplet, using `claude --resume` per-chat for continuity. Larry's chat ID (`7998341473`) is the only authorized chat ID (security gate; bot refuses to start with empty `TELEGRAM_ALLOWED_CHAT_IDS`).
+
+**Why:** The bar Larry set was "talk to an agent on the new platform by end of session." Beacon is the right first agent because every other agent's output flows from her specs.
+
+**Decisions made:**
+- **Telegram over Slack/iMessage/web UI:** works from his phone, anywhere. No new app to learn. Free.
+- **One bot per agent, not one shared bot:** lets each agent have its own personality + chat continuity. Costs us a BotFather setup per agent but pays off in mental model clarity.
+- **`claude --resume` per chat, not per agent:** if Larry talks to Beacon from two devices, they share continuity. If two different humans talk to Beacon (future), they have separate sessions.
+- **Allowlist-only chat IDs:** bot refuses to start with empty allowlist. Defense in depth — Telegram knowing the token isn't enough.
+- **tmux for the bot (temporarily):** got us to "alive" in one session. Stated openly as a weakness; systemd migration scheduled for D1.
+
+**Decisions deferred:**
+- Migrate to systemd → done in D1.
+- Dedicated agent-only Max → still open.
+
+**Verified:** Beacon's first conversation: she read all 6 prompt files, accurately summarized her job + current state, named what doesn't exist yet, asked "What are we working on?" — terse, peer-level, no filler. This became the voice/quality bar future agents need to clear on their first conversation as a smoke test.
+
+---
+
+## Phase C / D pre-staging — autonomous authoring (2026-05-08, evening, ~5 hours)
+
+**What we built:** Pre-staged the personas + infrastructure for Phase C (Forge + Mirror) and Phase D (Pulse + `/cycle`) so Larry's next activation sessions are ~15 min each rather than long authoring sessions.
+
+Concretely (4 commits to `main`):
+1. **Three agent personas** (Forge / Mirror / Pulse) — 18 files, ~12k words. Each follows Beacon's 6-file pattern.
+   - Forge ⚒️ (Builder): pragmatic, action-first; Build Loop + PR template + handoff package requirements in `TOOLS.md`.
+   - Mirror 🪞 (Reviewer): severity tags `[must-fix]` / `[should-fix]` / `[nit]`; Review Checklist baked in.
+   - Pulse 💓 (Observer / `/cycle`): diagnostic calm voice; Health Check Suite (A–G); tiered auto-fix allow-list (always / ask-then-do / never-auto); teach-to-fish discipline.
+2. **Adapted scripts from `gm-agent-core` upstream** (~20 files, ~5,400 lines): dispatch validator/lease/dedup-guard, watchdog/health-check, healers. Path translations applied (joe → larry); GM-specific topology dropped; stubs added with TODO markers for Phase D wiring.
+3. **`/cycle` infrastructure:** `runbooks/cycle-prompt.md` (Pulse's iteration spec, ~10KB), starter files for journal + actions log, `scripts/run_cycle.sh` (concurrency-locked wrapper), `scripts/agent_telegram_bot.py` (generic successor to `beacon_telegram_bot.py`, parameterized by `AGENT=` env var), `config/agent-models.json` (per-agent model routing), `shared/REPO-GUARDRAILS.md` authority matrix.
+4. **13 systemd unit files:** 4 bot services, 4 oneshot+timer pairs (cycle / sync / health-check / watchdog), all hardened (`User=larry`, `ProtectHome=read-only`, `MemoryMax=2G`, `NoNewPrivileges=true`).
+
+**Why:** Larry asked "is there anything you can do now to start on C and D?" Yes — ~80% of the work is authoring + wiring, not Larry-specific. Pre-stage everything so activation is a series of short, surgical Larry-actions (BotFather, paste token, install unit) rather than long bouts of "wait while I write."
+
+**Decisions made:**
+- **Adopt Beacon's 6-file persona pattern across all agents.** Uniformity > customization at this stage.
+- **Drop GM's 7-agent C-suite (Atlas/Sage/Luma/Nova/Prism/Ember/Mula).** Over-built for a solo sandbox. Target ~5 agents.
+- **Keep `/cycle` self-healing as a first-class capability**, not an afterthought.
+- **Direct commits to `main` on this config repo are allowed.** It's not a code repo; PRs are for `proto-*` repos.
+
+**Subagent caveat:** the script-adaptation subagent triggered a "pushed to main" security warning. Expected per the working-copy discipline rule.
+
+**Verified:** All files parse cleanly; systemd units pass `systemd-analyze verify` (later, on the droplet, during D1 activation).
+
+---
+
+## Phase D1 activation — agents go live (2026-05-09, single afternoon, ~5 hours)
+
+**What we built:** Activated everything that was pre-staged. By end of session: all 4 agents under systemd with auto-restart, Pulse running `/cycle` autonomously every hour on Sonnet 4.6 at ~$0.84/cycle, sync + health-check timers running, real journal entries being written.
+
+**Why:** The pre-staging in 2026-05-08 evening meant activation was "BotFather × 3, install tokens, install systemd units, fix bugs surfaced during activation, run first cycles, tune."
+
+**Decisions made (these shape D2+):**
+1. **Larry-approval gate before any Forge dispatch.** When Beacon completes a plan from a Pulse-dispatched task, she DMs Larry via Telegram with the plan and asks for approve/modify/reject. **Default = Medium autonomy** (proposed-then-confirmed). Loose mode (auto-approve carve-outs) added per-task-type later, never for code that touches T1 repos.
+2. **Ledger agent (Accountant/CFO) planned as Phase F+ 8th agent.** Watches all agent costs and cloud bills. Codename matches the others' single-syllable + image style. **Deferred until cost surface stabilizes** so we don't rebuild her checks every phase.
+3. **In D2 we add cost capture** so Ledger has a year of spend history when she arrives.
+4. **Cycle cadence: 1h → 4h** the next day. Hourly was ~$600/mo paying $0.84 to journal nothing-changed; 4h is ~$150/mo and catches real issues within a tolerable window. Dial back up when Build Loop is active.
+
+**Bugs surfaced and fixed during activation:**
+- `systemd ReadWritePaths` referenced `~/.config/anthropic` (doesn't exist on Linux Claude Code; should be `~/.claude`) → all 4 bots + cycle failing with `status=226/NAMESPACE`. Fixed.
+- Cycle ran on Opus 4.7 (1M-context) at $2.33/run → too expensive for hourly. Forced Sonnet via `--model claude-sonnet-4-6`. Per `agent-models.json`, this matches the design intent.
+- `~/.claude/settings.json` permissions allow-list too narrow → expanded with explicit allows + targeted denies (credentials, /etc, force-push, rm -rf).
+
+**Real findings from Pulse iter 1 (worth carrying forward):**
+- 4-of-4 bots cold-start with `claude --resume <stale-session>` → fail-then-retry pattern. Real bug, watch-listed by Pulse for permanent-fix dispatch once it appears in 3+ cycles.
+- Pulse's Beacon log-silence threshold (>30m → ask-then-do) false-positives on idle bot polling. Needs calibration.
+- Cycle's auto-fix sandbox needed widening for normal Read/Write/Bash patterns.
+
+**Verified:** All 4 bots responded on Telegram; first `/cycle` produced real findings; sync + health-check timers running clean.
+
+**Open issues entering D2:**
+- Pulse writes journal+MEMORY changes during cycle → uncommitted → `agent_core_health_check.py` flags dirty tree every 30 min. **D2 to add auto-commit hook in `run_cycle.sh`.**
+- No mechanism yet for Pulse to actually dispatch a task to Beacon/Forge/Mirror's inbox; everything still routes through a human. **D2 to build the inbox watcher.**
+
+---
+
+## Phase D2 — Inbox watcher + cost capture + cycle auto-commit (2026-05-11, ~2 hours)
+
+**What we built:**
+1. **`scripts/inbox_watcher.py`** — shared multi-agent daemon. Polls `inboxes/{beacon,forge,mirror,pulse}/` on 5s, validates via `dispatch_validator`, holds `inbox:<agent>` lease via `dispatch_lease` while running, spawns `claude --print` in each agent's CWD with the agent's `inbox_model` from `agent-models.json`, writes `outboxes/<agent>/<task-id>.json` + appends a record to `blackboard/costs.jsonl`, archives consumed task to `inboxes/<agent>/.archive/`. One thread per agent → agents run in parallel; max one task per agent in flight. Malformed/rejected tasks move to `inboxes/<agent>/.invalid/` with a `.reason` sidecar. Requeue cap = 3.
+2. **`systemd/ourliberty-inbox-watcher.service`** — `Type=simple`, `Restart=on-failure`, hardening parity with existing units. Single process for all four agents.
+3. **`run_cycle.sh` cost capture** — `jq`-parse `cycle.last-output.json` → append a normalized record to `~/agents/blackboard/costs.jsonl`. Best-effort; jq absence is non-fatal.
+4. **`run_cycle.sh` auto-commit** — if Pulse touched journal / actions / MEMORY, `git add` + commit + push. Closes the dirty-tree gap that was tripping `agent_core_health_check.py` every 30 min.
+5. **`runbooks/cycle-prompt.md` §8 "Dispatch task format (reference)"** — spells out the validator-strict fields (`task_id` required, `prompt` ≥ 100 chars, `source` enum) with a copy-paste template. Pulse can now write valid dispatches.
+
+**Why:** Phase D1 left the system *self-watching but not self-coordinating*. When Pulse found something, a human still drove Beacon → Forge → Mirror → merge through Telegram. D2 builds the layer that turns "Pulse writes JSON" into "Beacon actually receives it" — the foundation for D3's full autonomous Build Loop.
+
+**Key architectural decisions:**
+
+1. **One shared watcher process, four agent-threads, not one process per agent.**
+   - *Considered:* 4 separate systemd units (one per agent). Cleaner failure isolation.
+   - *Picked:* shared process. Less unit duplication, single place to evolve dispatch logic, subprocess isolation per task gives us the failure isolation we'd otherwise get from separate processes.
+   - *Mitigation:* each `claude --print` invocation is a subprocess — one agent crashing doesn't touch the watcher's main loop.
+
+2. **One task per agent in flight, agents run in parallel.**
+   - *Considered:* fan out (N concurrent tasks per agent). Faster on bursty inboxes.
+   - *Picked:* bounded. Lease identity is `inbox:<agent>`. Simpler, restart-safe, matches "agents are conversational beings, not workers." Easy to widen later by changing the lease identity to include a slot number.
+
+3. **Reuse `dispatch_lease.py`, don't reinvent.**
+   - The lease primitive already has flock + nonce + heartbeat + boot-id PID-reuse guard + SIGTERM→SIGKILL reclaim. Mature. Wasted effort to rebuild.
+
+4. **5-second poll, stdlib only (no inotify dependency).**
+   - At our task volume (single-digit per day initially), the difference between 5s and inotify is invisible. Stdlib keeps the watcher portable.
+
+5. **Keep `dispatch_validator.py` strict (MIN_PROMPT_LEN=100, `task_id` required) — adapt Pulse instead.**
+   - The strictness exists because of a real bug class (F24 empty-prompt). Weakening the validator would lose that protection. Teach Pulse to write substantive prompts via §8 of `cycle-prompt.md`.
+
+6. **No outbox consumer in D2 — strict scope.**
+   - The watcher writes outboxes; D3 wires the back-channel (Pulse's reply unblocking Beacon's session, etc.). Mixing concerns here would have ballooned D2.
+
+7. **Bundle auto-commit + cost capture with run_cycle.sh changes.**
+   - Both live in the same file, both are 30-min jobs, both unblock the next phase. Splitting into separate commits would have been process for its own sake.
+
+**Verified end-to-end on the droplet (2026-05-11, ~$0.29 total):**
+- **Smoke test (Pulse, Sonnet):** task picked up in 20s (5s poll + scp mtime skew), ran in 3.92s, $0.033. Outbox + costs.jsonl + archive all green. Pulse correctly identified herself from her CLAUDE.md.
+- **Validator-rejection test:** 9-char prompt rejected with F24 error, file moved to `.invalid/`, `.reason` sidecar written. $0.
+- **Parallelism test:** 4 tasks dropped simultaneously (one per agent). All 4 picked up within 1 second of each other (22:08:17 → 22:08:18), all 4 completed within 6 seconds of pickup. Wall-clock for the batch: 7s vs ~20s sequential. All 4 agents correctly identified themselves and obeyed the "no tools" instruction. Cost: $0.255 for all 4 (Beacon $0.072, Forge $0.076, Mirror $0.075, Pulse $0.033).
+
+**Open issues entering D3:**
+- `keys | first` in the cost-capture jq picks alphabetically — when a cycle uses both Haiku and Sonnet (via Claude Code's internal model routing), the cost record will say "haiku" even though most of the work was Sonnet. Cosmetic; flag for D5.
+- `run_cycle.sh` auto-commit whitelist covers four paths. If Pulse ever writes outside them, health-check will flag dirty tree. Watch the first few post-D2 cycles to confirm whitelist matches observed behavior.
+- The bot session-resume retry pattern is still open — natural first end-to-end Build Loop test in D3 once Pulse's pattern count crosses 3.
+
+---
+
+*This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
