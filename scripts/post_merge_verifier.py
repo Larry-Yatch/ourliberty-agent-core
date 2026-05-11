@@ -158,7 +158,7 @@ def list_recent_merged_agent_prs() -> list[dict]:
         '--json', 'number,title,headRefName,mergedAt,closingIssuesReferences',
     ) or []
 
-    agent_prefixes = ('beacon/', 'forge/', 'mirror/', 'pulse/', 'feat/', 'fix/', 'chore/', 'polish/', 'refactor/')
+    agent_prefixes = ('beacon/', 'forge/', 'mirror/', 'pulse/', 'feat/', 'fix/', 'chore/', 'polish/', 'refactor/', 'enhance/', 'ship/', 'hotfix/')
     return [p for p in prs if any((p.get('headRefName') or '').startswith(prefix) for prefix in agent_prefixes)]
 
 
