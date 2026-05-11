@@ -14,17 +14,17 @@
         "source": {
             "type": "string",
             "enum": [
-                "joe", "kelly",
-                "atlas", "prism", "sage", "main", "nova", "ember", "mula",
-                "atlas-result", "prism-result", "sage-result", "main-result", "nova-result", "ember-result", "mula-result",
-                "webhook", "telegram-webhook", "watchdog", "auto-retry", "auto-iterate", "blackboard", "system-test", "parallel-test", "cron",
-                "unknown",
-                "council-contribution", "council-approval", "council-adversarial",
-                "sage-milestone", "atlas-milestone", "continuation", "wave2-3-autopilot", "system-sweep",
-                "orchestrator", "ship_completion_watcher", "concierge-dispatch", "cycle-recovery",
-                "backlog-promoter"
+                "larry",
+                "beacon", "forge", "mirror", "pulse",
+                "beacon-result", "forge-result", "mirror-result", "pulse-result",
+                "aide", "scout", "compass",
+                "aide-result", "scout-result", "compass-result",
+                "webhook", "telegram-webhook", "watchdog", "auto-retry", "auto-iterate",
+                "blackboard", "system-test", "parallel-test", "cron", "unknown",
+                "continuation", "system-sweep", "cycle-recovery", "orchestrator",
+                "ship_completion_watcher", "backlog-promoter"
             ],
-            "description": "Who initiated this task."
+            "description": "Who initiated this task. Must match dispatch_validator.ALLOWED_SOURCES — keep these two in sync."
         },
         "reply_chat_id": {
             "type": ["integer", "null"],
