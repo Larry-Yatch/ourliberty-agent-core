@@ -85,11 +85,14 @@ Expected: most recent log line in ~/agents/logs/<agent>_telegram_bot.log < 30 mi
 
 #### D. Inbox / dispatch state
 
+Inboxes are polled every 5s by `scripts/inbox_watcher.py` (systemd unit `ourliberty-inbox-watcher.service`). The watcher validates each task, holds an `inbox:<agent>` lease while running it, writes the result to `~/agents/outboxes/<agent>/`, and archives the consumed task to `inboxes/<agent>/.archive/`. So a task sitting in an inbox > a few seconds means either (a) the watcher is down, (b) the agent is busy with an earlier task, or (c) the task is invalid and headed for `.invalid/`.
+
 ```
 Scan ~/agents/inboxes/<agent>/*.json for:
   • files older than the per-agent stale threshold (default 1h)
   • duplicate dedup_identity values (per HANDSHAKE-SCHEMA)
   • malformed JSON
+  • accumulation in inboxes/<agent>/.invalid/ (validator rejections — fix the dispatcher)
 ```
 
 | Finding | Class | Action |
@@ -139,8 +142,14 @@ For each finding type from A–F, count occurrences in the **last 10 cycles**:
 
 When you propose a permanent fix:
 1. Write a brief spec for the fix into `~/agents/blackboard/pulse-proposals/<slug>.md`
-2. Dispatch to the right agent via `~/agents/inboxes/<agent>/cycle-fix-<slug>.json` (HANDSHAKE-SCHEMA conformant)
-3. Note the proposal in the journal entry
+2. Dispatch to the right agent via `~/agents/inboxes/<agent>/cycle-fix-<slug>.json` — use the format in **Section 8 (Dispatch task format)** below. The inbox watcher will pick it up within 5s.
+3. Note the proposal (and the inbox file path) in the journal entry
+
+Routing rules:
+- Pattern is a runtime bug, missing handler, infra issue → **Forge** with a draft spec
+- Pattern needs a strategic / design call (new spec, architecture change, new agent) → **Beacon**; she'll DM Larry for approval before dispatching downstream
+- Pattern is a review-checklist gap → **Mirror**
+- Pattern is a check you should run yourself → update your auto-fix allow-list (PR via Forge)
 
 ### 3. Auto-fix allow-list (canonical)
 
@@ -241,6 +250,45 @@ Suggest: <suggested_action>
 That's it. Output the journal entry as your last message (so it's visible to whoever invoked `/cycle`). Done.
 
 No greeting. No "I noticed that...". No padding. Diagnostic, calm, factual.
+
+---
+
+### 8. Dispatch task format (reference)
+
+When you write to `~/agents/inboxes/<agent>/<slug>.json`, the file MUST satisfy `dispatch_validator.validate_task` or the inbox watcher will move it to `.invalid/` with a `.reason` sidecar. The validator is stricter than HANDSHAKE-SCHEMA — it exists to kill the F24 empty-prompt bug class.
+
+**Required fields:**
+
+| Field | Constraint |
+|---|---|
+| `task_id` | non-empty string, unique-ish (use the slug + ISO timestamp) |
+| `prompt` | ≥ 100 chars, ≤ 50000 chars; include all context the receiving agent needs |
+| `source` | one of `pulse`, `cycle-recovery`, `system-sweep`, `auto-iterate` (or another value in `ALLOWED_SOURCES` in `scripts/dispatch_validator.py`) |
+
+**Optional but strongly recommended:**
+
+| Field | When to set |
+|---|---|
+| `dedup_identity` | Always. Use `cycle-fix:<canonical-slug>` (e.g. `cycle-fix:bot-session-resume-retry`). Lets the same finding across cycles collapse to one task. |
+| `reply_chat_id` | Omit for system-to-system dispatch. The agent's outbox is the result channel. |
+| `timeout` | Default 14400 (4h). Set lower (e.g. 600) for narrow questions. |
+| `model` | Omit unless overriding the agent's `inbox_model` from `config/agent-models.json`. |
+
+**Template you can copy:**
+
+```json
+{
+  "task_id": "cycle-fix-<slug>-<YYYYMMDDTHHMMSSZ>",
+  "source": "pulse",
+  "dedup_identity": "cycle-fix:<canonical-slug>",
+  "prompt": "Pulse observed <finding> in cycles <iter-list>. <Evidence: log excerpts, file paths, counts>. <Why this matters: which contract / behaviour is broken>. <Proposed fix shape, or the constraint that needs a real design call>. <Acceptance criteria: how we'll know the fix worked>. Read agents/pulse/memory/ for prior context if needed.",
+  "timeout": 3600
+}
+```
+
+Drop the file as `~/agents/inboxes/<agent>/cycle-fix-<slug>.json` (or `cycle-finding-<slug>.json` if you're routing to Beacon for a design call rather than Forge for a code change). The watcher picks it up on the next 5s tick.
+
+If the task is rejected: read `~/agents/inboxes/<agent>/.invalid/<file>.reason`, fix the issue, and re-dispatch with a new `task_id` (don't reuse — dedup will block).
 
 ---
 

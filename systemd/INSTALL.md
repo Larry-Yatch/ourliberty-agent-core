@@ -54,6 +54,25 @@ sudo systemctl enable --now ourliberty-mirror-bot.service
 sudo systemctl enable --now ourliberty-pulse-bot.service
 ```
 
+### Inbox watcher (Phase D2)
+
+The shared inbox watcher polls `~/agents/inboxes/{beacon,forge,mirror,pulse}/`
+every 5s, validates each task, runs `claude --print` per-agent, and writes the
+result to `~/agents/outboxes/<agent>/`. One process, four agent threads, max
+one in-flight task per agent (lease primitive).
+
+```bash
+sudo systemctl enable --now ourliberty-inbox-watcher.service
+journalctl -u ourliberty-inbox-watcher.service -f   # tail the log
+```
+
+To smoke-test end-to-end, drop a HANDSHAKE-conformant JSON into one of the
+inbox dirs (see `runbooks/cycle-prompt.md` §8 for the format) and watch:
+- `journalctl -u ourliberty-inbox-watcher.service -f` for the pickup line
+- `~/agents/outboxes/<agent>/` for the result file
+- `~/agents/blackboard/costs.jsonl` for the cost record
+- `~/agents/inboxes/<agent>/.archive/` to confirm the task was consumed
+
 ### Periodic services (timers)
 
 These are **timers**, not the underlying services. Enabling the timer is what schedules the work:
@@ -154,4 +173,5 @@ If a bot needs a path it doesn't currently have, edit the `ReadWritePaths=` line
 | `ourliberty-mirror-bot.service` | Phase C activation | Create Mirror bot; install token |
 | `ourliberty-pulse-bot.service` | Phase D activation | Create Pulse bot; install token |
 | `ourliberty-cycle.timer` | Phase D activation | Anthropic API key in .env; first dry-run with Larry watching |
+| `ourliberty-inbox-watcher.service` | Phase D2 activation | None — just enable; relies on existing `scripts/dispatch_lease.py` + `dispatch_validator.py` |
 | `ourliberty-watchdog.timer` | Phase D activation | After cycle has been observed for ≥ 1 day |
