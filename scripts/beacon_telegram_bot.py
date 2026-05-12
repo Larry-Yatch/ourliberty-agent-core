@@ -6,6 +6,23 @@ to Claude Code running in Beacon's directory (~/agent-core/agents/beacon/),
 and posts the reply back. Conversation continuity is preserved per-chat
 via Claude Code's --resume by storing the session id keyed on chat id.
 
+Phase D3 (commit 3) added the approval gate. The bot now intercepts:
+
+  - User messages matching approve / yes / go / ok / ship it (exact, strict
+    whitelist) → resolve most-recent pending approval, dispatch via
+    safe_write_inbox, confirm to Larry. NO forward to Beacon.
+  - User messages prefixed `modify: ...` or `reject: ...` → resolve as
+    modified/rejected, forward a system-style note to Beacon explaining
+    what happened.
+  - User messages `pause` / `/pause` / `resume` / `/resume` → toggle the
+    global approval-pause flag. NO forward to Beacon.
+  - Beacon responses containing `=== APPROVAL_REQUEST === {json} ===
+    END_APPROVAL_REQUEST ===` → extract the plan payload, consult
+    trust_policy, and either (a) auto-dispatch + one-liner confirm,
+    (b) queue + DM the formatted approval request, or (c) DM the
+    policy rejection.
+  - Reminder schedule (6h/24h/72h) checked every ~5 min in the polling loop.
+
 Reads from environment:
   TELEGRAM_BOT_TOKEN_BEACON   — bot token from BotFather
   TELEGRAM_ALLOWED_CHAT_IDS   — comma-separated chat IDs allowed to talk to Beacon
@@ -31,6 +48,14 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+# D3 approval handler (commit 3). Side-effect imports ensure shared module
+# paths get added.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+import beacon_approval_handler as approval  # noqa: E402
+import safe_write_inbox  # noqa: E402
+
 # ---------- config ----------
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_BEACON", "").strip()
@@ -55,6 +80,11 @@ TELEGRAM_MAX = 4000  # Telegram caps at 4096; leave headroom for our markers
 
 CLAUDE_BIN = shutil.which("claude") or "/usr/bin/claude"
 CLAUDE_TIMEOUT_SEC = 600  # 10 min — long enough for Beacon to think hard
+
+# D3 reminder cadence — check at most every REMINDER_INTERVAL_SEC. With our
+# 30s getUpdates long-poll this means roughly every ~5 minutes of wall clock,
+# which is more than fine for 6h/24h/72h schedule granularity.
+REMINDER_INTERVAL_SEC = 300
 
 
 # ---------- logging ----------
@@ -168,14 +198,198 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         return (result.stdout.strip() or "[empty response]", session_id)
 
 
+# ---------- D3 approval gate ----------
+
+def handle_user_command(chat_id: int, action: dict) -> bool:
+    """Handle a recognized user approval command. Returns True if handled
+    (caller should NOT forward to Beacon)."""
+    kind = action.get('action', 'none')
+
+    if kind == 'pause':
+        approval.set_paused(True)
+        telegram_send(chat_id, approval.format_pause_confirmation())
+        log(f"approval pause activated by {chat_id}")
+        return True
+
+    if kind == 'resume':
+        approval.set_paused(False)
+        backlog = approval.pop_paused_backlog()
+        telegram_send(chat_id, approval.format_resume_confirmation(len(backlog)))
+        for entry in backlog:
+            telegram_send(entry.get('chat_id') or chat_id,
+                          approval.format_approval_dm(entry))
+        log(f"approval resume activated by {chat_id}, backlog={len(backlog)}")
+        return True
+
+    if kind == 'approve':
+        entry = approval.most_recent_pending()
+        if entry is None:
+            telegram_send(chat_id,
+                          "Nothing pending to approve right now.")
+            return True
+        try:
+            dest = approval.dispatch_approved(entry)
+            approval.resolve(entry['id'], 'approved')
+            telegram_send(chat_id, approval.format_dispatch_confirmation(entry))
+            log(f"approved {entry['id']} -> dispatched to {dest}")
+        except (safe_write_inbox.DispatchRejected,
+                safe_write_inbox.RoutingDenied) as e:
+            telegram_send(chat_id,
+                f"Dispatch FAILED for {entry['id']}: {type(e).__name__}: {e}. "
+                f"Entry remains pending — fix the issue and retry approval.")
+            log(f"dispatch failed for {entry['id']}: {e}")
+        return True
+
+    if kind == 'modify':
+        entry = approval.most_recent_pending()
+        if entry is None:
+            telegram_send(chat_id, "Nothing pending to modify right now.")
+            return True
+        reason = action.get('reason', '')
+        approval.resolve(entry['id'], 'modified', note=reason)
+        # Forward a structured note to Beacon so she can re-plan.
+        relay = (
+            f"[D3 approval gate] Larry asked to MODIFY plan {entry['id']}. "
+            f"Reason: {reason}. The previous plan was archived as 'modified'. "
+            f"Please propose a revised plan with a new APPROVAL_REQUEST marker, "
+            f"taking the modification request into account."
+        )
+        session_id = _bot_state['sessions'].get(str(chat_id))
+        reply, new_session = call_beacon(relay, session_id)
+        if new_session and new_session != session_id:
+            _bot_state['sessions'][str(chat_id)] = new_session
+            save_sessions(_bot_state['sessions'])
+        _send_beacon_response(chat_id, reply)
+        return True
+
+    if kind == 'reject':
+        entry = approval.most_recent_pending()
+        if entry is None:
+            telegram_send(chat_id, "Nothing pending to reject right now.")
+            return True
+        reason = action.get('reason', '')
+        approval.resolve(entry['id'], 'rejected', note=reason)
+        telegram_send(chat_id, f"❌ Rejected: {entry['id']}. Beacon notified.")
+        relay = (
+            f"[D3 approval gate] Larry REJECTED plan {entry['id']}. "
+            f"Reason: {reason}. Plan archived. Acknowledge and stand by."
+        )
+        session_id = _bot_state['sessions'].get(str(chat_id))
+        reply, new_session = call_beacon(relay, session_id)
+        if new_session and new_session != session_id:
+            _bot_state['sessions'][str(chat_id)] = new_session
+            save_sessions(_bot_state['sessions'])
+        _send_beacon_response(chat_id, reply)
+        return True
+
+    return False
+
+
+def _send_beacon_response(chat_id: int, reply: str) -> None:
+    """Send Beacon's response with approval-marker interception.
+
+    If Beacon emitted `=== APPROVAL_REQUEST ===`, extract the plan, consult
+    trust_policy, and either dispatch directly (auto_approve) or queue +
+    DM the formatted request (force_ask). The marker block is stripped
+    from the narrative shown to Larry.
+    """
+    try:
+        payload, narrative = approval.extract_approval_request(reply)
+    except approval.MalformedApprovalMarker as e:
+        telegram_send(chat_id, reply)
+        telegram_send(
+            chat_id,
+            f"⚠ Beacon's APPROVAL_REQUEST marker was malformed ({e}). "
+            f"No approval flow triggered.",
+        )
+        log(f"malformed approval marker from beacon: {e}")
+        return
+
+    if payload is None:
+        telegram_send(chat_id, reply)
+        return
+
+    # Marker present — handle approval flow.
+    action_str, rule = approval.trust_decision(payload)
+
+    if narrative:
+        telegram_send(chat_id, narrative)
+
+    if action_str == 'reject':
+        telegram_send(chat_id, approval.format_policy_rejection(payload, rule or {}))
+        log(f"trust_policy rejected: {payload.get('task_id')}")
+        return
+
+    if action_str == 'auto_approve':
+        entry = approval.add_pending(payload, chat_id=chat_id)
+        try:
+            approval.dispatch_approved(entry)
+            approval.resolve(entry['id'], 'approved',
+                             note=f'auto_approved by rule: {rule}')
+            telegram_send(chat_id,
+                          approval.format_auto_approve_confirmation(entry, rule or {}))
+            log(f"auto_approved + dispatched: {payload.get('task_id')}")
+        except (safe_write_inbox.DispatchRejected,
+                safe_write_inbox.RoutingDenied) as e:
+            telegram_send(
+                chat_id,
+                f"Auto-approve dispatch FAILED for {entry['id']}: "
+                f"{type(e).__name__}: {e}",
+            )
+            log(f"auto_approve dispatch failed for {entry['id']}: {e}")
+        return
+
+    # force_ask path
+    queued = approval.is_paused()
+    entry = approval.add_pending(payload, chat_id=chat_id,
+                                  queued_during_pause=queued)
+    if queued:
+        telegram_send(
+            chat_id,
+            f"⏸ Approval queued during pause: {entry['id']}. "
+            f"It'll be DMed on /resume.",
+        )
+        log(f"approval queued during pause: {entry['id']}")
+    else:
+        telegram_send(chat_id, approval.format_approval_dm(entry))
+        log(f"approval DMed for {entry['id']}")
+
+
+def _check_due_reminders() -> None:
+    """Send any reminders that have crossed their threshold."""
+    due = approval.due_reminders()
+    for entry, hours in due:
+        chat_id = entry.get('chat_id')
+        if chat_id is None:
+            continue
+        telegram_send(chat_id, approval.format_reminder_dm(entry, hours))
+        approval.record_reminder_sent(entry['id'], hours)
+        log(f"reminder sent ({hours}h) for {entry['id']}")
+
+
 # ---------- main loop ----------
+
+# Shared state visible to the approval handler (modify/reject paths need
+# to read+write sessions because they call back into Beacon).
+_bot_state: dict = {'sessions': {}}
+
 
 def main() -> None:
     log(f"Beacon bot starting (cwd={BEACON_DIR}, allowed={sorted(ALLOWED)})")
-    sessions = load_sessions()
+    _bot_state['sessions'] = load_sessions()
     offset = 0
+    last_reminder_check = 0.0
 
     while True:
+        # Periodic reminder sweep — rate-limited.
+        now = time.time()
+        if now - last_reminder_check >= REMINDER_INTERVAL_SEC:
+            try:
+                _check_due_reminders()
+            except Exception as e:
+                log(f"reminder sweep error: {type(e).__name__}: {e}")
+            last_reminder_check = now
+
         url = f"{API}/getUpdates?offset={offset}&timeout=30"
         data = http_json(url, timeout=35)
         if not data or not data.get("ok"):
@@ -198,16 +412,23 @@ def main() -> None:
                 continue
 
             log(f"<- {chat_id}: {text[:120]!r}")
+
+            # D3 — intercept approval commands before forwarding to Beacon.
+            action = approval.parse_user_reply(text)
+            if action.get('action') != 'none':
+                if handle_user_command(chat_id, action):
+                    continue
+
             telegram_send_action(chat_id, "typing")
 
-            session_id = sessions.get(str(chat_id))
+            session_id = _bot_state['sessions'].get(str(chat_id))
             reply, new_session = call_beacon(text, session_id)
             if new_session and new_session != session_id:
-                sessions[str(chat_id)] = new_session
-                save_sessions(sessions)
+                _bot_state['sessions'][str(chat_id)] = new_session
+                save_sessions(_bot_state['sessions'])
 
             log(f"-> {chat_id}: {reply[:120]!r}")
-            telegram_send(chat_id, reply)
+            _send_beacon_response(chat_id, reply)
 
 
 if __name__ == "__main__":
