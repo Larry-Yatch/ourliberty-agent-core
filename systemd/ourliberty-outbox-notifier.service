@@ -1,0 +1,39 @@
+[Unit]
+Description=Ourliberty Outbox Notifier (back-channel routing + dead-letter)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/outbox_notifier.py
+After=network-online.target ourliberty-inbox-watcher.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/outbox_notifier.py
+
+Restart=on-failure
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-outbox-notifier
+
+# Hardening parity with the inbox watcher.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

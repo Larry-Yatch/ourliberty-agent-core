@@ -38,6 +38,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
+import routing_validator  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = HOME / "agents"
@@ -285,6 +286,17 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     if not ok:
         log(f"[{agent}] validator rejected {task_file.name}: {reason}")
         write_invalid(task_file, f"validator: {reason}")
+        return
+
+    # Phase D3 — defense in depth: re-check role-boundary topology even though
+    # tasks written via safe_write_inbox already passed it. Catches tasks that
+    # bypassed safe_write_inbox (manual drops, future buggy dispatchers).
+    route_ok, route_reason = routing_validator.check_hard_topology(
+        task.get("source", ""), agent,
+    )
+    if not route_ok:
+        log(f"[{agent}] routing denied for {task_file.name}: {route_reason}")
+        write_invalid(task_file, f"routing: {route_reason}")
         return
 
     task_id = task.get("task_id") or task_file.stem
