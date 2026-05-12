@@ -16,12 +16,24 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 # Removed: was importing GM-specific token_manager (multi-account OAuth pool).
-# TODO(Larry): wire up Phase D token strategy. For now use a no-op fallback that
-# returns whatever CLAUDE_CODE_OAUTH_TOKEN is in the environment, account_id=0.
+# Stub with single-account no-op rate-limit semantics. Larry uses one Claude
+# Max OAuth on the droplet; rate-limit detection becomes meaningful when/if
+# a dedicated agent-only Max is added (Phase F+).
 def get_manager():
     class _StubTokenManager:
         def get_token(self):
-            return os.environ.get('CLAUDE_CODE_OAUTH_TOKEN', ''), 0
+            return os.environ.get('CLAUDE_CODE_OAUTH_TOKEN', ''), 'oauth'
+        def check_for_rate_limit(self, _output):
+            # No multi-account pool to cool down; treat all output as
+            # non-rate-limited. Real claude errors (5xx, transient) still
+            # trigger run_claude's retry path via the returncode!=0 branch.
+            return False
+        def detect_cap_in_output(self, _output):
+            return False
+        def report_rate_limit(self, _account_id, cooldown_seconds=300):
+            return None
+        def report_success(self, _account_id):
+            return None
     return _StubTokenManager()
 from concurrency_guard import get_guard
 
@@ -439,22 +451,29 @@ def _clear_cancel(task_stem):
 def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                system_prompt_file=None, timeout=14400, context='default',
                model_override=None, session_id=None, effort='high',
-               task_stem=None):
+               task_stem=None, out_meta=None):
     """
     Run a claude CLI command with concurrency guard + token management.
     Max 6 concurrent across entire system to prevent OOM.
 
     Supports graceful cancellation: if blackboard/cancel-task-{task_stem}.json
     exists, the worker process is terminated and the task returns as cancelled.
-    Sage or any agent can create this file to stop a running task.
+    Any agent can create this file to stop a running task.
 
-    New params:
+    Params:
       session_id: If provided, adds --resume <session_id> to resume a prior session.
       effort: 'low', 'medium', 'high', or 'max'. Sets CLAUDE_CODE_EFFORT_LEVEL env var.
-      task_stem: Task filename stem for cancel-marker matching.
+      task_stem: Task filename stem for cancel-marker matching + in-flight registry.
+      out_meta: Optional dict. If provided, populated on success with keys:
+        cost_usd, usage{input_tokens,output_tokens,cache_read,cache_creation},
+        model, account_id, attempts, started_at, completed_at, duration_sec.
+        Callers that don't need cost telemetry can ignore this; the function's
+        return value is unchanged for back-compat.
 
     Returns: (success: bool, output_text: str, new_session_id: str | None)
     """
+    _meta_started_at = datetime.now().isoformat()
+    _meta_t0 = time.time()
     tm = get_manager()
     guard = get_guard()
 
@@ -641,6 +660,21 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                         log(agent_id, 'Completed successfully (account=' + account_id +
                             (', sid=' + new_session_id[:12] + '...' if new_session_id else '') +
                             cost_str + ')')
+                        if out_meta is not None:
+                            usage = response.get('usage') or {}
+                            out_meta['cost_usd'] = cost
+                            out_meta['usage'] = {
+                                'input_tokens': usage.get('input_tokens'),
+                                'output_tokens': usage.get('output_tokens'),
+                                'cache_read': usage.get('cache_read_input_tokens'),
+                                'cache_creation': usage.get('cache_creation_input_tokens'),
+                            }
+                            out_meta['model'] = model
+                            out_meta['account_id'] = account_id
+                            out_meta['attempts'] = attempt + 1
+                            out_meta['started_at'] = _meta_started_at
+                            out_meta['completed_at'] = datetime.now().isoformat()
+                            out_meta['duration_sec'] = round(time.time() - _meta_t0, 2)
                         return True, output_text, new_session_id
 
                     if is_error:

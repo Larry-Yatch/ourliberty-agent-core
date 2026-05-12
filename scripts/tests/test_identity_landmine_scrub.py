@@ -302,7 +302,8 @@ class RunClaudeInvokesScrub(unittest.TestCase):
              mock.patch.object(agent_runner, 'get_agent_model',
                                return_value=('sonnet', 'sonnet'), create=True), \
              mock.patch.object(agent_runner, 'quarantine_parent_claude_md_poison',
-                               return_value=[]):
+                               return_value=[]), \
+             mock.patch.object(agent_runner, 'log', create=True):
             success, output, sid = agent_runner.run_claude(
                 'pulse', 'hello world this is a test prompt', timeout=5)
 

@@ -1,26 +1,31 @@
 #!/usr/bin/env python3
-"""inbox_watcher.py — shared multi-agent inbox watcher daemon (Phase D2).
+"""inbox_watcher.py — shared multi-agent inbox watcher daemon.
 
-Polls ~/agents/inboxes/{beacon,forge,mirror,pulse}/*.json on a 5s cadence.
-For each task: validate -> acquire lease -> spawn `claude --print` -> write
-outbox -> append cost record -> archive task -> release lease.
+Phase D2 introduced this watcher; Phase D2.5 migrated the actual claude
+spawning to call agent_runner.run_claude (upstream's hardened path with
+retry/backoff, identity-assertion preamble, /tmp landmine scrub, parent
+CLAUDE.md poison quarantine, in-flight registry, cancel-marker polling,
+start_new_session=True). The thread-per-agent structure (max one task
+per agent in flight, agents parallel across themselves) is preserved
+because it's a clean fit for our 4-agent topology — upstream uses a
+ThreadPoolExecutor over a flat queue.
 
-Concurrency model: one thread per agent. Each thread holds the lease
-"inbox:<agent>" while running a task, so at most one task per agent is in
-flight at any time, but all four agents run in parallel. Cross-process
-safety + restart-safety come from dispatch_lease (flock + nonce + TTL +
-boot-id PID-reuse guard).
+Polling cadence: 5s. One thread per agent in AGENTS. Per-agent lease
+"inbox:<agent>" via dispatch_lease provides cross-process safety + TTL +
+boot-id PID-reuse guard. EMERGENCY_HALT flag in blackboard/ stops all
+agent loops on next poll. Orphan-adoption on startup: any in-flight
+registry entries from a prior boot get a forfeit outbox written, no
+re-dispatch (output is forfeit; re-dispatch would risk double-billing
+if the original claude actually completed).
 
-stdlib only. Reuses dispatch_validator.validate_task and dispatch_lease.
+stdlib only. Reuses dispatch_lease, dispatch_validator, agent_runner.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import shutil
 import signal
-import subprocess
 import sys
 import threading
 import time
@@ -30,6 +35,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 
@@ -40,6 +46,8 @@ OUTBOXES_ROOT = AGENTS_ROOT / "outboxes"
 BLACKBOARD = AGENTS_ROOT / "blackboard"
 LOG_FILE = AGENTS_ROOT / "logs" / "inbox_watcher.log"
 COSTS_FILE = BLACKBOARD / "costs.jsonl"
+EMERGENCY_HALT_FILE = BLACKBOARD / "EMERGENCY_HALT"
+IN_FLIGHT_DIR = AGENTS_ROOT / "state" / "in-flight"
 AGENT_CORE = HOME / "agent-core"
 MODELS_FILE = AGENT_CORE / "config" / "agent-models.json"
 AGENTS_DIR = AGENT_CORE / "agents"
@@ -49,8 +57,6 @@ POLL_INTERVAL_SEC = 5
 DEFAULT_TIMEOUT_SEC = 14400  # 4h; matches HANDSHAKE-SCHEMA default
 FALLBACK_MODEL = "claude-sonnet-4-6"
 REQUEUE_MAX = 3
-
-CLAUDE_BIN = shutil.which("claude") or "/usr/bin/claude"
 
 _shutdown = threading.Event()
 
@@ -79,6 +85,8 @@ def load_models() -> dict:
 
 
 def resolve_model(agent: str, task: dict, models_config: dict) -> str:
+    """Pick the model for this task. Order: explicit task override → per-agent
+    inbox_model in config → default inbox_model → FALLBACK_MODEL."""
     if task.get("model"):
         return task["model"]
     agents_block = models_config.get("agents", {})
@@ -97,6 +105,7 @@ def ensure_dirs() -> None:
         (OUTBOXES_ROOT / a).mkdir(parents=True, exist_ok=True)
     BLACKBOARD.mkdir(parents=True, exist_ok=True)
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def scan_inbox(agent: str) -> list[Path]:
@@ -162,74 +171,102 @@ def bump_requeue(task_file: Path, task: dict) -> None:
         log(f"requeue write failed for {task_file}: {e}")
 
 
-def run_claude(agent: str, task: dict, model: str) -> tuple[dict, bool]:
-    cwd = AGENTS_DIR / agent
-    prompt = task["prompt"]
-    timeout = task.get("timeout") or DEFAULT_TIMEOUT_SEC
+def reap_orphans_on_startup() -> int:
+    """For every in-flight registry entry from a prior boot, write a forfeit
+    outbox so downstream consumers know the task did not produce a result,
+    then remove the registry entry.
 
-    cmd = [CLAUDE_BIN, "--print", "--output-format", "json", "--model", model, prompt]
+    Adopt-if-alive, mark-failed-if-dead policy (per Phase D2.5 Call C):
+    - If the PID is alive, the detached claude subprocess is still running
+      but we've lost its stdout pipe. Output is forfeit either way.
+    - If the PID is dead, we just clean up the registry.
+    NEVER re-dispatch: paid work that may have completed should not be
+    automatically duplicated. Operator re-dispatches manually if needed.
+    """
+    if not IN_FLIGHT_DIR.exists():
+        return 0
+    reaped = 0
+    for f in IN_FLIGHT_DIR.glob("*.json"):
+        try:
+            entry = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(f"reap_orphans: bad registry file {f.name}: {e}; deleting")
+            try:
+                f.unlink()
+            except OSError:
+                pass
+            continue
 
-    started = now_iso()
-    t0 = time.time()
-    try:
-        result = subprocess.run(
-            cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
-        )
-    except subprocess.TimeoutExpired:
-        return ({
-            "started_at": started,
-            "completed_at": now_iso(),
-            "duration_sec": round(time.time() - t0, 2),
-            "exit_code": -1,
-            "error": f"timeout after {timeout}s",
-            "model": model,
-            "result": "",
-        }, False)
-    except FileNotFoundError:
-        return ({
-            "started_at": started,
-            "completed_at": now_iso(),
-            "duration_sec": round(time.time() - t0, 2),
-            "exit_code": -2,
-            "error": f"claude binary not found at {CLAUDE_BIN}",
-            "model": model,
-            "result": "",
-        }, False)
+        task_stem = entry.get("task_stem") or f.stem
+        agent = entry.get("agent_id") or "unknown"
+        pid = entry.get("pid")
 
-    out = {
-        "started_at": started,
-        "completed_at": now_iso(),
-        "duration_sec": round(time.time() - t0, 2),
-        "exit_code": result.returncode,
-        "model": model,
+        alive = False
+        if pid:
+            try:
+                os.kill(int(pid), 0)
+                alive = True
+            except (OSError, ProcessLookupError, ValueError, TypeError):
+                alive = False
+
+        outbox_dir = OUTBOXES_ROOT / agent
+        try:
+            outbox_dir.mkdir(parents=True, exist_ok=True)
+            forfeit = _unique_dest(outbox_dir, f"{task_stem}.forfeit.json")
+            forfeit.write_text(json.dumps({
+                "task_id": task_stem,
+                "agent": agent,
+                "started_at": entry.get("started_at"),
+                "completed_at": now_iso(),
+                "exit_code": -3,
+                "error": (
+                    f"in-flight registry orphan; output forfeit during watcher "
+                    f"restart (pid={pid}, alive_at_reap={alive}). "
+                    f"Operator may manually re-dispatch with a fresh task_id."
+                ),
+                "result": "",
+                "model": entry.get("model"),
+            }, indent=2))
+        except OSError as e:
+            log(f"reap_orphans: forfeit write failed for {task_stem}: {e}")
+
+        try:
+            f.unlink()
+        except OSError:
+            pass
+        reaped += 1
+        log(f"reap_orphans: marked {agent}/{task_stem} as forfeit (alive_at_reap={alive})")
+
+    if reaped:
+        log(f"reap_orphans: total {reaped} orphan(s) marked as forfeit")
+    return reaped
+
+
+def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
+                  success: bool, output_text: str, session_id: str | None,
+                  meta: dict, error: str | None = None) -> dict:
+    outbox = {
+        "task_id": task_id,
+        "agent": agent,
+        "source_task_file": str(task_file),
+        "dedup_identity": task.get("dedup_identity"),
+        "reply_chat_id": task.get("reply_chat_id"),
+        "source": task.get("source"),
+        "started_at": meta.get("started_at") or now_iso(),
+        "completed_at": meta.get("completed_at") or now_iso(),
+        "duration_sec": meta.get("duration_sec"),
+        "exit_code": 0 if success else -1,
+        "model": meta.get("model"),
+        "account_id": meta.get("account_id"),
+        "attempts": meta.get("attempts"),
+        "result": output_text or "",
+        "claude_session_id": session_id,
+        "cost_usd": meta.get("cost_usd"),
+        "usage": meta.get("usage"),
     }
-
-    if result.returncode != 0:
-        out["error"] = (result.stderr or "")[:2000]
-        out["result"] = (result.stdout or "")[:2000]
-        return (out, False)
-
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        out["result"] = (result.stdout or "").strip()
-        out["error"] = "claude stdout not JSON"
-        return (out, False)
-
-    out["result"] = (data.get("result") or data.get("text") or "").strip()
-    out["claude_session_id"] = data.get("session_id")
-    cost = data.get("total_cost_usd")
-    if cost is None:
-        cost = data.get("cost_usd")
-    out["cost_usd"] = cost
-    usage = data.get("usage") or {}
-    out["usage"] = {
-        "input_tokens": usage.get("input_tokens"),
-        "output_tokens": usage.get("output_tokens"),
-        "cache_read": usage.get("cache_read_input_tokens"),
-        "cache_creation": usage.get("cache_creation_input_tokens"),
-    }
-    return (out, True)
+    if error:
+        outbox["error"] = error
+    return outbox
 
 
 def process_task(agent: str, task_file: Path, models_config: dict) -> None:
@@ -248,39 +285,75 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
 
     task_id = task.get("task_id") or task_file.stem
     model = resolve_model(agent, task, models_config)
+    timeout = task.get("timeout") or DEFAULT_TIMEOUT_SEC
 
-    log(f"[{agent}] start task={task_id} model={model} file={task_file.name}")
-    outbox, success = run_claude(agent, task, model)
-    outbox.update({
-        "task_id": task_id,
-        "agent": agent,
-        "source_task_file": str(task_file),
-        "dedup_identity": task.get("dedup_identity"),
-        "reply_chat_id": task.get("reply_chat_id"),
-        "source": task.get("source"),
-    })
+    # Identity-assertion preamble (Phase D2.5 Call A: on by default).
+    # expected_agent is implicit from inbox path (Call B). The preamble is
+    # idempotent — agent_runner skips it if the marker is already present.
+    expected_agent = agent
+    base_prompt = task["prompt"]
+    if agent_runner.IDENTITY_ASSERTION_MARKER not in base_prompt:
+        prompt = agent_runner.build_expected_agent_assertion(expected_agent) + base_prompt
+    else:
+        prompt = base_prompt
+
+    log(f"[{agent}] start task={task_id} model={model} timeout={timeout}s")
+    meta: dict = {}
+    try:
+        success, output_text, session_id = agent_runner.run_claude(
+            agent_id=agent,
+            prompt=prompt,
+            working_dir=str(AGENTS_DIR / agent),
+            timeout=timeout,
+            context="inbox",
+            model_override=model,
+            task_stem=task_id,
+            out_meta=meta,
+        )
+    except Exception as e:
+        log(f"[{agent}] agent_runner.run_claude raised on {task_file.name}: {e!r}")
+        outbox = _build_outbox(agent, task_id, task, task_file,
+                               False, "", None, meta,
+                               error=f"agent_runner exception: {e!r}")
+        outbox_path = _unique_dest(OUTBOXES_ROOT / agent, f"{task_id}.json")
+        try:
+            outbox_path.parent.mkdir(parents=True, exist_ok=True)
+            outbox_path.write_text(json.dumps(outbox, indent=2))
+        except OSError as oe:
+            log(f"[{agent}] outbox write also failed: {oe}")
+        try:
+            move_to(task_file, INBOXES_ROOT / agent / ".archive")
+        except OSError:
+            pass
+        return
+
+    outbox = _build_outbox(agent, task_id, task, task_file,
+                           success, output_text, session_id, meta,
+                           error=None if success else (output_text or "claude returned non-success"))
 
     outbox_path = _unique_dest(OUTBOXES_ROOT / agent, f"{task_id}.json")
     try:
         outbox_path.parent.mkdir(parents=True, exist_ok=True)
         outbox_path.write_text(json.dumps(outbox, indent=2))
     except OSError as e:
-        log(f"[{agent}] outbox write failed: {e}; leaving task for retry")
+        log(f"[{agent}] outbox write failed: {e}; bumping requeue and leaving task in inbox")
         bump_requeue(task_file, task)
         return
 
     if outbox.get("cost_usd") is not None:
+        usage = outbox.get("usage") or {}
         append_cost({
             "ts": outbox["completed_at"],
             "agent": agent,
             "task_id": task_id,
-            "model": model,
+            "model": outbox.get("model"),
             "cost_usd": outbox.get("cost_usd"),
-            "input_tokens": outbox.get("usage", {}).get("input_tokens"),
-            "output_tokens": outbox.get("usage", {}).get("output_tokens"),
-            "cache_read": outbox.get("usage", {}).get("cache_read"),
-            "cache_creation": outbox.get("usage", {}).get("cache_creation"),
+            "input_tokens": usage.get("input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "cache_read": usage.get("cache_read"),
+            "cache_creation": usage.get("cache_creation"),
             "duration_sec": outbox.get("duration_sec"),
+            "attempts": outbox.get("attempts"),
             "source": "inbox-watcher",
         })
 
@@ -290,12 +363,27 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         log(f"[{agent}] archive failed for {task_file}: {e}")
 
     log(f"[{agent}] done task={task_id} success={success} "
-        f"duration={outbox.get('duration_sec')}s cost=${outbox.get('cost_usd', '?')}")
+        f"duration={outbox.get('duration_sec')}s "
+        f"attempts={outbox.get('attempts')} "
+        f"cost=${outbox.get('cost_usd') if outbox.get('cost_usd') is not None else '?'}")
+
+
+def _emergency_halt_active() -> bool:
+    """True if the EMERGENCY_HALT flag is present. Writers: scripts/kill_switch.py
+    or manual `touch ~/agents/blackboard/EMERGENCY_HALT`. Clearing the file
+    requires the operator (no auto-clear) — a tripped halt is sticky until
+    investigated."""
+    return EMERGENCY_HALT_FILE.exists()
 
 
 def agent_loop(agent: str, models_config: dict) -> None:
     log(f"[{agent}] loop started")
     while not _shutdown.is_set():
+        if _emergency_halt_active():
+            log(f"[{agent}] EMERGENCY_HALT detected at {EMERGENCY_HALT_FILE}; shutting down")
+            _shutdown.set()
+            break
+
         try:
             tasks = scan_inbox(agent)
         except OSError as e:
@@ -308,7 +396,7 @@ def agent_loop(agent: str, models_config: dict) -> None:
 
         identity = f"inbox:{agent}"
         for task_file in tasks:
-            if _shutdown.is_set():
+            if _shutdown.is_set() or _emergency_halt_active():
                 break
             acq = dispatch_lease.try_acquire(identity)
             if not acq.get("acquired"):
@@ -342,13 +430,25 @@ def _install_signals() -> None:
 
 def main() -> int:
     ensure_dirs()
+
+    # Reap any in-flight registry entries from a prior boot (Phase D2.5 Call C:
+    # adopt-if-alive, mark-failed-if-dead, never re-dispatch).
+    reap_orphans_on_startup()
+
+    # Clear any leases left over from previous boots (PID re-use guard inside
+    # dispatch_lease handles current-boot stale entries automatically).
     swept = dispatch_lease.startup_sweep()
     if swept:
         log(f"startup_sweep cleared {swept} prev-boot leases")
 
     _install_signals()
     models_config = load_models()
-    log(f"starting; agents={AGENTS} poll={POLL_INTERVAL_SEC}s claude={CLAUDE_BIN}")
+    log(f"starting; agents={AGENTS} poll={POLL_INTERVAL_SEC}s "
+        f"runner=agent_runner.run_claude")
+
+    if _emergency_halt_active():
+        log(f"WARNING: EMERGENCY_HALT exists at startup ({EMERGENCY_HALT_FILE}); "
+            f"agent loops will see it and exit immediately. Remove the file to resume.")
 
     threads = []
     for a in AGENTS:
