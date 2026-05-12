@@ -393,7 +393,9 @@ class DeadLetterScanTest(unittest.TestCase):
         self.assertEqual(len(notifies), 1)
         data = json.loads(notifies[0].read_text())
         self.assertEqual(data['source'], 'forge-result')
-        self.assertIn('DEAD LETTER', data['prompt'])
+        # Uses the unified build_notify_prompt template now (intent=dead-letter).
+        self.assertEqual(data['intent'], 'dead-letter')
+        self.assertIn('dead-letter', data['prompt'])
         self.assertIn('F24 empty-prompt', data['prompt'])
 
     def test_dead_letter_dedup_across_runs(self):
@@ -418,6 +420,703 @@ class DeadLetterScanTest(unittest.TestCase):
         state = json.loads(on.DEAD_LETTER_STATE.read_text())
         # Key should be gc'd out of state
         self.assertNotIn('forge:gc.json', state['processed'])
+
+
+class BuildNotifyPromptTest(unittest.TestCase):
+    """The refined Option-C hybrid notify-prompt template (commit 4a)."""
+
+    def test_default_result_notification_intent_block_present(self):
+        prompt = on.build_notify_prompt(
+            intent='result-notification',
+            sender='beacon',
+            task_id='t-1',
+            success=True,
+            output='cycle complete; 3 observations recorded',
+        )
+        # Header tag
+        self.assertIn('[Inter-agent notify | intent=result-notification | from=beacon', prompt)
+        self.assertIn('task=t-1', prompt)
+        self.assertIn('status=SUCCESS', prompt)
+        # Framing
+        self.assertIn('not a new task request', prompt)
+        # Action verb
+        self.assertIn('Journal it in your activity log', prompt)
+        self.assertIn('Do not generate new work', prompt)
+        # Output section
+        self.assertIn('3 observations recorded', prompt)
+
+    def test_failure_status_in_header(self):
+        prompt = on.build_notify_prompt(
+            intent='result-notification',
+            sender='forge',
+            task_id='t-fail',
+            success=False,
+            output='',
+            error='claude timed out after 3 attempts',
+        )
+        self.assertIn('status=FAILED', prompt)
+        self.assertIn('claude timed out', prompt)
+
+    def test_clarification_response_includes_remaining_count(self):
+        prompt = on.build_notify_prompt(
+            intent='clarification-response',
+            sender='beacon',
+            task_id='watchdog-001',
+            success=True,
+            output='use line range 730-740 from the doc',
+            intent_kwargs={'remaining': 2},
+        )
+        self.assertIn('clarification-response', prompt)
+        self.assertIn('CLARIFY_REQUEST on task `watchdog-001`', prompt)
+        self.assertIn('2 clarification', prompt)
+        self.assertIn('PROCEED', prompt)
+        self.assertIn('REJECT', prompt)
+
+    def test_clarification_request_to_beacon_includes_counter(self):
+        prompt = on.build_notify_prompt(
+            intent='clarify',
+            sender='forge',
+            task_id='watchdog-001',
+            success=True,
+            output='Which line range covers the watchdog warning?',
+            intent_kwargs={'next_count': 1, 'max_count': 3},
+        )
+        self.assertIn('clarify', prompt)
+        self.assertIn('clarification 1 of 3', prompt)
+        self.assertIn('answer in-scope', prompt)
+        self.assertIn('escalate to Larry', prompt)
+        self.assertIn('Which line range', prompt)
+
+    def test_preflight_proceed_intent(self):
+        prompt = on.build_notify_prompt(
+            intent='ack-proceed',
+            sender='forge',
+            task_id='watchdog-001',
+            success=True,
+            output='Will edit docs/operating-manual.md L730-L740',
+        )
+        self.assertIn('ack-proceed', prompt)
+        self.assertIn('PROCEED on task `watchdog-001`', prompt)
+        self.assertIn('build phase will dispatch', prompt)
+
+    def test_preflight_rejection_with_reason(self):
+        prompt = on.build_notify_prompt(
+            intent='reject',
+            sender='forge',
+            task_id='t-bad-spec',
+            success=True,
+            output='Spec references nonexistent file foo.md',
+            intent_kwargs={'reason': 'Spec references nonexistent file foo.md'},
+        )
+        self.assertIn('reject', prompt)
+        self.assertIn('REJECTED task `t-bad-spec`', prompt)
+        self.assertIn('nonexistent file', prompt)
+        self.assertIn('Do not retry without addressing', prompt)
+
+    def test_dead_letter_intent(self):
+        prompt = on.build_notify_prompt(
+            intent='dead-letter',
+            sender='inbox-watcher',
+            task_id='t-rejected',
+            success=False,
+            output='',
+            intent_kwargs={'reason': 'F24 prompt too short'},
+        )
+        self.assertIn('dead-letter', prompt)
+        self.assertIn('F24 prompt too short', prompt)
+
+    def test_marker_error_intent(self):
+        prompt = on.build_notify_prompt(
+            intent='marker-error',
+            sender='outbox-notifier',
+            task_id='t-broken',
+            success=False,
+            output='=== PROCEED ===\n{bad json}',
+            intent_kwargs={
+                'reason': 'invalid JSON: Expecting property name',
+                'task_id': 't-broken',
+            },
+        )
+        self.assertIn('marker-error', prompt)
+        self.assertIn('could not be parsed', prompt)
+        self.assertIn('Re-read your CLAUDE.md', prompt)
+
+    def test_unknown_intent_falls_back_to_default_action(self):
+        prompt = on.build_notify_prompt(
+            intent='unknown-future-intent',
+            sender='beacon',
+            task_id='t-x',
+            success=True,
+            output='some output',
+        )
+        # Falls back to result-notification action block
+        self.assertIn('Journal it in your activity log', prompt)
+
+    def test_missing_intent_kwargs_does_not_crash(self):
+        # clarification-response template needs {remaining} but we omit it
+        prompt = on.build_notify_prompt(
+            intent='clarification-response',
+            sender='beacon',
+            task_id='t-1',
+            success=True,
+            output='answer text',
+            # intent_kwargs intentionally missing 'remaining'
+        )
+        # Should render (with unsubstituted template) rather than crash
+        self.assertIn('clarification-response', prompt)
+        self.assertIn('answer text', prompt)
+
+    def test_short_output_padded_to_validator_floor(self):
+        prompt = on.build_notify_prompt(
+            intent='result-notification',
+            sender='beacon',
+            task_id='t-tiny',
+            success=True,
+            output='ok',
+        )
+        import dispatch_validator
+        self.assertGreaterEqual(len(prompt), dispatch_validator.MIN_PROMPT_LEN)
+
+
+class ForgeMarkerRoutingTest(unittest.TestCase):
+    """Marker-driven routing for Forge outboxes — process_outbox integration."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _forge_outbox(self, marker_text, **overrides):
+        outbox = _good_outbox(
+            agent='forge',
+            source='beacon',
+            task_id='t-pf',
+            result=(
+                'Read the spec. Traced the line numbers. Ready to act.\n\n'
+                + marker_text
+            ),
+        )
+        outbox.update(overrides)
+        return outbox
+
+    def test_proceed_marker_routes_to_beacon_as_forge_result(self):
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-pf", "preflight_summary": "Will edit X line 12."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = self._forge_outbox(marker)
+        f = self._write_outbox('forge', 't-pf.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        self.assertEqual(data['source'], 'forge-result')
+        self.assertEqual(data['intent'], 'ack-proceed')
+        self.assertIn('PROCEED on task `t-pf`', data['prompt'])
+        self.assertIn('Will edit X line 12', data['prompt'])
+
+    def test_clarify_request_routes_to_beacon_as_forge_question(self):
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-pf", "question": "Which line range exactly?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = self._forge_outbox(
+            marker,
+            clarification_count=0,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('forge', 't-pf.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        # Source is forge-question (not forge-result) → tells Beacon's flow
+        # this is a question that should be answered, not a result to journal
+        self.assertEqual(data['source'], 'forge-question')
+        self.assertEqual(data['intent'], 'clarify')
+        # Counter propagated for the next leg
+        self.assertEqual(data['clarification_count'], 1)
+        self.assertEqual(data['max_clarifications'], 3)
+        self.assertIn('clarification 1 of 3', data['prompt'])
+        self.assertIn('Which line range', data['prompt'])
+
+    def test_reject_marker_routes_to_beacon_as_forge_result(self):
+        marker = (
+            '=== REJECT ===\n'
+            '{"task_id": "t-pf", "reason": "Spec references missing file."}\n'
+            '=== END_REJECT ==='
+        )
+        outbox = self._forge_outbox(marker)
+        f = self._write_outbox('forge', 't-pf.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        data = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        self.assertEqual(data['source'], 'forge-result')
+        self.assertEqual(data['intent'], 'reject')
+        self.assertIn('Spec references missing file', data['prompt'])
+
+    def test_clarify_at_budget_exhausted_converts_to_exhausted_intent(self):
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-pf", "question": "Final ambiguity?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = self._forge_outbox(
+            marker,
+            clarification_count=3,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('forge', 't-pf.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        data = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        # Source becomes forge-result (terminates the question round); intent
+        # is clarification-exhausted (not generic reject) so Beacon sees why.
+        self.assertEqual(data['source'], 'forge-result')
+        self.assertEqual(data['intent'], 'clarification-exhausted')
+        # Reason includes the question that exhausted budget
+        self.assertIn('Final ambiguity?', data['prompt'])
+        self.assertIn('budget', data['prompt'].lower())
+
+    def test_clarify_marker_bypasses_depth_cap(self):
+        """The preflight protocol is multi-hop; depth cap must not block it."""
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-pf", "question": "Q?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = self._forge_outbox(
+            marker,
+            # This would normally trigger depth-cap (>1)
+            source_task_file='/inboxes/forge/notify-prior.json',
+            _notify_depth=1,
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('forge', 't-pf-resume.json', outbox)
+
+        result = on.process_outbox(f)
+        # Marker-driven path should bypass depth cap and notify regardless
+        self.assertEqual(result, 'notified-marker')
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+
+    def test_clarify_marker_bypasses_should_notify_back_filter(self):
+        """If source is 'beacon-clarification' (reply leg), normally archived.
+        But a marker present means the protocol round is in progress — must notify."""
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-pf", "preflight_summary": "Got the clarification, building."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = self._forge_outbox(
+            marker,
+            source='beacon-clarification',
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('forge', 't-pf-resumed.json', outbox)
+
+        result = on.process_outbox(f)
+        # Without marker handling this would be 'archived-no-notify'
+        self.assertEqual(result, 'notified-marker')
+
+    def test_malformed_marker_dead_letters_back_to_forge(self):
+        marker = '=== PROCEED ===\n{bad json}\n=== END_PROCEED ==='
+        outbox = self._forge_outbox(marker)
+        f = self._write_outbox('forge', 't-pf-bad.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+        # Marker-error notify lands in FORGE's inbox (not Beacon's)
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        marker_errors = list(forge_inbox.glob('marker-error-*.json'))
+        self.assertEqual(len(marker_errors), 1)
+        data = json.loads(marker_errors[0].read_text())
+        self.assertEqual(data['source'], 'outbox-notifier')
+        self.assertEqual(data['intent'], 'marker-error')
+        # original_source propagated so the recovered marker can route back
+        self.assertEqual(data['original_source'], 'beacon')
+        # First retry → count starts at 1
+        self.assertEqual(data['marker_error_count'], 1)
+        self.assertIn('could not be parsed', data['prompt'])
+        self.assertIn('invalid JSON', data['prompt'])
+
+    def test_marker_error_recovered_marker_routes_via_original_source(self):
+        """The C1 fix: after a malformed marker, Forge's recovered output has
+        source=outbox-notifier (infra), but original_source=beacon propagates
+        through, so the recovered marker reaches Beacon, not a dead end."""
+        # Simulate Forge's outbox AFTER she received a marker-error notify and
+        # re-emitted a clean PROCEED. The outbox carries propagated fields.
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-recovered", "preflight_summary": "Recovered cleanly."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge',
+            source='outbox-notifier',  # the previous marker-error notify
+            task_id='t-recovered',
+            result='Got the marker-error notify, here is my corrected marker.\n\n' + marker,
+            original_source='beacon',  # propagated from the marker-error envelope
+            marker_error_count=1,
+        )
+        f = self._write_outbox('forge', 't-recovered.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        # Recovered marker landed in BEACON's inbox (not archived as dead end)
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        self.assertEqual(data['intent'], 'ack-proceed')
+        self.assertEqual(data['source'], 'forge-result')
+
+    def test_marker_error_retry_cap_dead_letters_to_dispatcher(self):
+        """The C2 fix: when marker_error_count exceeds MAX_MARKER_ERROR_RETRIES,
+        the notifier dead-letters to Beacon instead of looping back to Forge."""
+        marker = '=== PROCEED ===\n{still bad json}\n=== END_PROCEED ==='
+        outbox = _good_outbox(
+            agent='forge',
+            source='outbox-notifier',
+            task_id='t-loop',
+            result=marker,
+            original_source='beacon',
+            marker_error_count=on.MAX_MARKER_ERROR_RETRIES,  # next retry exceeds cap
+        )
+        f = self._write_outbox('forge', 't-loop.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+        # No new marker-error notify to forge (cap exceeded)
+        forge_marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(forge_marker_errors), 0)
+
+        # Dead-letter to Beacon instead
+        beacon_dead_letters = list(
+            (on.INBOXES_ROOT / 'beacon').glob('dead-letter-marker-*.json')
+        )
+        self.assertEqual(len(beacon_dead_letters), 1)
+        data = json.loads(beacon_dead_letters[0].read_text())
+        self.assertEqual(data['intent'], 'dead-letter')
+        self.assertIn('malformed markers', data['prompt'])
+        self.assertIn('cap=3', data['prompt'])
+
+    def test_multiple_markers_dead_letters_back_to_forge(self):
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-1", "preflight_summary": "x"}\n'
+            '=== END_PROCEED ===\n\n'
+            'Wait, actually:\n\n'
+            '=== REJECT ===\n'
+            '{"task_id": "t-1", "reason": "y"}\n'
+            '=== END_REJECT ==='
+        )
+        outbox = self._forge_outbox(marker)
+        f = self._write_outbox('forge', 't-pf-dup.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+        marker_errors = list((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json'))
+        self.assertEqual(len(marker_errors), 1)
+        data = json.loads(marker_errors[0].read_text())
+        self.assertIn('expected exactly one', data['prompt'])
+
+    def test_full_cascade_three_forge_two_beacon(self):
+        """M5 — End-to-end cascade across CLARIFY → answer → CLARIFY → answer
+        → PROCEED. Verifies clarification_count propagates correctly through
+        both marker-driven (forge) and default-path (beacon) legs."""
+        # === Round 1: Forge clarifies (count 0 → 1) ===
+        forge_outbox_1 = _good_outbox(
+            agent='forge', source='beacon', task_id='t-cascade',
+            result=(
+                'Need a quick clarification.\n\n'
+                '=== CLARIFY_REQUEST ===\n'
+                '{"task_id": "t-cascade", "question": "Which line range?"}\n'
+                '=== END_CLARIFY_REQUEST ==='
+            ),
+            clarification_count=0,
+            max_clarifications=3,
+        )
+        f1 = self._write_outbox('forge', 't-cascade-r1.json', forge_outbox_1)
+        r1 = on.process_outbox(f1)
+        self.assertEqual(r1, 'notified-marker')
+
+        # Beacon got a forge-question notify with count=1 propagated
+        beacon_inbox_1 = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(beacon_inbox_1), 1)
+        beacon_task_1 = json.loads(beacon_inbox_1[0].read_text())
+        self.assertEqual(beacon_task_1['source'], 'forge-question')
+        self.assertEqual(beacon_task_1['intent'], 'clarify')
+        self.assertEqual(beacon_task_1['clarification_count'], 1)
+        self.assertEqual(beacon_task_1['max_clarifications'], 3)
+
+        # === Round 2: Beacon answers (default path; count=1 carries forward) ===
+        beacon_outbox_1 = _good_outbox(
+            agent='beacon', source='forge-question',
+            source_task_file=str(beacon_inbox_1[0]),
+            task_id='notify-t-cascade-r1',
+            result='Line range is L730-L740. Use that.',
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f2 = self._write_outbox('beacon', 'b-r1.json', beacon_outbox_1)
+        r2 = on.process_outbox(f2)
+        self.assertEqual(r2, 'notified')
+
+        # Forge got a beacon-clarification with count=1 forwarded
+        forge_inbox_1 = list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))
+        self.assertEqual(len(forge_inbox_1), 1)
+        forge_task_1 = json.loads(forge_inbox_1[0].read_text())
+        self.assertEqual(forge_task_1['source'], 'beacon-clarification')
+        self.assertEqual(forge_task_1['intent'], 'clarification-response')
+        self.assertEqual(forge_task_1['clarification_count'], 1)
+        # The notify prompt tells Forge she has 2 remaining
+        self.assertIn('2 clarification', forge_task_1['prompt'])
+
+        # === Round 3: Forge clarifies again (count 1 → 2) ===
+        forge_outbox_2 = _good_outbox(
+            agent='forge', source='beacon-clarification', task_id='t-cascade',
+            result=(
+                '=== CLARIFY_REQUEST ===\n'
+                '{"task_id": "t-cascade", "question": "And the file path?"}\n'
+                '=== END_CLARIFY_REQUEST ==='
+            ),
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f3 = self._write_outbox('forge', 't-cascade-r3.json', forge_outbox_2)
+        r3 = on.process_outbox(f3)
+        # Note: source is beacon-clarification (reply leg) but marker handling
+        # overrides the default archive-no-notify behavior
+        self.assertEqual(r3, 'notified-marker')
+
+        # Second beacon notify, count now 2
+        beacon_inbox_2 = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(beacon_inbox_2), 2)
+        # Get the newer one
+        newer = max(beacon_inbox_2, key=lambda p: p.stat().st_mtime)
+        beacon_task_2 = json.loads(newer.read_text())
+        self.assertEqual(beacon_task_2['clarification_count'], 2)
+        self.assertIn('clarification 2 of 3', beacon_task_2['prompt'])
+
+        # === Round 4: Beacon answers (count=2 carries forward) ===
+        beacon_outbox_2 = _good_outbox(
+            agent='beacon', source='forge-question',
+            source_task_file=str(newer),
+            task_id='notify-t-cascade-r3',
+            result='docs/operating-manual.md',
+            clarification_count=2,
+            max_clarifications=3,
+        )
+        f4 = self._write_outbox('beacon', 'b-r2.json', beacon_outbox_2)
+        r4 = on.process_outbox(f4)
+        self.assertEqual(r4, 'notified')
+
+        forge_inbox_2 = list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))
+        self.assertEqual(len(forge_inbox_2), 2)
+        newer_forge = max(forge_inbox_2, key=lambda p: p.stat().st_mtime)
+        forge_task_2 = json.loads(newer_forge.read_text())
+        self.assertEqual(forge_task_2['clarification_count'], 2)
+        # 1 clarification left
+        self.assertIn('1 clarification', forge_task_2['prompt'])
+
+        # === Round 5: Forge PROCEEDs (terminal) ===
+        forge_outbox_3 = _good_outbox(
+            agent='forge', source='beacon-clarification', task_id='t-cascade',
+            result=(
+                'Got it. Building.\n\n'
+                '=== PROCEED ===\n'
+                '{"task_id": "t-cascade", "preflight_summary": "Edit docs/operating-manual.md L730-L740."}\n'
+                '=== END_PROCEED ==='
+            ),
+            clarification_count=2,
+            max_clarifications=3,
+        )
+        f5 = self._write_outbox('forge', 't-cascade-r5.json', forge_outbox_3)
+        r5 = on.process_outbox(f5)
+        self.assertEqual(r5, 'notified-marker')
+
+        # Final notify to Beacon with intent=ack-proceed
+        beacon_inbox_3 = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(beacon_inbox_3), 3)
+        final = max(beacon_inbox_3, key=lambda p: p.stat().st_mtime)
+        final_task = json.loads(final.read_text())
+        self.assertEqual(final_task['intent'], 'ack-proceed')
+        self.assertIn('Edit docs/operating-manual.md', final_task['prompt'])
+
+    def test_forge_outbox_without_marker_uses_default_routing(self):
+        """Backward-compat: a Forge outbox with no marker (legacy or test
+        scenario) follows the existing should_notify_back path."""
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-legacy',
+            result='Plain text result, no marker block here at all.',
+        )
+        f = self._write_outbox('forge', 't-legacy.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified')
+
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        # Default routing → forge-result
+        self.assertEqual(data['source'], 'forge-result')
+        # Default template → result-notification intent
+        self.assertIn('intent=result-notification', data['prompt'])
+
+    def test_non_forge_agent_with_marker_text_uses_default_routing(self):
+        """Only Forge outputs are marker-parsed. A marker-shaped string in
+        another agent's output should NOT trigger marker handling."""
+        outbox = _good_outbox(
+            agent='beacon', source='pulse', task_id='t-beacon',
+            result=(
+                'Discussing the preflight protocol:\n\n'
+                '=== PROCEED ===\n'
+                '{"task_id": "x", "preflight_summary": "example"}\n'
+                '=== END_PROCEED ==='
+            ),
+        )
+        f = self._write_outbox('beacon', 't-beacon.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified')
+
+        data = json.loads(
+            list((on.INBOXES_ROOT / 'pulse').glob('notify-*.json'))[0].read_text()
+        )
+        # Beacon's output isn't parsed for Forge markers
+        self.assertEqual(data['source'], 'beacon-result')
+        self.assertIn('intent=result-notification', data['prompt'])
+
+
+class ClassifyForgeMarkerTest(unittest.TestCase):
+    """Unit test the _classify_forge_marker helper in isolation."""
+
+    def test_no_marker_returns_none(self):
+        decision = on._classify_forge_marker({
+            'agent': 'forge', 'result': 'No markers in this text.',
+        })
+        self.assertIsNone(decision)
+
+    def test_empty_result_returns_none(self):
+        self.assertIsNone(on._classify_forge_marker({'agent': 'forge', 'result': ''}))
+        self.assertIsNone(on._classify_forge_marker({'agent': 'forge'}))
+
+    def test_proceed_returns_decision(self):
+        result = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-1", "preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        decision = on._classify_forge_marker({
+            'agent': 'forge', 'result': result, 'task_id': 't-1',
+        })
+        self.assertEqual(decision['marker_type'], 'proceed')
+        self.assertEqual(decision['intent'], 'ack-proceed')
+        self.assertEqual(decision['notify_source'], 'forge-result')
+        self.assertIsNone(decision['next_clarification_count'])
+
+    def test_clarify_under_budget(self):
+        result = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-1", "question": "Q?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        decision = on._classify_forge_marker({
+            'agent': 'forge',
+            'result': result,
+            'clarification_count': 0,
+            'max_clarifications': 3,
+        })
+        self.assertEqual(decision['marker_type'], 'clarify_request')
+        self.assertEqual(decision['intent'], 'clarify')
+        self.assertEqual(decision['notify_source'], 'forge-question')
+        self.assertEqual(decision['next_clarification_count'], 1)
+
+    def test_clarify_at_budget_becomes_exhausted(self):
+        result = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-1", "question": "Last Q?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        decision = on._classify_forge_marker({
+            'agent': 'forge',
+            'result': result,
+            'clarification_count': 3,
+            'max_clarifications': 3,
+        })
+        # Converted to clarification-exhausted (specific, not generic reject)
+        self.assertEqual(decision['marker_type'], 'clarify_request')
+        self.assertEqual(decision['intent'], 'clarification-exhausted')
+        self.assertEqual(decision['notify_source'], 'forge-result')
+        # The reason carries the question text for context
+        self.assertIn('Last Q?', decision['intent_kwargs']['reason'])
 
 
 if __name__ == '__main__':

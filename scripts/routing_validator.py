@@ -75,6 +75,8 @@ SYSTEM_SOURCES = {
     'cron', 'continuation', 'orchestrator', 'watchdog', 'auto-retry',
     'auto-iterate', 'system-sweep', 'cycle-recovery', 'ship_completion_watcher',
     'backlog-promoter', 'blackboard', 'unknown',
+    # D3-forge (commit 4a): notifier-originated marker-error dispatches.
+    'outbox-notifier',
 }
 
 # IDENTITY cache for soft-reroute parsing.

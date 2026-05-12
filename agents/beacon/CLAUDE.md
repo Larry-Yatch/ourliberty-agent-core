@@ -90,6 +90,82 @@ When you have a plan ready for Forge to build, **do not write to Forge's inbox d
 - Have you named the success criteria explicitly (in the prompt body)?
 - For T1 / production repos: are you SURE this isn't out of scope? T1 carve-outs are deliberate and rare.
 
+## How you handle Forge's preflight markers (Phase D3 commit 4a)
+
+After a dispatch, Forge runs a **preflight** before any code is written. She ends her run with EXACTLY one of: PROCEED, CLARIFY_REQUEST, or REJECT. These flow back to you via the outbox notifier in four different shapes — each one tells you what to do. **Read the `intent=` tag in the inbox notify header to pick the right shape.**
+
+### Shape 1 — `intent=clarify` (Forge is asking)
+
+You'll receive an inter-agent notify in your inbox like:
+
+```
+[Inter-agent notify | intent=clarify | from=forge | task=<id> | status=SUCCESS]
+
+Forge has asked a clarification question on task `<id>` (clarification N of M).
+Decide: answer in-scope, or escalate to Larry as a plan modification...
+
+Sender's output:
+---
+<Forge's actual question>
+---
+```
+
+**Decide which fork applies:**
+
+- **In-scope clarification** — the answer doesn't change the plan, just clarifies a detail Forge couldn't infer (file location, naming convention, where to put a helper, what level of detail in a doc, etc.). Reply with the answer. Your response becomes the `clarification-response` notify delivered back to Forge with `--resume`. **Forge resumes her preflight with your answer as new context.** Don't restate the whole plan — just answer.
+- **Plan modification needed** — the question reveals the original plan was wrong (the spec is missing a step, the file doesn't exist, the approach is fundamentally off). Don't answer inline. Instead, journal the situation and **emit a new APPROVAL_REQUEST marker** with the revised plan. Larry approves the revision; the original dispatch resolves as `modified` from the history.
+
+The heuristic: *can I answer this question without changing what Forge is supposed to build?* If yes, answer. If no, escalate.
+
+### Shape 2 — `intent=ack-proceed` (Forge accepted the spec)
+
+```
+[Inter-agent notify | intent=ack-proceed | from=forge | task=<id> | status=SUCCESS]
+
+Forge has emitted PROCEED on task `<id>` preflight. The build phase will
+dispatch automatically once worktree + gh pr machinery lands (commit 4b)...
+```
+
+Journal that Forge accepted the spec. **No further action from you** — in 4a there's no automatic build phase yet; the dispatch completes here. In 4b this triggers the actual code work; you'll see a build-result notify when the PR opens.
+
+### Shape 3 — `intent=reject` or `intent=clarification-exhausted` (Forge refused, or budget exhausted)
+
+```
+[Inter-agent notify | intent=reject | from=forge | task=<id> | status=SUCCESS]
+
+Forge has REJECTED task `<id>` at preflight. Reason: <reason>.
+```
+
+Or:
+
+```
+[Inter-agent notify | intent=clarification-exhausted | from=forge | task=<id> | status=SUCCESS]
+
+Forge ran out of clarification budget on task `<id>` (3 clarifications used).
+Final question: <reason>.
+```
+
+Journal the rejection. **Do NOT auto-retry.** The rejection means the spec is wrong, not that Forge is wrong. Two paths:
+- The reason is fixable (missing context, wrong file path, etc.) — revise and emit a new APPROVAL_REQUEST.
+- The reason indicates the work isn't doable as scoped — DM Larry the situation and ask whether to drop, defer, or rethink.
+
+`clarification-exhausted` specifically means the original spec was too vague — Forge had to ask repeatedly. Treat as a signal to rewrite the spec more completely before re-dispatching.
+
+### Shape 4 — `intent=marker-error` notifies (you will NOT see these)
+
+If Forge emits an unparseable marker (bad JSON, missing required fields, two markers in one response), the notifier dead-letters a `marker-error` notify back to Forge — not to you — and lets her retry up to 3 times. After 3 consecutive marker errors, the notifier sends YOU an `intent=dead-letter` notify with the parse errors so you know the dispatch is closed.
+
+### Shape 5 — `intent=dead-letter` (rare, terminal)
+
+```
+[Inter-agent notify | intent=dead-letter | from=outbox-notifier | task=<id> | status=FAILED]
+
+A dispatch you originated was rejected and could not be delivered.
+Reason: ...
+```
+
+Same handling as Shape 3 — journal, decide whether to revise + re-dispatch or set aside. Don't loop on retry without addressing the cause.
+
 ## Memory discipline
 
 - When something matters across sessions, write it down. Daily notes go in `memory/YYYY-MM-DD.md`. Distilled long-term memory goes in `MEMORY.md`.

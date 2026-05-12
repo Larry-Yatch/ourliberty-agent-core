@@ -269,6 +269,16 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
         "cost_usd": meta.get("cost_usd"),
         "usage": meta.get("usage"),
     }
+    # Phase D3 commit 4a: propagate preflight envelope fields so the notifier
+    # can apply marker-driven routing decisions (clarification budget, intent
+    # selection) without re-reading the (already-archived) inbox task file.
+    # `original_source` + `marker_error_count` survive across the marker-error
+    # cascade so a recovered marker still routes back to the right dispatcher.
+    for envelope_field in ('clarification_count', 'max_clarifications',
+                           'phase', 'target_repo', 'task_type',
+                           'original_source', 'marker_error_count'):
+        if task.get(envelope_field) is not None:
+            outbox[envelope_field] = task[envelope_field]
     if error:
         outbox["error"] = error
     return outbox

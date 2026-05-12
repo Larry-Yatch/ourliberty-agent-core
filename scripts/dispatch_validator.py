@@ -39,15 +39,33 @@ ALLOWED_SOURCES = {
     'blackboard', 'system-test', 'parallel-test', 'cron', 'unknown',
     'continuation', 'system-sweep', 'cycle-recovery', 'orchestrator',
     'ship_completion_watcher', 'backlog-promoter',
+    # D3-forge (commit 4a): notifier-originated marker-error dispatches
+    # back to Forge when her preflight marker is malformed. Treated as a
+    # system source (not a dialogue leg) — see routing_validator.SYSTEM_SOURCES.
+    'outbox-notifier',
 }
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
+#
+# Names ack-proceed / clarify / clarification-response / clarification-exhausted /
+# reject are the D3-prep preflight-protocol vocabulary used on Forge's outboxes
+# and Beacon's clarification replies.
+#
+# D3-forge (commit 4a) adds three notifier-emitted intents that aren't
+# preflight-protocol per se but ride the same envelope:
+#   - result-notification: generic inter-agent result delivery (Pulse over-run
+#     fix — naked notifies were getting misread as new work)
+#   - dead-letter: dispatcher learns its task was validator-rejected
+#   - marker-error: Forge learns her marker was unparseable (re-emit)
 ALLOWED_INTENTS = {
     'ack-proceed',
     'clarify',
     'clarification-response',
     'clarification-exhausted',
     'reject',
+    'result-notification',
+    'dead-letter',
+    'marker-error',
 }
 
 ALLOWED_PHASES = {'preflight', 'build'}

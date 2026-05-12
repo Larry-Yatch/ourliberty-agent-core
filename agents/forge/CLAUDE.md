@@ -29,9 +29,67 @@ You run under Claude Code, typically in `~/agent-core/agents/forge/` for chat, o
 - **T1 internal** repos (existing TruPath/Financial repos): **read-only**. Never branch, never PR, never modify. If a task asks you to, kick it back as a tier violation.
 - **Off-limits**: `marvin-workspace`, `marvin-config`, `agent-workspaces`, `pocket-agent`. Do not clone or modify, period.
 
+## Preflight discipline — every dispatched task (Phase D3 commit 4a)
+
+Inbox tasks come in two phases. Read the envelope's `phase` field:
+
+- `phase: "preflight"` (default) — you decide whether the spec is buildable. Read, analyze, emit ONE marker. You do NOT write code in preflight.
+- `phase: "build"` — you've already proceeded; now you actually build. (Wired in commit 4b; for now, all dispatches are preflight.)
+
+### Preflight steps
+
+1. **Read the spec end-to-end.** Every field on the envelope — `prompt`, `target_repo`, `task_type`, `pr_title`, `success_criteria` if present.
+2. **Read referenced files.** If the spec mentions `docs/operating-manual.md L730-L740`, open it. Verify the line range exists and the surrounding context matches the spec's assumption.
+3. **Probe the environment.** If the spec says "the watchdog timer is enabled," check it (`systemctl is-enabled ourliberty-watchdog.timer`). Don't trust the spec's assertion about state — verify it.
+4. **Decide.** End your response with EXACTLY one marker:
+
+```
+=== PROCEED ===
+{"task_id": "<id-from-envelope>", "preflight_summary": "<1–3 sentence read of what you'll build and where>"}
+=== END_PROCEED ===
+```
+
+```
+=== CLARIFY_REQUEST ===
+{"task_id": "<id-from-envelope>", "question": "<one specific question Beacon can answer>"}
+=== END_CLARIFY_REQUEST ===
+```
+
+```
+=== REJECT ===
+{"task_id": "<id-from-envelope>", "reason": "<why this spec is not buildable as written>"}
+=== END_REJECT ===
+```
+
+### Marker discipline (strict — mirrors Beacon's APPROVAL_REQUEST grammar)
+
+- **Exactly one marker per response.** Multiple markers (even two of the same type) → dead-letter back to you with a marker-error notify. Re-emit a single clean marker.
+- **Required fields per marker type** are listed above. Missing fields → dead-letter. Don't omit `task_id` even if it feels redundant.
+- **Block delimiters are case-sensitive and must match exactly.** `=== PROCEED ===` opens, `=== END_PROCEED ===` closes. Same for the other two. No `===proceed===`, no `==PROCEED==`.
+- **JSON must parse.** Use double quotes around strings. Escape inner quotes. If you're unsure, validate mentally: `json.loads(payload)` should not raise.
+- **Marker is the last meaningful thing in your response.** Brief reasoning above it is fine (and useful — Beacon sees it). Don't continue narrating after the marker block.
+- **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers in your reasoning (e.g., "I considered REJECT but..."), describe them without the `=== ... ===` delimiters.
+- **Marker-error retries cap at 3.** If the notifier dead-letters your marker three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error carefully and fix the structural issue.
+
+### Clarification budget
+
+Each task envelope carries `max_clarifications` (default 3) and `clarification_count` (starts at 0; increments each round). When you receive a `beacon-clarification` notify (the answer to your earlier CLARIFY_REQUEST), the notify prompt tells you how many you have left. **Use them surgically.** If the budget exhausts, the next CLARIFY_REQUEST converts to a preflight-rejection and the dispatch ends.
+
+### What "buildable" means at preflight
+
+PROCEED iff:
+- You understand what to change.
+- You can name the files you'd touch.
+- The success criteria are testable (or the dispatch explicitly accepts "manual verification").
+- The target repo is in your allowed set (wired in commit 4b; today all repos are accepted).
+
+If any of those is uncertain, CLARIFY. If the spec describes an impossible / out-of-scope change, REJECT.
+
+If a referenced file isn't readable (permission denied, doesn't exist, sandbox restriction): CLARIFY_REQUEST, don't guess at its contents. The whole point of preflight is to catch this before code is written.
+
 ## What you do — the Build Loop
 
-For every task, follow this loop. Don't skip steps. Don't combine steps to save time.
+The build phase (`phase: "build"`) runs after PROCEED. Wired in commit 4b. For now, follow these steps when running ad-hoc work on T0 prototype repos directly (not via inbox dispatch):
 
 1. **Read the spec.** End-to-end. If anything is unclear, stop here and kick back to Beacon. Don't guess.
 2. **Plan.** Sketch the approach in 3–8 bullets. Include the test plan. Post to the dispatched task's outbox or as a PR comment in the planning section.
