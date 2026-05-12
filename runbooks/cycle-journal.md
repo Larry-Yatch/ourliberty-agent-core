@@ -4,6 +4,27 @@
 
 ---
 
+## Iteration 20 — 2026-05-12 14:34 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. sync.json: status=no-change, commit=c766ce5=HEAD, branch=main. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-12T19:43:05Z (~51m ago), status=no-change, commit=c766ce5. Within 2h threshold. ✅
+- **(C) Agent liveness: nominal.** All 5 units active (beacon, forge, mirror, pulse, inbox-watcher). Beacon last logged 2026-05-11T23:39 MDT (~15h); forge 2026-05-09T13:44 MDT (~2.5d); pulse 2026-05-10T12:18 MDT (~2d). Log silence = confirmed false positive per MEMORY.md (idle Telegram; units active, no error spam). ✅
+- **(D) Inboxes: nominal.** No live .json tasks in any inbox. pulse/.invalid/ unchanged — same 2 files (d2-reject-20260511T220650Z.json, d25-reject-20260512T030823Z.json, source=larry, F24 class). Count=2; threshold=3 in 10 cycles. No new additions since iter 16. ✅
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active.** PID 72391 (bash, run_cycle.sh), 1m18s elapsed at check time. Fresh (< 10 min). Normal 4h-timer run. Interactive session takes precedence per prior iters.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED**. 5th consecutive clean cycle (iters 16–20). Fix `6b6284a` holding. ✅
+- Sync blocked: **CLOSED**. 5th consecutive successful sync proxy. ✅
+- Invalid pulse inbox dispatches: 2 total (both from iter 16 window), no new additions in iters 17–20. Still watching; 2/10, threshold=3.
+**Learned:** Nothing new. Fifth consecutive nominal cycle (iters 16–20). Structural health holding post-`6b6284a`.
+
+---
+
 ## Iteration 19 — 2026-05-12 10:34 MDT
 
 **Health:** ✅ Nominal
