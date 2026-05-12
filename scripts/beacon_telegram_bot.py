@@ -367,6 +367,42 @@ def _check_due_reminders() -> None:
         log(f"reminder sent ({hours}h) for {entry['id']}")
 
 
+def _process_update(update: dict) -> None:
+    """Process one Telegram update. Raises on truly unexpected errors —
+    caller catches at the outer per-update boundary."""
+    msg = update.get("message") or update.get("edited_message")
+    if not msg:
+        return
+    text = msg.get("text", "").strip()
+    chat = msg.get("chat", {})
+    chat_id = chat.get("id")
+    if not text or chat_id is None:
+        return
+
+    if chat_id not in ALLOWED:
+        log(f"ignored unauthorized chat {chat_id} ({chat.get('username') or '?'}): {text[:50]!r}")
+        return
+
+    log(f"<- {chat_id}: {text[:120]!r}")
+
+    # D3 — intercept approval commands before forwarding to Beacon.
+    action = approval.parse_user_reply(text)
+    if action.get('action') != 'none':
+        if handle_user_command(chat_id, action):
+            return
+
+    telegram_send_action(chat_id, "typing")
+
+    session_id = _bot_state['sessions'].get(str(chat_id))
+    reply, new_session = call_beacon(text, session_id)
+    if new_session and new_session != session_id:
+        _bot_state['sessions'][str(chat_id)] = new_session
+        save_sessions(_bot_state['sessions'])
+
+    log(f"-> {chat_id}: {reply[:120]!r}")
+    _send_beacon_response(chat_id, reply)
+
+
 # ---------- main loop ----------
 
 # Shared state visible to the approval handler (modify/reject paths need
@@ -398,37 +434,21 @@ def main() -> None:
 
         for update in data.get("result", []):
             offset = update["update_id"] + 1
-            msg = update.get("message") or update.get("edited_message")
-            if not msg:
-                continue
-            text = msg.get("text", "").strip()
-            chat = msg.get("chat", {})
-            chat_id = chat.get("id")
-            if not text or chat_id is None:
-                continue
-
-            if chat_id not in ALLOWED:
-                log(f"ignored unauthorized chat {chat_id} ({chat.get('username') or '?'}): {text[:50]!r}")
-                continue
-
-            log(f"<- {chat_id}: {text[:120]!r}")
-
-            # D3 — intercept approval commands before forwarding to Beacon.
-            action = approval.parse_user_reply(text)
-            if action.get('action') != 'none':
-                if handle_user_command(chat_id, action):
-                    continue
-
-            telegram_send_action(chat_id, "typing")
-
-            session_id = _bot_state['sessions'].get(str(chat_id))
-            reply, new_session = call_beacon(text, session_id)
-            if new_session and new_session != session_id:
-                _bot_state['sessions'][str(chat_id)] = new_session
-                save_sessions(_bot_state['sessions'])
-
-            log(f"-> {chat_id}: {reply[:120]!r}")
-            _send_beacon_response(chat_id, reply)
+            try:
+                _process_update(update)
+            except Exception as e:
+                # NEVER let a single bad update crash the bot — the message
+                # would replay on systemd restart, looping forever.
+                log(f"unhandled error processing update: {type(e).__name__}: {e}")
+                try:
+                    msg = update.get("message") or update.get("edited_message") or {}
+                    chat_id = msg.get("chat", {}).get("id")
+                    if chat_id in ALLOWED:
+                        telegram_send(chat_id,
+                            f"⚠ Bot internal error: {type(e).__name__}: {e}. "
+                            f"Check journalctl -u ourliberty-beacon-bot.")
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

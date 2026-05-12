@@ -69,7 +69,10 @@ import trust_policy      # noqa: E402
 HOME = Path.home()
 AGENTS_ROOT = HOME / 'agents'
 REPO_ROOT = _SCRIPT_DIR.parent
-PENDING_APPROVALS_PATH = REPO_ROOT / 'agents' / 'beacon' / 'state' / 'pending-approvals.json'
+# State lives in the RUNTIME tree (~/agents/state/), not the repo.
+# Runtime is writable by the bot's systemd unit; the repo is read-only.
+# Matches the convention used by dispatch-sentinel.json + other runtime state.
+PENDING_APPROVALS_PATH = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
 APPROVALS_PAUSED_FLAG = AGENTS_ROOT / 'blackboard' / 'APPROVALS_PAUSED'
 
 HISTORY_CAP = 1000
