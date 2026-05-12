@@ -957,4 +957,51 @@ Concretely (4 commits to `main`):
 
 ---
 
+## Phase D2.5 — Upstream-audit response: hybrid watcher + healers (2026-05-11, ~5 hours)
+
+**What we built:** Closed the gaps a comprehensive upstream audit found in D2. Five commits across one session:
+
+1. **`docs/upstream-audit.md`** (652 lines) — file-by-file map of upstream `gm-agent-core` vs Larry's fork. Lists every script with adoption status, identifies 10 gaps prioritized by phase, calls out genuinely-GM-specific code with a defended skip reason, and explicitly answers the D2 thin-watcher question.
+2. **`scripts/post_merge_verifier.py`** — forward-ported upstream `#241` (branch-prefix allowlist extension).
+3. **D2.5-prep** — synced `shared/HANDSHAKE-SCHEMA.json` source enum from GM-era to Larry-era (Gap 7); pulled upstream's identity-test fixtures (Gap 9). One test (`RunClaudeInvokesScrub`) required a Popen-mock rewrite because our fork's `agent_runner.run_claude` uses `subprocess.Popen` for cancel-marker polling while upstream uses `subprocess.run` — captured as a separate fixup commit.
+4. **D2.5-watcher** — the substantial migration (Gap 1 + Gap 5):
+   - Extended `_StubTokenManager` in `agent_runner.py` with `check_for_rate_limit`/`detect_cap_in_output`/`report_rate_limit`/`report_success` no-ops (the previous stub only had `get_token`, so the first real call would have crashed). Fixed `get_token` to return a string `account_id` ('oauth') instead of `0` (int) which broke string concatenation.
+   - Added optional `out_meta` dict parameter to `agent_runner.run_claude` so cost/usage/attempts/account_id can flow back to callers without breaking the existing return signature.
+   - Rewrote `scripts/inbox_watcher.py` (~470 lines) to delete its local `run_claude` and call `agent_runner.run_claude` instead. Identity-assertion preamble (Phase D2.5 Call A: on by default) prepended via `build_expected_agent_assertion(agent)` where `expected_agent` is implicit from the inbox path (Call B). `task_stem=task_id` activates in-flight registry + cancel-marker support.
+   - Added `reap_orphans_on_startup()` (Call C: adopt-if-alive, mark-failed-if-dead, never re-dispatch). On watcher restart, scans `state/in-flight/*.json`, writes forfeit outboxes with `exit_code=-3`, leaves operator to re-dispatch manually if needed.
+   - Added `_emergency_halt_active()` poll at the top of `agent_loop()` and inside the per-task loop. `~/agents/blackboard/EMERGENCY_HALT` is sticky — exits cleanly, systemd doesn't auto-restart, requires manual `systemctl start` to resume.
+   - Pre-create `~/agents/config/` in `ensure_dirs()` (fixup commit) — `concurrency_guard.py` writes its state there; missing directory caused the first hybrid dispatch to crash with `FileNotFoundError`.
+5. **D2.5-healers** — 7 systemd `.service` + `.timer` pairs (Gap 8) wrapping the already-pulled healer scripts: `abandoned-inbox-tasks` (10m), `blocked-inbox-age` (15m), `empty-inbox-files` (15m), `recovery-already-merged` (5m), `restart-dedup-obsolete` (5m), `silent-loop-death` (10m), `zombie-main-workers` (5m). All oneshot, `Nice=10`, lean hardening (matches upstream's healer style).
+
+**Why:** Larry caught that I'd started D3 design from scratch without auditing Joe's upstream. We paused, ran a 60-minute comprehensive audit, and the audit changed the trajectory: D2 had bypassed 600+ lines of upstream defense machinery (retry/backoff, identity-hardening, in-flight registry, cancel-markers, rate-limit detection). The "build complete, not fast" principle made the call obvious — adapt and use upstream's hardened path, not parallel it. Phase D2.5 isn't a new feature; it's "make D2 actually complete by the audit's measure" so D3 starts on a solid foundation.
+
+**Key decisions (audit-grounded, not designed from scratch):**
+
+1. **Hybrid migration, not full replacement.** Keep our thread-per-agent watcher structure (cleaner than upstream's ThreadPoolExecutor for our 4-agent fan-out). Swap only the `claude --print` spawning step to `agent_runner.run_claude`. The thin watcher's *structure* is Larry's improvement; the thin watcher's `run_claude` was undercooked and is correctly replaced.
+2. **Identity-assertion preamble on by default.** Defense against the upstream 2026-04-16 `/tmp/CLAUDE.md` poisoning incident (Joe lost a full day to silent persona-swapping). Cost: ~500 tokens/task, invisible at our scale. `expected_agent` is implicit from inbox path — filesystem layout is the truth, dispatchers can't lie about it.
+3. **Orphan policy: adopt-if-alive, mark-failed-if-dead, NEVER re-dispatch.** Re-dispatch automatically would risk double-billing if claude actually completed but the watcher restart lost its stdout pipe. The detached `start_new_session=True` subprocess outlives the watcher; we accept that output is forfeit on restart and surface it via outbox `exit_code=-3` with operator-actionable text.
+4. **Three-commit sequencing for rollback isolation.** D2.5-prep (zero-risk additions) → D2.5-watcher (the one risky commit) → D2.5-healers (independent additive concern). Each commit independently revertable.
+5. **Test-first, not test-after.** Pulled identity tests in D2.5-prep BEFORE the migration so we had a baseline. When the integration test (`RunClaudeInvokesScrub`) failed, the diagnostic took 30 minutes and surfaced a real test bug (Popen vs `run` API mismatch) rather than a real code defect — fixing it before the migration meant we knew the defense primitives were intact going in.
+6. **Lean hardening on healers.** Upstream's healers use minimal hardening (no `ProtectHome`/`ProtectSystem`). They're short-lived oneshots; the calculus is different from long-running services.
+7. **Schema enum sync without breaking the validator.** The previous `HANDSHAKE-SCHEMA.json` had GM-era sources (atlas/sage/luma/etc.) but `dispatch_validator.ALLOWED_SOURCES` had been rewritten to Larry-era (beacon/forge/mirror/pulse). The two had been disagreeing silently. Schema rewritten to match validator exactly; added a description note that they must stay in sync.
+
+**Verified end-to-end on the droplet (~$0.29 testing cost — same as D2 baseline):**
+
+- **Hybrid smoke test (Pulse, Sonnet):** 5.01s, attempts=1, $0.033. Outbox populated with all new meta fields (`account_id: 'oauth'`, `attempts: 1`, etc.). Pulse correctly read her CLAUDE.md.
+- **Validator-rejection:** 9-char prompt rejected with the F24 error, file in `.invalid/` with `.reason`. $0.
+- **Parallelism (4 agents simultaneous):** all 4 picked up within **18ms** of each other. Pulse done in 5.01s, three Opus agents done in 10.01s (5s `CANCEL_POLL_INTERVAL` granularity adds up to ~5s wait after claude finishes — trade-off for cancel-marker responsiveness, tunable later). All 4 returned exact ACK tokens + correct persona identification. $0.255.
+- **EMERGENCY_HALT:** flag touched → Forge thread detected first → all 4 exited within milliseconds → systemd did NOT auto-restart (clean exit, sticky-until-investigated by design). Manual `systemctl start` resumed cleanly with new PID.
+- **Healer timers:** all 7 unit pairs parsed cleanly via `systemd-analyze verify`, enabled successfully, first runs completed with `success`/`ExecMainStatus=0` within the same session.
+
+**Open issues entering D3:**
+
+- 5s `CANCEL_POLL_INTERVAL` adds up to ~5s wait on short tasks. Cosmetic; tunable.
+- During this session, Pulse's 4h `/cycle` timer fired on the droplet and the D2 auto-commit hook successfully committed her journal (`aade9d4`) — passive in-the-wild confirmation that D2's auto-commit + cost-capture infrastructure works.
+- D2.5 did NOT pull `dispatch_sentinel.py` (Gap 2), `routing_validator.py` (Gap 3), or the requeue/retry/dead-letter logic (Gap 4) — those directly support D3's three flows and land with D3.
+- Upstream `#240` (`heal_pr_auto_merge`) is deferred to D5+ (only matters when Forge starts opening PRs).
+
+**Next:** Phase D3 — the three flows (Beacon ↔ Pulse dialogue, Larry-approval gate, Beacon → Forge dispatch), now grounded in concrete upstream references the audit identified (`process_outbox_notifications` lines 1869-1947 for dialogue, `continuation registry` pattern for approval, `safe_write_inbox` for dispatch). Plus Gaps 2/3/4 lands with D3.
+
+---
+
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
