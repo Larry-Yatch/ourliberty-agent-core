@@ -1,0 +1,25 @@
+{
+    "_doc": "Trust policy for Beacon's approval gate. First-match-wins; default_action applies when no rule matches. Edit this file to add carve-outs as Larry builds confidence in specific dispatch shapes. Reloaded on every evaluate() call so changes take effect without restart. See scripts/trust_policy.py for the evaluator and schema.",
+    "_rule_fields": {
+        "source": "agent/system that initiated the task. \"*\" or omitted matches any.",
+        "target": "agent receiving the dispatch. \"*\" or omitted matches any.",
+        "task_type": "label on the task envelope. \"*\" or omitted matches any.",
+        "repos": "glob list against task.target_repo. [] matches any.",
+        "file_patterns": "glob list against task.changed_files. [] matches any.",
+        "action": "one of auto_approve | force_ask | reject."
+    },
+    "_example_rules_disabled": [
+        {
+            "source": "pulse",
+            "target": "forge",
+            "task_type": "doc-only",
+            "repos": ["ourliberty-agent-core"],
+            "file_patterns": ["docs/**", "*.md"],
+            "action": "auto_approve",
+            "_note": "Pulse-flagged doc-only changes in agent-core auto-approve. Uncomment to enable."
+        }
+    ],
+    "version": 1,
+    "default_action": "force_ask",
+    "rules": []
+}

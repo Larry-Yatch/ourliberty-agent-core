@@ -28,6 +28,9 @@ ALLOWED_SOURCES = {
     # Live agents
     'beacon', 'forge', 'mirror', 'pulse',
     'beacon-result', 'forge-result', 'mirror-result', 'pulse-result',
+    # Phase D3 clarification protocol
+    'forge-question', 'mirror-question',
+    'beacon-clarification',
     # Planned agents (placeholdered; safe to allow so dispatch tests don't fail)
     'aide', 'scout', 'compass',
     'aide-result', 'scout-result', 'compass-result',
@@ -37,6 +40,17 @@ ALLOWED_SOURCES = {
     'continuation', 'system-sweep', 'cycle-recovery', 'orchestrator',
     'ship_completion_watcher', 'backlog-promoter',
 }
+
+# Phase D3 — clarification protocol metadata. Optional on dispatch.
+ALLOWED_INTENTS = {
+    'ack-proceed',
+    'clarify',
+    'clarification-response',
+    'clarification-exhausted',
+    'reject',
+}
+
+ALLOWED_PHASES = {'preflight', 'build'}
 
 MIN_PROMPT_LEN = 100  # chars
 MAX_PROMPT_LEN = 50000
@@ -88,6 +102,28 @@ def validate_task(task):
     priority = task.get('priority')
     if priority is not None and priority not in ('founder-vision', 'normal', 'low', 'urgent'):
         return False, f'priority "{priority}" unknown'
+
+    # Phase D3 — intent / phase / clarification counters. All optional.
+    intent = task.get('intent')
+    if intent is not None and intent not in ALLOWED_INTENTS:
+        return False, f'intent "{intent}" not in allowed set {sorted(ALLOWED_INTENTS)}'
+
+    phase = task.get('phase')
+    if phase is not None and phase not in ALLOWED_PHASES:
+        return False, f'phase "{phase}" not in allowed set {sorted(ALLOWED_PHASES)}'
+
+    max_clar = task.get('max_clarifications')
+    if max_clar is not None and (not isinstance(max_clar, int) or max_clar < 0):
+        return False, f'max_clarifications must be non-negative int, got {max_clar!r}'
+
+    clar_count = task.get('clarification_count')
+    if clar_count is not None and (not isinstance(clar_count, int) or clar_count < 0):
+        return False, f'clarification_count must be non-negative int, got {clar_count!r}'
+
+    if max_clar is not None and clar_count is not None and clar_count > max_clar:
+        return False, (
+            f'clarification_count ({clar_count}) exceeds max_clarifications ({max_clar})'
+        )
 
     return True, 'ok'
 

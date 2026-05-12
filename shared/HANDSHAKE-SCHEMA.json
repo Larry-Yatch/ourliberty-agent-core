@@ -17,6 +17,8 @@
                 "larry",
                 "beacon", "forge", "mirror", "pulse",
                 "beacon-result", "forge-result", "mirror-result", "pulse-result",
+                "forge-question", "mirror-question",
+                "beacon-clarification",
                 "aide", "scout", "compass",
                 "aide-result", "scout-result", "compass-result",
                 "webhook", "telegram-webhook", "watchdog", "auto-retry", "auto-iterate",
@@ -24,7 +26,7 @@
                 "continuation", "system-sweep", "cycle-recovery", "orchestrator",
                 "ship_completion_watcher", "backlog-promoter"
             ],
-            "description": "Who initiated this task. Must match dispatch_validator.ALLOWED_SOURCES — keep these two in sync."
+            "description": "Who initiated this task. Must match dispatch_validator.ALLOWED_SOURCES — keep these two in sync. Phase D3 added forge-question / mirror-question (preflight clarifications) and beacon-clarification (clarification responses)."
         },
         "reply_chat_id": {
             "type": ["integer", "null"],
@@ -111,6 +113,63 @@
         "dedup_identity": {
             "type": "string",
             "description": "Optional. Explicit dedup key when auto-extraction is wrong."
+        },
+        "task_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required by dispatch_validator. Stable identifier used for in-flight registry, lease keys, and audit log correlation."
+        },
+        "intent": {
+            "type": "string",
+            "enum": [
+                "ack-proceed",
+                "clarify",
+                "clarification-response",
+                "clarification-exhausted",
+                "reject"
+            ],
+            "description": "Phase D3 — optional intent discriminator. Used by the clarification protocol. Absent on plain dispatch and result tasks. 'clarify' is Forge/Mirror asking a question; 'clarification-response' is Beacon answering; 'ack-proceed' is the agent confirming preflight is done; 'reject' / 'clarification-exhausted' signal terminal failure paths."
+        },
+        "phase": {
+            "type": "string",
+            "enum": ["preflight", "build"],
+            "description": "Phase D3 — optional dispatch phase for Forge. 'preflight' lets Forge read the spec and decide ack-proceed / clarify / reject before any commits. 'build' is the work phase, set after ack-proceed."
+        },
+        "target_repo": {
+            "type": "string",
+            "description": "Phase D3 — repo to operate on (required for Forge dispatches that involve a worktree). Examples: 'ourliberty-agent-core', 'TruPath-website'."
+        },
+        "task_type": {
+            "type": "string",
+            "description": "Phase D3 — optional label for trust-policy matching. Examples: 'doc-only', 'feature-development', 'code-review', 'observation'. Free-form; trust_policy.json rules can match on '*' or exact strings."
+        },
+        "pr_title": {
+            "type": "string",
+            "description": "Phase D3 — PR title for Forge dispatches that will open a pull request. Required for Forge tasks targeting a real repo."
+        },
+        "pr_body_template": {
+            "type": "string",
+            "description": "Phase D3 — optional template for the PR body. Forge fills in per-task specifics. If missing, Forge writes the body from her interpretation of the spec."
+        },
+        "max_clarifications": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 3,
+            "description": "Phase D3 — maximum clarification cycles allowed on this dispatch before dead-lettering. Default 3."
+        },
+        "clarification_count": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "Phase D3 — current clarification cycle counter. Incremented by Forge on each clarify intent. Dispatch dead-letters when count exceeds max_clarifications."
+        },
+        "session_id": {
+            "type": "string",
+            "description": "Phase D3 — claude session id for `--resume` on clarification-response delivery. Lets Forge continue her preflight reasoning rather than re-bootstrapping."
+        },
+        "expected_agent": {
+            "type": "string",
+            "description": "Phase D2.5 — identity-assertion hint. Implicit from inbox path at watcher pickup; written explicitly by dispatchers that want belt-and-suspenders. Defends against the upstream 2026-04-16 /tmp/CLAUDE.md poisoning incident."
         }
     },
     "additionalProperties": true
