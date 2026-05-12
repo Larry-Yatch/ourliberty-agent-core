@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_restart_dedup_obsolete every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-restart-dedup-obsolete.service
+
+[Install]
+WantedBy=timers.target

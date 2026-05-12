@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_abandoned_inbox_tasks every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-abandoned-inbox-tasks.service
+
+[Install]
+WantedBy=timers.target

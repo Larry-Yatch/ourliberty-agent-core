@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_recovery_already_merged every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-recovery-already-merged.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_zombie_main_workers every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-zombie-main-workers.service
+
+[Install]
+WantedBy=timers.target

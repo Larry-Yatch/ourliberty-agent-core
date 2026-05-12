@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_blocked_inbox_age every 15 minutes
+
+[Timer]
+OnBootSec=6min
+OnUnitActiveSec=15min
+Unit=ourliberty-heal-blocked-inbox-age.service
+
+[Install]
+WantedBy=timers.target

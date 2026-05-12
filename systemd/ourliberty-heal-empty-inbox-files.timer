@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_empty_inbox_files every 15 minutes
+
+[Timer]
+OnBootSec=8min
+OnUnitActiveSec=15min
+Unit=ourliberty-heal-empty-inbox-files.service
+
+[Install]
+WantedBy=timers.target

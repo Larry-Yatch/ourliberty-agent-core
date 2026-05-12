@@ -91,6 +91,43 @@ sudo systemctl enable --now ourliberty-agent-core-health.timer
 sudo systemctl enable --now ourliberty-watchdog.timer
 ```
 
+### Self-healing healers (Phase D2.5)
+
+Seven healer scripts under `scripts/heal_*.py` watch for specific failure modes the audit identified. Each runs on its own systemd timer (5–15 min cadence) and is one-shot — fires, reports, exits. Enabling these closes audit Gap 8.
+
+```bash
+# Install (copy unit files into systemd's directory)
+sudo cp ~/agent-core/systemd/ourliberty-heal-*.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-heal-*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable + start all 7 timers at once
+sudo systemctl enable --now ourliberty-heal-abandoned-inbox-tasks.timer
+sudo systemctl enable --now ourliberty-heal-blocked-inbox-age.timer
+sudo systemctl enable --now ourliberty-heal-empty-inbox-files.timer
+sudo systemctl enable --now ourliberty-heal-recovery-already-merged.timer
+sudo systemctl enable --now ourliberty-heal-restart-dedup-obsolete.timer
+sudo systemctl enable --now ourliberty-heal-silent-loop-death.timer
+sudo systemctl enable --now ourliberty-heal-zombie-main-workers.timer
+
+# Confirm
+systemctl list-timers 'ourliberty-heal-*' --all
+```
+
+What each one does:
+
+| Healer | Cadence | What it watches for |
+|---|---|---|
+| `abandoned-inbox-tasks` | 10 min | Tasks stuck in an inbox because the worker exited silently |
+| `blocked-inbox-age` | 15 min | Stale tasks in `inboxes/*/blocked/` past their TTL |
+| `empty-inbox-files` | 15 min | Empty / trivially-malformed JSON files dropped into agent inboxes |
+| `recovery-already-merged` | 5 min | Recovery tasks pointing at PRs that have since been merged |
+| `restart-dedup-obsolete` | 5 min | Stale `RESTART_DEDUP` duplicate markers |
+| `silent-loop-death` | 10 min | Self-scheduled re-queue loops that died without leaving a trace |
+| `zombie-main-workers` | 5 min | `claude` agent processes still running in deleted worktree paths |
+
+Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
+
 ## Checking state
 
 ```bash
