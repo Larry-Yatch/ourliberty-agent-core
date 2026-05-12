@@ -222,10 +222,13 @@ class ExpectedAgentAssertionBuilder(unittest.TestCase):
 class RunClaudeInvokesScrub(unittest.TestCase):
     """Fixture 5: the scrub fires on every run_claude() attempt.
 
-    Regression lock: the scrub must be called BEFORE subprocess.run, not
-    after, otherwise the landmine poisons the very spawn that is supposed
-    to be protected by it. We don't actually spawn Claude here — we stub
-    out subprocess.run and just assert ordering of calls.
+    Regression lock: the scrub must be called BEFORE the subprocess that
+    spawns claude, otherwise the landmine poisons the very spawn that is
+    supposed to be protected by it.
+
+    Note on the mock target: Larry's fork uses subprocess.Popen (with poll-
+    based cancel-marker support) rather than upstream's subprocess.run.
+    This test patches Popen accordingly.
     """
 
     def test_scrub_called_before_subprocess(self):
@@ -238,35 +241,77 @@ class RunClaudeInvokesScrub(unittest.TestCase):
             order.append('scrub')
             return []
 
-        def fake_subprocess_run(*args, **kwargs):
+        class _FakeStdin:
+            def write(self, _data):
+                pass
+            def close(self):
+                pass
+
+        class _FakeStream:
+            def __init__(self, text):
+                self._text = text
+            def read(self):
+                return self._text
+
+        class _FakeProc:
+            def __init__(self):
+                self.pid = 99999
+                self.stdin = _FakeStdin()
+                self.stdout = _FakeStream(
+                    '{"result": "ok", "session_id": "s1", "total_cost_usd": 0.0}')
+                self.stderr = _FakeStream('')
+                self.returncode = 0
+                self._polled = False
+            def poll(self):
+                # Return None once (so the poll loop body runs at most once),
+                # then 0 on subsequent calls. This exercises the cancel-check
+                # branch but exits immediately.
+                if not self._polled:
+                    self._polled = True
+                    return 0  # done immediately
+                return 0
+            def terminate(self):
+                pass
+            def kill(self):
+                pass
+            def wait(self, timeout=None):
+                return 0
+
+        def fake_popen(*args, **kwargs):
             order.append('subprocess')
-            return mock.Mock(stdout='{"result": "ok", "session_id": "s1"}',
-                             stderr='', returncode=0)
+            return _FakeProc()
 
         fake_tm = mock.Mock()
         fake_tm.get_token.return_value = ('tok', 'acct')
         fake_tm.check_for_rate_limit.return_value = False
+        fake_tm.detect_cap_in_output.return_value = False
+        fake_tm.report_success = mock.Mock()
+
         fake_guard = mock.Mock()
         fake_guard.wait_for_slot.return_value = True
         fake_guard.active_count.return_value = 0
 
         with mock.patch.object(agent_runner, 'scrub_tmp_identity_landmines',
                                side_effect=fake_scrub), \
-             mock.patch.object(agent_runner.subprocess, 'run',
-                               side_effect=fake_subprocess_run), \
+             mock.patch.object(agent_runner.subprocess, 'Popen',
+                               side_effect=fake_popen), \
              mock.patch.object(agent_runner, 'get_manager',
                                return_value=fake_tm, create=True), \
              mock.patch.object(agent_runner, 'get_guard',
                                return_value=fake_guard, create=True), \
              mock.patch.object(agent_runner, 'get_agent_model',
                                return_value=('sonnet', 'sonnet'), create=True), \
-             mock.patch.object(agent_runner, 'log', create=True):
-            success, _out, _sid = agent_runner.run_claude(
+             mock.patch.object(agent_runner, 'quarantine_parent_claude_md_poison',
+                               return_value=[]):
+            success, output, sid = agent_runner.run_claude(
                 'pulse', 'hello world this is a test prompt', timeout=5)
 
-        self.assertTrue(success)
+        self.assertTrue(success,
+                        'run_claude should report success when subprocess returncode is 0 + valid JSON')
+        self.assertEqual(output, 'ok')
+        self.assertEqual(sid, 's1')
         self.assertEqual(order[:2], ['scrub', 'subprocess'],
-                         'scrub must run BEFORE subprocess.run, got ' + str(order))
+                         'scrub must run BEFORE the subprocess spawn, got ' + str(order))
 
 
 def _main():
