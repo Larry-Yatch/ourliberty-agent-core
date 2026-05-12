@@ -106,6 +106,10 @@ def ensure_dirs() -> None:
     BLACKBOARD.mkdir(parents=True, exist_ok=True)
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
+    # concurrency_guard writes its state to ~/agents/config/.concurrency-guard.json
+    # — pre-create the directory so the first run_claude call doesn't fail with
+    # FileNotFoundError before reaching the scrub/spawn path.
+    (AGENTS_ROOT / "config").mkdir(parents=True, exist_ok=True)
 
 
 def scan_inbox(agent: str) -> list[Path]:
