@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-11 (Iteration 15)
+## Status snapshot — updated 2026-05-11 (Iteration 16)
 
-Fifteen cycles run. Iter 15: dirty tree 13th consecutive (iters 3–15). **Permanent fix confirmed in place** — `6b6284a` ("Phase D2: shared inbox watcher + cost capture + cycle auto-commit") added auto-commit step to `run_cycle.sh`. After each successful cycle, run_cycle.sh does `git add + commit + push` on Pulse-owned files (cycle-journal.md, cycle-actions.jsonl, MEMORY.md, memory/). Automated cycle PID 32030 (started 18:33 MDT 2026-05-11) will auto-commit iter 14+15 dirty files when it completes. Sync blocked 13 consecutive (all tree-caused since iter 3). All 4 bots systemctl active (log silence = confirmed false positive). settings.json (`agents/pulse/.claude/settings.json`) still absent — automated cycles cannot write journal entries, but auto-commit in run_cycle.sh mitigates the dirty-tree symptom by committing any pre-existing dirty files after each cycle. Fourteen total escalations written to pulse-escalations.json; none resolved through automated channels. Pattern expected to break with PID 32030 completion.
+Sixteen cycles run. **System returned to nominal.** Iter 16: dirty tree and sync-blocked patterns CLOSED — both plagued iters 3–15 (13 consecutive). Permanent fix `6b6284a` confirmed working: agent-core-sync.json shows status=success at 2026-05-12T03:39:58Z, commit=e2e5f79, first successful sync since iter 2. All 5 systemd units active (beacon, forge, mirror, pulse, inbox-watcher). Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — validator working). Watching as a potential new pattern (2 occurrences so far; threshold = 3 in 10 cycles).
 
 ## Known calibration issues
 
@@ -30,7 +30,7 @@ Fifteen cycles run. Iter 15: dirty tree 13th consecutive (iters 3–15). **Perma
 
 ## Recurring patterns I've promoted to permanent fixes
 
-- **2026-05-11 — Dirty tree (Pulse operational writes).** Pattern: 13 consecutive cycles (iters 3–15) left cycle-journal.md and MEMORY.md uncommitted, blocking sync. Permanent fix: `6b6284a` ("Phase D2: shared inbox watcher + cost capture + cycle auto-commit") added auto-commit step to `run_cycle.sh` — commits Pulse-owned files after each successful cycle. Landed ~2 days after G-rule first fired (iter 4). Implemented by Larry (committed 2026-05-11 15:52 MDT). Status: in place, expected to resolve the pattern with the completion of automated cycle PID 32030.
+- **2026-05-11 — Dirty tree (Pulse operational writes). CLOSED iter 16.** Pattern: 13 consecutive cycles (iters 3–15) left cycle-journal.md and MEMORY.md uncommitted, blocking sync. Permanent fix: `6b6284a` ("Phase D2: shared inbox watcher + cost capture + cycle auto-commit") added auto-commit step to `run_cycle.sh` — commits Pulse-owned files after each successful cycle. Landed ~2 days after G-rule first fired (iter 4). Implemented by Larry (committed 2026-05-11 15:52 MDT). **Confirmed resolved** — iter 16 sync.json shows success, commit e2e5f79, first clean A+B checks since iter 2.
 
 ## Recurring patterns I've decided NOT to promote (and why)
 

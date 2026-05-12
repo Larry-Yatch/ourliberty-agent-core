@@ -4,6 +4,27 @@
 
 ---
 
+## Iteration 16 — 2026-05-11 22:33 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Branch=main, working tree clean (confirmed via session start git status + sync.json proxy). HEAD=e2e5f79=origin/main. First clean check A since iter 2.
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-12T03:39:58Z, status=success, commit=e2e5f79, branch=main. First successful sync since iter 2 (13 consecutive failures closed). Permanent fix `6b6284a` (auto-commit in run_cycle.sh) confirmed working.
+- **(C) Agent liveness: nominal.** All 5 units active: beacon, forge, mirror, pulse, inbox-watcher. Log silence = confirmed false positive per MEMORY.md.
+- **(D) Inboxes: nominal (with note).** No live .json tasks in any inbox. Two items in pulse/.invalid/: `d2-reject-20260511T220650Z.json` and `d25-reject-20260512T030823Z.json` — both source=larry, prompt="too short" (9 chars), validator correctly rejected (F24 class: prompt < 100 chars). Validator working. Not a pattern yet (2 occurrences; threshold = 3 in 10 cycles). Likely Larry testing dispatch mechanism.
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core.
+- **(F) Concurrency: automated cycle active.** PID 37818 (bash), 2:08 elapsed, lock modified 22:33 MDT. Fresh (< 30 min). Interactive session takes precedence per iters 3–15 precedent.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED** after 13 consecutive iterations (iters 3–15). Permanent fix `6b6284a` confirmed — sync.json shows first successful sync since iter 2. Pattern promoted to "resolved" in MEMORY.md.
+- Sync blocked: **CLOSED** — same root cause, same resolution.
+- Invalid pulse inbox dispatches: 2 occurrences (2026-05-11T22:06Z, 2026-05-12T03:08Z), both source=larry, both F24 class. Watching; not yet at threshold.
+**Learned:** Auto-commit step in run_cycle.sh works as designed. Both long-running drift patterns (iters 3–15) closed. System structurally healthier — baseline reset to nominal. Updating MEMORY.md.
+
+---
+
 ## Iteration 15 — 2026-05-11 18:35 MDT
 
 **Health:** ⚠️ Drift → resolving
