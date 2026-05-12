@@ -4,6 +4,28 @@
 
 ---
 
+## Iteration 18 — 2026-05-12 06:35 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Sync.json proxy: status=no-change, commit=c3a9b35=HEAD (matches session-start gitStatus), branch=main. Clean.
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-12T11:41:00Z (05:41 MDT, ~54m ago), status=no-change, commit=c3a9b35. Within 2h threshold. ✅
+- **(C) Agent liveness: nominal.** All 5 units active: beacon, forge, mirror, pulse, inbox-watcher. Beacon last logged 2026-05-11 23:39 MDT (~7h) — recent activity; Larry interacted with approval flow (D3-approval "reject: smoke test only" at 23:39 MDT). Forge/mirror last logged 2026-05-09 13:44–46 MDT (~45h). Pulse last logged 2026-05-10 12:18 MDT. Log silence = confirmed false positive per MEMORY.md (idle Telegram; units active, no error spam in last visible log lines).
+- **(D) Inboxes: nominal.** No live .json tasks in any inbox. pulse/.invalid/ unchanged — same 2 files from iters 16–17 (d2-reject-20260511T220650Z.json, d25-reject-20260512T030823Z.json, source=larry, F24 class). Count=2; threshold=3 in 10 cycles. No new additions.
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: nominal.** Automated cycle PID 55319 (bash, run_cycle.sh) lock written 06:33:39 MDT, elapsed ~2 min at check time. Fresh (< 10 min). Normal 4h-timer run. Interactive session takes precedence per prior iters.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED**. 3rd consecutive clean cycle (iters 16–18). Fix `6b6284a` holding. ✅
+- Sync blocked: **CLOSED**. 3rd consecutive successful sync proxy. ✅
+- Invalid pulse inbox dispatches: 2 total (both from iter 16 window), no new additions this cycle. Still watching; 2/10, threshold=3.
+- Beacon D3-approval flow active: Larry interacted 2026-05-11 23:37–23:39 MDT (approval request sent by beacon for "watchdog-doc-fix-001", rejected by Larry as "smoke test only"). No anomaly — expected operational behavior.
+**Learned:** Nothing new. System third consecutive nominal cycle (iters 16–18). Structural health holding post-`6b6284a`. Beacon active in D3-approval flow.
+
+---
+
 ## Iteration 17 — 2026-05-12 02:36 MDT
 
 **Health:** ✅ Nominal
