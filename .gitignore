@@ -66,6 +66,9 @@ gdoc_images/
 screenshots/
 .claude/cache/
 
+# --- Local Claude Code settings (per-user permission overrides) ---
+.claude/settings.local.json
+
 # --- IDE ---
 .idea/
 .vscode/
