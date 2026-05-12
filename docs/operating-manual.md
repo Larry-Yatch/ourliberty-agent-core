@@ -1004,4 +1004,93 @@ Concretely (4 commits to `main`):
 
 ---
 
+## Phase D3 (commits 1–3 of 5) — dispatch back-channel + approval gate (2026-05-11 evening through 05-12 early, ~5 hours, ~$1.12 verification)
+
+**Status entering this entry:** 3 of 5 D3 commits shipped + verified live. Dispatch back-channel + Larry-approval gate work end-to-end. Commit 4 (Forge full flow + clarification protocol) and commit 5 (sentinel timer) are the remaining work; estimated 3–4 sessions of careful design + code across the two.
+
+**Design pre-session** (covered in conversation; for the record): D3 was scoped as Option C — D3 ships dispatch chain, D3.5 ships Forge→Mirror→Beacon review chain. Twelve architectural calls were surfaced + signed off before any code: free-text strict-whitelist approval (Call 2), no-timeout-auto-reject with reminders (Call 3), trust-policy substrate ships empty rules (Call 4), standalone outbox-notifier daemon (Call 4 packaging), Forge full flow through PR-open (Call 5), planted real follow-up as live test target (Call 6, watchdog-doc-fix), per-agent worktree opt-in (Call 9), task envelope provides `pr_title` (Call 10), strict reminder schedule 6/24/72h (Call 11), watchdog-enable as live target (Call 12). Plus six follow-on calls (13–18) for Forge preflight + clarification protocol: Forge-judged trigger (Call 13), create worktree on preflight (Call 14), wire `session_id` resume into watcher (Call 15), max-3 clarifications + escalation (Call 16), Beacon's clarification-vs-modification fork (Call 17), generalize clarification protocol to all agents now (Call 18).
+
+### D3-prep (`6392c03`) — substrate, zero-risk additive
+
+**Shipped** (11 files, +2167 lines, 69 new tests):
+
+1. **`scripts/routing_validator.py`** — two-layer role-boundary enforcement. Hard topology (`FRESH_DISPATCH_ROUTES` + dialogue-suffix bypass + system-source bypass) is Larry-shaped, added on top of upstream's pattern. Soft IDENTITY.md reroute adapted verbatim from upstream `scripts/routing_validator.py`. New `RoutingDenied` exception on hard-topology violation.
+2. **`scripts/dispatch_sentinel.py`** — stall detection for inbox + in-flight registry + leases. Inbox + lease scans adapted from upstream `scripts/dispatch_sentinel.py` (~lines 80–260). The in-flight registry scan with per-model thresholds (Sonnet 30m, Opus 60m, Haiku 15m, default 30m) is the D3-specific addition; upstream did not have this. Wrapped in a systemd timer in commit 5.
+3. **`scripts/safe_write_inbox.py`** — validated atomic-write helper. Combines `dispatch_validator` + `routing_validator` + filename-length guard + tempfile-rename atomic write + audit log to `~/agents/logs/routing-events.jsonl`. Extracted from upstream `orchestrator.safe_write_inbox` lines 551–594.
+4. **`scripts/trust_policy.py`** + **`config/trust-policy.json`** — autonomy-tier policy substrate. First-match-wins rule list; default-deny fallback; glob-based repo + file matching; malformed-policy fails-closed to `force_ask`. Default shipped policy = empty rules → every dispatch `force_ask`.
+5. **`shared/HANDSHAKE-SCHEMA.json`** extended: new source enums (`forge-question`, `mirror-question`, `beacon-clarification`); new optional fields (`task_id` formalized, `intent`, `phase`, `target_repo`, `task_type`, `pr_title`, `pr_body_template`, `max_clarifications`, `clarification_count`, `session_id`, `expected_agent`).
+6. **`scripts/dispatch_validator.py`** extended: same source enum additions, `ALLOWED_INTENTS` + `ALLOWED_PHASES` sets, optional validation for intent / phase / max_clarifications / clarification_count fields.
+7. Tests: `test_routing_validator.py` (14), `test_safe_write_inbox.py` (14), `test_trust_policy.py` (16), `test_dispatch_sentinel.py` (9).
+
+**Verified:** 85 unit tests pass on Python 3.12 droplet; `validate_agent_core.py` passes; three module `_self_test()`s pass. Zero live impact — nothing wired to live paths.
+
+### D3-notifier (`b2b5c1f`) — back-channel routing + dead-letter + watcher routing wire (LIVE)
+
+**Shipped** (4 files, +941 lines, 21 new tests):
+
+1. **`scripts/outbox_notifier.py`** — long-running daemon, 5s poll. Two scans per cycle:
+   - **Outboxes:** every completed `outboxes/<agent>/*.json`. Bare-agent sources notify back as `<agent>-result`. `*-question` sources notify back as `<agent>-clarification` with `intent=clarification-response` and `session_id` propagated for `--resume` (the watcher wiring lands in commit 4). Reply-leg sources (`*-result`, `*-clarification`, `*-answer`) and system sources are archive-only. Self-dispatch skipped. Failed tasks get a FAILED-framed notify. Adapted from `orchestrator.process_outbox_notifications` lines 1869–1947.
+   - **Dead-letter:** `.invalid/*.json` scan. Validator-rejected tasks today land in `.invalid/` with a `.reason` sidecar and nobody is notified. This scan finds new entries, writes a dead-letter notify to the source agent's inbox (Gap 4 closed). State persisted at `~/agents/state/outbox-notifier-dead-letter.json` (dedup + GC).
+   - Depth limiter at 1 (matches upstream's cap, orchestrator line 1878). EMERGENCY_HALT honored.
+2. **`systemd/ourliberty-outbox-notifier.service`** — `Type=simple`, hardening parity with the watcher, ordered `After=ourliberty-inbox-watcher.service`. **Live on droplet.**
+3. **`scripts/inbox_watcher.py`** modified — D3 defense-in-depth: `routing_validator.check_hard_topology()` called after `dispatch_validator` on every pickup. Catches tasks that bypassed `safe_write_inbox`. Rejections land in `.invalid/`; the notifier then dead-letters back to the source.
+4. **`scripts/tests/test_outbox_notifier.py`** — 21 tests covering routing decisions, depth cap, partial-JSON tolerance, short-prompt padding, dead-letter dedup + GC.
+
+**Verified live on droplet (~$0.62):**
+- Dropped a `source: pulse` task to Beacon's inbox → watcher picks up → Beacon ACKs (Sonnet, 5.02s, $0.031) → outbox archived → notifier sees `source=pulse` → writes `notify-*` to Pulse's inbox with `source=beacon-result` → Pulse's watcher picks up → Pulse processes (3.4 min, $0.59) → outbox archived → notifier sees `source=beacon-result` (reply leg) → archive-no-notify. Loop terminated by dialogue-suffix bypass. Full audit trail in `~/agents/logs/routing-events.jsonl`.
+- Pulse's 3.4-min run was over-budget because the notify prompt arrived naked ("Task result from beacon: SUCCESS\n\n...") with no framing telling her "this is an inter-agent notify; archive it." **Lesson filed for commit 4's clarification-response prompt template.**
+
+**Anomaly observed:** `archive failed for ... no such file or directory` warning on Pulse's inbox. A healer (likely `heal_abandoned_inbox_tasks` or `heal_blocked_inbox_age`) moved the inbox file mid-3.4-min-processing. Pre-existing watcher/healer race; not D3-introduced. Filed for D5.
+
+### D3-approval (`dc3cb81` + fixup `4e4f34a`) — Larry-approval gate via Telegram (LIVE)
+
+**Shipped** (4 + 2 files, +1336 / -38 lines, 39 new tests):
+
+1. **`scripts/beacon_approval_handler.py`** — pure-logic library, no I/O coupling. Provides:
+   - `parse_user_reply` — strict whitelist on positive confirmation (`approve` / `yes` / `go` / `ok` / `okay` / `ship` / `ship it`, exact match after case-fold + strip). Ambiguous text returns `none` → bot forwards to Beacon for clarification, never inferred approval. Modify / reject use prefix grammar (`modify:` / `reject:` followed by free-text reason). Pause / resume commands (`/pause` / `/resume`).
+   - `extract_approval_request` — regex extraction of `=== APPROVAL_REQUEST === {json} === END_APPROVAL_REQUEST ===` blocks. Validates required fields (`task_id`, `summary`, `target_agent`, `prompt`). Raises `MalformedApprovalMarker` on missing fields or invalid JSON. Returns parsed payload + narrative-with-marker-stripped.
+   - State file CRUD at `~/agents/state/beacon-pending-approvals.json` (runtime tree). Operations: `add_pending`, `find_pending_by_id`, `most_recent_pending`, `resolve` (status ∈ {approved, rejected, modified, expired}), `pop_paused_backlog`. History capped at 1000.
+   - `trust_decision` bridge to `trust_policy.evaluate`.
+   - `due_reminders` + `record_reminder_sent` — 6h / 24h / 72h schedule, deduped, suppressed during pause.
+   - `is_paused` / `set_paused` — file flag at `~/agents/blackboard/APPROVALS_PAUSED`.
+   - DM formatters and `dispatch_approved` (invokes `safe_write_inbox` with forced `source='beacon'`).
+2. **`scripts/beacon_telegram_bot.py`** extended — two intercept points + reminder sweep:
+   - **Before forwarding user message:** `parse_user_reply` → if recognized command, handle directly (no Beacon call). Approve dispatches via `dispatch_approved` + confirmation DM. Modify / reject resolve + send a structured relay note to Beacon. Pause / resume toggle the flag.
+   - **After Beacon's response:** `_send_beacon_response` calls `extract_approval_request`. If marker present, consult `trust_decision`, route to one of three paths: auto-dispatch + one-liner, queue + formatted approval DM, or policy rejection. Marker stripped from narrative.
+   - **Every ~5 min in the polling loop:** `_check_due_reminders` DMs nudges.
+   - **Defensive per-update try/except** wraps `_process_update` — a single bad update never crashes the bot (prevents the replay loop documented below).
+3. **`agents/beacon/CLAUDE.md`** — new section "How you dispatch work to Forge — the APPROVAL_REQUEST marker (Phase D3)". Documents the marker format (required + optional fields), the bot's behavior, the user-reply grammar Beacon should expect Larry to use, the pause / resume semantics, and a self-check before emitting. Replaces the old "Don't dispatch work to other agents" instruction.
+
+**Verified live on droplet (~$0.50):**
+- Larry messaged Beacon "*propose a tiny plan: fix the watchdog warning in operating-manual.md*". Beacon read her updated CLAUDE.md, emitted a clean marker with a detailed payload (her own preflight branching for Forge based on the actual `systemctl is-enabled` state, exact line numbers verified by grep, success criteria, out-of-scope list, "if you get stuck" guidance, `max_clarifications=2`). Bot extracted, persisted, DMed Larry the formatted approval request.
+- Larry replied `reject: smoke test only`. Bot resolved the entry as rejected, archived to history with `resolution_note`, DMed confirmation, relayed to Beacon. Beacon acknowledged.
+
+**Two bugs caught + fixed during the smoke test:**
+
+1. **State file path in repo tree, not runtime tree.** Initial commit placed `pending-approvals.json` at `agent-core/agents/beacon/state/` (REPO). The beacon-bot service has `ProtectHome=read-only` + `ReadWritePaths` covering `~/agents` but NOT `~/agent-core`. First `add_pending` call failed with `Errno 30: Read-only file system`, crashing the bot. **Fix:** moved state to `~/agents/state/beacon-pending-approvals.json`. State isn't source-of-truth and shouldn't be in the repo anyway. (Commit `4e4f34a`.)
+2. **Bot crash → systemd restart → message replay loop.** `Restart=on-failure` combined with in-memory `offset` (not persisted) means a crash mid-message replays the SAME update on restart. Beacon got Larry's prompt 7 times consecutively before we noticed, burning ~$0.40 of Sonnet tokens. **Fix:** defensive `try/except` per-update in the main loop. (Commit `4e4f34a`.)
+
+**Bug + verification cost:** ~$0.40 burned during the replay loop, ~$0.10 for the successful retry. Both bugs would have been worse to hit in commit 4 when Forge consumes real Sonnet/Opus tokens.
+
+**Codified conventions worth recalling:**
+
+1. **State files in runtime tree, not repo** — the repo (`~/agent-core/`) is read-only for services with `ProtectHome=read-only`. Runtime (`~/agents/`) is the only writable location across all current + planned services. Any future state file must follow this.
+2. **Strict positive-confirmation whitelist** — never infer approval from ambiguous text. Lesson borrowed from upstream's `INTERNAL_ACK_PREFIXES` filter (orchestrator lines 309–388).
+3. **Marker convention with required-field validation** — the bot rejects malformed markers explicitly rather than silently mis-parsing. Beacon gets a warning DM and can re-emit.
+4. **Notify task source override in `dispatch_approved`** — always sets `source='beacon'` on the envelope so a buggy marker payload cannot impersonate another agent.
+
+**Open issues entering commit 4 (D3-forge):**
+
+- **`ReadWritePaths` on `ourliberty-inbox-watcher.service` must include `~/agent-repos/`** before live worktree creation. Forge worktrees go to `~/agent-repos/<repo>/.worktrees/<task-id>/` which is NOT in any current `ReadWritePaths`. Pre-deployment blocker.
+- **Notify prompt framing** — the over-budget Pulse run during D3-notifier smoke ($0.59) was the receiver agent interpreting a naked notify as new work. Commit 4 needs a refined notify-template that tells the receiver "this is an inter-agent notify of intent X; do Y with it" (especially for `clarification-response` and dead-letter cases).
+- **`outbox_notifier.service` has `/home/larry/agent-core` in `ReadWritePaths` unnecessarily** — cosmetic security cleanup, file for D5.
+- **Concurrent state writes between bot main loop and reminder sweep** — currently single-threaded so no race, but `load_state → modify → save_state` is not atomic if we ever multithread. File for D5.
+- **Telegram rate limit on huge `/resume` backlogs** (>30 entries to one user) — edge case, file for D5.
+- **`ourliberty-watchdog.timer` still disabled** — design Call 12 nominated this as commit 4's live test target. Beacon already produced a high-quality plan for it during the D3-approval smoke (now in history); commit 4 will re-run the flow with `approve` instead of `reject`.
+- **Default trust policy ships empty** — every dispatch `force_ask`s today. Larry's dial; he edits `config/trust-policy.json` to add carve-outs as confidence grows. No code change needed.
+
+**Next:** Commit 4 (D3-forge) — preflight protocol + worktree machinery + session_id resume in watcher + Forge's CLAUDE.md update + clarification routes wired + `gh pr create` plumbing + ReadWritePaths fix on watcher. Plus commit 5 (D3-sentinel) wrapping the sentinel script as a systemd timer. See `docs/d3-commit-4-plan.md` for the structured plan.
+
+---
+
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
