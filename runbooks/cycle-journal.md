@@ -4,6 +4,27 @@
 
 ---
 
+## Iteration 17 — 2026-05-12 02:36 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Branch=main, tree=clean (session start git status confirms clean). HEAD=9c73cd1=origin/main per sync.json (status=no-change). Clean.
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-12T07:40:20Z (01:40 MDT, 56 min ago), status=no-change, commit=9c73cd1, branch=main. Within 2h threshold. ✅
+- **(C) Agent liveness: nominal.** All 5 units active: beacon, forge, mirror, pulse, inbox-watcher. Log silence = confirmed false positive per MEMORY.md calibration.
+- **(D) Inboxes: nominal.** No live .json tasks in any inbox. pulse/.invalid/ unchanged from iter 16 — same 2 files (d2-reject-20260511T220650Z.json, d25-reject-20260512T030823Z.json, source=larry, F24 class). Count=2; threshold=3 in 10 cycles. Still watching.
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core.
+- **(F) Concurrency: automated cycle active.** PID 47773 (bash, run_cycle.sh) elapsed 01:05, started ~02:33 MDT (4h-timer run). Fresh (< 10 min). Normal.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED** (confirmed iter 16). 0/1 cycles since fix.
+- Sync blocked: **CLOSED** (confirmed iter 16). 0/1 cycles since fix.
+- Invalid pulse inbox dispatches: 2 occurrences total (both from iter 16 window). No new additions this cycle. Watching; not yet at 3/10 threshold.
+**Learned:** Nothing new. System second nominal cycle in a row (iters 16–17). Structural health holding post-`6b6284a` fix.
+
+---
+
 ## Iteration 16 — 2026-05-11 22:33 MDT
 
 **Health:** ✅ Nominal
