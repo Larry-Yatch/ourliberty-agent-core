@@ -2,9 +2,9 @@
 """cleanup_stale_worktrees.py — Remove git worktrees older than 24 hours.
 
 Runs daily via systemd timer (ourliberty-cleanup-stale-worktrees). Cleans
-up ``/tmp/wt-*`` directories left behind by Forge dispatches. Worktrees
-are preserved for 24 hours after task completion so Larry can inspect the
-working state if anything went wrong.
+up ``~/agent-worktrees/wt-*`` directories left behind by Forge dispatches.
+Worktrees are preserved for 24 hours after task completion so Larry can
+inspect the working state if anything went wrong.
 
 Adapted from GrowthMastery-ai/gm-agent-core ``scripts/cleanup_stale_worktrees.py``
 for Larry-Yatch/ourliberty-agent-core (2026-05-12, Phase D3 commit 4b — Gap 10
@@ -14,6 +14,9 @@ in docs/upstream-audit.md). Adaptations:
   - ``CANONICAL_REPOS`` list (not a single REPO_DIR) so multi-repo expansion
     is one-line when ``allowed_repos`` in agent-models.json grows beyond
     ``ourliberty-agent-core``.
+  - 4b followup #2: worktree base ``~/agent-worktrees/`` instead of upstream's
+    ``/tmp/wt-`` — see worktree_manager.py for the PrivateTmp namespace
+    rationale.
 
 stdlib only.
 """
@@ -22,7 +25,7 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Canonical repos. Each is the working tree from which Forge worktrees are
@@ -36,6 +39,10 @@ from pathlib import Path
 CANONICAL_REPOS = [
     Path('/home/larry/agent-core'),
 ]
+
+# Path prefix that identifies a managed worktree. Must agree with
+# worktree_manager.WORKTREE_BASE + WORKTREE_PREFIX.
+MANAGED_WORKTREE_PREFIX = '/home/larry/agent-worktrees/wt-'
 
 LOG_FILE = Path('/home/larry/agents/logs/worktree-cleanup.log')
 IN_FLIGHT_DIR = Path('/home/larry/agents/state/in-flight')
@@ -67,7 +74,7 @@ def load_active_task_stems() -> set[str]:
 
 
 def log(msg: str) -> None:
-    line = f'[{datetime.utcnow().isoformat()}Z] {msg}'
+    line = f'[{datetime.now(timezone.utc).isoformat()}] {msg}'
     print(line, flush=True)
     try:
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +160,7 @@ def sweep_canonical(canonical_repo: Path, active_stems: set[str]) -> tuple[int, 
     for wt in worktrees:
         path = wt.get('path', '')
         # Skip the canonical itself and any worktree that isn't one of ours.
-        if path == str(canonical_repo) or '/tmp/wt-' not in path:
+        if path == str(canonical_repo) or MANAGED_WORKTREE_PREFIX not in path:
             kept += 1
             continue
 

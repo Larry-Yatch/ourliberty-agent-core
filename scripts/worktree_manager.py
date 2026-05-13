@@ -43,9 +43,20 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
-# Worktree base. Matches the /tmp/wt-* pattern that
-# cleanup_stale_worktrees.py scans for aging.
-WORKTREE_BASE = Path('/tmp')
+# Worktree base. NOT /tmp — the inbox-watcher and outbox-notifier services
+# run with systemd `PrivateTmp=yes`, so /tmp is a service-private namespace
+# (different services see different /tmps, and the namespace is destroyed
+# on every service restart). Persistent home-directory location instead:
+#
+#   - Visible to every service running as `larry` (no PrivateTmp games).
+#   - Survives watcher restarts → task_id-keyed reuse actually persists
+#     across CLARIFY round-trips and crash-recovery scenarios.
+#   - Cleanup service can reach the same dir.
+#
+# The directory is auto-created if missing. cleanup_stale_worktrees.py
+# scans the same path with the same 24h MAX_AGE_SECONDS grace.
+WORKTREE_BASE = Path.home() / 'agent-worktrees'
+WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
 WORKTREE_PREFIX = 'wt-'
 
 # Defensive cap on task_id length when building filesystem paths.

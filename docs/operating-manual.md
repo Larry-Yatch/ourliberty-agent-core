@@ -110,13 +110,13 @@ All four agents follow the same shape: a `~/agent-core/agents/<name>/` directory
 | Agent | Role | Telegram model | Inbox model | Status |
 |---|---|---|---|---|
 | **Beacon** 🪔 | Strategy / Architect — drafts specs from your intent | Opus | Opus | Live |
-| **Forge** ⚒️ | Builder — turns approved specs into code & PRs | Sonnet | Opus | Live (Build Loop not yet auto-triggered) |
+| **Forge** ⚒️ | Builder — turns approved specs into code & PRs | Sonnet | Opus | Live (auto preflight → build → PR via inbox dispatch as of D3 commit 4b, 2026-05-12) |
 | **Mirror** 🪞 | Adversarial Reviewer — gates merges, severity-tags findings | Sonnet | Opus | Live (PR-aware dispatch coming in D4) |
 | **Pulse** 💓 | Self-healing Observer — runs `/cycle`, escalates, dispatches fixes | Sonnet | Sonnet | Live (auto-cycle every 4h) |
 
 Future agents (per North Star / build plan): **Aide** (EA, Phase E), **Scout** (researcher, Phase 2), **Compass** (planner, Phase 2), **Ledger** (cost/CFO, Phase F+). Personas not yet authored.
 
-### Infrastructure (D1–D2)
+### Infrastructure (D1–D3)
 
 | Piece | What it is | Where it lives |
 |---|---|---|
@@ -125,10 +125,18 @@ Future agents (per North Star / build plan): **Aide** (EA, Phase E), **Scout** (
 | **`run_cycle.sh`** | Wraps `claude --print` for `/cycle`. Also (D2) captures cost to `costs.jsonl` and auto-commits Pulse's journal/MEMORY changes back to the repo. | `~/agent-core/scripts/run_cycle.sh` |
 | **`sync_agent_core.sh`** | Atomic-swap sync from `origin/main` to live runtime. Run by `ourliberty-sync.timer` every 1h. | `~/agent-core/scripts/sync_agent_core.sh` |
 | **`agent_core_health_check.py`** | Enforces working-copy discipline (always on `main`, always clean). Run by `ourliberty-agent-core-health.timer` every 30m. | `~/agent-core/scripts/agent_core_health_check.py` |
-| **Inbox watcher (D2)** | `ourliberty-inbox-watcher.service`. One process, four threads (one per agent). Polls inboxes every 5s; one in-flight task per agent (lease-protected). | `~/agent-core/scripts/inbox_watcher.py` |
-| **`dispatch_validator.py`** | Pre-dispatch validation: `task_id` required, `prompt` ≥ 100 chars, `source` in allowed set. Stricter than HANDSHAKE-SCHEMA — kills the F24 empty-prompt bug class. | `~/agent-core/scripts/dispatch_validator.py` |
+| **Inbox watcher (D2)** | `ourliberty-inbox-watcher.service`. One process, four threads (one per agent). Polls inboxes every 5s; one in-flight task per agent (lease-protected). Calls `agent_runner.run_claude` (D2.5) for the actual subprocess. | `~/agent-core/scripts/inbox_watcher.py` |
+| **Outbox notifier (D3-2)** | `ourliberty-outbox-notifier.service`. Watches `~/agents/outboxes/*` and routes results back to the originating agent (back-channel for `pulse → beacon → pulse` dialogue, `forge → beacon` PR notifications, etc.). Also drives marker-driven routing for Forge's preflight markers (D3-4a) and the build-phase re-dispatch after PROCEED (D3-4b). | `~/agent-core/scripts/outbox_notifier.py` |
+| **`safe_write_inbox.py`** (D3-prep) | Validated atomic write to an agent's inbox. Every dispatcher (Beacon's bot, the notifier, etc.) routes writes through this — filename guard, schema validation, routing validation, atomic write, audit log to `~/agents/logs/routing-events.jsonl`. | `~/agent-core/scripts/safe_write_inbox.py` |
+| **`routing_validator.py`** (D3-prep, extended in 4b) | Two-layer route check: hard topology `(source, target)` allow-list + soft IDENTITY.md reroute. 4b added `check_target_repo` for the `allowed_repos` allow-list per agent. | `~/agent-core/scripts/routing_validator.py` |
+| **`forge_preflight_handler.py`** (D3-4a) | Pure-logic marker library: parses Forge's `PROCEED` / `CLARIFY_REQUEST` / `REJECT` block, validates required fields, evaluates the clarification budget. Stateless — all envelope state rides on the task. | `~/agent-core/scripts/forge_preflight_handler.py` |
+| **`worktree_manager.py`** (D3-4b) | Keyed-reuse worktree manager for Forge dispatches. Same task_id → same worktree path across all dispatches (preflight, CLARIFY round-trip, build). Worktrees live at `~/agent-worktrees/wt-<agent>-<task_id>/` (NOT `/tmp`, see Section 4 note on `PrivateTmp`). Idempotent branch checkpoint with empty WIP commit pushed to origin. | `~/agent-core/scripts/worktree_manager.py` |
+| **`cleanup_stale_worktrees.py`** (D3-4b, ports upstream's Gap 10) | Daily sweep — removes `~/agent-worktrees/wt-*` directories older than 24h. Skips worktrees referenced by the in-flight registry (long Read-heavy builds don't get reaped mid-flight). Run by `ourliberty-cleanup-stale-worktrees.timer` every 24h. | `~/agent-core/scripts/cleanup_stale_worktrees.py` |
+| **Self-healing healers (D2.5)** | Seven adopted from upstream's `gm-heal-*` family — abandoned inbox tasks, blocked inbox age, empty inbox files, recovery-already-merged, restart-dedup obsolete, silent-loop death, zombie main workers. Each is a `ourliberty-heal-*.{service,timer}` pair. | `~/agent-core/systemd/ourliberty-heal-*` |
+| **`dispatch_validator.py`** | Pre-dispatch validation: `task_id` required, `prompt` ≥ 100 chars, `source` in allowed set, `phase` ∈ {`preflight`, `build`}, `intent` ∈ {`ack-proceed`, `clarify`, `clarification-response`, `clarification-exhausted`, `reject`, `result-notification`, `dead-letter`, `marker-error`}. Stricter than HANDSHAKE-SCHEMA. | `~/agent-core/scripts/dispatch_validator.py` |
 | **`dispatch_lease.py`** | Restart-safe concurrency primitive (flock + nonce + TTL + boot-id PID-reuse guard). Used by the watcher to ensure one task per agent at a time. | `~/agent-core/scripts/dispatch_lease.py` |
-| **`agent-models.json`** | Per-agent model routing. Tells the watcher which Claude model to use for each agent's inbox tasks. | `~/agent-core/config/agent-models.json` |
+| **`agent-models.json`** | Per-agent model routing. Tells the watcher which Claude model to use for each agent's inbox tasks. **4b** added per-agent `worktree_enabled` and `allowed_repos` fields (Forge has both set). | `~/agent-core/config/agent-models.json` |
+| **Forge worktree directory** (D3-4b) | Persistent base for Forge's per-task isolated git worktrees. Auto-created on first use; daily cleanup script reaps entries > 24h old. | `~/agent-worktrees/wt-forge-<task_id>/` |
 | **HANDSHAKE-SCHEMA** | JSON schema for inbox task files. Optional fields are documented here; required ones live in `dispatch_validator.py`. | `~/agent-core/shared/HANDSHAKE-SCHEMA.json` |
 | **`.env.larry`** | Environment file with your secrets (4× bot tokens, allowed chat IDs). | `~/credentials/.env.larry` |
 
@@ -251,11 +259,16 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-forge-bot.service` | Forge Telegram bot | continuous |
 | `ourliberty-mirror-bot.service` | Mirror Telegram bot | continuous |
 | `ourliberty-pulse-bot.service` | Pulse Telegram bot | continuous |
-| `ourliberty-inbox-watcher.service` | Shared inbox watcher (all 4 agents) | continuous, polls 5s |
+| `ourliberty-inbox-watcher.service` | Shared inbox watcher (all 4 agents). Calls `worktree_manager.ensure_worktree_for_task` for agents with `worktree_enabled` (Forge). | continuous, polls 5s |
+| `ourliberty-outbox-notifier.service` (D3-2 / 4a / 4b) | Back-channel router for outbox results. Drives Forge preflight markers + post-PROCEED build-phase re-dispatch + dead-letter cascade. | continuous, polls 5s |
 | `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
 | `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
 | `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
 | `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled — enable after cycle observed ≥ 1 day)* | every 5m |
+| `ourliberty-heal-*.timer` → `.service` (×7) | Self-healing healers (D2.5) — abandoned-inbox-tasks, blocked-inbox-age, empty-inbox-files, recovery-already-merged, restart-dedup-obsolete, silent-loop-death, zombie-main-workers. | every 5–15 min each |
+| `ourliberty-cleanup-stale-worktrees.timer` → `.service` (D3-4b) | Daily sweep of `~/agent-worktrees/wt-*` (24h grace; skips in-flight). | every 24h |
+
+> **Note on `PrivateTmp`:** the inbox-watcher and outbox-notifier services run with `PrivateTmp=yes` (a default systemd hardening for these services). Each service gets a private `/tmp` namespace that's invisible to host shell + other services + cleanup. Forge's worktrees therefore live at `~/agent-worktrees/`, NOT `/tmp/wt-*` — persistent across service restarts, visible across services, and reachable by the cleanup timer. Both services have `~/agent-worktrees` in `ReadWritePaths`.
 
 ### What's running right now?
 
@@ -1294,6 +1307,38 @@ Recommend (A) — cleanest, most explicit, and reading "worktrees live with the 
 - **Commit 5 (D3-sentinel)** still ahead — `dispatch_sentinel.py` systemd timer + enabling the `ourliberty-watchdog.timer` as the same commit's live test. The watchdog unit isn't even installed yet (`is-enabled` returns `not-found`); commit 5 installs and enables it.
 
 **Next:** Commit 5 (D3-sentinel) — install `dispatch_sentinel.py` as a systemd timer (every 10 min), install `ourliberty-watchdog.timer` so the system has a stall-detection layer + an inbox-age watchdog. The live test is the watchdog itself: drop a synthetic task into an inbox, kill the watcher, verify the watchdog catches the stall after the configured age. Plus the systemd PrivateTmp follow-up (depending on Larry's call).
+
+## Phase D3 (4b followup-2) — worktree base relocated off /tmp; preflight-discipline note queued for D3.5 (2026-05-12, ~30 min)
+
+Larry signed off on Option A from the 4b Part II entry's "Discovered architectural concern" section: move the Forge worktree base from `/tmp` to a persistent home-directory location so the `PrivateTmp=yes` namespace isolation on the watcher and notifier services stops sabotaging the cleanup timer and cross-restart task continuity.
+
+### What shipped
+
+- **`scripts/worktree_manager.py`** — `WORKTREE_BASE = Path.home() / 'agent-worktrees'`. Auto-mkdir on import. Header docstring rewritten to explain the PrivateTmp rationale so future readers don't try to "simplify" it back to `/tmp`.
+- **`scripts/cleanup_stale_worktrees.py`** — `MANAGED_WORKTREE_PREFIX = '/home/larry/agent-worktrees/wt-'` (replaces the `/tmp/wt-` substring filter). Bundled the `datetime.utcnow()` → `datetime.now(timezone.utc)` deprecation fix since we were touching the file.
+- **`systemd/ourliberty-inbox-watcher.service`** and **`ourliberty-outbox-notifier.service`** — `ReadWritePaths` extended to include `/home/larry/agent-worktrees`. Without this, `ProtectHome=read-only` would block worktree writes.
+- **`agents/forge/CLAUDE.md`** — single path mention updated from `/tmp/wt-forge-<task_id>/` to `~/agent-worktrees/wt-forge-<task_id>/`. The Build phase protocol text otherwise unchanged.
+- **`agents/beacon/CLAUDE.md`** — **preflight-prompt discipline** section added under "How you dispatch work to Forge." Captures the 4b test 1 fast-path observation as Beacon's responsibility: preflight prompts must read as *spec-to-evaluate*, not *plan-to-execute*. Specifically: lead with GOAL + CONTEXT, declarative EXACT LOCATIONS, avoid imperative verbs (do/execute/run/edit/commit/push), end with the one-line preflight reminder, and pre-fetch any droplet state Beacon could capture herself rather than asking Forge to probe in preflight. D3.5 is expected to add a runtime check (notifier rejects preflight outboxes that don't end with a marker); until then, this is prompt discipline.
+
+### Verification
+
+- Local + droplet test suites pass (235 tests). Worktree-manager tests already monkey-patch `WORKTREE_BASE` to a temp dir, so the location change is invisible to them.
+- `systemd-analyze verify` clean on both modified service units.
+- One dispatched test task (`worktree-relocation-smoke-001`, a no-op preflight) confirmed the new path: worktree created at `/home/larry/agent-worktrees/wt-forge-worktree-relocation-smoke-001/`, visible from host shell, visible from a separate `cleanup_stale_worktrees.py` run, branch checkpoint pushed cleanly.
+
+### Operational implications captured in Part I
+
+- Section 1 "Infrastructure (D1–D3)" inventory updated: new entries for `outbox_notifier.py`, `safe_write_inbox.py`, `routing_validator.py`, `forge_preflight_handler.py`, `worktree_manager.py`, `cleanup_stale_worktrees.py`, the 7 D2.5 healers, the Forge worktree directory itself, and the 4b additions to `agent-models.json` (`worktree_enabled`, `allowed_repos`).
+- Section 4 "The cast" systemd-units table updated: added `ourliberty-outbox-notifier.service` (was missing), `ourliberty-heal-*.timer` (×7), `ourliberty-cleanup-stale-worktrees.timer`. Inline note on `PrivateTmp=yes` semantics so future operators know the worktrees aren't in `/tmp`.
+- Forge's "Status" line in Section 1 updated: was "Live (Build Loop not yet auto-triggered)" — now "Live (auto preflight → build → PR via inbox dispatch as of D3 commit 4b, 2026-05-12)".
+
+### What's still ahead
+
+- **Open PRs review process** — PR #1 (watchdog-doc-fix) and PR #2 (pulse-cost-note) are still open against `ourliberty-agent-core` main. Need a workflow for surfacing open Forge PRs to Larry so they don't pile up. Three candidates surfaced (immediate Telegram notify on PR open; daily Pulse digest; hybrid). Awaiting Larry's pick before implementing.
+- **Preflight discipline runtime check** — currently prompt-based (Beacon's CLAUDE.md note). D3.5 should add a runtime gate in the outbox notifier: if a `phase=preflight` outbox doesn't contain a forge marker, dead-letter back to Forge with "preflight must end with a marker block" instead of routing through default-path as if it were a normal result. Documented in Beacon's CLAUDE.md so the constraint is visible to her now.
+- **Multi-repo expansion** — `CANONICAL_REPO_PATHS` (watcher) + `CANONICAL_REPOS` (cleanup) are still single-entry maps. When `allowed_repos` grows beyond `ourliberty-agent-core`, fold both into a top-level `repo_paths` block in `agent-models.json` so the logical-name → filesystem mapping lives in one place.
+
+**Next:** Commit 5 (D3-sentinel) — `dispatch_sentinel.py` + `ourliberty-watchdog.timer` install + watchdog live test. The PR review workflow likely lands as a separate small commit between 4b's tail and commit 5 (it touches Beacon's CLAUDE.md and possibly Pulse's `/cycle` prompt; not on the commit-5 critical path but worth shipping before the next live test).
 
 ---
 

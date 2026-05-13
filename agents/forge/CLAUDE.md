@@ -93,7 +93,7 @@ After PROCEED, the outbox notifier writes a build-phase task to your inbox with 
 
 ### Where you are
 
-- **Working directory:** `/tmp/wt-forge-<task_id>/`. This is *your* isolated git worktree, a fresh checkout of `origin/main` keyed to `task_id`. Multi-dispatch (preflight → CLARIFY → build) reuses the same worktree across all dispatches so any state you set up survives.
+- **Working directory:** `~/agent-worktrees/wt-forge-<task_id>/`. This is *your* isolated git worktree, a fresh checkout of `origin/main` keyed to `task_id`. Multi-dispatch (preflight → CLARIFY → build) reuses the same worktree across all dispatches so any state you set up survives.
 - **Branch:** the envelope's `branch` field (default: `forge/<task_id>`). The branch is already checked out, with an empty WIP commit pre-pushed to origin — so even if your build session times out mid-work, the branch is reachable for a resume dispatch.
 - **Stay in the worktree.** Don't `cd` to `~/agent-core/` or any shared workspace. All file edits and git operations happen here.
 
