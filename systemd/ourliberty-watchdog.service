@@ -20,7 +20,12 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ourliberty-watchdog
 
-NoNewPrivileges=true
+# NoNewPrivileges intentionally NOT set — watchdog must `sudo -n systemctl
+# start/restart` the daemons it auto-recovers (Q1-Dial-3 carve-out). Larry
+# has NOPASSWD sudo (see reference_droplet) so `sudo -n` succeeds silently
+# at the shell, but NoNewPrivileges blocks the kernel-level setuid path
+# sudo needs regardless of sudoers config. The remaining hardening below
+# preserves the rest of the protection envelope.
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only

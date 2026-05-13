@@ -54,6 +54,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 import beacon_approval_handler as approval  # noqa: E402
+import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
 
 # ---------- config ----------
@@ -367,6 +368,62 @@ def _check_due_reminders() -> None:
         log(f"reminder sent ({hours}h) for {entry['id']}")
 
 
+def _send_alert_dm(chat_id: int, text: str) -> bool:
+    """Send a chunked DM; return True only if every chunk got HTTP 200 + ok=True.
+
+    Per-line ack on the alert queue depends on this returning truthfully —
+    advancing the offset on a half-failed send loses the alert (M2 fix).
+    """
+    if not text:
+        return True
+    chunks: list[str] = []
+    remaining = text
+    while remaining:
+        chunks.append(remaining[:TELEGRAM_MAX])
+        remaining = remaining[TELEGRAM_MAX:]
+    for chunk in chunks:
+        result = http_json(f"{API}/sendMessage",
+                           {"chat_id": chat_id, "text": chunk})
+        if not result or not result.get("ok"):
+            return False
+    return True
+
+
+def _check_pending_alerts() -> None:
+    """Poll the shared larry-alerts queue and DM each new line.
+
+    Per-line ack: offset advances ONLY after every authorized chat got a
+    successful sendMessage. Telegram failure -> stop, retry next sweep.
+    At-least-once delivery (Telegram-side timeout could result in dup).
+    """
+    offset = larry_alerts.read_offset()
+    pending = larry_alerts.read_pending(offset)
+    if not pending:
+        return
+    for idx, alert in pending:
+        if alert.get('_malformed'):
+            log(f"alert idx={idx} malformed, skipping: {alert.get('raw', '')[:80]!r}")
+            larry_alerts.write_offset(idx + 1)
+            continue
+        text = larry_alerts.format_dm(alert)
+        all_delivered = True
+        for chat_id in sorted(ALLOWED):
+            if not _send_alert_dm(chat_id, text):
+                all_delivered = False
+                log(f"alert idx={idx} delivery to {chat_id} failed")
+                break
+        if all_delivered:
+            larry_alerts.write_offset(idx + 1)
+            log(
+                f"alert idx={idx} delivered "
+                f"(source={alert.get('source')}, subject={alert.get('subject', '-')})"
+            )
+        else:
+            # Don't advance — preserve order; retry on next sweep.
+            log(f"alert idx={idx} send failed; will retry next sweep")
+            return
+
+
 def _process_update(update: dict) -> None:
     """Process one Telegram update. Raises on truly unexpected errors —
     caller catches at the outer per-update boundary."""
@@ -417,13 +474,18 @@ def main() -> None:
     last_reminder_check = 0.0
 
     while True:
-        # Periodic reminder sweep — rate-limited.
+        # Periodic reminder + alert sweep — rate-limited. Same cadence
+        # (REMINDER_INTERVAL_SEC) because both are bounded-cost passes.
         now = time.time()
         if now - last_reminder_check >= REMINDER_INTERVAL_SEC:
             try:
                 _check_due_reminders()
             except Exception as e:
                 log(f"reminder sweep error: {type(e).__name__}: {e}")
+            try:
+                _check_pending_alerts()
+            except Exception as e:
+                log(f"alert sweep error: {type(e).__name__}: {e}")
             last_reminder_check = now
 
         url = f"{API}/getUpdates?offset={offset}&timeout=30"

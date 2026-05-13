@@ -24,6 +24,27 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import dispatch_sentinel as ds  # noqa: E402
+import larry_alerts  # noqa: E402
+
+
+def _redirect_larry_alerts(root: Path) -> dict:
+    """Point larry_alerts paths at the test root; return originals for restore."""
+    originals = {
+        'AGENTS_ROOT': larry_alerts.AGENTS_ROOT,
+        'ALERTS_FILE': larry_alerts.ALERTS_FILE,
+        'COOLDOWN_ROOT': larry_alerts.COOLDOWN_ROOT,
+        'OFFSET_FILE': larry_alerts.OFFSET_FILE,
+    }
+    larry_alerts.AGENTS_ROOT = root
+    larry_alerts.ALERTS_FILE = root / 'blackboard' / 'larry-alerts.jsonl'
+    larry_alerts.COOLDOWN_ROOT = root / 'state' / 'alert-cooldown'
+    larry_alerts.OFFSET_FILE = root / 'state' / 'beacon-alerts-offset.txt'
+    return originals
+
+
+def _restore_larry_alerts(originals: dict) -> None:
+    for name, value in originals.items():
+        setattr(larry_alerts, name, value)
 
 
 class SentinelScansTest(unittest.TestCase):
@@ -48,10 +69,12 @@ class SentinelScansTest(unittest.TestCase):
         ds.LEASES_DIR = self._root / 'state' / 'dispatch-leases'
         ds.IN_FLIGHT_DIR = self._root / 'state' / 'in-flight'
         ds.AGENT_MODELS_FILE = self._root / 'config' / 'agent-models.json'
+        self._la_originals = _redirect_larry_alerts(self._root)
 
     def tearDown(self):
         for name, value in self._originals.items():
             setattr(ds, name, value)
+        _restore_larry_alerts(self._la_originals)
         self._tmp.cleanup()
 
     def _write_inbox_task(self, agent, name, mtime_age_seconds, body=None):
@@ -164,10 +187,12 @@ class SentinelMainTest(unittest.TestCase):
         ds.LEASES_DIR = self._root / 'state' / 'dispatch-leases'
         ds.IN_FLIGHT_DIR = self._root / 'state' / 'in-flight'
         ds.AGENT_MODELS_FILE = self._root / 'config' / 'agent-models.json'
+        self._la_originals = _redirect_larry_alerts(self._root)
 
     def tearDown(self):
         for name, value in self._originals.items():
             setattr(ds, name, value)
+        _restore_larry_alerts(self._la_originals)
         self._tmp.cleanup()
 
     def _stale_inbox(self, agent='beacon', name='stale.json'):
@@ -204,6 +229,106 @@ class SentinelMainTest(unittest.TestCase):
         ds.main()
         state2 = json.loads(ds.STATE_FILE.read_text())
         self.assertEqual(state2['alerted'], {}, 'gc should drop resolved alerts')
+
+
+class SentinelLarryAlertsTest(unittest.TestCase):
+    """D3.5-prep additions — larry-alerts hook + cold-start re-arming (C2 fix)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {
+            'AGENTS_ROOT': ds.AGENTS_ROOT,
+            'STATE_FILE': ds.STATE_FILE,
+            'LOG_FILE': ds.LOG_FILE,
+            'ALERTS_LOG': ds.ALERTS_LOG,
+            'LEASES_DIR': ds.LEASES_DIR,
+            'IN_FLIGHT_DIR': ds.IN_FLIGHT_DIR,
+            'AGENT_MODELS_FILE': ds.AGENT_MODELS_FILE,
+        }
+        ds.AGENTS_ROOT = self._root
+        ds.STATE_FILE = self._root / 'state' / 'dispatch-sentinel.json'
+        ds.LOG_FILE = self._root / 'logs' / 'dispatch-sentinel.log'
+        ds.ALERTS_LOG = self._root / 'blackboard' / 'sentinel-alerts.jsonl'
+        ds.LEASES_DIR = self._root / 'state' / 'dispatch-leases'
+        ds.IN_FLIGHT_DIR = self._root / 'state' / 'in-flight'
+        ds.AGENT_MODELS_FILE = self._root / 'config' / 'agent-models.json'
+        self._la_originals = _redirect_larry_alerts(self._root)
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(ds, name, value)
+        _restore_larry_alerts(self._la_originals)
+        self._tmp.cleanup()
+
+    def _stale_inbox(self, agent='beacon', name='stale.json'):
+        inbox = self._root / 'inboxes' / agent
+        inbox.mkdir(parents=True, exist_ok=True)
+        f = inbox / name
+        with open(f, 'w') as fh:
+            json.dump({'prompt': 'x' * 200, 'source': 'beacon', 'task_id': 't'}, fh)
+        old_time = time.time() - ds.INBOX_STALL_SECONDS - 60
+        os.utime(f, (old_time, old_time))
+        return f
+
+    def test_load_state_missing_file_is_cold_start(self):
+        state, cold = ds.load_state()
+        self.assertEqual(state, {'alerted': {}})
+        self.assertTrue(cold)
+
+    def test_load_state_corrupted_file_is_cold_start(self):
+        ds.STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ds.STATE_FILE.write_text('}{ not json')
+        state, cold = ds.load_state()
+        self.assertEqual(state, {'alerted': {}})
+        self.assertTrue(cold)
+
+    def test_load_state_valid_file_not_cold_start(self):
+        ds.STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        ds.STATE_FILE.write_text(json.dumps({'alerted': {'k': 1.0}}))
+        state, cold = ds.load_state()
+        self.assertEqual(state['alerted'], {'k': 1.0})
+        self.assertFalse(cold)
+
+    def test_cold_start_suppresses_larry_alert(self):
+        # State file missing → first sweep records to sentinel-alerts.jsonl
+        # but NOT to larry-alerts.jsonl (C2 fix — don't flood after corruption).
+        self._stale_inbox()
+        ds.main()
+        # Sentinel's own alert log: written
+        self.assertTrue(ds.ALERTS_LOG.exists())
+        self.assertGreaterEqual(len(ds.ALERTS_LOG.read_text().strip().splitlines()), 1)
+        # Larry's queue: should be empty after cold-start sweep
+        self.assertFalse(
+            larry_alerts.ALERTS_FILE.exists() and
+            larry_alerts.ALERTS_FILE.read_text().strip()
+        )
+
+    def test_second_run_appends_larry_alert_for_new_stall(self):
+        # First sweep with no stalls (cold start, no-op).
+        ds.main()
+        # Now state file exists → second sweep is NOT a cold start.
+        # Plant a stall and re-run.
+        self._stale_inbox()
+        ds.main()
+        self.assertTrue(larry_alerts.ALERTS_FILE.exists())
+        lines = larry_alerts.ALERTS_FILE.read_text().strip().splitlines()
+        self.assertEqual(len(lines), 1)
+        record = json.loads(lines[0])
+        self.assertEqual(record['source'], 'sentinel')
+        self.assertEqual(record['severity'], 'warning')
+        self.assertIn('beacon', record['message'])
+
+    def test_already_alerted_stall_does_not_re_DM(self):
+        # First sweep, cold-start path → records to disk, no DM.
+        self._stale_inbox()
+        ds.main()
+        # Second sweep — same stall, already in alerted, should NOT re-fire to larry-alerts.
+        ds.main()
+        self.assertFalse(
+            larry_alerts.ALERTS_FILE.exists() and
+            larry_alerts.ALERTS_FILE.read_text().strip()
+        )
 
 
 if __name__ == '__main__':

@@ -1371,6 +1371,85 @@ Closes the D3 commit list with the narrow stall-detector running on a 10-minute 
 
 **Next:** D3.5 — Mirror review chain. Plan doc shipped at `docs/d3-5-plan.md` (206 lines). Likely splits into 5a (review markers + preflight gate), 5b (revision loop), 5c (escalation), 5d (auto-merge + EMERGENCY_HALT) per the same multi-commit pattern as D3 commit 4 → 4a + 4b.
 
+## Phase D3.5-prep — watchdog adapter + sentinel-DM wiring + beacon-bot alert sweep (2026-05-13, ~2 hours, $0)
+
+Closes the last D3-era item — adapts the dormant `scripts/watchdog.py` (610-line upstream import, never adapted for our topology) to actually monitor our 6 services, wires `dispatch_sentinel` alerts to Larry's phone via a shared queue, and gives Beacon's bot a periodic alert-poll sweep so infra alerts land as Telegram DMs without claude in the loop.
+
+The D3.5 plan doc reserved this as pre-5a work for one reason: D3.5's longer live tests need a safety net under them. Watchdog is that net. Without it, a single daemon crash mid-D3.5-test silently stalls everything until manual intervention.
+
+### Architectural calls signed off before code (per the decision-classification feedback memory)
+
+- **Q1 (VALUES, 1-5 dial) Auto-recovery scope: Dial 3.** Watchdog auto-restarts the 2 plumbing daemons (`inbox-watcher`, `outbox-notifier`) AND, per a design-review C1 carve-out, `beacon-bot` — because beacon-bot is the alert delivery channel; alerts about it being down can't reach Larry's phone if its consumer is also down. The other 3 bots (`forge-bot`, `mirror-bot`, `pulse-bot`) are alert-only with a `sudo systemctl restart ourliberty-<x>-bot` suggested-action in the DM. Their systemd `Restart=always` handles crashes; watchdog surfaces sustained outages where `StartLimitBurst` was exhausted.
+- **Q2 (TECHNICAL) Memory threshold for inbox-watcher V2 RSS check: 1.5 GB.** MemoryMax=2G with 500 MB headroom for spawned claude subprocesses.
+- **Q3 (TECHNICAL) Disk/system memory thresholds: 90% critical, 80% warning.** Upstream defaults.
+- **Q4 (ARCHITECTURAL) Stale-task check: dropped from watchdog.** Sentinel owns task-flow stall detection (3 scans). Watchdog owns infra (processes, services, memory, disk). Single source of truth. The follow-up: sentinel-DM wiring (its pre-existing deferred TODO) closes the loop so Larry's phone actually receives stall alerts — sentinel previously only wrote to disk.
+- **Q5 (TECHNICAL) Token-manager check: dropped.** Our token_manager is an inline stub in `agent_runner.py`, not a module — upstream's check would always pass uninterestingly. TODO comment left for Phase F+ when an agent-only Max OAuth pool gets wired.
+- **Q6 (ARCHITECTURAL) cgroup-aggregate memory check: ADD.** The V2 RSS check measures only the watcher's MainPID. Real overrun shape is the watcher + spawned claude subprocesses together exceeding `MemoryMax=2G`. New `check_inbox_watcher_cgroup` reports both parent RSS and children-MB breakdown in the alert payload so the human reading the DM can tell which side is bloating.
+- **Q7 (ARCHITECTURAL) Alert dispatch: shared queue + per-line ack delivery via Beacon's bot.** Watchdog and sentinel both `append_alert(...)` to `~/agents/blackboard/larry-alerts.jsonl`. Beacon's bot polls the queue on its existing reminder cadence (~5 min via REMINDER_INTERVAL_SEC=300) and DMs each new line with severity emoji + subject + message + suggested_action. Pulse-as-responder + twice-daily digest deferred to Commit 2 (separate values walkthrough on Pulse's autonomy).
+- **Q8 (VALUES, 1-5 dial) Verification depth: Dial 3.** Full alert path test + outbox-notifier auto-restart + inbox-watcher auto-restart + (added by C1) beacon-bot auto-restart + mirror-bot alert-only path + sentinel DM test.
+
+### Design-review issues caught before code (independent reviewer pass, $0)
+
+Same pattern as 4a/4b — fresh-eyes review before any code:
+1. **C1 CRITICAL — beacon-bot can't alert about itself.** Q1-Dial-3 said "bots alert-only" but beacon-bot is the alert channel; alerts pointing at itself wedge undelivered. **Fix:** carve-out — beacon-bot joins the auto-restart set.
+2. **C2 CRITICAL — sentinel state corruption causes alert flood.** `load_state()` returned `{'alerted': {}}` on JSONDecodeError → every pre-existing stall would re-fire as new on next sweep. **Fix:** `load_state()` returns `(state, cold_start)` tuple; cold-start sweep records to disk but suppresses larry-alerts append, re-arming dedup silently.
+3. **M1 MAJOR — watchdog `systemctl start` races systemd's own `Restart=on-failure`.** `auto-restart` SubState wasn't in the alive allow-list; calling `start` during systemd's pending restart would burn StartLimitBurst. **Fix:** `is_service_alive` treats `auto-restart` SubState as alive; explicit `StartLimitInterval=300/StartLimitBurst=10` added to both daemon units.
+4. **M2 MAJOR — line-count offset advance loses or duplicates alerts on crash.** **Fix:** per-line ack — `_send_alert_dm` returns bool from HTTP 200+ok=True only; offset advances only after every authorized chat got a success. At-least-once delivery (duplicates beat silence).
+5. **M3 MAJOR — cooldown key wasn't subject-specific.** If mirror-bot went down at 11pm and forge-bot at 11:30pm, the `bots` cooldown key suppressed the second alert. **Fix:** subject-specific keys (`bots:mirror`, `bots:forge`). Plus separate critical (10 min) and warning (60 min) cooldown windows (Larry's Dial 3 pick on the warning duration).
+6. **M4 MAJOR — MemoryMax hardcoded 2G in cgroup check.** **Fix:** `_read_memory_max()` queries `systemctl show -p MemoryMax`; handles `infinity` by returning None and skipping the check.
+
+### What shipped
+
+- **`scripts/larry_alerts.py`** (new, 175 lines) — shared append-only queue + cooldown gating + offset helpers. Per-subject cooldown buckets (10 min critical, 60 min warning). Atomic-write offset via tmp+rename. Malformed lines surface as `{'_malformed': True, 'raw': ...}` so the bot can skip past them. Stdlib only.
+- **`scripts/watchdog.py`** (rewrite, 610 → 558 lines) — 9 checks: inbox_watcher / outbox_notifier / beacon_bot (auto-restartable trio) + inbox_watcher_memory (V2 RSS, 1.5 GB threshold) + inbox_watcher_cgroup (NEW, 80%/95% of MemoryMax) + disk + system memory + log_growth (inbox_watcher.log) + bots (forge/mirror/pulse alert-only with subject-specific cooldown keys). `sudo -n systemctl start/restart` for write operations (watchdog runs as larry; NOPASSWD sudo enables silent escalation).
+- **`scripts/dispatch_sentinel.py`** (+~50 lines) — `load_state()` now returns `(state, cold_start)` tuple; main loop calls `larry_alerts.append_alert(...)` for each new stall **unless** cold_start (C2 fix). New `_stall_dm_message()` renders human-readable summaries per stall kind.
+- **`scripts/beacon_telegram_bot.py`** (+~64 lines) — new `_check_pending_alerts()` sweep called alongside `_check_due_reminders()` from main loop on the same 5-min cadence. `_send_alert_dm()` returns True only on full HTTP 200+ok=True success across all chunks. Per-line ack: offset advances only after delivery confirmed; on failure, break loop and retry on next sweep.
+- **`systemd/ourliberty-inbox-watcher.service`** + **`ourliberty-outbox-notifier.service`** — explicit `StartLimitInterval=300/StartLimitBurst=10` documented so watchdog and operators know systemd's own retry envelope.
+- **`systemd/ourliberty-watchdog.service`** — `NoNewPrivileges=true` REMOVED. Watchdog needs `sudo -n systemctl start/restart` to recover the daemons; NoNewPrivileges blocks setuid at the kernel level regardless of sudoers config. Remaining hardening (`PrivateTmp`, `ProtectSystem=strict`, `ProtectHome=read-only`, `ProtectKernelTunables/Modules/ControlGroups`, `RestrictSUIDSGID`) preserved.
+- **`scripts/tests/test_larry_alerts.py`** (new, ~210 lines) — cooldown gating, subject independence, severity-bucket independence, expiry, malformed-line handling, offset atomicity, format_dm rendering.
+- **`scripts/tests/test_watchdog.py`** (new, ~440 lines) — every check's success + failure paths, M1 SubState=auto-restart treated as alive, M3 subject-specific keys, M4 MemoryMax-from-systemctl + parent/children breakdown, RunAllChecks integration. Uses path-scoped `mock.patch('builtins.open', side_effect=...)` so the cgroup-file mock doesn't swallow `larry_alerts`'s writes.
+- **`scripts/tests/test_dispatch_sentinel.py`** (+~125 lines) — new `SentinelLarryAlertsTest` class covers C2 cold-start suppression, second-sweep new-stall append, dedup of already-alerted stalls. Existing tests extended to also redirect `larry_alerts.*` paths to the test root so they don't leak into real `~/agents/blackboard/larry-alerts.jsonl`.
+
+### Verification (Q8 Dial 3, on droplet, live)
+
+299/299 unit tests pass on droplet Python 3.12 (235 pre-existing + 64 new across D3.5-prep). $0 verification cost (no claude invocations).
+
+Six live tests (all completed within ~35 min wall clock):
+
+1. **Smoke alert end-to-end** — manually `append_alert(...)` then waited for beacon-bot's 5-min sweep. Larry's phone received `⚠ watchdog [d35-prep-smoke]` at ~00:10:30 (first sweep after bot restart).
+2. **outbox-notifier auto-restart** — `sudo systemctl stop ourliberty-outbox-notifier` at 00:11:09. Watchdog timer at 00:15:40 detected DOWN, attempted start. *(First-fire path: `systemctl start` failed because the watchdog service had `NoNewPrivileges=true` blocking sudo at kernel level. Critical alert "auto-restart failed" appended to queue. ISSUE FOUND AND FIXED LIVE — see Issues Caught below.)* Post-fix manual trigger at 00:19:30 succeeded; "auto-restarted" warning appended. Both DMs delivered at 00:20:21 bot sweep.
+3. **inbox-watcher auto-restart (load-bearing)** — `sudo systemctl stop ourliberty-inbox-watcher` at 00:21:08. Watchdog timer at 00:26:04 detected DOWN, sudo-start succeeded (post-NoNewPrivileges fix verified via timer-driven path). "Auto-restarted" warning appended. Larry's phone received the critical-then-warning DM pair at 00:30:21 sweep.
+4. **beacon-bot C1 carve-out** — `sudo systemctl stop ourliberty-beacon-bot` at 00:31:21. Watchdog timer at 00:32:08 detected DOWN, sudo-start succeeded. Bot started at 00:32:08, did its first sweep BEFORE watchdog appended the recovery alert (queue race, expected — bot picks up its own recovery DM on its NEXT 5-min sweep). Recovery DM delivered at 00:37:08.
+5. **mirror-bot alert-only path** — `sudo systemctl stop ourliberty-mirror-bot` at 00:33:04. Watchdog timer at 00:37:09 detected DOWN; logged `alert-only (systemd Restart=always handles crash recovery)`; appended critical alert with `subject: bots:mirror` and `suggested_action: sudo systemctl restart ourliberty-mirror-bot`. NO auto-restart attempted. DM delivered at 00:37:09 sweep. Larry ran the suggested command manually to restore (verified the workflow shape).
+6. **sentinel DM test** — planted a 4h-old fake task at `~/agents/inboxes/beacon/d35-sentinel-smoke.json`. Triggered sentinel manually (skipping the 10-min timer wait). Sentinel detected stall, appended warning alert via `larry_alerts.append_alert(source='sentinel', ...)`. DM in queue for next sweep delivery. Inbox-watcher also quarantined the planted file to `.invalid/` (independent verification of D2.5's routing-validator path).
+
+System returned to `overall=healthy`. All 6 services active. Inboxes empty. No in-flight tasks. Quiescent.
+
+### Issues caught during live verification (would have shipped broken without it)
+
+Two real bugs surfaced only during droplet execution:
+
+1. **`sudo` required, not just plain `systemctl`.** Watchdog runs as `User=larry` per its service unit. `systemctl start/restart` on system units requires root. Local tests used mocked subprocess.run so the privilege requirement was invisible. **Fix:** prepend `sudo -n` (non-interactive; relies on Larry's NOPASSWD sudoers config) to all systemctl write operations. Test assertions updated to expect the `sudo -n systemctl ...` prefix.
+2. **`NoNewPrivileges=true` blocks sudo at kernel level.** Even with NOPASSWD configured, the systemd hardening flag blocks the setuid path sudo needs regardless of sudoers. Surfaced because the post-sudo-fix MANUAL run (from shell, no NNP) worked, but the timer-driven run (under the service unit's NNP) still failed. **Fix:** remove `NoNewPrivileges=true` from `ourliberty-watchdog.service` with a comment block explaining why; preserve all other hardening flags.
+
+Both fixes verified live before declaring the test sequence complete.
+
+### Codified conventions worth recalling next session
+
+1. **Watchdog needs privilege escalation; healers and observers do not.** The other 9 timer-driven scripts (7 healers, sentinel, cleanup-worktrees) only read or write within `~/agents`. Only watchdog calls `systemctl start/restart` on system units. If a future service needs the same shape, the same `sudo -n` + no-NoNewPrivileges pattern applies.
+2. **Per-line ack is the right offset-advance shape for queue-based delivery.** Advance only after delivery confirmed; tolerate at-least-once duplicates. The alternative (advance-then-deliver) loses messages on crash.
+3. **Subject-specific cooldown keys, not check-specific.** When multiple instances of the same class can fail (multiple bots, multiple disks if we ever had them), the cooldown key needs the specific subject embedded — otherwise the first failure suppresses alerts about the second.
+4. **Independent code review catches integration bugs; live verification catches environment bugs.** This commit shipped 6 caught at review + 2 caught at live test. Both passes are load-bearing; the live verification cost $0 and ~35 min wall clock.
+5. **Beacon-bot's reminder + alert sweep cadence is 5 min.** Worst-case alert-to-DM latency is ~5 min watchdog detection + ~5 min bot sweep = ~10 min. Acceptable for infra alerts; documented.
+
+### Open items entering D3.5 commit 5a
+
+- **Commit 2 of the original "Option B" split** — Pulse-as-responder behavior change + twice-daily digest. Separate values walkthrough on Pulse's autonomy (sudo-restart authority, escalation criteria, DM voice). Not blocking 5a but worth scheduling.
+- **Beacon-bot self-recovery DM latency.** When watchdog restarts beacon-bot, the recovery alert is appended AFTER bot's first sweep (which started before the append). The alert delivers on the bot's NEXT sweep (~5 min later). Worst-case 10 min latency on beacon-bot recovery DMs specifically. Acceptable; deadman-style journal monitoring is a future enhancement.
+- **Trim larry-alerts.jsonl history.** Append-only; will grow slowly (~200 bytes per alert × low frequency). Add logrotate or trim-by-age sweep in a future commit when growth becomes visible (probably 6+ months out).
+
+**Next:** D3.5 commit 5a — Mirror review chain begins. Per `docs/d3-5-plan.md` Section "Sequencing": 5a ships Mirror's review marker pipeline + preflight-discipline runtime gate.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

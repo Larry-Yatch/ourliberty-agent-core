@@ -47,6 +47,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+import larry_alerts  # noqa: E402
+
 HOME = Path.home()
 AGENTS_ROOT = HOME / 'agents'
 STATE_FILE = AGENTS_ROOT / 'state' / 'dispatch-sentinel.json'
@@ -73,14 +79,21 @@ def log(msg: str, level: str = 'INFO') -> None:
     sys.stderr.write(line)
 
 
-def load_state() -> dict[str, Any]:
+def load_state() -> tuple[dict[str, Any], bool]:
+    """Return (state, cold_start).
+
+    cold_start=True when STATE_FILE is missing OR was corrupted/unreadable.
+    Callers suppress the larry-alerts Telegram append on cold starts so a
+    corrupted state file doesn't fan out every pre-existing stall to the
+    user as a fresh DM (design review C2).
+    """
     if not STATE_FILE.exists():
-        return {'alerted': {}}
+        return {'alerted': {}}, True
     try:
         with open(STATE_FILE) as f:
-            return json.load(f)
+            return json.load(f), False
     except (json.JSONDecodeError, OSError):
-        return {'alerted': {}}
+        return {'alerted': {}}, True
 
 
 def save_state(state: dict[str, Any]) -> None:
@@ -249,10 +262,38 @@ def record_alert(stall: dict[str, Any]) -> None:
         f.write(json.dumps(record) + '\n')
 
 
+def _stall_dm_message(stall: dict[str, Any]) -> str:
+    """Plain-English summary for the Telegram DM."""
+    kind = stall.get('kind', '?')
+    agent = stall.get('agent', '?')
+    file = stall.get('file', '?')
+    age_h = stall.get('age_hours', '?')
+    if kind == 'inbox-stall':
+        return (
+            f'Inbox task on {agent} unpicked for {age_h}h: {file}'
+        )
+    if kind == 'in-flight-stall':
+        threshold = stall.get('threshold_seconds', 0)
+        return (
+            f'In-flight task on {agent} stuck for {age_h}h '
+            f'(threshold {int(threshold/60)}m): {file}'
+        )
+    if kind == 'stale-lease':
+        return (
+            f'Stale lease for {agent} ({stall.get("identity", file)}) — '
+            f'no renew for {age_h}h.'
+        )
+    return f'{kind} on {agent}: {file} ({age_h}h)'
+
+
 def main() -> int:
     now = time.time()
-    state = load_state()
+    state, cold_start = load_state()
     alerted: dict[str, float] = state.get('alerted', {})
+    if cold_start:
+        log('cold start — state file missing or corrupted; this sweep will '
+            'record alerts to disk but will NOT DM Larry (re-arming dedup)',
+            'INFO')
 
     all_stalls: list[dict[str, Any]] = []
     for agent_id in MONITORED_AGENTS:
@@ -273,6 +314,20 @@ def main() -> int:
             f"{stall.get('file', '?')} age={stall.get('age_hours', '?')}h",
             'WARN',
         )
+        # D3.5-prep: surface new stalls to Larry via the shared alert queue.
+        # Suppressed on cold start to avoid fanning out pre-existing stalls
+        # if the state file was corrupted (design review C2).
+        if not cold_start:
+            larry_alerts.append_alert(
+                source='sentinel',
+                severity='warning',
+                subject=key,
+                message=_stall_dm_message(stall),
+                suggested_action=(
+                    f'ls -la {stall.get("path", "?")}'
+                    if stall.get('path') else None
+                ),
+            )
 
     # Garbage-collect alerted entries whose underlying file no longer exists.
     # Keeps the state file from growing unboundedly.

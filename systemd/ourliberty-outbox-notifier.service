@@ -17,6 +17,11 @@ ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/outbox_notifier.py
 
 Restart=on-failure
 RestartSec=10
+# Match the bot units' burst budget. Documented explicit so watchdog
+# (and operators reading the unit) know systemd's own retry envelope
+# rather than relying on systemd's default.
+StartLimitInterval=300
+StartLimitBurst=10
 
 StandardOutput=journal
 StandardError=journal
