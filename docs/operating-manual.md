@@ -1589,6 +1589,8 @@ Live verification target (~$1.50 cost): dispatch a spec Forge will get not-quite
 
 ## Phase D3.5 5b-followup — second-pass review fixes + live-test cascade fixes (2026-05-13, ~3 hours, $1.27 lost to the failed live test surfacing the bugs)
 
+Status: Shipped 2026-05-13.
+
 Two parallel review passes after 5b shipped: (1) a second-pass independent reviewer focused on multi-round data flow + prompt content (found 3 issues — M-7, M-8, m-9), (2) Larry's Path A live verification dispatch, which failed in a way that surfaced 3 more issues — Forge's marker-content discipline (Bug A), the 4a/4b task_id-wrapping cascade (Bug B), and the dead-letter Larry-DM gap (Bug C).
 
 ### The failed live test (2026-05-13 11:55–11:59 UTC −0600)
