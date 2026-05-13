@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-11 (Iteration 16)
+## Status snapshot — updated 2026-05-12 (Iteration 21)
 
-Sixteen cycles run. **System returned to nominal.** Iter 16: dirty tree and sync-blocked patterns CLOSED — both plagued iters 3–15 (13 consecutive). Permanent fix `6b6284a` confirmed working: agent-core-sync.json shows status=success at 2026-05-12T03:39:58Z, commit=e2e5f79, first successful sync since iter 2. All 5 systemd units active (beacon, forge, mirror, pulse, inbox-watcher). Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — validator working). Watching as a potential new pattern (2 occurrences so far; threshold = 3 in 10 cycles).
+Twenty-one cycles run. **System nominal — 6th consecutive clean cycle (iters 16–21).** Dirty-tree and sync-blocked patterns remain CLOSED (fix `6b6284a` holding). D3 Phase commits (Forge preflight markers + smoke verification, bd086e3 → 97cca9d) deployed to VM via successful sync at 23:43:21Z. First beacon inbox task processed end-to-end by inbox_watcher (notify-smoke-4a-001, success=True, 25s, $0.20, at 22:55Z). All 5 systemd units active. Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — no new additions). Watching; 2/10, threshold=3.
 
 ## Known calibration issues
 

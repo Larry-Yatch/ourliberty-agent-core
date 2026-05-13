@@ -4,6 +4,27 @@
 
 ---
 
+## Iteration 21 — 2026-05-12 18:35 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. sync.json: status=success, commit=97cca9d=HEAD, branch=main. New commits pulled (bd086e3 → 97cca9d): D3 Phase work (Forge preflight markers + smoke verification) now deployed on VM. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-12T23:43:21Z (~51m ago at cycle start), status=success. First sync in iters 17–21 to show a real pull rather than "no-change" — D3 commits deployed. ✅
+- **(C) Agent liveness: nominal.** All 5 units active (beacon, forge, mirror, pulse, inbox-watcher). Beacon last logged 2026-05-11T23:39 MDT (~19h); forge 2026-05-09T13:44 MDT (~2.5d); pulse 2026-05-10T12:18 MDT (~2d); mirror 2026-05-09T13:46 MDT (~2.5d). Log silence = confirmed false positive per MEMORY.md. inbox-watcher last logged 2026-05-12T22:55:28Z (16:55 MDT, ~1.5h ago) — successfully completed beacon inbox task `notify-smoke-4a-001` (success=True, duration=25s, cost=$0.20). First observed beacon inbox task processed by the watcher. ✅
+- **(D) Inboxes: nominal.** All inboxes empty — task notify-smoke-4a-001 already consumed and archived by watcher. pulse/.invalid/ unchanged — same 2 files (d2-reject-20260511T220650Z.json, d25-reject-20260512T030823Z.json, source=larry, F24 class). Count=2; threshold=3 in 10 cycles. No new additions. ✅
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active.** PID 81811 (bash, run_cycle.sh), elapsed ~1m, lock modified 18:34 MDT. Fresh (< 10 min). Normal 4h-timer run. Interactive session takes precedence per established precedent.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED**. 6th consecutive clean cycle (iters 16–21). Fix `6b6284a` holding. ✅
+- Sync blocked: **CLOSED**. 6th consecutive successful sync. ✅
+- Invalid pulse inbox dispatches: 2 total, no new additions (iters 17–21). Still watching; 2/10, threshold=3.
+**Learned:** First beacon inbox task processed (notify-smoke-4a-001) at 22:55 UTC — inbox pipeline proven end-to-end for beacon. D3 Phase commits (Forge preflight markers, smoke verification) deployed to VM via successful sync. System health remains solid at iter 21.
+
+---
+
 ## Iteration 20 — 2026-05-12 14:34 MDT
 
 **Health:** ✅ Nominal
