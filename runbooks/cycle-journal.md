@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 26 — 2026-05-13 14:35 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Branch=main, clean. HEAD=2bde0d3 ("docs/operating-manual: mark Phase D3.5 5b-followup shipped (#6)"). Sync confirms "Already up to date." ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-13T20:35:03Z (14:35 MDT), status=no-change, commit=2bde0d3. Within threshold. ✅
+- **(C) Agent liveness: core 6 nominal; 4 D3.5 services still inactive (iter 23b pending).** All 6 monitored units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Beacon last logged 13:07 MDT (~1.5h) — idle Telegram false positive per MEMORY.md calibration. 4 decommissioned services unchanged; iter 23b escalation still open. ✅
+- **(D) Inboxes: nominal.** All inboxes empty. forge/.invalid/ unchanged (1 file: notify-notify-pulse-cost-note-002.json, "worktree target_repo=None"). pulse/.invalid/ unchanged (3 files). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle — this session.** Lock PID 155215, modified 14:35 MDT. PID 155229 (claude --print) is this invocation. Fresh, normal. ✅
+- **(H) Forge digest:** PRs #4 ("docs/tunables: mark Phase F+ tunables-status script as tracked", merged 10:45 MDT), #5 ("docs/operating-manual: mark D3.5 commit 5b shipped", merged 13:02 MDT), #6 ("docs/operating-manual: mark D3.5 5b-followup shipped", merged 13:33 MDT) — all merged since iter 25. 0 open Forge PRs. D3.5 5b fully landed. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services + watchdog task_id bug; needs_response=true) still outstanding.
+**Forge:** shipped PRs #4, #5, #6 since iter 25; 0 open.
+**Patterns:**
+- 4 D3.5 services inactive: G-rule threshold held at 3 consecutive (iters 23–25). Carrying forward; awaiting Larry's iter 23b response before Forge dispatch.
+- forge/.invalid/ "worktree target_repo=None": 1 occurrence (iter 25). No recurrence this cycle. ✅
+- F24 class (prompt too short): no new occurrences since iter 23. Monitoring for full clear. ✅
+- Watchdog task_id missing: no recurrence since iter 23. ✅
+**Learned:** D3.5 5b work fully shipped (PRs #4–#6 merged). System clean. iter 23b the only open question.
+
+---
+
 ## Iteration 25 — 2026-05-13 10:41 MDT
 
 **Health:** ✅ Nominal
