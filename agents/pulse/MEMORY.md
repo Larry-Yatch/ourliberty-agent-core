@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-13 (Iteration 23)
+## Status snapshot — updated 2026-05-13 (Iteration 24)
 
-Twenty-three cycles run. **System: ⚠️ Drift — D3.5 work in progress.** Dirty-tree and sync-blocked (D3.5 development, not Pulse operational writes — different root cause from iters 3–15). Core 5 bots active. Notable events since iter 22: (1) At 22:56 MDT May 12, cascade outage: orchestrator + telegram-webhook + github-webhook + merge-watcher DOWN; restart FAILED; these 4 services now inactive (likely D3.5 decommission). (2) Watchdog tried to dispatch CRITICAL alert to Pulse inbox at 04:56Z — rejected: missing task_id. Bug in watchdog.py being rewritten in D3.5. (3) Secondary outages self-recovered: outbox-notifier, inbox-watcher, beacon-bot, mirror-bot all back up by 00:38 MDT. (4) d35-sentinel-smoke.json: F24 reject (57-char prompt). F24 G-rule fires: 3/10 in last 10 cycles; holding Forge dispatch since dispatch_sentinel.py + watchdog.py both in active D3.5 rewrite. pulse/.invalid/ now 3 files (d2-reject, d25-reject, watchdog-alert). Escalated 2 items (iter 23a informational, iter 23b needs_response=true).
+Twenty-four cycles run. **System: ⚠️ Drift — D3.5 work in progress.** Dirty-tree and sync-blocked (D3.5 development, same state as iter 23). Core 5 bots active. Notable events since iter 23: None new. D3.5 dirty-tree state unchanged (staged beacon_telegram_bot.py; unstaged dispatch_sentinel.py + tests; untracked larry_alerts.py + test files). 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — iter 23b escalation (needs_response=true) still open. pulse/.invalid/ unchanged at 3 files. F24 G-rule still at 3/10 — Forge dispatch held pending D3.5 completion.
 
 ## Known calibration issues
 

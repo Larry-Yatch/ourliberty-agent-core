@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 24 — 2026-05-13 06:36 MDT
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Repo discipline: dirty tree.** Branch=main. Same D3.5 work-in-progress as iter 23: staged (scripts/beacon_telegram_bot.py), unstaged (scripts/dispatch_sentinel.py, scripts/tests/test_dispatch_sentinel.py, scripts/watchdog.py), untracked (scripts/larry_alerts.py, scripts/tests/test_larry_alerts.py, scripts/tests/test_watchdog.py). HEAD=d3baca0 ("Pulse cycle 20260513T084231Z"). Active D3.5 development — never-auto.
+- **(B) Sync health: blocked.** agent-core-sync.json: last_sync=2026-05-13T11:46:19Z (05:46 MDT), status=error "Uncommitted changes in working tree," commit=d3baca0. Root cause = Check A. Never-auto.
+- **(C) Agent liveness: core 5 nominal; 4 D3.5 services inactive (same as iter 23).** Core 5 units active: beacon, forge, mirror, pulse, inbox-watcher. cycle.timer active. Beacon last logged 00:42 MDT (~5h54m) — idle Telegram false positive per MEMORY.md calibration. 4 D3.5 decommissioned services remain inactive: orchestrator, telegram-webhook, github-webhook, merge-watcher.timer. Same state as iter 23b escalation (unresolved, needs_response=true); D3.5 work visibly in progress (dirty tree confirms active dev). Not re-escalating.
+- **(D) Inboxes: nominal.** All inboxes empty. pulse/.invalid/ unchanged — 3 files (d2-reject, d25-reject, watchdog-alert-1778648185.json). No new additions since iter 23.
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active — COMMIT RISK.** PID 123359 (bash), elapsed ~1m21s, started 06:34 MDT. Normal 4h-timer run. Interactive session takes precedence per established precedent. **Risk:** this interactive session wrote cycle-journal.md + MEMORY.md, so run_cycle.sh's auto-commit check WILL fire when PID 123359 finishes. scripts/beacon_telegram_bot.py is already staged (D3.5 work-in-progress) — it will be swept into that "Pulse cycle" commit unless Larry runs `git restore --staged scripts/beacon_telegram_bot.py` first.
+- **(H) Forge digest: nominal.** 0 open Forge PRs. 0 merged since iter 23. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services inactive + watchdog task_id bug; needs_response=true) still outstanding — D3.5 work in progress; expect resolution when D3.5 lands.
+**Forge:** shipped 0 since iter 23; 0 open.
+**Patterns:**
+- D3.5 dirty tree + sync blocked: 2 consecutive (iters 23–24). Not at G-rule threshold (3/10). Active development state.
+- 4 D3.5 services inactive: 2 consecutive (iters 23–24). Not at G-rule threshold (3/10).
+- F24 class (prompt too short dispatches): 3/10 in last 10 cycles (iters 16, 17, 23). G-rule threshold reached — holding Forge dispatch; dispatch_sentinel.py in active D3.5 rewrite.
+- Watchdog dispatch missing task_id: 1 occurrence (iter 23). Not at G-rule threshold. watchdog.py in active rewrite.
+**Learned:** D3.5 dirty-tree state identical to iter 23 — Larry has not yet committed the D3.5 work. This is expected (work-in-progress). No new learnings; baseline unchanged.
+
+---
+
 ## Iteration 23 — 2026-05-13 02:40 MDT
 
 **Health:** ⚠️ Drift
