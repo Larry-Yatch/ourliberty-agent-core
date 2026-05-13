@@ -6,6 +6,38 @@ This is the second-biggest commit cluster of the D3 era by design. Realistic pac
 
 ---
 
+## Prep work — lands BEFORE 5a
+
+These items aren't D3.5 deliverables proper but they're prerequisites for the first D3.5 live test. Ship as a dedicated pre-D3.5 commit (call it `D3.5-prep`).
+
+### watchdog.py adapter rewrite (deferred from D3 commit 5 per the B-option signoff 2026-05-12)
+
+`scripts/watchdog.py` (610 lines, D2.5 era) is the broad 8-check health monitor with auto-recovery. D3 commit 5 enabled the narrow `dispatch_sentinel.py` timer but deferred enabling the watchdog because `watchdog.py` still carries GM-orchestrator hard-coding that doesn't translate to our 4-bot topology. Concretely:
+
+- `RESTARTABLE_SERVICES = ['ourliberty-orchestrator', 'ourliberty-telegram-webhook']` — neither service exists in our fork. **Replace with:** `['ourliberty-inbox-watcher', 'ourliberty-outbox-notifier', 'ourliberty-beacon-bot', 'ourliberty-forge-bot', 'ourliberty-mirror-bot', 'ourliberty-pulse-bot']`.
+- `EXPECTED_SERVICES = ['ourliberty-orchestrator', 'ourliberty-telegram-webhook', 'ourliberty-github-webhook', ...]` — same drop + replace.
+- `check_orchestrator()` (D2.5 line ~79) — replace with `check_inbox_watcher()` + `check_outbox_notifier()`; both serve the orchestrator's role in our topology. Same `systemctl is-active` + auto-restart shape.
+- `check_orchestrator_memory()` (D2.5 line ~108) — V2 RSS-via-MainPID logic translates directly to the inbox-watcher; replace the service name and the cgroup path. Watcher's `MemoryMax=2G` so the 1 GB hard threshold from upstream is reasonable.
+- `check_telegram_webhook()` — drop. We have 4 individual bots, each with its own webhook handler; per-bot liveness already covered by EXPECTED_SERVICES.
+- `check_github_webhook()` — drop. We don't have one (we use outbox-poll → notifier dispatch, not GitHub webhook).
+- Log-growth check — replace `orchestrator.log` reference with `inbox_watcher.log`.
+- The other 4 checks (disk, memory pressure, inbox stale-task detection, token manager status) translate directly.
+
+**Scope estimate:** ~80–150 line edits in `watchdog.py`, plus a test file (`scripts/tests/test_watchdog.py` doesn't exist yet — write it from scratch with the same ephemeral-fixture pattern as `test_worktree_manager.py`). Independent code review pre-push (same pattern as 4a/4b: ~5–6 issues caught at ~$0 cost is wildly favorable).
+
+**Pre-deploy verification:**
+- Run `watchdog.py` once manually after the adapter rewrite. Should report all 6 of our services as active and pass all 8 checks (excluding the 2 dropped GM-specific ones, so 6 of 8 will run; document this).
+- `systemctl enable --now ourliberty-watchdog.timer`. First fire on `Persistent=true` should be clean, same shape as the sentinel and cleanup-worktrees enables.
+- Auto-recovery path test: synthetic stop one bot (`sudo systemctl stop ourliberty-mirror-bot`), wait 5 min for watchdog to fire, verify it restarts.
+
+**Then:** clear to start D3.5 5a.
+
+### Why prep, not part of 5a
+
+The watchdog catches infra failures during D3.5's longer live tests. Without it, a stalled service mid-test would only surface via the sentinel (which detects stalls but doesn't restart). D3.5's revision/escalation loops are long enough that running them on an un-watchdog'd system means a single bot crash mid-test forces a manual restart and lost cost. Cheap insurance — half a session of work — for a phase that'll burn $5–7 in live tests.
+
+---
+
 ## Scope reminder
 
 Per the D3 design (Option C, signed off in 2026-05-08 design session): D3 ships the **dispatch** chain. D3.5 ships the **review** chain. They're peers, not parent/child. Once D3.5 lands, the loop is closed: Larry approves a plan → Beacon dispatches → Forge builds → Mirror reviews → either auto-merges or routes back for revision / replan → Pulse digest shows the outcome.
@@ -154,6 +186,7 @@ Same shape as D3 commit 4's plan:
 
 Before any sub-commit's `git push` + droplet sync + service restarts:
 
+- [ ] **`D3.5-prep` shipped first** — `watchdog.py` adapted to our topology + `ourliberty-watchdog.timer` enabled + auto-recovery path verified. See Prep work section above.
 - [ ] No in-flight tasks (`ls ~/agents/state/in-flight/`).
 - [ ] Local + droplet test suites pass after sync.
 - [ ] `gh auth status` shows `Larry-Yatch` with `repo` + `workflow` scopes (already verified pre-4b, but re-check pre-5a).
@@ -165,12 +198,13 @@ Before any sub-commit's `git push` + droplet sync + service restarts:
 
 ## Estimated depth
 
+- **D3.5-prep (watchdog adapter):** ~3 hours. Lines edits in `watchdog.py` (~80–150) + new test file + manual verification + first-fire + auto-recovery path test. See Prep work section.
 - **5a (Mirror review marker pipeline + preflight gate):** ~5 hours design + code + verification. Same shape as 4a; should go faster the second time.
 - **5b (revision loop):** ~4 hours. New code is small; integration risk is the unknown.
 - **5c (escalation loop):** ~3 hours. Beacon's CLAUDE.md is the big piece; code is minor.
 - **5d (auto-merge + EMERGENCY):** ~4 hours. `gh pr merge` mechanics are simple; EMERGENCY_HALT plumbing needs careful thought about which services need to halt on what evidence.
 
-**Total D3.5: ~16 hours of focused work across 3–4 sessions.** Spread across a week or two of multi-session pacing.
+**Total D3.5 (incl. prep): ~19 hours of focused work across 4–5 sessions.** Spread across a week or two of multi-session pacing.
 
 ---
 
