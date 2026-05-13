@@ -4,6 +4,31 @@
 
 ---
 
+## Iteration 23 — 2026-05-13 02:40 MDT
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Repo discipline: dirty tree.** Branch=main. Working tree has D3.5 work in progress: staged (scripts/beacon_telegram_bot.py), unstaged (scripts/dispatch_sentinel.py, scripts/tests/test_dispatch_sentinel.py, scripts/watchdog.py), untracked (scripts/larry_alerts.py, scripts/tests/test_larry_alerts.py, scripts/tests/test_watchdog.py). Ref: commit af69ef7 "docs(d3-5-plan): watchdog.py adapter rewrite." Never-auto — active development, not stuck Pulse writes.
+- **(B) Sync health: blocked.** agent-core-sync.json: last_sync=2026-05-13T07:45:09Z, status=error "Uncommitted changes in working tree," commit=af69ef7. Root cause = Check A. Never-auto.
+- **(C) Agent liveness: core bots nominal; 4 infrastructure services inactive.** Core 5 units active (beacon, forge, mirror, pulse, inbox-watcher). Watchdog reporting healthy since 00:38 MDT. BUT: transient cascade at 22:56 MDT May 12 (04:56Z May 13): ourliberty-orchestrator DOWN (start FAILED), ourliberty-telegram-webhook DOWN (restart FAILED), services down=[orchestrator, telegram-webhook, github-webhook, merge-watcher.timer, worktree-cleanup.timer]. Systemctl now confirms: orchestrator, telegram-webhook, github-webhook, merge-watcher.timer still inactive. Likely D3.5 decommission — watchdog.py rewrite stopped monitoring them at same time. Secondary outages (all self-recovered): outbox-notifier (00:15–00:19 MDT), inbox-watcher (00:25–00:26 MDT), beacon-bot (00:32 MDT), mirror-bot (00:37 MDT). Ask-then-do.
+- **(D) Inboxes: nominal with new invalid.** All inboxes empty. pulse/.invalid/ now 3 files: d2-reject (iter 16), d25-reject (iter 16–17), + NEW watchdog-alert-1778648185.json (ts=04:56Z, rejected: "task_id field missing or empty"). Alert content was CRITICAL: orchestrator/telegram-webhook down. Silently dropped — Larry NOT notified via Pulse escalation channel for this event. beacon/.invalid/ empty (d35-sentinel-smoke.json rejected 06:37Z for prompt=57 chars <100 min; stall alert delivered to Telegram idx=7 at 06:42Z, resolved).
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active.** PID 115018/115025 (bash + claude), started 02:34 MDT (08:34Z), ~6 min elapsed, normal range. settings.json absent — automated cycle still cannot write journal (known, unchanged). Interactive session takes precedence per iters 3–22 precedent.
+- **(H) Forge digest: nominal.** 0 open Forge PRs. 0 new merged since PR #2 (iter 22). ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:**
+- [yellow] D3.5 dirty tree + sync blocked. pulse-escalations.json iter 23a. (informational, needs_response=false)
+- [yellow] 4 infrastructure services inactive + watchdog dispatch to Pulse missing task_id. pulse-escalations.json iter 23b. (needs_response=true)
+**Forge:** shipped 0 since iter 22; 0 open.
+**Patterns:**
+- F24 class dispatches (prompt too short): d35-sentinel-smoke = 3rd in last 10 cycles. G-rule threshold reached (3/10). dispatch_sentinel.py is in active D3.5 work — holding Forge dispatch; likely being addressed by Larry in current session.
+- Watchdog dispatch missing task_id: 1 occurrence (new). Not at threshold. watchdog.py in active D3.5 rewrite — likely being addressed.
+- D3.5 transition infrastructure decommission: orchestrator, telegram-webhook, github-webhook, merge-watcher all inactive. 1 occurrence; watchdog stopped alerting on them. Verify intentional.
+**Learned:** D3.5 watchdog adapter rewrite is actively in progress. The cascade at 22:56 MDT was likely the D3.5 transition tearing down old infrastructure. Watchdog critical alert to Pulse was silently dropped (watchdog.py dispatch missing task_id — bug in the version being rewritten). F24 G-rule fires at 3/10 but both root sources (dispatch_sentinel.py, watchdog.py) are in active D3.5 work — monitor post-D3.5 rather than dispatching to Forge now.
+
+---
+
 ## Iteration 22 — 2026-05-12 22:37 MDT
 
 **Health:** ✅ Nominal

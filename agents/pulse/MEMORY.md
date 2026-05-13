@@ -6,13 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-12 (Iteration 22)
+## Status snapshot — updated 2026-05-13 (Iteration 23)
 
-Twenty-two cycles run. **System nominal — 7th consecutive clean cycle (iters 16–22).** Dirty-tree and sync-blocked patterns remain CLOSED (fix `6b6284a` holding). Post-iter-21 pipeline activity confirmed: Forge inbox task `worktree-relocation-smoke-001` (D3 worktree relocation smoke, $0.12) + Beacon notify task (D3 result notification, $0.18) both processed successfully by inbox_watcher at 03:23–03:24Z. PR #2 merged at 04:20Z (Forge docs: Pulse cost line update). All 5 systemd units active. Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — no new additions). Watching; 2/10, threshold=3.
+Twenty-three cycles run. **System: ⚠️ Drift — D3.5 work in progress.** Dirty-tree and sync-blocked (D3.5 development, not Pulse operational writes — different root cause from iters 3–15). Core 5 bots active. Notable events since iter 22: (1) At 22:56 MDT May 12, cascade outage: orchestrator + telegram-webhook + github-webhook + merge-watcher DOWN; restart FAILED; these 4 services now inactive (likely D3.5 decommission). (2) Watchdog tried to dispatch CRITICAL alert to Pulse inbox at 04:56Z — rejected: missing task_id. Bug in watchdog.py being rewritten in D3.5. (3) Secondary outages self-recovered: outbox-notifier, inbox-watcher, beacon-bot, mirror-bot all back up by 00:38 MDT. (4) d35-sentinel-smoke.json: F24 reject (57-char prompt). F24 G-rule fires: 3/10 in last 10 cycles; holding Forge dispatch since dispatch_sentinel.py + watchdog.py both in active D3.5 rewrite. pulse/.invalid/ now 3 files (d2-reject, d25-reject, watchdog-alert). Escalated 2 items (iter 23a informational, iter 23b needs_response=true).
 
 ## Known calibration issues
 
 - **All-bot log-silence false positive (confirmed iter 2, generalized from iter 1 beacon-only).** Check C threshold (>30m log silence → ask-then-do) fires on idle Telegram polling periods for ALL bots (beacon, forge, mirror, pulse). None of the bots log anything when no user messages arrive. Observed silence times: beacon 77m, forge 47m, mirror 45m, pulse 31m — all units were systemctl active. Do not escalate for log silence unless the systemd unit is also non-active or there's error-spam in the last visible log lines. Confirmed again iter 3 (silence 4h30m–5h18m, all 4 units active, no errors).
+
+- **D3.5 infrastructure decommission (observed iter 23, 2026-05-13).** Four services now inactive as expected D3.5 transition: ourliberty-orchestrator, ourliberty-telegram-webhook, ourliberty-github-webhook, ourliberty-merge-watcher.timer. The watchdog.py adapter rewrite removed them from monitoring at 22:56 MDT May 12. Do not escalate these as "down" until D3.5 plan confirms their replacement or reinstatement. Confirm with Larry (iter 23b escalation pending).
+
+- **Watchdog dispatch to Pulse inbox missing task_id (discovered iter 23, 2026-05-13).** watchdog.py generates dispatch payloads without a task_id field. Validator rejects them. Critical watchdog alerts to Pulse are silently dropped. watchdog.py is being rewritten in D3.5; ensure fix includes task_id in all dispatch payloads. See pulse/.invalid/watchdog-alert-1778648185.json.reason.
 
 ## System-state assumptions that have proven wrong
 
