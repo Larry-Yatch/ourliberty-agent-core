@@ -813,6 +813,17 @@ def process_outbox(outbox_file: Path) -> str:
             notify_task['clarification_count'] = marker_decision['next_clarification_count']
         if data.get('max_clarifications') is not None:
             notify_task['max_clarifications'] = data['max_clarifications']
+        # Phase D3 commit 4b post-test-2 fix: propagate target_repo + branch
+        # + pr_title/pr_body forward across the full clarification cascade
+        # (forge→beacon question, then beacon→forge answer, then forge
+        # re-preflight). Without these on the notify task, _build_outbox
+        # on Beacon's side has nothing to propagate, the answer leg arrives
+        # at Forge with target_repo=None, and the watcher's worktree gate
+        # refuses with "no canonical path". Same shape as the marker-error
+        # black hole the 4b review caught — different code path.
+        for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body'):
+            if data.get(f_name):
+                notify_task[f_name] = data[f_name]
 
         notify_filename = f'notify-{outbox_file.stem}.json'
         try:
@@ -925,6 +936,13 @@ def process_outbox(outbox_file: Path) -> str:
         notify_task['clarification_count'] = data['clarification_count']
     if data.get('max_clarifications') is not None:
         notify_task['max_clarifications'] = data['max_clarifications']
+    # Phase D3 commit 4b post-test-2 fix: propagate target_repo + branch +
+    # pr_title/pr_body so the clarification-answer leg back to Forge passes
+    # the worktree gate. See the matching block in the marker-decision path
+    # above for the full explanation.
+    for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body'):
+        if data.get(f_name):
+            notify_task[f_name] = data[f_name]
 
     notify_filename = f'notify-{outbox_file.stem}.json'
     try:

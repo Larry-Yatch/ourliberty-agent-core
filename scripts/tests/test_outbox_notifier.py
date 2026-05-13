@@ -802,6 +802,62 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         self.assertIn('could not be parsed', data['prompt'])
         self.assertIn('invalid JSON', data['prompt'])
 
+    def test_clarify_notify_propagates_target_repo_and_branch(self):
+        """4b post-test-2 fix: clarification cascade must propagate
+        target_repo/branch through BOTH notify hops. Without these on the
+        notify task, the answer leg dies at Forge's worktree gate."""
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-pf", "question": "Which line?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = self._forge_outbox(
+            marker,
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-pf',
+            pr_title='docs: example title',
+            pr_body='example body',
+            clarification_count=0,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('forge', 't-pf-clarify.json', outbox)
+        on.process_outbox(f)
+
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(data['branch'], 'forge/t-pf')
+        self.assertEqual(data['pr_title'], 'docs: example title')
+        self.assertEqual(data['pr_body'], 'example body')
+
+    def test_clarification_answer_leg_propagates_target_repo_and_branch(self):
+        """Beacon's answer to a forge-question must carry target_repo/branch
+        back to Forge so her re-preflight invocation passes the worktree gate."""
+        # Simulate Beacon's outbox responding to a forge-question.
+        outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='t-pf',
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-pf',
+            pr_title='docs: example title',
+            pr_body='example body',
+            clarification_count=1,
+            max_clarifications=3,
+            result='Use line 258 — the systemd-units table row.',
+        )
+        f = self._write_outbox('beacon', 't-pf-answer.json', outbox)
+        on.process_outbox(f)
+
+        notifies = list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        data = json.loads(notifies[0].read_text())
+        self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(data['branch'], 'forge/t-pf')
+        self.assertEqual(data['pr_title'], 'docs: example title')
+        self.assertEqual(data['pr_body'], 'example body')
+
     def test_marker_error_propagates_target_repo_and_branch(self):
         """4b review fix: malformed-marker retry must carry target_repo/branch
         forward or Forge's `worktree_enabled` watcher will reject the retry."""
