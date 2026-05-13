@@ -123,7 +123,7 @@ Retune trigger for all: healer fires repeatedly on the same artifact → root-ca
 
 **Monthly skim.** Once a month, read the table — no action required, just orient yourself to what's tunable and where. The act of re-reading catches "I forgot we had a knob for that" failure mode.
 
-**Eventual:** a small `tunables status` script that prints current values from the live config files + grep-scrapes constants from .py files. Phase F+ candidate. Goal: this doc becomes the spec; the script becomes the read-the-current-state surface.
+**Eventual:** a small `tunables status` script that prints current values from the live config files + grep-scrapes constants from .py files. Phase F+ candidate (tracked). Goal: this doc becomes the spec; the script becomes the read-the-current-state surface.
 
 First scheduled review: 2026-08-13.
 
