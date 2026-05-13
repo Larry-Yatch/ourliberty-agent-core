@@ -264,7 +264,7 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
 | `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
 | `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
-| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled — enable after cycle observed ≥ 1 day)* | every 5m |
+| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled; D2.5 criterion met 2026-05-11 — pending operator enablement)* | every 5m |
 | `ourliberty-heal-*.timer` → `.service` (×7) | Self-healing healers (D2.5) — abandoned-inbox-tasks, blocked-inbox-age, empty-inbox-files, recovery-already-merged, restart-dedup-obsolete, silent-loop-death, zombie-main-workers. | every 5–15 min each |
 | `ourliberty-cleanup-stale-worktrees.timer` → `.service` (D3-4b) | Daily sweep of `~/agent-worktrees/wt-*` (24h grace; skips in-flight). | every 24h |
 
