@@ -1641,11 +1641,24 @@ Same review pattern (4a/4b/5a/5a-followup → 5/6/6/6/6 issues each). This one c
 3. **Every terminal-from-Larry's-perspective intent must DM Larry.** `dead-letter` joined the set; verify when adding any future intent (`review-question` in 5b's deferred scope, `pulse-digest` in Phase F+, etc.) — if Larry initiated the work, he gets a closing DM at every termination shape.
 4. **Cascade brittleness is the failure mode to design against.** Forge's preflight slip cost $1.27 because three layers of bugs stacked: she made one prompt-discipline mistake; the marker-error retry mechanism couldn't recover because of B; the cascade exhaust didn't reach Larry because of C. Single-failure-mode design is dangerous; verify each layer's recovery path independently.
 
-### Verification (pending live re-test)
+### Verification (live, 2026-05-13)
 
 Synthetic unit tests pass locally (476 total, 4 pre-existing macOS-only worktree failures unrelated). 13 net new tests across the followup additions.
 
-Live verification target: re-run the failed dispatch (`opmanual-d35-5b-shipped-note-001` shape — small doc edit). Expected this time: Forge emits JSON marker → preflight PROCEED → build → PR opens → Mirror reviews → likely PASS → closing DM lands. If Forge slips again on JSON-vs-prose, the new diagnostic error tells her exactly how to fix; retry should succeed; chain completes; closing DM lands (now also fires from dead-letter if cascade exhausts).
+**Live test 1 (PR #5, `opmanual-d35-5b-shipped-note-001` — same task that originally failed):** chain ran successfully end-to-end. Forge slipped on JSON-vs-prose again on her first preflight attempt (`MalformedForgeMarker: phase=preflight requires ONE marker block ... — none found`); marker-error cascade fired retry 1; retry 1 succeeded (Bug B fix held — Forge's marker payload task_id matched the now-original envelope task_id); build phase dispatched; PR #5 opened at https://github.com/Larry-Yatch/ourliberty-agent-core/pull/5; Mirror reviewed + emitted REVIEW_PASS at 12:49:26. **Total cost: ~$1.31** ($0.29 + $0.31 + $0.23 + $0.46 + $0.30 across Beacon notify + Forge preflight retry + Beacon notify + Mirror review + Beacon journal). **But Larry got no closing DM** — `reply_chat_id` was None on Mirror's outbox, the auto-DM hook silently skipped.
+
+Trace showed reply_chat_id dropped at HOP 3 — the marker-error retry task in Forge's inbox. Root cause: `_notify_forge_marker_error` was missing the `reply_chat_id` propagation block. The M-3 5a-followup fix had landed on `_notify_mirror_marker_error` (which I'd added later) but the symmetric fix on the Forge equivalent was overlooked — pre-existing gap from 4a/4b. Shipped as **5b-followup-2** (commit `4c79450`).
+
+**Live test 2 (PR #6, `opmanual-d35-5b-followup-shipped-note-001`):** post-Bug-E-fix re-test. Chain ran 3 minutes wall-clock end-to-end. Forge nailed the JSON marker on first try (the strengthened CLAUDE.md guidance from Bug A landed). Build → PR #6 → Mirror REVIEW_PASS → **closing DM landed on Larry's Telegram at 13:07** with the full content (✓ prefix, PR URL, Mirror's verification summary including her grep evidence, "Ready for you to merge manually"). Full chain verified end-to-end including closing DM. Total cost: ~$0.50.
+
+PRs #5 + #6 merged to main (commits `8756e4a` and the prior merge). Closing-DM regression test passed at PR #6 — every terminal-from-Larry's-perspective intent now reliably reaches the originating chat thread.
+
+**Cascade-recovery paths still only unit-tested, not live:** Bug B cascade-recovery (envelope task_id stays original through retries), Bug C dead-letter Larry-DM, Bug E reply_chat_id propagation through marker-error. The unit tests are tight (16 new tests across the 5b-followup commits). Future live runs that happen to trigger marker-error cascades will exercise them naturally.
+
+**Codified additions worth recalling next session:**
+
+5. **The marker-error retry path is the most under-tested code in the dispatch chain.** Three production failures in 5b's verification window (Bug B, Bug C, Bug E) all lived in this path. Tests that exercise multi-hop chains with intentional preflight slips are essential before declaring future commits "live verified."
+6. **Forge sometimes drifts on JSON-vs-prose discipline non-deterministically.** Same prompt; first attempt was prose, second attempt was clean JSON. Don't assume "she did it right last time" — verify each live run by reading her outbox content before judging the chain succeeded by-virtue-of-cost-records-existing.
 
 **Next:** D3.5 commit 5c — Beacon replan flow (same as the next-up note in the 5b entry above).
 
