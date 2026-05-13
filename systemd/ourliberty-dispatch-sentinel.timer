@@ -1,0 +1,11 @@
+[Unit]
+Description=Run dispatch sentinel every 10 minutes (Gap 2 — stall detection)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=ourliberty-dispatch-sentinel.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

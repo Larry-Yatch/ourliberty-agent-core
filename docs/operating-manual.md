@@ -132,6 +132,7 @@ Future agents (per North Star / build plan): **Aide** (EA, Phase E), **Scout** (
 | **`forge_preflight_handler.py`** (D3-4a) | Pure-logic marker library: parses Forge's `PROCEED` / `CLARIFY_REQUEST` / `REJECT` block, validates required fields, evaluates the clarification budget. Stateless — all envelope state rides on the task. | `~/agent-core/scripts/forge_preflight_handler.py` |
 | **`worktree_manager.py`** (D3-4b) | Keyed-reuse worktree manager for Forge dispatches. Same task_id → same worktree path across all dispatches (preflight, CLARIFY round-trip, build). Worktrees live at `~/agent-worktrees/wt-<agent>-<task_id>/` (NOT `/tmp`, see Section 4 note on `PrivateTmp`). Idempotent branch checkpoint with empty WIP commit pushed to origin. | `~/agent-core/scripts/worktree_manager.py` |
 | **`cleanup_stale_worktrees.py`** (D3-4b, ports upstream's Gap 10) | Daily sweep — removes `~/agent-worktrees/wt-*` directories older than 24h. Skips worktrees referenced by the in-flight registry (long Read-heavy builds don't get reaped mid-flight). Run by `ourliberty-cleanup-stale-worktrees.timer` every 24h. | `~/agent-core/scripts/cleanup_stale_worktrees.py` |
+| **`dispatch_sentinel.py`** (D3 commit 5, ports upstream's Gap 2) | Stall detection — three scans per run: inbox stalls (> 3h unpicked), in-flight stalls (past per-model threshold), stale leases (heartbeat stopped). Disk-only alerts to `~/agents/blackboard/sentinel-alerts.jsonl` with dedup state in `state/dispatch-sentinel.json`. Does NOT auto-cancel; the cancel-marker pattern (`blackboard/cancel-task-<stem>.json`) is the explicit kill switch. Run by `ourliberty-dispatch-sentinel.timer` every 10m. | `~/agent-core/scripts/dispatch_sentinel.py` |
 | **Self-healing healers (D2.5)** | Seven adopted from upstream's `gm-heal-*` family — abandoned inbox tasks, blocked inbox age, empty inbox files, recovery-already-merged, restart-dedup obsolete, silent-loop death, zombie main workers. Each is a `ourliberty-heal-*.{service,timer}` pair. | `~/agent-core/systemd/ourliberty-heal-*` |
 | **`dispatch_validator.py`** | Pre-dispatch validation: `task_id` required, `prompt` ≥ 100 chars, `source` in allowed set, `phase` ∈ {`preflight`, `build`}, `intent` ∈ {`ack-proceed`, `clarify`, `clarification-response`, `clarification-exhausted`, `reject`, `result-notification`, `dead-letter`, `marker-error`}. Stricter than HANDSHAKE-SCHEMA. | `~/agent-core/scripts/dispatch_validator.py` |
 | **`dispatch_lease.py`** | Restart-safe concurrency primitive (flock + nonce + TTL + boot-id PID-reuse guard). Used by the watcher to ensure one task per agent at a time. | `~/agent-core/scripts/dispatch_lease.py` |
@@ -264,9 +265,10 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
 | `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
 | `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
-| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled; D2.5 criterion met 2026-05-11 — pending operator enablement)* | every 5m |
+| `ourliberty-watchdog.timer` → `.service` | Broad system health monitor with auto-recovery *(disabled; D2.5 criterion met but the underlying `watchdog.py` still has GM-era service-name hard-coding — pending adapter rewrite, separate from D3 commit 5 per the B option Larry signed off 2026-05-12)* | every 5m |
 | `ourliberty-heal-*.timer` → `.service` (×7) | Self-healing healers (D2.5) — abandoned-inbox-tasks, blocked-inbox-age, empty-inbox-files, recovery-already-merged, restart-dedup-obsolete, silent-loop-death, zombie-main-workers. | every 5–15 min each |
 | `ourliberty-cleanup-stale-worktrees.timer` → `.service` (D3-4b) | Daily sweep of `~/agent-worktrees/wt-*` (24h grace; skips in-flight). | every 24h |
+| `ourliberty-dispatch-sentinel.timer` → `.service` (D3 commit 5) | Stall detection — flags inbox tasks > 3h old, in-flight tasks past per-model threshold, leases with stale heartbeats. Disk-only alerts to `~/agents/blackboard/sentinel-alerts.jsonl`. Does NOT kill stalled tasks. | every 10m |
 
 > **Note on `PrivateTmp`:** the inbox-watcher and outbox-notifier services run with `PrivateTmp=yes` (a default systemd hardening for these services). Each service gets a private `/tmp` namespace that's invisible to host shell + other services + cleanup. Forge's worktrees therefore live at `~/agent-worktrees/`, NOT `/tmp/wt-*` — persistent across service restarts, visible across services, and reachable by the cleanup timer. Both services have `~/agent-worktrees` in `ReadWritePaths`.
 
@@ -1339,6 +1341,35 @@ Larry signed off on Option A from the 4b Part II entry's "Discovered architectur
 - **Multi-repo expansion** — `CANONICAL_REPO_PATHS` (watcher) + `CANONICAL_REPOS` (cleanup) are still single-entry maps. When `allowed_repos` grows beyond `ourliberty-agent-core`, fold both into a top-level `repo_paths` block in `agent-models.json` so the logical-name → filesystem mapping lives in one place.
 
 **Next:** Commit 5 (D3-sentinel) — `dispatch_sentinel.py` + `ourliberty-watchdog.timer` install + watchdog live test. The PR review workflow likely lands as a separate small commit between 4b's tail and commit 5 (it touches Beacon's CLAUDE.md and possibly Pulse's `/cycle` prompt; not on the commit-5 critical path but worth shipping before the next live test).
+
+## Phase D3 (commit 5 of 5) — dispatch_sentinel timer live; watchdog adapter deferred (2026-05-12, ~30 min)
+
+Closes the D3 commit list with the narrow stall-detector running on a 10-minute timer. The broader `watchdog.py` (8-check health monitor, D2.5 era) turned out to still carry GM-orchestrator hard-coding (`RESTARTABLE_SERVICES = ['ourliberty-orchestrator', 'ourliberty-telegram-webhook']` — neither exists in our topology), so per the B-option Larry signed off mid-session, the watchdog adaptation is deferred to its own commit. Commit 5 ships just the sentinel.
+
+### What shipped
+
+- **`systemd/ourliberty-dispatch-sentinel.{service,timer}`** (new) — installed at `/etc/systemd/system/`, enabled. `Type=oneshot`, `User=larry`, `OnBootSec=5min`, `OnUnitActiveSec=10min`, `Persistent=true`. Mirrors the `ourliberty-cleanup-stale-worktrees` shape.
+- Operating manual Part I:
+  - Section 1 Infrastructure inventory: new entry for `dispatch_sentinel.py` (3 scans, disk-only alerts, no auto-cancel — the cancel-marker pattern remains the explicit kill switch).
+  - Section 4 "The cast" systemd-units table: new row for `ourliberty-dispatch-sentinel.timer`.
+  - Section 4: the `ourliberty-watchdog.timer` annotation updated to reflect the actual deferral reason ("`watchdog.py` still has GM-era service-name hard-coding — pending adapter rewrite, separate from D3 commit 5"), superseding PR #1's earlier annotation update (which only noted the D2.5 criterion was met).
+
+### What's NOT in commit 5 (and why)
+
+- **`watchdog.py` adaptation + `ourliberty-watchdog.timer` enable.** Audit during commit 5 prep found that `scripts/watchdog.py` (610 lines, D2.5) still references `ourliberty-orchestrator`, `ourliberty-telegram-webhook`, `ourliberty-github-webhook` — none of which exist in our fork. Two of its 8 checks (`check_orchestrator`, `check_orchestrator_memory`) are GM-orchestrator-specific. Installing it as-is would alert every 5 minutes about missing services and try to restart things that don't exist. Three options surfaced (full adapter rewrite, defer, hybrid minimal-edit); Larry signed off on **defer** per the "build complete, not fast" principle. Scope decision: don't ship a half-adapted watchdog as a "live test surface" for the sentinel. Sentinel's own first-fire-on-enable is the live test.
+
+### Verification
+
+- `systemd-analyze verify` clean on both new units.
+- `enable --now` triggered immediate first run (`Persistent=true`): `[sentinel] [INFO] sweep complete — 0 known stalls, 0 new`. Exit 0. Next fire scheduled 10 min later.
+- No stuck tasks, no stale leases, no in-flight orphans — the system was quiescent at install time so the sweep had nothing to flag. This is the same kind of "clean first-fire" verification that worked for the cleanup-stale-worktrees timer.
+
+### Open issues entering D3.5
+
+- **`watchdog.py` adapter rewrite** — deferred from commit 5 by explicit decision. Will likely roll into D3.5's verification setup (the broader review chain needs a healthy infra baseline; rewriting watchdog as part of the D3.5 prep is a natural pairing).
+- **The original 4b-tail concerns** (PR review workflow, preflight-discipline runtime gate, multi-repo expansion) — all rolled into D3.5's scope per `docs/d3-5-plan.md`.
+
+**Next:** D3.5 — Mirror review chain. Plan doc shipped at `docs/d3-5-plan.md` (206 lines). Likely splits into 5a (review markers + preflight gate), 5b (revision loop), 5c (escalation), 5d (auto-merge + EMERGENCY_HALT) per the same multi-commit pattern as D3 commit 4 → 4a + 4b.
 
 ---
 
