@@ -826,6 +826,15 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
         notify_task['max_revisions'] = data['max_revisions']
     if data.get('pr_url'):
         notify_task['pr_url'] = data['pr_url']
+    # D3.5 5b-followup Bug E (live re-test): propagate reply_chat_id so a
+    # marker-error retry doesn't drop the originating Telegram chat thread.
+    # _notify_mirror_marker_error has this; _notify_forge_marker_error was
+    # missing it — discovered when the 2026-05-13 re-test completed PR #5
+    # successfully but Larry got no closing DM because reply_chat_id went
+    # to None on the first marker-error retry and never recovered through
+    # the chain.
+    if data.get('reply_chat_id') is not None:
+        notify_task['reply_chat_id'] = data['reply_chat_id']
 
     try:
         safe_write_inbox.safe_write_inbox(

@@ -3601,6 +3601,47 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertIn('3', rendered)
         self.assertIn('no PR was opened', rendered)
 
+    # ---- Bug E (live re-test): _notify_forge_marker_error propagates reply_chat_id ----
+
+    def test_bug_e_forge_marker_error_propagates_reply_chat_id(self):
+        # 2026-05-13 live re-test: PR #5 completed successfully (Mirror
+        # PASSed) but Larry got no closing DM. Root cause: Forge slipped
+        # on JSON-vs-prose, marker-error fired, retry task dropped
+        # reply_chat_id. Every downstream hop's propagation block found
+        # None to propagate. Mirror's outbox had reply_chat_id=None,
+        # _maybe_dm_larry silently skipped.
+        # Symmetric with the existing M-3 fix on _notify_mirror_marker_error.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 7998341473,
+            'result': '=== PROCEED ===\n<prose>\n=== END_PROCEED ===',
+        }
+        on._notify_forge_marker_error(data, 'no JSON in marker')
+        notifies = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['reply_chat_id'], 7998341473)
+
+    def test_bug_e_forge_marker_error_omits_when_absent(self):
+        # Defensive: if reply_chat_id is absent (autonomous Pulse runs),
+        # the retry task must NOT inject a falsy reply_chat_id key.
+        data = {
+            'agent': 'forge', 'source': 'beacon', 'task_id': 't-no-chat',
+            'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
+            'result': 'failed',
+        }
+        on._notify_forge_marker_error(data, 'reason')
+        notifies = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertNotIn('reply_chat_id', notify)
+
 
 if __name__ == '__main__':
     unittest.main()
