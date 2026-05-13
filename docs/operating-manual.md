@@ -255,7 +255,7 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
 | `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
 | `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
-| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled — enable after cycle observed ≥ 1 day)* | every 5m |
+| `ourliberty-watchdog.timer` → `.service` | Process / inbox-age watchdog *(disabled; D2.5 criterion met 2026-05-11 — pending operator enablement)* | every 5m |
 
 ### What's running right now?
 
