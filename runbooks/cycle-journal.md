@@ -4,6 +4,31 @@
 
 ---
 
+## Iteration 25 — 2026-05-13 10:41 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. HEAD=15d046e ("D3.5 5a-followup: Larry-DM-on-task-complete"). D3.5 work committed and pushed (d908ca6 + 15d046e). First clean tree since iter 22. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-13T16:30:39Z (~10 min ago at cycle start), status=success, "Synced f92a55b → 15d046e". D3.5 commits now live on VM. ✅
+- **(C) Agent liveness: core 5 nominal; cycle.timer active; 4 D3.5 services inactive (iter 23b pending).** All 6 monitored units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Beacon last logged 10:30 MDT (bot restart post-D3.5 deploy). 4 decommissioned services: orchestrator, telegram-webhook, github-webhook, merge-watcher.timer — still inactive, now 3 consecutive cycles (G-rule threshold reached). iter 23b escalation (needs_response=true) still open; awaiting Larry's confirmation of intentional decommission.
+- **(D) Inboxes: nominal with note.** All inboxes empty. forge/.invalid/: 1 new file since iter 24 — `notify-notify-pulse-cost-note-002.json` (ts=2026-05-13T02:52Z, rejected: "worktree: no canonical path for target_repo=None"). Depth-2 beacon→forge clarification-response for tunables cost-line update task. New validation error class (not F24/prompt-too-short). PR #2 (operating-manual cost update) merged at 04:20Z same day — underlying task likely completed via another path. 1 occurrence, below G-rule threshold. Monitor.
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active.** Lock PID 137549, modified 10:34 MDT (~7 min elapsed). Normal 4h-timer run. Interactive session takes precedence per established precedent.
+- **(H) Forge digest:** PR #3 "docs/tunables: set first scheduled review date (2026-08-13)" merged 16:20Z. 0 open Forge PRs. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services + watchdog task_id bug; needs_response=true) still outstanding. G-rule threshold now reached (3/10 consecutive) — holding Forge dispatch since this is a confirmation question for Larry, not a code bug.
+**Forge:** shipped PR #3 (tunables first review date) since iter 24; 0 open.
+**Patterns:**
+- D3.5 dirty tree + sync blocked: **CLOSED** (iters 23–24). D3.5 committed, tree clean, sync successful. ✅
+- 4 D3.5 services inactive: 3 consecutive (iters 23–24–25). **G-rule threshold reached.** Holding permanent-fix dispatch — awaiting Larry confirmation via iter 23b. Not routing to Forge until confirmed intentional.
+- forge/.invalid/ "worktree target_repo=None" rejection: 1 occurrence (new class, below threshold). Monitor.
+- F24 class (prompt too short): last seen iter 23. dispatch_sentinel.py now in D3.5 5a. No new F24 rejections post-D3.5 landing. Count still 3/10 — watching for resolution over next 5 cycles.
+- Watchdog task_id missing: 1 occurrence (iter 23). watchdog.py in D3.5 5a. Monitor post-D3.5.
+**Learned:** D3.5 5a work confirmed landed cleanly. Dirty-tree + sync-blocked pattern CLOSED. New forge/.invalid/ rejection class observed ("worktree target_repo=None" on depth-2 notify) — one occurrence, may be edge case in outbox_notifier depth check.
+
+---
+
 ## Iteration 24 — 2026-05-13 06:36 MDT
 
 **Health:** ⚠️ Drift
