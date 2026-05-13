@@ -195,21 +195,25 @@ manually after seeing this notify. No further action from you.
 
 Journal: "Mirror approved PR #N on task <id>." That's it in 5a — Larry merges manually. (Once 5d lands, this triggers `gh pr merge --squash --delete-branch` automatically.)
 
-### Shape 7 — `intent=review-revision` (Mirror found fixable issues)
+### Shape 7 — `intent=review-revision` (Mirror found fixable issues — D3.5 5b auto-dispatches)
 
 ```
 [Inter-agent notify | intent=review-revision | from=mirror | task=<id> | status=SUCCESS]
 
 Mirror has requested REVISION on PR `<url>` for task `<id>` (N finding(s),
-severity=medium, confidence=high). In 5a the Forge revision dispatch is not
-yet wired — journal the request and Larry handles the revision manually
-(DM Forge a follow-up task or comment on the PR). 5b will wire the
-auto-revision loop.
+severity=medium, confidence=high). The revision has been auto-dispatched
+to Forge — she will apply the findings in her existing build session,
+commit + push to the same branch (PR auto-updates), and Mirror will
+re-review. Journal the dispatch and await the re-review outcome. No manual
+action from you. (D3.5 5b: revision loop auto-wired; budget enforced by
+max_revisions in agent-models.json loop_bounds.)
 ```
 
-In 5a: journal "Mirror requested revision on task <id>: N findings, severity=X" and DM Larry the summary. Larry will dispatch the revision manually if he wants Forge to fix. (Once 5b lands, the notifier writes a `phase=revision` task to Forge's inbox with `--resume` against her build session; she patches and pushes; Mirror re-reviews. Bounded by `max_revisions` from `config/agent-models.json loop_bounds`.)
+**In 5b: just journal.** The revision dispatch is automatic — the notifier wrote a `phase=revision` task to Forge's inbox with `--resume` against her build session AND her findings serialized in the prompt. Forge will fix + push + her revision response triggers a fresh re-review by Mirror. The re-review is in YOUR inbox eventually as a new `intent=review-pass` / `review-revision` / `review-escalate` / `review-emergency-halt`. Treat each round as a fresh decision.
 
-### Shape 8 — `intent=review-escalate` (Mirror needs a replan)
+Bounded by `max_revisions` from `config/agent-models.json loop_bounds` (currently 3). When the budget exhausts (round N+1 > max_revisions), Mirror's REVIEW_REVISION auto-downgrades to ESCALATE — see Shape 8 for that handling. Larry gets a Telegram DM on budget-exhausted ESCALATE (the 5a-followup auto-DM pipe handles all terminal intents).
+
+### Shape 8 — `intent=review-escalate` (Mirror needs a replan — OR budget exhausted)
 
 ```
 [Inter-agent notify | intent=review-escalate | from=mirror | task=<id> | status=SUCCESS]
@@ -219,6 +223,14 @@ Reason: <Mirror's why>. In 5a the replan flow is not yet wired — journal the
 escalation and decide manually: revise the spec (new APPROVAL_REQUEST) or
 push back with reasoning. 5c will wire the auto-replan loop.
 ```
+
+**D3.5 5b note:** this intent now fires from THREE different scenarios. Read the `reason` field carefully to pick the right response:
+
+1. **Mirror directly emitted REVIEW_ESCALATE** (5a behavior). She judged the spec was wrong; reason field describes the misalignment.
+2. **Mirror emitted REVIEW_REVISION with low confidence** (5a auto-promote). Reason field starts "Mirror emitted REVIEW_REVISION with confidence: low across N finding(s). Auto-promoted to ESCALATE..." — she wasn't sure her findings were real; system kicked it to you.
+3. **Mirror emitted REVIEW_REVISION but budget exhausted** (5b). Reason field starts "Mirror emitted REVIEW_REVISION (severity=...) but revision_count would reach N, exceeding the budget of M. Routing as ESCALATE: the Forge↔Mirror auto-fix loop has exhausted attempts on this task." — Forge and Mirror went back and forth max_revisions times without converging; the auto-fix loop gave up.
+
+All three: Larry gets a Telegram DM (via the 5a-followup auto-DM pipe — escalate is a terminal intent). Your action is the same regardless of cause:
 
 Two paths in 5a, judged like Shape 1 (clarify) — *can I fix this by revising the spec, or is Mirror wrong?*
 

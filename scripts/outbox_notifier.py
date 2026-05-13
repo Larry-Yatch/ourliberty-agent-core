@@ -111,6 +111,59 @@ _PR_URL_RE = re.compile(
     r'\A\s*PR opened:\s*(https://github\.com/[^\s]+/pull/\d+)',
 )
 
+# D3.5 commit 5b — extract Forge's revision-applied summary from a revision-
+# phase outbox result. Forge's CLAUDE.md mandates revision responses START
+# with `Revision N applied: <one-line summary>`. Strict per Larry's signoff:
+# unlike the build-phase regex (which falls through to default routing when
+# the prefix is missing, preserving the blocker-paragraph path), the revision
+# phase has no documented blocker path — missing prefix triggers a
+# marker-error dead-letter cascade back to Forge.
+_REVISION_APPLIED_RE = re.compile(
+    r'\A\s*Revision\s+(\d+)\s+applied:\s*(.+?)(?:\n|\Z)',
+    re.IGNORECASE,
+)
+
+# D3.5 5b — read `loop_bounds.max_revisions` from config/agent-models.json so
+# retuning the dial in config actually takes effect (M-4 review fix). Cached
+# at module level since this fires on every Mirror review-request dispatch.
+# Tests reset the cache via _invalidate_loop_bounds_cache.
+_MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
+_LOOP_BOUNDS_CACHE: dict[str, Any] = {}
+
+
+def _invalidate_loop_bounds_cache() -> None:
+    """Drop the cached loop_bounds. Tests use this between runs."""
+    _LOOP_BOUNDS_CACHE.pop('config', None)
+
+
+def _load_max_revisions_from_config() -> int:
+    """Return `loop_bounds.max_revisions` from config/agent-models.json.
+
+    Falls back to mrh.DEFAULT_MAX_REVISIONS when the config file is missing,
+    malformed, or doesn't define the field. Cached — the file changes only
+    when Larry retunes the dial + restarts the daemon (sync.timer pulls;
+    daemon restart picks up the new value via this lazy load).
+
+    D3.5 5b M-4 review fix: before this, _dispatch_mirror_review hardcoded
+    `mrh.DEFAULT_MAX_REVISIONS` so config retuning had zero effect on actual
+    behavior. The docs/tunables.md promise that the dial is tunable depends
+    on this function reading the config file.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    loop_bounds = cfg.get('loop_bounds') if isinstance(cfg, dict) else None
+    if not isinstance(loop_bounds, dict):
+        return mrh.DEFAULT_MAX_REVISIONS
+    raw = loop_bounds.get('max_revisions')
+    if not isinstance(raw, int) or raw < 0:
+        return mrh.DEFAULT_MAX_REVISIONS
+    return raw
+
 # -------------------- notify-prompt template (D3-forge commit 4a) --------------------
 # Refined notify framing — Option C hybrid: one skeleton, per-intent action
 # block. Replaces the D3-notifier naked "Task result from <agent>: SUCCESS\n..."
@@ -193,9 +246,12 @@ INTENT_ACTION_BLOCKS = {
     'review-revision': (
         'Mirror has requested REVISION on PR `{pr_url}` for task `{task_id}` '
         '({finding_count} finding(s), severity={severity}, confidence={confidence}). '
-        'In 5a the Forge revision dispatch is not yet wired — journal the '
-        'request and Larry handles the revision manually (DM Forge a follow-up '
-        'task or comment on the PR). 5b will wire the auto-revision loop.'
+        'The revision has been auto-dispatched to Forge — she will apply '
+        'the findings in her existing build session, commit + push to the '
+        'same branch (PR auto-updates), and Mirror will re-review. Journal '
+        'the dispatch and await the re-review outcome. No manual action '
+        'from you. (D3.5 5b: revision loop auto-wired; budget enforced by '
+        'max_revisions in agent-models.json loop_bounds.)'
     ),
     'review-escalate': (
         'Mirror has ESCALATED PR `{pr_url}` on task `{task_id}` '
@@ -233,14 +289,15 @@ DM_TEMPLATES = {
         'Summary: {summary}\n'
         'Ready for you to merge manually.'
     ),
-    'review-revision': (
-        'Mirror requested revisions on PR {pr_url} (task `{task_id}`).\n'
-        '{finding_count} finding(s), severity={severity}, confidence={confidence}.\n'
-        'In 5a the revision dispatch is not auto-wired — DM Forge a follow-up '
-        'or comment on the PR.'
-    ),
     'review-escalate': (
-        'Mirror escalated PR {pr_url} on task `{task_id}`.\n'
+        # m-6 review fix: lead line is cause-agnostic. The intent fires from
+        # three scenarios — Mirror direct ESCALATE, low-confidence auto-
+        # promote, budget exhausted — and the {reason} body carries the
+        # specific cause. The old "Mirror escalated PR ..." lead was wrong
+        # for the budget-exhaust case (Mirror said revision; system
+        # downgraded). On phone, the lead is what Larry sees in the
+        # notification preview.
+        'Review escalated on PR {pr_url} (task `{task_id}`).\n'
         'Reason: {reason}\n'
         'Decide: revise the spec (new APPROVAL_REQUEST to Beacon) or push back.'
     ),
@@ -728,6 +785,24 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
         notify_task['target_repo'] = data['target_repo']
     if data.get('branch'):
         notify_task['branch'] = data['branch']
+    # D3.5 5b M-2 review fix: propagate revision-phase envelope fields so
+    # a marker-error retry triggered by the revision-preamble strict gate
+    # doesn't lose Forge's revision context. Without these the retry task
+    # arrives with no `phase` (watcher resume gate refuses --resume),
+    # no `forge_build_session_id` (next revision-dispatch can't thread),
+    # no `revision_count` / `max_revisions` (budget eval starts fresh),
+    # no `pr_url` (Forge has nothing to point Mirror at). Without these
+    # the revision-phase marker-error path is a dead end.
+    if data.get('phase'):
+        notify_task['phase'] = data['phase']
+    if data.get('forge_build_session_id'):
+        notify_task['forge_build_session_id'] = data['forge_build_session_id']
+    if data.get('revision_count') is not None:
+        notify_task['revision_count'] = data['revision_count']
+    if data.get('max_revisions') is not None:
+        notify_task['max_revisions'] = data['max_revisions']
+    if data.get('pr_url'):
+        notify_task['pr_url'] = data['pr_url']
 
     try:
         safe_write_inbox.safe_write_inbox(
@@ -994,6 +1069,21 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     agent = data.get('agent', 'mirror')
     auto_promoted = mrh.should_auto_promote(marker_type, payload)
 
+    # D3.5 5b: evaluate revision budget for REVIEW_REVISION markers. If the
+    # next dispatch would exceed max_revisions, downgrade to ESCALATE-shaped
+    # routing (Beacon's existing handler) with a budget-exhausted reason
+    # field. No new intent vocabulary per Larry's 5b signoff (option A).
+    # m-5 review fix: evaluate even when auto_promoted, so the combined
+    # case (low confidence AND budget exhausted) renders the budget reason
+    # (the stronger termination signal) rather than just the auto-promote
+    # reason. derive_intent handles both flags identically (escalate); only
+    # the reason text differs.
+    budget_exhausted = False
+    if marker_type == 'review_revision':
+        decision_str, _next_count, _max_count = mrh.evaluate_revision_budget(data)
+        if decision_str == 'exhausted':
+            budget_exhausted = True
+
     # Per-marker intent_kwargs for INTENT_ACTION_BLOCKS rendering. Keep
     # aligned with the templates in INTENT_ACTION_BLOCKS — missing keys
     # degrade gracefully via build_notify_prompt's exception handler, but
@@ -1006,7 +1096,37 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
             'summary': payload.get('summary', '(no summary)'),
         }
     elif marker_type == 'review_revision':
-        if auto_promoted:
+        # m-5 review fix: budget_exhausted is the stronger termination
+        # signal — render its reason even when auto_promoted is also True
+        # (low-confidence revision at round 3+ → user should see "loop
+        # exhausted on round N", not "Mirror was uncertain"; the latter is
+        # implied by the former).
+        if budget_exhausted:
+            current = data.get('revision_count', 0)
+            if not isinstance(current, int) or current < 0:
+                current = 0
+            max_count = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
+            if not isinstance(max_count, int) or max_count < 0:
+                max_count = mrh.DEFAULT_MAX_REVISIONS
+            reason = mrh.build_budget_exhausted_reason(
+                payload, current + 1, max_count,
+            )
+            if auto_promoted:
+                # Append a note that the low-confidence promote ALSO would
+                # have triggered escalate — preserves the audit trail.
+                reason = (
+                    reason
+                    + ' (Mirror also flagged this REVISION with '
+                    'confidence: low — the auto-promote rule would have '
+                    'routed it to ESCALATE regardless of budget.)'
+                )
+            intent_kwargs = {
+                'pr_url': pr_url,
+                'severity': payload.get('severity', '?'),
+                'confidence': payload.get('confidence', '?'),
+                'reason': reason,
+            }
+        elif auto_promoted:
             intent_kwargs = {
                 'pr_url': pr_url,
                 'severity': payload.get('severity', '?'),
@@ -1042,13 +1162,16 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     return {
         'marker_type': marker_type,
         'payload': payload,
-        'intent': mrh.derive_intent(marker_type, auto_promoted=auto_promoted),
+        'intent': mrh.derive_intent(
+            marker_type,
+            auto_promoted=auto_promoted,
+            budget_exhausted=budget_exhausted,
+        ),
         'notify_source': mrh.derive_notify_source(agent),
         'intent_kwargs': intent_kwargs,
         'auto_promoted': auto_promoted,
+        'budget_exhausted': budget_exhausted,
         # Parallel field to Forge's clarification_count for cascade plumbing.
-        # Mirror's terminal-only markers in 5a don't carry a counter; 5b
-        # populates this when REVIEW_REVISION dispatches back to Forge.
         'next_clarification_count': None,
     }
 
@@ -1209,9 +1332,9 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     branch = data.get('branch')
     # max_revisions sourced from config/agent-models.json `loop_bounds` —
     # propagated through the dispatch envelope so the budget is consistent
-    # across the full review/revision cascade. 5a doesn't enforce the
-    # budget (no revision loop yet); 5b activates evaluate_revision_budget.
-    max_revisions = mrh.DEFAULT_MAX_REVISIONS
+    # across the full review/revision cascade. M-4 review fix: actually
+    # reads the config file (was hardcoded to DEFAULT_MAX_REVISIONS in 5a).
+    max_revisions = _load_max_revisions_from_config()
 
     review_prompt_lines = [
         f'Review phase. Forge has opened PR `{pr_url}` for task `{task_id}`. '
@@ -1262,6 +1385,13 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
             review_task[f_name] = data[f_name]
+    # D3.5 5b: thread Forge's build session_id through Mirror's envelope as
+    # `forge_build_session_id` so a downstream REVIEW_REVISION can resume
+    # Forge's session for the revision dispatch. Without this, the revision
+    # task can't --resume the right conversation and Forge starts fresh,
+    # losing all the build context she'd already loaded.
+    if data.get('claude_session_id'):
+        review_task['forge_build_session_id'] = data['claude_session_id']
 
     review_filename = f'review-{task_id}.json'
     # Idempotency check (same pattern as _dispatch_build_phase): if the
@@ -1307,6 +1437,322 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
         )
 
 
+def _extract_revision_summary_from_result(
+    result_text: str,
+) -> Optional[tuple[int, str]]:
+    """Parse Forge's revision-phase outbox preamble. Returns (round_num, summary) or None.
+
+    D3.5 commit 5b. Forge's CLAUDE.md mandates revision responses START with
+    `Revision N applied: <summary>` (case-insensitive, N is integer round
+    number). Anchored to start-of-string with leading whitespace tolerance,
+    same shape as `_extract_pr_url_from_build_result`. Returns None when
+    the prefix is missing OR malformed — the caller treats None as a
+    discipline-violation and dead-letters via marker-error cascade (strict
+    mode per Larry's 5b signoff).
+    """
+    if not isinstance(result_text, str) or not result_text:
+        return None
+    m = _REVISION_APPLIED_RE.search(result_text)
+    if not m:
+        return None
+    try:
+        round_num = int(m.group(1))
+    except (TypeError, ValueError):
+        return None
+    summary = m.group(2).strip()
+    return round_num, summary
+
+
+def _dispatch_revision_to_forge(
+    data: dict[str, Any], decision: dict[str, Any],
+) -> None:
+    """Write a revision-task to Forge's inbox after Mirror's REVIEW_REVISION.
+
+    D3.5 commit 5b. Parallel to `_dispatch_build_phase`: same task_id, same
+    branch, --resume against Forge's build session. The marker's findings
+    serialize into the prompt so Forge has structured input on what to fix.
+
+    Pulls `forge_build_session_id` from Mirror's outbox envelope (threaded
+    through 5a's `_dispatch_mirror_review` → propagated via _build_outbox).
+    Without it, the revision task can't --resume the right conversation;
+    Forge starts fresh and loses her build context.
+
+    Caller responsibility: only invoke when `decision['marker_type'] ==
+    'review_revision'`, `not decision['auto_promoted']`, `not
+    decision['budget_exhausted']`. The classifier handles the
+    auto-promote/budget-exhaust downgrades to escalate routing.
+
+    Failure to write is logged WARN and non-fatal — the notify to Beacon
+    above has already informed her of the REVIEW_REVISION; Larry sees the
+    gap and can manually re-dispatch.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    forge_session = data.get('forge_build_session_id')
+    if not forge_session:
+        log(
+            f'REVIEW_REVISION on task {task_id} has no forge_build_session_id '
+            f'(propagation gap?); revision dispatch would have no session to '
+            f'--resume — skipping. Larry should manually re-dispatch.',
+            'WARN',
+        )
+        return
+
+    target_repo = data.get('target_repo')
+    if not target_repo:
+        log(
+            f'REVIEW_REVISION on task {task_id} has no target_repo on envelope; '
+            f'Forge worktree gate would reject revision dispatch — skipping.',
+            'WARN',
+        )
+        return
+
+    branch = data.get('branch')
+    payload = decision.get('payload') or {}
+    findings = payload.get('findings') or []
+
+    # Increment revision counter for the dispatch envelope. The cousin in
+    # Mirror's envelope is incremented when the re-review dispatches; this
+    # one is the count of revision attempts Forge has made so far.
+    current_count = data.get('revision_count', 0)
+    if not isinstance(current_count, int) or current_count < 0:
+        current_count = 0
+    next_count = current_count + 1
+    max_revisions = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
+    if not isinstance(max_revisions, int) or max_revisions < 0:
+        max_revisions = mrh.DEFAULT_MAX_REVISIONS
+
+    # Serialize findings into a human-readable block for the prompt.
+    findings_lines = ['Mirror\'s findings on this PR:', '']
+    if isinstance(findings, list):
+        for i, f in enumerate(findings, 1):
+            if not isinstance(f, dict):
+                findings_lines.append(f'  {i}. {f}')
+                continue
+            sev = f.get('severity', '?')
+            file_ref = f.get('file', '?')
+            line_ref = f.get('line_range', '?')
+            desc = f.get('description', '(no description)')
+            findings_lines.append(
+                f'  {i}. [{sev}] {file_ref} {line_ref} — {desc}'
+            )
+    else:
+        findings_lines.append(f'  (raw findings: {findings})')
+    findings_block = '\n'.join(findings_lines)
+
+    revision_prompt_lines = [
+        f'Revision phase. Mirror has reviewed your build on task `{task_id}` '
+        f'and requested changes (revision {next_count} of {max_revisions}).',
+        '',
+        f'Task: `{task_id}`',
+    ]
+    if branch:
+        revision_prompt_lines.append(f'Branch: `{branch}`')
+    pr_url = data.get('pr_url') or payload.get('pr_url')
+    if pr_url:
+        revision_prompt_lines.append(f'PR: {pr_url}')
+    revision_prompt_lines.extend([
+        '',
+        findings_block,
+        '',
+        'Follow the Revision phase protocol in your CLAUDE.md: apply each '
+        'finding as a targeted edit (no scope creep), commit with a '
+        'conventional-commit revision message, push to the same branch '
+        '(PR auto-updates), and emit a one-line result starting with '
+        f'`Revision {next_count} applied: <summary>` (strict per 5b — '
+        'missing prefix dead-letters back to you).',
+    ])
+    revision_prompt = '\n'.join(revision_prompt_lines)
+
+    revision_task: dict[str, Any] = {
+        'task_id': task_id,
+        'prompt': revision_prompt,
+        'source': 'beacon',          # logical dispatcher (Beacon's spec authorized this)
+        'phase': 'revision',
+        'session_id': forge_session,  # --resume Forge's build session
+        # C-1 review fix (D3.5 5b): also propagate forge_build_session_id
+        # on the revision-task envelope itself. _build_outbox propagates
+        # this onward to Forge's revision outbox, so round-2's
+        # _dispatch_mirror_review_rerun → next REVIEW_REVISION →
+        # _dispatch_revision_to_forge can still resolve the build session.
+        # Without this, the loop stalls silently at round 2.
+        'forge_build_session_id': forge_session,
+        'target_repo': target_repo,
+        'revision_count': next_count,
+        'max_revisions': max_revisions,
+        'dispatched_by': 'outbox-notifier',
+    }
+    if branch:
+        revision_task['branch'] = branch
+    if pr_url:
+        revision_task['pr_url'] = pr_url
+    if data.get('reply_chat_id') is not None:
+        revision_task['reply_chat_id'] = data['reply_chat_id']
+    # Propagate the same envelope fields _dispatch_build_phase does so a
+    # future REVIEW_QUESTION (deferred) round-trip would preserve PR
+    # metadata. Same shape as 5a M-2 review fix.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+        if data.get(f_name) is not None:
+            revision_task[f_name] = data[f_name]
+
+    # Idempotency check: revision-task filename is keyed on round number so
+    # multiple revision rounds for the same task_id don't collide. Re-process
+    # on notifier crash skips if already in inbox/archive/invalid.
+    revision_filename = f'revision-{task_id}-{next_count}.json'
+    forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+    if (
+        (forge_inbox / revision_filename).exists()
+        or (forge_inbox / '.archive' / revision_filename).exists()
+        or (forge_inbox / '.invalid' / revision_filename).exists()
+    ):
+        log(
+            f'revision-{next_count} already dispatched for task {task_id} '
+            f'(file or archive or .invalid present); skipping duplicate write'
+        )
+        return
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='forge',
+            task_dict=revision_task,
+            source_agent='beacon',
+            filename=revision_filename,
+        )
+        log(
+            f'revision-{next_count} dispatched forge <- beacon '
+            f'(task={task_id}, file={dest.name}, '
+            f'resume={forge_session[:12]}...)'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'revision dispatch FAILED for task {task_id} round {next_count}: '
+            f'{type(e).__name__}: {e}. Beacon already notified of REVISION; '
+            f'Larry must manually re-dispatch.',
+            'WARN',
+        )
+
+
+def _dispatch_mirror_review_rerun(
+    data: dict[str, Any], round_num: int, summary: str,
+) -> None:
+    """Write a fresh review-request to Mirror after Forge's revision lands.
+
+    D3.5 commit 5b. Parallel to `_dispatch_mirror_review` but for re-review
+    rounds: Mirror's previous session is closed, so she starts fresh on the
+    now-updated PR. The envelope carries `revision_count` (so her CLAUDE.md
+    knows this is round N, not round 0).
+
+    Triggered from `process_outbox` when Forge's `phase=revision` outbox
+    arrives WITH a valid `Revision N applied:` preamble. Missing preamble
+    is handled separately (strict gate → marker-error dead-letter).
+
+    `forge_build_session_id` propagates forward unchanged — the next
+    REVIEW_REVISION (if any) can dispatch another revision task to the
+    same session.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    target_repo = data.get('target_repo')
+    if not target_repo:
+        log(
+            f'Forge revision-{round_num} on task {task_id} has no target_repo; '
+            f'cannot dispatch re-review — skipping.',
+            'WARN',
+        )
+        return
+    branch = data.get('branch')
+    pr_url = data.get('pr_url')
+    max_revisions = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
+    if not isinstance(max_revisions, int) or max_revisions < 0:
+        max_revisions = mrh.DEFAULT_MAX_REVISIONS
+
+    review_prompt_lines = [
+        f'Re-review phase. Forge has applied revision {round_num} on task '
+        f'`{task_id}` per your earlier REVIEW_REVISION findings.',
+        '',
+        f"Forge's revision summary: {summary}",
+        '',
+        f'Task: `{task_id}`',
+    ]
+    if pr_url:
+        review_prompt_lines.append(f'PR: {pr_url}')
+    if branch:
+        review_prompt_lines.append(f'Branch: `{branch}`')
+    review_prompt_lines.extend([
+        '',
+        f'You are on revision round {round_num} of {max_revisions}. Read '
+        'the updated PR diff (`gh pr diff <N>` — same PR, now with Forge\'s '
+        'revision commit on top). Verify your earlier findings are resolved '
+        'AND no new issues were introduced. Emit one marker: REVIEW_PASS '
+        '(if findings resolved cleanly), REVIEW_REVISION (if more changes '
+        'needed; budget is round-aware — next would be round '
+        f'{round_num + 1}), REVIEW_ESCALATE (if revision approach is wrong), '
+        'or REVIEW_EMERGENCY_HALT (safety issue).',
+    ])
+    review_prompt = '\n'.join(review_prompt_lines)
+
+    review_task: dict[str, Any] = {
+        'task_id': task_id,
+        'prompt': review_prompt,
+        'source': 'beacon',
+        'phase': 'review',
+        'pr_url': pr_url or '(unknown)',
+        'target_repo': target_repo,
+        'revision_count': round_num,
+        'max_revisions': max_revisions,
+        'dispatched_by': 'outbox-notifier',
+    }
+    if branch:
+        review_task['branch'] = branch
+    if data.get('reply_chat_id') is not None:
+        review_task['reply_chat_id'] = data['reply_chat_id']
+    # forge_build_session_id propagates forward unchanged so the NEXT
+    # revision (if Mirror flags more findings) can resume Forge's session.
+    if data.get('forge_build_session_id'):
+        review_task['forge_build_session_id'] = data['forge_build_session_id']
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+        if data.get(f_name) is not None:
+            review_task[f_name] = data[f_name]
+
+    # Idempotency: keyed on round number so re-process on notifier crash
+    # doesn't double-dispatch a re-review.
+    review_filename = f'review-{task_id}-rev{round_num}.json'
+    mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
+    if (
+        (mirror_inbox / review_filename).exists()
+        or (mirror_inbox / '.archive' / review_filename).exists()
+        or (mirror_inbox / '.invalid' / review_filename).exists()
+    ):
+        log(
+            f're-review for revision {round_num} already dispatched for '
+            f'task {task_id}; skipping duplicate write'
+        )
+        return
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='mirror',
+            task_dict=review_task,
+            source_agent='beacon',
+            filename=review_filename,
+        )
+        log(
+            f're-review dispatched mirror <- beacon (task={task_id}, '
+            f'round={round_num}, file={dest.name})'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f're-review dispatch FAILED for task {task_id} round {round_num}: '
+            f'{type(e).__name__}: {e}. Forge already wrote her revision; '
+            f'Larry must manually re-dispatch.',
+            'WARN',
+        )
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
@@ -1337,6 +1783,82 @@ def process_outbox(outbox_file: Path) -> str:
         # No marker, so marker classification below returns None and the
         # default routing path takes over (Beacon notify with the full
         # build result narrative).
+
+    # D3.5 commit 5b — Forge revision-phase outbox. Strict gate per Larry's
+    # signoff (Option 3 — strict on revision, lenient on build):
+    #   - "Revision N applied: <summary>" preamble found → dispatch a
+    #     re-review to Mirror with revision_count incremented.
+    #   - Preamble missing → raise MalformedForgeMarker so the marker-error
+    #     cascade fires and Forge gets a sharp "use the required preamble"
+    #     prompt back. Unlike build phase, revision phase has no documented
+    #     blocker-paragraph alternative; the structure is mandatory.
+    # The Beacon notify still fires via the default routing path below
+    # (Beacon journals the revision narrative); the re-review dispatch is
+    # additive.
+    if agent == 'forge' and data.get('phase') == 'revision':
+        parsed = _extract_revision_summary_from_result(data.get('result', ''))
+        if parsed is None:
+            # Strict gate: revision phase MUST start with the preamble.
+            log(
+                f'forge revision-phase outbox without "Revision N applied:" '
+                f'preamble: {outbox_file.name}; treating as marker-error',
+                'WARN',
+            )
+            _notify_forge_marker_error(
+                data,
+                'phase=revision requires response to START with '
+                '"Revision N applied: <one-line summary>" preamble — none '
+                'found. Re-read agents/forge/CLAUDE.md Revision phase '
+                'protocol — the preamble is the structural signal that '
+                'revision completed; the rest of the response is narrative '
+                'underneath.',
+            )
+            _archive_outbox(outbox_file)
+            return 'marker-error'
+        round_num, summary = parsed
+        # D3.5 5b M-3 review fix: validate round_num against the envelope's
+        # expected revision_count. Forge writing "Revision 0 applied:" (no
+        # such round exists; first revision is round 1), "Revision 99
+        # applied:" (force-exhaust the budget via misreport), or repeating
+        # "Revision 1 applied:" twice (round drift) all reach this gate.
+        # Mismatch dead-letters via marker-error with a precise message
+        # so Forge re-emits with the correct number from the envelope.
+        envelope_round = data.get('revision_count')
+        if round_num < 1:
+            log(
+                f'forge revision-phase outbox with non-positive round '
+                f'(N={round_num}) in preamble: {outbox_file.name}; '
+                f'treating as marker-error',
+                'WARN',
+            )
+            _notify_forge_marker_error(
+                data,
+                f'Revision preamble round number must be ≥ 1 (you wrote '
+                f'"Revision {round_num} applied:"). The first revision is '
+                f'round 1; consecutive revisions increment. Read the '
+                f'envelope\'s `revision_count` field and use that number.',
+            )
+            _archive_outbox(outbox_file)
+            return 'marker-error'
+        if isinstance(envelope_round, int) and round_num != envelope_round:
+            log(
+                f'forge revision-phase outbox round mismatch: preamble '
+                f'says N={round_num}, envelope says revision_count='
+                f'{envelope_round} ({outbox_file.name}); treating as '
+                f'marker-error',
+                'WARN',
+            )
+            _notify_forge_marker_error(
+                data,
+                f'Revision preamble round number ({round_num}) does not '
+                f'match the envelope\'s `revision_count` ({envelope_round}). '
+                f'Use the envelope number — that\'s the round the dispatch '
+                f'is for. Re-emit "Revision {envelope_round} applied: ..." '
+                f'with the same summary content.',
+            )
+            _archive_outbox(outbox_file)
+            return 'marker-error'
+        _dispatch_mirror_review_rerun(data, round_num, summary)
 
     # Forge preflight marker check. Markers override default routing rules
     # because the preflight protocol is intentionally multi-hop and the
@@ -1480,6 +2002,21 @@ def process_outbox(outbox_file: Path) -> str:
         # preflight→build with --resume per signed-off design.
         if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
             _dispatch_build_phase(data)
+
+        # D3.5 5b: REVIEW_REVISION with budget remaining + high confidence
+        # → ALSO dispatch a revision task to Forge's inbox. Beacon's notify
+        # above is informational (Shape 7, now mid-chain in 5b); the
+        # revision dispatch is what actually triggers Forge's fix. Skipped
+        # if auto_promoted (low confidence → escalate) or budget_exhausted
+        # (over max_revisions → escalate); both downgrade to Beacon-only
+        # routing via the intent override above.
+        if (
+            marker_decision['marker_type'] == 'review_revision'
+            and agent == 'mirror'
+            and not marker_decision.get('auto_promoted')
+            and not marker_decision.get('budget_exhausted')
+        ):
+            _dispatch_revision_to_forge(data, marker_decision)
 
         # D3.5 5a-followup: chain-completion DM to the originating Telegram
         # thread. Fires only for terminal-from-Larry's-perspective intents

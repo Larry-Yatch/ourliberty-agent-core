@@ -1533,6 +1533,58 @@ Test 4's first run + the synthetic test overflow created 5 stale branches on ori
 
 **Next:** verify Test 4 re-run lands the DM, then D3.5 commit 5b (Forge↔Mirror revision loop) per the d3-5-plan sequencing.
 
+## Phase D3.5 commit 5b — Forge↔Mirror revision loop (2026-05-13, ~3 hours, live verification TBD)
+
+Closes the second sub-commit of D3.5. Mirror's REVIEW_REVISION marker now auto-dispatches a `phase=revision` task back to Forge under `--resume` against her build session, with findings serialized in the prompt. Forge applies the findings, commits + pushes to the same branch (PR auto-updates), emits a `Revision N applied:` preamble — the notifier detects it and auto-dispatches a fresh re-review to Mirror with `revision_count` incremented. Loop continues until Mirror emits PASS, or until `max_revisions` (currently 3 in `loop_bounds`) is exhausted — at which point Mirror's next REVIEW_REVISION downgrades to ESCALATE-shaped routing, Beacon journals, and Larry gets a Telegram DM via the 5a-followup auto-DM pipe.
+
+In **5b** the full Forge↔Mirror chain is closed. Beacon's replan flow on ESCALATE (5c) and auto-merge on PASS (5d) remain forward-compat-only.
+
+### Architectural calls signed off before code
+
+Per `feedback_decision_classification.md`:
+
+- **(ARCHITECTURAL) Session-id threading.** Forge's build `claude_session_id` propagates through Mirror's review-request envelope as `forge_build_session_id`; `_build_outbox` propagates forward; revision dispatch reads it as the resume target. *Alternative: per-task state file. Chose envelope-propagation — matches existing convention (clarification_count, marker_error_count, etc.).*
+- **(ARCHITECTURAL) Forge revision response format.** Plain text with `Revision N applied: <summary>` preamble. *Alternative: structured `=== REVISION_APPLIED ===` marker. Chose plain text — matches build-phase pattern; the prefix is the trigger.*
+- **(ARCHITECTURAL) Worktree continuity edge case.** Revision cycles > 24h could lose Forge's worktree (`cleanup-stale-worktrees` fires). Accept; document; worktree-manager recreates from origin if needed (only uncommitted edits lost). Logged in known-cleanup-gaps for future hardening.
+- **(VALUES, A/B) Budget exhaust behavior.** Option A: downgrade to `intent=review-escalate` with budget-exhausted reason; reuses existing Beacon handler, no new vocabulary. *Signed off A.*
+- **(VALUES, A/B) Push semantics on revision.** Option A: new commit on top of build, regular push, PR auto-updates. *Signed off A. Final merge `--squash` collapses build + revisions to one main-history commit.*
+- **(VALUES, mixed) Discipline gate scope.** Build phase stays lenient (missing `PR opened:` prefix → default routing to Beacon, preserving blocker-paragraph path). Revision phase is strict (missing `Revision N applied:` prefix → marker-error cascade back to Forge). Asymmetric because build has documented blocker-narrative fallback while revision doesn't. *Signed off Option 3.*
+- **(VALUES, 1-5 dial) `max_revisions` default.** Kept at 3 (in `loop_bounds`). Retune after live runs.
+- **REVIEW_QUESTION marker:** deferred again from 5b per the existing memory `project_review_question_deferred.md`. Re-evaluate after ≥20 real reviews.
+
+### What shipped
+
+- **`scripts/inbox_watcher.py`** (+5 LOC) — Resume-session gate extended: `phase in ('build', 'revision')` consumes `session_id` for --resume. `_build_outbox` propagation list extended with `forge_build_session_id`, `revision_count`, `max_revisions`, `pr_url` (forward-compat for the cascade legs).
+- **`scripts/mirror_review_handler.py`** (+~55 LOC) — `derive_intent` accepts `budget_exhausted` parameter (defaults False; True downgrades review_revision to review-escalate). New `build_budget_exhausted_reason()` helper renders the Beacon-facing escalate reason with finding context + budget figures.
+- **`scripts/outbox_notifier.py`** (+~400 LOC) — `_extract_revision_summary_from_result()` parses Forge's `Revision N applied:` preamble (anchored to start, case-insensitive on keyword). `_dispatch_revision_to_forge(data, decision)` parallel to `_dispatch_build_phase`: reads `forge_build_session_id`, serializes Mirror's findings into structured prompt, writes `phase=revision` task keyed `revision-<task_id>-<N>.json` (idempotent across inbox + .archive + .invalid). `_dispatch_mirror_review_rerun(data, round_num, summary)` parallel to `_dispatch_mirror_review`: writes fresh review-request to Mirror with `revision_count` set + `forge_build_session_id` propagated forward (so next revision can resume Forge's session). `_classify_mirror_marker` extended: REVIEW_REVISION → evaluate `mrh.evaluate_revision_budget(data)`; budget_exhausted downgrades intent to review-escalate via the new `derive_intent` param. `process_outbox` integration: REVIEW_REVISION marker + budget-OK + high-confidence → auto-call `_dispatch_revision_to_forge`. New `agent == 'forge' and phase == 'revision'` branch with strict gate — missing preamble → marker-error cascade. `INTENT_ACTION_BLOCKS['review-revision']` rewritten for mid-chain semantics ("auto-dispatched to Forge; you just journal"). `review-revision` removed from `TERMINAL_DM_INTENTS` (mid-chain in 5b; only escalate variant DMs Larry). `_dispatch_mirror_review` (5a code) extended to propagate `forge_build_session_id` from `data.claude_session_id` into Mirror's review-request envelope.
+- **`agents/forge/CLAUDE.md`** (+~80 lines) — New "Revision phase protocol" section parallel to Build phase protocol. Documents: same worktree + branch + PR; --resume Forge's build session; targeted edits per finding (no scope creep); conventional-commit revision message format; regular push (no force-push); strict `Revision N applied:` preamble required; missing → marker-error cascade with sharper "use the required preamble" prompt. Constraints listed explicitly.
+- **`agents/mirror/CLAUDE.md`** (+5 lines) — Re-review context note in "Review steps" section: when `revision_count > 0`, approach diff fresh (prior session is closed); verify findings resolved + no new regressions introduced; bounded by `max_revisions` budget which will downgrade further REVISION to ESCALATE.
+- **`agents/beacon/CLAUDE.md`** (+~15 lines) — Shape 7 (review-revision) rewritten: revision now auto-dispatched, journal only, no manual action. Shape 8 (review-escalate) expanded: 3 distinct trigger scenarios (direct REVIEW_ESCALATE, auto-promote from low-confidence REVISION, budget-exhaust downgrade). Larry gets DM in all three via terminal-intent pipe.
+- **`scripts/tests/test_outbox_notifier.py`** (+~370 LOC, 18 new tests across 2 classes) — `RevisionLoopTest` (12 cases): revision dispatch on REVIEW_REVISION + budget-remaining + high-confidence; low-confidence does not dispatch; budget-exhausted does not dispatch; missing forge_session skips; idempotency on re-process; Forge revision outbox → Mirror re-review dispatch; missing preamble → marker-error dead-letter; re-review idempotency; round-2 extraction correctness; forge_build_session_id propagation through Mirror's review-request; build phase lenient (missing PR URL → default routing, NOT marker-error); budget-exhausted queues Larry DM via escalate intent. `ExtractRevisionSummaryTest` (6 cases): regex anchoring, case-insensitivity, missing returns None, buried-in-narrative returns None, multi-line summary captures first line only.
+- **`scripts/tests/test_mirror_review_handler.py`** (+25 LOC, 4 new tests) — `derive_intent` budget_exhausted parameter (3 cases including both-flags case), `BuildBudgetExhaustedReasonTest` class (2 cases).
+- **5a-followup test update** (-1 +1 LOC) — `test_review_revision_does_not_dm_in_5b` replaces the 5a-era test that expected REVIEW_REVISION to DM. Confirms the intent flipped from terminal to mid-chain.
+
+### What's NOT in 5b
+
+- **REVIEW_QUESTION marker.** Deferred again. See `project_review_question_deferred.md` memory for re-eval criteria.
+- **Beacon replan flow on ESCALATE.** 5c will wire Beacon's auto-revise-spec + re-emit-APPROVAL_REQUEST when ESCALATE lands. 5b's ESCALATE still routes to Beacon for manual decision.
+- **Auto-merge on REVIEW_PASS.** 5d.
+- **EMERGENCY_HALT file trip.** 5d.
+- **Branch protection on `main`.** Deferred to 5d-design checkpoint.
+
+### Known limitations (logged for future hardening)
+
+- **Worktree continuity > 24h.** If a Forge↔Mirror revision cycle exceeds 24h wall clock, `cleanup-stale-worktrees` may remove Forge's worktree directory mid-cycle. Worktree-manager recreates from origin on next dispatch (only uncommitted edits lost). Real-world: most revision cycles complete in minutes; the edge case is when a Mirror review takes hours (e.g., very large diff) and revisions stack up. Mitigation candidate for future commit: extend `cleanup-stale-worktrees` to skip worktrees with active dispatch leases.
+- **claude session cache age.** Similar story for the session cache claude maintains for `--resume`. If 24h passes between Forge's build and her revision dispatch, the cache may be evicted and --resume could fail or produce a degraded continuation. Same mitigation shape.
+
+### Verification (pending live re-test)
+
+Synthetic unit tests pass locally (447 total, 4 pre-existing macOS-only worktree failures unrelated). 22 net new tests across the 5b additions.
+
+Live verification target (~$1.50 cost): dispatch a spec Forge will get not-quite-right (so Mirror flags REVISION), observe Forge's revision dispatch + apply + push, observe Mirror's re-review + PASS, observe closing DM. Plus a targeted budget-exhaust test (dispatch a spec where Forge keeps not satisfying Mirror — synthetic marker injection if needed — to confirm ESCALATE downgrade fires after round 3).
+
+**Next:** D3.5 commit 5c — Beacon replan flow. Wires Beacon's auto-revise-spec on ESCALATE intent (currently routes to manual decision). Smaller surface than 5b. After 5c → 5d (auto-merge + EMERGENCY_HALT). Then D3.5 closes.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

@@ -41,6 +41,8 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
 
 ### Review steps (phase=review)
 
+**Re-review context (D3.5 5b):** If the envelope's `revision_count > 0`, this is a re-review after Forge applied a revision. The prompt header will name the round number ("Re-review phase. Forge has applied revision 1 on task X."). Approach the diff fresh — your prior session is closed; you have no memory of your earlier findings beyond what's in the PR's commit history. Read both the original spec AND your earlier REVIEW_REVISION marker (if you can find it via the PR's commit history or Beacon's journal) to verify Forge resolved the findings cleanly AND didn't introduce new regressions. Bounded by `max_revisions` (currently 3) — if you flag REVIEW_REVISION again past round 3, the system auto-promotes to ESCALATE.
+
 1. **Read the spec.** The envelope's `prompt` carries the task context — task_id, PR URL, target_repo, branch. Read the corresponding APPROVAL_REQUEST from Beacon if it's referenced; that's the spec the diff has to match.
 2. **Read the PR diff.** `gh pr diff <N>` where `<N>` is the number from the PR URL. Don't skip — the marker contract is "I have actually read this." Reading the diff end-to-end is non-optional.
 3. **Optionally check out + test.** Your worktree is at `~/agent-worktrees/wt-mirror-<task_id>/`. Inside it: `gh pr checkout <N>` to switch to Forge's branch, then run the relevant test suite. Do this when the diff is non-trivial, touches behavior you can verify mechanically, or claims a test plan you should actually exercise. Skip when the diff is doc-only or styling.

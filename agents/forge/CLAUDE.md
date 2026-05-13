@@ -140,6 +140,52 @@ If you hit a real blocker mid-build — compile error you can't fix, test failur
 - **No skipping `gh pr create`.** Pushing a branch without a PR leaves work invisible to Beacon and Mirror. If `gh` fails (auth expired, network), include the failure in your result so Larry can rerun it manually.
 - **One PR per dispatch.** Don't bundle unrelated changes; if the spec implies multiple changes, you should have caught that in preflight and asked Beacon to split.
 
+## Revision phase protocol (Phase D3.5 commit 5b)
+
+When Mirror reviews your PR and emits `REVIEW_REVISION` (high confidence, budget remaining), the outbox notifier writes a `phase=revision` task to your inbox with `session_id` set to your build session, `source: beacon`, and Mirror's findings serialized in the prompt. The watcher dispatches it under `--resume`, so when you read the revision prompt it's the next user turn in the conversation you had during build. Your worktree, branch, and build context are intact.
+
+### Where you are
+
+- **Working directory:** the SAME worktree as your build — `~/agent-worktrees/wt-forge-<task_id>/`. Keyed on task_id, the worktree-manager returns the existing path. Your build edits are still there (committed); your scratch files may also persist.
+- **Branch:** the SAME branch you pushed for the original PR (envelope's `branch` field). Mirror's review was on this branch; your revision goes on top.
+- **PR:** the SAME PR that Mirror reviewed (envelope's `pr_url` field). When you push the revision commit, GitHub auto-updates the PR; you do NOT open a new PR.
+
+### Revision steps
+
+1. **Read Mirror's findings.** The prompt has them as a structured list with file path, line range, severity, and description per finding. Read each one and decide the smallest edit that resolves it.
+2. **Apply each finding as a targeted edit.** No scope creep. If a finding says "add input validation on `foo.py:L12`", that's the edit — don't refactor `foo.py` while you're at it. Mirror will re-review with the same scoping discipline she used the first time.
+3. **Run the relevant tests.** Same as build phase — the test suite should still pass after your revision edits.
+4. **Commit.** Conventional-commit revision message: `fix(<scope>): revision N — <one-line summary>`. Example: `fix(watchdog): revision 1 — add missing input-validation check per Mirror finding`. The body explains what each finding was and how the edit addresses it. Body is optional but useful when there are multiple findings.
+5. **Push.** Regular `git push origin <branch>`. NOT force-push — revision is a NEW commit on top of the existing build commit. The PR auto-updates because the branch is the PR's source.
+
+### Ending your revision response (STRICT — D3.5 5b)
+
+**Revision responses MUST start with the line:**
+
+```
+Revision N applied: <one-line summary of what you fixed>
+```
+
+Where N is the round number from the envelope's `revision_count` (incremented for you — round 1, 2, or 3 depending on how many cycles came before). Examples:
+
+- `Revision 1 applied: added input validation on foo.py L12-L15 per Mirror finding.`
+- `Revision 2 applied: fixed off-by-one in bar.py L40 + removed unused parameter from baz().`
+
+**The preamble is mandatory.** If your response doesn't start with it, the outbox notifier dead-letters back to you via the marker-error cascade (same machinery as preflight). You re-emit with the prefix. Three retries before the dispatch closes.
+
+Why strict (vs build phase's lenient prefix)? Build phase has a documented blocker-paragraph fallback (compile error you can't fix → plain narrative → default routing to Beacon). Revision phase has no equivalent fallback — Mirror's findings are by definition inline-fixable (she'd have used ESCALATE if they weren't), so "I couldn't apply the revision" is itself a structural problem worth catching with the gate. If you genuinely can't apply a finding, say so in the summary text *after* the preamble: `Revision 1 applied: fixed findings 1+2 but flagged finding 3 in narrative — Mirror should re-review and likely escalate.` Mirror's re-review then either accepts the partial fix or escalates.
+
+### After your revision response
+
+The outbox notifier reads your `Revision N applied:` preamble + dispatches a fresh `review-request` to Mirror on the same PR (with revision_count++). Mirror reviews the now-updated PR diff in a fresh session and emits one of: REVIEW_PASS (accept), REVIEW_REVISION (more changes needed; round N+1 dispatched to you), REVIEW_ESCALATE (kick to Beacon), REVIEW_EMERGENCY_HALT (safety issue). You don't see the re-review directly; it loops back through your inbox as another revision dispatch if Mirror finds more, or stops here if she passes.
+
+### Revision-phase constraints
+
+- **Same branch + PR.** Never open a new PR for a revision. Push to the existing branch; GitHub auto-updates the existing PR.
+- **No force-push.** Revision is additive. The build commit + revision commits are a clean history that the final `--squash` merge collapses.
+- **Don't rewrite Mirror's findings into your own framing.** Cite each finding by its position in her list ("finding 1 of 3"); apply the edit she described; don't expand scope.
+- **Bounded by `max_revisions`** (currently 3 from `agent-models.json` loop_bounds). Round 4+ would auto-promote Mirror's next REVISION to ESCALATE — the loop terminates with a human deciding.
+
 ## What you do for ad-hoc work (outside inbox dispatch)
 
 When Larry is chatting with you directly (not via dispatch), follow this short loop:

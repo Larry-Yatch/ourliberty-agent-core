@@ -380,15 +380,18 @@ def derive_notify_source(processing_agent: str = 'mirror') -> str:
 
 
 def derive_intent(
-    marker_type: str, auto_promoted: bool = False,
+    marker_type: str,
+    auto_promoted: bool = False,
+    budget_exhausted: bool = False,
 ) -> str:
-    """Map (marker_type, auto_promoted) to the notify intent string.
+    """Map (marker_type, auto_promoted, budget_exhausted) to the notify intent string.
 
-    Returns one of dispatch_validator's ALLOWED_INTENTS (D3.5 5a vocabulary):
+    Returns one of dispatch_validator's ALLOWED_INTENTS:
 
       review_pass            → 'review-pass'
       review_revision        → 'review-revision'  (under budget, high confidence)
                              → 'review-escalate'  (auto_promoted=True; low confidence)
+                             → 'review-escalate'  (budget_exhausted=True; D3.5 5b)
       review_escalate        → 'review-escalate'
       review_emergency_halt  → 'review-emergency-halt'
 
@@ -396,16 +399,49 @@ def derive_intent(
     action block. Auto-promote converts revision → escalate so Beacon sees
     the actual routing decision (and so 5b/5c don't have to disambiguate
     "low-confidence revision" from "escalation" in their handlers).
+
+    D3.5 commit 5b: budget_exhausted (revision_count + 1 > max_revisions)
+    also downgrades to escalate. Signed-off path: no new intent vocabulary;
+    Beacon's existing escalate handler renders it; the reason field carries
+    "revision budget exhausted on round N" via build_auto_promote_reason's
+    cousin (build_budget_exhausted_reason). Larry gets the DM via 5a-followup
+    auto-DM pipe (escalate is a terminal intent).
     """
     if marker_type == 'review_pass':
         return 'review-pass'
     if marker_type == 'review_revision':
-        return 'review-escalate' if auto_promoted else 'review-revision'
+        if auto_promoted or budget_exhausted:
+            return 'review-escalate'
+        return 'review-revision'
     if marker_type == 'review_escalate':
         return 'review-escalate'
     if marker_type == 'review_emergency_halt':
         return 'review-emergency-halt'
     return 'result-notification'
+
+
+def build_budget_exhausted_reason(
+    payload: dict[str, Any], next_count: int, max_count: int,
+) -> str:
+    """Frame revision-budget-exhaustion in Beacon-readable terms.
+
+    Used when REVIEW_REVISION auto-downgrades to ESCALATE because the
+    revision_count + 1 would exceed max_revisions. Preserves Mirror's
+    finding context so Beacon sees what she was asking for + that the
+    auto-fix loop ran out of attempts (not that Mirror's findings were
+    bad — just that they couldn't be resolved inline within budget).
+    """
+    findings = payload.get('findings') or []
+    n = len(findings) if isinstance(findings, list) else 0
+    severity = payload.get('severity', '?')
+    return (
+        f'Mirror emitted REVIEW_REVISION (severity={severity}, {n} finding(s)) '
+        f'but revision_count would reach {next_count}, exceeding the budget '
+        f'of {max_count}. Routing as ESCALATE: the Forge↔Mirror auto-fix '
+        f'loop has exhausted attempts on this task. Decide: revise the spec '
+        f'(new APPROVAL_REQUEST with a cleaner approach) or accept the PR '
+        f'as-is with caveats noted.'
+    )
 
 
 def build_auto_promote_reason(

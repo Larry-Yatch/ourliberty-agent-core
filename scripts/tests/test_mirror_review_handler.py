@@ -400,6 +400,23 @@ class DeriveIntentTest(unittest.TestCase):
             'review-escalate',
         )
 
+    def test_review_revision_budget_exhausted_becomes_escalate(self):
+        # D3.5 5b: budget_exhausted downgrades same as auto_promoted.
+        self.assertEqual(
+            mrh.derive_intent('review_revision', budget_exhausted=True),
+            'review-escalate',
+        )
+
+    def test_review_revision_both_flags_becomes_escalate(self):
+        # Both flags true (Mirror low-confidence AND budget exhausted) still
+        # routes as escalate — no ordering subtlety.
+        self.assertEqual(
+            mrh.derive_intent(
+                'review_revision', auto_promoted=True, budget_exhausted=True,
+            ),
+            'review-escalate',
+        )
+
     def test_review_escalate_intent(self):
         self.assertEqual(
             mrh.derive_intent('review_escalate'), 'review-escalate',
@@ -452,6 +469,28 @@ class BuildAutoPromoteReasonTest(unittest.TestCase):
         # fire in practice — but the helper shouldn't blow up if called
         # defensively.
         reason = mrh.build_auto_promote_reason({'findings': []})
+        self.assertIn('0 finding', reason)
+
+
+class BuildBudgetExhaustedReasonTest(unittest.TestCase):
+    """D3.5 5b: budget-exhausted reason includes finding context + budget figures."""
+
+    def test_includes_round_and_max(self):
+        payload = {
+            'findings': [{'file': 'a'}, {'file': 'b'}],
+            'severity': 'medium',
+        }
+        reason = mrh.build_budget_exhausted_reason(payload, next_count=4, max_count=3)
+        self.assertIn('2 finding', reason)
+        self.assertIn('medium', reason)
+        self.assertIn('reach 4', reason)
+        self.assertIn('budget of 3', reason)
+        self.assertIn('ESCALATE', reason)
+
+    def test_zero_findings_does_not_crash(self):
+        reason = mrh.build_budget_exhausted_reason(
+            {'findings': []}, next_count=4, max_count=3,
+        )
         self.assertIn('0 finding', reason)
 
 

@@ -2462,7 +2462,11 @@ class MaybeDmLarryTest(unittest.TestCase):
         self.assertIn('pull/1', notifs[0]['message'])
         self.assertIn('All clean', notifs[0]['message'])
 
-    def test_review_revision_renders_finding_count_and_severity(self):
+    def test_review_revision_does_not_dm_in_5b(self):
+        # D3.5 5b: REVIEW_REVISION is mid-chain (revision auto-dispatched to
+        # Forge). Larry only gets DM on terminal intents — escalate (incl.
+        # budget-exhausted downgrade), pass, emergency-halt, reject,
+        # clarification-exhausted. Confirming the 5a behavior was changed.
         data = {'task_id': 't-rev', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
         decision = self._decision('review-revision', 'review_revision', payload={
             'task_id': 't-rev',
@@ -2474,10 +2478,7 @@ class MaybeDmLarryTest(unittest.TestCase):
             'finding_count': 3, 'severity': 'medium', 'confidence': 'high',
         })
         on._maybe_dm_larry(data, decision)
-        notifs = self._read_notifications()
-        self.assertEqual(len(notifs), 1)
-        self.assertIn('3 finding', notifs[0]['message'])
-        self.assertIn('severity=medium', notifs[0]['message'])
+        self.assertEqual(self._read_notifications(), [])
 
     def test_review_escalate_renders_reason(self):
         data = {'task_id': 't-esc', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
@@ -2582,6 +2583,730 @@ class MaybeDmLarryTest(unittest.TestCase):
         notifs = self._read_notifications()
         self.assertEqual(len(notifs), 1)
         self.assertIn('exhausted', notifs[0]['message'])
+
+
+# ============================================================================
+# D3.5 5b — Forge↔Mirror revision loop
+# ============================================================================
+
+
+class RevisionLoopTest(unittest.TestCase):
+    """End-to-end: Mirror REVISION → Forge revision dispatch → Forge revision
+    outbox → Mirror re-review. Plus budget-exhaust + strict gate paths."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        # larry_alerts paths for DM-related side checks
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _mirror_revision_outbox(self, **overrides):
+        """Mirror outbox with a REVIEW_REVISION marker — the trigger for
+        the 5b revision-loop dispatch."""
+        marker = _mirror_revision_marker(
+            task_id='t-loop', severity='medium', confidence='high',
+        )
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='t-loop', phase='review',
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-loop',
+            result=f'Found 1 medium finding.\n\n{marker}',
+        )
+        # 5b prerequisite: forge_build_session_id must be on the envelope.
+        body['forge_build_session_id'] = 'forge-build-sess-abc'
+        body['pr_url'] = 'https://github.com/x/y/pull/77'
+        body.update(overrides)
+        return body
+
+    def _forge_revision_outbox(self, round_num=1, **overrides):
+        """Forge outbox after a revision dispatch — must start with the
+        Revision N applied: preamble per the 5b strict gate."""
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-loop',
+            phase='revision', target_repo='ourliberty-agent-core',
+            branch='forge/t-loop',
+            claude_session_id='forge-build-sess-abc',
+            result=(
+                f'Revision {round_num} applied: added input validation on '
+                f'foo.py L12-L15 per Mirror finding.\n\n'
+                f'Tests pass; pushed to forge/t-loop.'
+            ),
+        )
+        body['pr_url'] = 'https://github.com/x/y/pull/77'
+        body['revision_count'] = round_num
+        body['max_revisions'] = 3
+        body.update(overrides)
+        return body
+
+    # ----- Mirror REVISION → Forge revision dispatch -----
+
+    def test_review_revision_dispatches_revision_to_forge(self):
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 't-loop.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        # Revision task lands in Forge's inbox keyed on round number
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        revision = json.loads(revisions[0].read_text())
+        self.assertEqual(revision['task_id'], 't-loop')
+        self.assertEqual(revision['source'], 'beacon')
+        self.assertEqual(revision['phase'], 'revision')
+        self.assertEqual(revision['session_id'], 'forge-build-sess-abc')
+        self.assertEqual(revision['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(revision['branch'], 'forge/t-loop')
+        self.assertEqual(revision['revision_count'], 1)
+        self.assertEqual(revision['max_revisions'], 3)
+        self.assertEqual(revision['dispatched_by'], 'outbox-notifier')
+        # Findings serialized into the prompt
+        self.assertIn('Mirror\'s findings on this PR', revision['prompt'])
+        self.assertIn('medium', revision['prompt'])
+
+    def test_review_revision_low_confidence_does_not_dispatch(self):
+        # Auto-promote (5a behavior) blocks the revision dispatch — Mirror's
+        # uncertainty means the auto-fix loop shouldn't run; escalate instead.
+        marker = _mirror_revision_marker(task_id='t-low', confidence='low')
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='t-low',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='forge/t-low',
+            result=f'Maybe?\n\n{marker}',
+        )
+        body['forge_build_session_id'] = 'forge-sess-xyz'
+        body['pr_url'] = 'https://github.com/x/y/pull/78'
+        f = self._write_outbox('mirror', 't-low.json', body)
+        on.process_outbox(f)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+        # Beacon got the escalate notify instead
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        self.assertEqual(json.loads(notifies[0].read_text())['intent'], 'review-escalate')
+
+    def test_review_revision_budget_exhausted_does_not_dispatch(self):
+        # revision_count + 1 > max_revisions → downgrade to escalate.
+        body = self._mirror_revision_outbox(
+            revision_count=3, max_revisions=3,
+        )
+        f = self._write_outbox('mirror', 't-loop-exhausted.json', body)
+        on.process_outbox(f)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['intent'], 'review-escalate')
+        # Budget-exhausted reason is in the prompt body
+        self.assertIn('budget', notify['prompt'].lower())
+
+    def test_review_revision_missing_forge_session_skips_dispatch(self):
+        # Defensive: if forge_build_session_id propagation broke somewhere
+        # upstream, the dispatch should skip rather than write a bogus task.
+        body = self._mirror_revision_outbox()
+        body.pop('forge_build_session_id', None)
+        f = self._write_outbox('mirror', 't-no-session.json', body)
+        on.process_outbox(f)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+
+    def test_revision_dispatch_idempotent_on_reprocess(self):
+        body = self._mirror_revision_outbox()
+        f = self._write_outbox('mirror', 't-loop.json', body)
+        on.process_outbox(f)
+        # Re-write the same outbox + re-process (simulates notifier crash
+        # between dispatch and archive)
+        f2 = self._write_outbox('mirror', 't-loop.json', body)
+        on.process_outbox(f2)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+        )
+        # Still exactly one revision-task, despite two process_outbox calls
+        self.assertEqual(len(revisions), 1)
+
+    # ----- Forge revision outbox → Mirror re-review dispatch -----
+
+    def test_forge_revision_outbox_dispatches_rereview(self):
+        body = self._forge_revision_outbox(round_num=1)
+        f = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        on.process_outbox(f)
+        # Mirror inbox gets a fresh review-request keyed on round number
+        reviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+        )
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['task_id'], 't-loop')
+        self.assertEqual(review['source'], 'beacon')
+        self.assertEqual(review['phase'], 'review')
+        self.assertEqual(review['revision_count'], 1)
+        self.assertEqual(review['max_revisions'], 3)
+        self.assertIn('Re-review phase', review['prompt'])
+        self.assertIn('revision 1', review['prompt'])
+
+    def test_forge_revision_outbox_missing_preamble_dead_letters(self):
+        # Strict gate per Larry's Option 3 signoff: revision phase MUST
+        # start with "Revision N applied:" preamble. Missing → marker-error
+        # cascade back to Forge.
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-bad-rev',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='forge-sess',
+            # NO preamble; Forge fast-pathed past the protocol
+            result='I applied the fix but forgot to use the required format.',
+        )
+        f = self._write_outbox('forge', 'revision-t-bad-rev-1.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        # Marker-error notify lands in Forge's inbox
+        marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(marker_errors), 1)
+        notify = json.loads(marker_errors[0].read_text())
+        self.assertEqual(notify['intent'], 'marker-error')
+        self.assertIn('Revision N applied', notify['prompt'])
+        # No Mirror re-review dispatched
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')),
+            [],
+        )
+
+    def test_rereview_dispatch_idempotent_on_reprocess(self):
+        body = self._forge_revision_outbox(round_num=1)
+        f = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        on.process_outbox(f)
+        f2 = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        on.process_outbox(f2)
+        reviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+        )
+        self.assertEqual(len(reviews), 1)
+
+    def test_forge_revision_round_2_extracted_correctly(self):
+        # Round 2 prefix should parse and feed Mirror's revision_count=2.
+        body = self._forge_revision_outbox(round_num=2)
+        f = self._write_outbox('forge', 'revision-t-loop-2.json', body)
+        on.process_outbox(f)
+        reviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+        )
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['revision_count'], 2)
+        self.assertIn('revision 2', review['prompt'])
+
+    # ----- session_id propagation through the chain -----
+
+    def test_forge_session_id_propagates_into_mirror_review_request(self):
+        # 5a's _dispatch_mirror_review extended in 5b to carry
+        # forge_build_session_id forward (so a downstream REVIEW_REVISION
+        # can resume Forge's build session).
+        build = _good_outbox(
+            agent='forge', source='beacon', task_id='t-thread',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/t-thread',
+            claude_session_id='forge-build-thread-sess',
+            result=(
+                'PR opened: https://github.com/x/y/pull/99\n\n'
+                'Done.'
+            ),
+        )
+        f = self._write_outbox('forge', 't-thread.json', build)
+        on.process_outbox(f)
+        # Mirror's review-request envelope should now carry the field.
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-t-thread.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(
+            review['forge_build_session_id'], 'forge-build-thread-sess',
+        )
+
+    # ----- build phase remains lenient (Option 3) -----
+
+    def test_build_phase_missing_pr_url_falls_through_to_default_routing(self):
+        # Strict gate is revision-only per Larry's Option 3 signoff. A
+        # build response without the PR URL prefix (legitimate blocker
+        # paragraph) must still reach Beacon via default routing — NOT
+        # marker-error cascade. Confirms 5a behavior preserved.
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-blocker',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/t-blocker',
+            claude_session_id='forge-blocker-sess',
+            result=(
+                'Compile error in foo.py — the spec asked me to import '
+                'bar which does not exist. Need clarification on the '
+                'real module name before I can proceed.'
+            ),
+        )
+        f = self._write_outbox('forge', 't-blocker.json', body)
+        result = on.process_outbox(f)
+        # Default routing fires (not marker-error)
+        self.assertEqual(result, 'notified')
+        # Beacon got the blocker paragraph via forge-result default routing
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertIn('Compile error', notify['prompt'])
+        # NO marker-error notify to Forge
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')),
+            [],
+        )
+        # NO Mirror dispatch (no PR URL to review)
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')),
+            [],
+        )
+
+    # ----- budget-exhausted DM (escalate intent fires Larry DM) -----
+
+    def test_budget_exhausted_queues_larry_dm(self):
+        # When REVIEW_REVISION downgrades to escalate via budget exhaustion,
+        # the auto-DM hook should fire (review-escalate is in
+        # TERMINAL_DM_INTENTS). Confirms Larry hears about loop termination.
+        body = self._mirror_revision_outbox(
+            revision_count=3, max_revisions=3, reply_chat_id=7998341473,
+        )
+        f = self._write_outbox('mirror', 't-loop-exhausted.json', body)
+        on.process_outbox(f)
+        # Check larry-alerts.jsonl for the notification
+        pending = self._la.read_pending(0)
+        notifications = [r for _, r in pending if r.get('kind') == 'notification']
+        self.assertEqual(len(notifications), 1)
+        self.assertEqual(notifications[0]['intent'], 'review-escalate')
+        self.assertIn('budget', notifications[0]['message'].lower())
+
+
+class ExtractRevisionSummaryTest(unittest.TestCase):
+    """Tests for the revision-summary preamble regex."""
+
+    def test_extracts_round_and_summary(self):
+        result = on._extract_revision_summary_from_result(
+            'Revision 2 applied: added missing validation per Mirror.'
+        )
+        self.assertEqual(result, (2, 'added missing validation per Mirror.'))
+
+    def test_leading_whitespace_ok(self):
+        result = on._extract_revision_summary_from_result(
+            '\n\n  Revision 1 applied: fixed it.'
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0], 1)
+
+    def test_case_insensitive_keyword(self):
+        result = on._extract_revision_summary_from_result(
+            'REVISION 3 APPLIED: case test.'
+        )
+        self.assertIsNotNone(result)
+        self.assertEqual(result[0], 3)
+
+    def test_missing_returns_none(self):
+        self.assertIsNone(on._extract_revision_summary_from_result(''))
+        self.assertIsNone(on._extract_revision_summary_from_result(None))
+        self.assertIsNone(on._extract_revision_summary_from_result(
+            'just a narrative without the preamble'
+        ))
+
+    def test_buried_in_narrative_returns_none(self):
+        # Anchored to start; a "Revision N applied:" mention deeper in the
+        # text shouldn't match (Forge could be discussing a prior revision).
+        self.assertIsNone(on._extract_revision_summary_from_result(
+            'I considered earlier work where Revision 1 applied: stuff.\n'
+            'Then realized I need to fix something else.'
+        ))
+
+    def test_multiline_summary_only_first_line(self):
+        # The summary is one-line (stops at newline). Narrative below is
+        # preserved by the caller but doesn't extend the summary.
+        result = on._extract_revision_summary_from_result(
+            'Revision 1 applied: one-line summary.\n'
+            'Detailed narrative below explaining changes.'
+        )
+        self.assertEqual(result, (1, 'one-line summary.'))
+
+
+# ============================================================================
+# D3.5 5b — Post-review fixes (C-1, M-2, M-3, M-4, m-5, m-6)
+# ============================================================================
+
+
+class RevisionFollowupFixesTest(unittest.TestCase):
+    """Tests for the 6 issues caught by the independent reviewer."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+            '_MODELS_CONFIG_PATH',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on._MODELS_CONFIG_PATH = self._root / 'config' / 'agent-models.json'
+        on._invalidate_loop_bounds_cache()
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        on._invalidate_loop_bounds_cache()
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_models_config(self, body):
+        on._MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        on._MODELS_CONFIG_PATH.write_text(json.dumps(body))
+        on._invalidate_loop_bounds_cache()
+
+    def _write_outbox(self, agent, name, body):
+        d = on.OUTBOXES_ROOT / agent
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / name
+        f.write_text(json.dumps(body))
+        return f
+
+    # ---- C-1: forge_build_session_id propagates through revision dispatch ----
+
+    def test_c1_revision_dispatch_propagates_forge_build_session_id(self):
+        # The C-1 review fix: revision task envelope must carry
+        # forge_build_session_id so _build_outbox propagates it to Forge's
+        # revision outbox, so round 2's REVIEW_REVISION can find it.
+        data = {
+            'task_id': 't-loop',
+            'forge_build_session_id': 'forge-sess-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-loop',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'revision_count': 0,
+            'max_revisions': 3,
+            'reply_chat_id': 7998341473,
+        }
+        decision = {
+            'marker_type': 'review_revision',
+            'payload': {
+                'task_id': 't-loop', 'pr_url': data['pr_url'],
+                'findings': [
+                    {'file': 'a.py', 'line_range': 'L10', 'severity': 'medium',
+                     'description': 'fix this'},
+                ],
+                'severity': 'medium', 'confidence': 'high',
+            },
+        }
+        on._dispatch_revision_to_forge(data, decision)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        task = json.loads(revisions[0].read_text())
+        # Both session_id (for --resume) and forge_build_session_id (for
+        # forward-propagation to round 2) must be set.
+        self.assertEqual(task['session_id'], 'forge-sess-abc')
+        self.assertEqual(task['forge_build_session_id'], 'forge-sess-abc')
+
+    # ---- M-2: marker-error propagates revision-phase fields ----
+
+    def test_m2_marker_error_propagates_revision_phase_fields(self):
+        # Forge revision outbox without preamble triggers marker-error.
+        # The marker-error notify must carry phase, forge_build_session_id,
+        # revision_count, max_revisions, pr_url forward so Forge's retry
+        # can re-emit cleanly with full revision context.
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-no-preamble',
+            phase='revision', target_repo='ourliberty-agent-core',
+            branch='forge/t-no-preamble',
+            claude_session_id='forge-build-sess',
+            result='I forgot the required preamble format.',
+        )
+        body['forge_build_session_id'] = 'forge-build-sess'
+        body['revision_count'] = 2
+        body['max_revisions'] = 3
+        body['pr_url'] = 'https://github.com/x/y/pull/1'
+        body['reply_chat_id'] = 7998341473
+        f = self._write_outbox('forge', 'revision-t-no-preamble-2.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+        marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(marker_errors), 1)
+        notify = json.loads(marker_errors[0].read_text())
+        # All 5 revision-phase envelope fields must propagate.
+        self.assertEqual(notify['phase'], 'revision')
+        self.assertEqual(notify['forge_build_session_id'], 'forge-build-sess')
+        self.assertEqual(notify['revision_count'], 2)
+        self.assertEqual(notify['max_revisions'], 3)
+        self.assertEqual(notify['pr_url'], 'https://github.com/x/y/pull/1')
+        # session_id propagates too (already covered by existing test; verify)
+        self.assertEqual(notify['session_id'], 'forge-build-sess')
+
+    # ---- M-3: round_num validation against envelope ----
+
+    def test_m3_round_zero_rejected_as_marker_error(self):
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-zero',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='sess', result='Revision 0 applied: nope.',
+        )
+        body['revision_count'] = 1
+        f = self._write_outbox('forge', 'revision-t-zero-1.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(marker_errors), 1)
+        notify = json.loads(marker_errors[0].read_text())
+        self.assertIn('round number must be', notify['prompt'])
+        self.assertIn('round 1', notify['prompt'])
+
+    def test_m3_round_mismatch_rejected_as_marker_error(self):
+        # Envelope says round 2, Forge wrote "Revision 1 applied:" (round drift).
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-drift',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='sess',
+            result='Revision 1 applied: fixed the thing.',
+        )
+        body['revision_count'] = 2
+        f = self._write_outbox('forge', 'revision-t-drift-2.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        notify = json.loads(
+            next(iter((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json'))).read_text()
+        )
+        self.assertIn('does not match', notify['prompt'])
+        self.assertIn('revision_count', notify['prompt'])
+        self.assertIn('Revision 2 applied', notify['prompt'])
+
+    def test_m3_round_high_inflation_rejected(self):
+        # Forge tries to skip ahead — envelope round 1, she writes "Revision 99
+        # applied" (potentially trying to force-exhaust budget).
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-inflate',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='sess',
+            result='Revision 99 applied: skipping ahead.',
+        )
+        body['revision_count'] = 1
+        f = self._write_outbox('forge', 'revision-t-inflate-1.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+    def test_m3_correct_round_passes(self):
+        # Sanity: round matches envelope → dispatches the re-review normally.
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id='t-ok',
+            phase='revision', target_repo='ourliberty-agent-core',
+            claude_session_id='sess',
+            result='Revision 2 applied: all findings addressed.',
+        )
+        body['revision_count'] = 2
+        body['pr_url'] = 'https://github.com/x/y/pull/1'
+        f = self._write_outbox('forge', 'revision-t-ok-2.json', body)
+        on.process_outbox(f)
+        reviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-t-ok-rev*.json')
+        )
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['revision_count'], 2)
+
+    # ---- M-4: max_revisions read from config file ----
+
+    def test_m4_max_revisions_read_from_config(self):
+        # Write a config with max_revisions=5; verify _load reads it.
+        self._write_models_config({
+            'agents': {'forge': {'allowed_repos': ['ourliberty-agent-core']}},
+            'loop_bounds': {'max_revisions': 5, 'max_replans': 2},
+        })
+        self.assertEqual(on._load_max_revisions_from_config(), 5)
+
+    def test_m4_falls_back_to_default_when_config_missing(self):
+        # No config file at all → fall back to DEFAULT_MAX_REVISIONS (3).
+        self.assertEqual(
+            on._load_max_revisions_from_config(),
+            on.mrh.DEFAULT_MAX_REVISIONS,
+        )
+
+    def test_m4_falls_back_when_loop_bounds_missing(self):
+        # Config exists but no loop_bounds key.
+        self._write_models_config({'agents': {}})
+        self.assertEqual(
+            on._load_max_revisions_from_config(),
+            on.mrh.DEFAULT_MAX_REVISIONS,
+        )
+
+    def test_m4_falls_back_when_value_invalid(self):
+        # max_revisions present but not a non-negative int.
+        self._write_models_config({
+            'loop_bounds': {'max_revisions': 'three'},
+        })
+        self.assertEqual(
+            on._load_max_revisions_from_config(),
+            on.mrh.DEFAULT_MAX_REVISIONS,
+        )
+
+    def test_m4_falls_back_when_malformed_json(self):
+        on._MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        on._MODELS_CONFIG_PATH.write_text('{not valid json')
+        on._invalidate_loop_bounds_cache()
+        self.assertEqual(
+            on._load_max_revisions_from_config(),
+            on.mrh.DEFAULT_MAX_REVISIONS,
+        )
+
+    def test_m4_dispatch_mirror_review_uses_config_value(self):
+        # End-to-end: configure max_revisions=7; verify Mirror's
+        # review-request envelope carries 7 (not the hardcoded default 3).
+        self._write_models_config({
+            'agents': {'forge': {'allowed_repos': ['ourliberty-agent-core']},
+                       'mirror': {'allowed_repos': ['ourliberty-agent-core']}},
+            'loop_bounds': {'max_revisions': 7},
+        })
+        on._dispatch_mirror_review(
+            {
+                'task_id': 't-cfg',
+                'target_repo': 'ourliberty-agent-core',
+                'branch': 'forge/t-cfg',
+                'claude_session_id': 'sess',
+            },
+            'https://github.com/x/y/pull/1',
+        )
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['max_revisions'], 7)
+
+    # ---- m-5: budget evaluated even when auto_promoted ----
+
+    def test_m5_low_confidence_at_budget_exhausted_uses_budget_reason(self):
+        # Low confidence + budget exhausted: reason text should mention
+        # the budget cap (stronger termination signal), with audit-trail
+        # note that auto-promote would also have routed escalate.
+        data = {
+            'task_id': 't-both',
+            'agent': 'mirror',
+            'result': (
+                'Found something I am not sure about.\n\n'
+                '=== REVIEW_REVISION ===\n'
+                + json.dumps({
+                    'task_id': 't-both',
+                    'pr_url': 'https://github.com/x/y/pull/1',
+                    'findings': [{'file': 'a', 'line_range': 'L1',
+                                 'severity': 'low', 'description': 'maybe?'}],
+                    'severity': 'low', 'confidence': 'low',
+                })
+                + '\n=== END_REVIEW_REVISION ==='
+            ),
+            'revision_count': 3,
+            'max_revisions': 3,
+        }
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['intent'], 'review-escalate')
+        self.assertTrue(decision['auto_promoted'])
+        self.assertTrue(decision['budget_exhausted'])
+        reason = decision['intent_kwargs']['reason']
+        # Budget-exhausted reason is primary; auto-promote noted as appendix.
+        self.assertIn('budget', reason.lower())
+        self.assertIn('confidence: low', reason)
+
+    # ---- m-6: DM lead line is cause-agnostic ----
+
+    def test_m6_escalate_dm_template_does_not_say_mirror_escalated(self):
+        # The template lead shouldn't claim Mirror initiated the escalation
+        # — it can fire from auto-promote or budget-exhaust too. Lead is
+        # cause-agnostic; body's {reason} carries the specifics.
+        template = on.DM_TEMPLATES['review-escalate']
+        self.assertNotIn('Mirror escalated', template)
+        self.assertIn('Review escalated', template)
+        self.assertIn('{reason}', template)
 
 
 if __name__ == '__main__':

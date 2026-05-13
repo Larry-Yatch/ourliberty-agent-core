@@ -291,10 +291,16 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
     # dispatch. Without these in the outbox, _dispatch_build_phase in the
     # notifier reads None for branch and falls back to derive_branch_name —
     # any explicit branch from Beacon's spec gets silently overwritten.
+    # D3.5 5b: also propagate forge_build_session_id (Forge's build session,
+    # threaded through Mirror's review-request so the revision dispatch back
+    # to Forge can --resume the right session) and revision_count (the
+    # round counter, incremented each Forge→Mirror→Forge cycle).
     for envelope_field in ('clarification_count', 'max_clarifications',
                            'phase', 'target_repo', 'task_type',
                            'original_source', 'marker_error_count',
-                           'branch', 'pr_title', 'pr_body'):
+                           'branch', 'pr_title', 'pr_body',
+                           'forge_build_session_id', 'revision_count',
+                           'max_revisions', 'pr_url'):
         if task.get(envelope_field) is not None:
             outbox[envelope_field] = task[envelope_field]
     if error:
@@ -341,15 +347,17 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     model = resolve_model(agent, task, models_config)
     timeout = task.get("timeout") or DEFAULT_TIMEOUT_SEC
     # Only consume session_id when the dispatcher explicitly opted into a
-    # --resume continuation. Phase D3 commit 4b wires preflight→build as
-    # the one supported case (build task carries the preflight session_id).
-    # Other notify paths in outbox_notifier may carry claude_session_id
-    # for telemetry, but those sessions belong to the SENDER not the
-    # target, so consuming them blindly would resume the wrong agent's
-    # conversation. A future commit may widen this gate when Forge's
-    # session_id is propagated through Beacon's clarification round-trip.
+    # --resume continuation. Phase D3 commit 4b wires preflight→build; D3.5
+    # commit 5b extends the gate to `revision` (Forge's build session resumes
+    # again when Mirror's REVIEW_REVISION dispatches a revision task back to
+    # her with her findings as the next user turn). Other notify paths may
+    # carry claude_session_id for telemetry, but those sessions belong to
+    # the SENDER not the target, so consuming them blindly would resume the
+    # wrong agent's conversation.
     resume_session_id = (
-        task.get("session_id") if task.get("phase") == "build" else None
+        task.get("session_id")
+        if task.get("phase") in ("build", "revision")
+        else None
     )
 
     # Identity-assertion preamble (Phase D2.5 Call A: on by default).
