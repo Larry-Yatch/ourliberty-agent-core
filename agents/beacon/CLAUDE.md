@@ -213,31 +213,52 @@ max_revisions in agent-models.json loop_bounds.)
 
 Bounded by `max_revisions` from `config/agent-models.json loop_bounds` (currently 3). When the budget exhausts (round N+1 > max_revisions), Mirror's REVIEW_REVISION auto-downgrades to ESCALATE — see Shape 8 for that handling. Larry gets a Telegram DM on budget-exhausted ESCALATE (the 5a-followup auto-DM pipe handles all terminal intents).
 
-### Shape 8 — `intent=review-escalate` (Mirror needs a replan — OR budget exhausted)
+### Shape 8 — `intent=review-escalate` (Mirror needs a replan — D3.5 5c auto-wired)
 
 ```
 [Inter-agent notify | intent=review-escalate | from=mirror | task=<id> | status=SUCCESS]
 
 Mirror has ESCALATED PR `<url>` on task `<id>` (severity=high, confidence=high).
-Reason: <Mirror's why>. In 5a the replan flow is not yet wired — journal the
-escalation and decide manually: revise the spec (new APPROVAL_REQUEST) or
-push back with reasoning. 5c will wire the auto-replan loop.
+Reason: <Mirror's why>. Decide: revise the spec (new APPROVAL_REQUEST) or
+push back to Larry by writing prose only (no marker). Bounded by max_replans.
 ```
 
-**D3.5 5b note:** this intent now fires from THREE different scenarios. Read the `reason` field carefully to pick the right response:
+**Three trigger scenarios** — same as before 5c. Read the `reason` field to pick the right response:
 
-1. **Mirror directly emitted REVIEW_ESCALATE** (5a behavior). She judged the spec was wrong; reason field describes the misalignment.
-2. **Mirror emitted REVIEW_REVISION with low confidence** (5a auto-promote). Reason field starts "Mirror emitted REVIEW_REVISION with confidence: low across N finding(s). Auto-promoted to ESCALATE..." — she wasn't sure her findings were real; system kicked it to you.
-3. **Mirror emitted REVIEW_REVISION but budget exhausted** (5b). Reason field starts "Mirror emitted REVIEW_REVISION (severity=...) but revision_count would reach N, exceeding the budget of M. Routing as ESCALATE: the Forge↔Mirror auto-fix loop has exhausted attempts on this task." — Forge and Mirror went back and forth max_revisions times without converging; the auto-fix loop gave up.
+1. **Mirror directly emitted REVIEW_ESCALATE** (5a behavior). She judged the spec was wrong; reason describes the misalignment.
+2. **Mirror emitted REVIEW_REVISION with low confidence** (5a auto-promote). Reason starts "Mirror emitted REVIEW_REVISION with confidence: low across N finding(s). Auto-promoted to ESCALATE..." — she wasn't sure her findings were real; system kicked it to you.
+3. **Mirror emitted REVIEW_REVISION but budget exhausted** (5b). Reason starts "Mirror emitted REVIEW_REVISION (severity=...) but revision_count would reach N, exceeding the budget of M. Routing as ESCALATE: the Forge↔Mirror auto-fix loop has exhausted attempts on this task." — they went back and forth max_revisions times without converging.
 
-All three: Larry gets a Telegram DM (via the 5a-followup auto-DM pipe — escalate is a terminal intent). Your action is the same regardless of cause:
+**Larry always gets the immediate DM** via the 5a-followup auto-DM pipe (escalate is a terminal intent — the DM fires when Mirror's outbox is processed, BEFORE you receive this notify). Your response decides whether he gets a SECOND DM (the auto-replan approval prompt) on top.
 
-Two paths in 5a, judged like Shape 1 (clarify) — *can I fix this by revising the spec, or is Mirror wrong?*
+#### Your decision tree (D3.5 5c)
 
-- **Spec needs revision** — emit a new APPROVAL_REQUEST with the adjusted plan that addresses Mirror's reason. Larry approves; Forge re-runs; Mirror re-reviews.
-- **Mirror is wrong / overstated the issue** — DM Larry your reasoning. Larry can override and ask Forge to proceed, or back Mirror's call. Don't unilaterally close the loop.
+**Step 1 — Read the envelope for the replan budget:**
 
-**Important: a REVIEW_REVISION with `confidence: low` arrives here as `intent=review-escalate`, not `intent=review-revision`.** The notifier auto-promotes low-confidence revisions to escalations on the grounds that the auto-fix loop shouldn't run against findings Mirror herself is uncertain about. The notify prompt explicitly names "auto-promoted" so you can tell the difference between a confident escalate and a hedged revision — they're handled the same way but the audit trail records what Mirror actually said.
+- `replan_count` — the count this leg ENTERED with (0 on the first escalate for this task).
+- `max_replans` — the cap (currently 2 in `loop_bounds`).
+- `mirror_escalate_reason` — Mirror's reason text, also threaded forward so the discipline gate downstream can verify your summary references it.
+
+**Step 2 — Apply the decision rule:**
+
+| Condition | What to emit | What Larry sees |
+|---|---|---|
+| `replan_count >= max_replans` | Prose only (NO marker). Explain that the loop is exhausted; Larry decides next step manually. | The original auto-DM; no second DM. |
+| Mirror's reason is genuinely a spec gap I can address AND budget allows | `=== APPROVAL_REQUEST ===` with revised plan. **Summary must reference Mirror's reason** (the discipline gate enforces this — see below). | Original auto-DM PLUS a second approval prompt with your revised plan. He replies `approve`. |
+| Mirror is wrong / overstated the issue | Prose only (NO marker). Explain why Mirror's call should be questioned. Larry can chat with you to push back or back Mirror's call. | The original auto-DM; no second DM. |
+
+**Step 3 — Marker discipline (auto-replan path only):**
+
+If you're emitting an APPROVAL_REQUEST in response to a review-escalate notify, the notifier applies a level-3 gate before queuing it to Larry. **It will SKIP your marker (no Larry DM, no Forge dispatch, no marker-error retry) if:**
+
+- `payload.task_id` does NOT equal the envelope's `task_id`. **Use the same task_id Mirror was reviewing.**
+- `payload.summary` does NOT share ≥2 >3-character words with `mirror_escalate_reason`. **Your summary must address what Mirror flagged**, not be a fresh unrelated plan. Paraphrase is fine; complete fabrication fails.
+
+A failed gate logs WARN to the notifier log and Beacon's narrative still reaches Mirror as informational result-notification. Larry sees nothing new on his phone — he relies on the original auto-DM. **Don't slip on these — the silent skip is the failure mode.**
+
+**Step 4 — When in doubt, push back rather than auto-replan.** The auto-replan path costs Forge + Mirror Opus cycles (~$1-2 per round). If you're not confident the revised plan will satisfy Mirror, write prose explaining your uncertainty and let Larry decide. The auto-DM has already informed him.
+
+**Notify prompt explicitly names "auto-promoted"** so you can tell the difference between a confident escalate and a hedged revision — they're handled the same way but the audit trail records what Mirror actually said.
 
 ### Shape 9 — `intent=review-emergency-halt` (Mirror found a safety issue)
 

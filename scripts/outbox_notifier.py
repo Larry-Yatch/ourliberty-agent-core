@@ -62,11 +62,13 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import beacon_approval_handler as approval  # noqa: E402
 import dispatch_validator         # noqa: E402
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
 import safe_write_inbox             # noqa: E402
+import trust_policy                 # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = HOME / 'agents'
@@ -100,6 +102,14 @@ MAX_NOTIFY_DEPTH = 1
 # When exceeded, the notifier dead-letters back to Beacon instead of
 # retrying the agent again.
 MAX_MARKER_ERROR_RETRIES = 3
+
+# D3.5 commit 5c — inbound-intent values on a Beacon outbox that trigger
+# the auto-replan extraction path. Today only `review-escalate` qualifies
+# (Mirror flagged a finding that needs spec revision); future commits may
+# add others (e.g., a Pulse digest-driven replan intent). The check is
+# narrow on purpose — Beacon's chat-mode APPROVAL_REQUEST flow runs on
+# her telegram bot and must NOT also fire here.
+_BEACON_REPLAN_INBOUND_INTENTS = frozenset({'review-escalate'})
 
 # D3.5 commit 5a — extract Forge's PR URL from a build-phase outbox result.
 # Forge's CLAUDE.md mandates the build response START with `PR opened: <url>`
@@ -162,6 +172,30 @@ def _load_max_revisions_from_config() -> int:
     raw = loop_bounds.get('max_revisions')
     if not isinstance(raw, int) or raw < 0:
         return mrh.DEFAULT_MAX_REVISIONS
+    return raw
+
+
+def _load_max_replans_from_config() -> int:
+    """Return `loop_bounds.max_replans` from config/agent-models.json.
+
+    D3.5 5c. Same shape as `_load_max_revisions_from_config`. Falls back to
+    `approval.DEFAULT_MAX_REPLANS` (=2) when the config file is missing,
+    malformed, or doesn't define the field. Reads the same cached config so
+    the two budgets stay synchronized to the same on-disk state.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    loop_bounds = cfg.get('loop_bounds') if isinstance(cfg, dict) else None
+    if not isinstance(loop_bounds, dict):
+        return approval.DEFAULT_MAX_REPLANS
+    raw = loop_bounds.get('max_replans')
+    if not isinstance(raw, int) or raw < 0:
+        return approval.DEFAULT_MAX_REPLANS
     return raw
 
 # -------------------- notify-prompt template (D3-forge commit 4a) --------------------
@@ -1023,6 +1057,17 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         build_task['max_clarifications'] = max_clar
     if data.get('reply_chat_id') is not None:
         build_task['reply_chat_id'] = data['reply_chat_id']
+    # D3.5 5c C-1 review fix: propagate replan_count + max_replans through
+    # the preflight→build hop. Without this, an approval emitted by the 5c
+    # replan path (which set replan_count > 0 on the original Forge task
+    # envelope) would land in Forge's preflight outbox correctly but get
+    # reset to 0 on the build dispatch — breaking the budget enforcement
+    # on the next Mirror REVIEW_ESCALATE leg. Symmetric with how
+    # revision_count rides through _dispatch_revision_to_forge.
+    if data.get('replan_count') is not None:
+        build_task['replan_count'] = data['replan_count']
+    if data.get('max_replans') is not None:
+        build_task['max_replans'] = data['max_replans']
 
     build_filename = f'build-{task_id}.json'
     # Idempotency check (4b review fix): if the build task is already
@@ -1456,6 +1501,14 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     # losing all the build context she'd already loaded.
     if data.get('claude_session_id'):
         review_task['forge_build_session_id'] = data['claude_session_id']
+    # D3.5 5c C-1 review fix: propagate replan_count + max_replans through
+    # the build→review hop. Without this, Mirror's REVIEW_ESCALATE outbox
+    # would carry replan_count=0 on the second-loop iteration, defeating
+    # the budget cap. Symmetric with the preflight→build propagation.
+    if data.get('replan_count') is not None:
+        review_task['replan_count'] = data['replan_count']
+    if data.get('max_replans') is not None:
+        review_task['max_replans'] = data['max_replans']
 
     review_filename = f'review-{task_id}.json'
     # Idempotency check (same pattern as _dispatch_build_phase): if the
@@ -1867,10 +1920,285 @@ def _dispatch_mirror_review_rerun(
         )
 
 
+def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
+    """Handle Beacon's auto-replan APPROVAL_REQUEST emitted in response to a
+    review-escalate inbox dispatch.
+
+    D3.5 commit 5c. Bridges the gap between Beacon-via-inbox-watcher (her
+    APPROVAL_REQUEST in result text) and the bot's existing chat-mode
+    APPROVAL_REQUEST flow (which only fires on Telegram chat replies, not
+    on outbox-derived markers). The notifier acts as the bot's impersonator
+    here — calls `approval.extract_approval_request`, `trust_policy.evaluate`,
+    `approval.add_pending`, and queues the formatted approval DM through the
+    larry-alerts pipeline so the bot's existing alerts poll surfaces it to
+    Larry without any chat round-trip.
+
+    Returns:
+      True if the replan path took over (caller should archive the outbox
+        and NOT fall through to default routing).
+      False if the path declined (no marker, or marker failed the discipline
+        gate). Caller falls through to default routing so Beacon's narrative
+        still reaches Mirror as informational result-notification.
+
+    Decision tree (in order):
+
+      1. No APPROVAL_REQUEST present in result → return False.
+      2. Malformed APPROVAL_REQUEST (e.g., missing required fields) → log
+         WARN + return False (fall through; level-3 discipline doesn't run
+         marker-error cascade per 5c sign-off).
+      3. Discipline gate fail (task_id mismatch OR insufficient Mirror-reason
+         reference) → log WARN + return False.
+      4. Budget exhausted (replan_count+1 > max_replans) → queue Larry-
+         notification "loop exhausted" + return True (suppress dispatch).
+      5. Trust policy:
+           - reject → queue Larry-notification with policy rejection +
+             return True.
+           - auto_approve → add_pending(replan_count=next) +
+             dispatch_approved + queue Larry-notification with auto-approve
+             confirmation + resolve(approved) + return True.
+           - force_ask → add_pending(replan_count=next) + queue
+             approval-request alert + return True.
+
+    No marker-error cascade on the Beacon side (per 5c sign-off, level-3
+    discipline). If you want strict-5 dial behavior, the notifier would
+    need a `_notify_beacon_marker_error` parallel to the Forge/Mirror
+    paths plus a Beacon CLAUDE.md retry contract. Deferred.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    result_text = data.get('result') or ''
+    if not isinstance(result_text, str) or not result_text:
+        return False
+
+    try:
+        payload, _narrative = approval.extract_approval_request(result_text)
+    except approval.MalformedApprovalMarker as e:
+        log(
+            f'beacon replan APPROVAL_REQUEST malformed for task {task_id}: '
+            f'{e}; falling through to default routing',
+            'WARN',
+        )
+        return False
+
+    if payload is None:
+        # Beacon chose to push back with prose only — no marker emitted.
+        # Default routing will notify-back informationally.
+        return False
+
+    # Level-3 discipline gate. Failures log WARN and fall through; no
+    # cascade per 5c sign-off.
+    mirror_reason = data.get('mirror_escalate_reason', '') or ''
+    ok, err = approval.validate_replan_discipline(
+        payload, data, mirror_reason,
+    )
+    if not ok:
+        log(
+            f'beacon replan APPROVAL_REQUEST failed discipline gate for '
+            f'task {task_id}: {err}; falling through to default routing',
+            'WARN',
+        )
+        return False
+
+    # Budget gate (system-side backstop — Beacon's CLAUDE.md is first line).
+    decision, next_count, max_count = approval.evaluate_replan_budget(data)
+    reply_chat_id = data.get('reply_chat_id')
+    is_valid_chat = isinstance(reply_chat_id, int)
+
+    if decision == 'exhausted':
+        log(
+            f'beacon replan budget exhausted for task {task_id} '
+            f'(would be round {next_count} of {max_count}); '
+            f'suppressing APPROVAL_REQUEST and DMing Larry',
+            'WARN',
+        )
+        if is_valid_chat:
+            msg = (
+                f'Beacon replan loop exhausted on task `{task_id}` '
+                f'(round {next_count - 1} of {max_count} used). '
+                f'She emitted another revised plan but the budget cap fired. '
+                f'Decide manually: chat with her to take a different '
+                f'approach, or accept the prior PR as-is with caveats.'
+            )
+            if not larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-escalate',
+                message=msg,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                # M-5 review fix: surface alert-write failure so it's not
+                # silent. Beacon's reminder timer at 6/24/72h will catch
+                # the hung pending state, but for now log the gap loud.
+                log(
+                    f'BEACON_REPLAN_ALERT_WRITE_FAILED task={task_id} '
+                    f'budget-exhausted DM did not queue (disk full?); '
+                    f'manual intervention required',
+                    'WARN',
+                )
+        else:
+            # M-3 review fix: budget-exhausted with no chat_id is the
+            # cascade-exhaust-silent-to-Larry failure mode. Without a
+            # chat_id we can't DM, but we DO want a load-bearing sentinel
+            # the watchdog can scan for. The dispatch is closed either
+            # way; the silent loop is the part to avoid.
+            log(
+                f'BEACON_REPLAN_EXHAUSTED_NO_CHAT task={task_id} '
+                f'(round {next_count - 1} of {max_count}); cannot DM '
+                f'(no reply_chat_id on envelope); manual intervention '
+                f'required',
+                'WARN',
+            )
+        return True
+
+    # Trust policy decision.
+    try:
+        action_str, rule = approval.trust_decision(payload)
+    except Exception as e:  # noqa: BLE001 — defensive; never wedge daemon
+        log(
+            f'trust_policy.evaluate raised on beacon replan for task '
+            f'{task_id}: {type(e).__name__}: {e}; falling through',
+            'WARN',
+        )
+        return False
+
+    # add_pending requires a chat_id (the bot uses it to route the DM).
+    # Without one, we can't queue the approval-request alert because the
+    # bot has no destination. Fall through so the narrative still reaches
+    # Mirror via default routing.
+    if not is_valid_chat:
+        log(
+            f'beacon replan APPROVAL_REQUEST for task {task_id} has no '
+            f'valid reply_chat_id (got {reply_chat_id!r}); cannot route '
+            f'approval DM, falling through',
+            'WARN',
+        )
+        return False
+
+    if action_str == 'reject':
+        log(
+            f'trust_policy rejected beacon replan for task {task_id} '
+            f'(rule={rule}); DMing Larry the rejection',
+        )
+        msg = approval.format_policy_rejection(payload, rule or {})
+        if not larry_alerts.append_notification(
+            source='outbox-notifier',
+            intent='reject',
+            message=msg,
+            chat_id=reply_chat_id,
+            task_id=task_id,
+        ):
+            log(
+                f'BEACON_REPLAN_ALERT_WRITE_FAILED task={task_id} '
+                f'trust-policy reject DM did not queue (disk full?)',
+                'WARN',
+            )
+        return True
+
+    # Med-10 review fix: dedup by task_id against existing pending entries.
+    # Replay scenarios (notifier processes a duplicate outbox; bot replays
+    # after a crash; synthetic smoke test re-drops the same file) would
+    # otherwise create N pending entries and queue N alerts, DMing Larry
+    # N times for the same plan. Idempotency at the dispatch level
+    # (filename = task_id) catches the auto_approve fork, but force_ask
+    # has no analogous gate without this check.
+    existing = approval.find_pending_by_id(payload['task_id'])
+    if existing is not None and existing.get('status') == 'pending':
+        log(
+            f'beacon replan APPROVAL_REQUEST for task {task_id} already '
+            f'has a pending entry (id={existing["id"]}, status=pending); '
+            f'skipping duplicate add_pending + alert queue',
+        )
+        return True
+
+    entry = approval.add_pending(
+        payload,
+        chat_id=reply_chat_id,
+        replan_count=next_count,
+        max_replans=max_count,
+    )
+
+    if action_str == 'auto_approve':
+        # Med-9 review fix: bare-Exception coverage matches the trust_decision
+        # block above. Either both narrow OR both wide — daemon-never-wedge is
+        # the actual invariant. M-4 added OSError + JSONEncodeError to the
+        # original DispatchRejected/RoutingDenied pair.
+        try:
+            approval.dispatch_approved(entry)
+            approval.resolve(
+                entry['id'], 'approved',
+                note=f'auto_approved by rule (5c replan): {rule}',
+            )
+            log(
+                f'beacon replan auto-approved + dispatched: task={task_id}, '
+                f'replan_count={next_count}, rule={rule}',
+            )
+            msg = approval.format_auto_approve_confirmation(entry, rule or {})
+            if not larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-pass',  # informational; reuse closest emoji
+                message=msg,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                log(
+                    f'BEACON_REPLAN_ALERT_WRITE_FAILED task={task_id} '
+                    f'auto-approve confirmation did not queue (disk full?)',
+                    'WARN',
+                )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge invariant
+            log(
+                f'beacon replan auto-approve dispatch FAILED for task '
+                f'{task_id}: {type(e).__name__}: {e}',
+                'WARN',
+            )
+            # Entry is still in pending — Larry can resolve manually.
+            msg = (
+                f'Beacon replan auto-approve dispatch failed for task '
+                f'`{task_id}`: {type(e).__name__}: {e}. Entry remains '
+                f'pending; reply `reject: ...` to clear or retry manually.'
+            )
+            if not larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-escalate',
+                message=msg,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                log(
+                    f'BEACON_REPLAN_ALERT_WRITE_FAILED task={task_id} '
+                    f'auto-approve failure DM did not queue (disk full?)',
+                    'WARN',
+                )
+        return True
+
+    # force_ask path — queue the approval-request alert; bot DMs the
+    # formatted approval body on its next sweep.
+    body = approval.format_approval_dm(entry)
+    if not larry_alerts.append_approval_request(
+        chat_id=reply_chat_id,
+        approval_id=entry['id'],
+        body=body,
+    ):
+        # M-5 review fix: if the alert queue write fails, the pending entry
+        # still exists (durable) but Larry won't get the DM until the
+        # reminder timer fires at 6h. Log loud for watchdog scanning.
+        log(
+            f'BEACON_REPLAN_ALERT_WRITE_FAILED task={task_id} '
+            f'force_ask approval-request did not queue (disk full?); '
+            f'pending entry exists; reminder timer will surface at 6h',
+            'WARN',
+        )
+    log(
+        f'beacon replan APPROVAL_REQUEST queued for force_ask: task={task_id}, '
+        f'replan_count={next_count}, chat_id={reply_chat_id}',
+    )
+    return True
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
-       'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error'.
+       'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error' |
+       'notified-replan'.
     """
     try:
         data = json.loads(outbox_file.read_text())
@@ -1973,6 +2301,25 @@ def process_outbox(outbox_file: Path) -> str:
             _archive_outbox(outbox_file)
             return 'marker-error'
         _dispatch_mirror_review_rerun(data, round_num, summary)
+
+    # D3.5 commit 5c — Beacon auto-replan check. Beacon's outbox in response
+    # to a review-escalate inbox dispatch may contain a `=== APPROVAL_REQUEST
+    # ===` marker (her revised plan). The notifier impersonates the bot's
+    # chat-mode approval flow (extract → trust policy → add_pending → queue
+    # alert) so the bot's existing alerts poll surfaces the approval DM to
+    # Larry. If no marker or marker fails discipline, falls through to
+    # default routing — Beacon's narrative still reaches Mirror as
+    # informational. The auto-DM Larry received on the Mirror→Beacon hop
+    # (via 5a-followup's review-escalate DM_TEMPLATE) already gave him the
+    # initial signal; this just adds the auto-replan approval prompt on
+    # top when Beacon decides to revise.
+    if (
+        agent == 'beacon'
+        and data.get('inbound_intent') in _BEACON_REPLAN_INBOUND_INTENTS
+    ):
+        if _route_beacon_replan_approval(data):
+            _archive_outbox(outbox_file)
+            return 'notified-replan'
 
     # Forge preflight marker check. Markers override default routing rules
     # because the preflight protocol is intentionally multi-hop and the
@@ -2080,9 +2427,50 @@ def process_outbox(outbox_file: Path) -> str:
         # at Forge with target_repo=None, and the watcher's worktree gate
         # refuses with "no canonical path". Same shape as the marker-error
         # black hole the 4b review caught — different code path.
-        for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body'):
+        for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body',
+                       'pr_url'):
             if data.get(f_name):
                 notify_task[f_name] = data[f_name]
+        # D3.5 5c — when the marker decision is review-escalate (any of three
+        # sub-flavors: direct REVIEW_ESCALATE, auto-promoted from low-
+        # confidence REVISION, or budget-exhausted REVISION), surface the
+        # replan budget + Mirror's reason on the notify task so Beacon's
+        # CLAUDE.md decision tree has the data it needs without re-reading
+        # her inbox archive. `mirror_escalate_reason` rides forward through
+        # _build_outbox propagation so the notifier can apply the level-3
+        # discipline gate when Beacon emits her replan APPROVAL_REQUEST.
+        if marker_decision['intent'] == 'review-escalate':
+            notify_task['replan_count'] = data.get('replan_count', 0) or 0
+            max_replans = data.get('max_replans')
+            if not isinstance(max_replans, int) or max_replans < 0:
+                max_replans = _load_max_replans_from_config()
+            notify_task['max_replans'] = max_replans
+            reason = marker_decision.get('intent_kwargs', {}).get('reason', '')
+            # C-2 review fix: when the underlying marker was REVIEW_REVISION
+            # (auto_promoted or budget_exhausted), the `reason` text built by
+            # mrh.build_auto_promote_reason / build_budget_exhausted_reason is
+            # PROCEDURAL framing ("Mirror emitted REVISION with low confidence
+            # ... auto-promoted to ESCALATE"), not semantic finding content.
+            # Beacon's level-3 discipline gate compares her summary tokens
+            # against `mirror_escalate_reason` — without finding text, her
+            # good-faith replan summary will always fail. Augment the reason
+            # with finding descriptions so the gate has semantic signal.
+            payload = marker_decision.get('payload') or {}
+            if (
+                (marker_decision.get('auto_promoted')
+                 or marker_decision.get('budget_exhausted'))
+                and isinstance(payload.get('findings'), list)
+            ):
+                finding_descs = []
+                for f in payload['findings']:
+                    if isinstance(f, dict) and f.get('description'):
+                        finding_descs.append(str(f['description']))
+                if finding_descs:
+                    reason = (
+                        f'{reason} Findings: ' + ' | '.join(finding_descs)
+                    )
+            if reason:
+                notify_task['mirror_escalate_reason'] = reason
 
         notify_filename = f'notify-{outbox_file.stem}.json'
         try:

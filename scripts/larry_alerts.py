@@ -188,6 +188,58 @@ def append_notification(
     return True
 
 
+# ---------- approval-request writer (D3.5 5c: Beacon's auto-replan path) ----------
+
+
+def append_approval_request(
+    chat_id: int,
+    approval_id: str,
+    body: str,
+    source: str = 'outbox-notifier',
+) -> bool:
+    """Append one approval-request record (Beacon-replan path).
+
+    Different shape from `append_alert` and `append_notification`:
+
+    1. **No cooldown gating.** Each replan is 1:1 with a task; suppressing
+       would silently drop the auto-replan's approval prompt.
+    2. **Targeted to a specific chat_id** (same as notifications) — the
+       bot DMs only the originating thread.
+    3. **Carries `approval_id` + `body`** — `approval_id` is the pending-
+       approvals entry key (the bot looks it up to render the latest
+       formatted prompt + reminder schedule + dispatch on approve); `body`
+       is the pre-rendered fallback if the entry has been resolved before
+       the bot polls (race protection — degrade to "stale approval-request
+       record" rather than crashing the daemon).
+
+    Used by `outbox_notifier._route_beacon_replan_approval` when the
+    notifier extracts Beacon's auto-replan APPROVAL_REQUEST from her
+    outbox and the trust policy says `force_ask`. The bot's existing
+    chat-mode APPROVAL_REQUEST path (`_send_beacon_response` in
+    `beacon_telegram_bot.py`) is unchanged — that handles markers Beacon
+    emits in chat replies; this handles markers she emits via the inbox-
+    watcher dispatch.
+
+    Returns True on successful append, False on failure. Never raises —
+    callers fire-and-forget.
+    """
+    record = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'source': source,
+        'kind': 'approval_request',
+        'approval_id': approval_id,
+        'chat_id': chat_id,
+        'body': body,
+    }
+    try:
+        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+    except OSError:
+        return False
+    return True
+
+
 # ---------- reader side (bot owns this) ----------
 
 
@@ -251,11 +303,19 @@ _NOTIFICATION_INTENT_EMOJI = {
 
 
 def format_dm(record: dict) -> str:
-    """Render an alert OR notification for Telegram DM. Stable format the bot uses.
+    """Render an alert OR notification OR approval-request for Telegram DM.
 
-    Notifications (kind=notification) render as `<emoji> <message>` with the
-    emoji chosen by intent. Alerts render with source + subject + severity
-    emoji + message + optional suggested-action.
+    Three record shapes share this file:
+
+    - Alerts (`kind: "alert"` or missing) — render with source + subject +
+      severity emoji + message + optional suggested-action.
+    - Notifications (`kind: "notification"`) — render as `<emoji> <message>`
+      with the emoji chosen by intent.
+    - Approval requests (`kind: "approval_request"`, D3.5 5c) — render is
+      done by the BOT (it looks up the pending-approvals entry by
+      `approval_id` and calls `approval.format_approval_dm`). This function
+      returns the pre-rendered `body` as a fallback for the race where the
+      entry has been resolved between append and read.
     """
     if record.get('_malformed'):
         return f'⚠ Bad alert in queue (skipped): {record.get("raw", "")!r}'
@@ -264,6 +324,11 @@ def format_dm(record: dict) -> str:
         intent = record.get('intent', '?')
         emoji = _NOTIFICATION_INTENT_EMOJI.get(intent, '📬')
         return f'{emoji} {record.get("message", "")}'
+    # Approval-request rendering (D3.5 5c). Bot reads `approval_id` to find
+    # the pending entry and render via approval.format_approval_dm; this is
+    # the degraded-fallback path (entry vanished between append and read).
+    if record.get('kind') == 'approval_request':
+        return record.get('body', '🪔 (approval request — entry not found)')
     # Alert rendering (existing — D3.5-prep).
     severity = record.get('severity', 'warning')
     emoji = '🚨' if severity == 'critical' else '⚠'
