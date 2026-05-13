@@ -1160,6 +1160,142 @@ Plus several minor refactors: `outbox-notifier-result` source renamed to `outbox
 
 **Next:** Commit 4b (D3-forge-build) — `worktree_manager.py` module, watcher worktree-wire-up, `routing_validator.check_target_repo`, `agent-models.json` `worktree_enabled: true` + `allowed_repos`, Forge CLAUDE.md build-phase content, `cleanup_stale_worktrees.py` + systemd timer, live test on `watchdog-doc-fix-001` (the doc cleanup task Beacon already planned during D3-approval smoke). Plus commit 5 (D3-sentinel) wrapping `dispatch_sentinel.py` as a systemd timer and enabling the watchdog timer as the same commit's live test.
 
+## Phase D3 (commit 4b of 5) — worktree machinery + build-phase dispatch + cleanup timer (2026-05-12, single afternoon, ~$2.50 across two live smokes)
+
+**Status entering this entry:** 5 of 5 D3 commits' worth of code in tree (4b + a 4b followup); commit 5 (sentinel timer install) remains. Forge now actually writes code to a real repo via the full preflight → PROCEED → build → `gh pr create` chain, in keyed-reuse worktrees, with `--resume` carrying the preflight session into build. Two real PRs opened against `ourliberty-agent-core` during the live smokes.
+
+**Design pre-session** (covered in conversation; for the record): the 4b state-summary surfaced seven architectural calls that were already pre-decided in 4a's design session, plus five open questions that 4b needed to resolve. Larry signed off on the recommendations after a single round of classification per the feedback memory:
+
+- **Q1 VALUES** — Where does the build-phase re-dispatch get written from? **Outbox notifier** (extends the ack-proceed handler), not Beacon (would add a hop), not the watcher (mixes concerns). Larry's autonomy-vs-ceremony dial: once Beacon's spec is approved upstream, Forge's PROCEED is self-attesting; no double-approval.
+- **Q2 ARCHITECTURAL** — Canonical repo for `git worktree add`. **Treat `~/agent-core` itself as the canonical** rather than cloning into `~/agent-repos/<repo>/`. Single source of truth; worktrees go to `/tmp` so the canonical's working tree stays clean. Flagged the multi-repo expansion (when `allowed_repos` grows) as a future iteration.
+- **Q3 TECHNICAL** — Branch hint source. **Read from `task['branch']` envelope field**, not from `Branch hint:` regex on the prompt. Envelope is the contract.
+- **Q4 TECHNICAL** — `gh pr create` invocation locus. **Forge runs it herself** as the final step of her build phase; infra just ensures `gh` is in the worktree's env (already authed as `Larry-Yatch` with `repo` + `workflow` scopes).
+- **Q5 TECHNICAL** — `worktree_manager.py` module surface. **New module purely additive**; existing `agent_runner.create_worktree_for_task` + `setup_branch_checkpoint` left alone (their `agent_id == 'main'` codepath is unused by Larry but kept). Don't refactor working code; minimize change risk.
+
+### D3-forge-4b (`111b712`) — worktree machinery + build-phase dispatch + cleanup timer (LIVE)
+
+**Shipped** (13 files, +1812 / -10 lines, 46 new tests):
+
+**New (5 files):**
+
+1. **`scripts/worktree_manager.py`** (new, 370 lines) — keyed-reuse worktree manager. Combines two upstream patterns: `agent_runner.create_worktree_for_task` (mechanics: `git worktree add --detach`, /tmp base, stem sanitization) + `merge_gates._ensure_pr_worktree` (reuse-if-exists keyed by stable identifier, tear-down-if-stale). Public API:
+   - `ensure_worktree_for_task(agent_id, task_id, canonical_repo, branch=None, log_fn=None)` — high-level entry called from `inbox_watcher.process_task`. Returns `(worktree_path, branch_set_or_None)`. Idempotent on the same `task_id`.
+   - `create_or_reuse_worktree_for_task` — handles four cases: both on-disk and registered (reuse); only on-disk (stale, remove + recreate); only registered (orphan, prune + recreate); neither (fetch + create).
+   - `setup_branch_checkpoint` — `checkout -B → empty WIP commit → push -u origin` with `--force-with-lease` fallback. 4b review fix: skips the empty commit when HEAD subject already matches `[WIP][session-start] <task_id>` so re-dispatches don't stack empty commits.
+   - `worktree_path_for(agent_id, task_id)` — deterministic path `/tmp/wt-<agent>-<task_id>/` (no timestamp; reuse-keyed by task_id per the merge_gates pattern, NOT the agent_runner per-dispatch-fresh pattern).
+2. **`scripts/cleanup_stale_worktrees.py`** (new, 165 lines) — port from upstream's 123-line `gm-agent-core` script (Gap 10 closed). Adaptations: paths joe→larry, `CANONICAL_REPOS` list (so multi-repo expansion is one-line when `allowed_repos` grows). 4b review fix: skips worktrees referenced by `~/agents/state/in-flight/` so a long Read-heavy build (no mtime touch) isn't reaped mid-flight. Daily timer (`OnUnitActiveSec=1d`, `Persistent=true`), first run on `enable --now` was a clean no-op (`Removed: 0, Kept: 1` for the canonical itself).
+3. **`scripts/tests/test_worktree_manager.py`** (new, 17 tests) — ephemeral git origin + canonical fixtures for real-op coverage. Covers: path sanitization, deterministic keying, fresh-create, reuse, stale-dir cleanup, orphan-registry pruning, branch checkpoint push (with `receive.denyCurrentBranch=updateInstead` on origin), bad-branch return, missing-worktree return, idempotent `ensure_worktree_for_task`.
+4. **`systemd/ourliberty-cleanup-stale-worktrees.service` + `.timer`** (new) — installed at `/etc/systemd/system/`, enabled. `User=larry`, `Type=oneshot`, `EnvironmentFile=/home/larry/credentials/.env.larry`. `systemd-analyze verify` clean.
+
+**Modified (8 files):**
+
+5. **`scripts/inbox_watcher.py`** (+57 lines) — calls `worktree_manager.ensure_worktree_for_task` when `models_config[agent].worktree_enabled`. Threads `session_id` from envelope to `agent_runner.run_claude` for `--resume`, but **only when `task.phase == 'build'`** (intentional conservative gate — 4a's `notify_task['session_id']` propagation sets the SENDER's session on receiver tasks, which would resume the wrong agent's conversation; gating to `phase=build` matches the one supported continuation case). New `CANONICAL_REPO_PATHS` map (`ourliberty-agent-core` → `~/agent-core`). `check_target_repo` defense-in-depth call. Skips identity-assertion preamble on `--resume`. `_build_outbox` now propagates `branch` + `pr_title` + `pr_body` envelope fields (4b review fix — Beacon's PR title would otherwise drop at the preflight→outbox→build boundary).
+6. **`scripts/outbox_notifier.py`** (+125 lines) — three extensions:
+   - `_classify_forge_marker` asserts `marker.task_id == envelope.task_id`, raising `MalformedForgeMarker` on mismatch (the 4a smoke caught a drift here; tightens discipline).
+   - New `_dispatch_build_phase(data)` helper — fires after the ack-proceed notify-to-Beacon when `marker_type == 'proceed'`. Writes `build-<task_id>.json` to Forge's inbox with `phase=build`, `source=beacon`, `session_id=<preflight session>`, `dispatched_by=outbox-notifier`. Propagates target_repo, branch, pr_title, pr_body, max_clarifications. Idempotent on existing file (4b review fix: guards against notifier-crash-restart double-dispatch).
+   - `_notify_forge_marker_error` propagates `target_repo` + `branch` forward (4b review fix — same shape as the 4a marker-error black hole on a different code path: malformed-marker retry needs target_repo or the worktree gate refuses).
+7. **`scripts/routing_validator.py`** (+90 lines) — new `check_target_repo(target_agent, target_repo)` function, parallel to `check_hard_topology`. Reads `agent-models.json:agents.<agent>.allowed_repos` via a lazy-loaded cached config. Fails open in two cases (back-compat): `target_repo` is None/empty, or `allowed_repos` is unconfigured/empty. Fails closed when both are set and `target_repo` isn't on the allow-list.
+8. **`scripts/safe_write_inbox.py`** (+15 lines) — calls `check_target_repo` after `validate_route`; adds `target_repo` to the routing-events audit log.
+9. **`config/agent-models.json`** — Forge gets `worktree_enabled: true` + `allowed_repos: ["ourliberty-agent-core"]`. `_history` entry appended.
+10. **`agents/forge/CLAUDE.md`** (+100 lines) — new "Build phase protocol" section (worktree location, branch convention, conventional commits, `gh pr create` flow with envelope-driven `pr_title` + `pr_body` template, "start with `PR opened: <url>`" rule, "no marker block in build phase" rule). Preflight section cross-references the now-wired allow-list. Tier-rules line clarified: direct-commit-to-main only applies to ad-hoc Larry-chat work, never to inbox dispatch.
+11. **`scripts/tests/test_routing_validator.py`** (+95 lines) — new `CheckTargetRepoTest` class (9 tests).
+12. **`scripts/tests/test_outbox_notifier.py`** (+360 lines) — new `BuildPhaseDispatchTest` class (8 tests, seeded with realistic `agent-models.json` so the realistic allow-list shape is exercised, not the fail-open path). Marker task_id assertion tests (3). Marker-error propagation test (1).
+
+**Independent code review caught (and fixed in same commit) before push** — Larry asked for the same subagent assessment as 4a's review. The reviewer spent 60 seconds reading + 4 minutes critiquing across worktree lifecycle, build re-dispatch correctness, session_id gate logic, check_target_repo enforcement, marker task_id assertion, gh pr create flow, cleanup race, CLAUDE.md instructions, test coverage gaps. Found 6 real issues:
+
+1. **CRITICAL — Marker-error retry was a black hole on worktree_enabled agents.** Same shape as 4a's CRITICAL-1, different path: `_notify_forge_marker_error` wrote the retry task without `target_repo`. With Forge's `worktree_enabled: true`, the watcher rejects with `target_repo: no canonical path` and the malformed marker recovery silently dies. **Fix:** propagate `target_repo` + `branch` into the notify_task at `outbox_notifier._notify_forge_marker_error`.
+2. **CRITICAL — Beacon's `branch` / `pr_title` were dropped at build dispatch.** `_build_outbox` only propagated `target_repo`/`task_type`/etc; `branch`/`pr_title`/`pr_body` were not propagated. `_dispatch_build_phase` then read None for branch and fell back to the default — any explicit branch from Beacon's spec was silently overwritten. **Fix:** extend `_build_outbox`'s envelope_field list to include those three.
+3. **MAJOR — Empty WIP commits stacked on every dispatch.** `setup_branch_checkpoint` ran `git commit --allow-empty` unconditionally; reuse across preflight + build = 2+ empty commits before any real work. **Fix:** gate the empty commit on `git log -1 --pretty=%s` matching the WIP subject.
+4. **MAJOR — Duplicate build dispatch on notifier crash-restart.** Notifier crashing between `safe_write_inbox(build_task)` and `_archive_outbox(preflight_outbox)` would re-process on restart, writing a second build task that resumes a terminated session. **Fix:** idempotency check on existing `build-<task_id>.json` in forge's inbox or archive before writing.
+5. **MAJOR — `BuildPhaseDispatchTest` didn't seed agent-models.json.** Existing tests passed via the fail-open path; the realistic prod config (`allowed_repos: ["ourliberty-agent-core"]`) was unexercised. **Fix:** seed `MODELS_CONFIG_PATH` under `rv.REPO_ROOT` in setUp; added a negative test where build dispatch with a target_repo outside the allow-list is blocked by `safe_write_inbox`.
+6. **MAJOR — Cleanup race during long Read-heavy builds.** `mtime > 24h` + daily timer + Read-heavy builds = potential mid-build worktree removal. **Fix:** cleanup loads `~/agents/state/in-flight/` task_stems and skips any worktree whose path contains a live stem.
+
+Plus minor cleanups: CLAUDE.md tier-rules line scoped (direct-commit exception only outside inbox dispatch); dead-code branch in build prompt removed.
+
+**Verified live on droplet — two smokes, total ~$2.50.**
+
+**Live test 1 — `watchdog-doc-fix-001`** (95s, $0.78, **PR #1** opened):
+
+Dispatched the same spec Beacon emitted during D3-approval smoke (archived as rejected in her pending-approvals history). Cascade ran clean through the 4b machinery:
+
+- `safe_write_inbox` with `target_repo=ourliberty-agent-core` passed allowed_repos check ✓
+- Watcher picked up; `worktree_manager.ensure_worktree_for_task` created `/tmp/wt-forge-watchdog-doc-fix-001` ✓
+- `setup_branch_checkpoint` pushed `forge/watchdog-doc-fix-001` to origin with empty WIP checkpoint ✓
+- Forge ran in `working_dir=/tmp/wt-forge-watchdog-doc-fix-001`, 95s on Opus ✓
+- Forge made the doc edit, committed (conventional-commit msg), pushed, ran `gh pr create`, returned `PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1` ✓
+- Notifier processed the outbox, wrote ack-back to Beacon's inbox ✓
+- Beacon journaled the result ✓
+- Final PR diff: 1 insertion, 1 deletion in `docs/operating-manual.md:258`; PR body has the systemctl ground-truth output and cites the D2.5 criterion. Title matches `pr_title` envelope field exactly.
+
+**Caveat:** Forge **fast-pathed preflight → build in a single invocation**. Her output went through the *default* routing path (no marker emitted) — so the build-phase re-dispatch with `--resume` did NOT fire on test 1. The CLAUDE.md preflight section says "do NOT write code in preflight, decide one of three markers"; the task `prompt` itself said "REQUIRED STEPS: 1. Capture ground truth; 2. Pick the branch; 3. Edit; ..." which Forge read as build-phase instructions. End result correct but the marker pipeline wasn't exercised end-to-end. This is a discipline / prompt-strictness concern, NOT a 4b machinery concern — the build-phase dispatch IS covered by unit tests (`BuildPhaseDispatchTest`). Tightening the preflight-phase prompt template (or adding a hard runtime check that Forge's preflight output ends with a marker) is a follow-up for Beacon's spec-emission template.
+
+**Live test 2 v1 — `pulse-cost-note-002`** (failed; cost $0.51):
+
+Deliberately ambiguous spec ("update the Pulse cost line, but here are three candidate locations") designed to force CLARIFY_REQUEST and exercise the round-trip:
+
+- Forge preflight emitted a clean `CLARIFY_REQUEST` marker ✓
+- Notifier routed forge-question → Beacon's inbox ✓
+- Beacon answered (15s, $0.11) ✓
+- Notifier routed beacon-clarification → Forge's inbox ✓
+- **Forge's watcher refused with `worktree_enabled but no canonical path for target_repo=None`** ✗
+- Notifier dead-lettered the failure back to Beacon
+
+**Root cause:** clarification cascade dropped `target_repo` at *both* notify hops. Same shape as the marker-error black hole (different code path):
+- `outbox_notifier.process_outbox` marker-decision path wrote notify-to-Beacon without `target_repo`.
+- Beacon's inbox task had no `target_repo`. `_build_outbox` (now propagating the field) had nothing to propagate.
+- Default routing path wrote notify-to-Forge without `target_repo`. Forge's watcher gate refused.
+
+**Fix (`b805578`, follow-up commit):** propagate `target_repo` + `branch` + `pr_title` + `pr_body` into the notify_task in both `process_outbox` paths (marker-decision + default). Two new tests (`test_clarify_notify_propagates_target_repo_and_branch`, `test_clarification_answer_leg_propagates_target_repo_and_branch`) cover both legs. 235 tests pass (was 233 after 4b).
+
+**Live test 2 v2 — `pulse-cost-note-003`** (success; $1.21, **PR #2** opened):
+
+After the follow-up fix, re-ran with a new task_id. This time Forge picked PROCEED directly (concluded Section 10 of Part I was the clear single target despite the candidate-list framing). So the round-trip-via-CLARIFY didn't fire, but the 4b NEW machinery did, end-to-end:
+
+- Preflight (`950c0d77...`) emitted PROCEED marker ✓
+- Notifier marker-decision: ack-proceed notify to Beacon ✓
+- Notifier `_dispatch_build_phase`: build-phase task to Forge's inbox with `phase=build`, `session_id=950c0d77...` ✓
+- Watcher picked up build task, `worktree_manager` **reused the existing worktree** (`reusing worktree /tmp/wt-forge-pulse-cost-note-003`) ✓ — the keyed-reuse pattern WORKS in live traffic
+- Forge resumed under `--resume=950c0d77...`, ran 40s ✓ — `--resume` plumbing WORKS in live traffic
+- Forge committed, pushed, ran `gh pr create`, returned `PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/2` ✓
+- Final PR diff: 2 insertions, 2 deletions in `docs/operating-manual.md` Section 10 (cost line + monthly total).
+
+The clarification round-trip target_repo propagation is now covered by the new unit tests; live coverage of that specific path is still pending (Forge keeps deciding PROCEED on doc-only specs). A future spec genuinely needing clarification will exercise it.
+
+**Discovered architectural concern — systemd `PrivateTmp` namespace.** Investigating why `/tmp/wt-forge-watchdog-doc-fix-001/` wasn't visible from host shell after test 1 surfaced this: `ourliberty-inbox-watcher.service` and `ourliberty-outbox-notifier.service` have `PrivateTmp=yes` (existing security hardening). Each service gets its own `/tmp` namespace via `systemd-private-<id>-<service>-<rand>`. Implications:
+
+- The watcher creates `/tmp/wt-*` in its PRIVATE /tmp. Visible to its subprocesses (good — Forge can use the worktree). NOT visible to the cleanup-service (also has its own private /tmp) or to host shell.
+- `cleanup_stale_worktrees.service` was installed with default `PrivateTmp=no` so it sees host /tmp — which never has the worktrees. **Today's cleanup script can't actually reach the worktrees it's supposed to clean.**
+- On watcher *restart*, the old private /tmp gets destroyed by systemd. Any in-flight worktrees are *gone*. Cross-restart task continuity (a load-bearing assumption of `task_id`-keyed reuse) is broken in production.
+- Private /tmp is tmpfs (memory-backed). Worktrees accumulate in RAM over the service lifetime. After hundreds of dispatches, multi-GB of RAM goes to stale worktrees.
+
+**This is a real follow-up that should ship before scaling Forge dispatches.** The architectural decision "worktree path = `/tmp/wt-<agent>-<task_id>/`" was signed off pre-implementation; the `PrivateTmp` namespace effect wasn't surfaced in design review. Fix options:
+
+- (A) Move worktree base from `/tmp` to `~/agent-worktrees/` (persistent, visible across services, no namespace isolation). Requires WORKTREE_BASE change in `worktree_manager.py` + `CANONICAL_REPOS` change in `cleanup_stale_worktrees.py` + Forge CLAUDE.md path mentions.
+- (B) Disable `PrivateTmp` on the inbox-watcher and outbox-notifier services. Looser sandbox; the existing 4-agent OS already has wide filesystem access via `ReadWritePaths`, so the marginal hardening from PrivateTmp is small.
+- (C) Configure `BindPaths=/tmp/wt-*` or similar so the worktree subtree is shared across the services + cleanup service. Finickier systemd config; bind paths are static (no wildcards) so this likely means a single dedicated dir like `/var/lib/ourliberty-worktrees/` shared via BindPaths.
+
+Recommend (A) — cleanest, most explicit, and reading "worktrees live with the agents" matches the operating model. Defer to Larry's call (architectural).
+
+**Codified conventions worth recalling:**
+
+1. **Worktrees are keyed by task_id, not per-dispatch-fresh.** Multi-dispatch tasks (preflight → CLARIFY → answer → re-preflight → build) hit the same worktree under `--resume`. The mtime-touch on reuse + the in-flight registry are both needed to keep cleanup from racing the work.
+2. **Envelope fields must propagate through every hop in a cascade.** target_repo, branch, pr_title, pr_body, clarification budget, marker_error_count, original_source — anything the downstream needs survives by being explicitly listed in `_build_outbox`'s propagation set AND in `notify_task` construction in `outbox_notifier`. The 4b review caught two of these; test 2 caught a third. Default is "drop", which means every new envelope field is a new opportunity for a black-hole bug. A unit test per propagation hop is cheap insurance.
+3. **`session_id` propagation is dangerous.** A claude session belongs to ONE agent. Notify tasks carry `claude_session_id` for telemetry, but blindly threading it through to `agent_runner.run_claude` would resume the WRONG agent's conversation. Gate consumption on a phase-marker like `phase=build` and document the gate explicitly.
+4. **Forge's preflight discipline is prompt-shaped, not code-shaped.** Strong "REQUIRED STEPS"-style imperatives in the task prompt can override the phase=preflight envelope flag. If we want hard discipline, either (a) tighten Beacon's spec-emission template so preflight prompts say "DECIDE, do not act", or (b) add a runtime check that Forge's preflight output ends with a marker (and dead-letter back if not). Today we have neither; relying on CLAUDE.md guidance + spec discipline.
+5. **systemd PrivateTmp interacts with shared-state via /tmp.** When designing infrastructure that uses /tmp as a coordination point across services, audit the unit files for `PrivateTmp=yes` first. The 4a/4b reviewers didn't catch this; only the live smoke surfaced it.
+
+**Open issues entering commit 5:**
+
+- **systemd PrivateTmp / worktree location** — see "Discovered architectural concern" above. Architectural call needed before commit 5's live test.
+- **Forge preflight discipline** — test 1's fast-path bypassed the marker pipeline; live coverage of preflight→build separation is via test 2 v2 only. Consider tightening Beacon's prompt template or adding a runtime marker-required check.
+- **PR #1 + PR #2 are open against `ourliberty-agent-core` `main`.** Larry to review + merge (or close). They're the live-smoke output, both substantively correct, but no Mirror review yet (D3.5 hasn't landed). The watchdog PR is "doc-only" and aligned with the spec; the Pulse-cost PR has small arithmetic in the body that's worth eyeballing.
+- **CLARIFY round-trip not exercised live.** Unit tests cover the propagation fix; live coverage waits for a spec that Forge actually finds ambiguous.
+- **`DeprecationWarning` in `cleanup_stale_worktrees.py`** — uses `datetime.utcnow()` (deprecated in 3.12+). Inherited from upstream; trivial fix to `datetime.now(timezone.utc)`. Not blocking.
+- **Commit 5 (D3-sentinel)** still ahead — `dispatch_sentinel.py` systemd timer + enabling the `ourliberty-watchdog.timer` as the same commit's live test. The watchdog unit isn't even installed yet (`is-enabled` returns `not-found`); commit 5 installs and enables it.
+
+**Next:** Commit 5 (D3-sentinel) — install `dispatch_sentinel.py` as a systemd timer (every 10 min), install `ourliberty-watchdog.timer` so the system has a stall-detection layer + an inbox-age watchdog. The live test is the watchdog itself: drop a synthetic task into an inbox, kill the watcher, verify the watchdog catches the stall after the configured age. Plus the systemd PrivateTmp follow-up (depending on Larry's call).
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
+
