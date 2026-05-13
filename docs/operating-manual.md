@@ -694,7 +694,7 @@ The future **Ledger** agent (Phase F+) will roll this up into weekly summaries a
 
 - **Where:** [console.anthropic.com](https://console.anthropic.com) → Usage
 - **Currently using:** Larry's personal Claude Max OAuth on the droplet. Quota is per Max account. Both the Telegram bots and the inbox watcher share this auth.
-- **Cycle baseline:** ~$0.84 / cycle on Sonnet 4.6 → ~$5/day at the current 4h cadence → ~$150/mo. Inbox-dispatched tasks add to this proportional to volume.
+- **Cycle baseline:** ~$0.10 / cycle on Sonnet at the current 4h cadence → ~$0.60/day → ~$18/mo. Inbox-dispatched tasks add to this proportional to volume.
 - **Open follow-up:** dedicated agent-only Max account so Larry's personal Claude Code doesn't share quota with the droplet bots.
 
 ### DigitalOcean
@@ -711,7 +711,7 @@ The future **Ledger** agent (Phase F+) will roll this up into weekly summaries a
 
 - Free.
 
-### Total expected monthly: ~$58 droplet + ~$150 Anthropic (cycles) + whatever inbox dispatches cost. Currently ~$210/mo all-in.
+### Total expected monthly: ~$58 droplet + ~$18 Anthropic (cycles) + whatever inbox dispatches cost. Currently ~$76/mo all-in.
 
 ---
 
