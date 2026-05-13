@@ -4,6 +4,31 @@
 
 ---
 
+## Iteration 22 — 2026-05-12 22:37 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. origin/main ref=2c66db0=HEAD. Not behind, not ahead. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-13T03:44:13Z (~50m ago at cycle start), status=no-change, commit=f97b572. Three commits landed after that sync (326748a, 9d9273f, 2c66db0 — all via Larry + PR #2); local copy already at 2c66db0=origin. No pull needed. ✅
+- **(C) Agent liveness: nominal.** All 5 units active (beacon, forge, mirror, pulse, inbox-watcher). Beacon last logged May 11 23:39 MDT (~23h) — idle Telegram false positive, confirmed. Forge last logged May 9 13:44 MDT (~3d) — idle Telegram false positive, confirmed. inbox-watcher last logged 2026-05-13T03:24Z (~1.2h ago) — recently processed forge + beacon tasks. ✅
+- **(D) Inboxes: nominal.** All inboxes empty. pulse/.invalid unchanged — same 2 files (d2-reject, d25-reject; source=larry, F24 class). Count=2; threshold=3 in 10 cycles. No new additions since iter 16. ✅
+- **(E) PRs: nominal.** Zero open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle active.** PID 100335 (bash, run_cycle.sh), elapsed ~3m at check time, lock written 22:34 MDT. Fresh (< 10 min). Normal 4h-timer run. Interactive session takes precedence per established precedent.
+- **(H) Forge digest:**
+  - **Shipped since iter 21:** PR #2 "docs/operating-manual: update Pulse cost line (Sonnet 4h cadence)" merged at 2026-05-13T04:20:10Z. ✅
+  - **Inbox tasks processed (post iter 21):** forge completed `worktree-relocation-smoke-001` (D3 worktree relocation smoke, success=True, 15s, $0.12) at 03:23Z; beacon completed `notify-worktree-relocation-smoke-001` (success=True, 20s, $0.18) at 03:24Z. Both via inbox_watcher. ✅
+  - **Open Forge PRs:** 0.
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing. All checks nominal.
+**Patterns:**
+- Dirty tree (Pulse operational writes): **CLOSED**. 7th consecutive clean cycle (iters 16–22). Fix `6b6284a` holding. ✅
+- Sync blocked: **CLOSED**. 7th consecutive successful sync. ✅
+- Invalid pulse inbox dispatches: 2 total, no new additions (iters 16–22). Still watching; 2/10, threshold=3.
+**Learned:** Post-iter-21 activity confirms end-to-end pipeline health: Forge inbox task (`worktree-relocation-smoke-001`) processed + Beacon notified, all via inbox_watcher, all success. PR #2 (Forge docs update) merged cleanly. System active and functional between interactive cycles — not just passing health checks.
+
+---
+
 ## Iteration 21 — 2026-05-12 18:35 MDT
 
 **Health:** ✅ Nominal

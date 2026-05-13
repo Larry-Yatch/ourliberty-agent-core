@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-12 (Iteration 21)
+## Status snapshot — updated 2026-05-12 (Iteration 22)
 
-Twenty-one cycles run. **System nominal — 6th consecutive clean cycle (iters 16–21).** Dirty-tree and sync-blocked patterns remain CLOSED (fix `6b6284a` holding). D3 Phase commits (Forge preflight markers + smoke verification, bd086e3 → 97cca9d) deployed to VM via successful sync at 23:43:21Z. First beacon inbox task processed end-to-end by inbox_watcher (notify-smoke-4a-001, success=True, 25s, $0.20, at 22:55Z). All 5 systemd units active. Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — no new additions). Watching; 2/10, threshold=3.
+Twenty-two cycles run. **System nominal — 7th consecutive clean cycle (iters 16–22).** Dirty-tree and sync-blocked patterns remain CLOSED (fix `6b6284a` holding). Post-iter-21 pipeline activity confirmed: Forge inbox task `worktree-relocation-smoke-001` (D3 worktree relocation smoke, $0.12) + Beacon notify task (D3 result notification, $0.18) both processed successfully by inbox_watcher at 03:23–03:24Z. PR #2 merged at 04:20Z (Forge docs: Pulse cost line update). All 5 systemd units active. Two invalid pulse inbox dispatches in pulse/.invalid/ (source=larry, F24 class — no new additions). Watching; 2/10, threshold=3.
 
 ## Known calibration issues
 
