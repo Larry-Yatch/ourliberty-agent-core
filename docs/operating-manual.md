@@ -1535,6 +1535,8 @@ Test 4's first run + the synthetic test overflow created 5 stale branches on ori
 
 ## Phase D3.5 commit 5b — Forge↔Mirror revision loop (2026-05-13, ~3 hours, live verification TBD)
 
+Status: Shipped 2026-05-13.
+
 Closes the second sub-commit of D3.5. Mirror's REVIEW_REVISION marker now auto-dispatches a `phase=revision` task back to Forge under `--resume` against her build session, with findings serialized in the prompt. Forge applies the findings, commits + pushes to the same branch (PR auto-updates), emits a `Revision N applied:` preamble — the notifier detects it and auto-dispatches a fresh re-review to Mirror with `revision_count` incremented. Loop continues until Mirror emits PASS, or until `max_revisions` (currently 3 in `loop_bounds`) is exhausted — at which point Mirror's next REVIEW_REVISION downgrades to ESCALATE-shaped routing, Beacon journals, and Larry gets a Telegram DM via the 5a-followup auto-DM pipe.
 
 In **5b** the full Forge↔Mirror chain is closed. Beacon's replan flow on ESCALATE (5c) and auto-merge on PASS (5d) remain forward-compat-only.
