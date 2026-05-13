@@ -1,0 +1,18 @@
+[Unit]
+Description=Self-healing healer — clean up stale /tmp/wt-* worktrees older than 24h
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/cleanup_stale_worktrees.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/cleanup_stale_worktrees.py
+TimeoutStartSec=300
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-cleanup-stale-worktrees

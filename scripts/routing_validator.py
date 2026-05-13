@@ -32,6 +32,7 @@ Usage (library mode):
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from pathlib import Path
@@ -170,6 +171,79 @@ def invalidate_cache(agent_id: Optional[str] = None) -> None:
             IDENTITY_CACHE.clear()
         else:
             IDENTITY_CACHE.pop(agent_id, None)
+
+
+# ---- Repo-scope check (Phase D3 commit 4b — allowed_repos enforcement) ----
+
+# agent-models.json lives under <repo_root>/config/. We lazy-load it the
+# first time check_target_repo fires and cache it; tests call
+# invalidate_models_cache() between runs.
+MODELS_CONFIG_PATH = REPO_ROOT / 'config' / 'agent-models.json'
+_MODELS_CACHE: dict[str, Any] = {}
+_MODELS_LOCK = threading.Lock()
+
+
+def _load_models_config() -> dict[str, Any]:
+    """Lazy-load + cache config/agent-models.json. Returns {} on any error.
+
+    Caching is intentional — this fires on every safe_write_inbox call and
+    every inbox_watcher.process_task dispatch. Tests must invalidate
+    between runs.
+    """
+    with _MODELS_LOCK:
+        if 'config' in _MODELS_CACHE:
+            return _MODELS_CACHE['config']
+        try:
+            _MODELS_CACHE['config'] = json.loads(MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            _MODELS_CACHE['config'] = {}
+        return _MODELS_CACHE['config']
+
+
+def invalidate_models_cache() -> None:
+    """Drop the cached agent-models.json. Tests use this between runs."""
+    with _MODELS_LOCK:
+        _MODELS_CACHE.pop('config', None)
+
+
+def allowed_repos_for(agent_id: str) -> list[str]:
+    """Return the agent's allowed_repos list. Empty if unconfigured."""
+    config = _load_models_config()
+    agents_block = config.get('agents', {})
+    agent_block = agents_block.get(agent_id, {})
+    raw = agent_block.get('allowed_repos')
+    if not isinstance(raw, list):
+        return []
+    return [r for r in raw if isinstance(r, str) and r]
+
+
+def check_target_repo(
+    target_agent: str,
+    target_repo: Optional[str],
+) -> tuple[bool, Optional[str]]:
+    """Verify ``target_repo`` falls within ``target_agent``'s allowed_repos.
+
+    Fails open in two cases (preserving back-compat for non-worktree agents):
+
+      - ``target_repo`` is None or empty (most pre-D3-forge tasks).
+      - The target agent has no ``allowed_repos`` configured.
+
+    Fails closed only when ``target_repo`` is set AND the target agent's
+    allow-list is configured AND ``target_repo`` is not in it.
+
+    Returns ``(ok, reason_or_None)``. Callers raise RoutingDenied on False.
+    """
+    if not target_repo:
+        return True, None
+    allowed = allowed_repos_for(target_agent)
+    if not allowed:
+        return True, None
+    if target_repo not in allowed:
+        return False, (
+            f'target_repo "{target_repo}" not in allowed_repos for '
+            f'{target_agent} (allowed: {sorted(allowed)})'
+        )
+    return True, None
 
 
 def classify_task_type(prompt: str) -> Optional[str]:

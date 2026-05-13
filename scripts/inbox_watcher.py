@@ -39,6 +39,7 @@ import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 import routing_validator  # noqa: E402
+import worktree_manager  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = HOME / "agents"
@@ -58,6 +59,17 @@ POLL_INTERVAL_SEC = 5
 DEFAULT_TIMEOUT_SEC = 14400  # 4h; matches HANDSHAKE-SCHEMA default
 FALLBACK_MODEL = "claude-sonnet-4-6"
 REQUEUE_MAX = 3
+
+# Phase D3 commit 4b: logical target_repo name → canonical filesystem path.
+# Worktrees are spawned via `git worktree add` from the canonical. The agent's
+# `allowed_repos` (in agent-models.json) gates which logical names may be
+# targeted; this map resolves them to disk paths at dispatch time.
+#
+# TODO: when allowed_repos grows beyond one entry, surface this in
+# config/agent-models.json under a top-level "repo_paths" block.
+CANONICAL_REPO_PATHS: dict[str, Path] = {
+    "ourliberty-agent-core": HOME / "agent-core",
+}
 
 _shutdown = threading.Event()
 
@@ -274,9 +286,15 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
     # selection) without re-reading the (already-archived) inbox task file.
     # `original_source` + `marker_error_count` survive across the marker-error
     # cascade so a recovered marker still routes back to the right dispatcher.
+    # Phase D3 commit 4b: also propagate the build-phase metadata fields
+    # (branch, pr_title, pr_body) that Beacon sets on her APPROVAL_REQUEST
+    # dispatch. Without these in the outbox, _dispatch_build_phase in the
+    # notifier reads None for branch and falls back to derive_branch_name —
+    # any explicit branch from Beacon's spec gets silently overwritten.
     for envelope_field in ('clarification_count', 'max_clarifications',
                            'phase', 'target_repo', 'task_type',
-                           'original_source', 'marker_error_count'):
+                           'original_source', 'marker_error_count',
+                           'branch', 'pr_title', 'pr_body'):
         if task.get(envelope_field) is not None:
             outbox[envelope_field] = task[envelope_field]
     if error:
@@ -309,27 +327,103 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         write_invalid(task_file, f"routing: {route_reason}")
         return
 
+    # Phase D3 commit 4b — defense in depth: re-check target_repo scope.
+    # safe_write_inbox enforces this at write time; this catches manual drops.
+    repo_ok, repo_reason = routing_validator.check_target_repo(
+        agent, task.get("target_repo"),
+    )
+    if not repo_ok:
+        log(f"[{agent}] target_repo denied for {task_file.name}: {repo_reason}")
+        write_invalid(task_file, f"target_repo: {repo_reason}")
+        return
+
     task_id = task.get("task_id") or task_file.stem
     model = resolve_model(agent, task, models_config)
     timeout = task.get("timeout") or DEFAULT_TIMEOUT_SEC
+    # Only consume session_id when the dispatcher explicitly opted into a
+    # --resume continuation. Phase D3 commit 4b wires preflight→build as
+    # the one supported case (build task carries the preflight session_id).
+    # Other notify paths in outbox_notifier may carry claude_session_id
+    # for telemetry, but those sessions belong to the SENDER not the
+    # target, so consuming them blindly would resume the wrong agent's
+    # conversation. A future commit may widen this gate when Forge's
+    # session_id is propagated through Beacon's clarification round-trip.
+    resume_session_id = (
+        task.get("session_id") if task.get("phase") == "build" else None
+    )
 
     # Identity-assertion preamble (Phase D2.5 Call A: on by default).
     # expected_agent is implicit from inbox path (Call B). The preamble is
     # idempotent — agent_runner skips it if the marker is already present.
+    # Skipped on --resume because identity was established on the original
+    # invocation and re-asserting it on every resumed turn is noise.
     expected_agent = agent
     base_prompt = task["prompt"]
-    if agent_runner.IDENTITY_ASSERTION_MARKER not in base_prompt:
+    if (
+        not resume_session_id
+        and agent_runner.IDENTITY_ASSERTION_MARKER not in base_prompt
+    ):
         prompt = agent_runner.build_expected_agent_assertion(expected_agent) + base_prompt
     else:
         prompt = base_prompt
 
-    log(f"[{agent}] start task={task_id} model={model} timeout={timeout}s")
+    # Phase D3 commit 4b: per-agent worktree creation. For agents with
+    # worktree_enabled in agent-models.json, dispatch happens inside a
+    # /tmp/wt-<agent>-<task_id>/ worktree keyed by task_id so multi-dispatch
+    # tasks (preflight → CLARIFY → build under --resume) hit the same
+    # worktree across all dispatches. The branch checkpoint is set up on
+    # origin with an empty WIP commit so a session that times out mid-build
+    # still has the branch reachable for resume.
+    agents_block = models_config.get("agents", {})
+    agent_block = agents_block.get(agent, {})
+    working_dir = str(AGENTS_DIR / agent)
+    if agent_block.get("worktree_enabled"):
+        target_repo = task.get("target_repo")
+        canonical_path = (
+            CANONICAL_REPO_PATHS.get(target_repo) if target_repo else None
+        )
+        if canonical_path is None:
+            log(
+                f"[{agent}] worktree_enabled but no canonical path for "
+                f"target_repo={target_repo!r} on {task_file.name}; refusing"
+            )
+            write_invalid(
+                task_file,
+                f"worktree: no canonical path for target_repo={target_repo!r}",
+            )
+            return
+        branch = task.get("branch") or worktree_manager.derive_branch_name(
+            agent, task_id,
+        )
+        wt_path, wt_branch = worktree_manager.ensure_worktree_for_task(
+            agent_id=agent,
+            task_id=task_id,
+            canonical_repo=canonical_path,
+            branch=branch,
+            log_fn=lambda m: log(f"[{agent}] worktree: {m}"),
+        )
+        if wt_path is None:
+            log(
+                f"[{agent}] WORKTREE FAILED for {task_file.name}; "
+                f"bumping requeue, leaving task in inbox"
+            )
+            bump_requeue(task_file, task)
+            return
+        working_dir = str(wt_path)
+        log(
+            f"[{agent}] worktree ready: {wt_path} "
+            f"(branch={wt_branch}, target_repo={target_repo})"
+        )
+
+    log(f"[{agent}] start task={task_id} model={model} timeout={timeout}s"
+        + (f" resume={resume_session_id[:12]}..." if resume_session_id else ""))
     meta: dict = {}
     try:
         success, output_text, session_id = agent_runner.run_claude(
             agent_id=agent,
             prompt=prompt,
-            working_dir=str(AGENTS_DIR / agent),
+            working_dir=working_dir,
+            session_id=resume_session_id,
             timeout=timeout,
             context="inbox",
             model_override=model,

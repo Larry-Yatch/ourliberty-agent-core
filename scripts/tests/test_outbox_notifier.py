@@ -802,6 +802,26 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         self.assertIn('could not be parsed', data['prompt'])
         self.assertIn('invalid JSON', data['prompt'])
 
+    def test_marker_error_propagates_target_repo_and_branch(self):
+        """4b review fix: malformed-marker retry must carry target_repo/branch
+        forward or Forge's `worktree_enabled` watcher will reject the retry."""
+        marker = '=== PROCEED ===\n{bad json}\n=== END_PROCEED ==='
+        outbox = self._forge_outbox(
+            marker,
+            target_repo='ourliberty-agent-core',
+            branch='forge/watchdog-fix-001',
+        )
+        f = self._write_outbox('forge', 't-pf-bad-fields.json', outbox)
+        on.process_outbox(f)
+
+        marker_errors = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(marker_errors), 1)
+        data = json.loads(marker_errors[0].read_text())
+        self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(data['branch'], 'forge/watchdog-fix-001')
+
     def test_marker_error_recovered_marker_routes_via_original_source(self):
         """The C1 fix: after a malformed marker, Forge's recovered output has
         source=outbox-notifier (infra), but original_source=beacon propagates
@@ -1117,6 +1137,322 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
         self.assertEqual(decision['notify_source'], 'forge-result')
         # The reason carries the question text for context
         self.assertIn('Last Q?', decision['intent_kwargs']['reason'])
+
+    def test_marker_task_id_mismatch_raises_malformed(self):
+        # 4b discipline: marker.task_id MUST match envelope.task_id.
+        # The 4a smoke caught a drift where Forge emitted a different id;
+        # 4b raises MalformedForgeMarker so the cascade re-asks Forge.
+        result = (
+            '=== PROCEED ===\n'
+            '{"task_id": "drifted-id", "preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        with self.assertRaises(on.fph.MalformedForgeMarker) as cm:
+            on._classify_forge_marker({
+                'agent': 'forge', 'result': result, 'task_id': 'envelope-id',
+            })
+        self.assertIn('drifted-id', str(cm.exception))
+        self.assertIn('envelope-id', str(cm.exception))
+
+    def test_marker_task_id_match_succeeds(self):
+        result = (
+            '=== PROCEED ===\n'
+            '{"task_id": "matched", "preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        decision = on._classify_forge_marker({
+            'agent': 'forge', 'result': result, 'task_id': 'matched',
+        })
+        self.assertEqual(decision['marker_type'], 'proceed')
+
+    def test_marker_without_task_id_field_passes(self):
+        # Marker payload may legitimately omit task_id (CLARIFY_REQUEST with
+        # only a "question" field would be invalid per the schema, but the
+        # mismatch check is permissive when the marker side is absent).
+        result = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "matched", "question": "Q?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        # Envelope has no task_id — mismatch check is skipped.
+        decision = on._classify_forge_marker({
+            'agent': 'forge', 'result': result,
+            'clarification_count': 0, 'max_clarifications': 3,
+        })
+        self.assertIsNotNone(decision)
+
+
+class BuildPhaseDispatchTest(unittest.TestCase):
+    """Phase D3 commit 4b: PROCEED marker → build-phase task to Forge."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        # Seed a realistic agent-models.json so check_target_repo exercises
+        # the production allow-list shape (forge: ourliberty-agent-core).
+        # Without this, the test passes via the fail-open path and misses
+        # any regression that breaks the realistic flow.
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _forge_proceed_outbox(self, **overrides):
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-pf", "preflight_summary": "Will edit watchdog doc."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-pf',
+            claude_session_id='sess-preflight-xyz',
+            result=f'Read the spec. Ready to act.\n\n{marker}',
+        )
+        outbox.update(overrides)
+        return outbox
+
+    def test_proceed_writes_build_phase_task_to_forge(self):
+        outbox = self._forge_proceed_outbox(target_repo='ourliberty-agent-core')
+        f = self._write_outbox('forge', 't-pf.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        # Beacon still gets the ack-proceed notify (existing 4a behavior).
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+
+        # New 4b: Forge ALSO gets a build-phase task.
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 1)
+        build_data = json.loads(forge_builds[0].read_text())
+        self.assertEqual(build_data['phase'], 'build')
+        self.assertEqual(build_data['source'], 'beacon')
+        self.assertEqual(build_data['session_id'], 'sess-preflight-xyz')
+        self.assertEqual(build_data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(build_data['task_id'], 't-pf')
+        self.assertEqual(build_data['dispatched_by'], 'outbox-notifier')
+        self.assertIn('Build phase', build_data['prompt'])
+
+    def test_proceed_without_session_id_skips_build_phase(self):
+        outbox = self._forge_proceed_outbox(
+            claude_session_id=None,
+            target_repo='ourliberty-agent-core',
+        )
+        f = self._write_outbox('forge', 't-pf-nosid.json', outbox)
+
+        result = on.process_outbox(f)
+        # Notify-to-Beacon still happens; build-phase dispatch skipped.
+        self.assertEqual(result, 'notified-marker')
+
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 0)
+
+    def test_proceed_with_branch_propagates_to_build_task(self):
+        outbox = self._forge_proceed_outbox(
+            target_repo='ourliberty-agent-core',
+            branch='forge/watchdog-fix-001',
+        )
+        f = self._write_outbox('forge', 't-pf-branch.json', outbox)
+
+        on.process_outbox(f)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 1)
+        build_data = json.loads(forge_builds[0].read_text())
+        self.assertEqual(build_data['branch'], 'forge/watchdog-fix-001')
+
+    def test_proceed_with_max_clarifications_propagates(self):
+        outbox = self._forge_proceed_outbox(
+            target_repo='ourliberty-agent-core',
+            max_clarifications=5,
+        )
+        f = self._write_outbox('forge', 't-pf-mc.json', outbox)
+        on.process_outbox(f)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        build_data = json.loads(forge_builds[0].read_text())
+        self.assertEqual(build_data['max_clarifications'], 5)
+
+    def test_clarify_request_does_not_trigger_build_phase(self):
+        # Only PROCEED triggers build phase. CLARIFY/REJECT do not.
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-clr", "question": "Which file?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-clr',
+            claude_session_id='sess-clr',
+            clarification_count=0, max_clarifications=3,
+            target_repo='ourliberty-agent-core',
+            result=f'Need more info.\n\n{marker}',
+        )
+        f = self._write_outbox('forge', 't-clr.json', outbox)
+
+        on.process_outbox(f)
+
+        # Beacon gets the clarify notify; Forge inbox stays empty.
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 0)
+
+    def test_reject_does_not_trigger_build_phase(self):
+        marker = (
+            '=== REJECT ===\n'
+            '{"task_id": "t-rej", "reason": "Spec impossible."}\n'
+            '=== END_REJECT ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-rej',
+            target_repo='ourliberty-agent-core',
+            result=f'Cannot proceed.\n\n{marker}',
+        )
+        f = self._write_outbox('forge', 't-rej.json', outbox)
+
+        on.process_outbox(f)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 0)
+
+    def test_marker_task_id_mismatch_dead_letters_no_build_phase(self):
+        # Forge emits PROCEED with a drifted marker task_id → marker-error
+        # cascade fires, no build-phase task gets written.
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "drifted", "preflight_summary": "x"}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='envelope-id',
+            claude_session_id='sess-1',
+            target_repo='ourliberty-agent-core',
+            result=f'Reasoning.\n\n{marker}',
+        )
+        f = self._write_outbox('forge', 'envelope-id.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 0)
+
+    def test_target_repo_outside_allow_list_blocks_build_dispatch(self):
+        # If a PROCEED outbox carries a target_repo that's NOT in forge's
+        # allowed_repos, safe_write_inbox in _dispatch_build_phase raises
+        # RoutingDenied. The notify-to-Beacon still goes through; the
+        # build-phase dispatch is logged as a failure.
+        outbox = self._forge_proceed_outbox(
+            target_repo='unauthorized-repo',
+        )
+        f = self._write_outbox('forge', 't-pf-bad-repo.json', outbox)
+
+        result = on.process_outbox(f)
+        # Notify still succeeds (target_repo doesn't gate notify writes
+        # to Beacon — Beacon has no allowed_repos).
+        self.assertEqual(result, 'notified-marker')
+
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 0)
+
+    def test_build_dispatch_idempotent_on_existing_file(self):
+        # Simulate a notifier crash + restart: the same preflight outbox
+        # is processed twice. The second pass should NOT write a duplicate
+        # build task.
+        outbox = self._forge_proceed_outbox(target_repo='ourliberty-agent-core')
+        f1 = self._write_outbox('forge', 't-pf-idem.json', outbox)
+        on.process_outbox(f1)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 1)
+
+        # Second pass — write the same preflight outbox back and process.
+        f2 = self._write_outbox('forge', 't-pf-idem.json', outbox)
+        on.process_outbox(f2)
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 1, 'duplicate build task written')
+
+    def test_pr_title_and_body_propagate_to_build_task(self):
+        outbox = self._forge_proceed_outbox(
+            target_repo='ourliberty-agent-core',
+            pr_title='fix(watchdog): clarify enabled flag in docs',
+            pr_body='## Summary\nDocumentation fix.',
+        )
+        f = self._write_outbox('forge', 't-pf-prfields.json', outbox)
+        on.process_outbox(f)
+
+        forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(forge_builds), 1)
+        build_data = json.loads(forge_builds[0].read_text())
+        self.assertEqual(
+            build_data['pr_title'],
+            'fix(watchdog): clarify enabled flag in docs',
+        )
+        self.assertEqual(build_data['pr_body'], '## Summary\nDocumentation fix.')
+        self.assertIn('PR title:', build_data['prompt'])
 
 
 if __name__ == '__main__':

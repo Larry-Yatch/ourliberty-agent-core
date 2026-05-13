@@ -21,7 +21,9 @@
       "telegram_model": "claude-sonnet-4-6",
       "inbox_model": "claude-opus-4-7",
       "fallback_model": "claude-sonnet-4-6",
-      "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake."
+      "worktree_enabled": true,
+      "allowed_repos": ["ourliberty-agent-core"],
+      "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
     },
     "mirror": {
       "name": "Mirror",
@@ -71,6 +73,11 @@
     {
       "date": "2026-05-08",
       "change": "Initial creation. Beacon/Forge/Mirror/Pulse defined; Aide/Scout/Compass placeholdered.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-12",
+      "change": "D3 commit 4b: Forge gains worktree_enabled: true + allowed_repos: [ourliberty-agent-core]. Enforced by worktree_manager (dispatch path) and routing_validator.check_target_repo (safe_write_inbox + inbox_watcher defense-in-depth).",
       "author": "Claude (via Larry's session)"
     }
   ]

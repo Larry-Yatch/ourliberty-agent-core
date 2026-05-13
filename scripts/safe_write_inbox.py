@@ -149,6 +149,16 @@ def safe_write_inbox(
         target_agent, task_dict, source_agent=source_agent,
     )
 
+    # 2b. Repo-scope check (Phase D3 commit 4b). target_repo must be in the
+    #     target agent's allowed_repos when both are present. No-op for
+    #     legacy tasks that don't carry target_repo, and for agents whose
+    #     models config doesn't declare allowed_repos.
+    repo_ok, repo_reason = routing_validator.check_target_repo(
+        final_target, task_dict.get('target_repo'),
+    )
+    if not repo_ok:
+        raise routing_validator.RoutingDenied(repo_reason or 'target_repo denied')
+
     # 3. Filename guard
     safe_name, was_truncated = _truncate_filename(filename)
 
@@ -170,6 +180,7 @@ def safe_write_inbox(
         'task_id': task_dict.get('task_id'),
         'intent': task_dict.get('intent'),
         'phase': task_dict.get('phase'),
+        'target_repo': task_dict.get('target_repo'),
     })
 
     return dest

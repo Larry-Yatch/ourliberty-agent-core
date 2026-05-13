@@ -363,6 +363,26 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     if marker_type is None:
         return None
 
+    # Phase D3 commit 4b: tighten marker discipline. Forge's marker payload
+    # MUST carry the same task_id as the envelope. The 4a smoke surfaced a
+    # drift where Forge emitted a non-matching task_id; routing happened to
+    # work via the outbox filename stem, but Forge cannot rely on that path.
+    # Raise as MalformedForgeMarker so the marker-error cascade fires and
+    # Forge re-emits with the correct task_id.
+    envelope_task_id = data.get('task_id')
+    marker_task_id = (
+        payload.get('task_id') if isinstance(payload, dict) else None
+    )
+    if (
+        envelope_task_id is not None
+        and marker_task_id is not None
+        and marker_task_id != envelope_task_id
+    ):
+        raise fph.MalformedForgeMarker(
+            f'marker task_id ({marker_task_id!r}) does not match envelope '
+            f'task_id ({envelope_task_id!r})'
+        )
+
     agent = data.get('agent', 'forge')
     if marker_type == 'clarify_request':
         decision, next_count, max_count = fph.evaluate_clarification_budget(data)
@@ -489,6 +509,15 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
         notify_task['max_clarifications'] = data['max_clarifications']
     if data.get('claude_session_id'):
         notify_task['session_id'] = data['claude_session_id']
+    # Phase D3 commit 4b: propagate target_repo + branch so the retry task
+    # passes the watcher's worktree gate. Without these, an agent with
+    # `worktree_enabled: true` (Forge) rejects the marker-error retry as
+    # `target_repo: no canonical path` and the malformed-marker recovery
+    # silently dies — same shape as the 4a marker-error black-hole bug.
+    if data.get('target_repo'):
+        notify_task['target_repo'] = data['target_repo']
+    if data.get('branch'):
+        notify_task['branch'] = data['branch']
 
     try:
         safe_write_inbox.safe_write_inbox(
@@ -580,6 +609,127 @@ def _dead_letter_marker_error_to_dispatcher(
             f'marker-error dead-letter failed for {target_agent}/{task_id}: '
             f'{type(e).__name__}: {e}',
             'ERROR',
+        )
+
+
+def _dispatch_build_phase(data: dict[str, Any]) -> None:
+    """Write a build-phase task to Forge's inbox after a PROCEED marker.
+
+    Phase D3 commit 4b. The signed-off design is two invocations with
+    ``--resume``: preflight first, then build. The notify-to-Beacon (above)
+    is informational (Beacon journals "Forge is proceeding"); this is what
+    actually triggers code work.
+
+    ``source`` is ``beacon`` because Beacon is the logical dispatcher —
+    her APPROVAL_REQUEST + Larry's approval authorized the work. The
+    notifier acts as Beacon's mechanical extension. Audit field
+    ``dispatched_by: 'outbox-notifier'`` records the actual writer.
+
+    Failure to write the build-phase task is logged WARN and non-fatal.
+    The notify-to-Beacon above has already informed her that Forge
+    ack-proceeded; Larry sees the gap in the log and can manually
+    re-dispatch.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    preflight_session = data.get('claude_session_id')
+    if not preflight_session:
+        log(
+            f'PROCEED marker for task {task_id} has no claude_session_id; '
+            f'build-phase dispatch would have nothing to --resume — '
+            f'skipping. Larry should manually re-dispatch.',
+            'WARN',
+        )
+        return
+
+    target_repo = data.get('target_repo')
+    branch = data.get('branch')
+    pr_title = data.get('pr_title')
+    pr_body = data.get('pr_body')
+    max_clar = data.get('max_clarifications')
+
+    # The build prompt is the next user turn in the resumed claude session;
+    # the actual `target_repo` value is in the worktree's git config and
+    # Forge already read it during preflight. Keep this terse — the
+    # protocol details live in agents/forge/CLAUDE.md's Build phase section.
+    build_prompt_lines = [
+        'Build phase. Your preflight returned PROCEED; the plan you '
+        'confirmed is the contract. Execute it now in this worktree.',
+        '',
+        f'Task: `{task_id}`',
+    ]
+    if branch:
+        build_prompt_lines.append(f'Branch: `{branch}`')
+    if pr_title:
+        build_prompt_lines.append(f'PR title: `{pr_title}`')
+    build_prompt_lines.extend([
+        '',
+        'Follow the Build phase protocol in your CLAUDE.md: implement '
+        'changes → git add / git commit (conventional-commit style) → '
+        'git push -u origin <branch> → gh pr create. Emit a single '
+        'result block at the end starting with `PR opened: <url>`.',
+    ])
+    build_prompt = '\n'.join(build_prompt_lines)
+
+    build_task: dict[str, Any] = {
+        'task_id': task_id,
+        'prompt': build_prompt,
+        'source': 'beacon',
+        'phase': 'build',
+        'session_id': preflight_session,
+        'dispatched_by': 'outbox-notifier',
+    }
+    if target_repo:
+        build_task['target_repo'] = target_repo
+    if branch:
+        build_task['branch'] = branch
+    if pr_title:
+        build_task['pr_title'] = pr_title
+    if pr_body:
+        build_task['pr_body'] = pr_body
+    if max_clar is not None:
+        build_task['max_clarifications'] = max_clar
+    if data.get('reply_chat_id') is not None:
+        build_task['reply_chat_id'] = data['reply_chat_id']
+
+    build_filename = f'build-{task_id}.json'
+    # Idempotency check (4b review fix): if the build task is already
+    # present in Forge's inbox OR was already archived, skip re-dispatch.
+    # Guards against the notifier crashing between dispatch and archive
+    # of the preflight outbox: on restart, re-processing the same outbox
+    # would otherwise write a second build task that would resume an
+    # already-terminated session against potentially-dirty worktree state.
+    forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+    if (
+        (forge_inbox / build_filename).exists()
+        or (forge_inbox / '.archive' / build_filename).exists()
+    ):
+        log(
+            f'build-phase already dispatched for task {task_id} '
+            f'(file or archive present); skipping duplicate write'
+        )
+        return
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='forge',
+            task_dict=build_task,
+            source_agent='beacon',
+            filename=build_filename,
+        )
+        log(
+            f'build-phase dispatched forge <- beacon '
+            f'(task={task_id}, file={dest.name}, '
+            f'resume={preflight_session[:12]}...)'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'build-phase dispatch FAILED for task {task_id}: '
+            f'{type(e).__name__}: {e}. Beacon was already notified of '
+            f'PROCEED; Larry must manually re-dispatch build phase.',
+            'WARN',
         )
 
 
@@ -688,6 +838,15 @@ def process_outbox(outbox_file: Path) -> str:
             )
             _archive_outbox(outbox_file)
             return 'notify-failed'
+
+        # Phase D3 commit 4b: PROCEED → ALSO write a build-phase task to
+        # Forge's inbox. The notify-to-Beacon above is informational
+        # (Beacon journals "Forge is proceeding"); the build-phase dispatch
+        # below is what actually triggers code work. Two-invocation
+        # preflight→build with --resume per signed-off design.
+        if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
+            _dispatch_build_phase(data)
+
         _archive_outbox(outbox_file)
         return 'notified-marker'
 

@@ -25,7 +25,7 @@ You run under Claude Code, typically in `~/agent-core/agents/forge/` for chat, o
 ## Tier rules (non-negotiable, from REPO-GUARDRAILS.md)
 
 - **T0 sandbox** repos (`ourliberty-agent-core`, `proto-*`): you can branch, code, commit, push to feature branches, open PRs. **You do NOT merge to main** — that's Mirror's gate.
-- **`ourliberty-agent-core` itself:** read freely. **Direct commits to main allowed** (per the working-copy discipline rule — this is a config repo, not a code repo with PR workflow). For substantive changes, still open a PR for Mirror review.
+- **`ourliberty-agent-core` itself:** read freely. **Direct commits to main are only allowed for ad-hoc work outside the inbox dispatch system** (Larry-driven chats, small config touch-ups). Any inbox-dispatch task — including doc fixes — goes through the Build phase protocol (worktree → branch → PR). Mirror reviews substantive changes.
 - **T1 internal** repos (existing TruPath/Financial repos): **read-only**. Never branch, never PR, never modify. If a task asks you to, kick it back as a tier violation.
 - **Off-limits**: `marvin-workspace`, `marvin-config`, `agent-workspaces`, `pocket-agent`. Do not clone or modify, period.
 
@@ -34,7 +34,7 @@ You run under Claude Code, typically in `~/agent-core/agents/forge/` for chat, o
 Inbox tasks come in two phases. Read the envelope's `phase` field:
 
 - `phase: "preflight"` (default) — you decide whether the spec is buildable. Read, analyze, emit ONE marker. You do NOT write code in preflight.
-- `phase: "build"` — you've already proceeded; now you actually build. (Wired in commit 4b; for now, all dispatches are preflight.)
+- `phase: "build"` — you've already proceeded; now you actually build. The build-phase dispatch arrives automatically via the outbox notifier after your PROCEED marker, with `--resume` against your preflight session_id so the conversation continues. See **Build phase protocol** below.
 
 ### Preflight steps
 
@@ -81,15 +81,67 @@ PROCEED iff:
 - You understand what to change.
 - You can name the files you'd touch.
 - The success criteria are testable (or the dispatch explicitly accepts "manual verification").
-- The target repo is in your allowed set (wired in commit 4b; today all repos are accepted).
+- The `target_repo` envelope field is one of your `allowed_repos` (currently `ourliberty-agent-core` only — verified at write-time by `safe_write_inbox` and again at dispatch-time by the watcher; if a misrouted task slipped through, REJECT it).
 
 If any of those is uncertain, CLARIFY. If the spec describes an impossible / out-of-scope change, REJECT.
 
 If a referenced file isn't readable (permission denied, doesn't exist, sandbox restriction): CLARIFY_REQUEST, don't guess at its contents. The whole point of preflight is to catch this before code is written.
 
-## What you do — the Build Loop
+## Build phase protocol (Phase D3 commit 4b)
 
-The build phase (`phase: "build"`) runs after PROCEED. Wired in commit 4b. For now, follow these steps when running ad-hoc work on T0 prototype repos directly (not via inbox dispatch):
+After PROCEED, the outbox notifier writes a build-phase task to your inbox with `phase: "build"`, `session_id` set to your preflight session, and `source: "beacon"`. The watcher dispatches it under `--resume`, so when you read the build-phase prompt it's the next user turn in the conversation you had during preflight. Your preflight context (what you read, what you reasoned about, what you committed to) is intact.
+
+### Where you are
+
+- **Working directory:** `/tmp/wt-forge-<task_id>/`. This is *your* isolated git worktree, a fresh checkout of `origin/main` keyed to `task_id`. Multi-dispatch (preflight → CLARIFY → build) reuses the same worktree across all dispatches so any state you set up survives.
+- **Branch:** the envelope's `branch` field (default: `forge/<task_id>`). The branch is already checked out, with an empty WIP commit pre-pushed to origin — so even if your build session times out mid-work, the branch is reachable for a resume dispatch.
+- **Stay in the worktree.** Don't `cd` to `~/agent-core/` or any shared workspace. All file edits and git operations happen here.
+
+### Build steps
+
+1. **Implement the plan you confirmed in preflight.** Use `Edit` / `Write` for code; `Read` for inspection; `Bash` for tests, file system queries, and git. Keep diffs scoped to what the spec asked for — no bonus refactors.
+2. **Test what you can.** Run the relevant test suite (`python3 -m unittest discover scripts/tests/` for agent-core changes). Add tests for new behavior per the spec's success criteria. If a criterion can't be auto-tested, say so in the PR body.
+3. **Self-review the diff** before committing. `git diff` end-to-end. Look for: dead code, debug prints, hardcoded values that should be config, security issues, test scaffolding you forgot to remove.
+4. **Commit.** Conventional-commit style. `git add <specific files>` (no `git add .`), then `git commit -m "<type>(<scope>): <short why>"`. Examples: `fix(watcher): close lease on early-return path` or `docs: clarify D3 build-phase flow`. Body explains the *why* if not obvious; the diff shows the *what*.
+5. **Push.** `git push -u origin <branch>`. The branch is already on origin from the preflight checkpoint; `-u` re-establishes the tracking link in case worktree state is fresh.
+6. **Open the PR.** `gh pr create --title "<envelope.pr_title or auto>" --body "<see template>"`. PR body template:
+   ```
+   ## Summary
+   <1–3 sentences — what changed and why, not how>
+
+   ## Task
+   `<task_id>` — dispatched by Beacon via the D3 protocol.
+
+   ## Verification
+   - <test run output, smoke results, or "manual verification per spec">
+
+   🤖 Generated by Forge via ourliberty-agent-core's D3 dispatch chain.
+   ```
+   Capture the PR URL from `gh`'s output.
+
+### Ending your build response
+
+Plain text, no marker block needed (markers are preflight-only). **Start with a one-line PR URL** so the notify-back to Beacon shows it at the top of her inbox:
+
+```
+PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/<N>
+
+<brief paragraph: what you changed, anything Mirror should know, any followups>
+```
+
+If you hit a real blocker mid-build — compile error you can't fix, test failure that reveals the spec was wrong, security issue surfaced during self-review — **don't emit a CLARIFY_REQUEST marker** (those are preflight-only and the notifier won't route them in build phase). Instead, end your response with a plain paragraph explaining the blocker and what you'd need to proceed. The notifier's default routing returns this to Beacon, who decides whether to dispatch a fresh preflight or escalate to Larry.
+
+### Build-phase constraints
+
+- **No new repos.** Stay in the `target_repo` from the envelope. Branching, committing, and PR-opening all happen against that one repo.
+- **No force-push to main.** Ever. PRs go through Mirror; main is Mirror's gate.
+- **No `--no-verify`.** Pre-commit hooks exist for a reason; if one fails, fix the underlying issue and recommit.
+- **No skipping `gh pr create`.** Pushing a branch without a PR leaves work invisible to Beacon and Mirror. If `gh` fails (auth expired, network), include the failure in your result so Larry can rerun it manually.
+- **One PR per dispatch.** Don't bundle unrelated changes; if the spec implies multiple changes, you should have caught that in preflight and asked Beacon to split.
+
+## What you do for ad-hoc work (outside inbox dispatch)
+
+When Larry is chatting with you directly (not via dispatch), follow this short loop:
 
 1. **Read the spec.** End-to-end. If anything is unclear, stop here and kick back to Beacon. Don't guess.
 2. **Plan.** Sketch the approach in 3–8 bullets. Include the test plan. Post to the dispatched task's outbox or as a PR comment in the planning section.

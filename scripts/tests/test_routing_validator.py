@@ -151,6 +151,105 @@ class SoftRerouteTest(unittest.TestCase):
         self.assertFalse(rerouted)
 
 
+class CheckTargetRepoTest(unittest.TestCase):
+    """Phase D3 commit 4b: allowed_repos gating on target_repo."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        tmp_root = Path(self._tmp.name)
+        self._original_root = rv.REPO_ROOT
+        self._original_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = tmp_root
+        rv.MODELS_CONFIG_PATH = tmp_root / 'config' / 'agent-models.json'
+        rv.invalidate_models_cache()
+
+    def tearDown(self):
+        rv.REPO_ROOT = self._original_root
+        rv.MODELS_CONFIG_PATH = self._original_models_path
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _write_models(self, content):
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(content)
+        rv.invalidate_models_cache()
+
+    def test_target_repo_in_allowed_passes(self):
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["repo-a", "repo-b"]}}}'
+        )
+        ok, reason = rv.check_target_repo('forge', 'repo-a')
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_target_repo_not_in_allowed_denied(self):
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["repo-a"]}}}'
+        )
+        ok, reason = rv.check_target_repo('forge', 'sneaky-repo')
+        self.assertFalse(ok)
+        self.assertIn('sneaky-repo', reason)
+        self.assertIn('allowed_repos', reason)
+
+    def test_target_repo_none_passes(self):
+        # Legacy / non-worktree tasks have no target_repo.
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["repo-a"]}}}'
+        )
+        ok, _ = rv.check_target_repo('forge', None)
+        self.assertTrue(ok)
+        ok, _ = rv.check_target_repo('forge', '')
+        self.assertTrue(ok)
+
+    def test_no_allowed_repos_configured_passes(self):
+        # Agent has no allowed_repos field → no gating.
+        self._write_models(
+            '{"agents": {"beacon": {"inbox_model": "x"}}}'
+        )
+        ok, _ = rv.check_target_repo('beacon', 'whatever-repo')
+        self.assertTrue(ok)
+
+    def test_missing_models_file_passes(self):
+        # No agent-models.json at all → no gating (back-compat).
+        rv.invalidate_models_cache()
+        ok, _ = rv.check_target_repo('forge', 'whatever')
+        self.assertTrue(ok)
+
+    def test_malformed_models_file_passes(self):
+        self._write_models('{not valid json')
+        ok, _ = rv.check_target_repo('forge', 'whatever')
+        self.assertTrue(ok)
+
+    def test_non_list_allowed_repos_passes(self):
+        # Defensive: if someone sets allowed_repos to a string by mistake,
+        # treat as no-config rather than crash.
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": "repo-a"}}}'
+        )
+        ok, _ = rv.check_target_repo('forge', 'repo-a')
+        self.assertTrue(ok)
+
+    def test_allowed_repos_for_helper(self):
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["x", "y"]}}}'
+        )
+        self.assertEqual(rv.allowed_repos_for('forge'), ['x', 'y'])
+        self.assertEqual(rv.allowed_repos_for('mirror'), [])
+
+    def test_cache_invalidates(self):
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["repo-a"]}}}'
+        )
+        ok, _ = rv.check_target_repo('forge', 'repo-a')
+        self.assertTrue(ok)
+        # Change config; without invalidation we'd see old data.
+        self._write_models(
+            '{"agents": {"forge": {"allowed_repos": ["repo-b"]}}}'
+        )
+        ok, _ = rv.check_target_repo('forge', 'repo-a')
+        self.assertFalse(ok)
+
+
 class ValidateRouteTest(unittest.TestCase):
     """Combined entry point — hard topology raises, soft reroute returns."""
 

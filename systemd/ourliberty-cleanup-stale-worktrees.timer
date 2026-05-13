@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily cleanup of stale /tmp/wt-* worktrees (24h grace)
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=1d
+Unit=ourliberty-cleanup-stale-worktrees.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
