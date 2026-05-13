@@ -130,6 +130,26 @@ For each agent process running:
 | Process running > 10 min on single message | ask-then-do | Could be heavy task or hung; escalate decision |
 | (Future) Anthropic spend anomaly | ask-then-do | Escalate |
 
+#### H. Forge activity digest (D3 commit 4b+)
+
+Forge now opens real PRs against `ourliberty-agent-core`. Larry's review model is digest-driven — he doesn't want a Telegram ping per PR; he wants to see "what's shipped, what's open, what's stuck" in your cycle output. Mirror review (D3.5) eventually auto-merges clean PRs, but until then, surface anything that's been waiting on him.
+
+Run from inside `~/agent-core/`:
+
+```bash
+gh pr list --state open --search "head:forge/" --json number,title,headRefName,createdAt,updatedAt
+gh pr list --state merged --search "head:forge/ merged:>$(date -u -d '4 hours ago' +%Y-%m-%dT%H:%M:%SZ)" --json number,title,mergedAt
+```
+
+| Finding | Class | Action |
+|---|---|---|
+| No open Forge PRs | nominal | Note "Forge PRs: 0 open" in journal |
+| Open Forge PRs, all < 24h old | nominal | Note count + IDs in journal; no escalation (still in normal Mirror review window) |
+| Any open Forge PR > 24h old | ask-then-do | Escalate with PR list (numbers + titles + ages). Larry decides merge/close/let-it-cook. |
+| Recently merged Forge PRs | nominal | Note count + IDs in journal under "shipped" for visibility |
+
+The journal entry's `Forge:` line (added in Section 4 below) captures this digest. Once D3.5 ships Mirror's auto-merge loop, the `> 24h old` threshold drops to e.g. `> 72h` (only blocked-on-Larry PRs surface; Mirror handles the rest). Until then, 24h gives Mirror's manual stand-in (me, via the Telegram approval flow) a window to act before Pulse escalates.
+
 #### G. Pattern detection
 
 For each finding type from A–F, count occurrences in the **last 10 cycles**:
@@ -201,6 +221,7 @@ Append to `runbooks/cycle-journal.md`:
 **Found:** <one-line summary or "Nothing actionable.">
 **Did:** <list of always-fix actions, or "Nothing.">
 **Escalated:** <list of ask-then-do/never-auto items, or "Nothing.">
+**Forge:** shipped <N> since last cycle (#X, #Y …); <M> open (oldest <Z>h) — from check H
 **Patterns:** <noted patterns, or "None">
 **Learned:** <anything carrying forward in MEMORY.md, or "Nothing new.">
 ```
