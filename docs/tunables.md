@@ -125,6 +125,8 @@ Retune trigger for all: healer fires repeatedly on the same artifact → root-ca
 
 **Eventual:** a small `tunables status` script that prints current values from the live config files + grep-scrapes constants from .py files. Phase F+ candidate. Goal: this doc becomes the spec; the script becomes the read-the-current-state surface.
 
+First scheduled review: 2026-08-13.
+
 ---
 
 ## Change log
