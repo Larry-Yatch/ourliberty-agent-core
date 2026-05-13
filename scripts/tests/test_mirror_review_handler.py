@@ -128,15 +128,42 @@ class ParseMirrorMarkerTest(unittest.TestCase):
         self.assertIn('AKIA', payload['evidence'])
 
     def test_no_marker_returns_none(self):
+        # Inputs with NO delimiter at all. 5b-followup Bug A added a
+        # diagnostic raise when delimiters are present but JSON is missing
+        # — those cases moved to test_loose_delimiter_* tests below.
         for response in [
             '', None,
             'No marker block here.',
-            'Started writing === REVIEW_PASS but never closed it',
-            '=== REVIEW_PASS ===\nbut no JSON',
+            'Just chat output, no review markers.',
         ]:
             mtype, payload, narr = mrh.parse_mirror_marker(response)
             self.assertIsNone(mtype, f'should not match: {response!r}')
             self.assertIsNone(payload)
+
+    def test_loose_delimiter_with_prose_raises_diagnostic(self):
+        # D3.5 5b-followup Bug A: same shape as Forge's loose-delimiter
+        # detection. Mirror writes prose between delimiters → strict
+        # regex misses → loose detector fires actionable error.
+        response = (
+            'Reviewed the PR diff.\n\n'
+            '=== REVIEW_PASS ===\n'
+            'Coverage clean, approved.\n'
+            '=== END_REVIEW_PASS ==='
+        )
+        with self.assertRaises(mrh.MalformedMirrorMarker) as ctx:
+            mrh.parse_mirror_marker(response)
+        msg = str(ctx.exception)
+        self.assertIn('JSON object', msg)
+        self.assertIn('NOT prose', msg)
+
+    def test_loose_delimiter_with_unterminated_block_raises_diagnostic(self):
+        response = (
+            'Some narrative.\n'
+            '=== REVIEW_REVISION ===\n'
+            '{"task_id": "x"}'  # no closing block
+        )
+        with self.assertRaises(mrh.MalformedMirrorMarker):
+            mrh.parse_mirror_marker(response)
 
     def test_invalid_json_raises(self):
         response = (

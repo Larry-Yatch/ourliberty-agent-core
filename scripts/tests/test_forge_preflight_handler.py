@@ -75,17 +75,45 @@ class ParseForgeMarkerTest(unittest.TestCase):
         self.assertEqual(payload['reason'], 'Required file missing.')
 
     def test_no_marker_returns_none(self):
+        # Inputs with NO delimiter at all. 5b-followup Bug A added a
+        # diagnostic raise when delimiters are present in any form
+        # (including degenerate ones like `===PROCEED===` without spaces)
+        # — those moved to test_loose_delimiter_* tests.
         for response in [
             '',
             None,
             'Just text, no markers here.',
-            'PROCEED but no delimiters',
-            '===PROCEED===',  # no spaces, won't match regex
-            '=== PROCEED ===\n{"task_id": "x"}',  # no closing block
+            'PROCEED but no delimiters around it',
+            'Discussing the marker contract in narrative without ===.',
         ]:
             mtype, payload, narr = fph.parse_forge_marker(response or '')
             self.assertIsNone(mtype, f'response={response!r}')
             self.assertIsNone(payload)
+
+    def test_loose_delimiter_with_no_json_raises_diagnostic(self):
+        # D3.5 5b-followup Bug A: Forge sometimes writes prose inside the
+        # marker block instead of strict JSON (observed live 2026-05-13).
+        # The strict regex misses; the loose detector fires the actionable
+        # error explaining the JSON-only contract.
+        response = (
+            'Preflight checks done.\n\n'
+            '=== PROCEED ===\n'
+            'Preflight passed. File verified at line 1536. Plan: insert one '
+            'line. No ambiguity.\n'
+            '=== END_PROCEED ==='
+        )
+        with self.assertRaises(fph.MalformedForgeMarker) as ctx:
+            fph.parse_forge_marker(response)
+        msg = str(ctx.exception)
+        self.assertIn('JSON object', msg)
+        self.assertIn('NOT prose', msg)
+
+    def test_loose_delimiter_with_unterminated_block_raises_diagnostic(self):
+        # Opening delimiter + JSON but no closing block. Strict regex misses;
+        # loose detector still fires the actionable error.
+        response = '=== PROCEED ===\n{"task_id": "x", "preflight_summary": "..."}'
+        with self.assertRaises(fph.MalformedForgeMarker):
+            fph.parse_forge_marker(response)
 
     def test_malformed_json_raises(self):
         response = (

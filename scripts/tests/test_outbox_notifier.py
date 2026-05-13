@@ -2995,7 +2995,7 @@ class ExtractRevisionSummaryTest(unittest.TestCase):
 
 
 class RevisionFollowupFixesTest(unittest.TestCase):
-    """Tests for the 6 issues caught by the independent reviewer."""
+    """Tests for the 6 issues caught by the independent reviewer + Bug A/B/C."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -3027,6 +3027,19 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self._rv_root = rv.REPO_ROOT
         rv.REPO_ROOT = self._root / 'repo'
         rv.invalidate_cache()
+        # larry_alerts paths (for Bug C tests that verify DM-queue side effects)
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
         on.ensure_dirs()
 
     def tearDown(self):
@@ -3035,6 +3048,8 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         on._invalidate_loop_bounds_cache()
         for name, value in self._swi_originals.items():
             setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
         rv.REPO_ROOT = self._rv_root
         rv.invalidate_cache()
         self._tmp.cleanup()
@@ -3307,6 +3322,284 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertNotIn('Mirror escalated', template)
         self.assertIn('Review escalated', template)
         self.assertIn('{reason}', template)
+
+    # ---- M-7 (second-pass): Mirror marker-error propagates revision fields ----
+
+    def test_m7_mirror_marker_error_propagates_forge_session_and_phase(self):
+        # If Mirror's REVIEW_REVISION marker has bad JSON, the marker-error
+        # retry task must carry forge_build_session_id + phase forward so
+        # her clean retry's outbox has the field, _build_outbox propagates,
+        # and _dispatch_revision_to_forge can find the session to --resume.
+        data = {
+            'agent': 'mirror', 'source': 'beacon', 'task_id': 't-mirror-retry',
+            'phase': 'review',
+            'forge_build_session_id': 'forge-build-sess',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-mirror-retry',
+            'pr_url': 'https://github.com/x/y/pull/5',
+            'revision_count': 0,
+            'max_revisions': 3,
+            'reply_chat_id': 7998341473,
+            'claude_session_id': 'mirror-sess',
+        }
+        on._notify_mirror_marker_error(data, 'bad JSON in marker')
+        notifies = list(
+            (on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        # The two new fields (M-7 fix) must propagate.
+        self.assertEqual(notify['forge_build_session_id'], 'forge-build-sess')
+        self.assertEqual(notify['phase'], 'review')
+        # Plus the existing propagation should still work.
+        self.assertEqual(notify['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(notify['pr_url'], 'https://github.com/x/y/pull/5')
+        self.assertEqual(notify['revision_count'], 0)
+        self.assertEqual(notify['reply_chat_id'], 7998341473)
+
+    # ---- M-8 (second-pass): previous_findings threaded through chain ----
+
+    def test_m8_revision_dispatch_carries_previous_findings(self):
+        # _dispatch_revision_to_forge writes findings into the prompt AND
+        # threads them through the envelope as previous_findings so Mirror's
+        # re-review prompt can include them on round 2+.
+        data = {
+            'task_id': 't-findings',
+            'forge_build_session_id': 'forge-sess',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-findings',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'revision_count': 0,
+            'max_revisions': 3,
+        }
+        findings = [
+            {'file': 'a.py', 'line_range': 'L10', 'severity': 'medium',
+             'description': 'missing validation'},
+            {'file': 'b.py', 'line_range': 'L20', 'severity': 'low',
+             'description': 'unclear name'},
+        ]
+        decision = {
+            'marker_type': 'review_revision',
+            'payload': {
+                'task_id': 't-findings', 'pr_url': data['pr_url'],
+                'findings': findings,
+                'severity': 'medium', 'confidence': 'high',
+            },
+        }
+        on._dispatch_revision_to_forge(data, decision)
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-findings-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        task = json.loads(revisions[0].read_text())
+        self.assertEqual(task['previous_findings'], findings)
+
+    def test_m8_rereview_prompt_includes_previous_findings(self):
+        # Forge's revision outbox carries previous_findings via _build_outbox
+        # propagation; _dispatch_mirror_review_rerun reads them and injects
+        # into Mirror's re-review prompt. Without this, Mirror would
+        # re-derive findings from scratch on round 2.
+        data = {
+            'task_id': 't-rerev',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-rerev',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'revision_count': 1,
+            'max_revisions': 3,
+            'forge_build_session_id': 'forge-sess',
+            'previous_findings': [
+                {'file': 'a.py', 'line_range': 'L10', 'severity': 'medium',
+                 'description': 'critical-finding-keyword-marker'},
+            ],
+        }
+        on._dispatch_mirror_review_rerun(data, 1, 'fixed it')
+        reviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-t-rerev-rev*.json')
+        )
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        # The finding's description must appear in the re-review prompt.
+        self.assertIn('critical-finding-keyword-marker', review['prompt'])
+        self.assertIn('Your findings from the previous round', review['prompt'])
+        # AND the envelope propagates findings forward for round 2+ (in case
+        # Mirror flags REVIEW_REVISION again on this re-review).
+        self.assertEqual(
+            review['previous_findings'],
+            data['previous_findings'],
+        )
+
+    def test_m8_rereview_with_no_previous_findings_does_not_render_section(self):
+        # If somehow previous_findings is missing or empty, prompt should
+        # still render (degrade) without the findings section.
+        data = {
+            'task_id': 't-empty-findings',
+            'target_repo': 'ourliberty-agent-core',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'revision_count': 1,
+            'max_revisions': 3,
+        }
+        on._dispatch_mirror_review_rerun(data, 1, 'summary')
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        # Prompt still renders, just without the findings section.
+        self.assertIn('Re-review phase', review['prompt'])
+        self.assertNotIn('Your findings from the previous round', review['prompt'])
+
+    # ---- m-9 (second-pass): pr_url missing skips dispatch ----
+
+    def test_m9_rereview_missing_pr_url_skips_dispatch(self):
+        # Defensive: don't substitute literal '(unknown)' for missing pr_url
+        # — it propagates as a marker value into the next revision prompt.
+        # Instead, log + skip the dispatch (matches target_repo gate shape).
+        data = {
+            'task_id': 't-no-url',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-no-url',
+            'revision_count': 1,
+            'max_revisions': 3,
+            # NO pr_url
+        }
+        on._dispatch_mirror_review_rerun(data, 1, 'summary')
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        # Should NOT have dispatched
+        self.assertEqual(reviews, [])
+
+    # ---- Bug B: envelope task_id stays ORIGINAL across marker-error retries ----
+
+    def test_bug_b_forge_marker_error_keeps_original_task_id(self):
+        # 2026-05-13 live test failed because marker-error retries wrapped
+        # the envelope task_id as `marker-error-<orig>-<N>`. Forge emitted
+        # her marker with the ORIGINAL task_id (semantically correct — it's
+        # her task), the 4b task_id-mismatch check then rejected every
+        # retry, cascade exhausted on round 3. Fix: envelope task_id stays
+        # original; filename + marker_error_count handle uniqueness.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 7998341473,
+            'result': '=== PROCEED ===\n<prose, no JSON>\n=== END_PROCEED ===',
+        }
+        on._notify_forge_marker_error(data, 'no JSON in marker block')
+        notifies = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        # The envelope task_id MUST be the original, not the wrapper.
+        self.assertEqual(
+            notify['task_id'], 'opmanual-d35-5b-shipped-note-001',
+        )
+        # marker_error_count carries the retry counter.
+        self.assertEqual(notify['marker_error_count'], 1)
+        # Filename has the wrap for disk-level uniqueness.
+        self.assertIn('marker-error-opmanual-d35-5b-shipped-note-001-1',
+                      notifies[0].name)
+
+    def test_bug_b_forge_retry_2_also_keeps_original_task_id(self):
+        # On retry 2, the previous envelope had task_id=original AND
+        # marker_error_count=1. The retry-2 envelope should still have
+        # task_id=original, marker_error_count=2.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'marker_error_count': 1,  # this is now the 2nd retry
+            'original_source': 'beacon',
+            'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
+            'result': 'still no JSON',
+        }
+        on._notify_forge_marker_error(data, 'second attempt also failed')
+        notifies = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(
+            notify['task_id'], 'opmanual-d35-5b-shipped-note-001',
+        )
+        self.assertEqual(notify['marker_error_count'], 2)
+
+    def test_bug_b_mirror_marker_error_keeps_original_task_id(self):
+        data = {
+            'agent': 'mirror', 'source': 'beacon',
+            'task_id': 't-mirror-bad-marker',
+            'phase': 'review', 'forge_build_session_id': 'forge-sess',
+            'target_repo': 'ourliberty-agent-core',
+            'result': '=== REVIEW_PASS ===\n<prose>\n=== END_REVIEW_PASS ===',
+        }
+        on._notify_mirror_marker_error(data, 'prose, not JSON')
+        notifies = list(
+            (on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['task_id'], 't-mirror-bad-marker')
+        self.assertEqual(notify['marker_error_count'], 1)
+
+    # ---- Bug C: dead-letter triggers Larry DM ----
+
+    def test_bug_c_dead_letter_queues_larry_dm(self):
+        # When marker-error retries exhaust, the dead-letter notify to
+        # Beacon should ALSO queue a closing DM to Larry's chat thread.
+        # Without this (the failed 2026-05-13 live test), the chat goes
+        # silent after "approved + dispatched".
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 't-exhausted',
+            'reply_chat_id': 7998341473,
+            'marker_error_count': 3,
+            'original_source': 'beacon',
+        }
+        on._dead_letter_marker_error_to_dispatcher(
+            data, 'beacon', 'no JSON in marker block', 4,
+        )
+        # Beacon got the inter-agent dead-letter notify.
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('dead-letter-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+        # AND Larry got a closing DM via larry-alerts.jsonl
+        pending = self._la.read_pending(0)
+        notifs = [r for _, r in pending if r.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'dead-letter')
+        self.assertEqual(notifs[0]['chat_id'], 7998341473)
+        self.assertEqual(notifs[0]['task_id'], 't-exhausted')
+        self.assertIn('failed after 4 marker-error retries', notifs[0]['message'])
+        self.assertIn('no JSON', notifs[0]['message'])
+
+    def test_bug_c_dead_letter_without_chat_id_does_not_queue_dm(self):
+        # Autonomous Pulse-initiated runs have no reply_chat_id. The
+        # dead-letter still writes to Beacon's inbox; no DM is queued
+        # (silent skip in _maybe_dm_larry).
+        data = {
+            'agent': 'forge', 'source': 'beacon', 'task_id': 't-auto',
+            # NO reply_chat_id
+            'original_source': 'beacon',
+        }
+        on._dead_letter_marker_error_to_dispatcher(
+            data, 'beacon', 'reason', 4,
+        )
+        pending = self._la.read_pending(0)
+        notifs = [r for _, r in pending if r.get('kind') == 'notification']
+        self.assertEqual(notifs, [])
+        # But the dead-letter to Beacon still landed.
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('dead-letter-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+
+    def test_bug_c_dead_letter_template_renders_with_retry_count(self):
+        # Template should substitute task_id, reason, retry_count.
+        template = on.DM_TEMPLATES['dead-letter']
+        rendered = template.format(
+            task_id='t-foo', reason='bad marker', retry_count=3,
+        )
+        self.assertIn('t-foo', rendered)
+        self.assertIn('bad marker', rendered)
+        self.assertIn('3', rendered)
+        self.assertIn('no PR was opened', rendered)
 
 
 if __name__ == '__main__':

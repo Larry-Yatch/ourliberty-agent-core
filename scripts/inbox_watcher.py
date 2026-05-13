@@ -295,12 +295,17 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
     # threaded through Mirror's review-request so the revision dispatch back
     # to Forge can --resume the right session) and revision_count (the
     # round counter, incremented each Forge→Mirror→Forge cycle).
+    # D3.5 5b second-pass M-8 fix: also propagate previous_findings so
+    # Mirror's re-review prompt can include her round-N-1 findings (her
+    # session is fresh per round; she has no other reliable source for
+    # the prior findings).
     for envelope_field in ('clarification_count', 'max_clarifications',
                            'phase', 'target_repo', 'task_type',
                            'original_source', 'marker_error_count',
                            'branch', 'pr_title', 'pr_body',
                            'forge_build_session_id', 'revision_count',
-                           'max_revisions', 'pr_url'):
+                           'max_revisions', 'pr_url',
+                           'previous_findings'):
         if task.get(envelope_field) is not None:
             outbox[envelope_field] = task[envelope_field]
     if error:

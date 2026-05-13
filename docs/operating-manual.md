@@ -1585,6 +1585,68 @@ Live verification target (~$1.50 cost): dispatch a spec Forge will get not-quite
 
 **Next:** D3.5 commit 5c — Beacon replan flow. Wires Beacon's auto-revise-spec on ESCALATE intent (currently routes to manual decision). Smaller surface than 5b. After 5c → 5d (auto-merge + EMERGENCY_HALT). Then D3.5 closes.
 
+## Phase D3.5 5b-followup — second-pass review fixes + live-test cascade fixes (2026-05-13, ~3 hours, $1.27 lost to the failed live test surfacing the bugs)
+
+Two parallel review passes after 5b shipped: (1) a second-pass independent reviewer focused on multi-round data flow + prompt content (found 3 issues — M-7, M-8, m-9), (2) Larry's Path A live verification dispatch, which failed in a way that surfaced 3 more issues — Forge's marker-content discipline (Bug A), the 4a/4b task_id-wrapping cascade (Bug B), and the dead-letter Larry-DM gap (Bug C).
+
+### The failed live test (2026-05-13 11:55–11:59 UTC −0600)
+
+Larry dispatched a tiny doc-edit task (`opmanual-d35-5b-shipped-note-001`). Forge's preflight emitted:
+
+```
+[narrative bullets above]
+=== PROCEED ===
+Preflight passed. File and heading verified at docs/operating-manual.md:1536 via
+the literal-substring grep. Plan for build phase: insert `Status: Shipped...`
+=== END_PROCEED ===
+```
+
+**She wrote prose between the delimiters instead of the required `{"task_id":..., "preflight_summary":...}` JSON object.** The 5a preflight-discipline runtime gate (`parse_forge_marker` requires `\{...\}` between delimiters) returned None, raised `MalformedForgeMarker: none found`. The marker-error cascade then fired three retries, each rejected by the 4b task_id-mismatch check (because the cascade wraps envelope task_id as `marker-error-<orig>-<N>` but Forge correctly emits her marker with the original `<orig>`). Dead-letter to Beacon at retry 4. Total Opus cost: $1.27 (preflight + 3 retries + Beacon's dead-letter journal). Larry on his phone: "I approved, then nothing." No closing DM — `dead-letter` wasn't in `TERMINAL_DM_INTENTS`.
+
+Three layered bugs caught:
+
+- **Bug A (Forge discipline / parser diagnostic).** Forge sometimes emits prose between marker delimiters instead of strict JSON. The runtime gate's "none found" error didn't tell her that. Now: when delimiters are present but JSON is missing, the parser raises a diagnostic error explaining the JSON-only contract, AND her CLAUDE.md gets explicit wrong-vs-right example with the exact failure pattern.
+- **Bug B (marker-error cascade brittleness).** The 4a/4b cascade wrapped envelope task_id (`marker-error-<orig>-<N>`) but Forge's marker contract required envelope-and-payload task_id match. Forge correctly used the ORIGINAL task_id (she could see the wrapper was metadata, not the real task); the mismatch check rejected every retry. Pre-existing bug since 4b; 5b's strict preflight gate made it visible by triggering more marker-error cascades.
+- **Bug C (cascade exhaust silent to Larry).** `dead-letter` intent fired the inter-agent notify to Beacon's inbox but wasn't in `TERMINAL_DM_INTENTS`, so Larry's chat thread got no closing DM. Approval → silence.
+
+### Second-pass reviewer findings (orthogonal to live test)
+
+Same review pattern (4a/4b/5a/5a-followup → 5/6/6/6/6 issues each). This one caught 3:
+
+- **M-7 MAJOR — `_notify_mirror_marker_error` drops `forge_build_session_id` and `phase`.** If Mirror's REVIEW_REVISION marker has bad JSON on the first try, her clean retry's outbox loses the field via `_build_outbox` propagation (only what's on the task gets propagated). Then `_dispatch_revision_to_forge` silently skips (no session to --resume). Same shape as the C-1 propagation gap, mirrored on Mirror's side.
+- **M-8 MAJOR — Re-review prompt omits previous findings.** Mirror's CLAUDE.md told her to recover from "the PR's commit history or Beacon's journal" — but Forge's revision commit body explains what was fixed, not what the findings were, and "Beacon's journal" isn't a file Mirror has a documented tool to read. On round 2 she'd re-derive different findings, breaking loop coherence.
+- **m-9 minor — `pr_url` default `'(unknown)'` poisons next dispatch.** Defensive fallback substituted a literal marker string into Mirror's re-review envelope; if she REVISIONs again, that string propagates to Forge's next revision prompt as `PR: (unknown)`. Now: missing pr_url skips dispatch with WARN (matches target_repo gate shape).
+
+### What shipped
+
+- **`scripts/forge_preflight_handler.py`** (+~30 LOC) — `_LOOSE_FORGE_DELIMITER_RE` for diagnostic error path; `parse_forge_marker` raises `MalformedForgeMarker` with sharp "delimiters found but no JSON inside, put narrative ABOVE the block / JSON INSIDE" message when the loose detector matches but strict doesn't.
+- **`scripts/mirror_review_handler.py`** (+~30 LOC) — Symmetric `_LOOSE_MIRROR_DELIMITER_RE` + diagnostic raise in `parse_mirror_marker`.
+- **`scripts/outbox_notifier.py`** (+~90 LOC across multiple sites):
+  - Bug B: `_notify_forge_marker_error` and `_notify_mirror_marker_error` now keep envelope `task_id` as the ORIGINAL (filename + `marker_error_count` handle uniqueness). Forge's marker contract (task_id matches envelope) holds across retries.
+  - Bug C: new `DM_TEMPLATES['dead-letter']`; `_dead_letter_marker_error_to_dispatcher` calls `_maybe_dm_larry` with a synthetic decision dict so the chat thread gets a closing notification.
+  - M-7: `_notify_mirror_marker_error` propagates `forge_build_session_id` + `phase`.
+  - M-8: `_dispatch_revision_to_forge` threads `previous_findings` into the revision envelope; `_dispatch_mirror_review_rerun` injects them into the re-review prompt.
+  - m-9: `_dispatch_mirror_review_rerun` skips dispatch when `pr_url` is missing (matches `target_repo` gate shape).
+- **`scripts/inbox_watcher.py`** (+1 LOC) — `_build_outbox` envelope_fields adds `previous_findings`.
+- **`agents/forge/CLAUDE.md`** (+~22 lines) — Marker discipline section: explicit "JSON-only between delimiters" requirement with wrong-vs-right example using the exact failure pattern from the 2026-05-13 dispatch.
+- **`agents/mirror/CLAUDE.md`** (+~17 lines) — Symmetric JSON-only marker discipline guidance.
+- **Tests** (+~270 LOC, +13 new tests): loose-delimiter diagnostic tests in Forge + Mirror handler test files (4 cases); test class `RevisionFollowupFixesTest` gains tests for Bug B (3 cases — Forge initial retry, Forge retry 2, Mirror retry all keep original task_id), Bug C (3 cases — DM queued, no chat_id skips, template renders), plus the 5 second-pass tests for M-7/M-8/m-9 added earlier.
+
+### Codified conventions worth recalling next session
+
+1. **Marker payload is JSON-only; narrative goes above the block.** Universal — applies to Forge's preflight markers, Mirror's review markers, Beacon's APPROVAL_REQUEST. Forge's slip on 2026-05-13 was the first observed in real chain runs; the parser-level diagnostic + CLAUDE.md examples make this hard to repeat.
+2. **Marker-error envelope task_id must equal the original task_id.** Filename + `marker_error_count` handle uniqueness; the envelope task_id is the agent's marker-contract anchor. Any cascade that wraps envelope task_id will fail the agent's marker validation.
+3. **Every terminal-from-Larry's-perspective intent must DM Larry.** `dead-letter` joined the set; verify when adding any future intent (`review-question` in 5b's deferred scope, `pulse-digest` in Phase F+, etc.) — if Larry initiated the work, he gets a closing DM at every termination shape.
+4. **Cascade brittleness is the failure mode to design against.** Forge's preflight slip cost $1.27 because three layers of bugs stacked: she made one prompt-discipline mistake; the marker-error retry mechanism couldn't recover because of B; the cascade exhaust didn't reach Larry because of C. Single-failure-mode design is dangerous; verify each layer's recovery path independently.
+
+### Verification (pending live re-test)
+
+Synthetic unit tests pass locally (476 total, 4 pre-existing macOS-only worktree failures unrelated). 13 net new tests across the followup additions.
+
+Live verification target: re-run the failed dispatch (`opmanual-d35-5b-shipped-note-001` shape — small doc edit). Expected this time: Forge emits JSON marker → preflight PROCEED → build → PR opens → Mirror reviews → likely PASS → closing DM lands. If Forge slips again on JSON-vs-prose, the new diagnostic error tells her exactly how to fix; retry should succeed; chain completes; closing DM lands (now also fires from dead-letter if cascade exhausts).
+
+**Next:** D3.5 commit 5c — Beacon replan flow (same as the next-up note in the 5b entry above).
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

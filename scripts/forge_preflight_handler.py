@@ -73,6 +73,16 @@ REJECT_MARKER_RE = re.compile(
     re.DOTALL,
 )
 
+# D3.5 5b-followup Bug A: loose-delimiter detector for diagnostic error.
+# When the strict regex doesn't match but a Forge response DOES contain
+# marker-opening delimiters, the failure mode is "delimiters present but
+# content between them isn't JSON" — diagnostically different from "no
+# delimiters at all." Surface that distinction so Forge's retry knows to
+# put JSON between the delimiters, not prose.
+_LOOSE_FORGE_DELIMITER_RE = re.compile(
+    r'===\s*(PROCEED|CLARIFY_REQUEST|REJECT)\s*===',
+)
+
 MARKER_TYPES = ('proceed', 'clarify_request', 'reject')
 
 # Required fields per marker type.
@@ -138,6 +148,28 @@ def parse_forge_marker(
             all_matches.append((mtype, m))
 
     if not all_matches:
+        # D3.5 5b-followup Bug A: distinguish "no delimiters at all" from
+        # "delimiters present but no JSON inside." On 2026-05-13 Forge
+        # emitted `=== PROCEED ===\n<prose>\n=== END_PROCEED ===` — the
+        # delimiters were there but JSON wasn't, the strict regex didn't
+        # match, and the runtime gate reported "none found" — which is
+        # technically true but doesn't tell Forge what she actually did
+        # wrong. The diagnostic error here is more actionable.
+        loose_matches = _LOOSE_FORGE_DELIMITER_RE.findall(forge_response)
+        if loose_matches:
+            kinds = list(dict.fromkeys(loose_matches))  # dedupe preserve order
+            raise MalformedForgeMarker(
+                f'Marker opening delimiter(s) found ({kinds}) but no valid '
+                f'JSON object between them and the closing delimiter. The '
+                f'content INSIDE `=== XXX ===` and `=== END_XXX ===` MUST '
+                f'be a single JSON object — e.g. '
+                f'`{{"task_id": "...", "preflight_summary": "..."}}` — NOT '
+                f'prose, NOT a sentence, NOT an explanation. Put narrative '
+                f'ABOVE the marker block (Beacon reads it). Put strict JSON '
+                f'INSIDE the block (the parser reads it). If you want to '
+                f'explain your reasoning, do it in the narrative section, '
+                f'not the marker payload.'
+            )
         return None, None, forge_response
 
     if len(all_matches) > 1:

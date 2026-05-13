@@ -317,6 +317,20 @@ DM_TEMPLATES = {
         'Final question: {reason}\n'
         'Rewrite the spec more completely before re-dispatching.'
     ),
+    # D3.5 5b-followup Bug C: dead-letter is now a terminal-from-Larry's-
+    # perspective intent. The 5a-followup auto-DM pipe needs to surface
+    # cascade-exhaust events (Forge/Mirror marker-error retries hit the
+    # cap; dispatch closed; no PR opened) so the chat thread that initiated
+    # the work gets a closing notification — not silence. Without this,
+    # Larry approved-then-nothing for the failed 5b live test.
+    'dead-letter': (
+        'Dispatch on task `{task_id}` failed after {retry_count} '
+        'marker-error retries. The dispatch is closed; no PR was opened.\n'
+        'Reason: {reason}\n'
+        'Either revise the spec (sharper instructions or a different '
+        'approach) and re-emit APPROVAL_REQUEST to Beacon, or set this '
+        'task aside.'
+    ),
 }
 
 # Subset of intents that produce a closing DM to the originating chat. Other
@@ -758,8 +772,17 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
             'max_retries': MAX_MARKER_ERROR_RETRIES,
         },
     )
+    # D3.5 5b-followup Bug B: keep envelope task_id as the ORIGINAL task_id
+    # across retries. The previous wrapped form (`marker-error-<orig>-<N>`)
+    # broke the 4b task_id-mismatch check: Forge correctly emits her marker
+    # with the original task_id (that's the actual semantic task), but the
+    # envelope had the wrapper name, so the mismatch check rejected every
+    # retry. Cascade never recovered from real preflight failures.
+    # Retry tracking lives in `marker_error_count`; filename uses
+    # `-{new_count}` suffix for uniqueness. Now Forge's marker contract
+    # (task_id matches envelope) holds consistently across retries.
     notify_task: dict[str, Any] = {
-        'task_id': f'marker-error-{task_id}-{new_count}',
+        'task_id': task_id,
         'prompt': prompt,
         'source': 'outbox-notifier',
         'intent': 'marker-error',
@@ -895,6 +918,22 @@ def _dead_letter_marker_error_to_dispatcher(
             f'{type(e).__name__}: {e}',
             'ERROR',
         )
+
+    # D3.5 5b-followup Bug C: also DM Larry on cascade exhaust. The chat
+    # thread that initiated the dispatch deserves a closing notification
+    # — without this, "Larry approved, then silence" (the failed live
+    # test 2026-05-13 was exactly this shape). Build a synthetic decision
+    # dict so _maybe_dm_larry's render pipeline works.
+    synthetic_decision = {
+        'intent': 'dead-letter',
+        'payload': {'task_id': task_id},
+        'intent_kwargs': {
+            'task_id': task_id,
+            'reason': reason,
+            'retry_count': error_count,
+        },
+    }
+    _maybe_dm_larry(data, synthetic_decision)
 
 
 def _dispatch_build_phase(data: dict[str, Any]) -> None:
@@ -1225,8 +1264,12 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
             'max_retries': MAX_MARKER_ERROR_RETRIES,
         },
     )
+    # D3.5 5b-followup Bug B: same fix as Forge equivalent — keep envelope
+    # task_id as the ORIGINAL task_id across retries (was wrapped before;
+    # broke Mirror's marker contract). Retry tracking via marker_error_count;
+    # filename uniqueness via the `-{new_count}` filename suffix.
     notify_task: dict[str, Any] = {
-        'task_id': f'marker-error-{task_id}-{new_count}',
+        'task_id': task_id,
         'prompt': prompt,
         'source': 'outbox-notifier',
         'intent': 'marker-error',
@@ -1257,6 +1300,18 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
     # DM thread silently ends.
     if data.get('reply_chat_id') is not None:
         notify_task['reply_chat_id'] = data['reply_chat_id']
+    # D3.5 5b M-7 (second-pass review fix): propagate forge_build_session_id
+    # and phase. Without these, a Mirror marker-error retry that emits a
+    # clean REVIEW_REVISION on the second try would have no
+    # forge_build_session_id on the envelope — `_build_outbox` propagates
+    # only what's on the task — and `_dispatch_revision_to_forge` would
+    # silently skip (no session to --resume). Same shape as the C-1
+    # propagation gap, on Mirror's side. `phase` is also missing — without
+    # it, Mirror's retry task arrives with no phase context.
+    if data.get('forge_build_session_id'):
+        notify_task['forge_build_session_id'] = data['forge_build_session_id']
+    if data.get('phase'):
+        notify_task['phase'] = data['phase']
 
     try:
         safe_write_inbox.safe_write_inbox(
@@ -1580,6 +1635,17 @@ def _dispatch_revision_to_forge(
         'revision_count': next_count,
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
+        # D3.5 5b M-8 (second-pass review fix): thread Mirror's findings
+        # forward so the re-review prompt can include them. Mirror's
+        # re-review session is FRESH (no claude --resume); without these
+        # findings on the envelope, her re-review prompt has to direct her
+        # to reconstruct findings from sources that aren't reliably
+        # available (Forge's commit message body, Beacon's journal). On
+        # round 2 she'd re-derive different findings, breaking the loop's
+        # coherence. Findings round-trip: here → _build_outbox propagates
+        # → Forge's revision outbox carries → _dispatch_mirror_review_rerun
+        # reads + injects into Mirror's re-review prompt.
+        'previous_findings': findings if isinstance(findings, list) else [],
     }
     if branch:
         revision_task['branch'] = branch
@@ -1666,6 +1732,15 @@ def _dispatch_mirror_review_rerun(
     max_revisions = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
     if not isinstance(max_revisions, int) or max_revisions < 0:
         max_revisions = mrh.DEFAULT_MAX_REVISIONS
+    # D3.5 5b second-pass M-8 fix: pull previous_findings from envelope
+    # (threaded through _dispatch_revision_to_forge → _build_outbox →
+    # Forge's revision outbox → here). Mirror's re-review session is fresh
+    # — without these findings her CLAUDE.md tells her to find them in
+    # "the PR's commit history or Beacon's journal," neither of which is
+    # reliably accessible. Inject them directly into the prompt instead.
+    previous_findings = data.get('previous_findings')
+    if not isinstance(previous_findings, list):
+        previous_findings = []
 
     review_prompt_lines = [
         f'Re-review phase. Forge has applied revision {round_num} on task '
@@ -1679,25 +1754,51 @@ def _dispatch_mirror_review_rerun(
         review_prompt_lines.append(f'PR: {pr_url}')
     if branch:
         review_prompt_lines.append(f'Branch: `{branch}`')
+    if previous_findings:
+        review_prompt_lines.extend(['', 'Your findings from the previous round:'])
+        for i, f in enumerate(previous_findings, 1):
+            if not isinstance(f, dict):
+                review_prompt_lines.append(f'  {i}. {f}')
+                continue
+            sev = f.get('severity', '?')
+            file_ref = f.get('file', '?')
+            line_ref = f.get('line_range', '?')
+            desc = f.get('description', '(no description)')
+            review_prompt_lines.append(
+                f'  {i}. [{sev}] {file_ref} {line_ref} — {desc}'
+            )
     review_prompt_lines.extend([
         '',
         f'You are on revision round {round_num} of {max_revisions}. Read '
         'the updated PR diff (`gh pr diff <N>` — same PR, now with Forge\'s '
-        'revision commit on top). Verify your earlier findings are resolved '
-        'AND no new issues were introduced. Emit one marker: REVIEW_PASS '
-        '(if findings resolved cleanly), REVIEW_REVISION (if more changes '
-        'needed; budget is round-aware — next would be round '
+        'revision commit on top). Verify each finding above is resolved '
+        'in the new diff AND no new issues were introduced. Emit one marker: '
+        'REVIEW_PASS (if findings resolved cleanly), REVIEW_REVISION (if '
+        'more changes needed; budget is round-aware — next would be round '
         f'{round_num + 1}), REVIEW_ESCALATE (if revision approach is wrong), '
         'or REVIEW_EMERGENCY_HALT (safety issue).',
     ])
     review_prompt = '\n'.join(review_prompt_lines)
+
+    # D3.5 5b second-pass m-9 fix: don't substitute the literal string
+    # '(unknown)' when pr_url is missing — it propagates as a marker value
+    # into Forge's next revision prompt (`PR: (unknown)`). If pr_url is
+    # missing, log + skip the dispatch; same shape as the target_repo gate.
+    if not pr_url:
+        log(
+            f'Forge revision-{round_num} on task {task_id} has no pr_url '
+            f'on envelope; cannot dispatch re-review — skipping. Larry '
+            f'should manually re-dispatch.',
+            'WARN',
+        )
+        return
 
     review_task: dict[str, Any] = {
         'task_id': task_id,
         'prompt': review_prompt,
         'source': 'beacon',
         'phase': 'review',
-        'pr_url': pr_url or '(unknown)',
+        'pr_url': pr_url,
         'target_repo': target_repo,
         'revision_count': round_num,
         'max_revisions': max_revisions,
@@ -1711,6 +1812,10 @@ def _dispatch_mirror_review_rerun(
     # revision (if Mirror flags more findings) can resume Forge's session.
     if data.get('forge_build_session_id'):
         review_task['forge_build_session_id'] = data['forge_build_session_id']
+    # M-8 second-pass fix: also propagate previous_findings forward so the
+    # NEXT round's REVIEW_REVISION (if any) carries findings through.
+    if isinstance(data.get('previous_findings'), list):
+        review_task['previous_findings'] = data['previous_findings']
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
             review_task[f_name] = data[f_name]

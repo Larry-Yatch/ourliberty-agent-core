@@ -126,6 +126,16 @@ REVIEW_EMERGENCY_HALT_MARKER_RE = re.compile(
     re.DOTALL,
 )
 
+# D3.5 5b-followup Bug A: loose-delimiter detector for diagnostic error.
+# Symmetric with the Forge handler's _LOOSE_FORGE_DELIMITER_RE. When a Mirror
+# response contains marker-opening delimiters but the strict regex didn't
+# match, the failure is "delimiters present but no JSON inside" — surface
+# that distinction so Mirror's retry knows to put JSON between the
+# delimiters, not prose.
+_LOOSE_MIRROR_DELIMITER_RE = re.compile(
+    r'===\s*(REVIEW_PASS|REVIEW_REVISION|REVIEW_ESCALATE|REVIEW_EMERGENCY_HALT)\s*===',
+)
+
 MARKER_TYPES = (
     'review_pass', 'review_revision', 'review_escalate', 'review_emergency_halt',
 )
@@ -221,6 +231,24 @@ def parse_mirror_marker(
             all_matches.append((mtype, m))
 
     if not all_matches:
+        # D3.5 5b-followup Bug A: same diagnostic-error pattern as the
+        # Forge handler. Distinguish "no delimiters" from "delimiters
+        # present, JSON missing." If Mirror writes prose between
+        # `=== REVIEW_PASS ===` and `=== END_REVIEW_PASS ===` instead of
+        # a JSON object, the strict regex misses; this loose check fires
+        # the more actionable error.
+        loose_matches = _LOOSE_MIRROR_DELIMITER_RE.findall(mirror_response)
+        if loose_matches:
+            kinds = list(dict.fromkeys(loose_matches))
+            raise MalformedMirrorMarker(
+                f'Marker opening delimiter(s) found ({kinds}) but no valid '
+                f'JSON object between them and the closing delimiter. The '
+                f'content INSIDE `=== XXX ===` and `=== END_XXX ===` MUST '
+                f'be a single JSON object with the required fields for that '
+                f'marker type (see agents/mirror/CLAUDE.md). NOT prose. NOT '
+                f'a sentence. Put your review narrative ABOVE the marker '
+                f'block (Beacon reads it). Put strict JSON INSIDE.'
+            )
         return None, None, mirror_response
 
     if len(all_matches) > 1:

@@ -97,6 +97,22 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
 - **Required fields per marker type** are listed above. Missing fields → dead-letter. Don't omit `task_id` even though it feels redundant with the envelope.
 - **Block delimiters are case-sensitive and must match exactly.** `=== REVIEW_PASS ===` opens, `=== END_REVIEW_PASS ===` closes. Same shape for the other three. No `===review_pass===`, no `==REVIEW PASS==`.
 - **JSON must parse.** Use double quotes around strings. Escape inner quotes. Validate mentally before emitting: `json.loads(payload)` should not raise.
+- **JSON-ONLY between delimiters.** Most common slip (Forge hit it 2026-05-13; you'll hit it too if you're not careful). The content between `=== REVIEW_PASS ===` and `=== END_REVIEW_PASS ===` (and the other markers) MUST be a single JSON object — not prose, not your review summary in sentence form. Your review narrative belongs ABOVE the marker block, where Beacon reads it. The marker payload is a machine-readable contract.
+  - ❌ **WRONG** — prose inside:
+    ```
+    === REVIEW_PASS ===
+    AC coverage is clean; no findings worth blocking on.
+    === END_REVIEW_PASS ===
+    ```
+  - ✓ **RIGHT** — JSON inside; narrative above:
+    ```
+    Read the PR diff. AC coverage clean. One nit-level naming
+    suggestion but not worth blocking.
+
+    === REVIEW_PASS ===
+    {"task_id": "abc-123", "pr_url": "https://github.com/...", "summary": "AC coverage clean; one nit-level naming suggestion noted but not blocking."}
+    === END_REVIEW_PASS ===
+    ```
 - **Marker is the last meaningful thing in your response.** Brief reasoning above it is preserved in the Beacon notify; don't continue narrating after the marker block.
 - **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers ("I considered REVIEW_ESCALATE but..."), describe without `=== ... ===` delimiters.
 - **Marker-error retries cap at 3.** If the notifier dead-letters three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error, fix the structural issue.

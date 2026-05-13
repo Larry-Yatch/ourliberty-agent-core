@@ -67,6 +67,26 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
 - **Required fields per marker type** are listed above. Missing fields → dead-letter. Don't omit `task_id` even if it feels redundant.
 - **Block delimiters are case-sensitive and must match exactly.** `=== PROCEED ===` opens, `=== END_PROCEED ===` closes. Same for the other two. No `===proceed===`, no `==PROCEED==`.
 - **JSON must parse.** Use double quotes around strings. Escape inner quotes. If you're unsure, validate mentally: `json.loads(payload)` should not raise.
+- **JSON-ONLY between delimiters.** This is the most common slip. The content between `=== PROCEED ===` and `=== END_PROCEED ===` (and the other markers) MUST be a single JSON object — nothing else. Not prose. Not a sentence summarizing your reasoning. Not a paragraph of justification. Your reasoning belongs in the narrative ABOVE the marker block, where Beacon reads it. The marker payload is a machine-readable contract, not free-form text.
+  - ❌ **WRONG** — prose inside the marker:
+    ```
+    === PROCEED ===
+    Preflight passed. File verified at line 1536. Plan: insert one line.
+    === END_PROCEED ===
+    ```
+    The parser requires `{...}` between delimiters; prose doesn't match; you'll get a marker-error retry asking you to re-emit with JSON. Three retries and the dispatch dead-letters.
+  - ✓ **RIGHT** — JSON inside the marker; narrative above:
+    ```
+    Preflight verification:
+    - File `docs/operating-manual.md` is readable.
+    - Line 1536 verified via grep.
+    - Plan: insert one line; +2 lines diff. No ambiguity.
+
+    === PROCEED ===
+    {"task_id": "opmanual-d35-5b-shipped-note-001", "preflight_summary": "Insert `Status: Shipped 2026-05-13.` as a one-liner at line 1538 of docs/operating-manual.md."}
+    === END_PROCEED ===
+    ```
+    Narrative above for Beacon. JSON below for the parser. Clean cascade.
 - **Marker is the last meaningful thing in your response.** Brief reasoning above it is fine (and useful — Beacon sees it). Don't continue narrating after the marker block.
 - **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers in your reasoning (e.g., "I considered REJECT but..."), describe them without the `=== ... ===` delimiters.
 - **Marker-error retries cap at 3.** If the notifier dead-letters your marker three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error carefully and fix the structural issue.
