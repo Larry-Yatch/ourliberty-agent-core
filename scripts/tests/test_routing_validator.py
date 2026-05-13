@@ -34,6 +34,8 @@ class HardTopologyTest(unittest.TestCase):
             ('beacon', 'pulse'),
             ('forge', 'beacon'),
             ('mirror', 'beacon'),
+            # D3.5 commit 5a: mirror → forge added for 5b's revision loop.
+            ('mirror', 'forge'),
             ('larry', 'forge'),
             ('forge-question', 'beacon'),
             ('mirror-question', 'beacon'),
@@ -45,8 +47,7 @@ class HardTopologyTest(unittest.TestCase):
         for source, target in [
             ('pulse', 'forge'),       # Pulse can't dispatch work
             ('pulse', 'mirror'),
-            ('forge', 'mirror'),      # Review goes via Beacon, not direct
-            ('mirror', 'forge'),      # Changes go via Beacon
+            ('forge', 'mirror'),      # Review trigger goes via outbox-notifier, not direct
             ('forge', 'pulse'),
             ('mirror', 'pulse'),
         ]:

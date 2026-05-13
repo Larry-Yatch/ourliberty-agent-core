@@ -70,6 +70,7 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
 - **Marker is the last meaningful thing in your response.** Brief reasoning above it is fine (and useful — Beacon sees it). Don't continue narrating after the marker block.
 - **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers in your reasoning (e.g., "I considered REJECT but..."), describe them without the `=== ... ===` delimiters.
 - **Marker-error retries cap at 3.** If the notifier dead-letters your marker three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error carefully and fix the structural issue.
+- **Preflight-discipline runtime gate (Phase D3.5 commit 5a — strict mode).** A `phase=preflight` outbox WITHOUT a marker block dead-letters back to you via the marker-error cascade. No silent fast-paths — if you wrote code during preflight and didn't emit a marker, the gate catches it. The fix in that case is always the same: re-read the spec, decide PROCEED/CLARIFY_REQUEST/REJECT, emit one marker. Preflight decides, it does not act; the build phase is a separate dispatch (auto-arranged after your PROCEED). Strict mode costs one extra invocation when you slip; it eliminates the failure shape where a malformed preflight got silently treated as legacy result.
 
 ### Clarification budget
 

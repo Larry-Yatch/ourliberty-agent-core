@@ -1511,5 +1511,890 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         self.assertIn('PR title:', build_data['prompt'])
 
 
+# ============================================================================
+# D3.5 commit 5a — Mirror review marker pipeline + preflight-discipline gate
+# ============================================================================
+
+
+PR_URL_FIXTURE = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+
+
+def _mirror_pass_marker(task_id='t-rev', summary='AC coverage clean.'):
+    payload = json.dumps({
+        'task_id': task_id, 'pr_url': PR_URL_FIXTURE, 'summary': summary,
+    })
+    return f'=== REVIEW_PASS ===\n{payload}\n=== END_REVIEW_PASS ==='
+
+
+def _mirror_revision_marker(
+    task_id='t-rev', severity='medium', confidence='high', findings=None,
+):
+    if findings is None:
+        findings = [{
+            'file': 'scripts/foo.py', 'line_range': 'L12-L15',
+            'severity': 'medium', 'description': 'Missing validation.',
+        }]
+    payload = json.dumps({
+        'task_id': task_id, 'pr_url': PR_URL_FIXTURE,
+        'findings': findings, 'severity': severity, 'confidence': confidence,
+    })
+    return f'=== REVIEW_REVISION ===\n{payload}\n=== END_REVIEW_REVISION ==='
+
+
+def _mirror_escalate_marker(
+    task_id='t-rev', severity='high', confidence='high',
+    reason='Spec mismatch; needs replan.',
+):
+    payload = json.dumps({
+        'task_id': task_id, 'pr_url': PR_URL_FIXTURE,
+        'reason': reason, 'severity': severity, 'confidence': confidence,
+    })
+    return f'=== REVIEW_ESCALATE ===\n{payload}\n=== END_REVIEW_ESCALATE ==='
+
+
+def _mirror_emergency_marker(
+    task_id='t-rev',
+    reason='Diff adds plaintext credentials.',
+    evidence='+    "secret": "abc123"',
+):
+    payload = json.dumps({
+        'task_id': task_id, 'pr_url': PR_URL_FIXTURE,
+        'reason': reason, 'evidence': evidence,
+    })
+    return (
+        f'=== REVIEW_EMERGENCY_HALT ===\n{payload}\n'
+        f'=== END_REVIEW_EMERGENCY_HALT ==='
+    )
+
+
+def _mirror_outbox_body(marker_text='', **overrides):
+    """Synthetic Mirror outbox with optional marker embedded in result.
+
+    `source` defaults to 'beacon' because the review-request was dispatched
+    BY beacon (logically). task_id defaults to 't-rev'. `phase: 'review'`
+    is propagated so the envelope matches what `_dispatch_mirror_review`
+    actually writes.
+    """
+    base = _good_outbox(
+        agent='mirror', source='beacon', task_id='t-rev', phase='review',
+        result=(
+            'Reviewed the PR diff. Coverage clean.\n\n' + marker_text
+            if marker_text else 'Reviewed but emitted no marker.'
+        ),
+    )
+    base.update(overrides)
+    return base
+
+
+class ClassifyMirrorMarkerTest(unittest.TestCase):
+    """Unit tests for `_classify_mirror_marker` — routing decision shape."""
+
+    def test_review_pass_intent(self):
+        data = _mirror_outbox_body(_mirror_pass_marker())
+        decision = on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
+        self.assertEqual(decision['notify_source'], 'mirror-result')
+        self.assertFalse(decision['auto_promoted'])
+        self.assertEqual(decision['intent_kwargs']['pr_url'], PR_URL_FIXTURE)
+
+    def test_review_revision_high_confidence_routes_as_revision(self):
+        data = _mirror_outbox_body(
+            _mirror_revision_marker(confidence='high'),
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_revision')
+        self.assertEqual(decision['intent'], 'review-revision')
+        self.assertFalse(decision['auto_promoted'])
+        self.assertEqual(decision['intent_kwargs']['finding_count'], 1)
+        self.assertEqual(decision['intent_kwargs']['confidence'], 'high')
+
+    def test_review_revision_low_confidence_auto_promotes_to_escalate(self):
+        data = _mirror_outbox_body(
+            _mirror_revision_marker(confidence='low'),
+        )
+        decision = on._classify_mirror_marker(data)
+        # Marker type stays revision (Mirror's verdict), but intent escalates.
+        self.assertEqual(decision['marker_type'], 'review_revision')
+        self.assertEqual(decision['intent'], 'review-escalate')
+        self.assertTrue(decision['auto_promoted'])
+        # Reason from build_auto_promote_reason should be in intent_kwargs
+        self.assertIn('reason', decision['intent_kwargs'])
+        self.assertIn('low', decision['intent_kwargs']['reason'])
+
+    def test_review_escalate_intent(self):
+        data = _mirror_outbox_body(_mirror_escalate_marker())
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_escalate')
+        self.assertEqual(decision['intent'], 'review-escalate')
+        self.assertEqual(decision['intent_kwargs']['severity'], 'high')
+
+    def test_review_emergency_halt_intent(self):
+        data = _mirror_outbox_body(_mirror_emergency_marker())
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_emergency_halt')
+        self.assertEqual(decision['intent'], 'review-emergency-halt')
+        self.assertIn('credentials', decision['intent_kwargs']['reason'])
+        self.assertIn('secret', decision['intent_kwargs']['evidence'])
+
+    def test_no_marker_returns_none(self):
+        data = _mirror_outbox_body(result='Just chat output, no marker.')
+        self.assertIsNone(on._classify_mirror_marker(data))
+
+    def test_envelope_task_id_mismatch_raises(self):
+        # Marker says t-other but envelope says t-rev.
+        marker = _mirror_pass_marker(task_id='t-other')
+        data = _mirror_outbox_body(marker, task_id='t-rev')
+        with self.assertRaises(on.mrh.MalformedMirrorMarker) as ctx:
+            on._classify_mirror_marker(data)
+        self.assertIn('task_id', str(ctx.exception))
+
+    def test_malformed_marker_propagates(self):
+        # Missing required field (no summary on PASS).
+        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        marker = (
+            f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
+        )
+        data = _mirror_outbox_body(marker)
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
+
+    def test_multi_marker_propagates(self):
+        marker = _mirror_pass_marker() + '\n' + _mirror_revision_marker()
+        data = _mirror_outbox_body(marker)
+        with self.assertRaises(on.mrh.MultipleMirrorMarkers):
+            on._classify_mirror_marker(data)
+
+
+class MirrorMarkerRoutingTest(unittest.TestCase):
+    """process_outbox integration: Mirror outbox → Beacon notify, marker-error
+    cascade on malformed markers."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_mirror_outbox(self, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _get_beacon_notify(self):
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1, f'expected 1 beacon notify, got {len(notifies)}')
+        return json.loads(notifies[0].read_text())
+
+    def test_review_pass_notifies_beacon(self):
+        body = _mirror_outbox_body(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        data = self._get_beacon_notify()
+        self.assertEqual(data['source'], 'mirror-result')
+        self.assertEqual(data['intent'], 'review-pass')
+        self.assertIn(PR_URL_FIXTURE, data['prompt'])
+        self.assertIn('APPROVED', data['prompt'])
+
+    def test_review_revision_notifies_beacon_with_finding_count(self):
+        body = _mirror_outbox_body(_mirror_revision_marker(confidence='high'))
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        data = self._get_beacon_notify()
+        self.assertEqual(data['intent'], 'review-revision')
+        self.assertIn('1 finding', data['prompt'])
+
+    def test_review_revision_low_confidence_promotes_to_escalate(self):
+        body = _mirror_outbox_body(_mirror_revision_marker(confidence='low'))
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        data = self._get_beacon_notify()
+        # Verified: low-confidence revision routes as escalate.
+        self.assertEqual(data['intent'], 'review-escalate')
+        self.assertIn('ESCALATED', data['prompt'])
+
+    def test_review_escalate_notifies_beacon(self):
+        body = _mirror_outbox_body(_mirror_escalate_marker())
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        data = self._get_beacon_notify()
+        self.assertEqual(data['intent'], 'review-escalate')
+        self.assertIn('Spec mismatch', data['prompt'])
+
+    def test_review_emergency_halt_notifies_beacon(self):
+        body = _mirror_outbox_body(_mirror_emergency_marker())
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        data = self._get_beacon_notify()
+        self.assertEqual(data['intent'], 'review-emergency-halt')
+        self.assertIn('credentials', data['prompt'])
+        # 5a does NOT trip the halt-file yet — that's 5d.
+        self.assertFalse(on.EMERGENCY_HALT_FLAG.exists())
+
+    def test_malformed_marker_dead_letters_to_mirror(self):
+        # Missing required field — PASS without `summary`.
+        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        marker = (
+            f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
+        )
+        body = _mirror_outbox_body(marker)
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        # No notify to Beacon
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json')), [],
+        )
+        # marker-error notify lands in Mirror's inbox
+        mirror_notifies = list(
+            (on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(mirror_notifies), 1)
+        data = json.loads(mirror_notifies[0].read_text())
+        self.assertEqual(data['intent'], 'marker-error')
+        self.assertEqual(data['marker_error_count'], 1)
+        self.assertIn('summary', data['prompt'])
+
+    def test_no_marker_falls_through_to_default_routing(self):
+        # Mirror's chat-mode outputs (no marker) should NOT trigger marker
+        # routing — they go via the default path (notify Beacon as
+        # mirror-result with intent=result-notification).
+        body = _mirror_outbox_body(
+            result=('Reviewed but reporting back in chat mode without '
+                    'a marker — Larry asked me a question, not a review.'),
+        )
+        f = self._write_mirror_outbox('t-chat.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified')
+        data = self._get_beacon_notify()
+        self.assertEqual(data['source'], 'mirror-result')
+        self.assertEqual(data['intent'], 'result-notification')
+
+
+class PreflightDisciplineGateTest(unittest.TestCase):
+    """5a's deferred-from-4b runtime gate: phase=preflight WITHOUT a marker
+    must dead-letter back to Forge via the marker-error cascade."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def test_preflight_without_marker_dead_letters_to_forge(self):
+        # phase=preflight, but Forge wrote a build-style response with no
+        # marker block. This is the failure shape the gate exists to catch.
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-bad-pf',
+            phase='preflight',
+            result=('I read the spec and started editing the file '
+                    'directly — committed the change to a branch named '
+                    'fix/typo. PR opened: https://github.com/Larry-Yatch/'
+                    'ourliberty-agent-core/pull/99'),
+        )
+        f = self._write_outbox('forge', 't-bad-pf.json', outbox)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        # marker-error notify lands in Forge's inbox with the sharper prompt
+        forge_notifies = list(
+            (on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(forge_notifies), 1)
+        data = json.loads(forge_notifies[0].read_text())
+        self.assertEqual(data['intent'], 'marker-error')
+        self.assertIn('preflight', data['prompt'].lower())
+        self.assertIn('decides', data['prompt'].lower())
+
+    def test_build_phase_without_marker_falls_through_normally(self):
+        # phase=build, no marker — this is EXPECTED (build responses don't
+        # carry markers per Forge's CLAUDE.md). The gate must not fire here.
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-build-ok',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/t-build-ok',
+            result=('PR opened: https://github.com/Larry-Yatch/'
+                    'ourliberty-agent-core/pull/100\n\n'
+                    'Fixed the typo per spec.'),
+        )
+        f = self._write_outbox('forge', 't-build-ok.json', outbox)
+        result = on.process_outbox(f)
+        # Default routing path (no marker, no preflight gate fire) →
+        # notifies Beacon with the build result. ALSO dispatches a
+        # review-request to Mirror (next test class verifies that side).
+        self.assertEqual(result, 'notified')
+
+    def test_preflight_with_marker_does_not_fire_gate(self):
+        # The gate is only for phase=preflight WITHOUT a marker. Preflight
+        # WITH a marker takes the normal marker-driven routing path.
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-pf-ok", "preflight_summary": "Will fix typo."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-pf-ok',
+            phase='preflight', result=marker,
+        )
+        f = self._write_outbox('forge', 't-pf-ok.json', outbox)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+    def test_no_phase_field_does_not_fire_gate(self):
+        # Legacy Forge outboxes (pre-D3 dispatches still in flight) may
+        # have no phase field. The gate must not fire on those — only
+        # explicit phase=preflight + no marker triggers it.
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='t-legacy',
+            result='Some plain text response from a legacy dispatch.',
+        )
+        outbox.pop('phase', None)
+        f = self._write_outbox('forge', 't-legacy.json', outbox)
+        result = on.process_outbox(f)
+        # No marker, no phase → default routing path (Beacon notify).
+        self.assertEqual(result, 'notified')
+
+
+class MirrorReviewDispatchTest(unittest.TestCase):
+    """Forge build-phase outbox carrying 'PR opened:' triggers a review-
+    request task to Mirror's inbox (parallel to _dispatch_build_phase)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _build_outbox(self, **overrides):
+        base = _good_outbox(
+            agent='forge', source='beacon', task_id='t-built',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/t-built',
+            result=('PR opened: https://github.com/Larry-Yatch/'
+                    'ourliberty-agent-core/pull/77\n\n'
+                    'Implemented the fix; tests pass.'),
+        )
+        base.update(overrides)
+        return base
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def test_pr_opened_dispatches_review_request_to_mirror(self):
+        body = self._build_outbox()
+        f = self._write_outbox('forge', 't-built.json', body)
+        on.process_outbox(f)
+        # review-request task in Mirror's inbox
+        review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(review_tasks), 1)
+        data = json.loads(review_tasks[0].read_text())
+        self.assertEqual(data['task_id'], 't-built')
+        self.assertEqual(data['source'], 'beacon')
+        self.assertEqual(data['phase'], 'review')
+        self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(data['branch'], 'forge/t-built')
+        self.assertIn('pull/77', data['pr_url'])
+        self.assertEqual(data['revision_count'], 0)
+        # max_revisions sourced from mirror_review_handler default
+        self.assertEqual(data['max_revisions'], on.mrh.DEFAULT_MAX_REVISIONS)
+        self.assertEqual(data['dispatched_by'], 'outbox-notifier')
+
+    def test_pr_opened_also_notifies_beacon(self):
+        # The review dispatch is ADDITIVE — Beacon still gets her notify
+        # via the default routing path so she can journal "PR opened."
+        body = self._build_outbox()
+        f = self._write_outbox('forge', 't-built.json', body)
+        on.process_outbox(f)
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+        data = json.loads(beacon_notifies[0].read_text())
+        self.assertEqual(data['source'], 'forge-result')
+
+    def test_build_without_pr_url_skips_review_dispatch(self):
+        # If Forge's build response doesn't start with "PR opened:", no
+        # review-request fires. (Beacon still gets her notify; she sees
+        # the missing PR URL and decides what to do.)
+        body = self._build_outbox(
+            result='Tried to build but hit a compile error; need clarification.',
+        )
+        f = self._write_outbox('forge', 't-failed-build.json', body)
+        on.process_outbox(f)
+        review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(review_tasks, [])
+
+    def test_build_without_target_repo_skips_review_dispatch(self):
+        # Mirror's worktree gate (now active per 5a's agent-models.json)
+        # requires target_repo. If Forge's build envelope somehow lost
+        # target_repo, dispatching without it would dead-letter back to
+        # her — instead, log + skip and let Larry investigate.
+        body = self._build_outbox()
+        body.pop('target_repo', None)
+        f = self._write_outbox('forge', 't-no-repo.json', body)
+        on.process_outbox(f)
+        review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(review_tasks, [])
+
+    def test_preflight_outbox_does_not_trigger_review_dispatch(self):
+        # The trigger is phase=build specifically. A preflight outbox even
+        # with "PR opened:" in the result text (Forge fast-pathed) should
+        # NOT dispatch a review — the preflight-discipline gate catches
+        # that case and dead-letters to Forge.
+        body = self._build_outbox(
+            phase='preflight',
+            result='PR opened: https://github.com/Larry-Yatch/'
+                   'ourliberty-agent-core/pull/77\n\nI fast-pathed.',
+        )
+        f = self._write_outbox('forge', 't-fastpath.json', body)
+        result = on.process_outbox(f)
+        # Gate fires → marker-error, NOT review dispatch
+        self.assertEqual(result, 'marker-error')
+        review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(review_tasks, [])
+
+    def test_idempotency_duplicate_outbox_does_not_double_dispatch(self):
+        # If the notifier crashes between dispatch and archive of a build
+        # outbox, re-processing the same outbox should NOT write a second
+        # review-request (Mirror would otherwise spawn a duplicate review).
+        body = self._build_outbox()
+        f = self._write_outbox('forge', 't-built.json', body)
+        on.process_outbox(f)
+        # Simulate re-processing: re-write the outbox + run again. (In
+        # production this happens when the notifier crashes after the
+        # dispatch write but before the archive move.)
+        f2 = self._write_outbox('forge', 't-built.json', body)
+        on.process_outbox(f2)
+        review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        # Still exactly one review-request, despite two process_outbox calls.
+        self.assertEqual(len(review_tasks), 1)
+
+
+# ============================================================================
+# D3.5 commit 5a — Post-review fixes (C-1, M-1, M-2, M-3, m-2)
+# ============================================================================
+
+
+class MarkerOutputForPromptTest(unittest.TestCase):
+    """C-1 fix: _marker_output_for_prompt must produce real body text for
+    each of Mirror's 4 marker types (not '(no reason)' fallback)."""
+
+    def _decision(self, marker_type, payload, intent_kwargs=None):
+        return {
+            'marker_type': marker_type,
+            'payload': payload,
+            'intent': on.mrh.derive_intent(marker_type),
+            'notify_source': 'mirror-result',
+            'intent_kwargs': intent_kwargs or {},
+            'auto_promoted': False,
+            'next_clarification_count': None,
+        }
+
+    def test_review_pass_body_has_summary(self):
+        payload = {
+            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'summary': 'AC coverage clean across the board.',
+        }
+        body = on._marker_output_for_prompt({}, self._decision(
+            'review_pass', payload,
+        ))
+        self.assertIn('coverage clean', body)
+        self.assertNotEqual(body, '(no reason)')
+
+    def test_review_revision_body_has_finding_summary(self):
+        payload = {
+            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'findings': [
+                {'file': 'a.py', 'line_range': 'L10',
+                 'severity': 'medium',
+                 'description': 'Missing input validation on path arg.'},
+                {'file': 'b.py', 'line_range': 'L22',
+                 'severity': 'low', 'description': 'Variable name unclear.'},
+            ],
+            'severity': 'medium', 'confidence': 'high',
+        }
+        body = on._marker_output_for_prompt({}, self._decision(
+            'review_revision', payload,
+        ))
+        self.assertIn('2 finding', body)
+        self.assertIn('Missing input validation', body)
+
+    def test_review_escalate_body_has_reason(self):
+        payload = {
+            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'reason': 'Implemented X, spec said Y.',
+            'severity': 'high', 'confidence': 'high',
+        }
+        body = on._marker_output_for_prompt({}, self._decision(
+            'review_escalate', payload,
+        ))
+        self.assertIn('Implemented X', body)
+
+    def test_review_emergency_halt_body_has_reason_and_evidence(self):
+        payload = {
+            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'reason': 'Plaintext credentials in diff.',
+            'evidence': '+    "aws_secret": "AKIA..."',
+        }
+        body = on._marker_output_for_prompt({}, self._decision(
+            'review_emergency_halt', payload,
+        ))
+        self.assertIn('Plaintext credentials', body)
+        self.assertIn('AKIA', body)
+
+
+class DispatchIdempotencyInvalidCheckTest(unittest.TestCase):
+    """M-1 fix: _dispatch_mirror_review + _dispatch_build_phase skip when
+    the target file exists in .invalid/ (not just inbox or .archive/)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def test_mirror_review_skips_when_in_invalid(self):
+        # Plant a stale review-request in Mirror's .invalid/
+        invalid_dir = on.INBOXES_ROOT / 'mirror' / '.invalid'
+        invalid_dir.mkdir(parents=True, exist_ok=True)
+        (invalid_dir / 'review-t-stuck.json').write_text('{}')
+
+        data = {
+            'task_id': 't-stuck',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-stuck',
+        }
+        on._dispatch_mirror_review(data, 'https://github.com/x/y/pull/1')
+        # Should NOT have written a fresh review-request to the live inbox
+        live = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(live, [])
+
+    def test_build_phase_skips_when_in_invalid(self):
+        invalid_dir = on.INBOXES_ROOT / 'forge' / '.invalid'
+        invalid_dir.mkdir(parents=True, exist_ok=True)
+        (invalid_dir / 'build-t-stuck.json').write_text('{}')
+
+        data = {
+            'task_id': 't-stuck',
+            'claude_session_id': 'sess-abc',
+            'target_repo': 'ourliberty-agent-core',
+        }
+        on._dispatch_build_phase(data)
+        live = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(live, [])
+
+
+class MirrorReviewMetadataPropagationTest(unittest.TestCase):
+    """M-2 fix: _dispatch_mirror_review propagates pr_title/pr_body/
+    max_clarifications when present on the source envelope."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def test_pr_title_pr_body_max_clarifications_propagate(self):
+        data = {
+            'task_id': 't-meta',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-meta',
+            'pr_title': 'fix(watchdog): clarify enabled flag',
+            'pr_body': '## Summary\nDoc fix.',
+            'max_clarifications': 5,
+        }
+        on._dispatch_mirror_review(data, 'https://github.com/x/y/pull/1')
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['pr_title'], 'fix(watchdog): clarify enabled flag')
+        self.assertEqual(review['pr_body'], '## Summary\nDoc fix.')
+        self.assertEqual(review['max_clarifications'], 5)
+
+    def test_omitted_metadata_does_not_crash(self):
+        # Forge envelopes that don't carry the metadata fields should still
+        # dispatch successfully — the fields are optional.
+        data = {
+            'task_id': 't-bare',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/t-bare',
+        }
+        on._dispatch_mirror_review(data, 'https://github.com/x/y/pull/1')
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertNotIn('pr_title', review)
+        self.assertNotIn('pr_body', review)
+
+
+class MirrorMarkerErrorReplyChatIdTest(unittest.TestCase):
+    """M-3 fix: _notify_mirror_marker_error propagates reply_chat_id so a
+    Telegram-initiated review whose marker errors three-strikes still closes
+    the chat thread via the eventual dead-letter."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def test_reply_chat_id_propagates_into_marker_error_notify(self):
+        data = {
+            'agent': 'mirror', 'source': 'beacon',
+            'task_id': 't-chat', 'reply_chat_id': 7998341473,
+        }
+        on._notify_mirror_marker_error(data, 'some marker parse error')
+        notifies = list(
+            (on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['reply_chat_id'], 7998341473)
+
+
+class PrUrlRegexAnchoredTest(unittest.TestCase):
+    """m-2 fix: _PR_URL_RE is anchored to start-of-string so a stale PR URL
+    discussed in narrative doesn't false-match before the real one."""
+
+    def test_pr_url_at_start_extracted(self):
+        result = (
+            'PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/'
+            'pull/77\n\nDetails follow.'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77',
+        )
+
+    def test_pr_url_with_leading_whitespace_extracted(self):
+        result = (
+            '   PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/'
+            'pull/77\n\nDetails.'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77',
+        )
+
+    def test_pr_url_only_in_narrative_returns_none(self):
+        # Forge wrote a narrative that DISCUSSES a stale URL but didn't
+        # actually open a PR. Anchored regex must NOT match this.
+        result = (
+            'I considered re-using last week\'s branch where '
+            'PR opened: https://github.com/x/y/pull/99 — but instead, '
+            'I built fresh and ran into a compile error. No PR yet.'
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_stale_url_before_real_url_first_one_wins_only_at_start(self):
+        # Worst-case: Forge starts with narrative discussing a stale URL,
+        # then writes the real "PR opened:" later. Anchored regex returns
+        # None — the build response did NOT follow the contract (URL must
+        # be at start). Default routing fallback handles it; Beacon sees
+        # the result and decides.
+        result = (
+            'Briefly considered https://github.com/x/y/pull/99 but rejected.\n'
+            'PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/'
+            'pull/77'
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_empty_result_returns_none(self):
+        self.assertIsNone(on._extract_pr_url_from_build_result(''))
+        self.assertIsNone(on._extract_pr_url_from_build_result(None))
+
+
 if __name__ == '__main__':
     unittest.main()

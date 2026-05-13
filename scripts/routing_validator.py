@@ -54,7 +54,11 @@ FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     'pulse': {'beacon'},
     'beacon': {'pulse', 'forge', 'mirror'},
     'forge': {'beacon'},
-    'mirror': {'beacon'},
+    # D3.5 commit 5a: mirror → forge added as forward-compat for 5b's revision
+    # loop. 5a itself doesn't dispatch on this route (REVIEW_REVISION just
+    # journals to Beacon in 5a); 5b lights it up when the notifier writes
+    # revision-tasks to Forge's inbox in response to Mirror's REVIEW_REVISION.
+    'mirror': {'beacon', 'forge'},
     'larry': {'beacon', 'forge', 'mirror', 'pulse'},
     # Clarification protocol forward legs (Phase D3). A `<agent>-question`
     # source is a structured ask-before-build query. Reply legs use the

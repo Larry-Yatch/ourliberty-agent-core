@@ -175,6 +175,75 @@ Reason: ...
 
 Same handling as Shape 3 — journal, decide whether to revise + re-dispatch or set aside. Don't loop on retry without addressing the cause.
 
+## How you handle Mirror's review markers (Phase D3.5 commit 5a)
+
+Mirror reviews every PR Forge opens. The outbox notifier auto-dispatches a `review-request` to her inbox when Forge's build outbox carries `PR opened: <url>`. Mirror's review ends with one of four markers, each of which lands in your inbox as a `mirror-result` notify. **Read the `intent=` tag in the inbox notify header to pick the right shape — same protocol as Forge's preflight markers.**
+
+In **5a** all four shapes journal to you and stop there — auto-merge is not yet wired (5d), the Forge revision dispatch is not yet wired (5b), and the Beacon replan flow is not yet wired (5c). Larry handles whatever the marker requires manually. The shapes below describe what 5a delivers now; the manual-action note in each tells you what to do until the corresponding sub-commit lights the automation.
+
+### Shape 6 — `intent=review-pass` (Mirror approved the PR)
+
+```
+[Inter-agent notify | intent=review-pass | from=mirror | task=<id> | status=SUCCESS]
+
+Mirror has APPROVED PR `<url>` on task `<id>`. Summary: <Mirror's rationale>.
+Journal the approval. In 5a auto-merge is not yet wired, so Larry merges
+manually after seeing this notify. No further action from you.
+```
+
+Journal: "Mirror approved PR #N on task <id>." That's it in 5a — Larry merges manually. (Once 5d lands, this triggers `gh pr merge --squash --delete-branch` automatically.)
+
+### Shape 7 — `intent=review-revision` (Mirror found fixable issues)
+
+```
+[Inter-agent notify | intent=review-revision | from=mirror | task=<id> | status=SUCCESS]
+
+Mirror has requested REVISION on PR `<url>` for task `<id>` (N finding(s),
+severity=medium, confidence=high). In 5a the Forge revision dispatch is not
+yet wired — journal the request and Larry handles the revision manually
+(DM Forge a follow-up task or comment on the PR). 5b will wire the
+auto-revision loop.
+```
+
+In 5a: journal "Mirror requested revision on task <id>: N findings, severity=X" and DM Larry the summary. Larry will dispatch the revision manually if he wants Forge to fix. (Once 5b lands, the notifier writes a `phase=revision` task to Forge's inbox with `--resume` against her build session; she patches and pushes; Mirror re-reviews. Bounded by `max_revisions` from `config/agent-models.json loop_bounds`.)
+
+### Shape 8 — `intent=review-escalate` (Mirror needs a replan)
+
+```
+[Inter-agent notify | intent=review-escalate | from=mirror | task=<id> | status=SUCCESS]
+
+Mirror has ESCALATED PR `<url>` on task `<id>` (severity=high, confidence=high).
+Reason: <Mirror's why>. In 5a the replan flow is not yet wired — journal the
+escalation and decide manually: revise the spec (new APPROVAL_REQUEST) or
+push back with reasoning. 5c will wire the auto-replan loop.
+```
+
+Two paths in 5a, judged like Shape 1 (clarify) — *can I fix this by revising the spec, or is Mirror wrong?*
+
+- **Spec needs revision** — emit a new APPROVAL_REQUEST with the adjusted plan that addresses Mirror's reason. Larry approves; Forge re-runs; Mirror re-reviews.
+- **Mirror is wrong / overstated the issue** — DM Larry your reasoning. Larry can override and ask Forge to proceed, or back Mirror's call. Don't unilaterally close the loop.
+
+**Important: a REVIEW_REVISION with `confidence: low` arrives here as `intent=review-escalate`, not `intent=review-revision`.** The notifier auto-promotes low-confidence revisions to escalations on the grounds that the auto-fix loop shouldn't run against findings Mirror herself is uncertain about. The notify prompt explicitly names "auto-promoted" so you can tell the difference between a confident escalate and a hedged revision — they're handled the same way but the audit trail records what Mirror actually said.
+
+### Shape 9 — `intent=review-emergency-halt` (Mirror found a safety issue)
+
+```
+[Inter-agent notify | intent=review-emergency-halt | from=mirror | task=<id> | status=SUCCESS]
+
+Mirror has flagged EMERGENCY_HALT on PR `<url>` for task `<id>`. Reason:
+<credentials / destructive ops / allowlist breach>. Evidence: <quoted-from-diff
+string>. In 5a the halt-file trip + priority DM are not yet wired — Larry
+will see this as a normal notify. Treat it as critical: review the PR
+immediately and decide whether to close it without merge. 5d will wire the
+automatic halt.
+```
+
+**Treat as critical.** Even though 5a doesn't trip the halt-file or fire a priority DM, the marker is reserved for actual safety issues — Mirror only emits it for credentials in diffs, destructive migrations, allowlist breaches, or user-data-deletion shapes. Journal + DM Larry immediately with the evidence. The right action is almost always "close the PR without merge" — discuss with Larry before any decision to proceed. Once 5d lands, EMERGENCY_HALT trips `~/agents/blackboard/EMERGENCY_HALT` automatically and stops all agents on next poll.
+
+### Sanity check before acting
+
+Mirror is a single agent with a fallible judgment surface. For all four shapes above, the rule of thumb: **if Mirror's verdict surprises you given what you know about the spec, sanity-check before automating around it.** A REVIEW_PASS on something Larry explicitly asked to be reviewed manually is worth a second look; a REVIEW_ESCALATE on a one-line doc fix is worth questioning. In 5a everything is manual anyway so this is implicit; in 5b–5d the automation is bounded by loop budgets (`max_revisions`, `max_replans`, `cost_per_task_usd`) which catch the worst pathologies.
+
 ## Memory discipline
 
 - When something matters across sessions, write it down. Daily notes go in `memory/YYYY-MM-DD.md`. Distilled long-term memory goes in `MEMORY.md`.

@@ -57,6 +57,14 @@ ALLOWED_SOURCES = {
 #     fix — naked notifies were getting misread as new work)
 #   - dead-letter: dispatcher learns its task was validator-rejected
 #   - marker-error: Forge learns her marker was unparseable (re-emit)
+#
+# D3.5 commit 5a adds the Mirror review marker vocabulary:
+#   - review-pass: Mirror approved the PR; no findings ≥ medium, confidence high.
+#   - review-revision: Mirror found fixable issues; Forge revises (wired in 5b).
+#   - review-escalate: Mirror found issues that need Beacon replan (wired in 5c).
+#   - review-emergency-halt: Mirror found a safety issue (credentials, destructive
+#     migration, scope-of-trust breach); EMERGENCY_HALT trip wired in 5d.
+#   - replan-request: Beacon-shaped intent on a Mirror escalation notify.
 ALLOWED_INTENTS = {
     'ack-proceed',
     'clarify',
@@ -66,9 +74,18 @@ ALLOWED_INTENTS = {
     'result-notification',
     'dead-letter',
     'marker-error',
+    'review-pass',
+    'review-revision',
+    'review-escalate',
+    'review-emergency-halt',
+    'replan-request',
 }
 
-ALLOWED_PHASES = {'preflight', 'build'}
+# D3.5 commit 5a — Mirror review chain. `review` is the Mirror dispatch
+# phase (review-request task lands in her inbox after Forge opens a PR).
+# `revision` is the Forge revision phase wired in 5b (Mirror's REVIEW_REVISION
+# routes a fresh task back to Forge under --resume).
+ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision'}
 
 MIN_PROMPT_LEN = 100  # chars
 MAX_PROMPT_LEN = 50000

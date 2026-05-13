@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import signal
 import sys
@@ -63,6 +64,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import dispatch_validator         # noqa: E402
 import forge_preflight_handler as fph  # noqa: E402
+import mirror_review_handler as mrh  # noqa: E402
 import safe_write_inbox             # noqa: E402
 
 HOME = Path.home()
@@ -91,11 +93,22 @@ MAX_RESULT_TEXT_CHARS = 8000  # truncate huge claude outputs in notify prompts
 # marker-driven cascades.
 MAX_NOTIFY_DEPTH = 1
 
-# Cap on consecutive marker-error retries to Forge. Defense against a wedge
-# loop where Forge keeps producing malformed markers (e.g., a CLAUDE.md bug
-# or a session that's lost track of the grammar). When exceeded, the notifier
-# dead-letters back to Beacon instead of retrying Forge again.
+# Cap on consecutive marker-error retries to Forge OR Mirror. Defense
+# against a wedge loop where the agent keeps producing malformed markers
+# (e.g., a CLAUDE.md bug or a session that's lost track of the grammar).
+# When exceeded, the notifier dead-letters back to Beacon instead of
+# retrying the agent again.
 MAX_MARKER_ERROR_RETRIES = 3
+
+# D3.5 commit 5a — extract Forge's PR URL from a build-phase outbox result.
+# Forge's CLAUDE.md mandates the build response START with `PR opened: <url>`
+# (agents/forge/CLAUDE.md, Build phase protocol § "Ending your build response").
+# Anchored to start-of-string (with optional leading whitespace) so a PR URL
+# discussed in narrative ("I considered PR opened: <stale-url> from last week")
+# doesn't false-match before the real URL. m-2 review fix.
+_PR_URL_RE = re.compile(
+    r'\A\s*PR opened:\s*(https://github\.com/[^\s]+/pull/\d+)',
+)
 
 # -------------------- notify-prompt template (D3-forge commit 4a) --------------------
 # Refined notify framing — Option C hybrid: one skeleton, per-intent action
@@ -160,11 +173,48 @@ INTENT_ACTION_BLOCKS = {
     ),
     'marker-error': (
         'Your previous output on task `{task_id}` could not be parsed as a valid '
-        'preflight marker (retry {retry_count} of {max_retries}). Error: {reason}. '
-        'Re-read your CLAUDE.md preflight section, then re-emit EXACTLY one of '
-        'PROCEED / CLARIFY_REQUEST / REJECT with the required fields and matching '
-        '`=== END_XXX ===` block. After {max_retries} retries the dispatch will '
-        'be closed and dead-lettered back to Beacon.'
+        'marker (retry {retry_count} of {max_retries}). Error: {reason}. '
+        'Re-read your CLAUDE.md marker-discipline section and re-emit EXACTLY one '
+        'valid marker block with the required fields and matching '
+        '`=== END_XXX ===` delimiter. After {max_retries} retries the dispatch '
+        'will be closed and dead-lettered back to Beacon.'
+    ),
+    # D3.5 commit 5a — Mirror review marker intents. All four route to Beacon
+    # as informational journal entries in 5a; the actual loop machinery
+    # (revision dispatch to Forge in 5b, replan flow in 5c, auto-merge +
+    # EMERGENCY_HALT trip in 5d) lands later.
+    'review-pass': (
+        'Mirror has APPROVED PR `{pr_url}` on task `{task_id}`. Summary: '
+        '{summary}. Journal the approval. In 5a auto-merge is not yet wired, '
+        'so Larry merges manually after seeing this notify. No further action '
+        'from you.'
+    ),
+    'review-revision': (
+        'Mirror has requested REVISION on PR `{pr_url}` for task `{task_id}` '
+        '({finding_count} finding(s), severity={severity}, confidence={confidence}). '
+        'In 5a the Forge revision dispatch is not yet wired — journal the '
+        'request and Larry handles the revision manually (DM Forge a follow-up '
+        'task or comment on the PR). 5b will wire the auto-revision loop.'
+    ),
+    'review-escalate': (
+        'Mirror has ESCALATED PR `{pr_url}` on task `{task_id}` '
+        '(severity={severity}, confidence={confidence}). Reason: {reason}. '
+        'In 5a the replan flow is not yet wired — journal the escalation and '
+        'decide manually: revise the spec (new APPROVAL_REQUEST) or push back '
+        'with reasoning. 5c will wire the auto-replan loop.'
+    ),
+    'review-emergency-halt': (
+        'Mirror has flagged EMERGENCY_HALT on PR `{pr_url}` for task `{task_id}`. '
+        'Reason: {reason}. Evidence: {evidence}. In 5a the halt-file trip + '
+        'priority DM are not yet wired — Larry will see this as a normal '
+        'notify. Treat it as critical: review the PR immediately and decide '
+        'whether to close it without merge. 5d will wire the automatic halt.'
+    ),
+    'replan-request': (
+        'A downstream agent has requested a replan on task `{task_id}`. '
+        'Reason: {reason}. Decide: revise the plan inline (new APPROVAL_REQUEST '
+        'with adjusted scope) or push back to the requester. Bounded by '
+        'max_replans on the envelope.'
     ),
 }
 
@@ -361,6 +411,22 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
 
     marker_type, payload, _narrative = fph.parse_forge_marker(result_text)
     if marker_type is None:
+        # D3.5 commit 5a — preflight-discipline runtime gate (deferred from
+        # 4b's followup-2 doc). A `phase=preflight` outbox MUST end with one
+        # of PROCEED / CLARIFY_REQUEST / REJECT. If Forge fast-pathed past
+        # the marker block (e.g., started writing code during preflight),
+        # the dispatch has no decision recorded — dead-letter back via the
+        # marker-error cascade with a sharper "decide, don't act" prompt.
+        # 5a ships strict mode (per the d3-5-plan VALUES sign-off — soft
+        # warning lets Forge keep fast-pathing; strict costs one extra
+        # invocation, cheap insurance until Forge has 20+ disciplined runs).
+        if data.get('phase') == 'preflight':
+            raise fph.MalformedForgeMarker(
+                'phase=preflight requires ONE marker block at end of response '
+                '(PROCEED / CLARIFY_REQUEST / REJECT) — none found. Re-read '
+                "agents/forge/CLAUDE.md 'Preflight discipline' — preflight "
+                'decides, it does not act.'
+            )
         return None
 
     # Phase D3 commit 4b: tighten marker discipline. Forge's marker payload
@@ -702,10 +768,14 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
     if (
         (forge_inbox / build_filename).exists()
         or (forge_inbox / '.archive' / build_filename).exists()
+        # D3.5 5a M-1 review fix: also check .invalid/ — a prior dispatch that
+        # was validator-rejected lives there, and we shouldn't re-dispatch a
+        # duplicate that will hit the same rejection.
+        or (forge_inbox / '.invalid' / build_filename).exists()
     ):
         log(
             f'build-phase already dispatched for task {task_id} '
-            f'(file or archive present); skipping duplicate write'
+            f'(file or archive or .invalid present); skipping duplicate write'
         )
         return
 
@@ -733,6 +803,366 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         )
 
 
+def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Inspect a Mirror outbox for a review marker. Returns routing decision or None.
+
+    Phase D3.5 commit 5a. Parallel to `_classify_forge_marker` — same return
+    shape, same envelope-vs-marker task_id discipline, same dead-letter
+    cascade behavior on malformed markers.
+
+    The confidence-promote rule is applied internally: a REVIEW_REVISION
+    with `confidence: low` returns the routing decision shaped as an
+    ESCALATE (intent=`review-escalate`) but with `auto_promoted=True` so
+    downstream logging records that Mirror said revise + we routed escalate.
+
+    Raises `mrh.MalformedMirrorMarker` or `mrh.MultipleMirrorMarkers` if the
+    marker block is present but unparseable. The caller dead-letters those
+    back to Mirror so she can re-emit cleanly.
+
+    Returns None if the outbox has no marker (Mirror's chat-mode outputs
+    take the default routing path).
+    """
+    result_text = data.get('result', '')
+    if not isinstance(result_text, str) or not result_text.strip():
+        return None
+
+    marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
+    if marker_type is None:
+        return None
+
+    # Marker discipline: payload task_id MUST match envelope task_id
+    # (same shape as Forge handler's 4b check). Drift here means Mirror
+    # reviewed the wrong PR; route as marker-error so she re-emits.
+    envelope_task_id = data.get('task_id')
+    marker_task_id = (
+        payload.get('task_id') if isinstance(payload, dict) else None
+    )
+    if (
+        envelope_task_id is not None
+        and marker_task_id is not None
+        and marker_task_id != envelope_task_id
+    ):
+        raise mrh.MalformedMirrorMarker(
+            f'marker task_id ({marker_task_id!r}) does not match envelope '
+            f'task_id ({envelope_task_id!r})'
+        )
+
+    agent = data.get('agent', 'mirror')
+    auto_promoted = mrh.should_auto_promote(marker_type, payload)
+
+    # Per-marker intent_kwargs for INTENT_ACTION_BLOCKS rendering. Keep
+    # aligned with the templates in INTENT_ACTION_BLOCKS — missing keys
+    # degrade gracefully via build_notify_prompt's exception handler, but
+    # cleaner to supply them upfront.
+    pr_url = payload.get('pr_url', '(no PR URL)') if isinstance(payload, dict) else '(no PR URL)'
+
+    if marker_type == 'review_pass':
+        intent_kwargs = {
+            'pr_url': pr_url,
+            'summary': payload.get('summary', '(no summary)'),
+        }
+    elif marker_type == 'review_revision':
+        if auto_promoted:
+            intent_kwargs = {
+                'pr_url': pr_url,
+                'severity': payload.get('severity', '?'),
+                'confidence': payload.get('confidence', '?'),
+                'reason': mrh.build_auto_promote_reason(payload),
+            }
+        else:
+            findings = payload.get('findings') or []
+            finding_count = len(findings) if isinstance(findings, list) else 0
+            intent_kwargs = {
+                'pr_url': pr_url,
+                'finding_count': finding_count,
+                'severity': payload.get('severity', '?'),
+                'confidence': payload.get('confidence', '?'),
+            }
+    elif marker_type == 'review_escalate':
+        intent_kwargs = {
+            'pr_url': pr_url,
+            'severity': payload.get('severity', '?'),
+            'confidence': payload.get('confidence', '?'),
+            'reason': payload.get('reason', '(no reason)'),
+        }
+    elif marker_type == 'review_emergency_halt':
+        intent_kwargs = {
+            'pr_url': pr_url,
+            'reason': payload.get('reason', '(no reason)'),
+            'evidence': payload.get('evidence', '(no evidence)'),
+        }
+    else:
+        # Defensive: future marker types should at minimum render the pr_url.
+        intent_kwargs = {'pr_url': pr_url}
+
+    return {
+        'marker_type': marker_type,
+        'payload': payload,
+        'intent': mrh.derive_intent(marker_type, auto_promoted=auto_promoted),
+        'notify_source': mrh.derive_notify_source(agent),
+        'intent_kwargs': intent_kwargs,
+        'auto_promoted': auto_promoted,
+        # Parallel field to Forge's clarification_count for cascade plumbing.
+        # Mirror's terminal-only markers in 5a don't carry a counter; 5b
+        # populates this when REVIEW_REVISION dispatches back to Forge.
+        'next_clarification_count': None,
+    }
+
+
+def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
+    """Write a marker-error notify back to Mirror so she can re-emit a clean marker.
+
+    Phase D3.5 commit 5a. Parallel to `_notify_forge_marker_error` — same
+    retry counter on the envelope (`marker_error_count`), same MAX cap,
+    same dead-letter-to-original-dispatcher behavior on exhaust.
+
+    The notify-prompt template (`marker-error` intent) is shared with Forge
+    — agent-agnostic wording so both agents see the same retry shape. The
+    receiver decides which marker grammar to re-emit by reading their own
+    CLAUDE.md marker-discipline section.
+    """
+    agent = data.get('agent', 'mirror')
+    task_id = data.get('task_id', 'unknown')
+
+    # Trace original dispatcher (same pattern as Forge handler — on the
+    # first malformed-marker round, source IS the original dispatcher; on
+    # subsequent rounds it propagated via original_source).
+    original_source = data.get('original_source') or data.get('source') or 'beacon'
+
+    prev_count = data.get('marker_error_count', 0)
+    if not isinstance(prev_count, int) or prev_count < 0:
+        prev_count = 0
+    new_count = prev_count + 1
+
+    if new_count > MAX_MARKER_ERROR_RETRIES:
+        log(
+            f'marker-error retries exhausted ({new_count}/{MAX_MARKER_ERROR_RETRIES}) '
+            f'for task {task_id} on agent {agent}; dead-lettering to {original_source}',
+            'WARN',
+        )
+        _dead_letter_marker_error_to_dispatcher(
+            data, original_source, err_msg, new_count,
+        )
+        return
+
+    prompt = build_notify_prompt(
+        intent='marker-error',
+        sender='outbox-notifier',
+        task_id=task_id,
+        success=False,
+        output=(data.get('result') or '')[:1000],
+        intent_kwargs={
+            'reason': err_msg,
+            'task_id': task_id,
+            'retry_count': new_count,
+            'max_retries': MAX_MARKER_ERROR_RETRIES,
+        },
+    )
+    notify_task: dict[str, Any] = {
+        'task_id': f'marker-error-{task_id}-{new_count}',
+        'prompt': prompt,
+        'source': 'outbox-notifier',
+        'intent': 'marker-error',
+        '_notify_depth': 1,
+        'original_source': original_source,
+        'marker_error_count': new_count,
+    }
+    # Propagate envelope fields the agent needs to keep working on the same
+    # task (session_id for --resume, target_repo + branch for worktree gating).
+    # Same shape as the Forge marker-error path.
+    if data.get('claude_session_id'):
+        notify_task['session_id'] = data['claude_session_id']
+    if data.get('target_repo'):
+        notify_task['target_repo'] = data['target_repo']
+    if data.get('branch'):
+        notify_task['branch'] = data['branch']
+    if data.get('pr_url'):
+        notify_task['pr_url'] = data['pr_url']
+    # Revision counters propagate too — a marker-error round shouldn't
+    # reset the revision budget mid-review.
+    if data.get('revision_count') is not None:
+        notify_task['revision_count'] = data['revision_count']
+    if data.get('max_revisions') is not None:
+        notify_task['max_revisions'] = data['max_revisions']
+    # D3.5 5a M-3 review fix: propagate reply_chat_id so a Telegram-initiated
+    # review whose marker errors three-strikes still closes the chat thread
+    # via the eventual dead-letter to Beacon. Without this the user-facing
+    # DM thread silently ends.
+    if data.get('reply_chat_id') is not None:
+        notify_task['reply_chat_id'] = data['reply_chat_id']
+
+    try:
+        safe_write_inbox.safe_write_inbox(
+            target_agent=agent,
+            task_dict=notify_task,
+            source_agent='outbox-notifier',
+            filename=f'marker-error-{task_id}-{new_count}.json',
+        )
+        log(
+            f'marker-error notify written to {agent} for task {task_id} '
+            f'(retry {new_count}/{MAX_MARKER_ERROR_RETRIES})'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'marker-error notify failed for {agent}/{task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
+def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
+    """Return the PR URL from a Forge build-phase outbox, or None if absent.
+
+    Phase D3.5 commit 5a. Forge's CLAUDE.md mandates the build response
+    START with `PR opened: <url>`. Returns the first match — narrative
+    text below the URL is not searched. Returns None on empty/None input
+    or no match.
+    """
+    if not isinstance(result_text, str) or not result_text:
+        return None
+    m = _PR_URL_RE.search(result_text)
+    if not m:
+        return None
+    return m.group(1)
+
+
+def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
+    """Write a review-request task to Mirror's inbox after Forge opens a PR.
+
+    Phase D3.5 commit 5a. Fires inside `process_outbox` when Forge's
+    `phase=build` outbox carries `PR opened: <url>` in result. Same shape
+    as `_dispatch_build_phase`: a single new dispatch keyed by the same
+    task_id; the notify-to-Beacon from the default routing path still
+    fires alongside (Beacon journals "Forge opened PR #N"; this dispatch
+    starts Mirror's review).
+
+    `source` is `beacon` because Beacon is the logical dispatcher (her
+    APPROVAL_REQUEST authorized the work that produced the PR). The
+    `dispatched_by: 'outbox-notifier'` audit field records the actual
+    writer.
+
+    Failure to write the review-request is logged WARN and non-fatal —
+    the notify-to-Beacon above has already informed her of the PR; Larry
+    sees the gap and can manually re-dispatch.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    target_repo = data.get('target_repo')
+    if not target_repo:
+        # Without target_repo, Mirror's worktree gate (now active per 5a's
+        # agent-models.json change) rejects the review task as "no canonical
+        # path." Surface the gap to Larry rather than silently dropping.
+        log(
+            f'PR opened on task {task_id} but no target_repo on envelope; '
+            f'cannot dispatch review (Mirror requires target_repo for '
+            f'worktree gating). Larry must manually re-dispatch.',
+            'WARN',
+        )
+        return
+
+    branch = data.get('branch')
+    # max_revisions sourced from config/agent-models.json `loop_bounds` —
+    # propagated through the dispatch envelope so the budget is consistent
+    # across the full review/revision cascade. 5a doesn't enforce the
+    # budget (no revision loop yet); 5b activates evaluate_revision_budget.
+    max_revisions = mrh.DEFAULT_MAX_REVISIONS
+
+    review_prompt_lines = [
+        f'Review phase. Forge has opened PR `{pr_url}` for task `{task_id}`. '
+        f'Your job: verify this PR against the spec from the original '
+        f'APPROVAL_REQUEST and emit one marker block (PASS / REVISION / '
+        f'ESCALATE / EMERGENCY_HALT).',
+        '',
+        f'Task: `{task_id}`',
+        f'PR: {pr_url}',
+    ]
+    if branch:
+        review_prompt_lines.append(f'Branch: `{branch}`')
+    if target_repo:
+        review_prompt_lines.append(f'Target repo: `{target_repo}`')
+    review_prompt_lines.extend([
+        '',
+        'Follow the Review protocol in your CLAUDE.md: read the spec from '
+        'the dispatch context, fetch the PR diff (`gh pr diff <N>`), '
+        'optionally `gh pr checkout <N>` and run tests in your worktree '
+        'if you need to verify behavior. Emit a single marker block at '
+        'the end (REVIEW_PASS / REVIEW_REVISION / REVIEW_ESCALATE / '
+        f'REVIEW_EMERGENCY_HALT). You have {max_revisions} revision rounds '
+        'budget — set confidence thoughtfully (low-confidence revisions '
+        'auto-promote to escalate).',
+    ])
+    review_prompt = '\n'.join(review_prompt_lines)
+
+    review_task: dict[str, Any] = {
+        'task_id': task_id,
+        'prompt': review_prompt,
+        'source': 'beacon',
+        'phase': 'review',
+        'pr_url': pr_url,
+        'target_repo': target_repo,
+        'revision_count': 0,
+        'max_revisions': max_revisions,
+        'dispatched_by': 'outbox-notifier',
+    }
+    if branch:
+        review_task['branch'] = branch
+    if data.get('reply_chat_id') is not None:
+        review_task['reply_chat_id'] = data['reply_chat_id']
+    # D3.5 5a M-2 review fix: propagate the same envelope fields
+    # _dispatch_build_phase does. Without these, a future Mirror REVIEW_QUESTION
+    # round-trip (5b) loses the PR metadata when answering back to Beacon,
+    # and the worktree gate rejects with "no canonical path" — same shape as
+    # the 4a marker-error black hole.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+        if data.get(f_name) is not None:
+            review_task[f_name] = data[f_name]
+
+    review_filename = f'review-{task_id}.json'
+    # Idempotency check (same pattern as _dispatch_build_phase): if the
+    # review task is already in Mirror's inbox OR archived, skip. Guards
+    # against the notifier crashing between dispatch and archive of the
+    # build-phase outbox — re-processing would otherwise spawn a duplicate
+    # Mirror review of a PR she's already started reviewing.
+    mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
+    if (
+        (mirror_inbox / review_filename).exists()
+        or (mirror_inbox / '.archive' / review_filename).exists()
+        # D3.5 5a M-1 review fix: also check .invalid/ — a prior dispatch
+        # that was validator-rejected lives there. Don't re-dispatch a
+        # duplicate that will hit the same rejection.
+        or (mirror_inbox / '.invalid' / review_filename).exists()
+    ):
+        log(
+            f'review-request already dispatched for task {task_id} '
+            f'(file or archive or .invalid present); skipping duplicate write'
+        )
+        return
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='mirror',
+            task_dict=review_task,
+            source_agent='beacon',
+            filename=review_filename,
+        )
+        log(
+            f'review-request dispatched mirror <- beacon '
+            f'(task={task_id}, file={dest.name}, pr={pr_url})'
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'review-request dispatch FAILED for task {task_id}: '
+            f'{type(e).__name__}: {e}. Beacon was already notified of '
+            f'PR opened; Larry must manually re-dispatch review.',
+            'WARN',
+        )
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
@@ -748,6 +1178,21 @@ def process_outbox(outbox_file: Path) -> str:
     if not agent or not source:
         _archive_outbox(outbox_file)
         return 'archived-no-notify'
+
+    # D3.5 commit 5a — Forge build-phase outbox carrying "PR opened: <url>"
+    # triggers a `review-request` dispatch to Mirror. Fires BEFORE marker
+    # classification so the dispatch happens even though Forge's build
+    # response has no marker (markers are preflight-only per her CLAUDE.md
+    # Build phase protocol). This is an additive dispatch — the notify to
+    # Beacon below still fires via the default routing path, so Beacon
+    # journals "PR opened" while Mirror starts her review.
+    if agent == 'forge' and data.get('phase') == 'build':
+        pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
+        if pr_url:
+            _dispatch_mirror_review(data, pr_url)
+        # No marker, so marker classification below returns None and the
+        # default routing path takes over (Beacon notify with the full
+        # build result narrative).
 
     # Forge preflight marker check. Markers override default routing rules
     # because the preflight protocol is intentionally multi-hop and the
@@ -765,6 +1210,40 @@ def process_outbox(outbox_file: Path) -> str:
             _notify_forge_marker_error(data, str(e))
             _archive_outbox(outbox_file)
             return 'marker-error'
+
+    # D3.5 commit 5a — Mirror review marker check. Parallel to the Forge
+    # branch above; same return shape from the classifier so the marker-
+    # decision routing block below handles both transparently.
+    if agent == 'mirror':
+        try:
+            marker_decision = _classify_mirror_marker(data)
+        except (mrh.MalformedMirrorMarker, mrh.MultipleMirrorMarkers) as e:
+            log(
+                f'mirror marker error in {outbox_file.name}: '
+                f'{type(e).__name__}: {e}',
+                'WARN',
+            )
+            _notify_mirror_marker_error(data, str(e))
+            _archive_outbox(outbox_file)
+            return 'marker-error'
+        # Auto-promoted REVIEW_REVISION (low confidence → escalate) — log
+        # so the audit trail captures Mirror's original verdict alongside
+        # the system's routing decision.
+        if marker_decision and marker_decision.get('auto_promoted'):
+            log(
+                f'mirror REVIEW_REVISION auto-promoted to ESCALATE for task '
+                f'{data.get("task_id", "?")} (confidence=low)',
+            )
+        # 5d ships the EMERGENCY_HALT trip; 5a just logs at WARN level so
+        # the operator sees the marker fire even before the halt-file path
+        # is wired.
+        if marker_decision and marker_decision['marker_type'] == 'review_emergency_halt':
+            log(
+                f'mirror REVIEW_EMERGENCY_HALT on task '
+                f'{data.get("task_id", "?")}: {marker_decision["payload"].get("reason", "(no reason)")} '
+                f'— 5a journals to Beacon only; halt-file trip + priority DM in 5d',
+                'WARN',
+            )
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher
@@ -979,6 +1458,12 @@ def _marker_output_for_prompt(
 
     For ack-proceed/reject: the marker payload's summary/reason, so Beacon
     sees the context behind the decision.
+
+    D3.5 commit 5a — Mirror marker types. PASS body = summary; REVISION body
+    = finding summary; ESCALATE body = reason; EMERGENCY_HALT body = reason +
+    evidence. Without these branches the trailing fallback returns '(no
+    reason)' for PASS and (non-auto-promoted) REVISION since their
+    intent_kwargs carry no `reason` key — the C-1 review-pass-body-blank bug.
     """
     payload = decision['payload']
     marker_type = decision['marker_type']
@@ -988,6 +1473,28 @@ def _marker_output_for_prompt(
         return payload.get('preflight_summary', '(no summary)')
     if marker_type == 'reject':
         return payload.get('reason', '(no reason)')
+    if marker_type == 'review_pass':
+        return payload.get('summary', '(no summary)')
+    if marker_type == 'review_revision':
+        findings = payload.get('findings') or []
+        if isinstance(findings, list) and findings:
+            first = findings[0]
+            first_desc = (
+                first.get('description', '(no description)')
+                if isinstance(first, dict)
+                else str(first)
+            )
+            return (
+                f'{len(findings)} finding(s). First: {first_desc}'
+            )
+        return '(revision marker with no findings — should have been PASS)'
+    if marker_type == 'review_escalate':
+        return payload.get('reason', '(no reason)')
+    if marker_type == 'review_emergency_halt':
+        return (
+            f'Reason: {payload.get("reason", "(no reason)")}\n'
+            f'Evidence: {payload.get("evidence", "(no evidence)")}'
+        )
     # Budget-exhausted clarify converted to clarification-exhausted
     return decision['intent_kwargs'].get('reason', '(no reason)')
 

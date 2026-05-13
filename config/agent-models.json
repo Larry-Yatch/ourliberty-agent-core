@@ -31,7 +31,9 @@
       "telegram_model": "claude-sonnet-4-6",
       "inbox_model": "claude-opus-4-7",
       "fallback_model": "claude-sonnet-4-6",
-      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries."
+      "worktree_enabled": true,
+      "allowed_repos": ["ourliberty-agent-core"],
+      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge)."
     },
     "pulse": {
       "name": "Pulse",
@@ -69,6 +71,12 @@
       "status": "planned"
     }
   },
+  "loop_bounds": {
+    "max_revisions": 3,
+    "max_replans": 2,
+    "cost_per_task_usd": 5.0,
+    "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
+  },
   "_history": [
     {
       "date": "2026-05-08",
@@ -78,6 +86,11 @@
     {
       "date": "2026-05-12",
       "change": "D3 commit 4b: Forge gains worktree_enabled: true + allowed_repos: [ourliberty-agent-core]. Enforced by worktree_manager (dispatch path) and routing_validator.check_target_repo (safe_write_inbox + inbox_watcher defense-in-depth).",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-13",
+      "change": "D3.5 commit 5a: Mirror gains worktree_enabled: true + allowed_repos: [ourliberty-agent-core] so she can gh pr checkout PRs and run tests against the branch. Top-level loop_bounds block added with max_revisions=3, max_replans=2, cost_per_task_usd=5.0 (forward-compat for 5b/5c/5d enforcement).",
       "author": "Claude (via Larry's session)"
     }
   ]
