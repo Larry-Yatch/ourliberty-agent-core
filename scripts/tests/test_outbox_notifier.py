@@ -2396,5 +2396,193 @@ class PrUrlRegexAnchoredTest(unittest.TestCase):
         self.assertIsNone(on._extract_pr_url_from_build_result(None))
 
 
+# ============================================================================
+# D3.5 5a-followup — Larry-DM-on-task-complete (Bug A + Gap B)
+# ============================================================================
+
+
+class MaybeDmLarryTest(unittest.TestCase):
+    """_maybe_dm_larry appends a notification to larry-alerts.jsonl when
+    intent is terminal-from-Larry's-perspective AND reply_chat_id is set."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        # larry_alerts owns its own paths; reroute them.
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+
+    def tearDown(self):
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._tmp.cleanup()
+
+    def _read_notifications(self):
+        pending = self._la.read_pending(0)
+        return [rec for _, rec in pending if rec.get('kind') == 'notification']
+
+    def _decision(self, intent, marker_type=None, payload=None, intent_kwargs=None):
+        return {
+            'marker_type': marker_type or intent.replace('-', '_'),
+            'payload': payload or {},
+            'intent': intent,
+            'notify_source': 'mirror-result',
+            'intent_kwargs': intent_kwargs or {},
+            'auto_promoted': False,
+            'next_clarification_count': None,
+        }
+
+    def test_review_pass_with_chat_id_queues_notification(self):
+        data = {
+            'task_id': 't-pass', 'reply_chat_id': 7998341473,
+            'agent': 'mirror',
+        }
+        decision = self._decision('review-pass', 'review_pass', payload={
+            'task_id': 't-pass',
+            'pr_url': 'https://github.com/x/y/pull/1',
+            'summary': 'All clean.',
+        })
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'review-pass')
+        self.assertEqual(notifs[0]['chat_id'], 7998341473)
+        self.assertEqual(notifs[0]['task_id'], 't-pass')
+        self.assertIn('Mirror approved', notifs[0]['message'])
+        self.assertIn('pull/1', notifs[0]['message'])
+        self.assertIn('All clean', notifs[0]['message'])
+
+    def test_review_revision_renders_finding_count_and_severity(self):
+        data = {'task_id': 't-rev', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        decision = self._decision('review-revision', 'review_revision', payload={
+            'task_id': 't-rev',
+            'pr_url': 'https://github.com/x/y/pull/2',
+            'findings': [{'file': 'a'}, {'file': 'b'}, {'file': 'c'}],
+            'severity': 'medium', 'confidence': 'high',
+        }, intent_kwargs={
+            'pr_url': 'https://github.com/x/y/pull/2',
+            'finding_count': 3, 'severity': 'medium', 'confidence': 'high',
+        })
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('3 finding', notifs[0]['message'])
+        self.assertIn('severity=medium', notifs[0]['message'])
+
+    def test_review_escalate_renders_reason(self):
+        data = {'task_id': 't-esc', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        decision = self._decision('review-escalate', 'review_escalate', payload={
+            'task_id': 't-esc',
+            'pr_url': 'https://github.com/x/y/pull/3',
+            'reason': 'Spec mismatch.',
+            'severity': 'high', 'confidence': 'high',
+        }, intent_kwargs={
+            'pr_url': 'https://github.com/x/y/pull/3',
+            'reason': 'Spec mismatch.',
+            'severity': 'high', 'confidence': 'high',
+        })
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('Spec mismatch', notifs[0]['message'])
+
+    def test_review_emergency_renders_reason_and_evidence(self):
+        data = {'task_id': 't-halt', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        decision = self._decision('review-emergency-halt', 'review_emergency_halt', payload={
+            'task_id': 't-halt',
+            'pr_url': 'https://github.com/x/y/pull/4',
+            'reason': 'Plaintext credentials.',
+            'evidence': '+    "aws_key": "AKIA..."',
+        }, intent_kwargs={
+            'pr_url': 'https://github.com/x/y/pull/4',
+            'reason': 'Plaintext credentials.',
+            'evidence': '+    "aws_key": "AKIA..."',
+        })
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('Plaintext credentials', notifs[0]['message'])
+        self.assertIn('AKIA', notifs[0]['message'])
+
+    def test_non_terminal_intent_does_not_dm(self):
+        # ack-proceed is mid-chain — Forge proceeded, Beacon journals,
+        # nothing for Larry to do yet. No DM.
+        data = {'task_id': 't-mid', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        decision = self._decision('ack-proceed', 'proceed')
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
+    def test_clarify_intent_does_not_dm(self):
+        # Clarifications are mid-chain (Beacon answers Forge); no Larry DM.
+        data = {'task_id': 't-clar', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        decision = self._decision('clarify', 'clarify_request')
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
+    def test_result_notification_does_not_dm(self):
+        # Generic result-notification is the mid-chain catch-all; no DM.
+        data = {'task_id': 't-result', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        decision = self._decision('result-notification')
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
+    def test_missing_reply_chat_id_does_not_dm(self):
+        # Autonomous Pulse-initiated runs have no originating chat.
+        data = {'task_id': 't-auto', 'agent': 'mirror'}  # no reply_chat_id
+        decision = self._decision('review-pass', 'review_pass', payload={
+            'task_id': 't-auto', 'pr_url': 'x', 'summary': 'y',
+        })
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
+    def test_non_int_reply_chat_id_does_not_dm(self):
+        # Defensive: a corrupted reply_chat_id (string, list, whatever)
+        # gets logged and skipped — not propagated to a DM.
+        data = {
+            'task_id': 't-bad-chat', 'reply_chat_id': 'not-a-number',
+            'agent': 'mirror',
+        }
+        decision = self._decision('review-pass', 'review_pass', payload={
+            'task_id': 't-bad-chat', 'pr_url': 'x', 'summary': 'y',
+        })
+        on._maybe_dm_larry(data, decision)
+        self.assertEqual(self._read_notifications(), [])
+
+    def test_reject_intent_dms(self):
+        # Forge rejected the spec at preflight — terminal for Larry.
+        data = {'task_id': 't-rej', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        decision = self._decision('reject', 'reject', payload={
+            'task_id': 't-rej', 'reason': 'Required file missing.',
+        }, intent_kwargs={'reason': 'Required file missing.'})
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('REJECTED', notifs[0]['message'])
+        self.assertIn('Required file missing', notifs[0]['message'])
+
+    def test_clarification_exhausted_dms(self):
+        # Forge ran out of clarifications — terminal for Larry.
+        data = {'task_id': 't-cx', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        decision = self._decision(
+            'clarification-exhausted', 'clarify_request',
+            payload={'task_id': 't-cx', 'question': 'Final question?'},
+            intent_kwargs={'reason': 'Final question?'},
+        )
+        on._maybe_dm_larry(data, decision)
+        notifs = self._read_notifications()
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('exhausted', notifs[0]['message'])
+
+
 if __name__ == '__main__':
     unittest.main()

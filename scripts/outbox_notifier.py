@@ -64,6 +64,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import dispatch_validator         # noqa: E402
 import forge_preflight_handler as fph  # noqa: E402
+import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
 import safe_write_inbox             # noqa: E402
 
@@ -217,6 +218,149 @@ INTENT_ACTION_BLOCKS = {
         'max_replans on the envelope.'
     ),
 }
+
+# D3.5 5a-followup: per-intent DM templates for chain-completion DMs to Larry.
+# Fires only for terminal-from-Larry's-perspective intents (his task ends here,
+# either successfully or needing his attention). Mid-chain intents like
+# ack-proceed / clarify / clarification-response do not DM because they're
+# mechanics Larry doesn't need to see.
+#
+# Template fields drawn from the marker payload + envelope data (see
+# `_render_dm_message`).
+DM_TEMPLATES = {
+    'review-pass': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Ready for you to merge manually.'
+    ),
+    'review-revision': (
+        'Mirror requested revisions on PR {pr_url} (task `{task_id}`).\n'
+        '{finding_count} finding(s), severity={severity}, confidence={confidence}.\n'
+        'In 5a the revision dispatch is not auto-wired — DM Forge a follow-up '
+        'or comment on the PR.'
+    ),
+    'review-escalate': (
+        'Mirror escalated PR {pr_url} on task `{task_id}`.\n'
+        'Reason: {reason}\n'
+        'Decide: revise the spec (new APPROVAL_REQUEST to Beacon) or push back.'
+    ),
+    'review-emergency-halt': (
+        'EMERGENCY_HALT on PR {pr_url} (task `{task_id}`).\n'
+        'Reason: {reason}\n'
+        'Evidence: {evidence}\n'
+        'Review the PR immediately and decide whether to close without merge.'
+    ),
+    'reject': (
+        'Forge REJECTED task `{task_id}` at preflight.\n'
+        'Reason: {reason}\n'
+        'Either revise the spec and re-emit APPROVAL_REQUEST, or set aside.'
+    ),
+    'clarification-exhausted': (
+        'Forge exhausted clarification budget on task `{task_id}`.\n'
+        'Final question: {reason}\n'
+        'Rewrite the spec more completely before re-dispatching.'
+    ),
+}
+
+# Subset of intents that produce a closing DM to the originating chat. Other
+# intents are mid-chain mechanics that don't warrant Larry's attention.
+TERMINAL_DM_INTENTS = frozenset(DM_TEMPLATES.keys())
+
+
+def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
+    """Render the per-intent DM body. Returns None on missing template or
+    unrenderable fields (degrades to silence rather than crashing the daemon)."""
+    template = DM_TEMPLATES.get(intent)
+    if template is None:
+        return None
+    payload = decision.get('payload') or {}
+    intent_kwargs = decision.get('intent_kwargs') or {}
+    # Merge envelope payload + intent_kwargs so the template can pull from
+    # either. intent_kwargs wins on conflicts (the classifier already
+    # normalized fields like pr_url + finding_count + reason).
+    fields: dict[str, Any] = {
+        'task_id': payload.get('task_id', '?'),
+        'pr_url': payload.get('pr_url', '?'),
+        'summary': payload.get('summary', '?'),
+        'reason': payload.get('reason', '?'),
+        'evidence': payload.get('evidence', '?'),
+        'severity': payload.get('severity', '?'),
+        'confidence': payload.get('confidence', '?'),
+        'finding_count': 0,
+    }
+    findings = payload.get('findings')
+    if isinstance(findings, list):
+        fields['finding_count'] = len(findings)
+    # intent_kwargs from classifier may have pre-rendered values (e.g.
+    # auto-promote reason). Apply on top.
+    fields.update({k: v for k, v in intent_kwargs.items() if v is not None})
+    try:
+        return template.format(**fields)
+    except (KeyError, IndexError):
+        # Missing field — degrade rather than crash.
+        return None
+
+
+def _maybe_dm_larry(
+    data: dict[str, Any],
+    decision: dict[str, Any],
+) -> None:
+    """Append a chain-completion DM to larry-alerts.jsonl when the marker
+    intent is terminal-from-Larry's-perspective AND the source envelope
+    carries reply_chat_id.
+
+    Phase D3.5 5a-followup. Fires AFTER the marker-driven inter-agent
+    notify has been written; this is purely the Larry-facing side. Failure
+    here is non-fatal (log + continue) — the inter-agent chain has already
+    completed, the DM is the courtesy notification.
+
+    The reply_chat_id propagation through every hop (per dispatch_build_phase
+    + dispatch_mirror_review + marker-routing + default-routing blocks above)
+    keeps the chat thread reachable from the terminal hop.
+    """
+    intent = decision.get('intent')
+    if intent not in TERMINAL_DM_INTENTS:
+        return
+    chat_id = data.get('reply_chat_id')
+    if chat_id is None:
+        # No originating chat thread (autonomous Pulse-initiated runs, or
+        # Bug A unfixed). Silent skip — no DM target.
+        return
+    if not isinstance(chat_id, int):
+        log(
+            f'reply_chat_id is not an int ({type(chat_id).__name__}) on task '
+            f'{data.get("task_id", "?")}; skipping completion DM',
+            'WARN',
+        )
+        return
+    message = _render_dm_message(intent, decision)
+    if message is None:
+        log(
+            f'DM template missing or unrenderable for intent={intent} on task '
+            f'{data.get("task_id", "?")}; skipping completion DM',
+            'WARN',
+        )
+        return
+    task_id = data.get('task_id', 'unknown')
+    ok = larry_alerts.append_notification(
+        source='outbox-notifier',
+        intent=intent,
+        message=message,
+        chat_id=chat_id,
+        task_id=task_id,
+    )
+    if ok:
+        log(
+            f'queued completion DM to chat {chat_id} for intent={intent} '
+            f'(task={task_id})',
+        )
+    else:
+        log(
+            f'completion DM append failed for chat {chat_id} (intent={intent}, '
+            f'task={task_id}); inter-agent chain completed normally, DM dropped',
+            'WARN',
+        )
+
 
 _running = True
 
@@ -1336,6 +1480,13 @@ def process_outbox(outbox_file: Path) -> str:
         # preflight→build with --resume per signed-off design.
         if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
             _dispatch_build_phase(data)
+
+        # D3.5 5a-followup: chain-completion DM to the originating Telegram
+        # thread. Fires only for terminal-from-Larry's-perspective intents
+        # (review-pass/revision/escalate/emergency, plus Forge preflight
+        # reject/clarification-exhausted) and only when reply_chat_id is
+        # propagated through the chain. Non-fatal on failure.
+        _maybe_dm_larry(data, marker_decision)
 
         _archive_outbox(outbox_file)
         return 'notified-marker'

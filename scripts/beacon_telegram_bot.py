@@ -392,9 +392,20 @@ def _send_alert_dm(chat_id: int, text: str) -> bool:
 def _check_pending_alerts() -> None:
     """Poll the shared larry-alerts queue and DM each new line.
 
-    Per-line ack: offset advances ONLY after every authorized chat got a
-    successful sendMessage. Telegram failure -> stop, retry next sweep.
-    At-least-once delivery (Telegram-side timeout could result in dup).
+    Two record shapes share the same queue file (D3.5 5a-followup):
+
+    1. **Alerts** (no `kind` field, OR `kind: "alert"`) — infra failures from
+       watchdog/sentinel. Broadcast to every authorized chat (whoever's
+       available should see infra alerts). Severity emoji prefix; existing
+       D3.5-prep behavior.
+    2. **Notifications** (`kind: "notification"`) — chain-completion DMs
+       (review-pass / revision / escalate / emergency / reject /
+       clarification-exhausted). Targeted to the originating `chat_id` only
+       (not broadcast). Intent-specific emoji prefix.
+
+    Per-line ack: offset advances ONLY after delivery confirmed for every
+    target. Telegram failure -> stop, retry next sweep. At-least-once
+    delivery (Telegram-side timeout could result in dup).
     """
     offset = larry_alerts.read_offset()
     pending = larry_alerts.read_pending(offset)
@@ -405,19 +416,43 @@ def _check_pending_alerts() -> None:
             log(f"alert idx={idx} malformed, skipping: {alert.get('raw', '')[:80]!r}")
             larry_alerts.write_offset(idx + 1)
             continue
+
+        # Determine target chats: notifications go to the originating
+        # chat_id only; alerts broadcast to all authorized chats.
+        if alert.get('kind') == 'notification':
+            target_chat = alert.get('chat_id')
+            if not isinstance(target_chat, int) or target_chat not in ALLOWED:
+                # Defense-in-depth: a notification record claiming an
+                # unauthorized chat_id gets dropped (offset advances so we
+                # don't wedge), not delivered. The append_notification
+                # caller should have validated the chat_id is one of ours;
+                # this catches misconfigured pipelines or tampering.
+                log(
+                    f"notification idx={idx} has invalid/unauthorized "
+                    f"chat_id={target_chat!r}; dropping"
+                )
+                larry_alerts.write_offset(idx + 1)
+                continue
+            targets = [target_chat]
+        else:
+            targets = sorted(ALLOWED)
+
         text = larry_alerts.format_dm(alert)
         all_delivered = True
-        for chat_id in sorted(ALLOWED):
+        for chat_id in targets:
             if not _send_alert_dm(chat_id, text):
                 all_delivered = False
                 log(f"alert idx={idx} delivery to {chat_id} failed")
                 break
         if all_delivered:
             larry_alerts.write_offset(idx + 1)
-            log(
-                f"alert idx={idx} delivered "
-                f"(source={alert.get('source')}, subject={alert.get('subject', '-')})"
+            kind_desc = alert.get('kind') or 'alert'
+            tag = (
+                f"intent={alert.get('intent')}"
+                if kind_desc == 'notification'
+                else f"source={alert.get('source')}, subject={alert.get('subject', '-')}"
             )
+            log(f"{kind_desc} idx={idx} delivered ({tag})")
         else:
             # Don't advance — preserve order; retry on next sweep.
             log(f"alert idx={idx} send failed; will retry next sweep")

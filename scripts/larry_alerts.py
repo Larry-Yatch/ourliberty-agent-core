@@ -137,6 +137,57 @@ def append_alert(
     return True
 
 
+# ---------- notification writer (D3.5 5a-followup: chain-completion DMs) ----------
+
+
+def append_notification(
+    source: str,
+    intent: str,
+    message: str,
+    chat_id: int,
+    task_id: Optional[str] = None,
+) -> bool:
+    """Append one notification (closure DM for a chat-initiated task).
+
+    Different shape from `append_alert` in three ways:
+
+    1. **No cooldown gating.** Notifications are 1:1 with task completions
+       (one PASS → one DM), not infra-noise. Repeating the same intent for
+       different task_ids is normal; suppressing would lose closure DMs.
+    2. **Targeted to a specific chat_id**, not broadcast to all authorized
+       chats. The bot reads `chat_id` from the record and DMs only there.
+       (Future-proofing for multi-user; today single-chat means same
+       behavior either way.)
+    3. **Carries `intent`**, not `severity`. The bot renders intent-specific
+       emoji (✓ for review-pass, ⚠ for revision/escalate, 🛑 for emergency,
+       ✗ for reject/clarification-exhausted) via `format_dm`.
+
+    Records persist to the same `larry-alerts.jsonl` file as alerts, with
+    `kind: "notification"` field distinguishing the two. The bot's reader
+    side (`read_pending` + `read_offset` + `format_dm`) handles both.
+
+    Returns True on successful append, False on failure. Never raises —
+    callers fire-and-forget.
+    """
+    record = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'source': source,
+        'kind': 'notification',
+        'intent': intent,
+        'message': message,
+        'chat_id': chat_id,
+    }
+    if task_id:
+        record['task_id'] = task_id
+    try:
+        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(record, ensure_ascii=False) + '\n')
+    except OSError:
+        return False
+    return True
+
+
 # ---------- reader side (bot owns this) ----------
 
 
@@ -189,19 +240,40 @@ def write_offset(offset: int) -> None:
         pass
 
 
-def format_dm(alert: dict) -> str:
-    """Render an alert for Telegram DM. Stable format the bot uses."""
-    if alert.get('_malformed'):
-        return f'⚠ Bad alert in queue (skipped): {alert.get("raw", "")!r}'
-    severity = alert.get('severity', 'warning')
+_NOTIFICATION_INTENT_EMOJI = {
+    'review-pass': '✓',
+    'review-revision': '⚠',
+    'review-escalate': '⚠',
+    'review-emergency-halt': '🛑',
+    'reject': '✗',
+    'clarification-exhausted': '✗',
+}
+
+
+def format_dm(record: dict) -> str:
+    """Render an alert OR notification for Telegram DM. Stable format the bot uses.
+
+    Notifications (kind=notification) render as `<emoji> <message>` with the
+    emoji chosen by intent. Alerts render with source + subject + severity
+    emoji + message + optional suggested-action.
+    """
+    if record.get('_malformed'):
+        return f'⚠ Bad alert in queue (skipped): {record.get("raw", "")!r}'
+    # Notification rendering (D3.5 5a-followup).
+    if record.get('kind') == 'notification':
+        intent = record.get('intent', '?')
+        emoji = _NOTIFICATION_INTENT_EMOJI.get(intent, '📬')
+        return f'{emoji} {record.get("message", "")}'
+    # Alert rendering (existing — D3.5-prep).
+    severity = record.get('severity', 'warning')
     emoji = '🚨' if severity == 'critical' else '⚠'
-    source = alert.get('source', '?')
-    subject = alert.get('subject')
+    source = record.get('source', '?')
+    subject = record.get('subject')
     header = f'{emoji} {source}'
     if subject:
         header += f' [{subject}]'
-    lines = [header, alert.get('message', '')]
-    sa = alert.get('suggested_action')
+    lines = [header, record.get('message', '')]
+    sa = record.get('suggested_action')
     if sa:
         lines.append(f'Run: {sa}')
     return '\n'.join(line for line in lines if line)

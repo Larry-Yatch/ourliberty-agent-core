@@ -471,6 +471,34 @@ class DispatchApprovedTest(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data['source'], 'beacon')
 
+    def test_dispatch_propagates_chat_id_as_reply_chat_id(self):
+        # Bug A fix (D3.5 5a-followup): entry's chat_id must land in the
+        # dispatched task as reply_chat_id so the downstream chain can
+        # auto-DM Larry on terminal markers.
+        entry = {
+            'id': 't-chat',
+            'target_agent': 'forge',
+            'chat_id': 7998341473,
+            'dispatch_payload': _good_payload(task_id='t-chat'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['reply_chat_id'], 7998341473)
+
+    def test_dispatch_omits_reply_chat_id_when_chat_id_absent(self):
+        # Defensive: entries without chat_id (autonomous Pulse-initiated
+        # dispatches, future shapes) must NOT inject a falsy reply_chat_id.
+        entry = {
+            'id': 't-no-chat',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='t-no-chat'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertNotIn('reply_chat_id', data)
+
 
 if __name__ == '__main__':
     unittest.main()

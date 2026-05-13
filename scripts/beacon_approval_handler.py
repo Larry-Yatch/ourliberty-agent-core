@@ -523,8 +523,16 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     """
     payload = entry['dispatch_payload']
     target = entry.get('target_agent') or payload.get('target_agent', 'forge')
-    # Ensure source is 'beacon' on the envelope.
+    # Ensure source is 'beacon' on the envelope. Propagate `chat_id` from the
+    # stored entry into the dispatched task as `reply_chat_id` so the entire
+    # downstream chain (preflight → build → review → review-pass notify) can
+    # route a completion DM back to the chat thread that initiated the work.
+    # Bug A fix (D3.5 5a-followup): without this, the original Forge inbox
+    # task lands without reply_chat_id and the propagation chain has nothing
+    # to carry, so Larry never gets a closing DM on his Telegram thread.
     task_dict = {**payload, 'source': 'beacon'}
+    if entry.get('chat_id') is not None:
+        task_dict['reply_chat_id'] = entry['chat_id']
     # Filename — use task_id stem.
     filename = f'{payload["task_id"]}.json'
     return safe_write_inbox.safe_write_inbox(

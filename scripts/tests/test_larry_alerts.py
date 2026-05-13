@@ -245,5 +245,136 @@ class FormatDmTest(unittest.TestCase):
         self.assertIn('garbage', text)
 
 
+class AppendNotificationTest(_IsolatedQueueTest):
+    """D3.5 5a-followup: chain-completion DM notifications."""
+
+    def test_append_notification_writes_record(self):
+        ok = larry_alerts.append_notification(
+            source='outbox-notifier',
+            intent='review-pass',
+            message='Mirror approved PR #42 on task `t-abc`.',
+            chat_id=7998341473,
+            task_id='t-abc',
+        )
+        self.assertTrue(ok)
+        pending = larry_alerts.read_pending(0)
+        self.assertEqual(len(pending), 1)
+        _, record = pending[0]
+        self.assertEqual(record['kind'], 'notification')
+        self.assertEqual(record['intent'], 'review-pass')
+        self.assertEqual(record['chat_id'], 7998341473)
+        self.assertEqual(record['task_id'], 't-abc')
+        self.assertEqual(
+            record['message'],
+            'Mirror approved PR #42 on task `t-abc`.',
+        )
+
+    def test_append_notification_no_cooldown_gating(self):
+        # Notifications are 1:1 with task completions; same intent firing
+        # multiple times in quick succession (different task_ids) must NOT
+        # be suppressed.
+        for tid in ('t-a', 't-b', 't-c'):
+            ok = larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-pass',
+                message=f'Approved {tid}',
+                chat_id=7998341473,
+                task_id=tid,
+            )
+            self.assertTrue(ok, f'{tid} should not be suppressed')
+        pending = larry_alerts.read_pending(0)
+        self.assertEqual(len(pending), 3)
+        for _, record in pending:
+            self.assertEqual(record['kind'], 'notification')
+
+    def test_append_notification_without_task_id(self):
+        # task_id is optional.
+        ok = larry_alerts.append_notification(
+            source='outbox-notifier',
+            intent='review-pass',
+            message='Approved.',
+            chat_id=7998341473,
+        )
+        self.assertTrue(ok)
+        _, record = larry_alerts.read_pending(0)[0]
+        self.assertNotIn('task_id', record)
+
+
+class FormatDmNotificationTest(unittest.TestCase):
+    """D3.5 5a-followup: format_dm renders notifications with intent emoji,
+    not source/severity prefix."""
+
+    def test_review_pass_uses_checkmark(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification',
+            'intent': 'review-pass',
+            'message': 'Mirror approved PR #42.',
+            'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('✓'))
+        self.assertIn('Mirror approved', text)
+        # No source-prefix, no severity emoji
+        self.assertNotIn('outbox-notifier', text)
+        self.assertNotIn('🚨', text)
+        self.assertNotIn('⚠', text)
+
+    def test_review_revision_uses_warning(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'review-revision',
+            'message': 'Revisions requested.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('⚠'))
+
+    def test_review_escalate_uses_warning(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'review-escalate',
+            'message': 'Escalated.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('⚠'))
+
+    def test_review_emergency_halt_uses_stop(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'review-emergency-halt',
+            'message': 'EMERGENCY.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('🛑'))
+
+    def test_reject_uses_cross(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'reject',
+            'message': 'Forge rejected.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('✗'))
+
+    def test_clarification_exhausted_uses_cross(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'clarification-exhausted',
+            'message': 'Budget exhausted.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('✗'))
+
+    def test_unknown_intent_falls_back_to_mailbox_emoji(self):
+        text = larry_alerts.format_dm({
+            'kind': 'notification', 'intent': 'future-intent',
+            'message': 'Something.', 'chat_id': 1,
+        })
+        self.assertTrue(text.startswith('📬'))
+
+    def test_alert_format_unchanged_by_5a_followup(self):
+        # Regression check: alerts (no `kind` field, OR kind != notification)
+        # still render with the legacy source-prefix + severity emoji shape.
+        text = larry_alerts.format_dm({
+            'source': 'watchdog', 'severity': 'critical',
+            'subject': 'bots:mirror',
+            'message': 'Mirror is DOWN.',
+            'suggested_action': 'sudo systemctl restart x',
+        })
+        self.assertIn('🚨', text)
+        self.assertIn('watchdog', text)
+        self.assertIn('bots:mirror', text)
+        self.assertIn('Mirror is DOWN', text)
+        self.assertIn('Run:', text)
+
+
 if __name__ == '__main__':
     unittest.main()

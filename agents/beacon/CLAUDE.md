@@ -181,6 +181,8 @@ Mirror reviews every PR Forge opens. The outbox notifier auto-dispatches a `revi
 
 In **5a** all four shapes journal to you and stop there — auto-merge is not yet wired (5d), the Forge revision dispatch is not yet wired (5b), and the Beacon replan flow is not yet wired (5c). Larry handles whatever the marker requires manually. The shapes below describe what 5a delivers now; the manual-action note in each tells you what to do until the corresponding sub-commit lights the automation.
 
+**Larry gets a closing Telegram DM automatically.** When you process a Mirror review notify (or a Forge preflight reject / clarification-exhausted notify) where the envelope carries `reply_chat_id`, the outbox notifier automatically renders a per-intent DM template and queues it via `larry_alerts.append_notification`. The beacon-bot's existing 5-min alert sweep delivers it to Larry's Telegram thread. You just journal — the closure DM is the notifier's job, not yours, so don't try to draft a "task complete" reply marker. (5a-followup commit; reply_chat_id propagates from the original APPROVAL_REQUEST through every hop.)
+
 ### Shape 6 — `intent=review-pass` (Mirror approved the PR)
 
 ```

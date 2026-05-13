@@ -1502,6 +1502,37 @@ A REVIEW_REVISION with `confidence: low` is automatically routed as REVIEW_ESCAL
 
 **Next:** D3.5 commit 5b — Forge↔Mirror revision loop. Per `docs/d3-5-plan.md`: ships REVIEW_REVISION → `phase=revision` dispatch back to Forge under --resume, Forge's CLAUDE.md "Revision phase" section, `max_revisions` enforcement, REVIEW_QUESTION marker (deferred from 5a). Verification target: deliberately-flawed Forge build → Mirror REVISION → Forge fix → Mirror PASS. ~$1.50 live cost.
 
+## Phase D3.5 5a-followup — Larry-DM-on-task-complete (2026-05-13, ~2 hours, $0.50 live re-test pending)
+
+After Test 4's first real end-to-end dispatch (`tunables-first-review-date-001`, PR #3 merged) completed silently from Larry's perspective — Beacon's review-pass journal landed in her outbox but never reached his Telegram thread. Two distinct gaps surfaced:
+
+**Bug A (pre-existing):** `beacon_approval_handler.dispatch_approved` builds the inbox task from the APPROVAL_REQUEST marker's payload but never copies the entry's stored `chat_id` into the task as `reply_chat_id`. So the original Forge inbox task landed with `reply_chat_id=None`, and every downstream hop's propagation block found `None` to propagate. This bug predated 5a — it's been silent because no flow ever closed back to an originating chat thread before.
+
+**Gap B (5a scope):** Even with `reply_chat_id` propagating end-to-end, the outbox notifier wrote inter-agent notifies but had no mechanism to surface a closure DM to the originating Telegram chat. Beacon's claude invocation handling the PASS notify just journaled (correctly per her CLAUDE.md), but her response went to her outbox where the bot doesn't look.
+
+### Architectural call signed off
+
+**(VALUES, decided-and-moved) Notifier auto-DM vs Beacon-emits-marker.** Two options for closing the loop: (A) Beacon emits a `=== TELEGRAM_DM ===` marker in her response, bot intercepts and DMs Larry; (B) notifier auto-renders a per-intent DM template and queues it via the existing `larry-alerts.jsonl` pipe. Chose B — reliable (Beacon can't forget), matches the existing pattern where the notifier renders per-intent inter-agent action blocks, no new marker grammar. Trade-off: less flexibility for richer Beacon-authored DM content; acceptable for 5a, can extend with TELEGRAM_DM marker later if a real need surfaces.
+
+### What shipped
+
+- **`scripts/beacon_approval_handler.py`** (+3 lines) — `dispatch_approved` now copies `entry.get('chat_id')` into `task_dict['reply_chat_id']` when present. Bug A fix.
+- **`scripts/larry_alerts.py`** (+~50 lines) — New `append_notification(source, intent, message, chat_id, task_id)`. No cooldown gating (notifications are 1:1 with task completions). Targeted delivery (record carries `chat_id`; bot reads it). Persists to the same `larry-alerts.jsonl` with `kind: "notification"` field distinguishing from alerts. `format_dm` extended with `_NOTIFICATION_INTENT_EMOJI` map (✓ pass, ⚠ revision/escalate, 🛑 emergency-halt, ✗ reject/clarification-exhausted, 📬 fallback). Regression-preserved alert rendering.
+- **`scripts/outbox_notifier.py`** (+~140 lines) — New `DM_TEMPLATES` dict (6 per-intent templates), `TERMINAL_DM_INTENTS` frozenset, `_render_dm_message()`, `_maybe_dm_larry()` helper. Hook fires after marker-driven notify lands in `process_outbox`. Renders intent-specific message from `marker_decision['payload']` + `intent_kwargs`. Skips silently when reply_chat_id absent, intent non-terminal, or template unrenderable.
+- **`scripts/beacon_telegram_bot.py`** (+~30 lines) — `_check_pending_alerts` extended to handle `kind: "notification"` records. Notifications target the specific `chat_id` field; alerts continue to broadcast to all authorized chats. Defense-in-depth check: unauthorized chat_ids get dropped (offset advances so we don't wedge).
+- **`agents/beacon/CLAUDE.md`** (+~2 lines) — Note in Mirror-markers section: "Larry gets a closing Telegram DM automatically; you just journal."
+- **Tests** (+24, total 425): 2 new in `DispatchApprovedTest` (chat_id propagation + omission); `AppendNotificationTest` (3 cases: basic, no-cooldown, no-task-id) + `FormatDmNotificationTest` (8 cases including legacy-alert regression); `MaybeDmLarryTest` (11 cases covering all 6 terminal intents fire DM, 3 non-terminal intents skip DM, missing chat_id skips, non-int chat_id skips, reject + clarification-exhausted render).
+
+### Verification (pending live re-test)
+
+Synthetic unit tests pass locally (24 new). Live verification: re-run Test 4 (Larry dispatches small spec → approval → Forge build → Mirror PASS → DM to Larry's Telegram). Expected ~$0.50 + DM appearing on Larry's phone within ~5 min of Mirror PASS (bot sweep cadence).
+
+### Known cleanup gap (not in scope for this commit)
+
+Test 4's first run + the synthetic test overflow created 5 stale branches on origin (`forge/marker-error-*` from cascade overflow, `forge/smoke-5a-prdispatch` from synthetic, `mirror/tunables-first-review-date-001` from Mirror's worktree checkpoint). `cleanup-stale-worktrees` timer prunes worktree DIRECTORIES but does not clean up associated remote branches. Need to either extend the cleanup timer to delete the branches or run `git push origin --delete <branch>` periodically. Tracked for a future commit.
+
+**Next:** verify Test 4 re-run lands the DM, then D3.5 commit 5b (Forge↔Mirror revision loop) per the d3-5-plan sequencing.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
