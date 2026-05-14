@@ -100,7 +100,7 @@ Findings:
 ### E. PR / merge state
 
 - [ ] No PR is clean+green for > 30 minutes without merge in T0 sandbox repos (where auto-merge is policy)
-- [ ] No PR has unresolved Mirror request-changes for > 24 hours (Forge should iterate or escalate)
+- [ ] No PR has unresolved Mirror request-changes for > 72 hours (post-5d: clean+green PRs auto-merge themselves on Mirror PASS; only PRs blocked on Larry's input — auto-merge failures or replan approvals — should still be open this long)
 - [ ] No CI failure recurring across multiple recent PRs (suggests infra issue)
 
 Findings:
