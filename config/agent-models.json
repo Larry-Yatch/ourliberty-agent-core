@@ -92,6 +92,11 @@
       "date": "2026-05-13",
       "change": "D3.5 commit 5a: Mirror gains worktree_enabled: true + allowed_repos: [ourliberty-agent-core] so she can gh pr checkout PRs and run tests against the branch. Top-level loop_bounds block added with max_revisions=3, max_replans=2, cost_per_task_usd=5.0 (forward-compat for 5b/5c/5d enforcement).",
       "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-14",
+      "change": "D3.5 commit 5d: loop_bounds.cost_per_task_usd ($5.00) is now ACTIVATED — outbox_notifier reads it via _load_cost_per_task_cap_usd_from_config and enforces it at all four dispatch sites (_dispatch_build_phase, _dispatch_revision_to_forge, _dispatch_mirror_review, _dispatch_mirror_review_rerun). Cumulative spend is summed by task_id from ~/agents/blackboard/costs.jsonl; at-cap refuses dispatch + DMs Larry. Also: REVIEW_PASS now triggers auto-merge (gh pr merge --squash --delete-branch); REVIEW_EMERGENCY_HALT now trips ~/agents/blackboard/EMERGENCY_HALT + broadcast priority DM. The _note line on loop_bounds (claiming cost_per_task_usd was already read) was aspirational before 5d — it is true as of this commit.",
+      "author": "Claude (via Larry's session)"
     }
   ]
 }

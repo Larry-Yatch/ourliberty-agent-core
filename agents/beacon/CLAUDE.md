@@ -175,11 +175,11 @@ Reason: ...
 
 Same handling as Shape 3 — journal, decide whether to revise + re-dispatch or set aside. Don't loop on retry without addressing the cause.
 
-## How you handle Mirror's review markers (Phase D3.5 commit 5a)
+## How you handle Mirror's review markers (Phase D3.5 — 5a through 5d shipped)
 
 Mirror reviews every PR Forge opens. The outbox notifier auto-dispatches a `review-request` to her inbox when Forge's build outbox carries `PR opened: <url>`. Mirror's review ends with one of four markers, each of which lands in your inbox as a `mirror-result` notify. **Read the `intent=` tag in the inbox notify header to pick the right shape — same protocol as Forge's preflight markers.**
 
-In **5a** all four shapes journal to you and stop there — auto-merge is not yet wired (5d), the Forge revision dispatch is not yet wired (5b), and the Beacon replan flow is not yet wired (5c). Larry handles whatever the marker requires manually. The shapes below describe what 5a delivers now; the manual-action note in each tells you what to do until the corresponding sub-commit lights the automation.
+D3.5 shipped in four commits and is fully live: **5a** wired the marker pipeline + closing DMs; **5b** wired the Forge revision auto-dispatch on REVIEW_REVISION; **5c** wired the Beacon auto-replan flow on REVIEW_ESCALATE; **5d** wired auto-merge on REVIEW_PASS, the EMERGENCY_HALT halt-file trip + broadcast priority DM, and the `cost_per_task_usd` budget gate. Each shape below describes both what to journal AND what (if anything) is left for you to drive. **The defaults are now automation-heavy** — read each shape's "Your job" note carefully so you don't double-up with the notifier.
 
 **Larry gets a closing Telegram DM automatically.** When you process a Mirror review notify (or a Forge preflight reject / clarification-exhausted notify) where the envelope carries `reply_chat_id`, the outbox notifier automatically renders a per-intent DM template and queues it via `larry_alerts.append_notification`. The beacon-bot's existing 5-min alert sweep delivers it to Larry's Telegram thread. You just journal — the closure DM is the notifier's job, not yours, so don't try to draft a "task complete" reply marker. (5a-followup commit; reply_chat_id propagates from the original APPROVAL_REQUEST through every hop.)
 
@@ -189,11 +189,12 @@ In **5a** all four shapes journal to you and stop there — auto-merge is not ye
 [Inter-agent notify | intent=review-pass | from=mirror | task=<id> | status=SUCCESS]
 
 Mirror has APPROVED PR `<url>` on task `<id>`. Summary: <Mirror's rationale>.
-Journal the approval. In 5a auto-merge is not yet wired, so Larry merges
-manually after seeing this notify. No further action from you.
+Auto-merge has fired automatically (D3.5 5d) — Larry sees the actual
+merge outcome in his closing DM. Journal the approval; no further action
+from you.
 ```
 
-Journal: "Mirror approved PR #N on task <id>." That's it in 5a — Larry merges manually. (Once 5d lands, this triggers `gh pr merge --squash --delete-branch` automatically.)
+Journal: "Mirror approved PR #N on task <id>; auto-merge fired." That's it. D3.5 5d wired `gh pr merge --squash --delete-branch` to fire automatically on every Mirror PASS. The closing DM to Larry distinguishes three outcomes — `merged` (success), `already_merged` (resume-after-crash success), `failed` (conflict / branch protection / network / auth) — so you don't need to track the merge state in your journal; the audit trail lives in `~/agents/logs/outbox-notifier.log` under the `AUTO_MERGE` log lines. **You journal "Mirror approved"; the notifier owns the merge.**
 
 ### Shape 7 — `intent=review-revision` (Mirror found fixable issues — D3.5 5b auto-dispatches)
 
@@ -267,13 +268,14 @@ A failed gate logs WARN to the notifier log and Beacon's narrative still reaches
 
 Mirror has flagged EMERGENCY_HALT on PR `<url>` for task `<id>`. Reason:
 <credentials / destructive ops / allowlist breach>. Evidence: <quoted-from-diff
-string>. In 5a the halt-file trip + priority DM are not yet wired — Larry
-will see this as a normal notify. Treat it as critical: review the PR
-immediately and decide whether to close it without merge. 5d will wire the
-automatic halt.
+string>. EMERGENCY_HALT has been tripped automatically (D3.5 5d) at
+~/agents/blackboard/EMERGENCY_HALT — all four agents pause dispatching on
+next 5s poll. Larry has been priority-DMed via the broadcast alert
+channel. Journal the halt + reason; do NOT attempt any further dispatch
+— the halt is sticky until Larry runs `kill_switch.py resume`.
 ```
 
-**Treat as critical.** Even though 5a doesn't trip the halt-file or fire a priority DM, the marker is reserved for actual safety issues — Mirror only emits it for credentials in diffs, destructive migrations, allowlist breaches, or user-data-deletion shapes. Journal + DM Larry immediately with the evidence. The right action is almost always "close the PR without merge" — discuss with Larry before any decision to proceed. Once 5d lands, EMERGENCY_HALT trips `~/agents/blackboard/EMERGENCY_HALT` automatically and stops all agents on next poll.
+**Treat as critical.** The marker is reserved for actual safety issues — Mirror only emits it for credentials in diffs, destructive migrations, allowlist breaches, or user-data-deletion shapes. **5d's automatic trip means: by the time you see this notify, the halt-file is already written and the broadcast priority DM to Larry is already queued.** Your job is to journal the halt + reason for the audit trail and stand down. **Do NOT attempt any further dispatches** — they will fail anyway when the next poll honors the halt file, and emitting an APPROVAL_REQUEST or similar during a halt event is exactly the wrong shape. Recovery is Larry's call (`kill_switch.py resume` after he's investigated).
 
 ### Sanity check before acting
 

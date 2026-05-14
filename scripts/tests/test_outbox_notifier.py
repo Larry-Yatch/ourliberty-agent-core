@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -1688,6 +1689,37 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
         on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
         on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        # D3.5 5d — block any real `gh pr merge` shell-out during tests.
+        # Mirror PASS markers in this class now trigger _auto_merge_pr in
+        # production; without this override, integration tests would
+        # subprocess.run against the real GitHub repo. Default override
+        # returns a synthetic `merged` outcome; individual tests can
+        # replace _auto_merge_override with their own outcome shape.
+        self._auto_merge_calls: list[tuple[str, str]] = []
+        def _default_auto_merge(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return {
+                'merge_outcome': 'merged',
+                'merge_reason': 'squash-merged + branch deleted (test override)',
+                'pr_number': 42,
+                'repo_coords': 'test-owner/test-repo',
+            }
+        self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        # Reroute larry_alerts file targets into the tmpdir so the
+        # EMERGENCY_HALT priority DM + cost-budget DMs don't write to
+        # ~/agents during tests.
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
         self._swi_originals = {
             'AGENTS_ROOT': swi.AGENTS_ROOT,
             'INBOXES_ROOT': swi.INBOXES_ROOT,
@@ -1706,6 +1738,10 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
             setattr(on, name, value)
         for name, value in self._swi_originals.items():
             setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
         rv.REPO_ROOT = self._rv_root
         rv.invalidate_cache()
         self._tmp.cleanup()
@@ -1769,8 +1805,12 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         data = self._get_beacon_notify()
         self.assertEqual(data['intent'], 'review-emergency-halt')
         self.assertIn('credentials', data['prompt'])
-        # 5a does NOT trip the halt-file yet — that's 5d.
-        self.assertFalse(on.EMERGENCY_HALT_FLAG.exists())
+        # D3.5 5d — REVIEW_EMERGENCY_HALT now TRIPS the halt-file.
+        self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
+        envelope = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
+        self.assertEqual(envelope['activated_by'], 'mirror-marker')
+        self.assertEqual(envelope['task_id'], 't-rev')
+        self.assertIn('credentials', envelope['reason'])
 
     def test_malformed_marker_dead_letters_to_mirror(self):
         # Missing required field — PASS without `summary`.
@@ -2497,7 +2537,13 @@ class MaybeDmLarryTest(unittest.TestCase):
         self.assertEqual(len(notifs), 1)
         self.assertIn('Spec mismatch', notifs[0]['message'])
 
-    def test_review_emergency_renders_reason_and_evidence(self):
+    def test_review_emergency_does_not_dm_in_5d(self):
+        # D3.5 5d: REVIEW_EMERGENCY_HALT is no longer in TERMINAL_DM_INTENTS.
+        # The broadcast priority alert (kind: alert, fired from
+        # `_trip_emergency_halt`) carries the recovery command + reaches
+        # all authorized chats; a targeted closing DM on top would be a
+        # duplicate notification with stale "decide whether to close
+        # without merge" wording. Confirming the inversion vs 5a/5b/5c.
         data = {'task_id': 't-halt', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
         decision = self._decision('review-emergency-halt', 'review_emergency_halt', payload={
             'task_id': 't-halt',
@@ -2510,10 +2556,9 @@ class MaybeDmLarryTest(unittest.TestCase):
             'evidence': '+    "aws_key": "AKIA..."',
         })
         on._maybe_dm_larry(data, decision)
-        notifs = self._read_notifications()
-        self.assertEqual(len(notifs), 1)
-        self.assertIn('Plaintext credentials', notifs[0]['message'])
-        self.assertIn('AKIA', notifs[0]['message'])
+        # No notification queued — broadcast alert (fired separately by
+        # _trip_emergency_halt) is the channel for EMERGENCY_HALT.
+        self.assertEqual(self._read_notifications(), [])
 
     def test_non_terminal_intent_does_not_dm(self):
         # ack-proceed is mid-chain — Forge proceeded, Beacon journals,
@@ -4849,6 +4894,1174 @@ class BeaconReplanPauseTest(unittest.TestCase):
             a for a in alerts if a.get('kind') == 'approval_request'
         ]
         self.assertEqual(len(approval_records), 1)
+
+
+# -------------------- D3.5 5d — auto-merge + EMERGENCY_HALT + cost gate --------------------
+
+
+class ParsePrUrlTest(unittest.TestCase):
+    """D3.5 5d — `_parse_pr_url` extracts (repo_coords, pr_number)."""
+
+    def test_canonical_url(self):
+        out = on._parse_pr_url(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42',
+        )
+        self.assertEqual(out, ('Larry-Yatch/ourliberty-agent-core', 42))
+
+    def test_trailing_slash(self):
+        out = on._parse_pr_url(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42/',
+        )
+        self.assertEqual(out, ('Larry-Yatch/ourliberty-agent-core', 42))
+
+    def test_with_query_string(self):
+        out = on._parse_pr_url(
+            'https://github.com/owner/repo/pull/123?foo=bar',
+        )
+        self.assertEqual(out, ('owner/repo', 123))
+
+    def test_with_fragment(self):
+        out = on._parse_pr_url(
+            'https://github.com/owner/repo/pull/123#issuecomment-456',
+        )
+        self.assertEqual(out, ('owner/repo', 123))
+
+    def test_with_files_suffix(self):
+        # gh emits both bare and `/files` etc. URLs.
+        out = on._parse_pr_url('https://github.com/owner/repo/pull/7/files')
+        self.assertEqual(out, ('owner/repo', 7))
+
+    def test_not_a_pr_url(self):
+        self.assertIsNone(on._parse_pr_url(
+            'https://github.com/owner/repo/issues/42',
+        ))
+
+    def test_not_github(self):
+        self.assertIsNone(on._parse_pr_url('https://example.com/foo/bar/pull/1'))
+
+    def test_empty_string(self):
+        self.assertIsNone(on._parse_pr_url(''))
+
+    def test_none(self):
+        self.assertIsNone(on._parse_pr_url(None))
+
+    def test_zero_pr_number(self):
+        self.assertIsNone(on._parse_pr_url(
+            'https://github.com/owner/repo/pull/0',
+        ))
+
+
+class AutoMergePRTest(unittest.TestCase):
+    """D3.5 5d — `_auto_merge_pr` shell-out semantics + outcome distinguishing."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+    TASK_ID = 'test-task-001'
+
+    def _mock_run(self, *, returncode=0, stdout='', stderr=''):
+        """Build a fake subprocess.CompletedProcess-shaped result."""
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    def test_success_outcome(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._mock_run(returncode=0)
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'merged')
+        self.assertEqual(result['pr_number'], 42)
+        self.assertEqual(result['repo_coords'], 'Larry-Yatch/ourliberty-agent-core')
+
+    def test_gh_command_shape(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._mock_run(returncode=0)
+            on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        args, kwargs = m_run.call_args
+        cmd = args[0]
+        self.assertEqual(cmd[:3], ['gh', 'pr', 'merge'])
+        self.assertIn('42', cmd)
+        self.assertIn('--squash', cmd)
+        self.assertIn('--delete-branch', cmd)
+        self.assertIn('--repo', cmd)
+        # Repo coords directly after --repo
+        repo_idx = cmd.index('--repo')
+        self.assertEqual(cmd[repo_idx + 1], 'Larry-Yatch/ourliberty-agent-core')
+
+    def test_failure_conflict_distinguishable(self):
+        """gh exit != 0 AND state != MERGED → failed."""
+        merge_proc = self._mock_run(
+            returncode=1, stderr='not mergeable: the merge commit cannot be cleanly created',
+        )
+        view_proc = self._mock_run(
+            returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('not mergeable', result['merge_reason'])
+        self.assertEqual(result['pr_number'], 42)
+
+    def test_failure_branch_protection(self):
+        merge_proc = self._mock_run(
+            returncode=1,
+            stderr='Pull request not mergeable: required reviews are not approved',
+        )
+        view_proc = self._mock_run(
+            returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('required reviews', result['merge_reason'])
+
+    def test_failure_auth_expired(self):
+        merge_proc = self._mock_run(
+            returncode=1,
+            stderr='HTTP 401: Bad credentials (https://api.github.com/...)',
+        )
+        view_proc = self._mock_run(
+            returncode=1, stderr='HTTP 401: Bad credentials',
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        # state recheck also failed → state=None; outcome is still failed
+        # but the reason carries the original merge stderr.
+        self.assertIn('Bad credentials', result['merge_reason'])
+
+    def test_failure_timeout(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = on.subprocess.TimeoutExpired(
+                cmd=['gh'], timeout=on._AUTO_MERGE_TIMEOUT_S,
+            )
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('timed out', result['merge_reason'])
+
+    def test_failure_gh_missing(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = FileNotFoundError('gh')
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('gh CLI not found', result['merge_reason'])
+
+    def test_failure_os_error(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = OSError('Broken pipe')
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('Broken pipe', result['merge_reason'])
+
+    def test_malformed_pr_url_no_shellout(self):
+        """A garbage pr_url should not attempt the gh shell-out at all."""
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            result = on._auto_merge_pr('not-a-url', self.TASK_ID)
+        m_run.assert_not_called()
+        self.assertEqual(result['merge_outcome'], 'failed')
+        self.assertIn('malformed', result['merge_reason'].lower())
+
+    def test_already_merged_resume_path(self):
+        """Non-zero gh merge BUT state=MERGED → already_merged (success)."""
+        merge_proc = self._mock_run(
+            returncode=1, stderr='Pull request is already merged',
+        )
+        view_proc = self._mock_run(
+            returncode=0, stdout=json.dumps({'state': 'MERGED'}),
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = [merge_proc, view_proc]
+            result = on._auto_merge_pr(self.PR_URL, self.TASK_ID)
+        self.assertEqual(result['merge_outcome'], 'already_merged')
+        self.assertEqual(result['pr_number'], 42)
+        self.assertEqual(result['repo_coords'], 'Larry-Yatch/ourliberty-agent-core')
+
+
+class AlreadyMergedResumeTest(unittest.TestCase):
+    """D3.5 5d — resume after daemon crash: PR was merged on first pass,
+    second pass sees gh failure but state=MERGED → success-shaped DM."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+
+    def test_already_merged_dm_body_is_success_shape(self):
+        """The DM body for `already_merged` should be the success body,
+        not the failure body — resume-after-crash is a non-failure path."""
+        decision = {
+            'intent': 'review-pass',
+            'payload': {
+                'task_id': 't-resume',
+                'pr_url': self.PR_URL,
+                'summary': 'Resume after crash',
+            },
+            'intent_kwargs': {
+                'pr_url': self.PR_URL,
+                'summary': 'Resume after crash',
+            },
+            'merge_outcome': 'already_merged',
+            'merge_result': {
+                'merge_outcome': 'already_merged',
+                'merge_reason': 'PR was already merged (resume from prior dispatch)',
+                'pr_number': 42,
+                'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+            },
+        }
+        body = on._render_dm_message('review-pass', decision)
+        self.assertIsNotNone(body)
+        self.assertIn('Auto-merged + branch deleted', body)
+        # The success shape does NOT contain "FAILED".
+        self.assertNotIn('FAILED', body)
+
+    def test_failed_outcome_dm_body_is_failure_shape(self):
+        decision = {
+            'intent': 'review-pass',
+            'payload': {
+                'task_id': 't-fail',
+                'pr_url': self.PR_URL,
+                'summary': 'A summary',
+            },
+            'intent_kwargs': {
+                'pr_url': self.PR_URL,
+                'summary': 'A summary',
+            },
+            'merge_outcome': 'failed',
+            'merge_result': {
+                'merge_outcome': 'failed',
+                'merge_reason': 'conflict on the merge commit',
+                'pr_number': 42,
+                'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+            },
+        }
+        body = on._render_dm_message('review-pass', decision)
+        self.assertIsNotNone(body)
+        self.assertIn('Auto-merge FAILED', body)
+        self.assertIn('conflict on the merge commit', body)
+        self.assertIn('gh pr merge 42', body)
+        self.assertIn('Larry-Yatch/ourliberty-agent-core', body)
+
+    def test_merged_outcome_dm_body(self):
+        decision = {
+            'intent': 'review-pass',
+            'payload': {
+                'task_id': 't-ok',
+                'pr_url': self.PR_URL,
+                'summary': 'Done',
+            },
+            'intent_kwargs': {
+                'pr_url': self.PR_URL,
+                'summary': 'Done',
+            },
+            'merge_outcome': 'merged',
+            'merge_result': {
+                'merge_outcome': 'merged',
+                'merge_reason': 'squash-merged + branch deleted',
+                'pr_number': 42,
+                'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+            },
+        }
+        body = on._render_dm_message('review-pass', decision)
+        self.assertIsNotNone(body)
+        self.assertIn('Auto-merged + branch deleted', body)
+        self.assertNotIn('FAILED', body)
+
+
+class EmergencyHaltTripTest(unittest.TestCase):
+    """D3.5 5d — `_trip_emergency_halt` writes the halt file + queues priority DM."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {
+            'AGENTS_ROOT': on.AGENTS_ROOT,
+            'BLACKBOARD': on.BLACKBOARD,
+            'EMERGENCY_HALT_FLAG': on.EMERGENCY_HALT_FLAG,
+            'LOG_FILE': on.LOG_FILE,
+        }
+        on.AGENTS_ROOT = self._root
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on.LOG_FILE = self._root / 'logs' / 'notifier.log'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        on.BLACKBOARD.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        self._tmp.cleanup()
+
+    def _data(self, task_id='t-halt', reply_chat_id=None):
+        d = {'task_id': task_id, 'agent': 'mirror'}
+        if reply_chat_id is not None:
+            d['reply_chat_id'] = reply_chat_id
+        return d
+
+    def _payload(self, reason='credentials in diff', evidence='line 42: API_KEY=...',
+                 pr_url='https://github.com/owner/repo/pull/1'):
+        return {'reason': reason, 'evidence': evidence, 'pr_url': pr_url,
+                'task_id': 't-halt'}
+
+    def _read_alerts(self):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return []
+        return [json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()]
+
+    def test_halt_file_written_with_envelope(self):
+        on._trip_emergency_halt(self._data(), self._payload())
+        self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
+        env = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
+        self.assertEqual(env['activated_by'], 'mirror-marker')
+        self.assertEqual(env['task_id'], 't-halt')
+        self.assertEqual(env['reason'], 'credentials in diff')
+        self.assertIn('API_KEY', env['evidence'])
+        self.assertEqual(env['pr_url'], 'https://github.com/owner/repo/pull/1')
+        self.assertIn('activated_at', env)
+
+    def test_halt_idempotent_on_re_trip(self):
+        """Re-tripping should NOT overwrite an existing halt file."""
+        on.EMERGENCY_HALT_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        on.EMERGENCY_HALT_FLAG.write_text(json.dumps({
+            'activated_at': '2026-05-14T12:00:00Z',
+            'activated_by': 'operator',
+            'reason': 'operator-triggered halt earlier today',
+        }) + '\n')
+        on._trip_emergency_halt(self._data(), self._payload())
+        env = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
+        # Existing operator envelope is preserved.
+        self.assertEqual(env['activated_by'], 'operator')
+        self.assertEqual(env['reason'], 'operator-triggered halt earlier today')
+
+    def test_alert_queued_kind_alert(self):
+        on._trip_emergency_halt(self._data(), self._payload())
+        alerts = self._read_alerts()
+        emergency_alerts = [
+            a for a in alerts
+            if a.get('source') == 'outbox-notifier'
+            and a.get('severity') == 'critical'
+            and 'emergency-halt' in (a.get('subject') or '')
+        ]
+        self.assertEqual(len(emergency_alerts), 1)
+        a = emergency_alerts[0]
+        # kind: alert (no explicit kind field — bot reads missing/alert as broadcast)
+        self.assertNotIn('chat_id', a)  # not targeted; broadcast shape
+        self.assertEqual(a['severity'], 'critical')
+        self.assertEqual(a['subject'], 'emergency-halt:t-halt')
+        self.assertIn('EMERGENCY_HALT tripped', a['message'])
+
+    def test_alert_suggested_action_includes_recovery_command(self):
+        # D3.5 5d code-review-fix #15: recovery command lives in the
+        # `suggested_action` field of the alert record only — not
+        # duplicated in the message body (which would double-render on
+        # phone). Bot renderer concatenates both fields when DMing.
+        on._trip_emergency_halt(self._data(), self._payload())
+        alerts = self._read_alerts()
+        a = next(x for x in alerts if x.get('severity') == 'critical')
+        self.assertEqual(
+            a.get('suggested_action'),
+            'python3 ~/agent-core/scripts/kill_switch.py resume',
+        )
+        # Body should NOT contain the recovery command (no duplication).
+        self.assertNotIn('kill_switch.py resume', a['message'])
+
+    def test_per_task_cooldown_bucket(self):
+        """Two halts for different task_ids should both queue alerts;
+        the per-task subject avoids cross-task suppression."""
+        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        # Remove file so the second trip's idempotent check doesn't skip
+        # (the alert path is separate from the halt-file path, but both
+        # share the data-flow we're testing).
+        on.EMERGENCY_HALT_FLAG.unlink()
+        on._trip_emergency_halt(self._data(task_id='t-B'), self._payload())
+        alerts = self._read_alerts()
+        emergency = [a for a in alerts if a.get('severity') == 'critical']
+        subjects = {a.get('subject') for a in emergency}
+        self.assertIn('emergency-halt:t-A', subjects)
+        self.assertIn('emergency-halt:t-B', subjects)
+
+    def test_same_task_cooldown_suppresses(self):
+        """Re-tripping for the SAME task within 10 min — second alert
+        suppressed by cooldown bucket (subject keyed on task_id)."""
+        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        on.EMERGENCY_HALT_FLAG.unlink()
+        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        alerts = self._read_alerts()
+        emergency = [a for a in alerts if a.get('severity') == 'critical']
+        self.assertEqual(len(emergency), 1)  # second suppressed
+
+    def test_missing_payload_fields_dont_crash(self):
+        on._trip_emergency_halt(self._data(), {})  # no reason/evidence/pr_url
+        self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
+        env = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
+        self.assertEqual(env['reason'], '(no reason)')
+        self.assertEqual(env['evidence'], '(no evidence)')
+
+
+class CostBudgetGateTest(unittest.TestCase):
+    """D3.5 5d — `_check_cost_budget` + `_enforce_cost_budget` semantics."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {
+            'AGENTS_ROOT': on.AGENTS_ROOT,
+            'BLACKBOARD': on.BLACKBOARD,
+            'COSTS_FILE': on.COSTS_FILE,
+            'LOG_FILE': on.LOG_FILE,
+        }
+        on.AGENTS_ROOT = self._root
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.COSTS_FILE = on.BLACKBOARD / 'costs.jsonl'
+        on.LOG_FILE = self._root / 'logs' / 'notifier.log'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        on.BLACKBOARD.mkdir(parents=True, exist_ok=True)
+        # D3.5 5d code-review-fix #4: per-task DM dedup is daemon-lifetime
+        # state. Reset between test cases so re-enforcement tests aren't
+        # tainted by prior cases that landed the same task_id in the set.
+        on._reset_cost_budget_dmed_tasks()
+        self.addCleanup(on._reset_cost_budget_dmed_tasks)
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        self._tmp.cleanup()
+
+    def _write_costs(self, *records):
+        with open(on.COSTS_FILE, 'a', encoding='utf-8') as f:
+            for r in records:
+                f.write(json.dumps(r) + '\n')
+
+    def test_missing_ledger_allows_dispatch(self):
+        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertFalse(at_cap)
+        self.assertEqual(current, 0.0)
+        self.assertEqual(cap, 5.0)
+
+    def test_below_cap_allows_dispatch(self):
+        self._write_costs(
+            {'task_id': 't-x', 'cost_usd': 1.0},
+            {'task_id': 't-x', 'cost_usd': 2.0},
+            {'task_id': 't-other', 'cost_usd': 999.0},  # different task; ignored
+        )
+        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertFalse(at_cap)
+        self.assertEqual(current, 3.0)
+
+    def test_at_cap_refuses_dispatch(self):
+        self._write_costs(
+            {'task_id': 't-x', 'cost_usd': 3.0},
+            {'task_id': 't-x', 'cost_usd': 2.0},
+        )
+        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertTrue(at_cap)
+        self.assertEqual(current, 5.0)
+
+    def test_over_cap_refuses_dispatch(self):
+        self._write_costs(
+            {'task_id': 't-x', 'cost_usd': 4.0},
+            {'task_id': 't-x', 'cost_usd': 2.0},
+        )
+        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertTrue(at_cap)
+        self.assertEqual(current, 6.0)
+
+    def test_malformed_lines_skipped(self):
+        # Mix of valid + malformed (not JSON, wrong shape, missing fields)
+        # — gate stays robust.
+        with open(on.COSTS_FILE, 'w', encoding='utf-8') as f:
+            f.write('{"task_id": "t-x", "cost_usd": 1.0}\n')
+            f.write('not json at all\n')
+            f.write('{"task_id": "t-x"}\n')  # no cost_usd
+            f.write('{}\n')                   # no task_id
+            f.write('[1,2,3]\n')              # not a dict
+            f.write('{"task_id": "t-x", "cost_usd": 2.0}\n')
+            f.write('\n')                     # empty line
+        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertFalse(at_cap)
+        self.assertEqual(current, 3.0)
+
+    def test_negative_cost_ignored(self):
+        # Defensive — negative cost_usd is meaningless; skip.
+        self._write_costs(
+            {'task_id': 't-x', 'cost_usd': 1.0},
+            {'task_id': 't-x', 'cost_usd': -100.0},
+            {'task_id': 't-x', 'cost_usd': 1.0},
+        )
+        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertEqual(current, 2.0)
+        self.assertFalse(at_cap)
+
+    def test_bool_cost_ignored(self):
+        # bool is an int subclass — defensive guard.
+        self._write_costs(
+            {'task_id': 't-x', 'cost_usd': True},  # treated as 1 by Python
+            {'task_id': 't-x', 'cost_usd': 1.0},
+        )
+        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        self.assertEqual(current, 1.0)  # bool skipped, only the 1.0 counts
+
+    def test_enforce_allows_below_cap(self):
+        self._write_costs({'task_id': 't-x', 'cost_usd': 1.0})
+        data = {'reply_chat_id': 12345}
+        ok = on._enforce_cost_budget('t-x', 'build-phase', data)
+        self.assertTrue(ok)
+
+    def test_enforce_refuses_at_cap_and_dms_larry(self):
+        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        data = {'reply_chat_id': 12345}
+        ok = on._enforce_cost_budget('t-x', 'build-phase', data)
+        self.assertFalse(ok)
+        # DM queued
+        import larry_alerts as la
+        records = [json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()]
+        cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms), 1)
+        self.assertEqual(cost_dms[0]['chat_id'], 12345)
+        self.assertIn('build-phase', cost_dms[0]['message'])
+        self.assertIn('cap', cost_dms[0]['message'])
+
+    def test_enforce_no_chat_id_still_refuses(self):
+        """Refusal happens regardless of reply_chat_id; DM is best-effort."""
+        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        ok = on._enforce_cost_budget('t-x', 'build-phase', {})
+        self.assertFalse(ok)
+
+    def test_enforce_dedups_same_task_within_daemon_lifetime(self):
+        """First cap-fire DMs Larry; subsequent fires for the same task
+        within the same daemon-instance suppress the DM (code-review #4).
+        """
+        import larry_alerts as la
+        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        data = {'reply_chat_id': 12345}
+        # First refusal — DM queued.
+        on._enforce_cost_budget('t-x', 'build-phase', data)
+        records = [
+            json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+            if line.strip()
+        ]
+        cost_dms_first = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms_first), 1)
+        # Second refusal on the SAME task — suppressed.
+        on._enforce_cost_budget('t-x', 'mirror-review', data)
+        records = [
+            json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+            if line.strip()
+        ]
+        cost_dms_second = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms_second), 1, 'second fire should not queue a duplicate DM')
+        # Third refusal on the SAME task — still suppressed.
+        on._enforce_cost_budget('t-x', 'revision-to-forge', data)
+        records = [
+            json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+            if line.strip()
+        ]
+        cost_dms_third = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms_third), 1)
+
+    def test_enforce_dedups_per_task_not_globally(self):
+        """Cap-fire on task A does NOT suppress DM for task B (different
+        task — different dedup bucket)."""
+        import larry_alerts as la
+        self._write_costs({'task_id': 't-A', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-B', 'cost_usd': 10.0})
+        data = {'reply_chat_id': 12345}
+        on._enforce_cost_budget('t-A', 'build-phase', data)
+        on._enforce_cost_budget('t-B', 'build-phase', data)
+        records = [
+            json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+            if line.strip()
+        ]
+        cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms), 2)
+        task_ids = {r.get('task_id') for r in cost_dms}
+        self.assertEqual(task_ids, {'t-A', 't-B'})
+
+    def test_enforce_dedups_resets_after_daemon_restart(self):
+        """Simulating a daemon restart (test helper clears the set) —
+        the same task can DM again. Models the real production behavior
+        where the daemon-lifetime set is cleared on every restart, which
+        is intentional: Larry may have raised the cap and a restart
+        means the issue might be resolved."""
+        import larry_alerts as la
+        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        data = {'reply_chat_id': 12345}
+        on._enforce_cost_budget('t-x', 'build-phase', data)
+        on._reset_cost_budget_dmed_tasks()  # simulate daemon restart
+        on._enforce_cost_budget('t-x', 'mirror-review', data)
+        records = [
+            json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+            if line.strip()
+        ]
+        cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms), 2)
+
+    def test_load_cap_from_config_default(self):
+        """Missing/malformed config → default 5.0."""
+        on._invalidate_loop_bounds_cache()
+        # Point the config path at a non-existent file.
+        original = on._MODELS_CONFIG_PATH
+        on._MODELS_CONFIG_PATH = self._root / 'nope.json'
+        try:
+            on._invalidate_loop_bounds_cache()
+            cap = on._load_cost_per_task_cap_usd_from_config()
+            self.assertEqual(cap, on.DEFAULT_COST_PER_TASK_USD_CAP)
+        finally:
+            on._MODELS_CONFIG_PATH = original
+            on._invalidate_loop_bounds_cache()
+
+    def _with_loop_bounds(self, loop_bounds_dict):
+        """Helper: write a config with the given loop_bounds; yield."""
+        cfg_path = self._root / 'agent-models.json'
+        cfg_path.write_text(json.dumps({'loop_bounds': loop_bounds_dict}))
+        original = on._MODELS_CONFIG_PATH
+        on._MODELS_CONFIG_PATH = cfg_path
+        on._invalidate_loop_bounds_cache()
+        self.addCleanup(setattr, on, '_MODELS_CONFIG_PATH', original)
+        self.addCleanup(on._invalidate_loop_bounds_cache)
+
+    def test_load_cap_from_valid_config(self):
+        """Config with valid cost_per_task_usd → returns that value."""
+        self._with_loop_bounds({'cost_per_task_usd': 7.5})
+        self.assertEqual(on._load_cost_per_task_cap_usd_from_config(), 7.5)
+
+    def test_load_cap_with_bool_falls_back(self):
+        """`true` for cost_per_task_usd → fall back to default (bool is
+        an int subclass; defensive guard prevents bool from coercing to 1.0).
+        """
+        self._with_loop_bounds({'cost_per_task_usd': True})
+        self.assertEqual(
+            on._load_cost_per_task_cap_usd_from_config(),
+            on.DEFAULT_COST_PER_TASK_USD_CAP,
+        )
+
+    def test_load_cap_with_negative_falls_back(self):
+        """Negative cap is meaningless → default."""
+        self._with_loop_bounds({'cost_per_task_usd': -1.0})
+        self.assertEqual(
+            on._load_cost_per_task_cap_usd_from_config(),
+            on.DEFAULT_COST_PER_TASK_USD_CAP,
+        )
+
+    def test_load_cap_with_string_falls_back(self):
+        """Non-numeric cap → default."""
+        self._with_loop_bounds({'cost_per_task_usd': '5.00'})
+        self.assertEqual(
+            on._load_cost_per_task_cap_usd_from_config(),
+            on.DEFAULT_COST_PER_TASK_USD_CAP,
+        )
+
+
+class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
+    """D3.5 5d — process_outbox marker-routing extensions: auto-merge
+    fires on review_pass + result attaches to decision + DM reflects outcome."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        self._auto_merge_calls: list[tuple[str, str]] = []
+        self._merge_outcome_override = {
+            'merge_outcome': 'merged',
+            'merge_reason': 'squash-merged + branch deleted',
+            'pr_number': 42,
+            'repo_coords': 'test-owner/test-repo',
+        }
+        def _override(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return dict(self._merge_outcome_override)
+        self._orig_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _override
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._orig_override
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_mirror_outbox(self, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _body_with_chat(self, marker, chat_id=98765):
+        body = _mirror_outbox_body(marker)
+        body['reply_chat_id'] = chat_id
+        return body
+
+    def _read_notifications(self):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return []
+        return [json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()]
+
+    def test_auto_merge_fires_on_review_pass(self):
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-pass.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        pr_url, task_id = self._auto_merge_calls[0]
+        self.assertEqual(pr_url, PR_URL_FIXTURE)
+        self.assertEqual(task_id, 't-rev')  # the marker fixture's task_id
+
+    def test_auto_merge_skipped_on_review_revision(self):
+        body = self._body_with_chat(_mirror_revision_marker(confidence='high'))
+        f = self._write_mirror_outbox('t-rev.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._auto_merge_calls, [])
+
+    def test_auto_merge_skipped_on_review_escalate(self):
+        body = self._body_with_chat(_mirror_escalate_marker())
+        f = self._write_mirror_outbox('t-esc.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._auto_merge_calls, [])
+
+    def test_auto_merge_skipped_on_emergency_halt(self):
+        body = self._body_with_chat(_mirror_emergency_marker())
+        f = self._write_mirror_outbox('t-halt.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._auto_merge_calls, [])
+
+    def test_dm_body_reflects_merged_outcome(self):
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-pass.json', body)
+        on.process_outbox(f)
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        self.assertIn('Auto-merged + branch deleted', notifications[0]['message'])
+
+    def test_dm_body_reflects_failed_outcome(self):
+        self._merge_outcome_override = {
+            'merge_outcome': 'failed',
+            'merge_reason': 'conflict on the merge commit',
+            'pr_number': 42,
+            'repo_coords': 'test-owner/test-repo',
+        }
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-pass.json', body)
+        on.process_outbox(f)
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        self.assertIn('Auto-merge FAILED', notifications[0]['message'])
+        self.assertIn('conflict on the merge commit', notifications[0]['message'])
+        # The manual-fallback command must render the actual PR number +
+        # repo coords so Larry can copy-paste from his phone (code review
+        # finding #12).
+        self.assertIn(
+            'gh pr merge 42 --repo test-owner/test-repo --squash --delete-branch',
+            notifications[0]['message'],
+        )
+
+    def test_resume_after_crash_renders_success_body(self):
+        """End-to-end resume path: outbox processed once (override returns
+        merged), restored from .archive/, processed again (override returns
+        already_merged) — second DM body is the success shape, not failure.
+
+        Simulates: daemon crashes between auto-merge and archive; on
+        restart the same outbox is re-processed; `_auto_merge_pr`'s
+        `gh pr view` recheck disambiguates already-merged from failure.
+        Per Larry's sign-off: already-merged on resume reads as success.
+        """
+        body = self._body_with_chat(_mirror_pass_marker(), chat_id=98765)
+        f = self._write_mirror_outbox('t-resume.json', body)
+        # First pass — normal `merged` outcome.
+        on.process_outbox(f)
+        # Restore the outbox from archive (simulate crash before archive).
+        archived = on.OUTBOXES_ROOT / 'mirror' / '.archive' / 't-resume.json'
+        self.assertTrue(archived.exists())
+        archived.rename(f)
+        # Flip the override to the resume-after-crash outcome.
+        self._merge_outcome_override = {
+            'merge_outcome': 'already_merged',
+            'merge_reason': 'PR was already merged (resume from prior dispatch)',
+            'pr_number': 42,
+            'repo_coords': 'test-owner/test-repo',
+        }
+        # Second pass — already_merged outcome.
+        on.process_outbox(f)
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        # Two notifications now (one per pass). Both render the success
+        # body — already_merged uses the same template as merged because
+        # the user-visible state is identical (PR is merged either way).
+        self.assertEqual(len(notifications), 2)
+        for n in notifications:
+            self.assertIn('Auto-merged + branch deleted', n['message'])
+            self.assertNotIn('FAILED', n['message'])
+
+    def test_dm_body_reflects_already_merged_outcome(self):
+        self._merge_outcome_override = {
+            'merge_outcome': 'already_merged',
+            'merge_reason': 'PR was already merged (resume from prior dispatch)',
+            'pr_number': 42,
+            'repo_coords': 'test-owner/test-repo',
+        }
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-pass.json', body)
+        on.process_outbox(f)
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        # User-visible message is identical to `merged` — see _REVIEW_PASS_DM_VARIANTS.
+        self.assertIn('Auto-merged + branch deleted', notifications[0]['message'])
+        self.assertNotIn('FAILED', notifications[0]['message'])
+
+    def test_override_exception_renders_failed_outcome(self):
+        """A buggy override that raises should produce a failed-outcome DM,
+        not wedge the daemon. Daemon-never-wedge invariant."""
+        def _broken(pr_url, task_id):
+            raise RuntimeError('test override deliberately broken')
+        on._AUTO_MERGE_FN_OVERRIDE = _broken
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('t-pass.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        self.assertIn('Auto-merge FAILED', notifications[0]['message'])
+
+    def test_marker_error_no_auto_merge(self):
+        """Malformed PASS marker → marker-error cascade → NO auto-merge."""
+        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        marker = (
+            f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
+        )
+        body = self._body_with_chat(marker)
+        f = self._write_mirror_outbox('t-rev.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._auto_merge_calls, [])
+
+
+class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
+    """D3.5 5d — verify the cost gate refuses dispatch at each of the
+    four dispatch sites when the per-task spend is at-cap."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'COSTS_FILE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.COSTS_FILE = on.BLACKBOARD / 'costs.jsonl'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        # Seed agent-models.json so the routing validator's check_target_repo
+        # gate accepts `ourliberty-agent-core` for forge + mirror (matches
+        # production allowlist shape; same pattern as BuildPhaseDispatchTest).
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+                'mirror': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+        # Per-task DM dedup is daemon-lifetime state; reset between test
+        # cases so dispatch-site coverage isn't tainted by the prior case.
+        on._reset_cost_budget_dmed_tasks()
+        self.addCleanup(on._reset_cost_budget_dmed_tasks)
+        # Pre-load $99 onto the test task to put it past the $5 cap.
+        on.BLACKBOARD.mkdir(parents=True, exist_ok=True)
+        with open(on.COSTS_FILE, 'w', encoding='utf-8') as f:
+            f.write(json.dumps({'task_id': 't-over', 'cost_usd': 99.0}) + '\n')
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _forge_inbox_files(self):
+        return list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+
+    def _mirror_inbox_files(self):
+        return list((on.INBOXES_ROOT / 'mirror').glob('*.json'))
+
+    def test_build_phase_refused_at_cap(self):
+        data = {
+            'task_id': 't-over',
+            'claude_session_id': 'session-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'feature/x',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_build_phase(data)
+        self.assertEqual(self._forge_inbox_files(), [])
+
+    def test_mirror_review_refused_at_cap(self):
+        data = {
+            'task_id': 't-over',
+            'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_mirror_review(
+            data,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+        )
+        self.assertEqual(self._mirror_inbox_files(), [])
+
+    def test_revision_dispatch_refused_at_cap(self):
+        data = {
+            'task_id': 't-over',
+            'forge_build_session_id': 'session-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 555,
+        }
+        decision = {'payload': {'findings': []}}
+        on._dispatch_revision_to_forge(data, decision)
+        self.assertEqual(self._forge_inbox_files(), [])
+
+    def test_review_rerun_refused_at_cap(self):
+        data = {
+            'task_id': 't-over',
+            'target_repo': 'ourliberty-agent-core',
+            'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_mirror_review_rerun(data, round_num=1, summary='fix x')
+        self.assertEqual(self._mirror_inbox_files(), [])
+
+    def test_cost_budget_dm_queued_on_refusal(self):
+        import larry_alerts as la
+        data = {
+            'task_id': 't-over',
+            'claude_session_id': 'session-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_build_phase(data)
+        records = [json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()]
+        cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+        self.assertEqual(len(cost_dms), 1)
+        self.assertEqual(cost_dms[0]['chat_id'], 555)
+
+    def test_under_cap_allows_dispatch(self):
+        """Sanity: clean task_id below cap → dispatch proceeds normally."""
+        # Use a different task_id with no cost records.
+        data = {
+            'task_id': 't-clean',
+            'claude_session_id': 'session-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'feature/x',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_build_phase(data)
+        self.assertEqual(len(self._forge_inbox_files()), 1)
+
+    def test_idempotent_skip_does_not_fire_cost_dm(self):
+        """Second-pass review fix 2-#1: cost-budget gate is positioned
+        AFTER the idempotency check, so re-processing an outbox whose
+        dispatch already landed (crash-recovery scenario) does NOT fire
+        a false-alarm cost-DM to Larry. The idempotency check returns
+        early; the gate isn't reached."""
+        import larry_alerts as la
+        # Pre-load $99 onto t-already so cost would fire if reached.
+        with open(on.COSTS_FILE, 'a', encoding='utf-8') as f:
+            f.write(json.dumps({'task_id': 't-already', 'cost_usd': 99.0}) + '\n')
+        # Pre-stage the build dispatch as already-archived (simulates
+        # the daemon having processed this outbox + dispatched + archived
+        # in a prior run; now re-processing on resume).
+        (on.INBOXES_ROOT / 'forge' / '.archive').mkdir(parents=True, exist_ok=True)
+        (on.INBOXES_ROOT / 'forge' / '.archive' / 'build-t-already.json').write_text(
+            json.dumps({'task_id': 't-already', 'prompt': 'noop'}),
+        )
+        data = {
+            'task_id': 't-already',
+            'claude_session_id': 'session-abc',
+            'target_repo': 'ourliberty-agent-core',
+            'reply_chat_id': 555,
+        }
+        on._dispatch_build_phase(data)
+        # Idempotency check fires; cost gate is never reached.
+        # No new inbox file (the existing .archive entry blocks).
+        new_files = [
+            p for p in (on.INBOXES_ROOT / 'forge').glob('*.json')
+            if p.name != 'build-t-already.json'
+        ]
+        self.assertEqual(new_files, [])
+        # Critical: no cost-budget DM queued.
+        if la.ALERTS_FILE.exists():
+            records = [
+                json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
+                if line.strip()
+            ]
+            cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
+            self.assertEqual(
+                cost_dms, [],
+                'crash-recovery should not fire false-alarm cost-DM',
+            )
+
+
+class CostDmTemplateTest(unittest.TestCase):
+    """D3.5 5d — cost-budget-exhausted DM template renders correctly."""
+
+    def test_renders_with_full_fields(self):
+        decision = {
+            'intent': 'cost-budget-exhausted',
+            'payload': {'task_id': 't-x'},
+            'intent_kwargs': {
+                'task_id': 't-x',
+                'current_usd': '6.50',
+                'cap_usd': '5.00',
+                'dispatch_label': 'mirror-review-rerun',
+            },
+        }
+        body = on._render_dm_message('cost-budget-exhausted', decision)
+        self.assertIsNotNone(body)
+        self.assertIn('t-x', body)
+        self.assertIn('$6.50', body)
+        self.assertIn('$5.00', body)
+        self.assertIn('mirror-review-rerun', body)
+        self.assertIn('cost_per_task_usd', body)
+
+    def test_terminal_intent(self):
+        self.assertIn('cost-budget-exhausted', on.TERMINAL_DM_INTENTS)
+
+    def test_missing_kwargs_renders_with_placeholders(self):
+        """Missing intent_kwargs → renders with '?' placeholders, never crashes."""
+        decision = {
+            'intent': 'cost-budget-exhausted',
+            'payload': {'task_id': 't-x'},
+            'intent_kwargs': {},
+        }
+        body = on._render_dm_message('cost-budget-exhausted', decision)
+        self.assertIsNotNone(body)
+        # Should contain '?' placeholders where data is missing.
+        self.assertIn('?', body)
 
 
 if __name__ == '__main__':

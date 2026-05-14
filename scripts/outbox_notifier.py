@@ -51,6 +51,7 @@ import os
 import re
 import shutil
 import signal
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -78,6 +79,13 @@ BLACKBOARD = AGENTS_ROOT / 'blackboard'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
 DEAD_LETTER_STATE = AGENTS_ROOT / 'state' / 'outbox-notifier-dead-letter.json'
 EMERGENCY_HALT_FLAG = BLACKBOARD / 'EMERGENCY_HALT'
+# D3.5 commit 5d — cost-budget gate reads cumulative per-task spend from
+# the costs.jsonl ledger that inbox_watcher.process_task writes after every
+# claude invocation. Field shape: `{ts, task_id, agent, cost_usd, ...}` —
+# one JSON object per line. Field-name drift from upstream noted in
+# docs/upstream-audit.md Pattern G (we use `cost_usd`, upstream uses
+# `total_cost_usd`); the gate stays on the local name.
+COSTS_FILE = BLACKBOARD / 'costs.jsonl'
 
 AGENT_IDS = ['beacon', 'forge', 'mirror', 'pulse']
 
@@ -155,6 +163,56 @@ _REVISION_APPLIED_RE = re.compile(
 _MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
 _LOOP_BOUNDS_CACHE: dict[str, Any] = {}
 
+# D3.5 commit 5d — extract repo coords + PR number from a github.com PR URL.
+# Mirror's REVIEW_PASS marker carries `pr_url`; auto-merge needs the
+# (owner/repo, PR#) split to feed `gh pr merge`. Tolerant of trailing
+# slashes, query strings, fragments — anything after the PR digits is
+# discarded.
+# Anchored to start-of-string so an attacker-influenced URL embedded in a
+# Mirror outbox payload (e.g. via a future prompt-injection path or a
+# marker-error retry mis-shape) can't smuggle alternate repo coords. Only
+# matches genuine `https://github.com/<owner>/<repo>/pull/<N>` prefixes;
+# the post-PR-number path is discarded.
+_GH_PR_URL_RE = re.compile(
+    r'^https?://github\.com/([^/]+/[^/]+)/pull/(\d+)',
+)
+
+# D3.5 commit 5d — fallback cap when config is missing/malformed. The
+# config (`loop_bounds.cost_per_task_usd`) has been pre-staged since 5a at
+# $5.00; the live value Larry signed off on at Q7=3 is what gets enforced.
+# This constant is the safety net (config file missing or unparseable).
+DEFAULT_COST_PER_TASK_USD_CAP = 5.0
+
+# D3.5 commit 5d — `gh pr merge` and `gh pr view` shell-out timeout. 30s
+# allows for slow GitHub API + auth-token refresh; longer would risk the
+# notifier blocking past its 5s poll cadence on degraded gh CLI behavior.
+_AUTO_MERGE_TIMEOUT_S = 30
+
+# D3.5 commit 5d — test-mode override for `_auto_merge_pr`. Set by unit
+# tests (via monkey-patch) to a callable matching `_auto_merge_pr`'s
+# signature, returning the same dict shape — this prevents shell-out to
+# the real `gh pr merge` against the real GitHub repo when an existing
+# Mirror-marker integration test naturally exercises `process_outbox`'s
+# review-pass branch. Production keeps it as None (the real shell-out
+# fires). Defensive: a buggy/missing override returns through the real
+# path, never wedging the daemon.
+_AUTO_MERGE_FN_OVERRIDE: Optional[Any] = None
+
+# D3.5 commit 5d — daemon-lifetime dedup of cost-budget-cap-fired DMs per
+# task_id. First cap-fire for a task queues a closing DM to Larry; later
+# fires for the same task within the same daemon process just log a
+# sentinel and skip the DM. Cleared on daemon restart (intentional —
+# Larry may have raised the cap in config or accepted the work; either
+# way a fresh restart resets the gate). Per code-review finding #4
+# (avoids DM flooding when multiple dispatch sites refuse in rapid
+# succession on the same task).
+_COST_BUDGET_DMED_TASKS: set[str] = set()
+
+
+def _reset_cost_budget_dmed_tasks() -> None:
+    """Test helper — wipe the cost-budget-dedup set between cases."""
+    _COST_BUDGET_DMED_TASKS.clear()
+
 
 def _invalidate_loop_bounds_cache() -> None:
     """Drop the cached loop_bounds. Tests use this between runs."""
@@ -212,6 +270,171 @@ def _load_max_replans_from_config() -> int:
     if not isinstance(raw, int) or raw < 0:
         return approval.DEFAULT_MAX_REPLANS
     return raw
+
+
+def _load_cost_per_task_cap_usd_from_config() -> float:
+    """Return `loop_bounds.cost_per_task_usd` from config/agent-models.json.
+
+    D3.5 5d. Same shape as `_load_max_revisions_from_config` /
+    `_load_max_replans_from_config` — reads the cached `loop_bounds` block.
+    Falls back to `DEFAULT_COST_PER_TASK_USD_CAP` (=5.0) when the config
+    file is missing, malformed, or the field is absent/non-numeric/negative.
+
+    Activated in 5d per Q7=3 sign-off — the field has been pre-staged in
+    config since 5a but wasn't read by any code (the config's `_note` line
+    claiming "Read by outbox_notifier when classifying Mirror markers" was
+    aspirational). 5d wires the actual gate at the four dispatch sites.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    loop_bounds = cfg.get('loop_bounds') if isinstance(cfg, dict) else None
+    if not isinstance(loop_bounds, dict):
+        return DEFAULT_COST_PER_TASK_USD_CAP
+    raw = loop_bounds.get('cost_per_task_usd')
+    if isinstance(raw, bool):
+        # bool is an int subclass — exclude before the int/float check.
+        return DEFAULT_COST_PER_TASK_USD_CAP
+    if not isinstance(raw, (int, float)) or raw < 0:
+        return DEFAULT_COST_PER_TASK_USD_CAP
+    return float(raw)
+
+
+def _check_cost_budget(
+    task_id: str,
+    cap_usd: Optional[float] = None,
+) -> tuple[bool, float, float]:
+    """Return ``(at_cap, current_usd, cap_usd)`` for the per-task budget gate.
+
+    D3.5 commit 5d. Reads the JSONL cost ledger written by
+    ``inbox_watcher.process_task`` after every claude invocation; sums the
+    ``cost_usd`` field across all records matching ``task_id``. Returns
+    ``at_cap=True`` when the current sum is at or above the cap (next
+    dispatch would push past the budget).
+
+    Field-name choice (`cost_usd` not upstream's `total_cost_usd`) matches
+    Larry's D2-era local schema — see ``docs/upstream-audit.md`` Pattern G.
+
+    Tolerates a missing ledger (returns ``(False, 0.0, cap)``) and malformed
+    JSON lines (skips them; daemon-never-wedge). The whole gate degrades to
+    "allow dispatch" on read errors — the worst case is one extra Opus call,
+    not a wedged loop.
+
+    Cap is read from config via ``_load_cost_per_task_cap_usd_from_config``
+    when not passed explicitly. Tests pass an explicit value to avoid
+    touching the on-disk config.
+    """
+    if cap_usd is None:
+        cap_usd = _load_cost_per_task_cap_usd_from_config()
+    current = 0.0
+    try:
+        with open(COSTS_FILE, 'r', encoding='utf-8') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except (ValueError, json.JSONDecodeError):
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                if rec.get('task_id') != task_id:
+                    continue
+                cost = rec.get('cost_usd')
+                if isinstance(cost, bool):
+                    continue
+                if isinstance(cost, (int, float)) and cost >= 0:
+                    current += float(cost)
+    except FileNotFoundError:
+        return False, 0.0, cap_usd
+    except OSError:
+        # Don't wedge on transient read errors — allow dispatch, log
+        # elsewhere if the caller cares.
+        return False, 0.0, cap_usd
+    at_cap = current >= cap_usd
+    return at_cap, current, cap_usd
+
+
+def _enforce_cost_budget(
+    task_id: str,
+    dispatch_label: str,
+    data: dict[str, Any],
+) -> bool:
+    """Pre-dispatch cost-budget gate. Returns True if dispatch should proceed.
+
+    D3.5 commit 5d. Called inside each dispatch helper (`_dispatch_build_phase`,
+    `_dispatch_revision_to_forge`, `_dispatch_mirror_review`,
+    `_dispatch_mirror_review_rerun`) BEFORE the actual `safe_write_inbox`.
+    When ``at_cap``, refuses the dispatch and queues a closing DM to the
+    originating chat (if reply_chat_id present) so Larry sees the cap fire
+    instead of a silent stall.
+
+    Sentinel log line on cap-fire: ``COST_BUDGET_EXHAUSTED task=<id>
+    current=$X.XX cap=$5.00 dispatch=<label>`` — load-bearing for watchdog
+    scanning. Same pattern as the BEACON_REPLAN_ALERT_WRITE_FAILED sentinel
+    from 5c.
+    """
+    at_cap, current, cap = _check_cost_budget(task_id)
+    if not at_cap:
+        # Log at INFO (terse) so the cost trajectory is visible to the
+        # operator over time without spamming the log.
+        log(
+            f'COST_BUDGET task={task_id} current=${current:.2f} '
+            f'cap=${cap:.2f} dispatch={dispatch_label} (allowed)',
+        )
+        return True
+    # Per-task daemon-lifetime dedup. Multiple dispatch sites can refuse
+    # on the same task in rapid succession (e.g. Forge revision outbox
+    # then Mirror re-review outbox both hit the gate within seconds);
+    # without dedup, Larry's phone gets pinged once per dispatch attempt.
+    # First fire DMs Larry; subsequent fires log the suppression only.
+    already_dmed = task_id in _COST_BUDGET_DMED_TASKS
+    log(
+        f'COST_BUDGET_EXHAUSTED task={task_id} current=${current:.2f} '
+        f'cap=${cap:.2f} dispatch={dispatch_label}; refusing dispatch'
+        + ('' if already_dmed else ' + queueing closing DM'),
+        'WARN',
+    )
+    if already_dmed:
+        return False
+    reply_chat_id = data.get('reply_chat_id')
+    if isinstance(reply_chat_id, int):
+        # Build a synthetic decision so _render_dm_message has the same
+        # shape as marker-driven DMs.
+        synthetic_decision = {
+            'intent': 'cost-budget-exhausted',
+            'payload': {
+                'task_id': task_id,
+            },
+            'intent_kwargs': {
+                'task_id': task_id,
+                'current_usd': f'{current:.2f}',
+                'cap_usd': f'{cap:.2f}',
+                'dispatch_label': dispatch_label,
+            },
+        }
+        message = _render_dm_message('cost-budget-exhausted', synthetic_decision)
+        if message is not None:
+            if larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='cost-budget-exhausted',
+                message=message,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                _COST_BUDGET_DMED_TASKS.add(task_id)
+            else:
+                log(
+                    f'COST_BUDGET_DM_WRITE_FAILED task={task_id} '
+                    f'(disk full?); cap-fire DM did not queue',
+                    'WARN',
+                )
+    return False
 
 # -------------------- notify-prompt template (D3-forge commit 4a) --------------------
 # Refined notify framing — Option C hybrid: one skeleton, per-intent action
@@ -282,15 +505,14 @@ INTENT_ACTION_BLOCKS = {
         '`=== END_XXX ===` delimiter. After {max_retries} retries the dispatch '
         'will be closed and dead-lettered back to Beacon.'
     ),
-    # D3.5 commit 5a — Mirror review marker intents. All four route to Beacon
-    # as informational journal entries in 5a; the actual loop machinery
-    # (revision dispatch to Forge in 5b, replan flow in 5c, auto-merge +
-    # EMERGENCY_HALT trip in 5d) lands later.
+    # D3.5 commit 5a — Mirror review marker intents. D3.5 closed with 5d:
+    # revision dispatch (5b), replan flow (5c), auto-merge + EMERGENCY_HALT
+    # trip + cost-budget gate (5d) are all live.
     'review-pass': (
         'Mirror has APPROVED PR `{pr_url}` on task `{task_id}`. Summary: '
-        '{summary}. Journal the approval. In 5a auto-merge is not yet wired, '
-        'so Larry merges manually after seeing this notify. No further action '
-        'from you.'
+        '{summary}. Auto-merge has fired automatically (D3.5 5d) — Larry '
+        'sees the actual merge outcome in his closing DM. Journal the '
+        'approval; no further action from you.'
     ),
     'review-revision': (
         'Mirror has requested REVISION on PR `{pr_url}` for task `{task_id}` '
@@ -305,16 +527,28 @@ INTENT_ACTION_BLOCKS = {
     'review-escalate': (
         'Mirror has ESCALATED PR `{pr_url}` on task `{task_id}` '
         '(severity={severity}, confidence={confidence}). Reason: {reason}. '
-        'In 5a the replan flow is not yet wired — journal the escalation and '
-        'decide manually: revise the spec (new APPROVAL_REQUEST) or push back '
-        'with reasoning. 5c will wire the auto-replan loop.'
+        'D3.5 5c wired the auto-replan flow — apply your Shape 8 decision '
+        'tree (auto-replan via fresh APPROVAL_REQUEST, push back with prose, '
+        'or stand down if budget exhausted). Larry already received the '
+        'closing DM via the 5a-followup pipe; your APPROVAL_REQUEST decides '
+        'whether he gets a second DM with the revised plan. Bounded by '
+        'max_replans on the envelope.'
     ),
     'review-emergency-halt': (
         'Mirror has flagged EMERGENCY_HALT on PR `{pr_url}` for task `{task_id}`. '
-        'Reason: {reason}. Evidence: {evidence}. In 5a the halt-file trip + '
-        'priority DM are not yet wired — Larry will see this as a normal '
-        'notify. Treat it as critical: review the PR immediately and decide '
-        'whether to close it without merge. 5d will wire the automatic halt.'
+        'Reason: {reason}. Evidence: {evidence}. EMERGENCY_HALT has been '
+        'tripped automatically (D3.5 5d) at ~/agents/blackboard/EMERGENCY_HALT '
+        '— all four agents pause dispatching on next 5s poll. Larry has been '
+        'priority-DMed via the broadcast alert channel. Journal the halt + '
+        "reason; do NOT attempt any further dispatch — the halt is sticky "
+        'until Larry runs `kill_switch.py resume`.'
+    ),
+    'cost-budget-exhausted': (
+        'Cost-budget gate fired on task `{task_id}` (current ${current_usd} '
+        '>= cap ${cap_usd}). Dispatch refused at: {dispatch_label}. Journal '
+        'the refusal. The task is stalled until Larry decides — revise the '
+        'plan, raise the cap (config loop_bounds.cost_per_task_usd), or '
+        'accept the work as-is. No further automatic action from you.'
     ),
     'replan-request': (
         'A downstream agent has requested a replan on task `{task_id}`. '
@@ -332,11 +566,21 @@ INTENT_ACTION_BLOCKS = {
 #
 # Template fields drawn from the marker payload + envelope data (see
 # `_render_dm_message`).
+# D3.5 5d — review-pass DM is outcome-aware: the body reflects whether
+# auto-merge succeeded, was already-merged (resume case), or failed. The
+# `merge_outcome` value is set on the marker_decision by the auto-merge
+# call site in process_outbox; _render_dm_message reads it and picks the
+# correct variant via _REVIEW_PASS_DM_VARIANTS below.
 DM_TEMPLATES = {
     'review-pass': (
+        # Default template used when no merge_outcome is set (e.g. unit
+        # tests of the render-pipeline that don't simulate the auto-merge
+        # call). The marker-routing path always populates merge_outcome
+        # before _maybe_dm_larry fires, so production reads from the
+        # variant map below.
         'Mirror approved PR {pr_url} on task `{task_id}`.\n'
         'Summary: {summary}\n'
-        'Ready for you to merge manually.'
+        'Merge outcome: {merge_outcome}.'
     ),
     'review-escalate': (
         # m-6 review fix: lead line is cause-agnostic. The intent fires from
@@ -380,19 +624,83 @@ DM_TEMPLATES = {
         'approach) and re-emit APPROVAL_REQUEST to Beacon, or set this '
         'task aside.'
     ),
+    # D3.5 5d — cost-budget cap fired before dispatch. Terminal-from-Larry's-
+    # perspective: the task is stalled and won't progress without his
+    # intervention (revise plan, raise cap, or accept as-is).
+    'cost-budget-exhausted': (
+        'Cost-budget cap fired on task `{task_id}` (current ${current_usd} '
+        '>= cap ${cap_usd}).\n'
+        'Refused dispatch: {dispatch_label}\n'
+        'The task is stalled. Revise the spec to scope down, raise the cap '
+        '(config/agent-models.json loop_bounds.cost_per_task_usd), or accept '
+        'the work-so-far as-is.'
+    ),
+}
+
+# D3.5 5d — outcome-aware DM body variants for review-pass. Selected in
+# `_render_dm_message` based on `decision['merge_outcome']`. The variants
+# fall back to DM_TEMPLATES['review-pass'] on missing/unknown outcome so
+# the render pipeline never crashes mid-merge — degrade to silent-or-vague
+# rather than wedge the daemon.
+_REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
+    'merged': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merged + branch deleted.'
+    ),
+    'already_merged': (
+        # Resume-after-crash success path. Identical user-visible message
+        # to `merged` — the resume distinction is in the log/audit trail,
+        # not load-bearing for Larry.
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merged + branch deleted.'
+    ),
+    'failed': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merge FAILED: {merge_reason}\n'
+        'Merge manually: gh pr merge {pr_number} --repo {repo_coords} '
+        '--squash --delete-branch'
+    ),
 }
 
 # Subset of intents that produce a closing DM to the originating chat. Other
 # intents are mid-chain mechanics that don't warrant Larry's attention.
-TERMINAL_DM_INTENTS = frozenset(DM_TEMPLATES.keys())
+# D3.5 5d: `review-emergency-halt` is intentionally excluded from this set
+# even though it has a DM_TEMPLATES entry — the priority broadcast alert
+# fired by `_trip_emergency_halt` is strictly more informative (it carries
+# the recovery command + broadcasts to all authorized chats, not just the
+# originating one). A targeted closing DM on top would be a duplicate
+# notification with stale "decide whether to close without merge" wording
+# (the halt is sticky; the action is `kill_switch.py resume`, not closing
+# the PR). The DM_TEMPLATES['review-emergency-halt'] entry is kept for
+# backwards-compat with any future code path that wants to render the body
+# explicitly (e.g. an operating-manual sample), but the auto-pipe skips it.
+TERMINAL_DM_INTENTS = frozenset(DM_TEMPLATES.keys()) - {'review-emergency-halt'}
 
 
 def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
     """Render the per-intent DM body. Returns None on missing template or
-    unrenderable fields (degrades to silence rather than crashing the daemon)."""
+    unrenderable fields (degrades to silence rather than crashing the daemon).
+
+    D3.5 5d: when intent == 'review-pass', the body picks an outcome-aware
+    variant from `_REVIEW_PASS_DM_VARIANTS` based on
+    `decision['merge_outcome']`. Falls back to the canonical
+    `DM_TEMPLATES['review-pass']` template if no outcome is set or the
+    outcome key is unknown — defensive against tests/mid-rollout state
+    where the auto-merge path hasn't populated the field.
+    """
     template = DM_TEMPLATES.get(intent)
     if template is None:
         return None
+    # D3.5 5d — outcome-aware review-pass template selection.
+    if intent == 'review-pass':
+        merge_outcome = decision.get('merge_outcome')
+        if isinstance(merge_outcome, str):
+            variant = _REVIEW_PASS_DM_VARIANTS.get(merge_outcome)
+            if variant is not None:
+                template = variant
     payload = decision.get('payload') or {}
     intent_kwargs = decision.get('intent_kwargs') or {}
     # Merge envelope payload + intent_kwargs so the template can pull from
@@ -407,10 +715,30 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
         'severity': payload.get('severity', '?'),
         'confidence': payload.get('confidence', '?'),
         'finding_count': 0,
+        # D3.5 5d — auto-merge outcome fields; the `failed` variant needs
+        # all three. Default '?' so missing-field formatting doesn't
+        # raise — degrade to a vague body, never crash the daemon.
+        'merge_outcome': '?',
+        'merge_reason': '?',
+        'pr_number': '?',
+        'repo_coords': '?',
+        # D3.5 5d — cost-budget DM fields.
+        'current_usd': '?',
+        'cap_usd': '?',
+        'dispatch_label': '?',
     }
     findings = payload.get('findings')
     if isinstance(findings, list):
         fields['finding_count'] = len(findings)
+    # D3.5 5d — surface merge_result fields if attached by the auto-merge
+    # call site. Same shape as intent_kwargs: classifier-populated values
+    # win over payload defaults.
+    merge_result = decision.get('merge_result')
+    if isinstance(merge_result, dict):
+        for k in ('merge_outcome', 'merge_reason', 'pr_number', 'repo_coords'):
+            v = merge_result.get(k)
+            if v is not None:
+                fields[k] = v
     # intent_kwargs from classifier may have pre-rendered values (e.g.
     # auto-promote reason). Apply on top.
     fields.update({k: v for k, v in intent_kwargs.items() if v is not None})
@@ -1122,6 +1450,15 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         )
         return
 
+    # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
+    # review finding 2-#1): on a crash-recovery re-process where the
+    # downstream dispatch already landed, the idempotency check above
+    # returns first — the cost gate shouldn't fire a false-alarm DM for
+    # work that isn't being attempted. Gate refuses + DMs Larry only on
+    # genuine new dispatch attempts.
+    if not _enforce_cost_budget(task_id, 'build-phase', data):
+        return
+
     try:
         dest = safe_write_inbox.safe_write_inbox(
             target_agent='forge',
@@ -1576,6 +1913,11 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
         )
         return
 
+    # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
+    # review finding 2-#1) — see _dispatch_build_phase for rationale.
+    if not _enforce_cost_budget(task_id, 'mirror-review', data):
+        return
+
     try:
         dest = safe_write_inbox.safe_write_inbox(
             target_agent='mirror',
@@ -1808,6 +2150,11 @@ def _dispatch_revision_to_forge(
         )
         return
 
+    # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
+    # review finding 2-#1) — see _dispatch_build_phase for rationale.
+    if not _enforce_cost_budget(task_id, 'revision-to-forge', data):
+        return
+
     try:
         dest = safe_write_inbox.safe_write_inbox(
             target_agent='forge',
@@ -1859,6 +2206,7 @@ def _dispatch_mirror_review_rerun(
             'WARN',
         )
         return
+
     branch = data.get('branch')
     pr_url = data.get('pr_url')
     max_revisions = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
@@ -1990,6 +2338,11 @@ def _dispatch_mirror_review_rerun(
         )
         return
 
+    # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
+    # review finding 2-#1) — see _dispatch_build_phase for rationale.
+    if not _enforce_cost_budget(task_id, 'mirror-review-rerun', data):
+        return
+
     try:
         dest = safe_write_inbox.safe_write_inbox(
             target_agent='mirror',
@@ -2009,6 +2362,330 @@ def _dispatch_mirror_review_rerun(
             f're-review dispatch FAILED for task {task_id} round {round_num}: '
             f'{type(e).__name__}: {e}. Forge already wrote her revision; '
             f'Larry must manually re-dispatch.',
+            'WARN',
+        )
+
+
+def _parse_pr_url(pr_url: str) -> Optional[tuple[str, int]]:
+    """Return (repo_coords, pr_number) from a github.com PR URL, or None.
+
+    D3.5 commit 5d. Tolerant of trailing slashes, query strings, fragments;
+    anything after the PR digits is discarded. `repo_coords` is the
+    `owner/repo` form `gh pr merge --repo` expects.
+
+    Returns None when the URL doesn't match the github PR shape — the
+    caller treats None as a render-only failure (DM body will say "failed:
+    malformed pr_url") and skips the gh shell-out.
+    """
+    if not isinstance(pr_url, str) or not pr_url:
+        return None
+    m = _GH_PR_URL_RE.search(pr_url)
+    if not m:
+        return None
+    repo_coords = m.group(1)
+    try:
+        pr_number = int(m.group(2))
+    except (TypeError, ValueError):
+        return None
+    if pr_number <= 0:
+        return None
+    return repo_coords, pr_number
+
+
+def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
+    """Return the PR's `state` field via `gh pr view --json state`, or None.
+
+    D3.5 commit 5d. Used by `_auto_merge_pr` on non-zero exit from
+    `gh pr merge` to distinguish *already-merged* (resume-after-crash
+    success path) from *real failure* (conflict, branch-protection,
+    auth-expired, network). Returns None on transport error — the caller
+    treats that as "couldn't disambiguate; report the original failure."
+
+    State values per GitHub API: 'OPEN', 'CLOSED', 'MERGED'.
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords,
+             '--json', 'state'],
+            capture_output=True,
+            text=True,
+            timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) FAILED during merge-state '
+            f'recheck: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) returned {proc.returncode} '
+            f'during merge-state recheck: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    state = data.get('state')
+    if isinstance(state, str):
+        return state
+    return None
+
+
+def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
+    """Fire `gh pr merge <N> --squash --delete-branch` for a Mirror-PASSed PR.
+
+    D3.5 commit 5d. Returns a result dict the DM-render pipeline reads:
+
+      {
+        'merge_outcome': 'merged' | 'already_merged' | 'failed',
+        'merge_reason':  str,        # short — fits in a phone DM
+        'pr_number':     int | str,  # int when parsed, '?' on URL-parse fail
+        'repo_coords':   str,        # e.g. 'Larry-Yatch/ourliberty-agent-core'
+      }
+
+    The order in `process_outbox`'s marker-routing block is
+    **merge → render DM → DM queue → archive** (per Larry's sign-off):
+    the merge is the irreversible action; render-DM after so the body
+    accurately reflects what actually happened. The outbox archives last
+    so a daemon crash mid-merge re-processes the same outbox on restart;
+    the second call gets `already_merged` from `_gh_pr_state` and renders
+    the success body (`gh pr merge` on a merged PR returns non-zero, but
+    the state recheck disambiguates).
+
+    Patterns: upstream `merge_watcher.merge_pr` (line 117) shape for the
+    gh shell-out, extended with --delete-branch (per d3-5-plan Item 6
+    sign-off) and the state-recheck disambiguation that resume-safety
+    requires. Stderr capture mirrors how `subprocess.run` is used
+    throughout the codebase (see worktree_manager.py).
+
+    Failure modes the gh CLI can return:
+      - merge conflict (mergeable=CONFLICTING) — `failed`
+      - branch protection denial — `failed`
+      - PR closed without merge — `failed`
+      - auth expired / token revoked — `failed`
+      - network timeout / unreachable — `failed`
+      - already-merged (resume after crash) — `already_merged`
+      - malformed PR URL (couldn't parse) — `failed` (no shell-out)
+      - gh CLI missing entirely (FileNotFoundError) — `failed`
+    """
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url!r} outcome=failed '
+            f'reason=malformed-pr-url (no shell-out attempted)',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'failed',
+            'merge_reason': f'malformed PR URL: {pr_url!r}',
+            'pr_number': '?',
+            'repo_coords': '?',
+        }
+    repo_coords, pr_number = parsed
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'merge', str(pr_number),
+             '--repo', repo_coords,
+             '--squash',
+             '--delete-branch'],
+            capture_output=True,
+            text=True,
+            timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired as e:
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
+            f'reason=timeout after {_AUTO_MERGE_TIMEOUT_S}s ({e})',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'failed',
+            'merge_reason': f'gh pr merge timed out after {_AUTO_MERGE_TIMEOUT_S}s',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    except FileNotFoundError as e:
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
+            f'reason=gh-cli-missing ({e})',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'failed',
+            'merge_reason': 'gh CLI not found on PATH',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    except OSError as e:
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
+            f'reason=os-error ({type(e).__name__}: {e})',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'failed',
+            'merge_reason': f'{type(e).__name__}: {e}',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    if proc.returncode == 0:
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=merged '
+            f'(--squash --delete-branch)',
+        )
+        return {
+            'merge_outcome': 'merged',
+            'merge_reason': 'squash-merged + branch deleted',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    # Non-zero exit — could be a real failure OR a resume-after-crash where
+    # the PR was already merged on the prior pass. Disambiguate via state
+    # recheck before reporting failure.
+    stderr_text = (proc.stderr or '').strip()
+    state = _gh_pr_state(repo_coords, pr_number)
+    if state == 'MERGED':
+        log(
+            f'AUTO_MERGE task={task_id} pr={pr_url} outcome=already_merged '
+            f'(gh exit={proc.returncode} but state=MERGED — resume from '
+            f'prior crash; treating as success)',
+        )
+        return {
+            'merge_outcome': 'already_merged',
+            'merge_reason': 'PR was already merged (resume from prior dispatch)',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    # Real failure. Trim stderr to keep the DM body sane on phone.
+    reason_short = stderr_text[:200] if stderr_text else f'gh exit {proc.returncode}'
+    log(
+        f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
+        f'(gh exit={proc.returncode}, state={state}, '
+        f'stderr={stderr_text[:300]!r})',
+        'WARN',
+    )
+    return {
+        'merge_outcome': 'failed',
+        'merge_reason': reason_short,
+        'pr_number': pr_number,
+        'repo_coords': repo_coords,
+    }
+
+
+def _trip_emergency_halt(
+    data: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    """Write the EMERGENCY_HALT flag file + queue the priority broadcast DM.
+
+    D3.5 commit 5d. Activates the halt-file trip that 5a deferred — the
+    polling on both `inbox_watcher.py` and `outbox_notifier.py` has been
+    in place since the kill_switch.py adapter landed (audit-pulled from
+    upstream); 5d closes the loop by giving Mirror's REVIEW_EMERGENCY_HALT
+    marker authority to TRIP the file (vs only an operator running
+    `kill_switch.py halt`).
+
+    Flag envelope shape parallels `kill_switch.halt()` so an operator-
+    triggered halt and a Mirror-triggered halt are indistinguishable to
+    downstream readers. Idempotent: if the file already exists (operator
+    halt OR prior Mirror trip), the trip is a no-op for the file but the
+    priority DM still queues (different task, same Mirror urgency).
+
+    Priority DM uses `larry_alerts.append_alert(severity='critical')` —
+    BROADCASTS to all authorized chats (not targeted like the 5a-followup
+    closing-DM pipe). The 10-min cooldown is keyed on
+    `outbox-notifier:emergency-halt:<task_id>` so each task_id gets its
+    own bucket and same-task re-emits within 10 min are suppressed
+    (matches the kill_switch design: a tripped halt is sticky).
+
+    Halt scope: per Q5=A sign-off, ALL four agents stop dispatching. The
+    inbox-watcher's main-loop poll exits cleanly on next iteration; the
+    notifier-side poll exits cleanly too (loop checked at lines 538 + the
+    notifier's main poll respectively).
+    """
+    task_id = data.get('task_id') or 'unknown'
+    pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
+    reason = payload.get('reason') if isinstance(payload, dict) else None
+    evidence = payload.get('evidence') if isinstance(payload, dict) else None
+
+    # Idempotent file trip.
+    if EMERGENCY_HALT_FLAG.exists():
+        log(
+            f'EMERGENCY_HALT already tripped at {EMERGENCY_HALT_FLAG} '
+            f'(operator or prior Mirror dispatch); not overwriting. '
+            f'Re-emitting priority DM for task={task_id} anyway so the '
+            f'new evidence reaches Larry.',
+            'WARN',
+        )
+    else:
+        try:
+            BLACKBOARD.mkdir(parents=True, exist_ok=True)
+            envelope = {
+                'activated_at': datetime.now(timezone.utc).isoformat(),
+                'activated_by': 'mirror-marker',
+                'reason': reason or '(no reason)',
+                'evidence': evidence or '(no evidence)',
+                'task_id': task_id,
+                'pr_url': pr_url or '(no PR URL)',
+            }
+            EMERGENCY_HALT_FLAG.write_text(
+                json.dumps(envelope, indent=2, ensure_ascii=False) + '\n',
+            )
+            log(
+                f'EMERGENCY_HALT TRIPPED by Mirror REVIEW_EMERGENCY_HALT '
+                f'on task={task_id} (pr={pr_url}); halt file written at '
+                f'{EMERGENCY_HALT_FLAG}; all dispatches will pause on '
+                f'next 5s poll. Recovery: `python3 ~/agent-core/scripts/'
+                f'kill_switch.py resume`',
+                'CRITICAL',
+            )
+        except OSError as e:
+            # Halt-file write failure is critical — log loud for watchdog
+            # scanning. Continue to the priority DM so Larry still hears
+            # about the safety event even if the file write failed.
+            log(
+                f'EMERGENCY_HALT_FILE_WRITE_FAILED task={task_id} '
+                f'(disk full? permissions?): {type(e).__name__}: {e}; '
+                f'halt is NOT enforced — manual intervention required',
+                'WARN',
+            )
+
+    # Priority broadcast DM via larry_alerts.append_alert (kind: alert,
+    # broadcasts to all authorized chats). Per-task cooldown bucket via
+    # `subject` so different tasks don't suppress each other.
+    body_lines = [
+        f'EMERGENCY_HALT tripped on task `{task_id}`.',
+        f'Reason: {reason or "(no reason)"}',
+        f'Evidence: {evidence or "(no evidence)"}',
+    ]
+    if pr_url:
+        body_lines.append(f'PR: {pr_url}')
+    body_lines.append('All four agents halt on next 5s poll. The halt is sticky.')
+    # Recovery command is carried by `suggested_action` below; don't
+    # duplicate in the body (5d code-review finding #15).
+    body = '\n'.join(body_lines)
+    if not larry_alerts.append_alert(
+        source='outbox-notifier',
+        severity='critical',
+        message=body,
+        subject=f'emergency-halt:{task_id}',
+        suggested_action='python3 ~/agent-core/scripts/kill_switch.py resume',
+    ):
+        # Cooldown suppressed OR write failed — distinguish in the log.
+        # 10-min cooldown on a per-task_id basis means a re-emit on the
+        # SAME task within 10 min is intentional suppression; a NEW task
+        # halt would have a different subject and would not suppress.
+        log(
+            f'EMERGENCY_HALT priority DM not queued for task={task_id} '
+            f'(cooldown suppressed within 10 min OR alert-file write '
+            f'failed); halt file write above is the load-bearing action',
             'WARN',
         )
 
@@ -2470,16 +3147,15 @@ def process_outbox(outbox_file: Path) -> str:
                 f'mirror REVIEW_REVISION auto-promoted to ESCALATE for task '
                 f'{data.get("task_id", "?")} (confidence=low)',
             )
-        # 5d ships the EMERGENCY_HALT trip; 5a just logs at WARN level so
-        # the operator sees the marker fire even before the halt-file path
-        # is wired.
+        # D3.5 5d — REVIEW_EMERGENCY_HALT now TRIPS the halt-file +
+        # priority-DMs Larry via the broadcast `kind: alert` channel.
+        # Fires BEFORE the routine notify-to-Beacon below so the halt
+        # file is present before any other dispatch on the next poll
+        # (which would honor _emergency_halt_active() and exit cleanly).
+        # Beacon's notify still goes out for the journal entry; she sees
+        # the halt was tripped automatically via Shape 9 wording.
         if marker_decision and marker_decision['marker_type'] == 'review_emergency_halt':
-            log(
-                f'mirror REVIEW_EMERGENCY_HALT on task '
-                f'{data.get("task_id", "?")}: {marker_decision["payload"].get("reason", "(no reason)")} '
-                f'— 5a journals to Beacon only; halt-file trip + priority DM in 5d',
-                'WARN',
-            )
+            _trip_emergency_halt(data, marker_decision.get('payload') or {})
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher
@@ -2629,11 +3305,71 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             _dispatch_revision_to_forge(data, marker_decision)
 
+        # D3.5 5d — auto-merge on Mirror REVIEW_PASS. Order per Larry's
+        # sign-off: merge fires BEFORE the closing DM renders so the DM
+        # body accurately reflects what happened (merged / already_merged /
+        # failed). `merge_result` is attached to marker_decision so
+        # `_render_dm_message` can pick the outcome-aware DM variant. The
+        # outbox archives last so a daemon crash between merge and archive
+        # leads to re-processing the same outbox; the second call gets
+        # `already_merged` from `_gh_pr_state` and the same success DM body.
+        if (
+            marker_decision['marker_type'] == 'review_pass'
+            and agent == 'mirror'
+        ):
+            payload = marker_decision.get('payload') or {}
+            pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
+            if pr_url:
+                # Test-mode override: when tests set
+                # _AUTO_MERGE_FN_OVERRIDE, route through that instead of
+                # shelling out to the real `gh pr merge`. Defensive: any
+                # exception in the override falls through to a synthetic
+                # `failed` outcome so the daemon never wedges.
+                merge_fn = _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr
+                try:
+                    merge_result = merge_fn(
+                        pr_url, data.get('task_id') or 'unknown',
+                    )
+                except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+                    log(
+                        f'AUTO_MERGE override raised on task '
+                        f'{data.get("task_id", "?")}: {type(e).__name__}: {e}; '
+                        f'rendering failed outcome',
+                        'WARN',
+                    )
+                    merge_result = {
+                        'merge_outcome': 'failed',
+                        'merge_reason': f'override raised: {type(e).__name__}: {e}',
+                        'pr_number': '?',
+                        'repo_coords': '?',
+                    }
+                marker_decision['merge_result'] = merge_result
+                marker_decision['merge_outcome'] = merge_result['merge_outcome']
+            else:
+                # Mirror PASS without a pr_url is malformed; the marker
+                # parser would normally catch this, but defensive — render
+                # a failed-outcome DM so Larry sees the gap.
+                log(
+                    f'mirror REVIEW_PASS on task {data.get("task_id", "?")} '
+                    f'has no pr_url on payload; cannot auto-merge — DM will '
+                    f'reflect this as a failed outcome.',
+                    'WARN',
+                )
+                marker_decision['merge_result'] = {
+                    'merge_outcome': 'failed',
+                    'merge_reason': 'Mirror PASS marker had no pr_url',
+                    'pr_number': '?',
+                    'repo_coords': '?',
+                }
+                marker_decision['merge_outcome'] = 'failed'
+
         # D3.5 5a-followup: chain-completion DM to the originating Telegram
         # thread. Fires only for terminal-from-Larry's-perspective intents
         # (review-pass/revision/escalate/emergency, plus Forge preflight
         # reject/clarification-exhausted) and only when reply_chat_id is
         # propagated through the chain. Non-fatal on failure.
+        # D3.5 5d: review-pass DM body now reflects the merge_outcome
+        # attached above; the render pipeline picks the correct variant.
         _maybe_dm_larry(data, marker_decision)
 
         _archive_outbox(outbox_file)
@@ -2938,6 +3674,23 @@ def main_loop() -> int:
             for outbox_file in sorted(outbox_dir.glob('*.json')):
                 if outbox_file.name.startswith('.'):
                     continue
+                # D3.5 5d — honor mid-iteration EMERGENCY_HALT trips.
+                # _trip_emergency_halt (called from process_outbox below
+                # when Mirror emits REVIEW_EMERGENCY_HALT) writes the
+                # halt file synchronously. Without this re-check, the
+                # outer loop's halt gate (line ~3638) only fires on the
+                # NEXT 5s poll — meaning subsequent files in this poll
+                # can still trigger dispatches AFTER the halt fired.
+                # Halt is intended to stop the world; checking per-file
+                # closes the window.
+                if _emergency_halt_active():
+                    log(
+                        'EMERGENCY_HALT detected mid-iteration — '
+                        'aborting remaining outbox scan; will exit '
+                        'cleanly on next outer poll',
+                        'WARN',
+                    )
+                    return 0
                 try:
                     process_outbox(outbox_file)
                 except Exception as e:
@@ -2946,6 +3699,22 @@ def main_loop() -> int:
                         f'{type(e).__name__}: {e}',
                         'ERROR',
                     )
+
+        # D3.5 5d second-pass review-fix 2-#2: also gate the dead-letter
+        # scan on halt. Without this, if EMERGENCY_HALT trips on the very
+        # last file of the very last agent (so the inner-loop check from
+        # 2-#3 doesn't fire) the dead-letter scan still calls
+        # safe_write_inbox to notify originating agents — i.e. dispatches
+        # that the halt is meant to pause. The next outer poll's halt gate
+        # at the top of the while-loop catches this on the second pass,
+        # but the within-poll dead-letter scan is a halt-leak.
+        if _emergency_halt_active():
+            log(
+                'EMERGENCY_HALT detected before dead-letter scan — '
+                'aborting remaining poll work; exiting cleanly',
+                'WARN',
+            )
+            return 0
 
         # Dead-letter scan
         try:
