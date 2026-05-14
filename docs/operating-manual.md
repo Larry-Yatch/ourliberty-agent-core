@@ -1709,18 +1709,19 @@ Two skipped from cdd56aa as low-value polish: Min-X1 (`dispatch_approved` error 
 
 ### Verification (live, 2026-05-13)
 
-End-to-end live smoke run, ambiguous spec → ESCALATE → auto-replan → re-dispatch → PASS. Full chain exercised:
+The smoke ran in two phases.
 
-1. Beacon dispatched the spec.
-2. **Forge built** in worktree, opened PR.
-3. **Mirror reviewed** → emitted `REVIEW_ESCALATE` (the ambiguity case the spec was designed to trigger).
-4. **Beacon auto-emitted** a fresh `=== APPROVAL_REQUEST ===` in her response (Shape 8 path) with the revised plan.
-5. **Notifier extracted** the marker, passed the level-3 discipline gate (task_id match + long-token overlap with Mirror's escalate reason), passed `evaluate_replan_budget` (`replan_count=0 < max_replans=2`), wrote the pending-approvals entry with `_replan_count=1`, queued the `kind: approval_request` alert.
-6. **Bot's alerts poll** surfaced the approval DM to Larry's Telegram chat.
-7. Larry replied `approve`; **bot dispatched** the revised spec to Forge's inbox with `replan_count=1` on the envelope.
-8. **Forge re-built**; **Mirror re-reviewed** → **`REVIEW_PASS`**.
+**Phase 1 (PR #8, $2.91).** Beacon emitted the 5c-shipped-section APPROVAL_REQUEST; Forge built; Mirror reviewed and approved. The cycle PASSed end-to-end at the chain level, BUT `replan_count=1` propagation was only exercised in unit tests at that point — Mirror's verdict on PR #8 was PASS, so the replan path didn't fire in the live chain. Phase 1 confirmed the no-escalate happy path; it did not exercise the auto-replan branch.
 
-The `replan_count=1` propagation was verified end-to-end by tracing the envelope field through Forge's revised task file, the re-review trigger, and the closing journal entry — it did not reset to 0 on the revision/re-review legs (the C-X1 second-pass fix was load-bearing here). Closing DM landed on Larry's Telegram with the standard ✓-prefix shape. Total live cost: $TBD (not yet aggregated from the journal; PR #7's pre-flight estimate was ~$2.50).
+**Phase 2 round 1 ($0.60, surfaced the discipline-gate notify-prefix bug).** A second smoke specifically designed to drive Mirror to ESCALATE so the Beacon auto-replan would fire. Beacon's replan APPROVAL_REQUEST was emitted correctly, but the level-3 discipline gate silently skipped it: the notify-prefix Beacon prepends to her marker (the `[Inter-agent notify | intent=review-escalate | …]` block) was being counted as payload content during the ≥2-word match against `mirror_escalate_reason`, so legitimate replans whose actual summary referenced Mirror's reason were getting falsely rejected because the notify-prefix words dominated the comparison. Larry got the original ESCALATE auto-DM; no second DM with the replan plan; Forge never received the re-dispatch.
+
+**Fix shipped as 5c-followup in PR #9 (commit `033ef1b`).** The notifier now strips the notify-prefix block before running the discipline-gate word-match, so payload summary is compared against `mirror_escalate_reason` cleanly.
+
+**Phase 2 retry ($0.60).** Re-ran the ESCALATE-driving smoke after the PR #9 fix landed. Full 5c chain verified DM-to-DM: Forge build → Mirror review → Mirror ESCALATE → Larry auto-DM on ESCALATE → Beacon replan APPROVAL_REQUEST → discipline-gate PASS → Larry auto-DM with replan plan → approve → Forge re-dispatch → Mirror re-review → PASS → Larry closing DM. `replan_count=1` propagation verified end-to-end through every hop. Closing DM landed.
+
+**Total smoke spend: $4.11** ($2.91 Phase 1 + $0.60 Phase 2 round 1 + $0.60 Phase 2 retry; PR #9 fix cost not counted here — it was its own commit + tests in the 5c-followup dispatch).
+
+The two-pass smoke pattern (happy path first, then a designed-to-fail second pass) is the same shape established in 5b-followup. The Phase 2 bug surfacing on the first auto-replan attempt validates the practice — without it, the discipline-gate skip would have shipped silent and Larry would have seen an ESCALATE auto-DM with no follow-through across every future replan.
 
 ### Known cleanup gaps
 
