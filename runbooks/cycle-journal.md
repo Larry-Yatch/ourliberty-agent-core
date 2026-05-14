@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 27 — 2026-05-13 18:37 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Branch=main, clean. HEAD=66549e9 ("Pulse cycle 20260513T203745Z"). Sync confirmed no-change at 66549e9. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-14T00:35:40Z (18:35 MDT, 2 min before cycle), status=no-change. Well within 2h threshold. ✅
+- **(C) Agent liveness: nominal.** All 6 core units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Bot log silence is idle Telegram poller false positive per MEMORY.md calibration. 4 decommissioned services still inactive; iter 23b pending Larry confirmation. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/ unchanged (1 file: notify-notify-pulse-cost-note-002.json). pulse/.invalid/ unchanged (3 files). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Concurrency: automated cycle running concurrently.** Lock PID 164291 (run_cycle.sh), 2 min old, process active. Interactive session invoked by Larry; interactive takes precedence per iter 25 precedent. ✅
+- **(H) Forge digest:** 0 open Forge PRs; 0 merged in last 4h. System quiet post-D3.5 5b. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services + watchdog task_id bug; needs_response=true) still outstanding.
+**Forge:** 0 open; 0 shipped in last 4h.
+**Patterns:**
+- 4 D3.5 services inactive: 5 consecutive (iters 23–27). Still holding Forge dispatch pending iter 23b response from Larry.
+- forge/.invalid/ "worktree target_repo=None": no new occurrence (iters 26–27). Monitoring.
+- F24 class (prompt too short): no new occurrence since iter 23. Monitoring.
+- Watchdog task_id missing: no new occurrence since iter 23. Monitoring.
+**Learned:** Nothing new. System nominal. iter 23b (intentional-decommission confirmation) the only open question.
+
+---
+
 ## Iteration 26 — 2026-05-13 14:35 MDT
 
 **Health:** ✅ Nominal

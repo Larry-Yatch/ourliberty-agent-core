@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-13 (Iteration 26)
+## Status snapshot — updated 2026-05-13 (Iteration 27)
 
-Twenty-six cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped: PRs #4 (tunables F+ tracking), #5 (opmanual 5b commit), #6 (opmanual 5b-followup) all merged 2026-05-13. Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — G-rule threshold at 3 consecutive (iters 23–24–25); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file (depth-2 "worktree target_repo=None", 1 occurrence total). F24 G-rule: no new occurrences since D3.5; monitoring for full clear.
+Twenty-seven cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped (PRs #4–#6 merged 2026-05-13). Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — G-rule at 5 consecutive (iters 23–27); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file (depth-2 "worktree target_repo=None", 1 occurrence total). F24 G-rule: no new occurrences since D3.5; monitoring for full clear.
 
 ## Known calibration issues
 
