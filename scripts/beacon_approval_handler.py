@@ -299,6 +299,32 @@ def find_pending_by_id(approval_id: str, state: Optional[dict[str, Any]] = None)
     return None
 
 
+def find_by_id_any_state(
+    approval_id: str, state: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Search BOTH pending and history for an entry with this id.
+
+    D3.5 commit 5c (Med-X1 second-pass review fix). The 5c replan dedup
+    gate needs to short-circuit replays where the entry has already been
+    auto-approved + resolved (entry moved to history). `find_pending_by_id`
+    alone misses this case: a notifier crash between `resolve` and outbox
+    archive would let the duplicate outbox re-dispatch on the next poll,
+    overwriting the already-dispatched Forge task file.
+
+    Returns the entry from `pending` if present, else from `history` if
+    present, else None. Caller treats either as "this approval_id is
+    already known; skip the duplicate."
+    """
+    s = state if state is not None else load_state()
+    for entry in s.get('pending', []):
+        if entry.get('id') == approval_id:
+            return entry
+    for entry in s.get('history', []):
+        if entry.get('id') == approval_id:
+            return entry
+    return None
+
+
 def most_recent_pending(state: Optional[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
     """Return the most-recently-created pending entry, or None.
 

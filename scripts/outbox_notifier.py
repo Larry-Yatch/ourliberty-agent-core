@@ -1721,6 +1721,18 @@ def _dispatch_revision_to_forge(
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
             revision_task[f_name] = data[f_name]
+    # D3.5 5c C-X1 (second-pass review fix): propagate replan_count +
+    # max_replans through the revision-loop dispatches too. Without this,
+    # a task that goes through ANY revision round before re-escalating has
+    # replan_count reset to 0 on the resulting REVIEW_ESCALATE notify —
+    # silently defeating the max_replans cap. The first C-1 fix covered
+    # preflight→build and build→review; this completes coverage of the
+    # remaining two dispatch sites (_dispatch_revision_to_forge here +
+    # _dispatch_mirror_review_rerun below).
+    if data.get('replan_count') is not None:
+        revision_task['replan_count'] = data['replan_count']
+    if data.get('max_replans') is not None:
+        revision_task['max_replans'] = data['max_replans']
 
     # Idempotency check: revision-task filename is keyed on round number so
     # multiple revision rounds for the same task_id don't collide. Re-process
@@ -1881,6 +1893,14 @@ def _dispatch_mirror_review_rerun(
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
             review_task[f_name] = data[f_name]
+    # D3.5 5c C-X1 (second-pass review fix): also propagate replan_count +
+    # max_replans through the re-review dispatch. Closes the second seam in
+    # the revision-loop replan-budget propagation chain (the partner fix is
+    # in _dispatch_revision_to_forge above).
+    if data.get('replan_count') is not None:
+        review_task['replan_count'] = data['replan_count']
+    if data.get('max_replans') is not None:
+        review_task['max_replans'] = data['max_replans']
 
     # Idempotency: keyed on round number so re-process on notifier crash
     # doesn't double-dispatch a re-review.
@@ -2093,18 +2113,19 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
             )
         return True
 
-    # Med-10 review fix: dedup by task_id against existing pending entries.
-    # Replay scenarios (notifier processes a duplicate outbox; bot replays
-    # after a crash; synthetic smoke test re-drops the same file) would
-    # otherwise create N pending entries and queue N alerts, DMing Larry
-    # N times for the same plan. Idempotency at the dispatch level
-    # (filename = task_id) catches the auto_approve fork, but force_ask
-    # has no analogous gate without this check.
-    existing = approval.find_pending_by_id(payload['task_id'])
-    if existing is not None and existing.get('status') == 'pending':
+    # Med-10 review fix: dedup by task_id. Replay scenarios (notifier
+    # processes a duplicate outbox; bot replays after a crash; synthetic
+    # smoke test re-drops the same file) would otherwise create N pending
+    # entries and queue N alerts, DMing Larry N times for the same plan.
+    # Med-X1 second-pass fix: search BOTH pending AND history. The original
+    # find_pending_by_id missed entries that completed auto-approve (entry
+    # moved to history) but the outbox wasn't archived due to a crash —
+    # replay would re-dispatch the Forge task, overwriting the prior one.
+    existing = approval.find_by_id_any_state(payload['task_id'])
+    if existing is not None:
         log(
             f'beacon replan APPROVAL_REQUEST for task {task_id} already '
-            f'has a pending entry (id={existing["id"]}, status=pending); '
+            f'has an entry (id={existing["id"]}, status={existing.get("status", "pending")}); '
             f'skipping duplicate add_pending + alert queue',
         )
         return True

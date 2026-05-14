@@ -4056,6 +4056,36 @@ class BeaconReplanLoopTest(unittest.TestCase):
         ]
         self.assertEqual(len(approval_records), 1)
 
+    def test_replay_dedups_history_after_auto_approve(self):
+        """Med-X1 second-pass fix: replay of a previously-auto-approved outbox
+        (entry moved from pending to history) is also dedup'd. Without this,
+        a notifier crash between resolve() and outbox archive would let the
+        replay re-dispatch the Forge task, overwriting the prior one."""
+        self._set_policy(default_action='auto_approve')
+        body = self._beacon_replan_outbox()
+        f1 = self._write_outbox('beacon', 'beacon-aa1.json', body)
+        on.process_outbox(f1)
+        # First run: entry should be in history (auto-approved + resolved)
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        self.assertEqual(len(state.get('history', [])), 1)
+        # Replay scenario — same outbox content arrives again
+        f2 = self._write_outbox('beacon', 'beacon-aa2.json', body)
+        result = on.process_outbox(f2)
+        self.assertEqual(result, 'notified-replan')
+        # Should NOT add a second history entry
+        state2 = self._ah.load_state()
+        self.assertEqual(len(state2.get('pending', [])), 0)
+        self.assertEqual(
+            len(state2.get('history', [])), 1,
+            f'replay should not double-dispatch; got {len(state2.get("history", []))} history entries',
+        )
+        # Forge inbox should have exactly one task (the first dispatch);
+        # the safe_write_inbox call from the replay would have been skipped
+        # by the dedup gate before reaching the inbox write.
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        self.assertEqual(len(forge_tasks), 1)
+
     # ----- C-1 regression: replan_count propagates through dispatch hops -----
 
     def test_dispatch_build_phase_propagates_replan_count(self):
@@ -4103,6 +4133,62 @@ class BeaconReplanLoopTest(unittest.TestCase):
         review = json.loads(review_tasks[0].read_text())
         self.assertEqual(review['replan_count'], 1)
         self.assertEqual(review['max_replans'], 2)
+
+    def test_dispatch_revision_to_forge_propagates_replan_count(self):
+        """C-X1 second-pass fix: replan_count + max_replans flow through
+        the revision-loop dispatch too. Without this, any task that goes
+        through a revision round before re-escalating has the replan
+        budget silently reset to 0."""
+        marker = _mirror_revision_marker(
+            task_id='task-001', confidence='high', severity='medium',
+        )
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+        )
+        body['forge_build_session_id'] = 'sess-abc'
+        body['pr_url'] = 'https://github.com/x/y/pull/77'
+        body['replan_count'] = 1
+        body['max_replans'] = 2
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        # Revision task to Forge should carry the replan budget forward.
+        revision_tasks = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-*.json')
+        )
+        self.assertEqual(len(revision_tasks), 1)
+        revision = json.loads(revision_tasks[0].read_text())
+        self.assertEqual(revision['replan_count'], 1)
+        self.assertEqual(revision['max_replans'], 2)
+
+    def test_dispatch_mirror_review_rerun_propagates_replan_count(self):
+        """C-X1 second-pass fix: re-review dispatch also carries replan_count."""
+        # Synthesize a Forge revision outbox with replan budget on envelope.
+        revision_outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='revision', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            claude_session_id='sess-abc',
+            result=(
+                'Revision 1 applied: added validation per Mirror finding.\n\n'
+                'Tests pass; pushed to forge/task-001.'
+            ),
+        )
+        revision_outbox['pr_url'] = 'https://github.com/x/y/pull/77'
+        revision_outbox['revision_count'] = 1
+        revision_outbox['max_revisions'] = 3
+        revision_outbox['replan_count'] = 1
+        revision_outbox['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', revision_outbox)
+        on.process_outbox(f)
+        rereviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-rev*.json')
+        )
+        self.assertEqual(len(rereviews), 1)
+        rereview = json.loads(rereviews[0].read_text())
+        self.assertEqual(rereview['replan_count'], 1)
+        self.assertEqual(rereview['max_replans'], 2)
 
     # ----- C-2 regression: findings text augments mirror_escalate_reason -----
 
