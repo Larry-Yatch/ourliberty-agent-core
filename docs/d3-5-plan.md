@@ -1,5 +1,7 @@
 # D3.5 — Mirror review chain (plan)
 
+> **Status (2026-05-14): SHIPPED, D3.5 CLOSED.** All four sub-commits live (5a `d908ca6` + 5a-followup `15d046e`, 5b `3f29cfa` + followups `f3f90f7` + `4c79450`, 5c `463c6d8` + followups `033ef1b`/`7f68377`/`0c58c3a`/`957228a`, 5d `8412f82` + ops-manual `ac1bd4a`). Loop fully live: Forge builds → opens PR → Mirror reviews → auto-merge on PASS / Beacon auto-replan on ESCALATE / Forge revision on REVISION / EMERGENCY_HALT trip on safety event. Cost-budget gate enforced at all four dispatch sites. Verification arc lives in `docs/operating-manual.md` Part II — see the 5a/5b/5c/5d entries. This planning doc is preserved as-is for historical context; for current behavior consult the operating manual + agent CLAUDE.md files.
+
 **Status as this plan is written (2026-05-12, after commit 4b + followup-2 + the Pulse digest commit shipped):** D3 is essentially complete. Commit 5 (sentinel + watchdog install) is the last D3 piece and is its own short plan. D3.5 is the next phase — the **review** half of the dispatch chain. D3 made Forge actually write code (preflight → build → PR open); D3.5 makes Mirror actually review the code (review → revise / escalate / pass → auto-merge).
 
 This is the second-biggest commit cluster of the D3 era by design. Realistic pacing: **3–4 sessions of focused design + code + verification**, almost certainly split into multiple sub-commits (likely 5a / 5b / 5c / 5d, see Sequencing below — note these are *D3.5* sub-commits, not D3 commit-5 sub-commits; named the same way because we already did 4a/4b).
