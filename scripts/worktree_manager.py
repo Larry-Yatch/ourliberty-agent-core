@@ -325,12 +325,82 @@ def setup_branch_checkpoint(
     commit_msg = f'[WIP][session-start] {safe_stem}'
 
     try:
-        r1 = subprocess.run(
-            ['git', 'checkout', '-B', branch],
+        # D3.5 5c-followup-3 (Miss #1): fetch origin/<branch> explicitly
+        # BEFORE the local checkout. The worktree was created from
+        # origin/main (per create_or_reuse_worktree_for_task), so its HEAD
+        # has no knowledge of origin/<branch> if that branch exists with
+        # commits we don't yet have locally. Without this fetch, the
+        # `git checkout -B branch` below would create a NEW local branch
+        # at origin/main's commit — and the subsequent force-with-lease
+        # push would silently overwrite origin/<branch>'s real commits
+        # (the empty-lease fallback succeeds because we never fetched it).
+        # Surfaced on PR #7 2026-05-14: Mirror's worktree wiped Larry's
+        # 1594-LOC commit on the branch.
+        #
+        # Defense-in-depth (PR #11 reviewer §2 + §6): the fetch MUST
+        # succeed or we MUST have a fresh-local-only state. A silently-
+        # failed fetch combined with a stale `refs/remotes/origin/<branch>`
+        # ref from a prior dispatch could base our checkout on stale state,
+        # WIP-commit on top, and the subsequent `--force-with-lease`
+        # (whose lease references the stale local ref) could succeed if
+        # the git version's lease semantics are looser than modern's.
+        # Treat fetch failure as a hard refusal — the dispatch returns
+        # None, caller logs + skips. Recovering from a transient fetch
+        # failure on the NEXT dispatch attempt is preferable to risking
+        # a wipe.
+        r_fetch = subprocess.run(
+            ['git', 'fetch', 'origin', branch],
             cwd=str(worktree_path),
             capture_output=True, text=True,
-            timeout=WORKTREE_OP_TIMEOUT_SEC,
+            timeout=FETCH_TIMEOUT_SEC,
         )
+        # `git fetch origin <branch>` returns 128 when the branch doesn't
+        # exist on origin (with stderr `couldn't find remote ref ...`).
+        # That's NOT an error condition for us — we just want to know
+        # whether origin has the branch. Distinguish:
+        #   - returncode 0: branch exists on origin, fetched its tip.
+        #   - returncode 128 + "couldn't find remote ref": branch doesn't
+        #     exist on origin. Fresh-branch dispatch — fall through.
+        #   - other non-zero: real fetch failure (network, auth). Refuse.
+        fetch_stderr = r_fetch.stderr or ''
+        branch_exists_on_origin = (r_fetch.returncode == 0)
+        branch_absent_on_origin = (
+            r_fetch.returncode != 0
+            and "couldn't find remote ref" in fetch_stderr.lower()
+        )
+        fetch_truly_failed = (
+            r_fetch.returncode != 0 and not branch_absent_on_origin
+        )
+        if fetch_truly_failed:
+            if log_fn:
+                log_fn(
+                    f'setup_branch_checkpoint: fetch origin/{branch} '
+                    f'failed (rc={r_fetch.returncode}): '
+                    f'{fetch_stderr[:200]} — refusing to checkpoint '
+                    f'without remote state knowledge (would risk wiping '
+                    f'unseen commits via force-with-lease)'
+                )
+            return None
+
+        # If origin/<branch> exists, base the local branch on it so the
+        # WIP commit lands ON TOP of any existing remote work. If it
+        # doesn't exist (confirmed by fetch returncode 128), fall through
+        # to the legacy "create from current HEAD" behavior — safe because
+        # there's nothing on origin to overwrite.
+        if branch_exists_on_origin:
+            r1 = subprocess.run(
+                ['git', 'checkout', '-B', branch, f'origin/{branch}'],
+                cwd=str(worktree_path),
+                capture_output=True, text=True,
+                timeout=WORKTREE_OP_TIMEOUT_SEC,
+            )
+        else:
+            r1 = subprocess.run(
+                ['git', 'checkout', '-B', branch],
+                cwd=str(worktree_path),
+                capture_output=True, text=True,
+                timeout=WORKTREE_OP_TIMEOUT_SEC,
+            )
         if r1.returncode != 0:
             if log_fn:
                 log_fn(
