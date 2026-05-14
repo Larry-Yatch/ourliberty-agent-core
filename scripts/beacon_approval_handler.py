@@ -698,7 +698,19 @@ def validate_replan_discipline(
     to compare against, the gate has nothing to enforce.
     """
     # Check 1: task_id match
+    # 5c-followup fix: strip the `notify-` prefix from envelope task_id
+    # before comparing. The outbox-notifier's marker-routing block prefixes
+    # `notify-` to task_id when writing the notify-task envelope to Beacon's
+    # inbox (existing D3 convention for filename disambiguation), so Beacon's
+    # outbox carries `task_id='notify-<orig>'`. Beacon (per her CLAUDE.md
+    # Shape 8) correctly uses the ORIGINAL task_id in her APPROVAL_REQUEST
+    # payload. Strict equality would reject every legitimate replan. Both
+    # 5c review passes missed this because the test fixtures synthesized
+    # envelopes with raw task_ids, not the production-shaped notify-prefixed
+    # ones. Surfaced by Phase 2 live smoke 2026-05-14.
     envelope_task_id = envelope.get('task_id')
+    if isinstance(envelope_task_id, str) and envelope_task_id.startswith('notify-'):
+        envelope_task_id = envelope_task_id[len('notify-'):]
     payload_task_id = payload.get('task_id')
     if (
         envelope_task_id is not None

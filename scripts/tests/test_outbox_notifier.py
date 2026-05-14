@@ -3802,10 +3802,17 @@ class BeaconReplanLoopTest(unittest.TestCase):
         # source='outbox-notifier' mirrors what the notifier writes when
         # routing Mirror's escalate marker to Beacon's inbox (via the
         # mirror-result notify_source → outbox-notifier filename).
+        # 5c-followup fix: envelope task_id has the `notify-` prefix in
+        # production (the marker-routing block in process_outbox prefixes
+        # it for filename disambiguation). Match that shape here so the
+        # discipline-gate prefix-stripping logic is exercised. Beacon's
+        # marker payload uses the ORIGINAL task_id (no prefix) per her
+        # Shape 8 guidance — that's already what _beacon_approval_request_
+        # marker emits as task_id='task-001'.
         body = _good_outbox(
             agent='beacon',
             source='mirror-result',
-            task_id='task-001',
+            task_id='notify-task-001',
             result=result,
         )
         body['inbound_intent'] = 'review-escalate'

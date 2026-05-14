@@ -631,6 +631,35 @@ class ValidateReplanDisciplineTest(unittest.TestCase):
         )
         self.assertFalse(ok)
 
+    def test_envelope_notify_prefix_is_stripped_before_compare(self):
+        """5c-followup fix: production envelopes carry task_id='notify-<orig>'
+        (marker-routing block prefixes it for filename disambiguation).
+        Beacon's APPROVAL_REQUEST uses the ORIGINAL task_id per her Shape 8.
+        The discipline gate must strip the prefix before comparing — strict
+        equality would reject every legitimate replan. Surfaced by Phase 2
+        live smoke 2026-05-14."""
+        envelope = {'task_id': 'notify-task-001'}
+        payload = self._payload(task_id='task-001')
+        ok, err = ah.validate_replan_discipline(
+            payload, envelope, 'Missing input validation in the parser.',
+        )
+        self.assertTrue(
+            ok, f'gate should pass after stripping notify- prefix: {err}',
+        )
+
+    def test_envelope_double_notify_prefix_only_strips_one(self):
+        """5c-followup fix corollary: only one `notify-` prefix is stripped,
+        not arbitrary repeats. A pathological `notify-notify-task-001`
+        envelope (shouldn't happen in production but defensive) compares
+        as `notify-task-001` after stripping, which won't match payload's
+        `task-001`. Gate correctly rejects."""
+        envelope = {'task_id': 'notify-notify-task-001'}
+        payload = self._payload(task_id='task-001')
+        ok, _ = ah.validate_replan_discipline(
+            payload, envelope, 'Missing input validation.',
+        )
+        self.assertFalse(ok)
+
     def test_short_tokens_filtered_out(self):
         # "of", "the", "in" — these <4-char words don't count as overlap.
         envelope = {'task_id': 'task-001'}
