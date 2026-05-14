@@ -1664,7 +1664,7 @@ PRs #5 + #6 merged to main (commits `8756e4a` and the prior merge). Closing-DM r
 
 **Next:** D3.5 commit 5c — Beacon replan flow (same as the next-up note in the 5b entry above).
 
-## Phase D3.5 commit 5c — Beacon auto-replan on Mirror ESCALATE (2026-05-13, ~5–6 hours, $TBD)
+## Phase D3.5 commit 5c — Beacon auto-replan on Mirror ESCALATE (2026-05-13, ~5–6 hours, $4.11)
 
 Status: Shipped 2026-05-13.
 
