@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-14 (Iteration 30)
+## Status snapshot — updated 2026-05-14 (Iteration 31)
 
-Thirty cycles run. **System: 🟡 Notable.** D3.5 5b work fully shipped. D3.5 5c PR #7 ("Beacon auto-replan on Mirror ESCALATE") open on larry/d35-5c-beacon-replan — **Mirror REVIEW_ESCALATE issued 03:23Z May 14**: branch is empty (zero code, only [WIP] placeholder commit bcf4a56). D3.5 5c implementation commits never landed on the branch (push failure or wrong branch). Beacon notified; no re-push yet. Escalated to Larry in iter 30 (pulse-escalations.json). Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — 8 consecutive (iters 23–30); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file. F24 G-rule: no new occurrences since D3.5; monitoring.
+Thirty-one cycles run. **System: ✅ Nominal.** D3.5 5c ("Beacon auto-replan on Mirror ESCALATE") shipped — PR #7 merged (HEAD=463c6d8). Iter 30 escalation (empty branch, Mirror REVIEW_ESCALATE) resolved. 2 new PRs open: #8 (forge/opmanual-d35-5c-shipped-section-001, Forge doc for D3.5 5c, ~55 min old) and #9 (larry/d35-5c-followup-discipline-prefix, followup discipline fix, ~36 min old). Both within normal Mirror review window. Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — 9 consecutive (iters 23–31); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file. F24 G-rule: no new occurrences since D3.5; monitoring.
 
 ## Known calibration issues
 
