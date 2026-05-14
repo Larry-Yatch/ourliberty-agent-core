@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-13 (Iteration 27)
+## Status snapshot — updated 2026-05-13 (Iteration 28)
 
-Twenty-seven cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped (PRs #4–#6 merged 2026-05-13). Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — G-rule at 5 consecutive (iters 23–27); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file (depth-2 "worktree target_repo=None", 1 occurrence total). F24 G-rule: no new occurrences since D3.5; monitoring for full clear.
+Twenty-eight cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped (PRs #4–#6 merged 2026-05-13). D3.5 5c PR #7 ("Beacon auto-replan on Mirror ESCALATE") open on larry/d35-5c-beacon-replan, pending Mirror review. Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — G-rule at 6 consecutive (iters 23–28); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file (depth-2 "worktree target_repo=None", 1 occurrence total). F24 G-rule: no new occurrences since D3.5; monitoring for full clear.
 
 ## Known calibration issues
 

@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 28 — 2026-05-13 22:43 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. HEAD=2b4a878 ("Pulse cycle 20260514T004015Z"). ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-14T04:36:18Z (22:36 MDT, ~7 min before cycle read), status=no-change, commit=2b4a878. Updated in-flight by concurrent automated cycle. ✅
+- **(C) Agent liveness: nominal.** All 6 core units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Bot log silence = idle Telegram false positive per MEMORY.md. 4 decommissioned services still inactive (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer); iter 23b pending Larry confirmation. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/ unchanged (1 file: notify-notify-pulse-cost-note-002.json). pulse/.invalid/ unchanged (3 files: d2-reject, d25-reject, watchdog-alert-1778648185). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: 1 open, pending review.** PR #7 "D3.5 commit 5c: Beacon auto-replan on Mirror ESCALATE" (branch larry/d35-5c-beacon-replan), created 2026-05-14T03:19Z, MERGEABLE, reviewDecision="" (awaiting Mirror review), no CI, auto-merge not enabled. Age ~80 min. Below ask-then-do threshold (24h). ✅
+- **(F) Concurrency: automated cycle concurrent.** Lock PID 173610 (bash, run_cycle.sh), 32s old at check time. Interactive session takes precedence per established precedent. ✅
+- **(H) Forge digest:** PR #7 is a larry/ branch, not a forge/ branch. 0 open Forge-authored PRs. 0 merged since iter 27. Larry has PR #7 (D3.5 5c) open, pending Mirror review. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services + watchdog task_id bug; needs_response=true) still outstanding.
+**Forge:** 0 open Forge PRs; 0 shipped since iter 27.
+**Patterns:**
+- 4 D3.5 services inactive: 6 consecutive (iters 23–28). Still holding Forge dispatch pending iter 23b response from Larry.
+- forge/.invalid/ "worktree target_repo=None": no new occurrence (iters 26–28). Monitoring.
+- F24 class (prompt too short): no new occurrence since iter 23. Monitoring.
+- Watchdog task_id missing: no new occurrence since iter 23. Monitoring.
+**Learned:** D3.5 5c PR (#7) is Larry's next D3.5 commit, pending Mirror review. iter 23b still the only open question.
+
+---
+
 ## Iteration 27 — 2026-05-13 18:37 MDT
 
 **Health:** ✅ Nominal
