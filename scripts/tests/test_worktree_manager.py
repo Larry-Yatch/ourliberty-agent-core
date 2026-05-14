@@ -227,6 +227,157 @@ class WorktreeLifecycleTest(unittest.TestCase):
         )
         self.assertIsNone(result)
 
+    def test_setup_branch_checkpoint_preserves_existing_origin_commits(self):
+        """D3.5 5c-followup-3 (Miss #1): when origin/<branch> already has
+        commits (e.g., Larry directly authored work on this branch and
+        pushed it), setup_branch_checkpoint must NOT overwrite those
+        commits with the WIP-checkpoint-on-main-base. The WIP commit
+        must land ON TOP of origin's existing HEAD.
+
+        Surfaced on PR #7 2026-05-14: Mirror's worktree force-pushed a
+        [WIP][session-start] commit over Larry's 1594-LOC `a9035b0`,
+        wiping the branch on origin. Audit Miss #1.
+
+        Pre-fix behavior: `git checkout -B <branch>` would create the
+        local branch at the worktree's HEAD (= origin/main, since
+        create_or_reuse_worktree_for_task uses --detach origin/main),
+        then push --force-with-lease would succeed because we never
+        fetched origin/<branch> (no remote-tracking ref → empty lease
+        accepts the force).
+
+        Post-fix behavior: fetch origin/<branch> explicitly; if it
+        exists, checkout from origin/<branch>; the push is then a
+        fast-forward and origin's prior commit is preserved as the
+        WIP commit's parent.
+        """
+        _git(
+            'config', 'receive.denyCurrentBranch', 'updateInstead',
+            cwd=self.origin,
+        )
+        # Larry creates a branch on origin with real work
+        _git('checkout', '-b', 'larry/real-work', cwd=self.origin)
+        (self.origin / 'real_file.py').write_text(
+            '# Larry\'s real implementation\nprint("important code")\n'
+        )
+        _git('add', 'real_file.py', cwd=self.origin)
+        _git('commit', '-q', '-m', 'feat: real implementation', cwd=self.origin)
+        # Capture the real commit hash before Mirror's worktree fires
+        larry_commit = _git('rev-parse', 'HEAD', cwd=self.origin).stdout.strip()
+        # Switch origin back to main so it's not on the protected branch
+        _git('checkout', 'main', cwd=self.origin)
+
+        # Mirror's worktree fires: creates from origin/main, then runs
+        # setup_branch_checkpoint targeting larry/real-work
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'mirror', 'review-larry-work', self.canonical, log_fn=self._log_fn,
+        )
+        self.assertIsNotNone(path)
+
+        # The fix: this should NOT wipe larry's commit on origin
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'larry/real-work', 'review-larry-work',
+            log_fn=self._log_fn,
+        )
+        self.assertEqual(branch, 'larry/real-work')
+
+        # Verify origin still has larry's commit reachable from
+        # larry/real-work HEAD — i.e., the WIP checkpoint landed ON TOP,
+        # NOT as a replacement.
+        log = _git(
+            'log', '--format=%H %s', 'larry/real-work',
+            cwd=self.origin, check=False,
+        )
+        self.assertIn(
+            larry_commit, log.stdout,
+            f"Larry's commit {larry_commit[:12]} was wiped from origin/larry/real-work. "
+            f"Branch log:\n{log.stdout}"
+        )
+        # And the WIP checkpoint should be the new HEAD (above larry's)
+        head_subject = _git(
+            'log', '-1', '--pretty=%s', 'larry/real-work', cwd=self.origin,
+        ).stdout.strip()
+        self.assertIn('[WIP][session-start]', head_subject)
+
+    def test_setup_branch_checkpoint_fresh_branch_still_works(self):
+        """Backward compat: when origin/<branch> doesn't exist, fall
+        through to the legacy 'create from current HEAD' behavior."""
+        _git(
+            'config', 'receive.denyCurrentBranch', 'updateInstead',
+            cwd=self.origin,
+        )
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'forge', 'task-fresh', self.canonical, log_fn=self._log_fn,
+        )
+        # forge/task-fresh does NOT exist on origin yet
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'forge/task-fresh', 'task-fresh', log_fn=self._log_fn,
+        )
+        self.assertEqual(branch, 'forge/task-fresh')
+        # Verify origin now has the new branch with the WIP commit
+        r = _git('branch', '--list', 'forge/task-fresh', cwd=self.origin)
+        self.assertIn('forge/task-fresh', r.stdout)
+
+    def test_setup_branch_checkpoint_fetch_failure_refuses_checkpoint(self):
+        """Defense-in-depth (PR #11 reviewer §2): when the fetch can't
+        succeed for non-absent-branch reasons (network failure; origin
+        unreachable), refuse to checkpoint. The risk is that a stale
+        remote-tracking ref combined with a fetch failure could base the
+        checkout on stale state and force-with-lease could push over
+        origin's current commits."""
+        _git(
+            'config', 'receive.denyCurrentBranch', 'updateInstead',
+            cwd=self.origin,
+        )
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'forge', 'task-fetch-fail', self.canonical,
+            log_fn=self._log_fn,
+        )
+        # Break origin URL so the fetch genuinely fails (simulates
+        # network/auth failure, not absent-branch). The reused worktree
+        # inherits the broken remote URL from the canonical clone.
+        _git(
+            'remote', 'set-url', 'origin',
+            str(self.tmpdir / 'does-not-exist'),
+            cwd=path,
+        )
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'forge/task-fetch-fail', 'task-fetch-fail',
+            log_fn=self._log_fn,
+        )
+        # Refuse — don't risk a wipe via uncertain state
+        self.assertIsNone(branch)
+        # Surface the refusal in logs for watchdog visibility
+        self.assertTrue(
+            any('refusing to checkpoint' in m for m in self.logs),
+            f'expected refusal log; got: {self.logs}',
+        )
+
+    def test_setup_branch_checkpoint_absent_remote_branch_is_not_a_failure(self):
+        """When `git fetch origin <branch>` returns non-zero because the
+        branch doesn't exist on origin (stderr: "couldn't find remote
+        ref..."), that's NOT a fetch failure — it's a fresh-branch
+        signal. Fall through to legacy create-from-HEAD behavior."""
+        _git(
+            'config', 'receive.denyCurrentBranch', 'updateInstead',
+            cwd=self.origin,
+        )
+        path = worktree_manager.create_or_reuse_worktree_for_task(
+            'forge', 'task-absent-remote', self.canonical,
+            log_fn=self._log_fn,
+        )
+        # forge/totally-new-branch absolutely does NOT exist on origin.
+        # The fetch will return 128 with "couldn't find remote ref" — our
+        # logic must recognize this as "fresh branch" not "fetch failed".
+        branch = worktree_manager.setup_branch_checkpoint(
+            path, 'forge/totally-new-branch', 'task-absent-remote',
+            log_fn=self._log_fn,
+        )
+        self.assertEqual(branch, 'forge/totally-new-branch')
+        # Origin should now have the new branch
+        r = _git('branch', '--list', 'forge/totally-new-branch',
+                 cwd=self.origin)
+        self.assertIn('forge/totally-new-branch', r.stdout)
+
     def test_ensure_worktree_with_branch(self):
         _git(
             'config', 'receive.denyCurrentBranch', 'updateInstead',
