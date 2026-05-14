@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-13 (Iteration 28)
+## Status snapshot — updated 2026-05-14 (Iteration 30)
 
-Twenty-eight cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped (PRs #4–#6 merged 2026-05-13). D3.5 5c PR #7 ("Beacon auto-replan on Mirror ESCALATE") open on larry/d35-5c-beacon-replan, pending Mirror review. Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — G-rule at 6 consecutive (iters 23–28); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file (depth-2 "worktree target_repo=None", 1 occurrence total). F24 G-rule: no new occurrences since D3.5; monitoring for full clear.
+Thirty cycles run. **System: 🟡 Notable.** D3.5 5b work fully shipped. D3.5 5c PR #7 ("Beacon auto-replan on Mirror ESCALATE") open on larry/d35-5c-beacon-replan — **Mirror REVIEW_ESCALATE issued 03:23Z May 14**: branch is empty (zero code, only [WIP] placeholder commit bcf4a56). D3.5 5c implementation commits never landed on the branch (push failure or wrong branch). Beacon notified; no re-push yet. Escalated to Larry in iter 30 (pulse-escalations.json). Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — 8 consecutive (iters 23–30); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file. F24 G-rule: no new occurrences since D3.5; monitoring.
 
 ## Known calibration issues
 
@@ -52,7 +52,7 @@ Twenty-eight cycles run. **System: ✅ Nominal.** D3.5 5b work fully shipped (PR
 
 ## System-state assumptions that have proven wrong
 
-*(empty — when a check assumed something about the system that turned out not to be true; document so the check gets updated.)*
+- **2026-05-14 (iter 30) — GitHub reviewDecision="" does not mean Mirror is still reviewing.** When Mirror issues REVIEW_ESCALATE rather than a formal GitHub approve/request-changes, `reviewDecision` stays "" on GitHub. Pulse iter 29 saw reviewDecision="" and assumed Mirror was still in progress — Mirror had finished 5h earlier and escalated. **Fix:** Add sub-check to Check E: when a PR has reviewDecision="" and has been open > a short window, also scan mirror outbox for a completed review result. Proposal at agents/pulse/memory/check-gap-mirror-outbox-escalate.md.
 
 ---
 
