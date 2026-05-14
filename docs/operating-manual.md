@@ -1664,6 +1664,79 @@ PRs #5 + #6 merged to main (commits `8756e4a` and the prior merge). Closing-DM r
 
 **Next:** D3.5 commit 5c — Beacon replan flow (same as the next-up note in the 5b entry above).
 
+## Phase D3.5 commit 5c — Beacon auto-replan on Mirror ESCALATE (2026-05-13, ~5–6 hours, $TBD)
+
+Status: Shipped 2026-05-13.
+
+Closes the third sub-commit of D3.5: when Mirror emits `REVIEW_ESCALATE` (direct, auto-promoted low-confidence, or revision-budget-exhausted), Beacon now emits a fresh `=== APPROVAL_REQUEST ===` in her inbox-watcher response; the outbox-notifier extracts the marker (impersonating the bot's chat-mode flow), consults `trust_policy`, adds a pending-approvals entry, and queues a `kind: approval_request` alert that the bot's alerts poll surfaces to Larry as a DM — no chat round-trip required. The loop is bounded by `max_replans=2` from `loop_bounds`, with `replan_count` propagated system-side through every dispatch hop. Live-verified end-to-end with Mirror PASS on the re-review; one cleanup gap (worktree_manager checkpoint behaviour during the live test attempt) deferred to a 5c-followup commit.
+
+### The architectural calls
+
+Five decisions signed off pre-code (per `feedback_decision_classification` — TECHNICAL/ARCHITECTURAL/VALUES, with VALUES on a 1–5 dial):
+
+1. **Plumbing fork: Option A.** Notifier extracts Beacon's `=== APPROVAL_REQUEST ===` from her outbox and queues an alert; the bot does NOT poll outbox. Keeps the bot's responsibilities narrow (alerts + chat) and avoids a second outbox-reader race. Locked at design time; no Option B fallback shipped.
+2. **Discipline gate: level 3 (medium).** `validate_replan_discipline` requires payload `task_id` to match envelope `task_id` AND payload summary to share ≥2 long-token (>3 chars) overlap with `mirror_escalate_reason`. Failure logs a WARN and falls through to default routing — no marker-error cascade, because the failure mode is upstream-of-Larry (Beacon authored a sloppy summary) rather than a contract violation Forge could re-attempt. Med-8 adaptive-threshold fix tightens this when the Mirror reason itself has fewer than 2 long tokens (`min(2, len(mirror_tokens))`).
+3. **`cost_per_task_usd`: deferred to 5d.** 5c ships replan-count enforcement only; the cost-budget arm of the budget envelope lands in 5d alongside auto-merge.
+4. **Budget-exhaust: A + B both.** Beacon's CLAUDE.md (Shape 8 rewrite) is the first line — she's told not to emit `=== APPROVAL_REQUEST ===` when `replan_count >= max_replans`. The notifier is the hard backstop — `evaluate_replan_budget` rejects the replan even if Beacon emits anyway, sending a reject-DM instead. A alone would be a single-point-of-failure if Beacon's prompt drifts; B alone would cost a wasted Beacon turn on every cap-violation. Belt + suspenders.
+5. **`replan_count` is system-controlled.** Lives on the envelope; stored as `_replan_count` (underscore = system field) on the pending-approvals entry; propagated through every dispatch hop by the notifier. Beacon does not author it. Agents are stateless across dispatches, so anything the agent could observe-and-author is racy by construction — the monotonic counter belongs to the dispatcher.
+
+### Two-pass independent review
+
+Same pattern established in 4a/4b/5a/5a-followup/5b/5b-followup. **First pass** caught 11 issues; 10 fixed pre-push and 1 (Med-7 compound-word regex edge case) deferred for live-test surfacing:
+
+- **C-1** — `replan_count` reset on every Forge→Mirror leg because `_dispatch_build_phase` + `_dispatch_mirror_review` didn't propagate it. Fixed.
+- **C-2** — `mirror_escalate_reason` was procedural framing on 2 of 3 trigger paths (auto-promote + budget-exhaust), making the discipline gate unsatisfiable for Beacon's good-faith summary. Fixed by augmenting reason with findings text.
+- **M-3/M-4/M-5/M-6** — sentinel-log on exhaust+missing-chat, bare-Exception coverage on `dispatch_approved`, `append_*` return-value check + sentinel on failure, `inbound_intent` propagation anti-contamination comment.
+- **Med-8/9/10/11** — adaptive overlap threshold, asymmetric exception coverage, dedup-by-task_id on outbox replay, test-coverage gaps.
+
+**Second pass** (run AFTER the first-pass fixes were applied — explicit "review the diff again with fresh eyes" budget) caught 2 more, shipped as followup commit `cdd56aa` inside PR #7:
+
+- **C-X1 (CRITICAL)** — the C-1 fix propagated `replan_count`/`max_replans` through `_dispatch_build_phase` + `_dispatch_mirror_review` but missed the parallel revision-loop dispatches (`_dispatch_revision_to_forge` + `_dispatch_mirror_review_rerun`). A task that took any revision round before re-escalating would silently reset `replan_count` to 0 on the next ESCALATE notify, defeating `max_replans` entirely. And the revision loop is exactly where this matters — Mirror uses the revision budget BEFORE escalating, by design. Fixed; 2 regression tests added.
+- **Med-X1** — Med-10's outbox-replay dedup only checked `state['pending']`. After `auto_approve` the entry moves to `state['history']`; a notifier crash between `resolve()` and outbox archive would let the replay run a fresh `add_pending` + `dispatch_approved`, overwriting the prior Forge task file. Fix: new helper `approval.find_by_id_any_state` searches both pending and history; the replan-approval router uses it for the dedup gate. 1 regression test added.
+
+Two skipped from cdd56aa as low-value polish: Min-X1 (`dispatch_approved` error message conflates dispatch + resolve failures) and Min-X2 (silent drop of findings without description on degraded-Mirror-input).
+
+### What shipped
+
+- **`scripts/beacon_approval_handler.py`** (+~165 LOC) — `DEFAULT_MAX_REPLANS = 2`, `REPLAN_REASON_MIN_TOKEN_OVERLAP = 2`, `evaluate_replan_budget` (parallel to `mirror_review_handler.evaluate_revision_budget`), `validate_replan_discipline` (the level-3 gate with Med-8 adaptive threshold), `add_pending` extended with `replan_count`/`max_replans`, `dispatch_approved` propagates to the next Forge envelope, `find_by_id_any_state` helper (Med-X1).
+- **`scripts/outbox_notifier.py`** (+~315 LOC core + ~98 LOC for C-X1 fix) — `_load_max_replans_from_config`, `_BEACON_REPLAN_INBOUND_INTENTS`, `_route_beacon_replan_approval` (the bot-impersonator path: extract → discipline gate → budget gate → trust policy → `add_pending` + queue alert OR auto-approve dispatch OR reject DM); `_classify_mirror_marker` propagates `replan_count`/`max_replans`/`mirror_escalate_reason` on escalate intents; **C-2 fix** augments reason with findings text on auto-promote + budget-exhaust paths; **M-3 + M-5** surface alert-write failures as load-bearing sentinels for watchdog scanning; **Med-9** bare-Exception coverage on `dispatch_approved`; **C-X1 fix** (in cdd56aa) propagates replan budget through `_dispatch_revision_to_forge` + `_dispatch_mirror_review_rerun`.
+- **`scripts/inbox_watcher.py`** (+~12 LOC) — `_build_outbox` envelope_fields extended; `inbound_intent` propagated as a separate field with M-6 anti-contamination code comment.
+- **`scripts/larry_alerts.py`** (+~52 LOC) — `append_approval_request` + `format_dm` extension for the `kind: approval_request` shape.
+- **`scripts/beacon_telegram_bot.py`** (+~30 LOC) — alerts-poll handler recognizes `kind: approval_request` and renders the DM.
+- **`agents/beacon/CLAUDE.md`** — Shape 8 rewritten with a structured decision tree (don't emit at cap; emit fresh `=== APPROVAL_REQUEST ===` when escalate intent is valid and `replan_count < max_replans`).
+- **Tests** (+~770 LOC, +44 new tests across the two commits): `BeaconReplanLoopTest` in `test_outbox_notifier.py` (22 cases — happy path, discipline-gate fails, budget-exhaust, malformed marker, missing chat_id, idempotency-via-dedup, C-1/C-2 regressions, auto-approve/reject trust paths, inbound_intent propagation, non-escalate regression); `EvaluateReplanBudgetTest` (5), `ValidateReplanDisciplineTest` (8 incl. Med-8 adaptive-threshold), `AddPendingReplanCountTest` (3), `DispatchApprovedPropagatesReplanCountTest` (3) in `test_beacon_approval_handler.py`; plus the 3 second-pass regression tests (C-X1 ×2, Med-X1 ×1) in cdd56aa.
+- **Test count:** 519 → 522 local + droplet both clean (4 pre-existing macOS-only worktree failures unrelated).
+
+### Verification (live, 2026-05-13)
+
+The smoke ran in two phases.
+
+**Phase 1 (PR #8, $2.91).** Beacon emitted the 5c-shipped-section APPROVAL_REQUEST; Forge built; Mirror reviewed and approved. The cycle PASSed end-to-end at the chain level, BUT `replan_count=1` propagation was only exercised in unit tests at that point — Mirror's verdict on PR #8 was PASS, so the replan path didn't fire in the live chain. Phase 1 confirmed the no-escalate happy path; it did not exercise the auto-replan branch.
+
+**Phase 2 round 1 ($0.60, surfaced the discipline-gate notify-prefix bug).** A second smoke specifically designed to drive Mirror to ESCALATE so the Beacon auto-replan would fire. Beacon's replan APPROVAL_REQUEST was emitted correctly, but the level-3 discipline gate silently skipped it: the notify-prefix Beacon prepends to her marker (the `[Inter-agent notify | intent=review-escalate | …]` block) was being counted as payload content during the ≥2-word match against `mirror_escalate_reason`, so legitimate replans whose actual summary referenced Mirror's reason were getting falsely rejected because the notify-prefix words dominated the comparison. Larry got the original ESCALATE auto-DM; no second DM with the replan plan; Forge never received the re-dispatch.
+
+**Fix shipped as 5c-followup in PR #9 (commit `033ef1b`).** The notifier now strips the notify-prefix block before running the discipline-gate word-match, so payload summary is compared against `mirror_escalate_reason` cleanly.
+
+**Phase 2 retry ($0.60).** Re-ran the ESCALATE-driving smoke after the PR #9 fix landed. Full 5c chain verified DM-to-DM: Forge build → Mirror review → Mirror ESCALATE → Larry auto-DM on ESCALATE → Beacon replan APPROVAL_REQUEST → discipline-gate PASS → Larry auto-DM with replan plan → approve → Forge re-dispatch → Mirror re-review → PASS → Larry closing DM. `replan_count=1` propagation verified end-to-end through every hop. Closing DM landed.
+
+**Total smoke spend: $4.11** ($2.91 Phase 1 + $0.60 Phase 2 round 1 + $0.60 Phase 2 retry; PR #9 fix cost not counted here — it was its own commit + tests in the 5c-followup dispatch).
+
+The two-pass smoke pattern (happy path first, then a designed-to-fail second pass) is the same shape established in 5b-followup. The Phase 2 bug surfacing on the first auto-replan attempt validates the practice — without it, the discipline-gate skip would have shipped silent and Larry would have seen an ESCALATE auto-DM with no follow-through across every future replan.
+
+### Known cleanup gaps
+
+- **`scripts/worktree_manager.py` — checkpoint behaviour during the PR #7 Mirror review attempt.** Surfaced during the live test; the exact symptom (suspected: an existing per-task checkpoint commit was overwritten / not preserved across a review re-run when the same branch was reused) is **(symptom to be captured in 5c-followup entry)** — not recoverable from PR #7 comments (PR has zero comments) or commit history in this worktree. The live chain still completed (Mirror PASS), so the bug did not block 5c shipping, but it needs a clean repro + fix before 5d's auto-merge lands and starts depending on stable checkpoint state. Tracked as `5c-followup`.
+
+This `### Known cleanup gaps` subsection is new convention worth keeping: surface a forward pointer when a phase ships with a known-but-deferred issue, so future-Forge and future-Larry both have a paper trail without editing the prior shipped entry.
+
+### Codified additions worth recalling next session
+
+7. **Level-3 discipline gates that silently fall through (WARN + default routing) are the right shape when the failure is upstream-of-Larry.** Marker-error cascades only make sense when the misbehaving agent could re-attempt and succeed; when the misbehavior is "Beacon authored a sloppy `mirror_escalate_reason`" there's nothing for the cascade to fix. Fail closed (replan does not dispatch), but don't fan out alarms — just log a sentinel for watchdog scanning.
+8. **System-controlled monotonic counters (`replan_count`, `revision_count`, future `cost_per_task_usd`) live on the envelope and are incremented by the notifier, not by the agent.** Agents are stateless across dispatches. Any counter the agent could observe-and-author is racy by construction; the dispatcher is the only place with both atomicity and the full history.
+9. **The two-pass independent review pattern is now standard for D3.5 commits — budget for it.** Second-pass review of the post-fix diff has caught a CRITICAL on 4a, 5a-followup, 5b-followup, and 5c (C-X1 here). The "I already fixed the first 11; surely it's clean now" instinct is the failure mode the second pass exists to interrupt. Plan ~30 minutes + ~$0.20 per commit for it.
+
+**Next:** D3.5 commit 5d — auto-merge on Mirror PASS + `cost_per_task_usd` budget enforcement. Closes D3.5.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
