@@ -500,5 +500,252 @@ class DispatchApprovedTest(unittest.TestCase):
         self.assertNotIn('reply_chat_id', data)
 
 
+# -------------------- D3.5 5c — replan budget + discipline --------------------
+
+
+class EvaluateReplanBudgetTest(unittest.TestCase):
+    """Symmetric with mirror_review_handler.evaluate_revision_budget tests."""
+
+    def test_allow_at_zero(self):
+        decision, next_count, max_count = ah.evaluate_replan_budget(
+            {'replan_count': 0, 'max_replans': 2}
+        )
+        self.assertEqual(decision, 'allow')
+        self.assertEqual(next_count, 1)
+        self.assertEqual(max_count, 2)
+
+    def test_allow_at_one_of_two(self):
+        decision, next_count, max_count = ah.evaluate_replan_budget(
+            {'replan_count': 1, 'max_replans': 2}
+        )
+        self.assertEqual(decision, 'allow')
+        self.assertEqual(next_count, 2)
+        self.assertEqual(max_count, 2)
+
+    def test_exhausted_at_two_of_two(self):
+        decision, next_count, max_count = ah.evaluate_replan_budget(
+            {'replan_count': 2, 'max_replans': 2}
+        )
+        self.assertEqual(decision, 'exhausted')
+        self.assertEqual(next_count, 3)
+        self.assertEqual(max_count, 2)
+
+    def test_defaults_when_envelope_missing_fields(self):
+        decision, next_count, max_count = ah.evaluate_replan_budget({})
+        self.assertEqual(decision, 'allow')
+        self.assertEqual(next_count, 1)
+        self.assertEqual(max_count, ah.DEFAULT_MAX_REPLANS)
+
+    def test_negative_or_non_int_treated_as_zero(self):
+        decision, next_count, _ = ah.evaluate_replan_budget(
+            {'replan_count': -1, 'max_replans': 'oops'}
+        )
+        self.assertEqual(decision, 'allow')
+        self.assertEqual(next_count, 1)
+
+
+class ValidateReplanDisciplineTest(unittest.TestCase):
+    """Level-3 (medium) gate on Beacon's replan APPROVAL_REQUEST."""
+
+    def _payload(self, **overrides):
+        p = {
+            'task_id': 'task-001',
+            'summary': (
+                'Address Mirror\'s concern about missing input validation '
+                'in the parser by adding explicit boundary checks.'
+            ),
+            'target_agent': 'forge',
+            'prompt': 'x' * 200,
+        }
+        p.update(overrides)
+        return p
+
+    def test_passes_when_task_id_matches_and_reason_referenced(self):
+        envelope = {'task_id': 'task-001'}
+        mirror_reason = 'Missing input validation in the parser.'
+        ok, err = ah.validate_replan_discipline(
+            self._payload(), envelope, mirror_reason,
+        )
+        self.assertTrue(ok, f'gate should pass but got: {err}')
+
+    def test_task_id_mismatch_fails(self):
+        envelope = {'task_id': 'task-002'}
+        ok, err = ah.validate_replan_discipline(
+            self._payload(task_id='task-001'),
+            envelope, 'missing input validation',
+        )
+        self.assertFalse(ok)
+        self.assertIn('task_id', err)
+
+    def test_no_reason_overlap_fails(self):
+        envelope = {'task_id': 'task-001'}
+        payload = self._payload(
+            summary='Implement entirely unrelated feature X.',
+        )
+        ok, err = ah.validate_replan_discipline(
+            payload, envelope, 'missing input validation in the parser',
+        )
+        self.assertFalse(ok)
+        self.assertIn('Mirror', err)
+
+    def test_case_insensitive_reason_match(self):
+        envelope = {'task_id': 'task-001'}
+        payload = self._payload(
+            summary='MISSING VALIDATION addressed by adding checks.',
+        )
+        ok, err = ah.validate_replan_discipline(
+            payload, envelope, 'missing input validation',
+        )
+        self.assertTrue(ok, f'case-insensitive should pass: {err}')
+
+    def test_empty_mirror_reason_skips_check_two(self):
+        # Defensive fallback: no baseline → second check auto-passes.
+        envelope = {'task_id': 'task-001'}
+        payload = self._payload(summary='Unrelated content.')
+        ok, _ = ah.validate_replan_discipline(payload, envelope, '')
+        self.assertTrue(ok)
+
+    def test_short_mirror_reason_adapts_threshold(self):
+        """Med-8 review fix: when Mirror's reason is terse (<2 long tokens),
+        the gate must adapt the threshold to len(mirror_tokens) — otherwise
+        Beacon's good-faith summary always fails."""
+        envelope = {'task_id': 'task-001'}
+        # Mirror reason has only 1 >3-char token ("spec")
+        payload = self._payload(
+            summary='Address the spec gap by adding a clarifying example.',
+        )
+        ok, err = ah.validate_replan_discipline(
+            payload, envelope, 'Spec gap.',
+        )
+        self.assertTrue(ok, f'short mirror reason should adapt threshold: {err}')
+
+    def test_short_mirror_reason_still_requires_overlap(self):
+        """Med-8 review fix corollary: when Mirror's reason is terse but
+        Beacon's summary has zero token overlap, gate still fails."""
+        envelope = {'task_id': 'task-001'}
+        payload = self._payload(
+            summary='Implement unrelated feature X with new module Y.',
+        )
+        ok, _ = ah.validate_replan_discipline(
+            payload, envelope, 'Spec gap.',
+        )
+        self.assertFalse(ok)
+
+    def test_short_tokens_filtered_out(self):
+        # "of", "the", "in" — these <4-char words don't count as overlap.
+        envelope = {'task_id': 'task-001'}
+        payload = self._payload(
+            summary='Fix the of in or by but at on as.'
+        )
+        ok, err = ah.validate_replan_discipline(
+            payload, envelope, 'the parser of the foo in the bar.',
+        )
+        self.assertFalse(ok)
+
+
+class AddPendingReplanCountTest(unittest.TestCase):
+    """add_pending stores replan_count under _replan_count (system-controlled)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._original_path = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'pending.json'
+
+    def tearDown(self):
+        ah.PENDING_APPROVALS_PATH = self._original_path
+        self._tmp.cleanup()
+
+    def test_replan_count_zero_omits_field(self):
+        entry = ah.add_pending(
+            _good_payload(task_id='t-fresh'), chat_id=1,
+            replan_count=0,
+        )
+        self.assertNotIn('_replan_count', entry)
+        self.assertNotIn('_max_replans', entry)
+
+    def test_replan_count_positive_stores_underscore_fields(self):
+        entry = ah.add_pending(
+            _good_payload(task_id='t-replan'), chat_id=1,
+            replan_count=1, max_replans=2,
+        )
+        self.assertEqual(entry.get('_replan_count'), 1)
+        self.assertEqual(entry.get('_max_replans'), 2)
+
+    def test_replan_count_positive_uses_default_max_when_unset(self):
+        entry = ah.add_pending(
+            _good_payload(task_id='t-replan-default'), chat_id=1,
+            replan_count=1,
+        )
+        self.assertEqual(entry.get('_replan_count'), 1)
+        self.assertEqual(entry.get('_max_replans'), ah.DEFAULT_MAX_REPLANS)
+
+
+class DispatchApprovedPropagatesReplanCountTest(unittest.TestCase):
+    """dispatch_approved writes replan_count/max_replans onto the task envelope
+    ONLY when _replan_count > 0 on the entry (system-controlled, not noise)."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+
+    def tearDown(self):
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def test_fresh_entry_omits_replan_count(self):
+        entry = {
+            'id': 't-fresh',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='t-fresh'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertNotIn('replan_count', data)
+        self.assertNotIn('max_replans', data)
+
+    def test_replan_entry_writes_both_fields(self):
+        entry = {
+            'id': 't-replan',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='t-replan'),
+            '_replan_count': 1,
+            '_max_replans': 2,
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['replan_count'], 1)
+        self.assertEqual(data['max_replans'], 2)
+
+    def test_replan_entry_uses_default_max_when_omitted(self):
+        entry = {
+            'id': 't-replan-default',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='t-replan-default'),
+            '_replan_count': 1,
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['replan_count'], 1)
+        self.assertEqual(data['max_replans'], ah.DEFAULT_MAX_REPLANS)
+
+
 if __name__ == '__main__':
     unittest.main()

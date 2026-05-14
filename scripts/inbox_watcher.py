@@ -299,15 +299,38 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
     # Mirror's re-review prompt can include her round-N-1 findings (her
     # session is fresh per round; she has no other reliable source for
     # the prior findings).
+    # D3.5 5c: also propagate replan_count, max_replans, and intent (as
+    # `inbound_intent`). replan_count + max_replans flow forward through
+    # the dispatch chain so the next REVIEW_ESCALATE notify carries the
+    # incremented budget. `inbound_intent` is the inbound task's `intent`
+    # field surfaced on the outbox so outbox_notifier can recognize
+    # "Beacon is responding to a review-escalate notify" without re-reading
+    # the (already-archived) inbox task file. Symmetric with how
+    # `original_source` and `marker_error_count` ride through the cascade.
     for envelope_field in ('clarification_count', 'max_clarifications',
                            'phase', 'target_repo', 'task_type',
                            'original_source', 'marker_error_count',
                            'branch', 'pr_title', 'pr_body',
                            'forge_build_session_id', 'revision_count',
                            'max_revisions', 'pr_url',
-                           'previous_findings'):
+                           'previous_findings',
+                           'replan_count', 'max_replans',
+                           'mirror_escalate_reason'):
         if task.get(envelope_field) is not None:
             outbox[envelope_field] = task[envelope_field]
+    # `inbound_intent` is special — sourced from task['intent'] (not
+    # task['inbound_intent']) and renamed on the outbox to make the
+    # ownership unambiguous: this is "the intent that fired the inbox
+    # dispatch I just ran," not "an intent I as the agent decided." Skip
+    # propagation when task has no intent (e.g., chat-mode tasks have none).
+    # M-6 review fix: NEVER add `inbound_intent` to the envelope_fields
+    # propagation list above — that would carry a stale prior-dispatch
+    # intent through to a chat-mode follow-up, and outbox_notifier's
+    # _BEACON_REPLAN_INBOUND_INTENTS check would mis-fire on it. The
+    # value must always derive from THIS dispatch's inbound task, never
+    # from a propagated prior value.
+    if task.get('intent') is not None:
+        outbox['inbound_intent'] = task['intent']
     if error:
         outbox["error"] = error
     return outbox

@@ -3643,5 +3643,717 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertNotIn('reply_chat_id', notify)
 
 
+# -------------------- D3.5 5c — Beacon auto-replan loop --------------------
+
+
+def _beacon_approval_request_marker(
+    task_id='task-001',
+    summary=(
+        'Address Mirror\'s concern about missing input validation by '
+        'narrowing the parser interface and adding boundary checks.'
+    ),
+    target_agent='forge',
+    prompt='x' * 200,
+):
+    """Synthetic Beacon APPROVAL_REQUEST marker block — same shape Beacon
+    emits in chat-mode, now extracted from outboxes by 5c."""
+    payload = json.dumps({
+        'task_id': task_id,
+        'summary': summary,
+        'target_agent': target_agent,
+        'prompt': prompt,
+        'target_repo': 'ourliberty-agent-core',
+        'task_type': 'feature-development',
+    })
+    return (
+        f'=== APPROVAL_REQUEST ===\n{payload}\n'
+        f'=== END_APPROVAL_REQUEST ==='
+    )
+
+
+class BeaconReplanLoopTest(unittest.TestCase):
+    """End-to-end: Mirror REVIEW_ESCALATE → Beacon receives notify with
+    replan_count + max_replans + mirror_escalate_reason → Beacon emits
+    APPROVAL_REQUEST → notifier extracts + queues approval-request alert
+    → bot DMs Larry. Plus budget-exhaust + discipline-gate paths.
+
+    Mirrors `RevisionLoopTest` setUp/tearDown shape — full tmpdir reroute
+    of AGENTS_ROOT + INBOXES_ROOT + OUTBOXES_ROOT + ROUTING_EVENTS_LOG +
+    larry_alerts queue + pending-approvals state. Tests run in isolation.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        # larry_alerts paths
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        # beacon_approval_handler state path (notifier writes pending entries)
+        import beacon_approval_handler as ah
+        self._ah_original = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'state' / 'pending-approvals.json'
+        self._ah = ah
+        # trust_policy runtime path — tests override per-case via _set_policy
+        import trust_policy as tp
+        self._tp = tp
+        self._tp_original_runtime = tp.RUNTIME_POLICY_PATH
+        self._tp_original_repo = tp.REPO_POLICY_PATH
+        tp.RUNTIME_POLICY_PATH = self._root / 'trust-policy.json'
+        tp.REPO_POLICY_PATH = self._root / 'trust-policy-repo.json'  # absent
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._ah.PENDING_APPROVALS_PATH = self._ah_original
+        self._tp.RUNTIME_POLICY_PATH = self._tp_original_runtime
+        self._tp.REPO_POLICY_PATH = self._tp_original_repo
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _set_policy(self, default_action='force_ask', rules=None):
+        """Write a synthetic trust-policy file for the test case."""
+        policy = {
+            'version': 1,
+            'default_action': default_action,
+            'rules': rules or [],
+        }
+        self._tp.RUNTIME_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._tp.RUNTIME_POLICY_PATH.write_text(json.dumps(policy))
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        """Return parsed records from the synthetic larry-alerts.jsonl."""
+        if not self._la.ALERTS_FILE.exists():
+            return []
+        lines = self._la.ALERTS_FILE.read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def _beacon_replan_outbox(
+        self,
+        marker_text=None,
+        narrative_prefix='I will revise the spec to address Mirror\'s point.',
+        replan_count=0,
+        max_replans=2,
+        mirror_escalate_reason='Missing input validation in the parser.',
+        reply_chat_id=7998341473,
+        **overrides,
+    ):
+        """Synthetic Beacon outbox responding to a review-escalate inbox
+        dispatch. Marker is appended after the narrative — _route_beacon_
+        replan_approval extracts it via approval.extract_approval_request.
+
+        Defaults match the discipline-gate-pass shape: task_id='task-001'
+        matches the envelope, the summary shares >2 >3-char tokens with
+        mirror_escalate_reason ('validation', 'parser', etc).
+        """
+        if marker_text is None:
+            marker_text = _beacon_approval_request_marker(task_id='task-001')
+        result = (
+            f'{narrative_prefix}\n\n{marker_text}'
+            if marker_text else narrative_prefix
+        )
+        # source='outbox-notifier' mirrors what the notifier writes when
+        # routing Mirror's escalate marker to Beacon's inbox (via the
+        # mirror-result notify_source → outbox-notifier filename).
+        body = _good_outbox(
+            agent='beacon',
+            source='mirror-result',
+            task_id='task-001',
+            result=result,
+        )
+        body['inbound_intent'] = 'review-escalate'
+        body['replan_count'] = replan_count
+        body['max_replans'] = max_replans
+        if mirror_escalate_reason:
+            body['mirror_escalate_reason'] = mirror_escalate_reason
+        if reply_chat_id is not None:
+            body['reply_chat_id'] = reply_chat_id
+        body.update(overrides)
+        return body
+
+    # ----- Mirror REVIEW_ESCALATE → Beacon notify carries replan budget -----
+
+    def test_mirror_escalate_notify_carries_replan_count_and_reason(self):
+        """Mirror's REVIEW_ESCALATE outbox processed by the notifier
+        produces a notify-task on Beacon's inbox that carries replan_count,
+        max_replans, and mirror_escalate_reason for the next leg."""
+        marker = _mirror_escalate_marker(
+            task_id='task-001', reason='Missing input validation in the parser.',
+        )
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        body['reply_chat_id'] = 7998341473
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        # Notify task on Beacon's inbox
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        self.assertEqual(notify['intent'], 'review-escalate')
+        self.assertEqual(notify['replan_count'], 0)
+        self.assertEqual(notify['max_replans'], 2)  # from loop_bounds
+        self.assertIn(
+            'input validation', notify['mirror_escalate_reason'].lower(),
+        )
+
+    def test_mirror_escalate_propagates_inbound_replan_count(self):
+        """When Mirror's envelope carries replan_count=1 (because Beacon
+        already replanned once and this is the second escalate), the
+        notify to Beacon must carry replan_count=1 forward."""
+        marker = _mirror_escalate_marker(task_id='task-001')
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        body['replan_count'] = 1
+        body['max_replans'] = 2
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        notify = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        self.assertEqual(notify['replan_count'], 1)
+
+    # ----- Beacon outbox with APPROVAL_REQUEST → extracted and routed -----
+
+    def test_beacon_approval_request_adds_pending_and_queues_alert(self):
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-replan.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+        # Pending-approvals state has the entry
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        entry = pending[0]
+        self.assertEqual(entry['id'], 'task-001')
+        self.assertEqual(entry['chat_id'], 7998341473)
+        self.assertEqual(entry.get('_replan_count'), 1)
+        self.assertEqual(entry.get('_max_replans'), 2)
+        # Approval-request alert queued
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 1)
+        rec = approval_records[0]
+        self.assertEqual(rec['approval_id'], 'task-001')
+        self.assertEqual(rec['chat_id'], 7998341473)
+        self.assertIn('task-001', rec['body'])
+
+    def test_beacon_no_marker_falls_through_to_default_routing(self):
+        """Beacon's response with no APPROVAL_REQUEST is a push-back via
+        prose — should default-route, NOT trigger the replan path."""
+        body = self._beacon_replan_outbox(marker_text='')
+        f = self._write_outbox('beacon', 'beacon-pushback.json', body)
+        result = on.process_outbox(f)
+        # Default routing notifies the source-agent equivalent; pulse here
+        # is not the source (source is 'mirror-result' which is an infra
+        # source — no primary_agent_id). So this should archive without
+        # notify, NOT 'notified-replan'.
+        self.assertNotEqual(result, 'notified-replan')
+        # No pending entry
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        # No approval-request alert
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 0)
+
+    def test_beacon_replan_without_inbound_intent_does_not_route(self):
+        """Defense in depth: if `inbound_intent` is missing (e.g., chat-mode
+        outbox somehow lands in the notifier path), the replan path must
+        NOT fire — Beacon's chat-mode flow handles those."""
+        body = self._beacon_replan_outbox()
+        body.pop('inbound_intent', None)
+        f = self._write_outbox('beacon', 'beacon-chat.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-replan')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- Discipline gate (level 3) -----
+
+    def test_discipline_gate_task_id_mismatch_falls_through(self):
+        marker = _beacon_approval_request_marker(task_id='task-WRONG')
+        body = self._beacon_replan_outbox(marker_text=marker)
+        f = self._write_outbox('beacon', 'beacon-mismatch.json', body)
+        result = on.process_outbox(f)
+        # Falls through to default routing
+        self.assertNotEqual(result, 'notified-replan')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    def test_discipline_gate_no_reason_overlap_falls_through(self):
+        marker = _beacon_approval_request_marker(
+            task_id='task-001',
+            summary='Implement an entirely unrelated thing instead.',
+        )
+        body = self._beacon_replan_outbox(
+            marker_text=marker,
+            mirror_escalate_reason='Missing input validation in the parser.',
+        )
+        f = self._write_outbox('beacon', 'beacon-norefr.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-replan')
+
+    def test_discipline_gate_empty_mirror_reason_auto_passes(self):
+        """When mirror_escalate_reason is empty (defensive fallback), the
+        reason-overlap check is skipped — task_id match is still enforced."""
+        marker = _beacon_approval_request_marker(
+            task_id='task-001',
+            summary='Any unrelated summary at all.',
+        )
+        body = self._beacon_replan_outbox(
+            marker_text=marker, mirror_escalate_reason='',
+        )
+        f = self._write_outbox('beacon', 'beacon-empty.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+
+    # ----- Budget gate -----
+
+    def test_replan_budget_exhausted_suppresses_marker(self):
+        """replan_count=2 already → next_count=3 > max_replans=2 → exhausted.
+        No pending entry; budget-exhaust notification queued for Larry."""
+        body = self._beacon_replan_outbox(replan_count=2, max_replans=2)
+        f = self._write_outbox('beacon', 'beacon-exhaust.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')  # handled, just suppressed
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        # Larry-notification queued
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertIn('exhausted', notifs[0]['message'].lower())
+        self.assertEqual(notifs[0]['chat_id'], 7998341473)
+
+    def test_replan_budget_remaining_proceeds(self):
+        """replan_count=1, max_replans=2 → next=2 ≤ max → allowed."""
+        body = self._beacon_replan_outbox(replan_count=1, max_replans=2)
+        f = self._write_outbox('beacon', 'beacon-r1.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 1)
+        self.assertEqual(state['pending'][0].get('_replan_count'), 2)
+
+    # ----- Malformed marker -----
+
+    def test_malformed_approval_marker_falls_through(self):
+        """Malformed APPROVAL_REQUEST (missing required field) logs WARN
+        and falls through to default routing — no cascade per 5c sign-off."""
+        bad_payload = json.dumps({'task_id': 'task-001'})  # missing fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._beacon_replan_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-bad.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-replan')
+
+    # ----- Missing reply_chat_id -----
+
+    def test_missing_reply_chat_id_falls_through(self):
+        body = self._beacon_replan_outbox(reply_chat_id=None)
+        body.pop('reply_chat_id', None)
+        f = self._write_outbox('beacon', 'beacon-nochat.json', body)
+        result = on.process_outbox(f)
+        # Without a chat_id we can't route the approval DM — fall through
+        # so the narrative reaches Mirror by default routing.
+        self.assertNotEqual(result, 'notified-replan')
+
+    # ----- dispatch_approved propagates replan_count downstream -----
+
+    def test_dispatch_approved_writes_replan_count_to_forge_envelope(self):
+        """Round-trip: notifier extracts marker → add_pending(replan_count=1)
+        → dispatch_approved → Forge inbox task has replan_count=1 +
+        max_replans=2 on the envelope."""
+        body = self._beacon_replan_outbox(replan_count=0, max_replans=2)
+        f = self._write_outbox('beacon', 'beacon-rt.json', body)
+        on.process_outbox(f)
+        entry = self._ah.find_pending_by_id('task-001')
+        self.assertIsNotNone(entry)
+        # Simulate Larry approving — bot calls dispatch_approved
+        dest = self._ah.dispatch_approved(entry)
+        forge_task = json.loads(Path(dest).read_text())
+        self.assertEqual(forge_task['replan_count'], 1)
+        self.assertEqual(forge_task['max_replans'], 2)
+        self.assertEqual(forge_task['reply_chat_id'], 7998341473)
+
+    # ----- Idempotency (Med-10 review fix) -----
+
+    def test_replay_dedups_pending_by_task_id(self):
+        """Med-10 fix: second process_outbox on a duplicate outbox detects
+        the existing pending entry and skips add_pending + alert queue."""
+        body = self._beacon_replan_outbox()
+        f1 = self._write_outbox('beacon', 'beacon-rep.json', body)
+        on.process_outbox(f1)
+        # Replay — write a fresh copy of the same outbox
+        f2 = self._write_outbox('beacon', 'beacon-rep2.json', body)
+        result = on.process_outbox(f2)
+        # Should be 'notified-replan' (handled by replan path) but dedup
+        # short-circuited the duplicate add.
+        self.assertEqual(result, 'notified-replan')
+        state = self._ah.load_state()
+        self.assertEqual(
+            len(state.get('pending', [])), 1,
+            f'expected 1 pending entry after replay, got {len(state.get("pending", []))}',
+        )
+        # Exactly one approval-request alert should be queued.
+        alerts = self._read_alerts()
+        approval_records = [
+            a for a in alerts if a.get('kind') == 'approval_request'
+        ]
+        self.assertEqual(len(approval_records), 1)
+
+    def test_replay_dedups_history_after_auto_approve(self):
+        """Med-X1 second-pass fix: replay of a previously-auto-approved outbox
+        (entry moved from pending to history) is also dedup'd. Without this,
+        a notifier crash between resolve() and outbox archive would let the
+        replay re-dispatch the Forge task, overwriting the prior one."""
+        self._set_policy(default_action='auto_approve')
+        body = self._beacon_replan_outbox()
+        f1 = self._write_outbox('beacon', 'beacon-aa1.json', body)
+        on.process_outbox(f1)
+        # First run: entry should be in history (auto-approved + resolved)
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        self.assertEqual(len(state.get('history', [])), 1)
+        # Replay scenario — same outbox content arrives again
+        f2 = self._write_outbox('beacon', 'beacon-aa2.json', body)
+        result = on.process_outbox(f2)
+        self.assertEqual(result, 'notified-replan')
+        # Should NOT add a second history entry
+        state2 = self._ah.load_state()
+        self.assertEqual(len(state2.get('pending', [])), 0)
+        self.assertEqual(
+            len(state2.get('history', [])), 1,
+            f'replay should not double-dispatch; got {len(state2.get("history", []))} history entries',
+        )
+        # Forge inbox should have exactly one task (the first dispatch);
+        # the safe_write_inbox call from the replay would have been skipped
+        # by the dedup gate before reaching the inbox write.
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        self.assertEqual(len(forge_tasks), 1)
+
+    # ----- C-1 regression: replan_count propagates through dispatch hops -----
+
+    def test_dispatch_build_phase_propagates_replan_count(self):
+        """C-1 fix: replan_count + max_replans flow through preflight→build."""
+        # Synthesize a Forge preflight outbox carrying replan_count=1
+        preflight = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='preflight', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            result=(
+                'Plan looks clean.\n=== PROCEED ===\n'
+                '{"task_id": "task-001", "preflight_summary": "Ready."}\n'
+                '=== END_PROCEED ==='
+            ),
+        )
+        preflight['replan_count'] = 1
+        preflight['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', preflight)
+        on.process_outbox(f)
+        # Forge's build task should now exist with replan_count=1
+        build_tasks = list(
+            (on.INBOXES_ROOT / 'forge').glob('build-*.json')
+        )
+        self.assertEqual(len(build_tasks), 1)
+        build = json.loads(build_tasks[0].read_text())
+        self.assertEqual(build['replan_count'], 1)
+        self.assertEqual(build['max_replans'], 2)
+
+    def test_dispatch_mirror_review_propagates_replan_count(self):
+        """C-1 fix: replan_count + max_replans flow through build→review."""
+        build = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
+        )
+        build['replan_count'] = 1
+        build['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', build)
+        on.process_outbox(f)
+        review_tasks = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-*.json')
+        )
+        self.assertEqual(len(review_tasks), 1)
+        review = json.loads(review_tasks[0].read_text())
+        self.assertEqual(review['replan_count'], 1)
+        self.assertEqual(review['max_replans'], 2)
+
+    def test_dispatch_revision_to_forge_propagates_replan_count(self):
+        """C-X1 second-pass fix: replan_count + max_replans flow through
+        the revision-loop dispatch too. Without this, any task that goes
+        through a revision round before re-escalating has the replan
+        budget silently reset to 0."""
+        marker = _mirror_revision_marker(
+            task_id='task-001', confidence='high', severity='medium',
+        )
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+        )
+        body['forge_build_session_id'] = 'sess-abc'
+        body['pr_url'] = 'https://github.com/x/y/pull/77'
+        body['replan_count'] = 1
+        body['max_replans'] = 2
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        # Revision task to Forge should carry the replan budget forward.
+        revision_tasks = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-*.json')
+        )
+        self.assertEqual(len(revision_tasks), 1)
+        revision = json.loads(revision_tasks[0].read_text())
+        self.assertEqual(revision['replan_count'], 1)
+        self.assertEqual(revision['max_replans'], 2)
+
+    def test_dispatch_mirror_review_rerun_propagates_replan_count(self):
+        """C-X1 second-pass fix: re-review dispatch also carries replan_count."""
+        # Synthesize a Forge revision outbox with replan budget on envelope.
+        revision_outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='revision', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            claude_session_id='sess-abc',
+            result=(
+                'Revision 1 applied: added validation per Mirror finding.\n\n'
+                'Tests pass; pushed to forge/task-001.'
+            ),
+        )
+        revision_outbox['pr_url'] = 'https://github.com/x/y/pull/77'
+        revision_outbox['revision_count'] = 1
+        revision_outbox['max_revisions'] = 3
+        revision_outbox['replan_count'] = 1
+        revision_outbox['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', revision_outbox)
+        on.process_outbox(f)
+        rereviews = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-rev*.json')
+        )
+        self.assertEqual(len(rereviews), 1)
+        rereview = json.loads(rereviews[0].read_text())
+        self.assertEqual(rereview['replan_count'], 1)
+        self.assertEqual(rereview['max_replans'], 2)
+
+    # ----- C-2 regression: findings text augments mirror_escalate_reason -----
+
+    def test_auto_promoted_escalate_reason_includes_findings(self):
+        """C-2 fix: low-confidence REVISION auto-promoted to ESCALATE must
+        carry Mirror's finding descriptions in mirror_escalate_reason, not
+        just the procedural framing. Without findings in the reason text,
+        Beacon's level-3 discipline gate can never find token overlap."""
+        marker = _mirror_revision_marker(
+            task_id='task-001', confidence='low',
+            findings=[
+                {'file': 'parser.py', 'line_range': 'L12-L15',
+                 'severity': 'medium',
+                 'description': 'Missing input validation for malformed inputs.'},
+            ],
+        )
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        notify = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        # Reason should contain procedural text AND finding description
+        reason = notify.get('mirror_escalate_reason', '')
+        self.assertIn('Findings:', reason)
+        self.assertIn('input validation', reason)
+        # And it should still mention the auto-promote (procedural framing)
+        self.assertIn('auto-promot', reason.lower())
+
+    def test_budget_exhausted_escalate_reason_includes_findings(self):
+        """C-2 fix: budget-exhausted REVISION downgrade to ESCALATE must
+        also carry findings in the reason."""
+        marker = _mirror_revision_marker(
+            task_id='task-001', confidence='high',
+            findings=[
+                {'file': 'parser.py', 'line_range': 'L20',
+                 'severity': 'medium',
+                 'description': 'Edge case for empty input not handled.'},
+            ],
+        )
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        body['revision_count'] = 3  # at the max, next would exhaust
+        body['max_revisions'] = 3
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        notify = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        reason = notify.get('mirror_escalate_reason', '')
+        self.assertIn('Findings:', reason)
+        self.assertIn('empty input', reason)
+        self.assertIn('budget', reason.lower())
+
+    # ----- Med-11: missing test coverage -----
+
+    def test_auto_approve_trust_path_dispatches_immediately(self):
+        """When trust_policy yields auto_approve, the notifier dispatches
+        the new Forge task directly (no Larry DM beyond the confirmation
+        notification) and resolves the pending entry as approved."""
+        self._set_policy(default_action='auto_approve')
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-aa.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+        # Forge inbox has the dispatched task
+        forge_tasks = list(
+            (on.INBOXES_ROOT / 'forge').glob('task-001.json')
+        )
+        self.assertEqual(len(forge_tasks), 1)
+        forge_task = json.loads(forge_tasks[0].read_text())
+        self.assertEqual(forge_task['replan_count'], 1)
+        self.assertEqual(forge_task['max_replans'], 2)
+        self.assertEqual(forge_task['reply_chat_id'], 7998341473)
+        # Pending entry is resolved + in history
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        history = state.get('history', [])
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0]['status'], 'approved')
+        # Confirmation notification queued
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        # NO approval-request alert (auto-approve skips the force_ask path)
+        approval_records = [
+            a for a in alerts if a.get('kind') == 'approval_request'
+        ]
+        self.assertEqual(len(approval_records), 0)
+
+    def test_reject_trust_path_dms_larry_without_dispatch(self):
+        """When trust_policy yields reject, the notifier DMs Larry the
+        policy rejection and does NOT add a pending entry."""
+        self._set_policy(default_action='reject')
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-rj.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+        # No pending entry
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        # Rejection notification queued
+        alerts = self._read_alerts()
+        notifs = [
+            a for a in alerts
+            if a.get('kind') == 'notification' and a.get('intent') == 'reject'
+        ]
+        self.assertEqual(len(notifs), 1)
+        # No Forge task dispatched
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        self.assertEqual(len(forge_tasks), 0)
+
+    def test_inbound_intent_propagates_through_full_chain(self):
+        """End-to-end: Mirror REVIEW_ESCALATE → notifier writes notify to
+        Beacon's inbox with intent=review-escalate → inbox_watcher fires
+        Beacon (here simulated by reading the notify file) → outbox would
+        carry inbound_intent=review-escalate. We test the inbox-side
+        contract: the notify task on Beacon's inbox has `intent=review-
+        escalate`, which inbox_watcher._build_outbox would surface as
+        `inbound_intent` on the outbox."""
+        marker = _mirror_escalate_marker(task_id='task-001')
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        notify = json.loads(notifies[0].read_text())
+        # This is the field inbox_watcher reads to populate inbound_intent
+        self.assertEqual(notify['intent'], 'review-escalate')
+
+    def test_non_escalate_intent_omits_replan_count_on_notify(self):
+        """Regression: a review-pass / review-revision (mid-chain) marker
+        decision should NOT add replan_count + max_replans to the notify
+        task. Only review-escalate carries the replan budget."""
+        marker = _mirror_pass_marker(task_id='task-001')
+        body = _mirror_outbox_body(
+            marker, source='beacon', task_id='task-001',
+            target_repo='ourliberty-agent-core',
+        )
+        # Even if envelope has replan_count from a prior cycle, the
+        # marker-driven routing should only carry it on escalate notifies.
+        body['replan_count'] = 1
+        body['max_replans'] = 2
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        notify = json.loads(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
+        )
+        self.assertNotIn('replan_count', notify)
+        self.assertNotIn('max_replans', notify)
+        self.assertNotIn('mirror_escalate_reason', notify)
+
+
+# Med-8 regression test lives in test_beacon_approval_handler — the
+# adapt-threshold logic is in validate_replan_discipline. See
+# ValidateReplanDisciplineTest.test_short_mirror_reason_adapts_threshold.
+
+
 if __name__ == '__main__':
     unittest.main()

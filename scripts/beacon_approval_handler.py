@@ -103,6 +103,21 @@ APPROVAL_MARKER_RE = re.compile(
 # Reminder schedule (hours after creation).
 REMINDER_HOURS = [6, 24, 72]
 
+# D3.5 commit 5c: replan budget default. Caps the number of times Beacon
+# can auto-emit an APPROVAL_REQUEST in response to Mirror's REVIEW_ESCALATE
+# notify on a single task_id. Read from `config/agent-models.json`
+# `loop_bounds.max_replans` at dispatch time; the default here matches that
+# file but is local to keep this module config-free. Symmetric with
+# `mirror_review_handler.DEFAULT_MAX_REVISIONS`.
+DEFAULT_MAX_REPLANS = 2
+
+# D3.5 commit 5c: minimum number of >3-char tokens from Mirror's escalation
+# reason that must appear in Beacon's replan APPROVAL_REQUEST summary for
+# the discipline gate to pass. Dial-3 (medium) per Larry's 2026-05-13 5c
+# sign-off — strict enough to catch "Beacon made up her own reason" but
+# lenient enough that paraphrase survives.
+REPLAN_REASON_MIN_TOKEN_OVERLAP = 2
+
 
 # -------------------- exceptions --------------------
 
@@ -237,8 +252,18 @@ def add_pending(
     chat_id: int,
     queued_during_pause: bool = False,
     state: Optional[dict[str, Any]] = None,
+    replan_count: int = 0,
+    max_replans: Optional[int] = None,
 ) -> dict[str, Any]:
-    """Add a pending-approval entry. Returns the entry dict written."""
+    """Add a pending-approval entry. Returns the entry dict written.
+
+    D3.5 commit 5c: `replan_count` and `max_replans` are SYSTEM-controlled
+    fields, not Beacon-authored. Stored under underscore-prefixed keys
+    (`_replan_count`, `_max_replans`) to make the system-vs-Beacon ownership
+    visible at a glance. When non-zero, `dispatch_approved` writes them to
+    the next task envelope so the loop budget propagates through the next
+    Forge dispatch.
+    """
     s = state if state is not None else load_state()
     entry = {
         'id': payload['task_id'],
@@ -251,6 +276,15 @@ def add_pending(
         'reminders_sent': [],
         'queued_during_pause': queued_during_pause,
     }
+    # D3.5 5c — system-controlled replan counter. Only attach when this is
+    # a replan (count > 0). Fresh approvals don't carry the field at all,
+    # so dispatch_approved doesn't write replan_count=0 to the envelope
+    # (which would be noise and could confuse downstream propagation).
+    if replan_count and replan_count > 0:
+        entry['_replan_count'] = replan_count
+        entry['_max_replans'] = (
+            max_replans if max_replans is not None else DEFAULT_MAX_REPLANS
+        )
     s['pending'].append(entry)
     if state is None:
         save_state(s)
@@ -260,6 +294,32 @@ def add_pending(
 def find_pending_by_id(approval_id: str, state: Optional[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
     s = state if state is not None else load_state()
     for entry in s.get('pending', []):
+        if entry.get('id') == approval_id:
+            return entry
+    return None
+
+
+def find_by_id_any_state(
+    approval_id: str, state: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Search BOTH pending and history for an entry with this id.
+
+    D3.5 commit 5c (Med-X1 second-pass review fix). The 5c replan dedup
+    gate needs to short-circuit replays where the entry has already been
+    auto-approved + resolved (entry moved to history). `find_pending_by_id`
+    alone misses this case: a notifier crash between `resolve` and outbox
+    archive would let the duplicate outbox re-dispatch on the next poll,
+    overwriting the already-dispatched Forge task file.
+
+    Returns the entry from `pending` if present, else from `history` if
+    present, else None. Caller treats either as "this approval_id is
+    already known; skip the duplicate."
+    """
+    s = state if state is not None else load_state()
+    for entry in s.get('pending', []):
+        if entry.get('id') == approval_id:
+            return entry
+    for entry in s.get('history', []):
         if entry.get('id') == approval_id:
             return entry
     return None
@@ -533,6 +593,20 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     task_dict = {**payload, 'source': 'beacon'}
     if entry.get('chat_id') is not None:
         task_dict['reply_chat_id'] = entry['chat_id']
+    # D3.5 5c — replan_count + max_replans propagation. When this entry was
+    # added by `_route_beacon_replan_approval` (notifier extracted Beacon's
+    # auto-replan APPROVAL_REQUEST from her outbox after a review-escalate
+    # notify), the entry carries `_replan_count` and `_max_replans` under
+    # underscore-prefixed keys (system-controlled — Beacon doesn't author).
+    # Surface them on the dispatched task envelope so the next Forge → Mirror
+    # cycle's REVIEW_ESCALATE notify carries the incremented count forward,
+    # and so Mirror's classifier can backstop the budget (defense in depth).
+    replan_count = entry.get('_replan_count')
+    if replan_count and replan_count > 0:
+        task_dict['replan_count'] = replan_count
+        task_dict['max_replans'] = (
+            entry.get('_max_replans') or DEFAULT_MAX_REPLANS
+        )
     # Filename — use task_id stem.
     filename = f'{payload["task_id"]}.json'
     return safe_write_inbox.safe_write_inbox(
@@ -541,3 +615,120 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
         source_agent='beacon',
         filename=filename,
     )
+
+
+# -------------------- replan budget + discipline (D3.5 commit 5c) --------------------
+
+def evaluate_replan_budget(
+    task_envelope: dict[str, Any],
+) -> tuple[str, int, int]:
+    """Decide whether another replan round is permitted.
+
+    Returns `(decision, next_count, max_count)` where:
+      - decision ∈ {'allow', 'exhausted'}
+      - next_count is the value `replan_count` would take after this round
+      - max_count is the envelope's `max_replans` (or `DEFAULT_MAX_REPLANS`)
+
+    Parallel to `mirror_review_handler.evaluate_revision_budget`. Called by
+    `outbox_notifier._route_beacon_replan_approval` as the system-side
+    backstop. Beacon's CLAUDE.md is the first line — she's instructed to
+    check the envelope counters and NOT emit APPROVAL_REQUEST when at cap.
+    This function catches it if she misses.
+
+    Stateless: pass the envelope in, get a decision out.
+    """
+    current = task_envelope.get('replan_count', 0)
+    if not isinstance(current, int) or current < 0:
+        current = 0
+    max_count = task_envelope.get('max_replans', DEFAULT_MAX_REPLANS)
+    if not isinstance(max_count, int) or max_count < 0:
+        max_count = DEFAULT_MAX_REPLANS
+    next_count = current + 1
+    if next_count > max_count:
+        return 'exhausted', next_count, max_count
+    return 'allow', next_count, max_count
+
+
+# Tokenizer for the level-3 discipline gate on replan reason references.
+# Strips punctuation, lowercases, keeps tokens > 3 chars to filter common
+# words ("the", "a", "of") that don't carry semantic weight. Symmetric
+# tokenization on both sides (Mirror's reason and Beacon's summary) means
+# paraphrase survives ("addressed missing validation" passes when Mirror
+# said "validation was missing"); pure fabrication fails ("scope creep
+# concern" rejects when Mirror said "credentials in test file").
+_REPLAN_TOKEN_RE = re.compile(r'[A-Za-z]{4,}')
+
+
+def _replan_tokens(text: str) -> set[str]:
+    """Lowercase >3-char word tokens. Empty set if text is non-string/empty."""
+    if not isinstance(text, str) or not text:
+        return set()
+    return {tok.lower() for tok in _REPLAN_TOKEN_RE.findall(text)}
+
+
+def validate_replan_discipline(
+    payload: dict[str, Any],
+    envelope: dict[str, Any],
+    mirror_reason: str,
+) -> tuple[bool, str]:
+    """Apply the level-3 discipline gate to Beacon's auto-replan APPROVAL_REQUEST.
+
+    Returns `(ok, error_msg)` where:
+      - ok=True means the marker passes the gate and routing should proceed
+      - ok=False means the marker fails; caller logs WARN + falls through to
+        default routing (NO marker-error cascade — strict-5 dial behavior was
+        not selected for 5c per Larry's 2026-05-13 sign-off)
+
+    Level-3 (medium) gate checks:
+
+      1. **task_id match** — payload['task_id'] must equal envelope['task_id'].
+         Catches "Beacon authored a marker for the wrong task" (audit-trail
+         confusion). Strict, not lenient.
+
+      2. **Mirror-reason reference** — payload['summary'] must contain at
+         least `REPLAN_REASON_MIN_TOKEN_OVERLAP` (=2) tokens from Mirror's
+         escalation reason (>3-char words, case-insensitive). Catches
+         "Beacon made up her own reason instead of addressing Mirror's
+         finding." Lenient on phrasing — paraphrase passes; complete
+         fabrication fails. The summary is what Larry sees on the approval
+         DM; making it reference Mirror's actual concern is the value.
+
+    Both checks are necessary; missing either fails. Empty Mirror reason
+    (defensive fallback) auto-passes the second check — without a baseline
+    to compare against, the gate has nothing to enforce.
+    """
+    # Check 1: task_id match
+    envelope_task_id = envelope.get('task_id')
+    payload_task_id = payload.get('task_id')
+    if (
+        envelope_task_id is not None
+        and payload_task_id is not None
+        and payload_task_id != envelope_task_id
+    ):
+        return False, (
+            f'APPROVAL_REQUEST task_id ({payload_task_id!r}) does not match '
+            f'envelope task_id ({envelope_task_id!r}); replan must reuse the '
+            f'original task_id'
+        )
+
+    # Check 2: Mirror reason reference (skip if no reason to compare against)
+    if not mirror_reason:
+        return True, ''
+    mirror_tokens = _replan_tokens(mirror_reason)
+    summary = payload.get('summary', '')
+    summary_tokens = _replan_tokens(summary)
+    overlap = mirror_tokens & summary_tokens
+    # Med-8 review fix: adapt threshold to len(mirror_tokens). If Mirror's
+    # reason is terse ("Spec gap." → 1 long token), requiring 2 overlap is
+    # unsatisfiable and Beacon's good-faith summary always fails. Keep the
+    # Dial-3 strictness for verbose reasons; gracefully degrade when she's
+    # terse. Symmetric with the "empty mirror reason auto-passes" case.
+    required = min(REPLAN_REASON_MIN_TOKEN_OVERLAP, len(mirror_tokens))
+    if len(overlap) < required:
+        return False, (
+            f'APPROVAL_REQUEST summary does not reference Mirror\'s escalation '
+            f'reason (overlap={len(overlap)} tokens; need {required}). '
+            f'Replan summary must address what Mirror flagged. '
+            f'summary={summary[:120]!r}, mirror_reason={mirror_reason[:120]!r}'
+        )
+    return True, ''

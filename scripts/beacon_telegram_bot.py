@@ -417,18 +417,19 @@ def _check_pending_alerts() -> None:
             larry_alerts.write_offset(idx + 1)
             continue
 
-        # Determine target chats: notifications go to the originating
-        # chat_id only; alerts broadcast to all authorized chats.
-        if alert.get('kind') == 'notification':
+        # Determine target chats: notifications + approval-requests go to
+        # the originating chat_id only; alerts broadcast to all authorized
+        # chats. Both targeted shapes share the chat_id validation path.
+        kind = alert.get('kind')
+        if kind in ('notification', 'approval_request'):
             target_chat = alert.get('chat_id')
             if not isinstance(target_chat, int) or target_chat not in ALLOWED:
-                # Defense-in-depth: a notification record claiming an
-                # unauthorized chat_id gets dropped (offset advances so we
-                # don't wedge), not delivered. The append_notification
-                # caller should have validated the chat_id is one of ours;
+                # Defense-in-depth: a record claiming an unauthorized
+                # chat_id gets dropped (offset advances so we don't wedge),
+                # not delivered. The writer caller should have validated;
                 # this catches misconfigured pipelines or tampering.
                 log(
-                    f"notification idx={idx} has invalid/unauthorized "
+                    f"{kind} idx={idx} has invalid/unauthorized "
                     f"chat_id={target_chat!r}; dropping"
                 )
                 larry_alerts.write_offset(idx + 1)
@@ -437,7 +438,25 @@ def _check_pending_alerts() -> None:
         else:
             targets = sorted(ALLOWED)
 
-        text = larry_alerts.format_dm(alert)
+        # D3.5 5c — approval-request rendering. Look up the live pending
+        # entry by approval_id and render via approval.format_approval_dm;
+        # this picks up any updates to the formatting since the record was
+        # appended. Falls back to the appended body if the entry has
+        # already been resolved (race: bot was offline, entry resolved
+        # via auto-approve path, now we're reading the queue).
+        if kind == 'approval_request':
+            approval_id = alert.get('approval_id')
+            entry = (
+                approval.find_pending_by_id(approval_id)
+                if isinstance(approval_id, str) else None
+            )
+            text = (
+                approval.format_approval_dm(entry)
+                if entry is not None
+                else larry_alerts.format_dm(alert)
+            )
+        else:
+            text = larry_alerts.format_dm(alert)
         all_delivered = True
         for chat_id in targets:
             if not _send_alert_dm(chat_id, text):
@@ -447,11 +466,15 @@ def _check_pending_alerts() -> None:
         if all_delivered:
             larry_alerts.write_offset(idx + 1)
             kind_desc = alert.get('kind') or 'alert'
-            tag = (
-                f"intent={alert.get('intent')}"
-                if kind_desc == 'notification'
-                else f"source={alert.get('source')}, subject={alert.get('subject', '-')}"
-            )
+            if kind_desc == 'notification':
+                tag = f"intent={alert.get('intent')}"
+            elif kind_desc == 'approval_request':
+                tag = f"approval_id={alert.get('approval_id')}"
+            else:
+                tag = (
+                    f"source={alert.get('source')}, "
+                    f"subject={alert.get('subject', '-')}"
+                )
             log(f"{kind_desc} idx={idx} delivered ({tag})")
         else:
             # Don't advance — preserve order; retry on next sweep.
