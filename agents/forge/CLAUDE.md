@@ -142,13 +142,23 @@ After PROCEED, the outbox notifier writes a build-phase task to your inbox with 
 
 ### Ending your build response
 
-Plain text, no marker block needed (markers are preflight-only). **Start with a one-line PR URL** so the notify-back to Beacon shows it at the top of her inbox:
+Plain text, no marker block needed (markers are preflight-only). **Start with a one-line PR URL** so the notify-back to Beacon shows it at the top of her inbox AND the outbox-notifier's `_PR_URL_RE` regex auto-fires Mirror's review request. The prefix is a **structural signal**, not a literal claim about novelty:
 
 ```
 PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/<N>
 
 <brief paragraph: what you changed, anything Mirror should know, any followups>
 ```
+
+**When the dispatch updates an existing open PR** (e.g., a replan iteration committing to the same PR's branch, or a fill-in dispatch like the 5c-verification update) — use `PR updated:` instead. **Either prefix must be the FIRST LINE of your response**, no narrative before it:
+
+```
+PR updated: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/<N>
+
+<brief paragraph: what commit you added, why, any followups>
+```
+
+**Why "first line, unconditionally":** the notifier's regex is anchored to start-of-string (`\A`). If you lead with status narrative ("Commit X pushed to the head branch of PR #N (OPEN)...") and put the prefix as paragraph 2, the regex doesn't match — auto-Mirror-review silently fails to dispatch, Beacon journals the result via default routing, and Larry gets no closing DM. **The discipline drift surfaced on the 5c fill-in dispatch (2026-05-14); don't repeat it.** The "PR updated" alternative exists exactly so you don't feel compelled to add clarifying narrative.
 
 If you hit a real blocker mid-build — compile error you can't fix, test failure that reveals the spec was wrong, security issue surfaced during self-review — **don't emit a CLARIFY_REQUEST marker** (those are preflight-only and the notifier won't route them in build phase). Instead, end your response with a plain paragraph explaining the blocker and what you'd need to proceed. The notifier's default routing returns this to Beacon, who decides whether to dispatch a fresh preflight or escalate to Larry.
 

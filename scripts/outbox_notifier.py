@@ -112,13 +112,28 @@ MAX_MARKER_ERROR_RETRIES = 3
 _BEACON_REPLAN_INBOUND_INTENTS = frozenset({'review-escalate'})
 
 # D3.5 commit 5a — extract Forge's PR URL from a build-phase outbox result.
-# Forge's CLAUDE.md mandates the build response START with `PR opened: <url>`
-# (agents/forge/CLAUDE.md, Build phase protocol § "Ending your build response").
+# Forge's CLAUDE.md mandates the build response START with EITHER
+# `PR opened: <url>` (new PR opened this dispatch) OR `PR updated: <url>`
+# (commit added to a PR that was already open — e.g., a replan iteration,
+# a fill-in dispatch, or any subsequent build on an existing PR's branch).
 # Anchored to start-of-string (with optional leading whitespace) so a PR URL
 # discussed in narrative ("I considered PR opened: <stale-url> from last week")
 # doesn't false-match before the real URL. m-2 review fix.
+#
+# D3.5 5c-followup-2 (Miss #3): added the `updated` alternative. Prior version
+# only matched `PR opened:`, which broke the auto-Mirror-review trigger on
+# existing-PR-update flows — Forge naturally led with status narrative ("Commit
+# X pushed to the head branch of PR #N (OPEN)...") and put `PR opened: <url>`
+# as paragraph 2, never matching the start-of-string anchor. Surfaced by the
+# 5c fill-in dispatch live test 2026-05-14. Forge's CLAUDE.md updated in the
+# same commit with the explicit `PR updated:` example so the discipline rule
+# matches the regex contract.
 _PR_URL_RE = re.compile(
-    r'\A\s*PR opened:\s*(https://github\.com/[^\s]+/pull/\d+)',
+    # HIGH-2 (PR #10 review): use `[ \t]` not `\s` so newlines between `PR`
+    # and the verb DON'T match. `\s+` would let Forge accidentally split
+    # `PR\nopened: <url>` across lines and still satisfy the regex even
+    # though it violates the CLAUDE.md "FIRST LINE unconditional" rule.
+    r'\A[ \t]*PR[ \t]+(?:opened|updated):[ \t]*(https://github\.com/[^\s]+/pull/\d+)',
 )
 
 # D3.5 commit 5b — extract Forge's revision-applied summary from a revision-
@@ -1069,7 +1084,23 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
     if data.get('max_replans') is not None:
         build_task['max_replans'] = data['max_replans']
 
-    build_filename = f'build-{task_id}.json'
+    # D3.5 5c-followup-2 (audit C-1): key the build-task filename by
+    # replan_count when this is a replan iteration. The dedup check below
+    # is filename-based; without the round suffix, the round-1 archive
+    # entry collides with every subsequent replan iteration's build
+    # dispatch — the dedup returns true on the .archive/ hit and silently
+    # drops the dispatch. Symmetric with how _dispatch_revision_to_forge
+    # keys revision filenames on revision_count. Surfaced by 5c deeper
+    # audit 2026-05-14 — same "canonical scenario assumed" pattern as
+    # Miss #3 (this is the structural-collision sibling of the regex-
+    # anchoring miss).
+    replan_count = data.get('replan_count', 0)
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
+    if replan_count > 0:
+        build_filename = f'build-{task_id}-replan{replan_count}.json'
+    else:
+        build_filename = f'build-{task_id}.json'
     # Idempotency check (4b review fix): if the build task is already
     # present in Forge's inbox OR was already archived, skip re-dispatch.
     # Guards against the notifier crashing between dispatch and archive
@@ -1510,7 +1541,21 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     if data.get('max_replans') is not None:
         review_task['max_replans'] = data['max_replans']
 
-    review_filename = f'review-{task_id}.json'
+    # D3.5 5c-followup-2 (audit C-2): key the review-task filename by
+    # replan_count when this is a replan iteration's first review. Same
+    # rationale as the _dispatch_build_phase C-1 sibling — without the
+    # round suffix, round-1's archive entry collides and every replan's
+    # first Mirror review silently drops. (Re-reviews within a single
+    # replan iteration are already keyed by revision_count in
+    # _dispatch_mirror_review_rerun; this gate is just for the first
+    # review per replan round.)
+    replan_count = data.get('replan_count', 0)
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
+    if replan_count > 0:
+        review_filename = f'review-{task_id}-replan{replan_count}.json'
+    else:
+        review_filename = f'review-{task_id}.json'
     # Idempotency check (same pattern as _dispatch_build_phase): if the
     # review task is already in Mirror's inbox OR archived, skip. Guards
     # against the notifier crashing between dispatch and archive of the
@@ -1737,7 +1782,20 @@ def _dispatch_revision_to_forge(
     # Idempotency check: revision-task filename is keyed on round number so
     # multiple revision rounds for the same task_id don't collide. Re-process
     # on notifier crash skips if already in inbox/archive/invalid.
-    revision_filename = f'revision-{task_id}-{next_count}.json'
+    # D3.5 5c-followup-2 HIGH-1 (combined-state fix): also key by replan_count
+    # when this is a replan iteration. Without this, the second replan
+    # iteration's revision_count=1 collides with the first iteration's
+    # archived revision-{task}-1.json — same shape as C-1/C-2 but on the
+    # inner revision loop. Surfaced by the PR #10 independent reviewer.
+    replan_count = data.get('replan_count', 0)
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
+    if replan_count > 0:
+        revision_filename = (
+            f'revision-{task_id}-replan{replan_count}-{next_count}.json'
+        )
+    else:
+        revision_filename = f'revision-{task_id}-{next_count}.json'
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
     if (
         (forge_inbox / revision_filename).exists()
@@ -1904,7 +1962,22 @@ def _dispatch_mirror_review_rerun(
 
     # Idempotency: keyed on round number so re-process on notifier crash
     # doesn't double-dispatch a re-review.
-    review_filename = f'review-{task_id}-rev{round_num}.json'
+    # D3.5 5c-followup-2 HIGH-1 (combined-state fix): also key by replan_count
+    # when this is a replan iteration. The bare `rev{N}` filename collides
+    # across replan iterations because `revision_count` resets to 0 on each
+    # replan's first review dispatch (see _dispatch_mirror_review's
+    # hardcoded `revision_count: 0`). Without replan_count keying, the
+    # second replan's first revision re-review file collides with the first
+    # replan's archive — same shape as C-1/C-2.
+    replan_count = data.get('replan_count', 0)
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
+    if replan_count > 0:
+        review_filename = (
+            f'review-{task_id}-replan{replan_count}-rev{round_num}.json'
+        )
+    else:
+        review_filename = f'review-{task_id}-rev{round_num}.json'
     mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
     if (
         (mirror_inbox / review_filename).exists()
@@ -2130,12 +2203,27 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
         )
         return True
 
+    # D3.5 5c-followup-3 (audit 5.A): respect the /pause contract. When
+    # approvals are paused, the bot's chat-mode flow correctly creates
+    # the entry with queued_during_pause=True and skips the DM — the
+    # backlog surfaces on /resume. The notifier-side replan path was
+    # missing this check, so Beacon's auto-replan APPROVAL_REQUEST would
+    # DM Larry during a /pause, violating the contract. Mirror the bot's
+    # chat-mode shape: durably add the entry as queued, skip the alert.
+    is_paused = approval.is_paused()
     entry = approval.add_pending(
         payload,
         chat_id=reply_chat_id,
         replan_count=next_count,
         max_replans=max_count,
+        queued_during_pause=is_paused,
     )
+    if is_paused:
+        log(
+            f'beacon replan APPROVAL_REQUEST queued during /pause for task '
+            f'{task_id} (replan_count={next_count}); will be DMed on /resume',
+        )
+        return True
 
     if action_str == 'auto_approve':
         # Med-9 review fix: bare-Exception coverage matches the trust_decision

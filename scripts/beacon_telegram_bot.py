@@ -247,6 +247,14 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             telegram_send(chat_id, "Nothing pending to modify right now.")
             return True
         reason = action.get('reason', '')
+        # D3.5 5c-followup-3 (audit 3.A): capture the system-controlled replan
+        # state from the entry being modified. Without this, Beacon's chat-
+        # mode re-plan via _send_beacon_response would call add_pending(...)
+        # without replan_count/max_replans, defeating the budget cap. The
+        # next Forge→Mirror cycle's REVIEW_ESCALATE notify would carry
+        # replan_count=0 and the loop becomes unbounded.
+        prior_replan_count = entry.get('_replan_count', 0)
+        prior_max_replans = entry.get('_max_replans')
         approval.resolve(entry['id'], 'modified', note=reason)
         # Forward a structured note to Beacon so she can re-plan.
         relay = (
@@ -260,7 +268,11 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         if new_session and new_session != session_id:
             _bot_state['sessions'][str(chat_id)] = new_session
             save_sessions(_bot_state['sessions'])
-        _send_beacon_response(chat_id, reply)
+        _send_beacon_response(
+            chat_id, reply,
+            inherited_replan_count=prior_replan_count,
+            inherited_max_replans=prior_max_replans,
+        )
         return True
 
     if kind == 'reject':
@@ -269,6 +281,12 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             telegram_send(chat_id, "Nothing pending to reject right now.")
             return True
         reason = action.get('reason', '')
+        # 5c-followup-3 audit 3.A: same replan-state capture as the modify
+        # branch above. A `reject:` on a replan-pending entry sometimes
+        # bounces Beacon into emitting a different replan; without this
+        # capture, the new entry would lose replan_count tracking.
+        prior_replan_count = entry.get('_replan_count', 0)
+        prior_max_replans = entry.get('_max_replans')
         approval.resolve(entry['id'], 'rejected', note=reason)
         telegram_send(chat_id, f"❌ Rejected: {entry['id']}. Beacon notified.")
         relay = (
@@ -280,19 +298,36 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
         if new_session and new_session != session_id:
             _bot_state['sessions'][str(chat_id)] = new_session
             save_sessions(_bot_state['sessions'])
-        _send_beacon_response(chat_id, reply)
+        _send_beacon_response(
+            chat_id, reply,
+            inherited_replan_count=prior_replan_count,
+            inherited_max_replans=prior_max_replans,
+        )
         return True
 
     return False
 
 
-def _send_beacon_response(chat_id: int, reply: str) -> None:
+def _send_beacon_response(
+    chat_id: int, reply: str,
+    inherited_replan_count: int = 0,
+    inherited_max_replans=None,
+) -> None:
     """Send Beacon's response with approval-marker interception.
 
     If Beacon emitted `=== APPROVAL_REQUEST ===`, extract the plan, consult
     trust_policy, and either dispatch directly (auto_approve) or queue +
     DM the formatted request (force_ask). The marker block is stripped
     from the narrative shown to Larry.
+
+    D3.5 5c-followup-3 (audit 3.A): `inherited_replan_count` /
+    `inherited_max_replans` carry the system-controlled replan budget
+    forward when this response is Beacon's chat-mode re-plan after Larry
+    replied `modify:` or `reject:` to a replan-pending entry. The bot's
+    handle_user_command captures these from the entry being modified and
+    passes them through so the next add_pending preserves budget tracking.
+    Without this, every modify/reject on a replan resets the counter and
+    defeats max_replans.
     """
     try:
         payload, narrative = approval.extract_approval_request(reply)
@@ -322,7 +357,11 @@ def _send_beacon_response(chat_id: int, reply: str) -> None:
         return
 
     if action_str == 'auto_approve':
-        entry = approval.add_pending(payload, chat_id=chat_id)
+        entry = approval.add_pending(
+            payload, chat_id=chat_id,
+            replan_count=inherited_replan_count,
+            max_replans=inherited_max_replans,
+        )
         try:
             approval.dispatch_approved(entry)
             approval.resolve(entry['id'], 'approved',
@@ -342,8 +381,12 @@ def _send_beacon_response(chat_id: int, reply: str) -> None:
 
     # force_ask path
     queued = approval.is_paused()
-    entry = approval.add_pending(payload, chat_id=chat_id,
-                                  queued_during_pause=queued)
+    entry = approval.add_pending(
+        payload, chat_id=chat_id,
+        queued_during_pause=queued,
+        replan_count=inherited_replan_count,
+        max_replans=inherited_max_replans,
+    )
     if queued:
         telegram_send(
             chat_id,
