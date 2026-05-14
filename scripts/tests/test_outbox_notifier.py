@@ -4189,8 +4189,9 @@ class BeaconReplanLoopTest(unittest.TestCase):
         revision_outbox['max_replans'] = 2
         f = self._write_outbox('forge', 'task-001.json', revision_outbox)
         on.process_outbox(f)
+        # D3.5 5c-followup-2 HIGH-1 keyed filename when replan_count>0
         rereviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan*-rev*.json')
         )
         self.assertEqual(len(rereviews), 1)
         rereview = json.loads(rereviews[0].read_text())
@@ -4360,6 +4361,494 @@ class BeaconReplanLoopTest(unittest.TestCase):
 # Med-8 regression test lives in test_beacon_approval_handler — the
 # adapt-threshold logic is in validate_replan_discipline. See
 # ValidateReplanDisciplineTest.test_short_mirror_reason_adapts_threshold.
+
+
+# -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
+
+
+class ReplanDispatchKeyingTest(unittest.TestCase):
+    """C-1 + C-2 audit fixes: build/review filenames key by replan_count.
+
+    Without round-keyed filenames, the .archive/ dedup check on iteration 2
+    would silently drop the dispatch — defeating the replan loop entirely.
+    These tests fail on the pre-fix code: iteration 1 lands the file at
+    `build-<task>.json`, iteration 2 also tries `build-<task>.json`, finds it
+    archived, returns. Round-keying separates them.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    # ----- C-1: _dispatch_build_phase keyed by replan_count -----
+
+    def test_build_dispatch_keyed_by_replan_count_iteration_2(self):
+        """Replan iteration 2 must NOT collide with iteration 1's archive."""
+        # Simulate iteration 1 having archived a build task
+        forge_inbox_archive = on.INBOXES_ROOT / 'forge' / '.archive'
+        forge_inbox_archive.mkdir(parents=True, exist_ok=True)
+        (forge_inbox_archive / 'build-task-001.json').write_text('{}')
+
+        # Iteration 2 preflight proceeds — dispatch should land at the
+        # replan-keyed filename, not collide
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "task-001", "preflight_summary": "Iteration 2 ready."}\n'
+            '=== END_PROCEED ==='
+        )
+        preflight = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='preflight', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            claude_session_id='sess-iter2-xyz',
+            result=f'Ready.\n\n{marker}',
+        )
+        preflight['replan_count'] = 1
+        preflight['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', preflight)
+        on.process_outbox(f)
+
+        # New build task lands at the keyed filename
+        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-task-001-replan1.json'))
+        self.assertEqual(
+            len(keyed), 1,
+            f'expected build-task-001-replan1.json (round-keyed); '
+            f'inbox contents: {list((on.INBOXES_ROOT / "forge").iterdir())}',
+        )
+
+    def test_build_dispatch_unkeyed_when_replan_count_zero(self):
+        """Backward-compat: replan_count=0 (or missing) uses the legacy
+        unkeyed filename so prior idempotency behavior is preserved."""
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "task-001", "preflight_summary": "Fresh dispatch."}\n'
+            '=== END_PROCEED ==='
+        )
+        preflight = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='preflight', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            claude_session_id='sess-fresh-xyz',
+            result=f'Ready.\n\n{marker}',
+        )
+        # replan_count omitted (defaults to 0)
+        f = self._write_outbox('forge', 'task-001.json', preflight)
+        on.process_outbox(f)
+
+        legacy = list((on.INBOXES_ROOT / 'forge').glob('build-task-001.json'))
+        self.assertEqual(len(legacy), 1)
+        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-task-001-replan*.json'))
+        self.assertEqual(len(keyed), 0)
+
+    # ----- C-2: _dispatch_mirror_review keyed by replan_count -----
+
+    def test_mirror_review_dispatch_keyed_by_replan_count_iteration_2(self):
+        """Replan iteration 2's first Mirror review must NOT collide with
+        iteration 1's archived review task."""
+        mirror_inbox_archive = on.INBOXES_ROOT / 'mirror' / '.archive'
+        mirror_inbox_archive.mkdir(parents=True, exist_ok=True)
+        (mirror_inbox_archive / 'review-task-001.json').write_text('{}')
+
+        build = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
+        )
+        build['replan_count'] = 1
+        build['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', build)
+        on.process_outbox(f)
+
+        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan1.json'))
+        self.assertEqual(
+            len(keyed), 1,
+            f'expected review-task-001-replan1.json (round-keyed); '
+            f'inbox contents: {list((on.INBOXES_ROOT / "mirror").iterdir())}',
+        )
+
+    def test_mirror_review_dispatch_unkeyed_when_replan_count_zero(self):
+        """Backward-compat: round 1 still uses the legacy unkeyed filename."""
+        build = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='build', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
+        )
+        # replan_count omitted
+        f = self._write_outbox('forge', 'task-001.json', build)
+        on.process_outbox(f)
+
+        legacy = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001.json'))
+        self.assertEqual(len(legacy), 1)
+        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan*.json'))
+        self.assertEqual(len(keyed), 0)
+
+    # ----- HIGH-1 (PR #10 review): combined-state revision filename keying -----
+
+    def test_revision_dispatch_keyed_by_replan_count_combined_state(self):
+        """HIGH-1: revision dispatch filename ALSO keys by replan_count to
+        avoid colliding with prior replan iteration's archived revisions.
+        Without this, replan iter 2's first revision (revision_count=1)
+        would collide with replan iter 1's archived revision-{task}-1.json
+        and silently drop — same shape as C-1/C-2 on the inner loop."""
+        # Seed archive with replan-iter-1's revision file (the collision target)
+        forge_archive = on.INBOXES_ROOT / 'forge' / '.archive'
+        forge_archive.mkdir(parents=True, exist_ok=True)
+        (forge_archive / 'revision-task-001-1.json').write_text('{}')
+
+        # Synthesize Mirror REVIEW_REVISION outbox for replan iter 2
+        marker_payload = json.dumps({
+            'task_id': 'task-001',
+            'pr_url': 'https://github.com/x/y/pull/77',
+            'findings': [{
+                'file': 'foo.py', 'line_range': 'L12-L15',
+                'severity': 'medium',
+                'description': 'Missing validation.',
+            }],
+            'severity': 'medium', 'confidence': 'high',
+        })
+        marker = (
+            f'=== REVIEW_REVISION ===\n{marker_payload}\n'
+            f'=== END_REVIEW_REVISION ==='
+        )
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id='task-001',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            result=f'Findings.\n\n{marker}',
+        )
+        body['forge_build_session_id'] = 'sess-abc'
+        body['pr_url'] = 'https://github.com/x/y/pull/77'
+        body['replan_count'] = 1  # replan iteration 2
+        body['max_replans'] = 2
+        f = self._write_outbox('mirror', 'task-001.json', body)
+        on.process_outbox(f)
+        # Revision task should land at the replan-keyed filename, not collide
+        keyed = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-replan1-*.json')
+        )
+        self.assertEqual(
+            len(keyed), 1,
+            f'expected replan-keyed revision filename; inbox: '
+            f'{list((on.INBOXES_ROOT / "forge").iterdir())}',
+        )
+        # And the legacy unkeyed filename should NOT have been written
+        # (the archived collider is still the only one there)
+        legacy_inbox = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-1.json')
+        )
+        self.assertEqual(len(legacy_inbox), 0)
+
+    def test_rerun_review_dispatch_keyed_by_replan_count_combined_state(self):
+        """HIGH-1 sibling: _dispatch_mirror_review_rerun also keys by
+        replan_count to avoid colliding with prior replan iteration's
+        archived re-reviews."""
+        mirror_archive = on.INBOXES_ROOT / 'mirror' / '.archive'
+        mirror_archive.mkdir(parents=True, exist_ok=True)
+        (mirror_archive / 'review-task-001-rev1.json').write_text('{}')
+
+        revision_outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='task-001',
+            phase='revision', target_repo='ourliberty-agent-core',
+            branch='forge/task-001',
+            claude_session_id='sess-abc',
+            result=(
+                'Revision 1 applied: validation added per Mirror finding.\n'
+                '\nTests pass; pushed to forge/task-001.'
+            ),
+        )
+        revision_outbox['pr_url'] = 'https://github.com/x/y/pull/77'
+        revision_outbox['revision_count'] = 1
+        revision_outbox['max_revisions'] = 3
+        revision_outbox['replan_count'] = 1
+        revision_outbox['max_replans'] = 2
+        f = self._write_outbox('forge', 'task-001.json', revision_outbox)
+        on.process_outbox(f)
+        keyed = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan1-rev*.json')
+        )
+        self.assertEqual(len(keyed), 1)
+        legacy = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-rev1.json')
+        )
+        self.assertEqual(len(legacy), 0)
+
+
+class PRUrlRegexAcceptsBothPrefixesTest(unittest.TestCase):
+    """Miss #3 fix: _PR_URL_RE accepts `PR opened:` OR `PR updated:` as
+    first-line prefix. Forge's CLAUDE.md drift on existing-PR-update flows
+    surfaced when she led with status narrative and put `PR opened:` as
+    paragraph 2 — the strict anchor missed, auto-Mirror-review didn't fire."""
+
+    def test_pr_opened_still_matches(self):
+        result = 'PR opened: https://github.com/x/y/pull/42\n\nDid the work.'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/42',
+        )
+
+    def test_pr_updated_matches(self):
+        result = 'PR updated: https://github.com/x/y/pull/8\n\nAdded a commit to the existing PR.'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/8',
+        )
+
+    def test_pr_opened_at_paragraph_2_still_does_not_match(self):
+        """Anchoring is still enforced — Forge can't put narrative first.
+        This is the failure mode of the original 5c fill-in dispatch:
+        her response started with 'Commit X pushed...' and put the prefix
+        on line 3. The regex correctly rejects."""
+        result = (
+            "Commit `8e5c692` pushed to `forge/task-001`, the head branch "
+            "of PR #8 (OPEN).\n\nPR opened: https://github.com/x/y/pull/8"
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_pr_updated_at_paragraph_2_still_does_not_match(self):
+        """Symmetric anchoring check for the `updated` alternative."""
+        result = (
+            "Commit added to existing PR.\n\n"
+            "PR updated: https://github.com/x/y/pull/8"
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_pr_opened_with_leading_whitespace_matches(self):
+        """\\A allows leading whitespace per the regex (defensive)."""
+        result = '   PR opened: https://github.com/x/y/pull/1\n'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/1',
+        )
+
+    def test_invalid_pr_url_returns_none(self):
+        result = 'PR opened: not-a-url\n'
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_pr_other_verb_does_not_match(self):
+        """Only opened|updated. Not closed|merged|reopened — those would
+        signal terminal states that shouldn't auto-fire review."""
+        result = 'PR closed: https://github.com/x/y/pull/8\n'
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_newline_between_PR_and_verb_does_not_match(self):
+        """HIGH-2 (PR #10 review): the verb must be on the SAME line as PR.
+        `\\s` would have accepted `PR\\nopened: <url>` which violates the
+        CLAUDE.md FIRST-LINE-unconditional discipline contract. Tighten to
+        `[ \\t]` so the regex matches the discipline rule."""
+        result = 'PR\nopened: https://github.com/x/y/pull/1'
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_newline_before_PR_does_not_match(self):
+        """Leading newlines before `PR` also violate first-line discipline."""
+        result = '\nPR opened: https://github.com/x/y/pull/1'
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+
+# -------------------- D3.5 5c-followup-3 (audit 3.A + 5.A) --------------------
+
+
+class BeaconReplanPauseTest(unittest.TestCase):
+    """Audit 5.A fix: notifier-side replan path respects approval.is_paused().
+
+    Without this, Beacon's auto-replan APPROVAL_REQUEST during a /pause
+    would DM Larry the approval prompt, violating the pause contract.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        import beacon_approval_handler as ah
+        self._ah_original = ah.PENDING_APPROVALS_PATH
+        self._ah_paused_flag = ah.APPROVALS_PAUSED_FLAG
+        ah.PENDING_APPROVALS_PATH = self._root / 'state' / 'pending-approvals.json'
+        ah.APPROVALS_PAUSED_FLAG = self._root / 'blackboard' / 'APPROVALS_PAUSED'
+        self._ah = ah
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._ah.PENDING_APPROVALS_PATH = self._ah_original
+        self._ah.APPROVALS_PAUSED_FLAG = self._ah_paused_flag
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        if not self._la.ALERTS_FILE.exists():
+            return []
+        lines = self._la.ALERTS_FILE.read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def _beacon_replan_outbox(self):
+        marker_payload = json.dumps({
+            'task_id': 'task-001',
+            'summary': (
+                "Address Mirror's input validation concern in the parser."
+            ),
+            'target_agent': 'forge',
+            'prompt': 'x' * 200,
+            'target_repo': 'ourliberty-agent-core',
+            'task_type': 'feature-development',
+        })
+        marker = (
+            f'=== APPROVAL_REQUEST ===\n{marker_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = _good_outbox(
+            agent='beacon',
+            source='mirror-result',
+            task_id='notify-task-001',
+            result=f'Revising.\n\n{marker}',
+        )
+        body['inbound_intent'] = 'review-escalate'
+        body['replan_count'] = 0
+        body['max_replans'] = 2
+        body['mirror_escalate_reason'] = (
+            'Missing input validation in the parser.'
+        )
+        body['reply_chat_id'] = 7998341473
+        return body
+
+    def test_pause_queues_replan_entry_without_alert(self):
+        """During /pause, the replan entry persists with queued_during_pause
+        but no approval-request alert is queued. /resume surfaces backlog."""
+        self._ah.set_paused(True)
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-paused.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]['id'], 'task-001')
+        self.assertTrue(pending[0].get('queued_during_pause'))
+        self.assertEqual(pending[0].get('_replan_count'), 1)
+        # No approval-request alert
+        alerts = self._read_alerts()
+        approval_records = [
+            a for a in alerts if a.get('kind') == 'approval_request'
+        ]
+        self.assertEqual(
+            len(approval_records), 0,
+            'pause must suppress the approval-request DM',
+        )
+
+    def test_pause_resume_surfaces_replan_backlog(self):
+        """After /resume, pop_paused_backlog returns the queued replan
+        entry with its _replan_count intact for the bot to DM."""
+        self._ah.set_paused(True)
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-resume.json', body)
+        on.process_outbox(f)
+        self._ah.set_paused(False)
+        backlog = self._ah.pop_paused_backlog()
+        self.assertEqual(len(backlog), 1)
+        self.assertEqual(backlog[0]['id'], 'task-001')
+        self.assertEqual(backlog[0].get('_replan_count'), 1)
+
+    def test_no_pause_proceeds_normally(self):
+        """Sanity: no pause → alert queued as before."""
+        body = self._beacon_replan_outbox()
+        f = self._write_outbox('beacon', 'beacon-normal.json', body)
+        on.process_outbox(f)
+        alerts = self._read_alerts()
+        approval_records = [
+            a for a in alerts if a.get('kind') == 'approval_request'
+        ]
+        self.assertEqual(len(approval_records), 1)
 
 
 if __name__ == '__main__':
