@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 29 — 2026-05-14 02:40 MDT
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. sync.json: commit=cd50657 ("Pulse cycle 20260514T043824Z") = HEAD. Not behind, not ahead. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-14T07:36:28Z (~1h before cycle start), status=no-change, commit=cd50657. Within 2h threshold. ✅
+- **(C) Agent liveness: nominal.** All 6 core units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Bot log silence = idle Telegram false positive per MEMORY.md. 4 decommissioned services still inactive (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer); iter 23b pending Larry confirmation. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/: 1 file (notify-notify-pulse-cost-note-002.json, unchanged). pulse/.invalid/: 3 tasks (6 files including .reason sidecars; same 3 entries since iter 23: d2-reject, d25-reject, watchdog-alert-1778648185). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: 1 open, pending review.** PR #7 "D3.5 commit 5c: Beacon auto-replan on Mirror ESCALATE" (larry/d35-5c-beacon-replan), created 2026-05-14T03:19Z, reviewDecision="" (awaiting Mirror review), mergeable=UNKNOWN (GitHub recomputing; was MERGEABLE iter 28). Age ~5h. Below ask-then-do threshold (24h). ✅
+- **(F) Concurrency: automated cycle active.** Lock PID 181579 (bash), 2 min old at check time. Normal 4h-timer run (~08:38 UTC). Interactive session takes precedence per established precedent. ✅
+- **(H) Forge digest:** PR #7 is a larry/ branch, not a forge/ branch. 0 open Forge-authored PRs. 0 merged in last 4h. ✅
+
+**Did:** Nothing. No always-fix actions applicable.
+**Escalated:** Nothing new. iter 23b (4 decommissioned services + watchdog task_id bug; needs_response=true) still outstanding.
+**Forge:** 0 open Forge PRs; 0 shipped since iter 28.
+**Patterns:**
+- 4 D3.5 services inactive: 7 consecutive (iters 23–29). Still holding Forge dispatch pending iter 23b response from Larry.
+- forge/.invalid/ "worktree target_repo=None": no new occurrence (iters 26–29). Monitoring.
+- F24 class (prompt too short): no new occurrence since iter 23. Monitoring.
+- Watchdog task_id missing: no new occurrence since iter 23. Monitoring.
+**Learned:** Nothing new. System nominal. PR #7 (D3.5 5c) still pending Mirror review; iter 23b still the only open question.
+
+---
+
 ## Iteration 28 — 2026-05-13 22:43 MDT
 
 **Health:** ✅ Nominal
