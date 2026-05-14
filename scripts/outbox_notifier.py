@@ -308,7 +308,10 @@ def _check_cost_budget(
     task_id: str,
     cap_usd: Optional[float] = None,
 ) -> tuple[bool, float, float]:
-    """Return ``(at_cap, current_usd, cap_usd)`` for the per-task budget gate.
+    """Sum cumulative ``cost_usd`` by ``task_id`` from ``costs.jsonl`` to enforce the per-task cap.
+    Tolerates a missing or malformed ledger by degrading to "allow dispatch".
+
+    Return ``(at_cap, current_usd, cap_usd)`` for the per-task budget gate.
 
     D3.5 commit 5d. Reads the JSONL cost ledger written by
     ``inbox_watcher.process_task`` after every claude invocation; sums the
