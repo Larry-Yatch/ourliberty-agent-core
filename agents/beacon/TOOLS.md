@@ -42,6 +42,8 @@
 ~/credentials/                      # mode 700; .env.larry for secrets
 ```
 
+**Memory split (2026-05-15):** Beacon's long-term memory now lives on the persistent mount at `/home/larry/agents/memory/beacon/` — both the index (`MEMORY.md`) and individual memory files (`<slug>.md` siblings). The `agents/beacon/MEMORY.md` file in this repo is a redirect stub kept for git history; do not read or write to it. This split exists because the synced repo is mounted read-only during Beacon sessions (to prevent local writes that the upstream sync would silently overwrite), so working memory cannot live there. Specs, identity files, and other artifacts that change through PRs continue to live in the repo.
+
 ## The Spec Template (use exactly this when Larry says "write it up")
 
 ```markdown

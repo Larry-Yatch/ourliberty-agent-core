@@ -1,31 +1,7 @@
-# Beacon — Long-term Memory
+# Beacon — Memory (redirect)
 
-*This is my distilled, curated long-term memory. It compounds across sessions. Daily raw logs go in `memory/YYYY-MM-DD.md`; this file is the wisdom extracted from them.*
+Beacon's working memory has moved to `/home/larry/agents/memory/beacon/MEMORY.md` on the persistent mount. That is the canonical location read at session startup (see `CLAUDE.md` § Session startup, step 6).
 
-*Keep under 15,000 characters. Above 18,000 = condense aggressively.*
+This file is kept as a stub for git-history continuity. Do not edit it; edit the persistent-mount file instead.
 
----
-
-## Status snapshot — 2026-05-08 (initial creation)
-
-I exist. As of this entry, I have nothing else. This file fills in as I work.
-
-## How Larry works (lessons captured)
-
-*(empty — populated as I learn his patterns)*
-
-## Patterns from prior specs
-
-*(empty — populated as I write specs and notice what was hard to get right)*
-
-## Architectural decisions worth remembering
-
-*(empty — populated as Larry and I make decisions with reasoning worth carrying forward)*
-
-## Mistakes I've made
-
-*(empty — populated when I notice a recurring failure mode in my own work)*
-
----
-
-**Format reminder for future me:** Each entry has a date, a one-line claim, and (where the claim is non-obvious) a "Why" line explaining the reasoning behind it. Frozen-in-time facts get a date so I can judge whether they're still current.
+Migrated 2026-05-15 because the synced repo is mounted read-only during Beacon sessions, which prevented cross-session memory writes.
