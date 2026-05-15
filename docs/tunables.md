@@ -32,7 +32,7 @@ Every numeric or boolean knob in the agent system, in one place. The values list
 |---|---|---|---|---|
 | `max_revisions` | `config/agent-models.json` `loop_bounds` | 3 | 1–5 | Forge↔Mirror revisions consistently converge in 1–2 → lower. Mirror keeps requesting revision past 3 → raise OR force ESCALATE earlier. |
 | `max_replans` | `config/agent-models.json` `loop_bounds` | 2 | 1–4 | Beacon's replans usually land in 1 → lower to 1 (one revision is enough). 2 replans rarely enough to resolve → raise to 3 OR escalate to Larry sooner. |
-| `cost_per_task_usd` | `config/agent-models.json` `loop_bounds` | 5.0 | 1.0–20.0 | Stuck loops burn $5 before pause → lower. Real long-running tasks legitimately exceed → raise. After 10+ live D3.5 runs, retune to actual p95 cost × 2. |
+| `cost_per_task_usd` | `config/agent-models.json` `loop_bounds` | 15.0 | 1.0–20.0 | Stuck loops burn $15 before pause → lower. Real long-running tasks legitimately exceed → raise. After 10+ live D3.5 runs, retune to actual p95 cost × 2. |
 | `DEFAULT_MAX_REVISIONS` (handler default) | `scripts/mirror_review_handler.py` | 3 | 1–5 | Should match `loop_bounds.max_revisions`; drift between the two is a bug. |
 
 ---
@@ -139,3 +139,4 @@ Append-only. When you retune a dial, add a row here with date, dial name, old �
 | 2026-05-13 | `DEFAULT_MAX_REVISIONS` (handler) | (new) → 3 | Matches `loop_bounds.max_revisions`. Tracked separately because the handler has its own default for when an envelope omits the field. |
 | 2026-05-13 | Doc created | — | First version of this index. Populated from the dials in active use as of 5a ship. |
 | 2026-05-13 | `max_revisions` | active in 5b | D3.5 5b lit the revision loop. Enforced: REVIEW_REVISION at revision_count+1 > max_revisions downgrades to ESCALATE (no new vocabulary; reuses Beacon's escalate handler). Re-eval after 10+ live revision rounds — if Forge consistently converges in 1-2, lower to 2; if 3 rarely enough, raise OR sharpen the spec design. |
+| 2026-05-15 | `cost_per_task_usd` | $5 → $15 | Ledger build dispatch (build-ledger-001) spans 12+ files + spec read; $5 cap risked mid-build trip. $15 gives headroom without removing gate. |

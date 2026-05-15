@@ -74,7 +74,7 @@
   "loop_bounds": {
     "max_revisions": 3,
     "max_replans": 2,
-    "cost_per_task_usd": 5.0,
+    "cost_per_task_usd": 15.0,
     "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
   },
   "_history": [
@@ -96,6 +96,11 @@
     {
       "date": "2026-05-14",
       "change": "D3.5 commit 5d: loop_bounds.cost_per_task_usd ($5.00) is now ACTIVATED — outbox_notifier reads it via _load_cost_per_task_cap_usd_from_config and enforces it at all four dispatch sites (_dispatch_build_phase, _dispatch_revision_to_forge, _dispatch_mirror_review, _dispatch_mirror_review_rerun). Cumulative spend is summed by task_id from ~/agents/blackboard/costs.jsonl; at-cap refuses dispatch + DMs Larry. Also: REVIEW_PASS now triggers auto-merge (gh pr merge --squash --delete-branch); REVIEW_EMERGENCY_HALT now trips ~/agents/blackboard/EMERGENCY_HALT + broadcast priority DM. The _note line on loop_bounds (claiming cost_per_task_usd was already read) was aspirational before 5d — it is true as of this commit.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-15",
+      "change": "loop_bounds.cost_per_task_usd raised from $5 to $15. Trigger: upcoming Ledger build dispatch (build-ledger-001) spans 12+ files + longer preflight read across two specs; $5 cap risked tripping mid-build. $15 gives headroom without removing the gate.",
       "author": "Claude (via Larry's session)"
     }
   ]
