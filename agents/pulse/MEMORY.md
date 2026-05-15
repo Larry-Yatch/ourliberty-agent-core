@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-15 (Iteration 36 — dead-letter response)
+## Status snapshot — updated 2026-05-15 (Iteration 39 — Beacon dispatch gap discovered; re-dispatched)
 
-Thirty-six cycles/responses run. **System: ⚠️ Minor drift.** PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" still open — Mirror REVIEW_PASS > 15h (May 14 21:58Z), autoMergeRequest=null. Pulse always-fix blocked by session permissions 3 consecutive cycles (33–35). Corrected G-rule dispatch now routed to Beacon (iter 36): cycle-fix-gh-pr-merge-allowlist-beacon-20260515T090000Z.json. PR #20 (Ledger + Pulse Check I specs) still open, ~13h, within Mirror window. Core 6 units active. 4 decommissioned services inactive — expected. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file.
+Thirty-nine cycles/responses run. **System: ⚠️ Drift.** PR #16 still open — Mirror REVIEW_PASS > 16h (May 14 21:58Z), autoMergeRequest=null, manual merge still needed. Allowlist fix pipeline stalled: Beacon processed approval at 02:52Z May 15 but generated APPROVAL_REQUEST as TEXT output — never wrote dispatch file to Forge inbox. Re-dispatched to Beacon (iter 39) via cycle-fix-allowlist-forge-redispatch-20260515T141600Z.json asking Beacon to use Write tool to place Forge preflight in ~/agents/inboxes/forge/. PR #20 (Ledger + Pulse Check I specs) open ~5.5h, within Mirror review window. Core 6 units active. Automated cycle PID 263442 running 1h40m+ at 0% CPU (possible stuck cycle; monitoring). pulse/.invalid/ 3 files. forge/.invalid/ 2 files.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -46,7 +46,9 @@ Thirty-six cycles/responses run. **System: ⚠️ Minor drift.** PR #16 "docs(d3
 
 - **2026-05-15 — Pulse Check I (optimization mode) spec in flight.** PR #20 "docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)" (forge/beacon-specs-ledger-pulsei-001) open. Once merged, review PR contents and update cycle-prompt.md to include Check I. Do not add Check I to the suite until the spec is landed and reviewed.
 
-- **2026-05-15 — gh pr merge session allowlist fix dispatched to Forge.** cycle-fix-gh-pr-merge-allowlist-20260515T083700Z.json in forge inbox. Once Forge implements, verify `gh pr merge` no longer requires per-invocation approval in Pulse sessions. Close this watch item when cycle-actions.jsonl shows result=success for enable-pr-auto-merge.
+- **2026-05-15 — gh pr merge session allowlist fix: pipeline stalled at Beacon→Forge dispatch.** Beacon processed pulse-approve-gh-pr-merge-allowlist-build-20260515T100000Z (02:52Z May 15, iter 38) and generated APPROVAL_REQUEST as TEXT output only — never wrote dispatch file to ~/agents/inboxes/forge/. Forge inbox unmodified since 02:42Z (pre-Beacon completion). Root cause: Beacon described the dispatch but didn't execute Write tool call. Iter 39 re-dispatched to Beacon (cycle-fix-allowlist-forge-redispatch-20260515T141600Z.json) asking Beacon to use Write tool explicitly. Close this watch item when cycle-actions.jsonl shows result=success for enable-pr-auto-merge.
+
+- **2026-05-15 — Beacon dispatch gap: text output vs file write.** Beacon sometimes generates downstream dispatch JSON as TEXT in its result field instead of using the Write tool to write to ~/agents/inboxes/<agent>/. Confirmed once (iter 38, allowlist fix). Text output is not processed by the inbox watcher. Watch for recurrence across other Beacon tasks. If recurs, dispatch to Beacon with behavioral correction: downstream dispatches MUST use Write tool, not just text output.
 
 ## Recurring patterns I've decided NOT to promote (and why)
 
