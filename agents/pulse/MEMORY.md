@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-15 (Iteration 39 — Beacon dispatch gap discovered; re-dispatched)
+## Status snapshot — updated 2026-05-15 (Iteration 41)
 
-Thirty-nine cycles/responses run. **System: ⚠️ Drift.** PR #16 still open — Mirror REVIEW_PASS > 16h (May 14 21:58Z), autoMergeRequest=null, manual merge still needed. Allowlist fix pipeline stalled: Beacon processed approval at 02:52Z May 15 but generated APPROVAL_REQUEST as TEXT output — never wrote dispatch file to Forge inbox. Re-dispatched to Beacon (iter 39) via cycle-fix-allowlist-forge-redispatch-20260515T141600Z.json asking Beacon to use Write tool to place Forge preflight in ~/agents/inboxes/forge/. PR #20 (Ledger + Pulse Check I specs) open ~5.5h, within Mirror review window. Core 6 units active. Automated cycle PID 263442 running 1h40m+ at 0% CPU (possible stuck cycle; monitoring). pulse/.invalid/ 3 files. forge/.invalid/ 2 files.
+Forty-one cycles/responses run. **System: ⚠️ Minor drift (dirty tree + stuck cycle).** PR #16 MERGED 2026-05-15T16:39:06Z this cycle — always-fix finally succeeded after PR #21 allowlist landed. `gh pr merge` now works without per-session approval. PR #20 (Ledger + Pulse Check I specs) open, within Mirror review window. Core 6 units active. Stuck cycle G-rule dispatched to Beacon (3rd occurrence: iters 8, 39, 41). Dirty tree from iter 40 notification session; commit at end of this cycle unblocks sync.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -40,15 +40,19 @@ Thirty-nine cycles/responses run. **System: ⚠️ Drift.** PR #16 still open �
 
 - **2026-05-11 — Dirty tree (Pulse operational writes). CLOSED iter 16.** Pattern: 13 consecutive cycles (iters 3–15) left cycle-journal.md and MEMORY.md uncommitted, blocking sync. Permanent fix: `6b6284a` ("Phase D2: shared inbox watcher + cost capture + cycle auto-commit") added auto-commit step to `run_cycle.sh` — commits Pulse-owned files after each successful cycle. Landed ~2 days after G-rule first fired (iter 4). Implemented by Larry (committed 2026-05-11 15:52 MDT). **Confirmed resolved** — iter 16 sync.json shows success, commit e2e5f79, first clean A+B checks since iter 2.
 
+- **2026-05-15 — gh pr merge allowlist. CLOSED iter 41.** Pattern: `enable-pr-auto-merge` always-fix blocked by session permissions for 5 consecutive cycles (iters 33, 34, 35, 39, and attempted in 41 before allowlist confirmed). G-rule fired iter 35 → Beacon relay iters 36–40 → PR #21 merged 12:46Z May 15 → first successful always-fix iter 41 (PR #16 merged 16:39Z). Permanent fix: `agents/pulse/.claude/settings.json` with `Bash(gh pr merge:*)` + `Bash(git branch:*)`. **Closed.**
+
 - **2026-05-15 — D3.5 infrastructure decommission. CLOSED iter 35.** Pattern: 4 services (ourliberty-orchestrator, ourliberty-telegram-webhook, ourliberty-github-webhook, ourliberty-merge-watcher.timer) showed as inactive every cycle from iter 23 onward (12 consecutive, iters 23–34). Permanent fix: PR #18 "pulse: close iter 23b — codify D3.5 active-set + decommissioned services" merged 2026-05-15T05:51Z. `runbooks/cycle-prompt.md` Check C codifies the 6-unit active set + 4 decommissioned services as explicit "do not escalate" exclusion list. iter 23b escalation marked resolved. **Closed. No further tracking needed.**
 
 ## Pending watch items (not yet patterns)
 
 - **2026-05-15 — Pulse Check I (optimization mode) spec in flight.** PR #20 "docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)" (forge/beacon-specs-ledger-pulsei-001) open. Once merged, review PR contents and update cycle-prompt.md to include Check I. Do not add Check I to the suite until the spec is landed and reviewed.
 
-- **2026-05-15 — gh pr merge session allowlist fix: pipeline stalled at Beacon→Forge dispatch.** Beacon processed pulse-approve-gh-pr-merge-allowlist-build-20260515T100000Z (02:52Z May 15, iter 38) and generated APPROVAL_REQUEST as TEXT output only — never wrote dispatch file to ~/agents/inboxes/forge/. Forge inbox unmodified since 02:42Z (pre-Beacon completion). Root cause: Beacon described the dispatch but didn't execute Write tool call. Iter 39 re-dispatched to Beacon (cycle-fix-allowlist-forge-redispatch-20260515T141600Z.json) asking Beacon to use Write tool explicitly. Close this watch item when cycle-actions.jsonl shows result=success for enable-pr-auto-merge.
+- **2026-05-15 — Stuck automated cycle: G-rule dispatched (iter 41).** 3rd occurrence (iters 8, 39, 41 — PID 279213, 2h17m, 3.5MB RSS, Ss state). Dispatch to Beacon: `cycle-fix-stuck-cycle-watchdog-20260515T170000Z.json` (dedup_identity=cycle-fix:stuck-cycle-watchdog). Proposed fix: `timeout 1800` wrapper around `claude --print` in run_cycle.sh + lock cleanup in ERR/EXIT traps + log line on timeout. Close this watch item when cycle-actions.jsonl shows no stuck cycle for 5+ consecutive automated runs.
 
-- **2026-05-15 — Beacon dispatch gap: text output vs file write.** Beacon sometimes generates downstream dispatch JSON as TEXT in its result field instead of using the Write tool to write to ~/agents/inboxes/<agent>/. Confirmed once (iter 38, allowlist fix). Text output is not processed by the inbox watcher. Watch for recurrence across other Beacon tasks. If recurs, dispatch to Beacon with behavioral correction: downstream dispatches MUST use Write tool, not just text output.
+- **CLOSED 2026-05-15 — gh pr merge session allowlist fix.** PR #21 "Pulse: add gh pr merge + git branch to project-scoped settings allowlist" merged 12:46Z. Always-fix succeeded first use (iter 41, PR #16 merged). `agents/pulse/.claude/settings.json` now has `Bash(gh pr merge:*)` and `Bash(git branch:*)`.
+
+- **2026-05-15 — Beacon dispatch gap: text output vs file write — corrected.** Beacon generated downstream dispatch as text (not Write tool call) in iter 38. Confirmed 1 occurrence; resolved in iter 40 via explicit Write-tool-instruction redispatch. If recurs, dispatch behavioral correction to Beacon: downstream dispatches MUST use Write tool, not just text output.
 
 ## Recurring patterns I've decided NOT to promote (and why)
 

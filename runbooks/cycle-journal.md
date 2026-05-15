@@ -4,6 +4,59 @@
 
 ---
 
+## Iteration 41 — 2026-05-15 ~11:00 MDT (interactive)
+
+**Health:** ⚠️ Drift (dirty tree; stuck automated cycle; PR #16 fixed this cycle)
+**Found:**
+- **(A) Repo discipline: dirty tree.** Session gitStatus: branch=main. agents/pulse/MEMORY.md staged; runbooks/cycle-actions.jsonl and runbooks/cycle-journal.md unstaged-modified. Root cause: iter 40 notification session wrote operational files without committing. Sync.json confirms: status=error, "Uncommitted changes in working tree", commit=d445647. Will commit at end of cycle. ⚠️
+- **(B) Sync health: error.** Last_sync=2026-05-15T16:36:47Z, status=error, "Uncommitted changes in working tree". Directly caused by Check A. Will self-heal after commit. ⚠️
+- **(C) Agent liveness: nominal.** All 6 units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/: 2 files unchanged (iter-35 rejected dispatch + notify-pulse-cost-note-002). pulse/.invalid/: 3 files unchanged (d2-reject, d25-reject, watchdog-alert-1778648185). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: drift resolved for PR #16; PR #20 within window.**
+  - PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" — MERGED at 2026-05-15T16:39:06Z this cycle via `gh pr merge 16 --auto --squash`. Always-fix succeeded (first success after 5 blocked cycles: 33, 34, 35, 39; PR #21 allowlist landed between iter 40 and iter 41). ✅
+  - PR #20 "docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)" (forge/beacon-specs-ledger-pulsei-001) — open, reviewDecision="", ~10h old, within 24h Mirror review window. Mirror outbox empty (no review result yet). ✅
+- **(F) Concurrency: automated cycle stuck.** PID 279213, elapsed 2h17m, 3.5MB RSS, Ss state. Lock modified 10:36 MDT (> 30 min → stale per spec). Matches iter 8 and iter 39 signatures exactly. Interactive session overrides per established precedent. **G-rule threshold met (3rd occurrence)** — dispatched permanent fix proposal to Beacon. ⚠️
+- **(H) Forge digest:** Shipped since iter 40: PR #21 ("Pulse: add gh pr merge + git branch to project-scoped settings allowlist", merged 12:46Z MDT), PR #22 ("beacon: migrate MEMORY.md to persistent mount; CLAUDE.md + TOOLS.md updated", merged 15:59Z), PR #23 ("D3.5 5d-followup-2: fix Mirror review-request gap after marker-error-retry build", merged 16:15Z). Open: PR #20 (forge/beacon-specs-ledger-pulsei-001, 10h, Ledger + Pulse Check I specs, within window). ✅
+
+**Did:**
+- Always-fix `enable-pr-auto-merge` on PR #16: `gh pr merge 16 --repo Larry-Yatch/ourliberty-agent-core --auto --squash` — **SUCCESS** (merged at 16:39:06Z). Logged to cycle-actions.jsonl. ✅
+- G-rule dispatch to Beacon: `cycle-fix-stuck-cycle-watchdog-20260515T170000Z.json` (dedup_identity=cycle-fix:stuck-cycle-watchdog). Proposed fix: `timeout 1800` wrapper around `claude --print` in run_cycle.sh + lock cleanup in ERR/EXIT traps + log line on timeout.
+
+**Escalated:** Nothing new. Stuck cycle is G-rule routed to Beacon, not a Larry escalation (pattern well-understood, fix proposed).
+
+**Forge:** shipped 3 since iter 40 (PR #21, #22, #23); 1 open (PR #20, 10h, within Mirror window). PR #16 merged this cycle.
+
+**Patterns:**
+- **`enable-pr-auto-merge` blocked → RESOLVED.** PR #21 (allowlist fix) landed; `gh pr merge` now succeeds without per-session approval. Pipeline: iter 35 G-rule → iters 36–40 Beacon relay → PR #21 merged iter 41 → first successful always-fix this cycle. Watch item CLOSED.
+- **Stuck automated cycle: 3rd occurrence (iters 8, 39, 41).** G-rule triggered. Dispatched to Beacon: `cycle-fix-stuck-cycle-watchdog-20260515T170000Z.json`. Proposed fix: timeout 1800s + lock cleanup + log line in run_cycle.sh.
+- Dirty tree from interactive sessions: 3rd occurrence as a findable issue (iter 39 fixed it with commit, iter 40 notification re-dirtied it). Root cause unchanged — interactive sessions don't auto-commit. Operational writes committed at end of this cycle as mitigation.
+- PR #20 (Pulse Check I spec): still open. Do not add Check I to cycle suite until PR merges.
+
+**Learned:** PR #21 allowlist fix confirmed working — `gh pr merge` now executes without per-session approval prompt. Stuck cycle G-rule proposal sent to Beacon (Pulse→Forge blocked per HARD_TOPOLOGY; Beacon relays). MEMORY.md updating: close "gh pr merge allowlist" watch item, add stuck-cycle G-rule as pending watch.
+
+---
+
+## Iteration 40 — 2026-05-15 ~14:30 MDT (result-notification from Beacon)
+
+**Health:** ⚠️ Drift (allowlist pipeline progressing — Forge preflight now confirmed in-flight)
+**Found:**
+- **(Result) Beacon redispatch SUCCESS.** Beacon completed `cycle-fix-allowlist-forge-redispatch-20260515T141600Z.json` (iter 39 redispatch). Dispatch file written and validated at `~/agents/inboxes/forge/cycle-fix-allowlist-forge-preflight-20260515T141600Z.json`. task_id=`pulse-allowlist-gh-pr-merge-001`, source=beacon, phase=preflight, target_repo=ourliberty-agent-core, dedup_identity=`cycle-fix:gh-pr-merge-allowlist-forge-build`, prompt=2855 chars. Iter 38 gap (Beacon text-output instead of file write) is closed. Forge will run preflight for `agents/pulse/.claude/settings.json` allowlist PR.
+- **(E) PR #16 and #20 status unchanged.** No new PR checks this cycle; full check suite deferred — notification-only invocation. PR #16 still requires Larry terminal merge; PR #20 within Mirror review window.
+
+**Did:** Nothing — result-notification only per notification protocol.
+
+**Escalated:** Nothing new. Iter 39 [yellow] "allowlist pipeline stalled" is partially resolved (redispatch succeeded; now awaiting Forge preflight result). Iter 39 [yellow] "automated cycle stuck" — no update this cycle.
+
+**Forge:** Preflight now confirmed in-flight for `agents/pulse/.claude/settings.json`. PR #16 and #20 still open (unchanged from iter 39).
+
+**Patterns:**
+- **Beacon dispatch gap (text vs file write) — iter 38 gap confirmed, iter 39 corrected, iter 40 resolved.** Beacon described the dispatch in iter 38 but did not execute Write tool. Redispatch with explicit Write tool instruction (iter 39) succeeded. Pattern: 1 confirmed occurrence; redispatch protocol works. Watch for recurrence.
+- `enable-pr-auto-merge` allowlist pipeline: iter 35 G-rule → iters 36–37 Beacon relay → iter 38 gap → iter 39 redispatch → iter 40 confirmed delivery. Next: Forge preflight result.
+
+**Learned:** Redispatch approach (explicit Write tool instruction to Beacon) resolved the text-output gap. Iter 38 failure was execution gap, not understanding gap. MEMORY.md updated to reflect pipeline status.
+
+---
+
 ## Iteration 39 — 2026-05-15 ~08:16 MDT (interactive)
 
 **Health:** ⚠️ Drift
