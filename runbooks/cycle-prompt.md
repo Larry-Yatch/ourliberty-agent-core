@@ -69,7 +69,9 @@ Checks:
 
 #### C. Agent process liveness
 
-For each agent in the active set (currently `beacon`; eventually `forge`, `mirror`, `pulse`, `aide`):
+For each unit in the active set — the 4 agent bots `beacon`, `forge`, `mirror`, `pulse` plus the 2 infra units `ourliberty-inbox-watcher.service` and `ourliberty-cycle.timer` (`aide` joins when Phase F brings up the EA agent):
+
+**Decommissioned — do not escalate as "down":** `ourliberty-orchestrator`, `ourliberty-telegram-webhook`, `ourliberty-github-webhook`, `ourliberty-merge-watcher.timer`. Decommissioned 2026-05-12 in the D3.5 `watchdog.py` adapter rewrite; confirmed intentional by Larry 2026-05-15.
 
 ```
 Expected: tmux session OR systemd unit named ourliberty-<agent>-bot active.
