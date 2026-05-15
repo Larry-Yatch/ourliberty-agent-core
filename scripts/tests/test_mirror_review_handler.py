@@ -165,6 +165,63 @@ class ParseMirrorMarkerTest(unittest.TestCase):
         with self.assertRaises(mrh.MalformedMirrorMarker):
             mrh.parse_mirror_marker(response)
 
+    def test_bare_review_pass_keyword_raises_diagnostic(self):
+        # D3.5 5d-followup (auto-merge-gap-pr16-001): the PR #16 failure
+        # shape. Mirror ended her response with bare `REVIEW_PASS` on its
+        # own line, no `===` delimiters, no JSON. Pre-fix the parser
+        # silently returned (None, None, ...); outbox_notifier fell through
+        # past the auto-merge block and the PR sat unmerged for 7h+.
+        response = (
+            'Verified diff is purely additive; hashes resolve on main.\n'
+            'Shape matches prior doc-only PRs (#13, #14, #15).\n'
+            '\n'
+            'REVIEW_PASS'
+        )
+        with self.assertRaises(mrh.MalformedMirrorMarker) as ctx:
+            mrh.parse_mirror_marker(response)
+        msg = str(ctx.exception)
+        self.assertIn('Bare marker keyword', msg)
+        self.assertIn('REVIEW_PASS', msg)
+        self.assertIn('=== REVIEW_PASS ===', msg)
+
+    def test_bare_review_revision_keyword_raises_diagnostic(self):
+        response = 'Found a missing-validation issue.\nREVIEW_REVISION\n'
+        with self.assertRaises(mrh.MalformedMirrorMarker) as ctx:
+            mrh.parse_mirror_marker(response)
+        self.assertIn('Bare marker keyword', str(ctx.exception))
+        self.assertIn('REVIEW_REVISION', str(ctx.exception))
+
+    def test_bare_keyword_with_trailing_whitespace_raises(self):
+        # Trailing whitespace / newlines around the bare keyword must not
+        # let it slip past the detector — Mirror's outputs commonly end
+        # with a newline.
+        response = 'Reviewed.\n\n  REVIEW_PASS  \n\n'
+        with self.assertRaises(mrh.MalformedMirrorMarker):
+            mrh.parse_mirror_marker(response)
+
+    def test_keyword_mid_sentence_does_not_trigger_bare_check(self):
+        # Defensive: a marker keyword appearing inside narrative prose
+        # ("I considered REVIEW_REVISION but...") must NOT trip the bare
+        # check — it isn't alone on its line. Without the marker block,
+        # this is just chat-mode output and should return (None, None, ...).
+        response = (
+            'I considered REVIEW_REVISION here but the diff is clean, '
+            'so this would be REVIEW_PASS territory.'
+        )
+        mtype, payload, _ = mrh.parse_mirror_marker(response)
+        self.assertIsNone(mtype)
+        self.assertIsNone(payload)
+
+    def test_well_formed_marker_with_keyword_above_not_misdetected(self):
+        # Regression guard: when a properly-formed marker block IS present,
+        # the bare-keyword detector must not fire on the keyword inside the
+        # `=== KEYWORD ===` opener (because the strict regex matched first
+        # and the bare-keyword check only runs on the no-match branch).
+        response = 'Narrative above.\n\n' + _pass_marker()
+        mtype, payload, _ = mrh.parse_mirror_marker(response)
+        self.assertEqual(mtype, 'review_pass')
+        self.assertIsNotNone(payload)
+
     def test_invalid_json_raises(self):
         response = (
             '=== REVIEW_PASS ===\n'
