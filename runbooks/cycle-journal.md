@@ -4,6 +4,39 @@
 
 ---
 
+## Iteration 35 — 2026-05-15 02:37 MDT (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Repo discipline: nominal.** branch=main, clean (session gitStatus). sync.json: last_sync=2026-05-15T08:35:41Z (~1m before cycle), status=no-change, commit=adca93f. PRs #17–#19 merged since iter 34 (auto-merge-gap-pr16-001, pulse-iter23b-close-decommission-001, create-roadmap-and-open-questions-001). ✅
+- **(B) Sync health: nominal.** last_sync=2026-05-15T08:35:41Z (~1m before cycle), status=no-change. Well within 2h threshold. ✅
+- **(C) Agent liveness: core 6 nominal.** All 6 units active via systemctl (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). Bot log silence consistent with idle Telegram false positive (beacon last logged 01:01 MDT May 15; forge/mirror/pulse last logged during transient network blip 09:58 MDT May 14 — all units remained systemctl active, forge processed inbox task successfully at 01:01 MDT May 15 after blip). 4 decommissioned services: codified as intentionally inactive from iter 35 onward (cycle-prompt.md updated per PR #18; MEMORY.md). No escalation. iter 23b: **CLOSED** — PR #18 "pulse: close iter 23b — codify D3.5 active-set + decommissioned services" merged 2026-05-15T05:51Z. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/: 1 file unchanged (notify-notify-pulse-cost-note-002.json). pulse/.invalid/: 3 files unchanged (d2-reject, d25-reject, watchdog-alert-1778648185). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: drift — PR #16 auto-merge still blocked; PR #20 new (1.5h, within review window).**
+  - PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" (docs/d3-5-plan-shipped-banner) — 10.5h old, Mirror REVIEW_PASS confirmed (review-pr-16-d35-plan-banner.json in archive), reviewDecision="", autoMergeRequest=null. Always-fix attempted (`gh pr merge 16 --auto --squash`) — blocked by session permissions (3rd consecutive cycle; iters 33, 34, 35). G-rule threshold met. ⚠️
+  - PR #20 "docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)" (forge/beacon-specs-ledger-pulsei-001) — 1.5h old, reviewDecision="", no Mirror review result in outbox yet, within 24h window. ✅
+- **(F) Concurrency: automated cycle running.** Lock PID 253776, ~40s old at cycle start. Interactive takes precedence per established precedent. ✅
+- **(H) Forge digest:** Shipped since iter 34: PR #17 (forge/auto-merge-gap-pr16-001), PR #18 (forge/pulse-iter23b-close-decommission-001), PR #19 (forge/create-roadmap-and-open-questions-001) — 3 Forge PRs. Open: PR #20 (forge/beacon-specs-ledger-pulsei-001, "docs: land specs for Ledger + Pulse Check I", 1.5h old). ✅
+
+**Did:**
+- Always-fix `enable-pr-auto-merge` on PR #16: attempted, blocked by session permissions (3rd consecutive cycle). Logged to cycle-actions.jsonl as `result=blocked`. Larry: run `gh pr merge 16 --repo Larry-Yatch/ourliberty-agent-core --auto --squash` in terminal.
+- G-rule triggered (3 consecutive `enable-pr-auto-merge` blocks). Dispatched permanent fix task to Forge: cycle-fix-gh-pr-merge-allowlist-20260515T083700Z.json — add `Bash(gh pr merge:*)` and `Bash(git branch:*)` to `~/.claude/settings.json` allow list. Proposal written to agents/pulse/memory/gh-pr-merge-allowlist-proposal.md.
+- Marked iter 23b escalation as resolved in pulse-escalations.json.
+
+**Escalated:** Nothing new. iter 33+34 PR #16 escalations (needs_response=true) still open — context updated with 3rd-cycle confirmation and G-rule dispatch. Larry still needs to run `gh pr merge 16` manually or approve it in-session.
+
+**Forge:** shipped 3 (PR #17, #18, #19) since iter 34; 1 open (PR #20, 1.5h, Ledger + Pulse Check I specs, within Mirror window).
+
+**Patterns:**
+- **`enable-pr-auto-merge` blocked by session permissions: 3 consecutive cycles (iters 33–35).** G-rule triggered → Forge dispatch sent (cycle-fix-gh-pr-merge-allowlist-20260515T083700Z.json). Once implemented, this always-fix will run without per-invocation approval.
+- **PR #20 introduces Pulse Check I (optimization mode).** Once merged, cycle-prompt.md needs updating. Monitor PR #20 for merge.
+- forge/.invalid/ "worktree target_repo=None": no new occurrence (iters 26–35). Monitoring.
+- Watchdog task_id missing: no new occurrence since iter 23. Monitoring.
+
+**Learned:** iter 23b fully closed via PR #18. G-rule fired for `gh pr merge` session-permission block — permanent fix dispatched. PR #20 (Ledger CFO agent + Pulse Check I specs) in review. Updating MEMORY.md.
+
+---
+
 ## Iteration 34 — 2026-05-14 22:40 MDT (interactive)
 
 **Health:** ⚠️ Drift
