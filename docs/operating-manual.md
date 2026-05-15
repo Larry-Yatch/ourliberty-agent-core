@@ -269,6 +269,7 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-heal-*.timer` → `.service` (×7) | Self-healing healers (D2.5) — abandoned-inbox-tasks, blocked-inbox-age, empty-inbox-files, recovery-already-merged, restart-dedup-obsolete, silent-loop-death, zombie-main-workers. | every 5–15 min each |
 | `ourliberty-cleanup-stale-worktrees.timer` → `.service` (D3-4b) | Daily sweep of `~/agent-worktrees/wt-*` (24h grace; skips in-flight). | every 24h |
 | `ourliberty-dispatch-sentinel.timer` → `.service` (D3 commit 5) | Stall detection — flags inbox tasks > 3h old, in-flight tasks past per-model threshold, leases with stale heartbeats. Disk-only alerts to `~/agents/blackboard/sentinel-alerts.jsonl`. Does NOT kill stalled tasks. | every 10m |
+| `ourliberty-ledger.timer` → `.service` | Ledger weekly cost report (see §10.1). Pure-Python compute via `scripts/ledger_weekly.py`; no LLM in the loop. | weekly, Mon 07:00 UTC |
 
 > **Note on `PrivateTmp`:** the inbox-watcher and outbox-notifier services run with `PrivateTmp=yes` (a default systemd hardening for these services). Each service gets a private `/tmp` namespace that's invisible to host shell + other services + cleanup. Forge's worktrees therefore live at `~/agent-worktrees/`, NOT `/tmp/wt-*` — persistent across service restarts, visible across services, and reachable by the cleanup timer. Both services have `~/agent-worktrees` in `ReadWritePaths`.
 
@@ -690,7 +691,47 @@ Every Claude invocation through the inbox watcher or `/cycle` appends one record
 
 Quick queries (jq one-liners) live in §7 "Watching costs".
 
-The future **Ledger** agent (Phase F+) will roll this up into weekly summaries and flag anomalies. Until she exists, you check it yourself when you want to know.
+The **Ledger** agent (see §10.1 below) rolls this up into a weekly summary every Monday morning, writes a markdown report + JSON sidecar to `~/agents/blackboard/ledger/weekly-YYYY-MM-DD.{md,json}`, and DMs Larry a one-line headline.
+
+### 10.1 The Ledger weekly report
+
+Ledger runs every Monday morning at 07:00 UTC (00:00–01:00 MDT depending on DST) via `ourliberty-ledger.timer` → `ourliberty-ledger.service`. The service wraps `scripts/run_ledger.sh`, which (after a lock + `EMERGENCY_HALT` check) invokes `python3 scripts/ledger_weekly.py`. The Python module is fully deterministic — no LLM is in the loop for the weekly run.
+
+**What he reads:**
+- `~/agents/blackboard/costs.jsonl` — last 7 days of cost rows (window `[week_ending - 7d, week_ending)`).
+- `~/agents/outboxes/<agent>/.archive/<task_id>.json` — per-row `task_type` attribution. Rows with no matching archive get `task_type = "unknown"`.
+- The prior 4 weekly sidecars at `~/agents/blackboard/ledger/weekly-*.json` — for week-over-week delta + σ baselines (suspended until ≥4 weekly windows of history exist).
+
+**What he writes:**
+- `~/agents/blackboard/ledger/weekly-YYYY-MM-DD.md` — human-readable report (total, by-agent, by-task_type, anomalies, top-5).
+- `~/agents/blackboard/ledger/weekly-YYYY-MM-DD.json` — machine-readable sidecar (schema documented in `runbooks/ledger-prompt.md` § "JSON sidecar schema"; consumed by Pulse Check I).
+- `~/agents/blackboard/ledger/ledger-ready-YYYY-MM-DD` — sentinel file Pulse Check I polls before reading the JSON.
+- `runbooks/ledger-journal.md` — one-line entry per run, auto-committed + pushed by `run_ledger.sh`.
+- One alert via `larry_alerts.append_alert(source='ledger', severity='warning', subject='weekly-YYYY-MM-DD', ...)` — delivered to Larry's Telegram via the beacon-bot's 5-min alert sweep.
+
+**Recovery from a missed run.** If the Monday timer was missed (e.g., droplet was off), `Persistent=true` causes the run to fire on next boot. For an ad-hoc rerun:
+
+```bash
+# Default: report for the current Monday
+sudo systemctl start ourliberty-ledger.service
+
+# Or a specific week:
+bash ~/agent-core/scripts/run_ledger.sh
+# (the wrapper passes --week-ending defaulted to current Monday;
+# for arbitrary weeks invoke Python directly)
+python3 ~/agent-core/scripts/ledger_weekly.py --week-ending 2026-05-18
+```
+
+The lock file `~/agents/state/.ledger.lock` prevents overlapping runs (30-min stale threshold). The `larry_alerts` cooldown bucket keyed by `(source, subject=weekly-YYYY-MM-DD)` prevents duplicate DMs even if the run fires twice for the same week.
+
+**Verifying the timer:**
+
+```bash
+systemctl list-timers ourliberty-ledger.timer
+systemd-analyze calendar 'Mon *-*-* 07:00:00 UTC'
+journalctl -u ourliberty-ledger.service -n 50
+tail -1 ~/agents/blackboard/ledger/weekly-$(date -u -d 'last monday' +%Y-%m-%d).json
+```
 
 ### Anthropic (Claude Code / API)
 
@@ -740,7 +781,8 @@ The future **Ledger** agent (Phase F+) will roll this up into weekly summaries a
 | **`git pull`** | Download new commits from GitHub into your local clone. |
 | **Beacon** | Strategy/Architect agent. First agent in the system. Personality defined in `agents/beacon/*.md`. |
 | **Forge / Mirror / Pulse** | Live agents (D1 activation). Personality in `agents/<name>/*.md`, bot under systemd. |
-| **Aide / Scout / Compass / Ledger** | Planned future agents. Personas not yet authored. |
+| **Ledger** | CFO / cost-intelligence agent (v1 shipped). Runs weekly Mon 07:00 UTC, writes report + JSON sidecar to `~/agents/blackboard/ledger/`, DMs Larry. See §10.1. |
+| **Aide / Scout / Compass** | Planned future agents. Personas not yet authored. |
 | **HANDSHAKE** | The JSON schema for tasks that flow between agents via inboxes. Lives at `shared/HANDSHAKE-SCHEMA.json`. Optional fields documented there; required ones in `scripts/dispatch_validator.py`. |
 | **Inbox / Outbox** | Per-agent directories under `~/agents/{inboxes,outboxes}/<agent>/`. Dropping a JSON task in an inbox triggers the watcher to run that agent on it. The result lands in the outbox. |
 | **Inbox watcher** | The shared daemon (`ourliberty-inbox-watcher.service`) that polls all four inboxes and runs `claude --print` on valid tasks. |

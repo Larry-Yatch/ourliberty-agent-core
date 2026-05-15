@@ -1,0 +1,36 @@
+[Unit]
+Description=Ourliberty Ledger — weekly cost report (markdown + JSON sidecar) + headline DM
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/ledger-prompt.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT + auto-commit of the journal
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_ledger.sh
+
+# Weekly run should complete in well under a minute (deterministic Python, no LLM)
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-ledger
+
+# Hardening (matches ourliberty-cycle.service pattern)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
