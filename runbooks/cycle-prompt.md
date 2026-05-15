@@ -168,10 +168,10 @@ When you propose a permanent fix:
 3. Note the proposal (and the inbox file path) in the journal entry
 
 Routing rules:
-- Pattern is a runtime bug, missing handler, infra issue → **Forge** with a draft spec
+- Pattern is a runtime bug, missing handler, infra issue → **Beacon** with a draft spec (Beacon relays to Forge — Pulse→Forge is blocked by HARD_TOPOLOGY in routing_validator.py; Pulse can only dispatch to Beacon)
 - Pattern needs a strategic / design call (new spec, architecture change, new agent) → **Beacon**; she'll DM Larry for approval before dispatching downstream
-- Pattern is a review-checklist gap → **Mirror**
-- Pattern is a check you should run yourself → update your auto-fix allow-list (PR via Forge)
+- Pattern is a review-checklist gap → **Beacon** with the pattern (Beacon relays to Mirror)
+- Pattern is a check you should run yourself → update your auto-fix allow-list via **Beacon** (Beacon relays implementation to Forge)
 
 ### 3. Auto-fix allow-list (canonical)
 

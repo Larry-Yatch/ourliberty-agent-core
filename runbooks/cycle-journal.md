@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 36 — 2026-05-15 (dead-letter response, not a scheduled cycle)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(Dead-letter) Forge dispatch from iter 35 rejected by routing validator.** `cycle-fix-gh-pr-merge-allowlist-20260515T083700Z.json` written to `~/agents/inboxes/forge/` in iter 35 was moved to `.invalid/` with reason: `routing: route pulse -> forge not allowed (allowed from pulse: ['beacon'])`. The HARD_TOPOLOGY in `routing_validator.py` (line 54) restricts Pulse to dispatching only to Beacon. Pulse→Forge is explicitly blocked (test at line 362 asserts this). cycle-actions.jsonl iter 35 recorded `result=success` for the dispatch (file-write succeeded) but delivery failed at validation. That entry is misleading — the action did not complete.
+- **(E) PR #16 still open.** `docs(d3-5-plan): mark D3.5 as shipped + closed` — now > 15h since Mirror REVIEW_PASS, autoMergeRequest=null, reviewDecision="", mergeable=UNKNOWN (GitHub recomputing). Session permissions still block the always-fix. Larry still needs to run `gh pr merge 16 --repo Larry-Yatch/ourliberty-agent-core --auto --squash` in terminal. No change from iter 35.
+- **(E) PR #20 still open.** `docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)` — within 24h Mirror review window as of iter 35 (~13h ago). Still nominal.
+
+**Did:**
+- Dispatched corrected task to **Beacon** (not Forge): `cycle-fix-gh-pr-merge-allowlist-beacon-20260515T090000Z.json`. Beacon is the correct recipient per routing topology; she will relay to Forge + get Larry approval before implementation.
+- Noted misleading `result=success` in iter 35 cycle-actions.jsonl — dispatch wrote the file but the task was never delivered. Logged correction in cycle-actions.jsonl.
+
+**Escalated:** Continuing iters 33–35 PR #16 escalation (needs_response=true). No new escalation.
+
+**Forge:** 0 new since iter 35.
+
+**Patterns:**
+- **NEW (structural): Pulse→Forge dispatch route is architecturally blocked.** HARD_TOPOLOGY in routing_validator.py line 54 restricts Pulse to `{'beacon'}`. Any cycle-fix dispatch must go through Beacon, not Forge directly. MEMORY.md updated. cycle-prompt.md Section 7 routing rules are accurate ("code shape → Forge") but the intermediate step (Pulse→Beacon→Forge) was not explicit. Adding to MEMORY.md.
+- `enable-pr-auto-merge` blocked by session permissions: ongoing (iters 33–36). Corrected Forge dispatch now routed via Beacon.
+
+**Learned:** Pulse can only dispatch to Beacon per HARD_TOPOLOGY. cycle-prompt.md routing rules (G section) are accurate in spirit but missed that Pulse→Forge is blocked at the validator layer. The correct path is always Pulse→Beacon→Forge. MEMORY.md updated.
+
+---
+
 ## Iteration 35 — 2026-05-15 02:37 MDT (interactive)
 
 **Health:** ⚠️ Drift
