@@ -2126,6 +2126,56 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # Still exactly one review-request, despite two process_outbox calls.
         self.assertEqual(len(review_tasks), 1)
 
+    def test_pr20_marker_error_retry_build_dispatches_review(self):
+        """5d-followup-2: post-marker-error-retry build envelope where Forge's
+        result narrates status bullets and puts `PR opened:` on its own line
+        at the END of the result (PR #20's verbatim shape from
+        outboxes/forge/.archive/beacon-specs-ledger-pulsei-001.2.json) now
+        dispatches the Mirror review-request. Prior \\A anchor silently
+        dropped this — Beacon got her notify but Mirror never started review.
+        """
+        # Verbatim narrative-then-URL shape from the failed PR #20 dispatch.
+        # The build envelope carries the standard `phase: build` + `agent:
+        # forge` + `source: beacon` regardless of whether it followed a
+        # marker-error retry — by the time process_outbox sees it, the
+        # retry-origin metadata is irrelevant to this code path.
+        body = self._build_outbox(
+            task_id='beacon-specs-ledger-pulsei-001',
+            branch='forge/beacon-specs-ledger-pulsei-001',
+            result=(
+                'Build phase contract is already satisfied on this branch:\n'
+                '- Branch `forge/beacon-specs-ledger-pulsei-001` pushed to origin\n'
+                '- Commit `62edc9c`: `docs: add specs for Ledger (CFO agent) '
+                'and Pulse Check I (optimization mode)`\n'
+                '- Files added: `agents/beacon/specs/ledger.md` (+151), '
+                '`agents/beacon/specs/pulse-check-i.md` (+94)\n'
+                '- PR #20 open against main, awaiting Mirror\n\n'
+                'PR opened: https://github.com/Larry-Yatch/'
+                'ourliberty-agent-core/pull/20'
+            ),
+        )
+        f = self._write_outbox(
+            'forge', 'beacon-specs-ledger-pulsei-001.json', body,
+        )
+        on.process_outbox(f)
+        review_tasks = list(
+            (on.INBOXES_ROOT / 'mirror').glob('review-*.json')
+        )
+        self.assertEqual(len(review_tasks), 1)
+        review = json.loads(review_tasks[0].read_text())
+        self.assertEqual(review['task_id'], 'beacon-specs-ledger-pulsei-001')
+        self.assertEqual(
+            review['pr_url'],
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/20',
+        )
+        self.assertEqual(review['phase'], 'review')
+        self.assertEqual(review['source'], 'beacon')
+        # Default routing notify to Beacon also fires (additive dispatch)
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(len(beacon_notifies), 1)
+
 
 # ============================================================================
 # D3.5 commit 5a — Post-review fixes (C-1, M-1, M-2, M-3, m-2)
@@ -2385,8 +2435,11 @@ class MirrorMarkerErrorReplyChatIdTest(unittest.TestCase):
 
 
 class PrUrlRegexAnchoredTest(unittest.TestCase):
-    """m-2 fix: _PR_URL_RE is anchored to start-of-string so a stale PR URL
-    discussed in narrative doesn't false-match before the real one."""
+    """m-2 fix + 5d-followup-2 relaxation: _PR_URL_RE is anchored to start-
+    of-LINE (re.MULTILINE) so a `PR opened:` URL on its own line wins from
+    any position in the result, while a mid-paragraph stale URL still
+    doesn't false-match. PR #20's narrative-then-URL build response shape
+    is the canonical case that motivated the line-anchor relaxation."""
 
     def test_pr_url_at_start_extracted(self):
         result = (
@@ -2409,8 +2462,9 @@ class PrUrlRegexAnchoredTest(unittest.TestCase):
         )
 
     def test_pr_url_only_in_narrative_returns_none(self):
-        # Forge wrote a narrative that DISCUSSES a stale URL but didn't
-        # actually open a PR. Anchored regex must NOT match this.
+        # Forge discussed a stale URL mid-paragraph without ever putting
+        # `PR opened:` at line-start. The line anchor must NOT match this —
+        # the m-2 false-match protection is preserved across the relaxation.
         result = (
             'I considered re-using last week\'s branch where '
             'PR opened: https://github.com/x/y/pull/99 — but instead, '
@@ -2418,18 +2472,41 @@ class PrUrlRegexAnchoredTest(unittest.TestCase):
         )
         self.assertIsNone(on._extract_pr_url_from_build_result(result))
 
-    def test_stale_url_before_real_url_first_one_wins_only_at_start(self):
-        # Worst-case: Forge starts with narrative discussing a stale URL,
-        # then writes the real "PR opened:" later. Anchored regex returns
-        # None — the build response did NOT follow the contract (URL must
-        # be at start). Default routing fallback handles it; Beacon sees
-        # the result and decides.
+    def test_narrative_before_real_url_at_line_start_matches(self):
+        # 5d-followup-2: Forge's narrative-then-URL shape (PR #20's actual
+        # build response) now matches — the URL is on its own line at line
+        # start, just preceded by status bullets. The strict-string anchor
+        # used to silently drop this, breaking the Mirror review dispatch.
         result = (
             'Briefly considered https://github.com/x/y/pull/99 but rejected.\n'
             'PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/'
             'pull/77'
         )
-        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/77',
+        )
+
+    def test_pr_20_envelope_shape_matches(self):
+        # Verbatim shape of PR #20's archived Forge build outbox result.
+        # Narrative paragraph with status bullets, then `PR opened: <url>`
+        # on its own line at the end. This dispatch missed Mirror review
+        # because of the start-of-string anchor; the fix must catch it.
+        result = (
+            'Build phase contract is already satisfied on this branch:\n'
+            '- Branch `forge/beacon-specs-ledger-pulsei-001` pushed to origin\n'
+            '- Commit `62edc9c`: `docs: add specs for Ledger (CFO agent) and '
+            'Pulse Check I (optimization mode)`\n'
+            '- Files added: `agents/beacon/specs/ledger.md` (+151), '
+            '`agents/beacon/specs/pulse-check-i.md` (+94)\n'
+            '- PR #20 open against main, awaiting Mirror\n\n'
+            'PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/'
+            'pull/20'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/20',
+        )
 
     def test_empty_result_returns_none(self):
         self.assertIsNone(on._extract_pr_url_from_build_result(''))
@@ -4682,27 +4759,34 @@ class PRUrlRegexAcceptsBothPrefixesTest(unittest.TestCase):
             'https://github.com/x/y/pull/8',
         )
 
-    def test_pr_opened_at_paragraph_2_still_does_not_match(self):
-        """Anchoring is still enforced — Forge can't put narrative first.
-        This is the failure mode of the original 5c fill-in dispatch:
-        her response started with 'Commit X pushed...' and put the prefix
-        on line 3. The regex correctly rejects."""
+    def test_pr_opened_at_paragraph_2_now_matches(self):
+        """5d-followup-2: line-anchor relaxation. Forge's lenient build-phase
+        shape (status narrative then URL on its own line) now wins. This was
+        the silent-drop failure mode for the 5c fill-in dispatch and PR #20's
+        sibling — both had the URL on a non-first line and missed Mirror
+        review under the prior \\A anchor."""
         result = (
             "Commit `8e5c692` pushed to `forge/task-001`, the head branch "
             "of PR #8 (OPEN).\n\nPR opened: https://github.com/x/y/pull/8"
         )
-        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/8',
+        )
 
-    def test_pr_updated_at_paragraph_2_still_does_not_match(self):
-        """Symmetric anchoring check for the `updated` alternative."""
+    def test_pr_updated_at_paragraph_2_now_matches(self):
+        """Symmetric line-anchor check for the `updated` alternative."""
         result = (
             "Commit added to existing PR.\n\n"
             "PR updated: https://github.com/x/y/pull/8"
         )
-        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/8',
+        )
 
     def test_pr_opened_with_leading_whitespace_matches(self):
-        """\\A allows leading whitespace per the regex (defensive)."""
+        """Regex allows leading horizontal whitespace on the prefix line."""
         result = '   PR opened: https://github.com/x/y/pull/1\n'
         self.assertEqual(
             on._extract_pr_url_from_build_result(result),
@@ -4722,15 +4806,20 @@ class PRUrlRegexAcceptsBothPrefixesTest(unittest.TestCase):
     def test_newline_between_PR_and_verb_does_not_match(self):
         """HIGH-2 (PR #10 review): the verb must be on the SAME line as PR.
         `\\s` would have accepted `PR\\nopened: <url>` which violates the
-        CLAUDE.md FIRST-LINE-unconditional discipline contract. Tighten to
-        `[ \\t]` so the regex matches the discipline rule."""
+        CLAUDE.md discipline contract. Tightened to `[ \\t]` so the regex
+        matches the discipline rule."""
         result = 'PR\nopened: https://github.com/x/y/pull/1'
         self.assertIsNone(on._extract_pr_url_from_build_result(result))
 
-    def test_newline_before_PR_does_not_match(self):
-        """Leading newlines before `PR` also violate first-line discipline."""
+    def test_leading_blank_line_then_PR_matches(self):
+        """5d-followup-2: with the line-anchor relaxation, a leading blank
+        line before `PR opened:` is fine — the URL is still on its own line
+        at line-start. Symmetric with the narrative-before-URL case."""
         result = '\nPR opened: https://github.com/x/y/pull/1'
-        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/1',
+        )
 
 
 # -------------------- D3.5 5c-followup-3 (audit 3.A + 5.A) --------------------

@@ -120,13 +120,25 @@ MAX_MARKER_ERROR_RETRIES = 3
 _BEACON_REPLAN_INBOUND_INTENTS = frozenset({'review-escalate'})
 
 # D3.5 commit 5a — extract Forge's PR URL from a build-phase outbox result.
-# Forge's CLAUDE.md mandates the build response START with EITHER
+# Forge's CLAUDE.md mandates the build response include either
 # `PR opened: <url>` (new PR opened this dispatch) OR `PR updated: <url>`
 # (commit added to a PR that was already open — e.g., a replan iteration,
 # a fill-in dispatch, or any subsequent build on an existing PR's branch).
-# Anchored to start-of-string (with optional leading whitespace) so a PR URL
-# discussed in narrative ("I considered PR opened: <stale-url> from last week")
-# doesn't false-match before the real URL. m-2 review fix.
+# Anchored to start-of-LINE (re.MULTILINE) so a PR URL discussed mid-paragraph
+# ("I considered PR opened: <stale-url> from last week") doesn't false-match,
+# while still catching a real `PR opened: <url>` line that lands at the end
+# of a narrative paragraph (Forge's lenient build-phase shape: status bullets
+# then the URL on its own line).
+#
+# D3.5 5d-followup-2 (PR #20 sibling): relaxed the anchor from \A (start-of-
+# string) to ^ + re.MULTILINE. The strict start-of-string form matched PR #17's
+# build result (`PR opened:` on line 1) but silently dropped PR #20's build
+# result, which led with narrative ("Build phase contract is already satisfied
+# on this branch:\n- Branch ...") and put `PR opened: <url>` on its own line
+# at the end — causing the Mirror review-request dispatch to be skipped while
+# the default Beacon notify still fired. The m-2 review's mid-paragraph
+# false-match protection is preserved by the line anchor: `i considered PR
+# opened: <stale>` still doesn't match (no line-start prefix).
 #
 # D3.5 5c-followup-2 (Miss #3): added the `updated` alternative. Prior version
 # only matched `PR opened:`, which broke the auto-Mirror-review trigger on
@@ -141,7 +153,8 @@ _PR_URL_RE = re.compile(
     # and the verb DON'T match. `\s+` would let Forge accidentally split
     # `PR\nopened: <url>` across lines and still satisfy the regex even
     # though it violates the CLAUDE.md "FIRST LINE unconditional" rule.
-    r'\A[ \t]*PR[ \t]+(?:opened|updated):[ \t]*(https://github\.com/[^\s]+/pull/\d+)',
+    r'^[ \t]*PR[ \t]+(?:opened|updated):[ \t]*(https://github\.com/[^\s]+/pull/\d+)',
+    re.MULTILINE,
 )
 
 # D3.5 commit 5b — extract Forge's revision-applied summary from a revision-
@@ -1763,10 +1776,15 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
 def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
     """Return the PR URL from a Forge build-phase outbox, or None if absent.
 
-    Phase D3.5 commit 5a. Forge's CLAUDE.md mandates the build response
-    START with `PR opened: <url>`. Returns the first match — narrative
-    text below the URL is not searched. Returns None on empty/None input
-    or no match.
+    Phase D3.5 commit 5a. Forge's CLAUDE.md asks the build response to lead
+    with `PR opened: <url>` / `PR updated: <url>`, but the regex is line-
+    anchored (not string-anchored) per 5d-followup-2 so the URL is accepted
+    on its own line anywhere in the response — Forge's lenient build-phase
+    shape often narrates status bullets and puts the URL at the end. Mid-
+    paragraph URLs ("I considered PR opened: <stale> last week") still don't
+    match — the line anchor preserves the m-2 false-match protection.
+    Returns the first matching line's URL, or None on empty/None input or
+    no match.
     """
     if not isinstance(result_text, str) or not result_text:
         return None
