@@ -4,6 +4,33 @@
 
 ---
 
+## Iteration 33 — 2026-05-14 18:50 MDT
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Repo discipline: nominal.** Session gitStatus: branch=main, clean. sync.json: commit=b8ca8b6 ("docs/operating-manual: add Phase D3.5 commit 5d shipped entry #15"), status=no-change. 4 PRs landed since iter 32 (#12–#15): D3.5 5d feature + docs. ✅
+- **(B) Sync health: nominal.** agent-core-sync.json: last_sync=2026-05-15T00:33:58Z (~12 min before cycle), status=no-change, commit=b8ca8b6. Well within 2h threshold. ✅
+- **(C) Agent liveness: core 6 nominal; 4 D3.5 services still inactive.** beacon, forge, mirror, pulse, inbox-watcher, cycle.timer all active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — 11th consecutive (iters 23–33). iter 23b (needs_response=true) still outstanding. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty (no live tasks). forge/.invalid/: 1 file unchanged (notify-notify-pulse-cost-note-002.json). pulse/.invalid/: 3 files unchanged (d2-reject, d25-reject, watchdog-alert-1778648185). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: notable — PR #16 Mirror REVIEW_PASS 2.5h ago, auto-merge not fired.** PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" (branch: docs/d3-5-plan-shipped-banner, created 21:57Z, MERGEABLE, reviewDecision="", autoMergeRequest=null). Mirror outbox sub-check: review-pr-16-d35-plan-banner.json — REVIEW_PASS at 15:58 MDT (cost=$0.279, exit_code=0). Auto-merge did not fire despite D3.5 5d shipping that feature. Always-fix (`gh pr merge 16 --auto --squash`) attempted but blocked by interactive session permissions. ⚠️
+- **(E sub-check — mirror outbox scan):** review-pr-16-d35-plan-banner.json confirms REVIEW_PASS. Sub-check functioning correctly. ✅
+- **(F) Concurrency: no automated cycle lock at check time.** ✅
+- **(H) Forge digest:** PRs #13 (forge/d35-5d-smoke-1-opmanual-5c-cost) and #14 (forge/d35-5d-smoke-2-cost-budget-docstring) merged since iter 32 — 2 Forge PRs. Also #12 (D3.5 5d main feature, larry/ branch) and #15 (D3.5 5d opmanual entry, larry/ branch) merged. D3.5 fully shipped. 0 open Forge PRs.
+- **State change vs iter 32:** D3.5 commit 5d (auto-merge + EMERGENCY_HALT + cost-budget gate) and docs (#13–#15) landed since iter 32. All of D3.5 is now on main. PR #16 (d3-5-plan-shipped-banner) open 2.5h with Mirror PASS; auto-merge gap noted.
+
+**Did:** Always-fix `enable-pr-auto-merge` on PR #16 attempted — blocked by interactive session permissions (not in pre-approved allowlist). No cycle-actions.jsonl entry (action did not execute). Larry needs to run `gh pr merge 16 --repo Larry-Yatch/ourliberty-agent-core --auto --squash` or approve the command in this session.
+**Escalated:** [yellow] PR #16 auto-merge gap — written to pulse-escalations.json iter 33.
+**Forge:** shipped 2 Forge PRs (#13, #14) + 2 larry/ PRs (#12, #15) since iter 32; 0 open.
+**Patterns:**
+- 4 D3.5 services inactive: 11 consecutive (iters 23–33). Still holding Forge dispatch pending iter 23b response from Larry. No new escalation.
+- forge/.invalid/ "worktree target_repo=None": no new occurrence (iters 26–33). Monitoring.
+- F24 class (prompt too short): no new occurrence since iter 23. Monitoring.
+- Watchdog task_id missing: no new occurrence since iter 23. Monitoring.
+- **D3.5 5d auto-merge gap:** 1st occurrence (PR #16, Mirror REVIEW_PASS 2.5h with no auto-merge). Monitoring — G-rule threshold is 3 occurrences.
+**Learned:** D3.5 fully shipped. Check E sub-check (mirror outbox scan) correctly caught PR #16 Mirror PASS that GitHub reviewDecision="" would have hidden — sub-check validated against a real PR. Auto-merge did not fire despite D3.5 5d; first occurrence. Updating MEMORY.md.
+
+---
+
 ## Iteration 32 — 2026-05-14 14:37 MDT
 
 **Health:** ✅ Nominal
