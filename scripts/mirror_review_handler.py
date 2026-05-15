@@ -136,6 +136,24 @@ _LOOSE_MIRROR_DELIMITER_RE = re.compile(
     r'===\s*(REVIEW_PASS|REVIEW_REVISION|REVIEW_ESCALATE|REVIEW_EMERGENCY_HALT)\s*===',
 )
 
+# D3.5 5d-followup (auto-merge-gap-pr16-001): bare-keyword detector. Mirror
+# can ALSO fail the marker contract by typing a marker keyword as bare prose
+# (e.g. literal "REVIEW_PASS" on its own line) with NO delimiters and NO
+# JSON. The loose-delimiter check above misses this — without any `===`
+# tokens, there is nothing for it to find. Pre-fix, the parser silently
+# returned (None, None, ...) and the outbox notifier fell through to the
+# default routing path, skipping the D3.5 5d auto-merge block. PR #16 hit
+# exactly this shape (Mirror ended her review with bare `REVIEW_PASS`); the
+# PR sat unmerged for 7h+ despite a clean PASS.
+#
+# Match heuristic: a marker keyword alone on a line (any whitespace allowed
+# around it, MULTILINE mode). This avoids false positives from prose that
+# mentions a token mid-sentence ("I considered REVIEW_REVISION but...") —
+# such mentions are never alone on their line.
+_BARE_MIRROR_KEYWORD_RE = re.compile(
+    r'(?m)^\s*(REVIEW_PASS|REVIEW_REVISION|REVIEW_ESCALATE|REVIEW_EMERGENCY_HALT)\s*$',
+)
+
 MARKER_TYPES = (
     'review_pass', 'review_revision', 'review_escalate', 'review_emergency_halt',
 )
@@ -248,6 +266,25 @@ def parse_mirror_marker(
                 f'marker type (see agents/mirror/CLAUDE.md). NOT prose. NOT '
                 f'a sentence. Put your review narrative ABOVE the marker '
                 f'block (Beacon reads it). Put strict JSON INSIDE.'
+            )
+        # D3.5 5d-followup (auto-merge-gap-pr16-001): bare-keyword detector.
+        # If Mirror typed a marker keyword on its own line but omitted the
+        # `=== ... ===` delimiters and JSON entirely, raise so the
+        # marker-error cascade asks her to re-emit. Pre-fix this fell
+        # through to (None, None, ...) and the outbox notifier skipped
+        # auto-merge — exactly the PR #16 failure shape.
+        bare_matches = _BARE_MIRROR_KEYWORD_RE.findall(mirror_response)
+        if bare_matches:
+            kinds = list(dict.fromkeys(bare_matches))
+            raise MalformedMirrorMarker(
+                f'Bare marker keyword(s) found on their own line ({kinds}) '
+                f'with NO `=== ... ===` delimiters and NO JSON payload. A '
+                f'review verdict requires the full block form: '
+                f'`=== {kinds[0]} ===` on one line, a JSON object with the '
+                f'required fields ({sorted(REQUIRED_FIELDS.get(kinds[0].lower(), set()))}) '
+                f'on the next, then `=== END_{kinds[0]} ===`. Put your '
+                f'narrative ABOVE the block, not the bare keyword below it '
+                f'(see agents/mirror/CLAUDE.md).'
             )
         return None, None, mirror_response
 
