@@ -212,3 +212,23 @@ If a bot needs a path it doesn't currently have, edit the `ReadWritePaths=` line
 | `ourliberty-cycle.timer` | Phase D activation | Anthropic API key in .env; first dry-run with Larry watching |
 | `ourliberty-inbox-watcher.service` | Phase D2 activation | None — just enable; relies on existing `scripts/dispatch_lease.py` + `dispatch_validator.py` |
 | `ourliberty-watchdog.timer` | Phase D activation | After cycle has been observed for ≥ 1 day |
+| `ourliberty-ledger.timer` | After build-ledger-001 lands | None — `scripts/ledger_weekly.py` is pure-Python, no extra credentials. First Monday after enable triggers the inaugural run. |
+
+### Ledger (weekly cost report)
+
+After this PR lands:
+
+```bash
+sudo cp ~/agent-core/systemd/ourliberty-ledger.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-ledger.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-ledger.timer
+systemctl list-timers ourliberty-ledger.timer
+
+# Manual smoke (writes a real report for the current Monday):
+sudo systemctl start ourliberty-ledger.service
+journalctl -u ourliberty-ledger.service -n 50
+ls -la ~/agents/blackboard/ledger/
+```
+
+See `docs/operating-manual.md` §10.1 for full ops detail (recovery from missed run, manual `--week-ending` invocation, sentinel contract with Pulse Check I).

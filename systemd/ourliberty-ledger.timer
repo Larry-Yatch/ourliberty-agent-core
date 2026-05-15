@@ -1,0 +1,19 @@
+[Unit]
+Description=Run Ourliberty Ledger weekly cost report every Monday morning
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/ledger-prompt.md
+
+[Timer]
+# Monday 07:00 UTC = 00:00 MDT (summer) / 01:00 MDT (winter).
+# Larry's local timezone is MDT/MST. Fires every Monday morning regardless of
+# DST shift. Server runs UTC; the report's `week_ending` field is always the
+# Monday at 00:00 UTC.
+OnCalendar=Mon *-*-* 07:00:00 UTC
+# Run on next boot if the system was off when a run was due
+Persistent=true
+# Add a small randomized delay (0-5 min) so we don't all-hit external pipes at
+# exactly :00; trivial for a weekly run but matches systemd best practice.
+RandomizedDelaySec=300
+Unit=ourliberty-ledger.service
+
+[Install]
+WantedBy=timers.target
