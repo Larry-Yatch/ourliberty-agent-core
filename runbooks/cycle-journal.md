@@ -4,6 +4,37 @@
 
 ---
 
+## Iteration 42 — 2026-05-15 ~10:44 MDT (result-notification from Beacon: cycle-fix-stuck-cycle-watchdog APPROVAL_REQUEST)
+
+**Health:** (notification session — no full check suite; iter 41 state carried forward)
+**Found:**
+- **(Result) Beacon completed `cycle-fix-stuck-cycle-watchdog-20260515T170000Z.json` — APPROVAL_REQUEST returned.**
+  - Beacon confirmed: `scripts/run_cycle.sh` lives at repo root (not under `agents/pulse/scripts/`). EXIT trap (line 36) already releases lock on any exit via `trap 'rm -f "$LOCK_FILE"; log "lock released"' EXIT`. Real gap: `claude --print` has no timeout, and a hung call holds the lock indefinitely. Distinguishing timeout from generic failure in log is also missing.
+  - Proposed fix: `CYCLE_TIMEOUT_SEC=1800` constant near `LOCK_MAX_AGE_SEC`; `timeout "$CYCLE_TIMEOUT_SEC" claude --print ...` wrapper with `$?` captured immediately (so `set -e` doesn't abort); exit code 124 branch logs `TIMED OUT after 1800s`; lock cleanup preserved via existing EXIT trap.
+  - task_id=`pulse-cycle-timeout-guard-001`, target=forge, target_repo=ourliberty-agent-core (T0), changed_files=[scripts/run_cycle.sh], phase=preflight.
+  - Forge inbox was empty when Pulse checked — Beacon correctly held dispatch pending Pulse approval (no text-output-vs-file-write gap this time). ✅
+
+**Assessment:** APPROVED. Spec is sound:
+  - T0 repo only; reversible; single file touched.
+  - `set -e` concern correctly addressed: capture `$?` immediately so non-zero is consumed before `set -e` sees it.
+  - EXIT trap remains — lock released on timeout via natural script exit.
+  - TIMED OUT log line distinct from generic failure — greppable.
+  - Cost capture and auto-commit skip cleanly on CYCLE_OK=0 (correct behavior on timeout).
+
+**Did:**
+- Approved APPROVAL_REQUEST; dispatch written to Beacon inbox: `pulse-approve-cycle-timeout-guard-20260515T164400Z.json` (dedup_identity=cycle-fix:stuck-cycle-timeout-guard-forge-preflight). Instructed Beacon to write Forge preflight file using Write tool.
+- Logged to cycle-actions.jsonl.
+
+**Escalated:** Nothing.
+
+**Patterns:**
+- Stuck cycle fix: Beacon→Forge pipeline now moving. Beacon held correctly for Pulse approval (good behavior — APPROVAL_REQUEST pattern working as designed). Watch for Forge preflight result.
+- MEMORY.md pending watch item "Stuck automated cycle: G-rule dispatched (iter 41)" updated — approval dispatched, Forge preflight next.
+
+**Learned:** Beacon's APPROVAL_REQUEST gating is functioning correctly — no text-output gap (unlike iter 38). Approval dispatch sent; Beacon will write Forge preflight dispatch file.
+
+---
+
 ## Iteration 41 — 2026-05-15 ~11:00 MDT (interactive)
 
 **Health:** ⚠️ Drift (dirty tree; stuck automated cycle; PR #16 fixed this cycle)
