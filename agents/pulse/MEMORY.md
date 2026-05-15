@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-14 (Iteration 33)
+## Status snapshot — updated 2026-05-14 (Iteration 34)
 
-Thirty-three cycles run. **System: ⚠️ Minor drift.** D3.5 fully shipped — PRs #12 (5d main feature), #13, #14 (Forge docs), #15 (opmanual entry) all merged since iter 32 (HEAD=b8ca8b6). PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" open with Mirror REVIEW_PASS (2.5h unmerged); auto-merge did not fire per D3.5 5d logic — gap noted, [yellow] escalation iter 33. Core 6 units active. 4 decommissioned services (orchestrator, telegram-webhook, github-webhook, merge-watcher.timer) still inactive — **11 consecutive** (iters 23–33); iter 23b escalation (needs_response=true) open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file.
+Thirty-four cycles run. **System: ⚠️ Minor drift.** D3.5 fully shipped (HEAD=2f205dc, iter 33 auto-commit). PR #16 "docs(d3-5-plan): mark D3.5 as shipped + closed" still open — Mirror REVIEW_PASS at 21:58Z May 14, now 7h+ unmerged; auto-merge not fired 2 consecutive cycles (iters 33–34). outbox_notifier processed Mirror PASS (beacon notified) but GitHub approval/auto-merge step did not execute. Pulse always-fix blocked by session permissions twice. Iter 33+34 escalations (needs_response=true) await Larry approval of `gh pr merge 16`. Core 6 units active. 4 decommissioned services still inactive — **12 consecutive** (iters 23–34); iter 23b open awaiting Larry's intentional-decommission confirmation. pulse/.invalid/ unchanged at 3 files. forge/.invalid/ unchanged at 1 file.
 
 ## Known calibration issues
 
@@ -16,7 +16,7 @@ Thirty-three cycles run. **System: ⚠️ Minor drift.** D3.5 fully shipped — 
 
 - **D3.5 infrastructure decommission (observed iter 23, 2026-05-13; G-rule threshold iter 25).** Four services now inactive as expected D3.5 transition: ourliberty-orchestrator, ourliberty-telegram-webhook, ourliberty-github-webhook, ourliberty-merge-watcher.timer. The watchdog.py adapter rewrite removed them from monitoring at 22:56 MDT May 12. Do not escalate these as "down." G-rule threshold (3 consecutive: iters 23–24–25) reached iter 25 — holding Forge dispatch since this is a confirmation question for Larry, not a code bug. iter 23b (needs_response=true) still open; once Larry confirms intentional decommission, close it and update this entry. 11 consecutive as of iter 33.
 
-- **D3.5 5d auto-merge gap (observed iter 33, 2026-05-14).** PR #16 received Mirror REVIEW_PASS at ~21:58Z but autoMergeRequest remained null 2.5h later. D3.5 5d shipped auto-merge logic (PR #12) but it did not fire. First occurrence — monitor. If it recurs on next PR after Mirror PASS, route to Forge to investigate the auto-merge trigger path (likely outbox_notifier → Beacon → gh pr merge). Iter 33 [yellow] escalation written.
+- **D3.5 5d auto-merge gap (observed iters 33–34, 2026-05-14).** PR #16 received Mirror REVIEW_PASS at ~21:58Z but autoMergeRequest remained null 7h+ later. D3.5 5d shipped auto-merge logic (PR #12) but it did not fire. Narrowed diagnosis (iter 34): outbox_notifier DID process the Mirror outbox result (review-pr-16-d35-plan-banner.json archived; notify-review-pr-16-d35-plan-banner.json in beacon archive) — but the downstream `gh pr review --approve` / `gh pr merge --auto` step did not execute. Gap is in the outbox_notifier → GitHub execution path, after the notify chain. Pulse always-fix blocked by session permissions both cycles. Route to Forge for investigation when NEXT distinct PR after Mirror PASS also fails to auto-merge. Iters 33+34 [yellow] escalations written.
 
 - **Watchdog dispatch to Pulse inbox missing task_id (discovered iter 23, 2026-05-13).** watchdog.py generates dispatch payloads without a task_id field. Validator rejects them. Critical watchdog alerts to Pulse are silently dropped. watchdog.py rewritten in D3.5 5a (commit d908ca6); verify fix includes task_id in all dispatch payloads. See pulse/.invalid/watchdog-alert-1778648185.json.reason. Verify post-D3.5 — no recurrence since iter 23.
 
