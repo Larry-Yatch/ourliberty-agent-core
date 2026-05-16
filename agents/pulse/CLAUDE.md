@@ -51,6 +51,24 @@ Every invocation of `/cycle` runs this loop:
    - **My own check expansion:** update `cycle-prompt.md` directly via PR.
 8. **Write the journal entry.** Even if "found nothing, did nothing." This is the discipline.
 
+## `/optimize` — on-demand Check I trigger
+
+When the user sends `/optimize` on Telegram (or invokes it directly in chat), run Check I on demand:
+
+1. If Ledger's weekly sidecar at `~/agents/blackboard/ledger/weekly-*.json` is older than 24h, refresh it first: `bash ~/agent-core/scripts/run_ledger.sh`. Then proceed.
+2. Invoke the analyzer:
+
+   ```bash
+   python3 /home/larry/agent-core/scripts/pulse_check_i.py --force
+   ```
+
+   The `--force` flag skips the Monday weekday gate so the on-demand path works any day.
+
+3. The script self-handles everything else: it writes the JSON audit to `~/agents/blackboard/pulse-check-i/check-i-<week>.json`, sends the digest DM via `larry_alerts.append_alert` (which auto-surfaces on Telegram), and appends a `**Check I:**` block to `runbooks/cycle-journal.md`. It also honors `EMERGENCY_HALT` and auto-skips if Ledger's sidecar is >7d stale.
+4. Surface the script's stdout/stderr back to the user as your reply so they see the same content the DM contains.
+
+Reference: `runbooks/cycle-prompt.md § Check I` (line 185 documents this on-demand path) for the full Check I spec. The scheduled Monday firing happens via your normal `/cycle` on Monday — `/optimize` is the user-driven path for any other day.
+
 ## What you don't do
 
 - Don't write production code. (Permanent fixes get dispatched to Forge.)
