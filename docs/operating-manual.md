@@ -733,6 +733,65 @@ journalctl -u ourliberty-ledger.service -n 50
 tail -1 ~/agents/blackboard/ledger/weekly-$(date -u -d 'last monday' +%Y-%m-%d).json
 ```
 
+### 10.2 Pulse Check I (weekly optimization digest)
+
+Check I is Pulse's optimization-mode pass, additive to her existing 4h Health Check Suite (Checks A–H). It fires only on Monday cycles, **after** Ledger has landed his weekly report (sentinel-gated). The deterministic compute lives in `scripts/pulse_check_i.py`; no LLM is in the loop for the v1 baseline (Pulse-the-LLM running /cycle may layer an interpretation paragraph on top of the analyzer's output).
+
+**When it fires:**
+- Today is Monday (UTC weekday == 0), AND
+- `~/agents/blackboard/EMERGENCY_HALT` not present, AND
+- `~/agents/blackboard/ledger/ledger-ready-<this-Monday>` sentinel exists, AND
+- `~/agents/blackboard/ledger/weekly-<this-Monday>.json` is ≤ 7 days old.
+
+Off-Monday cycles skip Check I entirely; Pulse's A–H output is unchanged.
+
+**What it reads:**
+- Ledger's JSON sidecar at `~/agents/blackboard/ledger/weekly-YYYY-MM-DD.json` (schema in `runbooks/ledger-prompt.md`).
+- Outbox archives at `~/agents/outboxes/<agent>/.archive/*.json` — counts retry suffixes (`<task>.1.json`, `<task>.2.json`) per task_id to surface recurring shapes.
+
+**What it writes:**
+- A Telegram alert via `larry_alerts.append_alert(source='pulse', severity='warning', subject='check-i-YYYY-MM-DD', ...)`. The DM shape is either **heartbeat** ("chain shapes nominal — no proposed optimizations this week") when nothing actionable is found, or **digest** (Ledger headline + retry-overhead + numbered list of proposals) when proposals were synthesized.
+- `~/agents/blackboard/pulse-check-i/check-i-YYYY-MM-DD.json` — structured audit record (mode, ledger_headline, engineering_signals, proposals).
+- A `**Check I:**` block appended to `runbooks/cycle-journal.md` (additive to the standard A–H entry written by Pulse).
+
+**How to interpret the DM:**
+- **Heartbeat** (`Pulse Check I (week of X): chain shapes nominal — ...`): everything was within baseline; no action requested. Skim and move on.
+- **Digest** (`Pulse Check I (week of X): Ledger total ..., N anomalies. Proposed optimizations: 1. ...`): the analyzer surfaced 1–3 proposals tagged with effort (`small`/`medium`/`large`) and impact (free-text USD or percent estimate). Each proposal is a *recommendation*, not an auto-dispatch — Beacon drafts the actual dispatch once you approve.
+- **Skipped** (`Pulse Check I (week of X): skipped — Ledger sidecar unavailable`): Ledger's run didn't land for this week. Investigate Ledger first (§10.1), then re-run Check I manually.
+
+**Manual trigger via Telegram `/optimize`:** the Pulse bot accepts `/optimize` for an ad-hoc Check I run regardless of the weekday. If Ledger's sidecar is >24h old, the bot refreshes Ledger first (runs `scripts/run_ledger.sh`), then invokes the analyzer with `--force` to bypass the Monday gate.
+
+**Manual rerun (CLI):**
+
+```bash
+# Default: current Monday, scheduled cadence
+python3 ~/agent-core/scripts/pulse_check_i.py
+
+# Skip the Monday weekday gate (the `/optimize` path)
+python3 ~/agent-core/scripts/pulse_check_i.py --force
+
+# Specific week
+python3 ~/agent-core/scripts/pulse_check_i.py --week-ending 2026-05-18
+
+# Dry run — no DM, no journal append
+python3 ~/agent-core/scripts/pulse_check_i.py --no-dm --no-journal
+```
+
+**Verifying Check I fired:**
+
+```bash
+# Did the audit record land for this week?
+ls -la ~/agents/blackboard/pulse-check-i/check-i-$(date -u -d 'last monday' +%Y-%m-%d).json
+
+# Did the journal pick up the Check I block?
+grep -A 20 "^\*\*Check I" ~/agent-core/runbooks/cycle-journal.md | tail -25
+
+# Did the DM queue?
+tail -3 ~/agents/blackboard/larry-alerts.jsonl
+```
+
+**Empty-week behavior is the contract** — the heartbeat DM fires even with zero findings so silence never means "Pulse ran but didn't tell you." If Check I should have fired and *nothing* landed (no journal block, no audit record, no DM), check the cycle log (`~/agents/logs/cycle.log`) for invocation errors or the Monday-gate skip note.
+
 ### Anthropic (Claude Code / API)
 
 - **Where:** [console.anthropic.com](https://console.anthropic.com) → Usage

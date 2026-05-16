@@ -152,6 +152,45 @@ gh pr list --state merged --search "head:forge/ merged:>$(date -u -d '4 hours ag
 
 The journal entry's `Forge:` line (added in Section 4 below) captures this digest. Once D3.5 ships Mirror's auto-merge loop, the `> 24h old` threshold drops to e.g. `> 72h` (only blocked-on-Larry PRs surface; Mirror handles the rest). Until then, 24h gives Mirror's manual stand-in (me, via the Telegram approval flow) a window to act before Pulse escalates.
 
+#### I. Optimization mode (weekly, Monday)
+
+Check I is **additive to Checks A–H, not a replacement**. It fires only on Monday cycles after Ledger's weekly run has landed. Off-Monday cycles skip this block entirely — your A–H output is unchanged.
+
+```
+Trigger conditions:
+  • Today is Monday (UTC weekday == 0), AND
+  • EMERGENCY_HALT not present, AND
+  • Ledger's sentinel ~/agents/blackboard/ledger/ledger-ready-<this-Monday> exists.
+
+If any condition fails on Monday, journal a one-line skip note and proceed
+to Check G.
+```
+
+**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. The analyzer reads Ledger's JSON sidecar + Pulse's engineering signals (retry overhead, recurring-task repeats from outbox archives, σ anomalies), synthesizes up to 3 proposed optimizations tagged with effort + impact, emits a Telegram DM, appends a `**Check I:**` block to this journal, and writes a structured JSON audit record at `~/agents/blackboard/pulse-check-i/check-i-<week>.json`.
+
+```bash
+python3 ~/agent-core/scripts/pulse_check_i.py
+```
+
+Behaviors you can rely on:
+
+| Scenario | Analyzer behavior | Your action |
+|---|---|---|
+| Monday + sentinel + sidecar present, proposals synthesized | Emits digest DM + journal block | Note Check I fired with proposal count in your cycle entry |
+| Monday + sentinel + sidecar present, no proposals | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
+| Monday + sidecar missing/stale | Skips with journal note; no DM | Note Check I skipped: Ledger report unavailable |
+| EMERGENCY_HALT tripped | Exits 0 silently; no DM, no journal | Same as for Checks A-H during halt |
+| Not Monday | Exits 0 with stderr note; no DM, no journal | Do not invoke; journal nothing for Check I |
+
+**On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Monday weekday gate. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
+
+**Proposals format (deterministic v1 — tune after week 2 per spec § 8):**
+- Effort: `small` / `medium` / `large`
+- Impact: free-text USD or percent estimate
+- Rationale: 1-2 sentences tying the proposal to evidence (sidecar field or signal)
+
+When the analyzer surfaces proposals, you may add an interpretation paragraph after the deterministic block (engineering reading of *why* this week looked like it did). Keep it scoped — the analyzer's proposals are the contract; your interpretation is enrichment.
+
 #### G. Pattern detection
 
 For each finding type from A–F, count occurrences in the **last 10 cycles**:
