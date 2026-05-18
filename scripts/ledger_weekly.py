@@ -34,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from task_type_inference import infer_task_type
+
 # --- constants ---
 
 SCHEMA_VERSION = "v1"
@@ -139,20 +141,34 @@ def load_cost_rows(
 def attribute_task_types(rows: list[CostRow], outbox_root: Path) -> None:
     """For each row, look up task_type from the matching outbox archive.
 
-    Mutates rows in place; rows with no matching archive keep task_type='unknown'.
+    Mutates rows in place. Lookup order:
+      1. outbox archive `task_type` field — authoritative when the dispatch
+         envelope set one explicitly.
+      2. `infer_task_type(task_id)` fallback (task_type_inference module) —
+         maps known task_id prefixes to labels (notify-* -> notification,
+         cycle-* -> cycle, marker-error-* -> retry, etc.). Recovers ~90%+
+         of historical rows that pre-dated dispatch envelopes carrying
+         task_type.
+
+    Rows whose task_id matches no known prefix end up as "unclassified",
+    distinct from the legacy "unknown" default (so new bug-finding can tell
+    "writer set nothing" apart from "inference saw the id and gave up").
     """
     for row in rows:
         archive = outbox_root / row.agent / ".archive" / f"{row.task_id}.json"
-        if not archive.exists():
-            continue
-        try:
-            with open(archive, "r", encoding="utf-8") as f:
-                obj = json.load(f)
-            tt = obj.get("task_type")
-            if tt:
-                row.task_type = tt
-        except (json.JSONDecodeError, OSError):
-            continue
+        if archive.exists():
+            try:
+                with open(archive, "r", encoding="utf-8") as f:
+                    obj = json.load(f)
+                tt = obj.get("task_type")
+                if tt:
+                    row.task_type = tt
+                    continue
+            except (json.JSONDecodeError, OSError):
+                pass
+        # Archive missing, unreadable, or had no task_type — infer from prefix.
+        if row.task_type in (None, "", "unknown"):
+            row.task_type = infer_task_type(row.task_id)
 
 
 # --- computation ---

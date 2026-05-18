@@ -32,6 +32,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from task_type_inference import infer_task_type
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -498,10 +500,15 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
 
     if outbox.get("cost_usd") is not None:
         usage = outbox.get("usage") or {}
+        # task_type either rides through from the dispatch envelope (already
+        # in outbox) or is inferred from task_id prefix so cost rows are not
+        # uniformly "unknown". See task_type_inference for the discriminator.
+        task_type = outbox.get("task_type") or infer_task_type(task_id)
         append_cost({
             "ts": outbox["completed_at"],
             "agent": agent,
             "task_id": task_id,
+            "task_type": task_type,
             "model": outbox.get("model"),
             "cost_usd": outbox.get("cost_usd"),
             "input_tokens": usage.get("input_tokens"),
