@@ -17,6 +17,10 @@ LOG_FILE="${LOG_DIR}/cycle.log"
 
 mkdir -p "$LOCK_DIR" "$LOG_DIR"
 
+# Helper: push_with_rebase (with non-FF rebase fallback). See header.
+# shellcheck source=_lib_push_with_rebase.sh
+source "${HOME}/agent-core/scripts/_lib_push_with_rebase.sh"
+
 log() {
     echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] run_cycle: $*" | tee -a "$LOG_FILE"
 }
@@ -101,11 +105,11 @@ if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "Pulse cycle ${TS}" -m "Auto-committed by run_cycle.sh after successful /cycle." 2>>"$LOG_FILE"; then
             log "auto-commit: created commit for cycle ${TS}"
-            if git push -q origin main 2>>"$LOG_FILE"; then
-                log "auto-commit: pushed to origin/main"
-            else
-                log "auto-commit: push failed (commit retained locally)"
-            fi
+            # push_with_rebase handles non-FF refusal (origin advanced via
+            # an interactive PR merge) by pull --rebase --autostash + retry.
+            # It writes its own log lines; || true keeps set -e happy when
+            # the push genuinely fails (the next cycle will retry).
+            push_with_rebase origin main "$LOG_FILE" || true
         else
             log "auto-commit: nothing to commit (or commit failed; see log)"
         fi
