@@ -299,22 +299,45 @@ def compute_anomalies(
     return out
 
 
+def _is_retry_task_id(tid: str) -> bool:
+    """Return True iff `tid` names a row that represents work paid for a retry.
+
+    Discriminator (tuned 2026-05-18 after week-1 measurement showed v1 over-
+    counted by ~3-4x):
+
+    * `notify-*` rows are EXCLUDED. They are the inter-agent workflow channel
+      (a task that goes Forge -> Mirror -> auto-merge produces 3 notify-<id>
+      rows; that is the legitimate workflow shape, not a retry). The v1
+      heuristic counted all notify-* as retries, which is what inflated the
+      reported overhead.
+    * `marker-error-*` rows (and the cascade form `marker-error-marker-error-*`)
+      ARE retries — the marker-error notify cascade is, by definition, work
+      Forge or Mirror is redoing after emitting a malformed marker.
+    * `cycle-fix-*` rows ARE retries — Pulse-driven re-dispatch when the cycle
+      surfaced a fault that needs Forge or Beacon to redo a piece of work.
+    * Rows containing `-revision-` ARE retries — Forge revision rounds where
+      Mirror sent her back to fix findings on an open PR.
+    """
+    if tid.startswith("notify-"):
+        return False
+    if tid.startswith("marker-error-"):
+        return True
+    if tid.startswith("cycle-fix-"):
+        return True
+    if "-revision-" in tid:
+        return True
+    return False
+
+
 def compute_retry_overhead(
     rows: list[CostRow], total_usd: float
 ) -> dict[str, float]:
     """Sum cost of retry/clarification rows.
 
-    v1 heuristic: a row is a retry if its task_id matches one of the known
-    retry shapes — task_id starts with `notify-` (clarification-response /
-    review-revision dispatches) OR contains `-revision-` (Forge revision
-    rounds) OR contains `-cycle-fix-` (Pulse-driven re-dispatches). This is
-    deliberately broad; tune after week 2 once we have real data.
+    See `_is_retry_task_id` for the discriminator and the rationale behind
+    the v2 tuning (2026-05-18 week-1 follow-up).
     """
-    retry_usd = 0.0
-    for row in rows:
-        tid = row.task_id
-        if tid.startswith("notify-") or "-revision-" in tid or "-cycle-fix-" in tid:
-            retry_usd += row.cost_usd
+    retry_usd = sum(row.cost_usd for row in rows if _is_retry_task_id(row.task_id))
     percent = (retry_usd / total_usd * 100.0) if total_usd > 0 else 0.0
     return {"total_retry_cost_usd": retry_usd, "percent_of_total": percent}
 
