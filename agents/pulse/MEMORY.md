@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-15 (Iteration 44)
+## Status snapshot — updated 2026-05-18 (Iteration 45)
 
-Forty-four cycles/responses run. **System: ⚠️ Minor drift (PR #20 Mirror review never dispatched; stuck-cycle fix blocked on Larry approval).** PR #16 MERGED iter 41. PR #20 (Ledger + Pulse Check I specs) open 13.5h — Mirror review was never dispatched (outbox_notifier _PR_URL_RE bug, fixed by PR #23); Beacon catch-up dispatch sent iter 44 (dedup_identity=cycle-fix:pr20-mirror-review-catchup). Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 escalation [yellow]).
+Forty-five cycles/responses run. **System: ⚠️ Minor drift (dirty tree — pulse_check_i.py journal writes uncommitted; sync error b6b6293).** PR #20 confirmed merged 2026-05-15T20:45Z. PRs #28 (Check I) and #29 (/optimize) shipped 2026-05-16. PR #30 (per-agent allowlist sweep) merged 2026-05-18T16:41Z. Ledger live; Check I fired first time (baseline: $115.91/wk, 23.6% retry overhead). Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 escalation [yellow]).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -46,13 +46,19 @@ Forty-four cycles/responses run. **System: ⚠️ Minor drift (PR #20 Mirror rev
 
 ## Pending watch items (not yet patterns)
 
-- **2026-05-15 — Pulse Check I (optimization mode) spec in flight; PR #20 Mirror review catch-up in progress.** PR #20 "docs: land specs for Ledger (CFO agent) and Pulse Check I (optimization mode)" (forge/beacon-specs-ledger-pulsei-001) open 13.5h. Mirror review was never dispatched (outbox_notifier _PR_URL_RE bug, pre-PR-#23). Iter 44: Beacon catch-up dispatch sent (task_id=pulse-pr20-mirror-review-catchup-20260515T203800Z, dedup_identity=cycle-fix:pr20-mirror-review-catchup). 24h window closes 2026-05-16T07:03Z. Once PR #20 merges, review contents and update cycle-prompt.md to include Check I. Do not add Check I to the suite until the spec is landed and reviewed.
+- **2026-05-18 — pulse_check_i.py journal writes not auto-committed (1st occurrence).** pulse_check_i.py appended two Check I blocks to cycle-journal.md on 2026-05-18 but no git commit step covers those writes. Root cause: same as general dirty-tree pattern — operational write without commit. Will recur every Monday. If recurs 2026-05-25 (2nd occurrence), dispatch to Beacon: add `git -C ~/agent-core add runbooks/cycle-journal.md && git -C ~/agent-core commit -m "pulse: Check I journal append $(date +%Y%m%d)"` to pulse_check_i.py after its journal write. First occurrence only; monitoring.
 
-- **2026-05-15 — Stuck automated cycle: awaiting Larry approval (iter 43).** 3rd occurrence (iters 8, 39, 41). Spec confirmed sound (iter 42): `CYCLE_TIMEOUT_SEC=1800` + `timeout` wrapper + exit-124 TIMED OUT log line in `scripts/run_cycle.sh`. **Blocked on Larry authorization.** Pulse iter 42 approval dispatch was an architectural error (see below). Larry must: (A) message Beacon via Telegram → fresh APPROVAL_REQUEST → approve; (B) approve prior APPROVAL_REQUEST if still in bot queue; or (C) edit `scripts/run_cycle.sh` directly in terminal. Escalated to pulse-escalations.json iter 43 [yellow]. task_id=pulse-cycle-timeout-guard-001. Close when fix lands and 5+ consecutive automated runs show no stuck cycle.
+- **2026-05-18 — Check I double-write timing race (1st occurrence).** pulse_check_i.py fired twice on 2026-05-18: once before ledger-ready-2026-05-18 sentinel was written (logged as "Skipped"), once after (digest). Both appended to journal. Not a functional failure but creates noise entries. If recurs 2026-05-25, permanent fix: ensure Ledger writes sentinel before invoking pulse_check_i.py (or add brief retry loop in pulse_check_i.py for the sentinel).
 
-- **CLOSED 2026-05-15 — gh pr merge session allowlist fix.** PR #21 "Pulse: add gh pr merge + git branch to project-scoped settings allowlist" merged 12:46Z. Always-fix succeeded first use (iter 41, PR #16 merged). `agents/pulse/.claude/settings.json` now has `Bash(gh pr merge:*)` and `Bash(git branch:*)`.
+- **2026-05-18 — Check I week-1 baseline: $115.91/week, 23.6% retry overhead.** First Check I run. Proposals: (1) investigate retry/clarification sources ($27.39/wk), (2) template `opmanual-d35-5b-shipped-note-001` (4 forge retries). Engineering context: week 1 was heavy infrastructure build-out (PRs #21-#30). Holding Beacon dispatch until week 2 (2026-05-25) confirms whether overhead is structural or one-time.
 
-- **2026-05-15 — Beacon dispatch gap: text output vs file write — corrected.** Beacon generated downstream dispatch as text (not Write tool call) in iter 38. Confirmed 1 occurrence; resolved in iter 40 via explicit Write-tool-instruction redispatch. If recurs, dispatch behavioral correction to Beacon: downstream dispatches MUST use Write tool, not just text output.
+- **2026-05-15 — Stuck automated cycle: awaiting Larry approval (iter 43).** 3rd occurrence (iters 8, 39, 41). Spec confirmed sound (iter 42): `CYCLE_TIMEOUT_SEC=1800` + `timeout` wrapper + exit-124 TIMED OUT log line in `scripts/run_cycle.sh`. **Blocked on Larry authorization.** Larry must: (A) message Beacon via Telegram → fresh APPROVAL_REQUEST → approve; (B) approve prior APPROVAL_REQUEST if still in bot queue; or (C) edit `scripts/run_cycle.sh` directly in terminal (line 50: wrap `claude --print ...` with `timeout 1800`). Escalated iter 43 [yellow]. task_id=pulse-cycle-timeout-guard-001. Close when fix lands and 5+ consecutive automated runs show no stuck cycle.
+
+- **CLOSED 2026-05-15 — PR #20 Mirror review dispatch gap.** PR #20 "docs: land specs for Ledger + Pulse Check I" merged 2026-05-15T20:45Z. Beacon catch-up dispatch (iter 44) worked. Check I spec shipped in PR #28 (2026-05-16).
+
+- **CLOSED 2026-05-15 — gh pr merge session allowlist fix.** PR #21 merged 12:46Z. PR #30 (per-agent allowlist sweep) merged 2026-05-18T16:41Z further expanded allowlist (bash/python3/pytest/gh-pr-checkout).
+
+- **2026-05-15 — Beacon dispatch gap: text output vs file write — corrected.** 1 occurrence (iter 38), resolved in iter 40. Monitor for recurrence.
 
 ## Recurring patterns I've decided NOT to promote (and why)
 

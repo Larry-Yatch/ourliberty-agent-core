@@ -29,6 +29,12 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+# Telegram text helpers (shared with beacon_telegram_bot.py)
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+from telegram_text_utils import strip_leading_slash  # noqa: E402
+
 # ---------- config ----------
 
 AGENT = os.environ.get("AGENT", "").strip().lower()
@@ -198,6 +204,7 @@ def main() -> None:
                 continue
 
             log(f"<- {chat_id}: {text[:120]!r}")
+            text = strip_leading_slash(text)
             telegram_send_action(chat_id, "typing")
 
             session_id = sessions.get(str(chat_id))
