@@ -56,6 +56,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 import beacon_approval_handler as approval  # noqa: E402
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
+from telegram_text_utils import strip_leading_slash  # noqa: E402
 
 # ---------- config ----------
 
@@ -548,6 +549,12 @@ def _process_update(update: dict) -> None:
     if action.get('action') != 'none':
         if handle_user_command(chat_id, action):
             return
+
+    # Strip leading `/` AFTER approval handling so pause/resume/approve
+    # tokens still match in parse_user_reply, but novel slash-prefixed
+    # commands (e.g. /diagnose) reach Beacon instead of being eaten by
+    # Claude Code's CLI parser.
+    text = strip_leading_slash(text)
 
     telegram_send_action(chat_id, "typing")
 
