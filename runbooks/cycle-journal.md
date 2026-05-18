@@ -4,6 +4,46 @@
 
 ---
 
+## Iteration 46 — 2026-05-18 ~20:30 UTC (interactive)
+
+**Health:** ⚠️ Drift (dirty tree — 3 Check I blocks uncommitted post-fixup PRs; sync error)
+**Found:**
+- **(A) Repo discipline: dirty tree.** Session gitStatus: M runbooks/cycle-journal.md. Root cause: pulse_check_i.py ran three times on 2026-05-18 (lines 1104–1125): (1) skip before ledger-ready sentinel, (2) first digest at ~16:10Z (23.6% overhead — notify-* not yet excluded), (3) corrected digest after PRs #33+#35 merged (3.8% overhead, 1 proposal). Third run appended to bottom of file; no auto-commit covers Check I writes. Branch=main. Never-auto; committing at cycle end. ⚠️
+- **(B) Sync health: error.** last_sync=2026-05-18T19:58:56Z, status=error, "Uncommitted changes in working tree", commit=893d2a1 (PR #35 merge commit, 18:57Z). Directly caused by (A). Self-heals after commit. ⚠️
+- **(C) Agent liveness: nominal.** All 6 units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/ unchanged (2 files: iter-35 routing-reject + notify-pulse-cost-note-002, from 2026-05-12/15). pulse/.invalid/ unchanged (3 files: d2, d25, watchdog, from 2026-05-11/12). ✅
+- **(E) PRs: nominal.** 0 open. ✅
+- **(H) Forge digest (since iter 45, ~16:55Z):** 5 PRs + 1 direct commit merged 18:38–18:57Z:
+  - PR #31 fix(bots): strip leading slash so /optimize reaches agent
+  - PR #32 fix(cycle): rebase + retry push on non-FF refusal in run_cycle.sh
+  - PR #33 fix(ledger): exclude notify-* from retry_overhead heuristic (23.6% → 3.68%)
+  - PR #34 fix(cost-capture): infer task_type from task_id prefix (~75% "unknown" bucket eliminated)
+  - PR #35 fix(pulse-check-i): exclude notify-* from gather_retry_repeats (26+ → 10 real repeats)
+  - direct commit 2d43bce: ledger weekly run 20260518T184113Z
+  - 0 open Forge PRs. ✅
+- **(I) Check I corrected baseline:** Third Check I run (post-#33/#35) is ground truth: $115.91/week total, $4.44 retry overhead (3.8% — well under 15% threshold). 1 proposal: [medium] template opmanual-d35-5b-shipped-note-001 (4 repeats). Supersedes 23.6% figure from iter 45 (that was notify-* noise). ✅
+- **(Pending) Stuck-cycle timeout guard:** PR #32 fixes push failures from non-FF refusal (separate issue). Timeout guard (wrap `claude --print` with `timeout 1800`) still unimplemented; blocked on Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:**
+- Nothing (always-fix conditions not met).
+- Committing operational writes at cycle end.
+
+**Escalated:** Nothing new. Stuck-cycle timeout guard still pending Larry (iter 43 [yellow] escalation, open).
+
+**Forge:** shipped 5 PRs (#31–#35) + 1 direct ledger commit since iter 45. 0 open.
+
+**Patterns:**
+- **Check I triple-write (still day-1 Monday; monitoring for 2026-05-25 recurrence):** 3 blocks on 2026-05-18: skip + first digest + corrected digest. Root cause: (a) no idempotency guard — Check I re-runs whenever sentinel+sidecar present; (b) no commit step. Will dispatch to Beacon on 2026-05-25 if recurs.
+- **Week-1 cost baseline corrected:** Real retry overhead = 3.8% ($4.44). The 23.6% in iter 45's Check I was notify-* workflow rotations misclassified as retries. PRs #33+#35 fixed both heuristics. Proposal 1 (investigate retry sources) effectively resolved.
+- **PR #32 separates two distinct run_cycle.sh failure modes:** (a) non-FF push failure — now fixed; (b) stuck `claude --print` with no timeout — still open.
+
+**Learned:**
+- Check I week-1 baseline is $115.91/wk, 3.8% overhead. The 23.6% figure was noise; real signal is 10 true high-repeat tasks, 1 proposal. MEMORY.md updated.
+- PR #31 (leading slash fix) should make /optimize reliably route from Telegram. Worth verifying at next /optimize invocation.
+- 5-PR + direct-commit batch in a 20-minute window (18:38–18:57Z) is healthy fix velocity for week 1.
+
+---
+
 ## Iteration 45 — 2026-05-18 ~16:55 UTC (interactive)
 
 **Health:** ⚠️ Drift (dirty tree — pulse_check_i.py journal writes uncommitted; sync error)
@@ -1114,4 +1154,13 @@
   1. [medium] Investigate retry / clarification cost sources — ~$27.39/wk reclaimable (23.6% of total spend is retries/clarifications)
      Rationale: Retry overhead is above the 15% threshold. Audit the outbox-notifier log for the dominant retry shapes (revision, clarification, cycle-fix) and tighten the upstream preflight / spec template that caused them.
   2. [medium] Template / fast-path repeating shape `opmanual-d35-5b-shipped-note-001` — 4 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 4 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-18):**
+
+- Ledger total: $115.91; 0 anomaly(ies)
+- Retry overhead: $4.44 (3.8%)
+- High-repeat tasks: `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3, `beacon-memory-migration-001`×3, `beacon-specs-ledger-pulsei-001`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `opmanual-d35-5b-shipped-note-001` — 4 repeats observed this week; templating would collapse most retry cycles
      Rationale: Outbox archives show this task_id retried 4 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
