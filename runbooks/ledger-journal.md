@@ -33,3 +33,14 @@ Iteration numbers are monotonic: the module reads the highest existing `## Itera
 **DM:** queued
 
 _Smoke dispatch `smoke-and-merge-ledger-pr25-001`: invoked `python3 scripts/ledger_weekly.py` against the live droplet before merging PR #25. Production-path verifications: ✅ markdown report `~/agents/blackboard/ledger/weekly-2026-05-11.md` written + non-empty; ✅ JSON sidecar `~/agents/blackboard/ledger/weekly-2026-05-11.json` parses + conforms to spec § 7 schema (all 9 required fields, `schema_version=v1`); ✅ sentinel `ledger-ready-2026-05-11` touched; ✅ DM queued via `larry_alerts.append_alert` (`source=ledger, subject=weekly-2026-05-11`) with heartbeat shape — week of 2026-05-11 covers [2026-05-04, 2026-05-11) which had zero rows (Ledger wasn't live yet), so heartbeat path exercised correctly. Substantive computation paths separately validated against `--week-ending 2026-05-18 --output-dir /tmp/smoke-substantive --no-dm`: 196 real cost rows → total $88.68, by-agent rendered (beacon $20.11 / forge $33.73 / mirror $10.88 / pulse $23.95), by-task_type rendered (`unknown` bucket holds 148/196 rows for Pulse cycle + notify dispatches per PR body's preflight note), top-5 correctly placed `build-ledger-001` (this PR's own build) at $7.31, retry overhead 24.0%. Anomalies = ramp-up notice as expected (no prior sidecars). All four success criteria pass; PR #25 merged at commit 62cbcb0._
+
+## Iteration 2 — 2026-05-18 16:10 UTC
+
+**Week ending:** 2026-05-18
+**Health:** ✅ Nominal
+**Total:** $115.91
+**Vs prior:** +$115.91 (+0.0%)
+**Anomalies:** 0 σ-flagged (ramp-up: σ-flagging suspended)
+**Skipped rows:** 0
+**Sentinel:** /home/larry/agents/blackboard/ledger/ledger-ready-2026-05-18
+**DM:** queued
