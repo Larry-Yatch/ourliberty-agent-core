@@ -4,6 +4,45 @@
 
 ---
 
+## Iteration 45 — 2026-05-18 ~16:55 UTC (interactive)
+
+**Health:** ⚠️ Drift (dirty tree — pulse_check_i.py journal writes uncommitted; sync error)
+**Found:**
+- **(A) Repo discipline: dirty tree.** Session gitStatus: M runbooks/cycle-journal.md. Root cause: pulse_check_i.py appended two Check I blocks to the journal bottom (lines 1065-1078) — one skipped (~16:05Z, before ledger-ready sentinel was written) and one digest (~16:10Z, after sentinel). No auto-commit covers pulse_check_i.py journal writes. Branch=main. Never-auto. ⚠️
+- **(B) Sync health: error.** last_sync=2026-05-18T16:42:34Z (sync triggered by PR #30 merge), status=error, "Uncommitted changes in working tree", commit=b6b6293 (PR #30 merge commit). Directly caused by Check A. Self-heals after commit. ⚠️
+- **(C) Agent liveness: nominal.** All 6 units active (beacon, forge, mirror, pulse, inbox-watcher, cycle.timer). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. forge/.invalid/: 2 files unchanged (iter-35 routing-reject + notify-pulse-cost-note-002). pulse/.invalid/: 3 files unchanged (d2, d25, watchdog rejects). beacon/.invalid/ and mirror/.invalid/ empty. ✅
+- **(E) PRs: nominal.** PR #30 "chore(allowlist): grant bash/python3/pytest/gh-pr-checkout per-agent" (chore/per-agent-allowlist-sweep) visible open at 16:37Z, confirmed MERGED 16:41Z. 0 open PRs. ✅
+- **(H) Forge digest:** Since iter 44 (2026-05-15): PR #28 (forge/build-pulse-check-i-001, merged 2026-05-16T00:49Z), PR #29 (forge/wire-pulse-optimize-001, merged 2026-05-16T01:48Z). Also: PR #30 (chore/per-agent-allowlist-sweep, non-forge branch, merged 16:41Z), dc08c31 (ledger weekly run direct commit, 16:10Z). PR #20 (docs: land Ledger + Check I specs) merged 2026-05-15T20:45Z — CLOSED. 0 open Forge PRs. ✅
+- **(I) Check I: FIRED (automated, 16:10:52Z).** Today is Monday 2026-05-18. Sentinel ledger-ready-2026-05-18 ✓, sidecar weekly-2026-05-18.json ✓. Mode=digest. Two appends: first skipped (sidecar not yet ready at ~16:05Z), second digest (after Ledger committed at 16:10Z). audit: check-i-2026-05-18.json.
+  - Ledger baseline: $115.91/week (week 1; no prior-week delta).
+  - Anomalies: 0. Retry overhead: $27.39 (23.6%) — above 15% threshold.
+  - 26 high-repeat task IDs (retry_count 3-4); dominated by beacon notify + forge build tasks from infrastructure build-out week.
+  - Proposals: (1) [medium] Investigate retry/clarification cost sources — ~$27.39/wk reclaimable; (2) [medium] Template `opmanual-d35-5b-shipped-note-001` (4 forge retries).
+  - Engineering read: retry overhead is real but context-heavy — week 1 was a full infrastructure build-out (PRs #21-#30). Holding Beacon dispatch until week 2 confirms whether overhead is structural or one-time.
+- **(F) Stuck-cycle timeout guard: still unimplemented.** run_cycle.sh line 50: no `timeout` wrapper around `claude --print`. Pending since iter 43 [yellow] escalation. Larry authorization still required. Noted, not re-escalated.
+
+**Did:**
+- Nothing. No always-fix conditions met.
+- Committing operational writes at cycle end (journal + Check I appends + MEMORY.md).
+
+**Escalated:** Nothing new. Stuck-cycle timeout guard still pending Larry (iter 43 [yellow] escalation, still open).
+
+**Forge:** shipped 2 forge/ PRs since iter 44 (PR #28 Check I, PR #29 /optimize); PR #30 allowlist sweep (non-forge, Larry-direct); dc08c31 ledger direct. 0 open.
+
+**Patterns:**
+- **NEW (1st): pulse_check_i.py journal writes not auto-committed.** Same root cause as general dirty-tree pattern — operational write without git commit. First occurrence (Check I new as of PR #28). Will recur every Monday. Monitoring; if recurs next Monday (2nd occurrence), dispatch to Beacon for permanent fix (add commit step to pulse_check_i.py).
+- **NEW (1st): Check I double-write timing race.** pulse_check_i.py ran twice in rapid succession: once before ledger-ready sentinel was written (skipped), once after (digest). Both appended to journal. Not a functional problem but leaves noise. If recurs next Monday, permanent fix: Ledger should signal Check I only after sentinel is written.
+- **Stuck-cycle timeout guard: 4th cycle unresolved** (iters 43, 44, 45 + now). Not re-escalating — action items documented in iter 43. Waiting for Larry.
+- PR #30: per-agent allowlist now covers bash/python3/pytest/gh-pr-checkout. Should reduce bash approval friction next cycle.
+
+**Learned:**
+- PR #20 (specs) confirmed merged 2026-05-15T20:45Z — Beacon catch-up dispatch from iter 44 worked. Closing watch item.
+- Check I live on week 1: $115.91 baseline, 23.6% retry overhead. Proposals held pending week 2 confirmation.
+- pulse_check_i.py needs auto-commit step (new watch item, first occurrence).
+
+---
+
 ## Iteration 44 — 2026-05-15 14:38 MDT (interactive)
 
 **Health:** ⚠️ Drift (dirty tree; PR #20 Mirror review never dispatched)
@@ -1061,3 +1100,18 @@
 **Learned:** Pulse persona created; cycle-prompt.md and this journal initialized. First real iteration will be Iteration 1, dispatched when Larry activates Phase D (Anthropic API key + systemd timer + first dry-run).
 
 ---
+
+**Check I (2026-05-18):**
+
+- Skipped: Ledger sidecar unavailable
+
+**Check I (2026-05-18):**
+
+- Ledger total: $115.91; 0 anomaly(ies)
+- Retry overhead: $27.39 (23.6%)
+- High-repeat tasks: `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3, `beacon-memory-migration-001`×3, `beacon-specs-ledger-pulsei-001`×3
+- Mode: digest — 2 proposal(s):
+  1. [medium] Investigate retry / clarification cost sources — ~$27.39/wk reclaimable (23.6% of total spend is retries/clarifications)
+     Rationale: Retry overhead is above the 15% threshold. Audit the outbox-notifier log for the dominant retry shapes (revision, clarification, cycle-fix) and tighten the upstream preflight / spec template that caused them.
+  2. [medium] Template / fast-path repeating shape `opmanual-d35-5b-shipped-note-001` — 4 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 4 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
