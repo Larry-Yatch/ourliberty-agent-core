@@ -40,6 +40,8 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+from task_type_inference import infer_task_type
 from typing import Any, Optional
 
 # --- constants ---
@@ -126,6 +128,13 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
     with ≥ HIGH_REPEAT_COUNT_THRESHOLD suffixes is a candidate for templating
     / fast-pathing — these are the patterns Check I surfaces.
 
+    Excludes `notify-*` task_ids (the inter-agent workflow channel).
+    A task that goes Forge -> Mirror -> auto-merge produces three notify-<id>
+    files in Beacon's outbox archive (forge-result, mirror-result, auto-merge),
+    all with the same notify-<id> task_id, which safe_write_inbox rotates as
+    `.1.json`, `.2.json`. Counting these as retries is the same v1 measurement
+    bug that PR #33 fixed in Ledger's compute_retry_overhead one level up.
+
     Returns a list of {task_id, agent, retry_count} sorted desc by retries.
     """
     counts: dict[tuple[str, str], int] = {}
@@ -147,6 +156,9 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
                 base = parts[0]
             else:
                 base = stem
+            # Exclude workflow notify-* rotations. These are not retries.
+            if infer_task_type(base) == "notification":
+                continue
             key = (agent_dir.name, base)
             counts[key] = counts.get(key, 0) + 1
     repeats = [
