@@ -2,8 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(bash:*)",
-      "Bash(gh pr merge:*)",
-      "Bash(git branch:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(pytest:*)",
       "Bash(python3:*)"
     ]
   }
