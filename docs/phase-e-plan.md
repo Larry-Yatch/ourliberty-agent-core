@@ -55,13 +55,14 @@ What we are NOT building in E: production-grade deploys, custom Supabase per pro
 | Phase | Goal | Est. effort | Depends on | Status |
 |---|---|---|---|---|
 | **E1** | Hardening (markers, watcher, auto-merge) | ~3 days (actual: ~1 day) | — | **Done 2026-05-19** (PRs #40, #41, #42, #43) |
-| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1 | Not started |
+| **E1.5** | Credential rotation discipline | ~1 day | E1 | In flight 2026-05-19 (design PR opened; Forge build dispatch next) |
+| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | E2.0 done 2026-05-19; E2.1 next |
 | **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | Not started |
 | **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started |
 | **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | **Done 2026-05-19** (PRs #37, #38, #39) |
 | **E6** | Bench items (Ledger, audit logger, Guardian, prod deploy, etc.) | — | Trigger-based | Deferred |
 
-Critical path: **E1 → E2 → E3 → E4**. E5 can run in parallel with any of E1–E4.
+Critical path: **E1 → E1.5 → E2 → E3 → E4**. E5 can run in parallel with any of these.
 
 ---
 
@@ -115,6 +116,63 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
 
 ---
 
+## Phase E1.5 — Credential Rotation Discipline
+
+**Goal:** Make credential rotation a system primitive instead of a Larry-remembering responsibility. Every credential ships with a registry entry + runbook + Beacon-owned calendar event; a drift healer fails closed on any credential found in a credential store without a matching registry entry.
+
+**Why inserted between E1 and E2:** Surfaced during E2.0 Vercel token install on 2026-05-19. Auditing `.env.larry` revealed 8 active credentials across 4 storage locations (`.env.larry`, gh CLI keychain, Claude Max OAuth, workspace-mcp OAuth), 17 empty template placeholders accumulated since Phase A, and zero tracking of rotation cadences. The DigitalOcean template comment "rotate every 90 days" had been silent for 11 days. Larry's framing: *"We need to make that a part of the system."* Doing this now means E2 + E3 + every future credential ship with the discipline baked in.
+
+**Plain-language framing for the learning curve:**
+
+- **Credential rotation** = swapping out a long-lived secret (API key, OAuth token) on a schedule, so that even if a leak happens, the leaked value stops working after a known window.
+- **Registry** = a list, in JSON, of every credential the system knows about. Each entry says where the credential is stored, when it was last rotated, when it's due next, and a link to the rotation runbook.
+- **Drift healer** = a small Python script run by systemd every 6 hours; reads the registry + the actual credential stores; DMs Larry if anything is in one place but not the other.
+
+### Prerequisites
+- E1 complete (the drift healer is a sibling pattern to `heal_pr_auto_merge`; both are defense-in-depth periodic scripts)
+- Phase E2.0 done (Vercel token installed; it's the first credential to populate the registry)
+
+### Decisions locked 2026-05-19
+- Default cadence for credentials without a vendor-mandated schedule: **365 days** (Q1 Dial 4 — matches Vercel; cognitive load matches; vendor-mandated overrides this on a per-entry basis)
+- Drift healer posture: **fail-closed, DM every 6h until reconciled** (Q2 Option A)
+- Cleanup posture for empty `.env.larry` slots: **remove them, re-add with full discipline when needed** (Q1 of cleanup pair, Option B)
+- Registry scope: **all credential stores, not just `.env.larry`** (Q2 of cleanup pair, Option B)
+- `scope_audit` DM body when due: **(B) Pulse runs usage analysis + proposes specific drops** ("scopes-used-in-last-90-days" — `scripts/scope_usage_tracker.py` instruments gh CLI / workspace-mcp / Vercel API call sites, logs to `~/agents/blackboard/scope-usage.jsonl`)
+
+### Tasks
+
+**E1.5.1 — Design artifacts** (~½ day, Claude-driven) — **THIS PR**
+
+- `config/token-rotation-schedule.json` — registry with all 8 entries populated
+- `docs/runbooks/rotate-vercel-token.md` — canonical runbook (template for the other 7)
+- `shared/credentials-discipline.md` — Mirror-enforced 4-artifact rule
+- This phase plan + docs/roadmap.md drift cleanup
+
+**E1.5.2 — Implementation** (~½ day, Forge dispatch) — **NEXT PR**
+
+- `scripts/validate_token_rotation_schedule.py` — JSON schema validator + tests
+- `scripts/heal_credential_registry_drift.py` — every-6h drift detection + DM (default dry-run; activation pattern from `heal_pr_auto_merge`)
+- `runbooks/cycle-prompt.md` Pulse extension — "any rotation within 60d? DM Larry" check
+- `scripts/scope_usage_tracker.py` — instrument gh CLI + workspace-mcp + Vercel API call sites with scope-tagged log emits
+- 7 templated runbooks: `rotate-telegram-bot-token.md`, `audit-github-gh-oauth.md`, `audit-claude-max-oauth.md`, `audit-google-oauth.md`, + stubs for the future Aide / Supabase / DO / Cloudflare credentials (to be filled when those land)
+- Beacon batch-dispatch: 3 additional calendar events (GitHub gh-OAuth annual scope audit + Claude Max annual audit + Google OAuth annual scope audit). Telegram bot tokens get no scheduled event; Vercel is already done.
+- `.env.larry` cleanup on droplet: remove the 17 empty template lines
+- New systemd unit + timer for the drift healer
+
+**Success criteria:**
+- Validator passes on `config/token-rotation-schedule.json`
+- Drift healer dry-run reports zero drift against current state
+- Pulse cycle DM check fires correctly when a `next_rotation_due` is within 60 days (live-test with a synthetic past-due entry)
+- Larry receives a single batch DM from Beacon confirming the 3 new calendar events
+
+### Deferred from E1.5 (intentionally)
+- Multi-operator support (`owner_role` already in schema, but no real operator other than Larry today)
+- Automated rotation (Vercel/GitHub PATs aren't programmatically rotatable; would require vendor SDKs)
+- Pre-commit credential scanner (separate hygiene tool; revisit in E6 if needed)
+- Aide bot Telegram token registry entry — wait until the Aide agent is actually built
+
+---
+
 ## Phase E2 — Deploy Layer (Vercel Preview-First)
 
 **Goal:** When Forge ships a PR on a configured product repo, a Vercel preview URL is automatically posted to Telegram. That's the whole MVP.
@@ -132,12 +190,14 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
 
 ### Tasks
 
-**E2.0 — One-time Vercel setup walkthrough** (~30 min, Larry-driven, I narrate)
+**E2.0 — One-time Vercel setup walkthrough** (~30 min, Larry-driven, I narrate) — **DONE 2026-05-19**
 
 - Sign up for Vercel with GitHub auth
-- Generate a personal access token, scope: `Full Access` (we'll restrict later)
-- Add token to droplet: `/etc/systemd/system/ourliberty-secrets.env`, mode 0600 (matches existing pattern)
-- Note: NEVER commit the token; it goes in the secrets env file only (see `feedback_security_no_plaintext_secrets`)
+- Generate a 1-year personal access token, scope: `Full Account` (Hobby tier has no finer-grained option)
+- Add token to droplet: `/home/larry/credentials/.env.larry` as `VERCEL_TOKEN=...` (mode 0600, owner `larry:larry`; matches the existing template's reserved slot — the file is the systemd-units' `EnvironmentFile=` reference, NOT `/etc/systemd/system/ourliberty-secrets.env` as the original plan said)
+- The `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` slots already exist in the template (empty); they fill in E2.3 when the dashboard Vercel project is connected
+- Note: NEVER commit the token; it goes in `.env.larry` only (see `feedback_security_no_plaintext_secrets`)
+- Token rotation discipline lives in `config/token-rotation-schedule.json` per E1.5 (see below); Beacon owns the calendar event
 
 **E2.1 — `config/deploy_targets.json`** (~½ day)
 
@@ -345,11 +405,11 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-19 (end of session)
-**Current phase:** E1 + E5 both **DONE**. Next phase: **E2 (Vercel deploy layer)**.
-**Next concrete action:** Kick off E2.0 — one-time Vercel setup walkthrough with Larry. Then E2.1 (`config/deploy_targets.json`), E2.2 (`scripts/deploy_notifier.py`), E2.3 (connect first repo to Vercel + end-to-end smoke).
+**Last updated:** 2026-05-19 (mid-session — E2.0 + E1.5 design landed)
+**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **in flight** (design PR opened; Forge build dispatch next).
+**Next concrete action:** Land the E1.5 design PR (this one), then dispatch Forge for E1.5.2 implementation. After E1.5 closes, resume E2.1 (`config/deploy_targets.json`).
 **Blockers:** None
-**Open questions for Larry:** None outstanding from E1/E5. E2 will surface its own (Vercel account email, GitHub-vs-token auth, dashboard repo name).
+**Open questions for Larry:** None outstanding. E2.1 will surface design questions when it kicks off.
 
 **E1 completion summary (2026-05-19):**
 - ✅ **E1.1** — `render_marker` helpers in 3 handlers + `scripts/marker.py` CLI + drift tests (PR #40). 167 tests pass; agents now produce canonical marker text via Bash instead of hand-typing delimiters. PR #16's silent-dead-letter shape (bare `REVIEW_PASS`) made structurally impossible.
