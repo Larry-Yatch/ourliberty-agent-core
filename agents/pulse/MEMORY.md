@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-19 (Iteration 51)
+## Status snapshot — updated 2026-05-19 (Iteration 52)
 
-Fifty-one cycles/responses run. **System: ✅ Nominal.** PR #38 (Beacon E5 Drive/Doc conventions + workspace-mcp wire-up) merged 2026-05-19T16:10Z. All checks nominal — A/B/C/D/E/F/H clean. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]); no stuck cycle this invocation.
+Fifty-two cycles/responses run. **System: ⚠️ Drift.** Local main 1 commit ahead of origin/main (ac247e2 not pushed — push_with_rebase failed silently for iter 51 auto-commit). Expect self-resolution when automated cycle PID 541629 completes. All other checks nominal — B/C/D/E/F/H clean. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -45,6 +45,9 @@ Fifty-one cycles/responses run. **System: ✅ Nominal.** PR #38 (Beacon E5 Drive
 - **2026-05-15 — D3.5 infrastructure decommission. CLOSED iter 35.** Pattern: 4 services (ourliberty-orchestrator, ourliberty-telegram-webhook, ourliberty-github-webhook, ourliberty-merge-watcher.timer) showed as inactive every cycle from iter 23 onward (12 consecutive, iters 23–34). Permanent fix: PR #18 "pulse: close iter 23b — codify D3.5 active-set + decommissioned services" merged 2026-05-15T05:51Z. `runbooks/cycle-prompt.md` Check C codifies the 6-unit active set + 4 decommissioned services as explicit "do not escalate" exclusion list. iter 23b escalation marked resolved. **Closed. No further tracking needed.**
 
 ## Pending watch items (not yet patterns)
+
+- **2026-05-19 — push_with_rebase silent failure (1st post-resolution occurrence, iter 52).** ac247e2 ("Pulse cycle 20260519T164200Z") present in local git log but not on origin/main (origin tracking ref = 6c301ee). Sync at 20:02Z ran ff-only, was a no-op (local ahead). Root cause: push_with_rebase ran during run_cycle.sh for iter 51 auto-commit and failed silently (|| true). Expect self-resolution when automated cycle PID 541629 completes. If Check A is still "ahead" at iter 53, escalate to [yellow] and add to watch. If 3 occurrences in 10 cycles: dispatch to Beacon (Forge fix: improve push_with_rebase failure visibility / retry loop in run_cycle.sh).
+
 
 - **2026-05-18 — pulse_check_i.py journal writes not auto-committed (1st Monday, 3 blocks).** pulse_check_i.py ran three times on 2026-05-18: skip (pre-sentinel), first digest (23.6% — pre-fix), corrected digest (3.8% — post-PRs #33+#35). Each appended to journal; no commit step. Also: no idempotency guard — Check I re-runs whenever sentinel+sidecar present, regardless of prior run today. **If recurs 2026-05-25 (2nd Monday), dispatch to Beacon:** (a) add commit step to pulse_check_i.py after journal write; (b) add idempotency guard (skip if check-i-<week>.json already written at mode=digest today). Monitoring.
 
