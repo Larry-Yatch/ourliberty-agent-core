@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-18 (Iteration 46)
+## Status snapshot — updated 2026-05-19 (Iteration 47)
 
-Forty-six cycles/responses run. **System: ⚠️ Minor drift (dirty tree — 3 Check I blocks uncommitted; sync error 893d2a1).** PRs #31–#35 (bots+cycle+ledger+cost-capture+pulse-check-i fixes) merged 2026-05-18T18:38–18:57Z. Check I week-1 baseline corrected: $115.91/wk, **3.8% retry overhead** (not 23.6% — notify-* was misclassified as retries; PRs #33+#35 fixed). 1 remaining proposal: template opmanual-d35-5b-shipped-note-001. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
+Forty-seven cycles/responses run. **System: ✅ Nominal.** PR #36 (Phase E plan spec) merged 2026-05-18T23:55Z. First fully clean A+B+C+D+E interactive cycle since iter 41. Sync success at 23:59Z (81c76d0). Check I week-1 baseline: $115.91/wk, 3.8% retry overhead, 1 open proposal (template opmanual-d35-5b-shipped-note-001). Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
