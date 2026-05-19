@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-19 (Iteration 47)
+## Status snapshot — updated 2026-05-19 (Iteration 49)
 
-Forty-seven cycles/responses run. **System: ✅ Nominal.** PR #36 (Phase E plan spec) merged 2026-05-18T23:55Z. First fully clean A+B+C+D+E interactive cycle since iter 41. Sync success at 23:59Z (81c76d0). Check I week-1 baseline: $115.91/wk, 3.8% retry overhead, 1 open proposal (template opmanual-d35-5b-shipped-note-001). Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
+Forty-nine cycles/responses run. **System: ⚠️ Drift — stuck automated cycle.** PR #37 (Beacon E5 Google Workspace conventions) merged 2026-05-19T02:09Z. Diverged-repo cluster (19+ consecutive failures, old iter numbering) fully resolved — Check A nominal since iter 47. Sync nominal. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow], PID 508506, 6h03m elapsed iter 49).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -52,7 +52,7 @@ Forty-seven cycles/responses run. **System: ✅ Nominal.** PR #36 (Phase E plan 
 
 - **2026-05-18 — Check I week-1 baseline (CORRECTED): $115.91/week, 3.8% retry overhead ($4.44).** PRs #33+#35 fixed notify-* misclassification; corrected run shows 3.8% (not 23.6%). Proposal 1 (investigate retry sources) effectively resolved — dominant source was notify-* misclassification. 1 remaining proposal: [medium] template opmanual-d35-5b-shipped-note-001 (4 forge repeats). Holding Beacon dispatch until week 2 (2026-05-25) confirms whether the template shape is structural.
 
-- **2026-05-15 — Stuck automated cycle: awaiting Larry approval (iter 43).** 3rd occurrence (iters 8, 39, 41). Spec confirmed sound (iter 42): `CYCLE_TIMEOUT_SEC=1800` + `timeout` wrapper + exit-124 TIMED OUT log line in `scripts/run_cycle.sh`. **Blocked on Larry authorization.** Larry must: (A) message Beacon via Telegram → fresh APPROVAL_REQUEST → approve; (B) approve prior APPROVAL_REQUEST if still in bot queue; or (C) edit `scripts/run_cycle.sh` directly in terminal (line 50: wrap `claude --print ...` with `timeout 1800`). Escalated iter 43 [yellow]. task_id=pulse-cycle-timeout-guard-001. Close when fix lands and 5+ consecutive automated runs show no stuck cycle.
+- **2026-05-19 — Stuck automated cycle: iter 49 occurrence (PID 508506, 6h03m).** Multiple occurrences across cycle history (iters 8, 39, 41, 46, 48, 52, 49). Spec confirmed sound (iter 43): `CYCLE_TIMEOUT_SEC=1800` + `timeout` wrapper + exit-124 TIMED OUT log line in `scripts/run_cycle.sh`. **Blocked on Larry authorization.** Paths: (A) message Beacon via Telegram → fresh APPROVAL_REQUEST → approve; (B) edit `scripts/run_cycle.sh` directly in terminal (add CYCLE_TIMEOUT_SEC=1800, wrap `claude --print ...` with `timeout "$CYCLE_TIMEOUT_SEC"`, log exit-124). Escalated iter 43 [yellow], renewed iter 49. To kill current stuck cycle: `kill 508511 508506 && rm ~/agents/state/.cycle.lock`. Close when fix lands and 5+ consecutive automated runs show no stuck cycle.
 
 - **CLOSED 2026-05-15 — PR #20 Mirror review dispatch gap.** PR #20 "docs: land specs for Ledger + Pulse Check I" merged 2026-05-15T20:45Z. Beacon catch-up dispatch (iter 44) worked. Check I spec shipped in PR #28 (2026-05-16).
 
