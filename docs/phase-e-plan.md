@@ -345,9 +345,9 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-18 (late session)
-**Current phase:** E5 — Google Suite via MCP — verified live via CLI, Telegram smoke test in progress
-**Next concrete action:** After Telegram smoke confirms, commit `agents/beacon/.claude/settings.json` change (currently only on droplet) and tackle E5.3 (spec workflow update in Beacon's CLAUDE.md). Then E1 hardening.
+**Last updated:** 2026-05-19 (mid session)
+**Current phase:** E5 — Google Suite via MCP — claude.ai connectors stable + workspace-mcp wired for Doc editing. E5.3 docs in progress.
+**Next concrete action:** Land this PR (settings.json + google-workspace.md + this file). Then write the E5.3 section in `agents/beacon/CLAUDE.md` (spec-drafting workflow with Google Docs — Doc-as-surface, marker-as-source-of-truth, offer-to-summarize). Then real Beacon Telegram smoke. Then E1 hardening.
 **Blockers:** None
 **Open questions for Larry:** None outstanding
 
@@ -367,14 +367,22 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 **Architecture decisions locked this session:**
 - Droplet uses a dedicated Anthropic Max plan, NOT API key auth (Larry preferred OAuth-based subscription billing over per-token)
 - Droplet's claude.ai account = agent.beacon.ourliberty@gmail.com (same email as Google identity, simpler)
-- Drive connector has no `share_file` / `set_permissions` tool — known gap for "Beacon drafts spec doc and shares to Larry's personal account." Workaround in E5.3.
 - delete-class tools intentionally excluded from Beacon allow list (Beacon should not be able to delete user data without explicit approval)
 
+**E5 update (2026-05-19 — workspace-mcp wired):**
+- ✅ Decision: Path 1 (re-enable existing workspace-mcp install on droplet) over Path 3 (custom Google Docs API wrapper). Probe-first strategy — if workspace-mcp proves reliable in real use, we keep it; otherwise we revisit a thin custom wrapper.
+- ✅ `claude mcp add workspace-mcp --scope user -e GOOGLE_OAUTH_CLIENT_ID=... -e GOOGLE_OAUTH_CLIENT_SECRET=... -- uvx --from workspace-mcp workspace-mcp --single-user --tools docs drive --transport stdio` registered.
+- ✅ OAuth user-token bootstrapped via PTY orchestrator + SSH-tunneled localhost:8000 (same pattern as `claude auth login`). Token at `~/.google_workspace_mcp/credentials/agent.beacon.ourliberty@gmail.com.json` (NOT `~/.config/workspace-mcp/` — gotcha, doc updated).
+- ✅ Required adding `agent.beacon.ourliberty@gmail.com` as a Test User in Cloud Console (`beacon-agent` project, OAuth consent screen). Standard for unpublished OAuth clients in Testing mode.
+- ✅ End-to-end smoke verified: `create_doc` → `update_drive_file` (move to `Shared with Larry/inbox/`) → `find_and_replace_doc` → `modify_doc_text` (append) → `get_doc_as_markdown` (readback). Sharing inheritance works on a move; Larry confirmed doc visible in his personal Drive.
+- ✅ Closes the known E5 share-file gap: workspace-mcp DOES have `set_drive_file_permissions` + `manage_drive_access`. We **intentionally excluded** them from Beacon's allowlist (same posture as delete tools — sharing changes escalate to Larry).
+- ✅ Convention nailed: workspace-mcp owns Docs/Drive primary ownership; claude.ai connectors stay for Gmail/Calendar; claude.ai Drive kept as fallback for week 1 then pruned.
+- ✅ Beacon `.claude/settings.json` allowlist expanded from 27 → 56 tools (added 29 workspace-mcp tools, excluded 6: `start_google_auth`, both `debug_*`, `check_drive_file_public_access`, `manage_drive_access`, `set_drive_file_permissions`).
+
 **Known follow-ups (small):**
-- `agents/beacon/.claude/settings.json` change is only on droplet; needs to land in repo via PR (small)
-- Personal credentials backups in `~/.claude/` (3 files) can be cleaned up once new auth is fully validated (~1 day)
-- workspace-mcp registration removed but install + OAuth client + client_secret.json remain on droplet (~5 min cleanup if desired)
-- E5.3 (spec workflow update in Beacon's CLAUDE.md): teach Beacon when to draft to Google Docs vs Telegram, and how to handle the doc-sharing-back-to-Larry workflow
+- Personal credentials backups in `~/.claude/` (3 files) can be cleaned up once new auth is fully validated — auth has been stable >24h as of 2026-05-19.
+- Smoke-test Doc `2026-05-19 - workspace-mcp smoke test` in `Shared with Larry/inbox/` should be deleted by Larry (Beacon can't — intentionally) once we're past the smoke phase.
+- E5.3 (spec workflow update in Beacon's CLAUDE.md): teach Beacon when to draft to Google Docs vs Telegram, and how the Doc → marker → Forge dispatch flow works. Design agreed: Doc-as-surface, marker-as-source-of-truth, offer-to-summarize.
 
 **Recent commits in agent-core that bear on this plan:**
 - PR #30 — per-agent allowlist sweep (related to E1 hardening posture)
