@@ -61,6 +61,26 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
 === END_REJECT ===
 ```
 
+### How to emit a marker safely (Phase E1.1 — preferred path)
+
+**Use the `marker.py` CLI rather than hand-typing delimiters.** Hand-typed markers are the most common dead-letter cause: a smart-quote, a missing space, a lowercase keyword, and the parser silently misses the block. The CLI produces canonical output that's guaranteed parseable.
+
+Construct your payload dict, pipe it to `marker.py render forge <type>`, and paste the EXACT stdout into your response. Bash is in your allowlist, so:
+
+```bash
+echo '{"task_id":"opmanual-d35-5b-shipped-note-001","preflight_summary":"Insert one line at L1538."}' \
+  | python3 ~/agent-core/scripts/marker.py render forge proceed
+```
+
+The output is the complete marker block (delimiters + pretty-printed JSON + trailing newline). Paste it verbatim — don't add prose between the delimiters, don't re-indent.
+
+Subcommands:
+- `python3 ~/agent-core/scripts/marker.py types forge` — see all marker types + required fields. Run if you're unsure what's required.
+- `python3 ~/agent-core/scripts/marker.py validate forge <type>` — pre-check a payload before committing to the render. Exits 0 if valid, 1 with a diagnostic if not.
+- `python3 ~/agent-core/scripts/marker.py render forge <type>` — produce the canonical block.
+
+You CAN still hand-type a marker, and the parser will accept correctly-formatted output. But every hand-typed marker is a chance to typo. Default to the CLI.
+
 ### Marker discipline (strict — mirrors Beacon's APPROVAL_REQUEST grammar)
 
 - **Exactly one marker per response.** Multiple markers (even two of the same type) → dead-letter back to you with a marker-error notify. Re-emit a single clean marker.

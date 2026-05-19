@@ -158,6 +158,17 @@ MARKER_TYPES = (
     'review_pass', 'review_revision', 'review_escalate', 'review_emergency_halt',
 )
 
+# Canonical KEYWORD for each marker type. The render path uses this to build
+# the block delimiters; the parse path uses regex constants above. Both sides
+# must agree — the round-trip tests in scripts/tests/test_mirror_review_handler.py
+# (TestRenderMarker) fail loudly if MARKER_KEYWORDS drifts from the regexes.
+MARKER_KEYWORDS = {
+    'review_pass': 'REVIEW_PASS',
+    'review_revision': 'REVIEW_REVISION',
+    'review_escalate': 'REVIEW_ESCALATE',
+    'review_emergency_halt': 'REVIEW_EMERGENCY_HALT',
+}
+
 # Required fields per marker type. Keep aligned with agents/mirror/CLAUDE.md's
 # Marker formats section — if either side drifts, the contract is broken.
 REQUIRED_FIELDS = {
@@ -208,6 +219,43 @@ class MalformedMirrorMarker(ReviewHandlerError):
 
 class MultipleMirrorMarkers(ReviewHandlerError):
     """Mirror emitted more than one marker — ambiguous which to act on."""
+
+
+# -------------------- marker rendering --------------------
+
+def render_marker(marker_type: str, **payload: Any) -> str:
+    """Build a canonical review-marker block from a payload dict.
+
+    Returns the exact text Mirror should paste into her response — block
+    delimiters + pretty-printed JSON payload + trailing newline. Output is
+    guaranteed parseable by `parse_mirror_marker`; the round-trip test
+    `TestRenderMarker.test_render_then_parse_roundtrip` enforces that.
+
+    Raises ValueError (NOT MalformedMirrorMarker — render-time errors are
+    caller programming errors, not runtime parse failures) if:
+      - marker_type is not in MARKER_TYPES
+      - payload is missing any field in REQUIRED_FIELDS[marker_type]
+
+    Extra fields beyond REQUIRED_FIELDS are allowed and preserved (matches
+    the existing optional-field pattern — e.g., REVIEW_PASS may carry an
+    optional `notes`, REVIEW_EMERGENCY_HALT may carry a `severity` even
+    though it's not strictly required since the marker itself implies it).
+    """
+    if marker_type not in MARKER_TYPES:
+        raise ValueError(
+            f'unknown marker type: {marker_type!r}. '
+            f'Valid types: {sorted(MARKER_TYPES)}'
+        )
+    required = REQUIRED_FIELDS[marker_type]
+    missing = required - set(payload.keys())
+    if missing:
+        raise ValueError(
+            f'render_marker({marker_type!r}): missing required fields: '
+            f'{sorted(missing)}. Required: {sorted(required)}'
+        )
+    keyword = MARKER_KEYWORDS[marker_type]
+    json_body = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False)
+    return f'=== {keyword} ===\n{json_body}\n=== END_{keyword} ===\n'
 
 
 # -------------------- marker extraction --------------------

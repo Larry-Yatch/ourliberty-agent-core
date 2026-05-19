@@ -578,5 +578,76 @@ class BuildBudgetExhaustedReasonTest(unittest.TestCase):
         self.assertIn('0 finding', reason)
 
 
+# -------------------- render_marker (E1.1) --------------------
+
+class RenderMarkerTest(unittest.TestCase):
+    """Render path tests + render <-> parse round-trip (E1.1).
+
+    Complement the parse tests above. If MARKER_KEYWORDS drifts from the
+    parser's regex source, the round-trip cases fail. If a new marker type
+    is added to MARKER_TYPES without extending MARKER_KEYWORDS or
+    REQUIRED_FIELDS, the schema-coverage test fails.
+
+    The cross-handler drift detector lives in test_marker_drift.py.
+    """
+
+    def _payloads(self) -> dict:
+        return {
+            'review_pass': {
+                'task_id': 't-001', 'pr_url': 'https://github.com/x/y/pull/1',
+                'summary': 'change is correct and complete',
+            },
+            'review_revision': {
+                'task_id': 't-001', 'pr_url': 'https://github.com/x/y/pull/1',
+                'findings': [{'file': 'a.py', 'line': 1, 'issue': 'typo'}],
+                'severity': 'medium', 'confidence': 'high',
+            },
+            'review_escalate': {
+                'task_id': 't-001', 'pr_url': 'https://github.com/x/y/pull/1',
+                'reason': 'spec is internally inconsistent',
+                'severity': 'high', 'confidence': 'high',
+            },
+            'review_emergency_halt': {
+                'task_id': 't-001', 'pr_url': 'https://github.com/x/y/pull/1',
+                'reason': 'plaintext credential detected in diff',
+                'evidence': 'OPENAI_API_KEY=sk-abc... in config.py:12',
+            },
+        }
+
+    def test_render_then_parse_roundtrip(self):
+        for mtype, payload in self._payloads().items():
+            with self.subTest(mtype=mtype):
+                rendered = mrh.render_marker(mtype, **payload)
+                ptype, ppayload, narrative = mrh.parse_mirror_marker(rendered)
+                self.assertEqual(ptype, mtype)
+                self.assertEqual(ppayload, payload)
+                self.assertEqual(narrative.strip(), '')
+
+    def test_unknown_marker_type_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'unknown marker type'):
+            mrh.render_marker('bogus', task_id='t-001')
+
+    def test_missing_required_field_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'missing required fields'):
+            mrh.render_marker(
+                'review_pass', task_id='t-001', pr_url='https://x/y/pull/1',
+            )  # missing summary
+
+    def test_extra_fields_preserved_in_payload(self):
+        rendered = mrh.render_marker(
+            'review_pass',
+            task_id='t-001', pr_url='https://x/y/pull/1', summary='ok',
+            notes='all green on CI',
+        )
+        _, parsed, _ = mrh.parse_mirror_marker(rendered)
+        self.assertEqual(parsed.get('notes'), 'all green on CI')
+
+    def test_keyword_and_required_fields_cover_every_marker_type(self):
+        for mtype in mrh.MARKER_TYPES:
+            with self.subTest(mtype=mtype):
+                self.assertIn(mtype, mrh.MARKER_KEYWORDS)
+                self.assertIn(mtype, mrh.REQUIRED_FIELDS)
+
+
 if __name__ == '__main__':
     unittest.main()

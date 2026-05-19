@@ -100,6 +100,24 @@ APPROVAL_MARKER_RE = re.compile(
     re.DOTALL,
 )
 
+# E1.1: marker grammar registry, mirrors forge_preflight_handler and
+# mirror_review_handler. Beacon has just one marker type today; the registry
+# shape stays symmetric so render_marker has the same signature across all
+# three handlers and the drift-detector test
+# (scripts/tests/test_marker_drift.py) can iterate every handler uniformly.
+MARKER_TYPES = ('approval_request',)
+
+MARKER_KEYWORDS = {
+    'approval_request': 'APPROVAL_REQUEST',
+}
+
+# Required fields per marker type. Kept aligned with extract_approval_request's
+# inline check below and with agents/beacon/CLAUDE.md's marker example. Single
+# source of truth — the parser reads from this; the renderer reads from this.
+REQUIRED_FIELDS = {
+    'approval_request': {'task_id', 'summary', 'target_agent', 'prompt'},
+}
+
 # Reminder schedule (hours after creation).
 REMINDER_HOURS = [6, 24, 72]
 
@@ -167,6 +185,43 @@ def parse_user_reply(text: str) -> dict[str, Any]:
     return {'action': 'none'}
 
 
+# -------------------- marker rendering --------------------
+
+def render_marker(marker_type: str, **payload: Any) -> str:
+    """Build a canonical approval-marker block from a payload dict.
+
+    Returns the exact text Beacon should paste into her response — block
+    delimiters + pretty-printed JSON payload + trailing newline. Output is
+    guaranteed parseable by `extract_approval_request`; the round-trip test
+    `TestRenderMarker.test_render_then_parse_roundtrip` enforces that.
+
+    Raises ValueError (NOT MalformedApprovalMarker — render-time errors are
+    caller programming errors, not runtime parse failures) if:
+      - marker_type is not in MARKER_TYPES (today: only 'approval_request')
+      - payload is missing any field in REQUIRED_FIELDS[marker_type]
+
+    Extra fields beyond REQUIRED_FIELDS are allowed and preserved (matches
+    the existing optional-field pattern — e.g., approval_request supports
+    `target_repo`, `task_type`, `changed_files`, `pr_title`,
+    `pr_body_template`, `max_clarifications`, `phase`, `reply_chat_id`).
+    """
+    if marker_type not in MARKER_TYPES:
+        raise ValueError(
+            f'unknown marker type: {marker_type!r}. '
+            f'Valid types: {sorted(MARKER_TYPES)}'
+        )
+    required = REQUIRED_FIELDS[marker_type]
+    missing = required - set(payload.keys())
+    if missing:
+        raise ValueError(
+            f'render_marker({marker_type!r}): missing required fields: '
+            f'{sorted(missing)}. Required: {sorted(required)}'
+        )
+    keyword = MARKER_KEYWORDS[marker_type]
+    json_body = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False)
+    return f'=== {keyword} ===\n{json_body}\n=== END_{keyword} ===\n'
+
+
 # -------------------- Beacon marker extraction --------------------
 
 def extract_approval_request(beacon_response: str) -> tuple[Optional[dict[str, Any]], str]:
@@ -194,8 +249,9 @@ def extract_approval_request(beacon_response: str) -> tuple[Optional[dict[str, A
         raise MalformedApprovalMarker(
             f'approval marker payload must be a JSON object, got {type(payload).__name__}'
         )
-    # Validate the minimum required fields.
-    required = {'task_id', 'summary', 'target_agent', 'prompt'}
+    # Validate the minimum required fields. Sourced from module-level
+    # REQUIRED_FIELDS so the renderer and parser stay in lockstep.
+    required = REQUIRED_FIELDS['approval_request']
     missing = required - set(payload.keys())
     if missing:
         raise MalformedApprovalMarker(

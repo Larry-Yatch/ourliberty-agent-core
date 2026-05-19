@@ -776,5 +776,61 @@ class DispatchApprovedPropagatesReplanCountTest(unittest.TestCase):
         self.assertEqual(data['max_replans'], ah.DEFAULT_MAX_REPLANS)
 
 
+# -------------------- render_marker (E1.1) --------------------
+
+class RenderMarkerTest(unittest.TestCase):
+    """Render path tests + render <-> parse round-trip (E1.1).
+
+    Beacon has just one marker type today ('approval_request'); the test
+    shape stays symmetric with the Forge / Mirror handler tests so the
+    drift detector (test_marker_drift.py) can iterate uniformly.
+    """
+
+    def _payload(self) -> dict:
+        return {
+            'task_id': 't-001',
+            'summary': 'add a render_marker helper to Forge handler',
+            'target_agent': 'forge',
+            'prompt': 'GOAL: add render_marker. CONTEXT: see scripts/...',
+        }
+
+    def test_render_then_parse_roundtrip(self):
+        rendered = ah.render_marker('approval_request', **self._payload())
+        parsed, narrative = ah.extract_approval_request(rendered)
+        self.assertEqual(parsed, self._payload())
+        self.assertEqual(narrative.strip(), '')
+
+    def test_unknown_marker_type_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'unknown marker type'):
+            ah.render_marker('bogus', task_id='t-001')
+
+    def test_missing_required_field_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'missing required fields'):
+            ah.render_marker(
+                'approval_request', task_id='t-001', summary='x', target_agent='forge',
+            )  # missing prompt
+
+    def test_extra_fields_preserved_in_payload(self):
+        rendered = ah.render_marker(
+            'approval_request',
+            **self._payload(),
+            target_repo='ourliberty-agent-core',
+            task_type='feature-development',
+            pr_title='feat: render marker',
+            phase='preflight',
+            reply_chat_id='12345',
+        )
+        parsed, _ = ah.extract_approval_request(rendered)
+        self.assertEqual(parsed.get('target_repo'), 'ourliberty-agent-core')
+        self.assertEqual(parsed.get('phase'), 'preflight')
+        self.assertEqual(parsed.get('reply_chat_id'), '12345')
+
+    def test_keyword_and_required_fields_cover_every_marker_type(self):
+        for mtype in ah.MARKER_TYPES:
+            with self.subTest(mtype=mtype):
+                self.assertIn(mtype, ah.MARKER_KEYWORDS)
+                self.assertIn(mtype, ah.REQUIRED_FIELDS)
+
+
 if __name__ == '__main__':
     unittest.main()

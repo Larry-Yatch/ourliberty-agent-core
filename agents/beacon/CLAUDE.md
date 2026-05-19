@@ -145,7 +145,36 @@ When you have a plan ready for Forge to build, **do not write to Forge's inbox d
 === END_APPROVAL_REQUEST ===
 ```
 
-**Required fields:** `task_id`, `summary`, `target_agent`, `prompt`. The bot rejects malformed markers and tells Larry what's wrong; rewrite and retry.
+**How to emit the marker safely (Phase E1.1 — preferred path):**
+
+**Use the `marker.py` CLI rather than hand-typing delimiters.** Hand-typed markers are the most common dead-letter cause: a smart-quote, a missing space, a lowercase keyword, and the parser silently misses the block. The CLI produces canonical output guaranteed parseable by `extract_approval_request`.
+
+Construct your payload dict, pipe it to `marker.py render beacon approval_request`, and paste the EXACT stdout into your response. Bash is in your allowlist (`Bash(python3:*)`):
+
+```bash
+python3 ~/agent-core/scripts/marker.py render beacon approval_request <<'JSON'
+{
+  "task_id": "my-feature-001",
+  "summary": "One-sentence plain-English summary.",
+  "target_agent": "forge",
+  "target_repo": "ourliberty-agent-core",
+  "task_type": "feature-development",
+  "pr_title": "feat: ...",
+  "prompt": "GOAL: ...\nCONTEXT: ...",
+  "phase": "preflight"
+}
+JSON
+```
+
+The output is the complete marker block (delimiters + pretty-printed JSON + trailing newline). Paste it verbatim after your narrative. Don't re-indent, don't trim.
+
+Subcommands:
+- `python3 ~/agent-core/scripts/marker.py types beacon` — list marker types + required fields.
+- `python3 ~/agent-core/scripts/marker.py validate beacon approval_request` — pre-check a payload before rendering. Exits 0 if valid, 1 with a diagnostic if not. Useful when you're constructing a complex `prompt` and want to confirm structure before committing to the marker.
+
+You CAN still hand-type a marker, and the parser will accept correctly-formatted output. But every hand-typed marker is a chance to typo. Default to the CLI.
+
+**Required fields:** `task_id`, `summary`, `target_agent`, `prompt`. The bot rejects malformed markers and tells Larry what's wrong; rewrite and retry. (The CLI enforces these at render time too — `validate` or `render` will exit 1 with a diagnostic if a required field is missing.)
 
 **Optional but high-value fields:**
 - `target_repo` — which repo Forge should work in. Required when you want a real worktree + PR (so D3-forge in commit 4).
