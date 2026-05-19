@@ -390,20 +390,13 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         else None
     )
 
-    # Identity-assertion preamble (Phase D2.5 Call A: on by default).
-    # expected_agent is implicit from inbox path (Call B). The preamble is
-    # idempotent — agent_runner skips it if the marker is already present.
-    # Skipped on --resume because identity was established on the original
-    # invocation and re-asserting it on every resumed turn is noise.
-    expected_agent = agent
-    base_prompt = task["prompt"]
-    if (
-        not resume_session_id
-        and agent_runner.IDENTITY_ASSERTION_MARKER not in base_prompt
-    ):
-        prompt = agent_runner.build_expected_agent_assertion(expected_agent) + base_prompt
-    else:
-        prompt = base_prompt
+    # Identity-assertion preamble (Phase D2.5 Call A: on by default;
+    # E1.2: gating moved INTO agent_runner.run_claude). expected_agent is
+    # implicit from the inbox path (Call B). run_claude handles the three
+    # idempotency conditions itself: skips when session_id is set (resume),
+    # when the marker is already present in the prompt, and (trivially)
+    # when expected_agent is None.
+    prompt = task["prompt"]
 
     # Phase D3 commit 4b: per-agent worktree creation. For agents with
     # worktree_enabled in agent-models.json, dispatch happens inside a
@@ -467,6 +460,7 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             model_override=model,
             task_stem=task_id,
             out_meta=meta,
+            expected_agent=agent,
         )
     except Exception as e:
         log(f"[{agent}] agent_runner.run_claude raised on {task_file.name}: {e!r}")
