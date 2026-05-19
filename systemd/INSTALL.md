@@ -101,7 +101,7 @@ sudo cp ~/agent-core/systemd/ourliberty-heal-*.service /etc/systemd/system/
 sudo cp ~/agent-core/systemd/ourliberty-heal-*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 
-# Enable + start all 7 timers at once
+# Enable + start all 8 timers at once
 sudo systemctl enable --now ourliberty-heal-abandoned-inbox-tasks.timer
 sudo systemctl enable --now ourliberty-heal-blocked-inbox-age.timer
 sudo systemctl enable --now ourliberty-heal-empty-inbox-files.timer
@@ -109,6 +109,7 @@ sudo systemctl enable --now ourliberty-heal-recovery-already-merged.timer
 sudo systemctl enable --now ourliberty-heal-restart-dedup-obsolete.timer
 sudo systemctl enable --now ourliberty-heal-silent-loop-death.timer
 sudo systemctl enable --now ourliberty-heal-zombie-main-workers.timer
+sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — runs in DRY-RUN mode by default; see service file for activation
 
 # Confirm
 systemctl list-timers 'ourliberty-heal-*' --all

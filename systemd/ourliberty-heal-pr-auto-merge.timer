@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_pr_auto_merge every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-pr-auto-merge.service
+
+[Install]
+WantedBy=timers.target

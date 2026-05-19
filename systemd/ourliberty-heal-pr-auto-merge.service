@@ -1,0 +1,27 @@
+[Unit]
+Description=Self-healing healer — auto-merge Mirror-PASSed PRs the primary path missed (E1.3)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_pr_auto_merge.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# E1.3 activation gate. Per phase-e-plan: default OFF until verified live.
+# When unset (or != "true"), the healer runs in DRY-RUN mode — it logs
+# candidates and DMs Larry one-time activation instructions, but does not
+# call `gh pr merge`. To activate after verification:
+#   sudo systemctl edit ourliberty-heal-pr-auto-merge.service
+# then add a line in the [Service] section:
+#   Environment="OURLIBERTY_AUTOMERGE_ENABLED=true"
+# then `sudo systemctl restart ourliberty-heal-pr-auto-merge.timer`.
+Environment="OURLIBERTY_AUTOMERGE_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_pr_auto_merge.py
+TimeoutStartSec=120
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-pr-auto-merge
