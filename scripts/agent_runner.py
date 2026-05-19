@@ -346,9 +346,9 @@ def build_expected_agent_assertion(expected_agent):
     """Build a prompt preamble that tells the subprocess to verify its
     loaded CLAUDE.md matches `expected_agent` before doing anything.
 
-    Opt-in: only inserted when the task envelope includes
-    `expected_agent: '<id>'`. Never duplicated (idempotent via marker check
-    by caller).
+    Opt-in: only inserted when the caller declares an expected identity.
+    Never duplicated (idempotent via marker check in
+    `_maybe_prepend_identity_assertion`).
     """
     ea = str(expected_agent).strip().lower()
     return ("=" * 70 + "\n"
@@ -365,6 +365,32 @@ def build_expected_agent_assertion(expected_agent):
             " loaded=<the agent name you actually see>\n\n"
             "If the loaded CLAUDE.md matches `" + ea + "`, proceed normally.\n"
             + "=" * 70 + "\n\n")
+
+
+def _maybe_prepend_identity_assertion(prompt, expected_agent, session_id):
+    """Return `prompt` with the identity-assertion preamble prepended iff:
+      - `expected_agent` is set (caller declared an identity), AND
+      - `session_id` is None (we're not resuming a session — the assertion
+        was made on the original turn, repeating it on every --resume is
+        noise), AND
+      - the marker is not already present (idempotent: caller may have
+        built the prompt with the preamble already in place).
+
+    Otherwise return `prompt` unchanged.
+
+    E1.2: the gating logic used to live in `inbox_watcher.process_task` and
+    in `process_inbox` (still does, for the upstream codepath). Centralizing
+    it here lets every `run_claude` caller get the right thing by default
+    just by passing `expected_agent`. The watcher no longer needs to
+    construct the preamble manually.
+    """
+    if not expected_agent:
+        return prompt
+    if session_id:
+        return prompt
+    if IDENTITY_ASSERTION_MARKER in prompt:
+        return prompt
+    return build_expected_agent_assertion(expected_agent) + prompt
 
 
 CANCEL_DIR = AGENTS_ROOT / 'blackboard'
@@ -451,7 +477,7 @@ def _clear_cancel(task_stem):
 def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                system_prompt_file=None, timeout=14400, context='default',
                model_override=None, session_id=None, effort='high',
-               task_stem=None, out_meta=None):
+               task_stem=None, out_meta=None, expected_agent=None):
     """
     Run a claude CLI command with concurrency guard + token management.
     Max 6 concurrent across entire system to prevent OOM.
@@ -469,6 +495,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
         model, account_id, attempts, started_at, completed_at, duration_sec.
         Callers that don't need cost telemetry can ignore this; the function's
         return value is unchanged for back-compat.
+      expected_agent: If set, prepends an identity-assertion preamble (defined
+        in `build_expected_agent_assertion`) that makes the subprocess refuse
+        if its loaded CLAUDE.md names a different agent. Skipped when
+        session_id is set (preamble was already there on the original turn)
+        or when the marker is already present in `prompt` (idempotent). E1.2
+        moved this gating from the caller into run_claude so every caller
+        gets the right behavior by passing the parameter.
 
     Returns: (success: bool, output_text: str, new_session_id: str | None)
     """
@@ -476,6 +509,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
     _meta_t0 = time.time()
     tm = get_manager()
     guard = get_guard()
+
+    # E1.2: opt-in identity-assertion preamble. Centralized here so callers
+    # don't have to replicate the gating logic. The helper is a no-op when
+    # expected_agent is None.
+    prompt = _maybe_prepend_identity_assertion(prompt, expected_agent, session_id)
 
     # Wait for a concurrency slot (blocks if at capacity)
     if not guard.wait_for_slot(agent_id, timeout=1800):
