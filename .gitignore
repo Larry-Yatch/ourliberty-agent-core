@@ -4,6 +4,7 @@
 !.env.example
 !config/.env.example
 *credentials*
+!shared/credentials-discipline.md
 auth-tokens.json
 webhook-secrets.json
 
