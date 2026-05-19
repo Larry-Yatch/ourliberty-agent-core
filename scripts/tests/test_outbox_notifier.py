@@ -5523,7 +5523,7 @@ class CostBudgetGateTest(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_enforce_refuses_at_cap_and_dms_larry(self):
-        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         ok = on._enforce_cost_budget('t-x', 'build-phase', data)
         self.assertFalse(ok)
@@ -5538,7 +5538,7 @@ class CostBudgetGateTest(unittest.TestCase):
 
     def test_enforce_no_chat_id_still_refuses(self):
         """Refusal happens regardless of reply_chat_id; DM is best-effort."""
-        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
         ok = on._enforce_cost_budget('t-x', 'build-phase', {})
         self.assertFalse(ok)
 
@@ -5547,7 +5547,7 @@ class CostBudgetGateTest(unittest.TestCase):
         within the same daemon-instance suppress the DM (code-review #4).
         """
         import larry_alerts as la
-        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         # First refusal — DM queued.
         on._enforce_cost_budget('t-x', 'build-phase', data)
@@ -5578,8 +5578,8 @@ class CostBudgetGateTest(unittest.TestCase):
         """Cap-fire on task A does NOT suppress DM for task B (different
         task — different dedup bucket)."""
         import larry_alerts as la
-        self._write_costs({'task_id': 't-A', 'cost_usd': 10.0})
-        self._write_costs({'task_id': 't-B', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-A', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 't-B', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         on._enforce_cost_budget('t-A', 'build-phase', data)
         on._enforce_cost_budget('t-B', 'build-phase', data)
@@ -5599,7 +5599,7 @@ class CostBudgetGateTest(unittest.TestCase):
         is intentional: Larry may have raised the cap and a restart
         means the issue might be resolved."""
         import larry_alerts as la
-        self._write_costs({'task_id': 't-x', 'cost_usd': 10.0})
+        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         on._enforce_cost_budget('t-x', 'build-phase', data)
         on._reset_cost_budget_dmed_tasks()  # simulate daemon restart

@@ -103,7 +103,10 @@ class WorktreeLifecycleTest(unittest.TestCase):
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
-        self.tmpdir = Path(self._tmp.name)
+        # Resolve symlinks (e.g. macOS /var/folders -> /private/var/folders)
+        # so path comparisons against `git worktree list --porcelain` output
+        # — which always returns the real path — pass on both Linux and macOS.
+        self.tmpdir = Path(self._tmp.name).resolve()
         self.origin = _make_origin_repo(self.tmpdir)
         self.canonical = _make_canonical_clone(self.tmpdir, self.origin)
         self._wt_base = self.tmpdir / 'wt'
