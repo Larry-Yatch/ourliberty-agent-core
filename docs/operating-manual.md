@@ -1937,6 +1937,62 @@ Verified both daemons reported `inactive` post-trip (halt-honored). The four Tel
 
 **Next:** D3.5 closes. Phase E (Aide agent prototype) is next per `reference_droplet.md`'s deferred list. The 5d-deferred cost-gate-upstream-propagation + costs.jsonl-compaction items wait for organic data before redesign.
 
+## Phase E5 — Google Suite via MCP (2026-05-18 + 2026-05-19, ~2 sessions)
+
+Status: Shipped 2026-05-19. **E5 + E5.3 close.** PRs #37, #38, #39.
+
+Beacon can now create, read, and edit Google Docs/Drive/Gmail/Calendar from the droplet, scoped to the agent's own Google account (`agent.beacon.ourliberty@gmail.com`), fully isolated from Larry's personal Google. Detailed wiring lives in memory `project_phase_e5_complete.md`; concise build narrative here.
+
+**Identity stack locked:**
+- Droplet Claude Code = separate Anthropic Max plan tied to the agent Google account (NOT Larry's personal account, NOT API-key auth — Larry preferred subscription billing).
+- Google identity = same agent email. All Google MCP calls scoped to this account.
+- Larry's personal Anthropic + personal Google = unchanged, used from his laptop only.
+
+**Two MCP servers on droplet:**
+- **workspace-mcp** (`uvx --from workspace-mcp ... --single-user --tools docs drive --transport stdio`) — primary Docs/Drive surface, full editing capability. OAuth token at `~/.google_workspace_mcp/credentials/<email>.json`. Required adding the agent email as a Test User in `beacon-agent` Google Cloud Console (Testing-mode OAuth client).
+- **claude.ai connectors** (Drive/Gmail/Calendar) — Gmail/Calendar primary, Drive kept as week-1 fallback for workspace-mcp.
+
+**Convention codified in `shared/google-workspace.md`:** workspace-mcp owns Docs/Drive primary; claude.ai owns Gmail/Calendar; everything Beacon creates must end up inside `Shared with Larry/<sub-folder>/` (sharing inheritance handles Larry's personal-account visibility). Non-negotiable two-step pattern for workspace-mcp: `create_doc` (lands at root) → `update_drive_file(add_parents=<folder>, remove_parents="root")`. End-to-end smoke verified 2026-05-19; Larry confirmed doc visibility from personal Drive.
+
+**Beacon allowlist:** 57 entries (3 Bash + 25 claude.ai + 29 workspace-mcp). Intentionally excluded for escalation posture: delete-class tools (don't exist in `--tools docs drive` install anyway), `set_drive_file_permissions` + `manage_drive_access` (sharing changes escalate to Larry), `start_google_auth` (operator-only), `debug_*` (debug-only), `check_drive_file_public_access` (low value).
+
+**E5.3 (PR #39) closed the workflow question:** Beacon now knows when to draft specs in a Google Doc vs reply inline in Telegram (heuristic: ~400 words / multi-section / Larry asks → Doc; else inline). The architectural rule: **Doc is the editing surface for Larry; APPROVAL_REQUEST marker `prompt` is the source of truth that reaches Forge.** Beacon reads the final Doc state via `get_doc_as_markdown` at dispatch time, embeds the full body in the marker prompt, includes the Doc URL for human traceability. Forge does NOT have Google MCP tools — marker stays self-contained. Preserves every D3/D3.5 gate. Long-conversation notes-doc summarization is offer-only (5a pattern, no auto-trigger).
+
+**Key lessons / gotchas:**
+- workspace-mcp credential dir is `~/.google_workspace_mcp/credentials/`, NOT `~/.config/workspace-mcp/` (the latter only holds `client_secret.json`). First orchestrator iteration watched the wrong directory for 10 min.
+- OAuth client in Testing mode requires explicitly adding the agent email as a Test User in Cloud Console — even though the agent owns the project, it isn't auto-added.
+- workspace-mcp's `create_doc` doesn't take a folder param. The `update_drive_file` two-step is non-negotiable; conventions doc spells it out.
+- Headless OAuth via PTY orchestrator + SSH-tunneled localhost:8000 pattern (same shape as the `claude auth login` orchestrator) works cleanly. Pattern captured in `feedback_headless_oauth_orchestrator` memory; re-usable for Vercel/GitHub/AWS auth in E2.
+
+**Next:** E1 hardening (same session, same day).
+
+## Phase E1 — Hardening (2026-05-19, ~1 day actual vs ~3 days estimated, 4 PRs)
+
+Status: Shipped 2026-05-19. **E1 closes.** PRs #40, #41, #42, #43.
+
+Three structural cracks closed plus an opportunistic test-hygiene pass. Estimated 3 days; actual ~1 day because D2.5 had already done more than the phase-e-plan reflected when authored, and the framing-first pattern caught the redundancy before code was written.
+
+**E1.1 — `render_marker` helpers + `marker.py` CLI + drift tests (PR #40).** Closed the silent-dead-letter class of bugs that took PR #16 7+ hours to surface. Each handler (`forge_preflight_handler`, `mirror_review_handler`, `beacon_approval_handler`) gained a `MARKER_KEYWORDS` registry + a `render_marker(type, **payload) -> str` function that validates type + required fields, JSON-encodes payload, wraps in canonical delimiters. `scripts/marker.py` exposes `render`/`validate`/`types` subcommands; agents pipe JSON via Bash and paste the output verbatim. New `test_marker_drift.py` cross-handler test catches any future marker type added without a sample payload + render coverage. Each agent's CLAUDE.md gained a "How to emit a marker safely" subsection documenting the CLI path. 167 marker-related tests, all green.
+
+**E1 hygiene pass (PR #41).** While auditing for E1.2, discovered 13 stale test failures across three modules, no production-code touches:
+- `test_worktree_manager` — macOS-only path comparison failures (`/var/folders/...` vs realpath `/private/var/folders/...`). Fixed by `.resolve()` in setUp.
+- `test_outbox_notifier.CostBudgetGateTest` — D3.5 5d raised `loop_bounds.cost_per_task_usd` from $5 → $15; tests still wrote `cost_usd=10.0` expecting refusal. Bumped to $20.
+- `test_ledger` — autonomous PRs #33/#34 changed task_type inference (`unknown` → `unclassified`/prefix-derived) and excluded `notify-*` from retry_overhead; tests weren't updated. Brought assertions into alignment with current contract; each fix carries an inline comment naming the originating PR. **Observation worth a future thought:** Mirror reviewed PRs #33/#34 but didn't catch the test drift — tests passed in isolation against old code, just not in the discover-all run after merge. Possible D3.5 retro item: should Mirror's checklist include "did any test assertion need updating to match the new contract?"
+
+**E1.2 — `expected_agent` parameter + centralized preamble gating (PR #42).** Framing surfaced that D2.5 had already migrated `inbox_watcher` onto `agent_runner.run_claude` and wired the in-flight registry, parent-CLAUDE.md guard, /tmp landmine scrub, and EMERGENCY_HALT check. The phase-e-plan was authored 2026-05-18 with stale awareness. The one remaining piece was the identity-assertion preamble: the watcher built it manually with three gating conditions before passing the prompt. This PR moved that logic into `agent_runner._maybe_prepend_identity_assertion`, added an `expected_agent` kwarg to `run_claude`, and simplified the watcher (14 lines removed, 1 added). Now every `run_claude` caller gets the right behavior by passing one parameter; future callers can't forget the marker-already-present check. 6 new tests cover the four gating conditions plus idempotency under repeated calls. Note: `agent_runner.process_inbox` still has the old inline gating at line 1075–1092 — left intact since that codepath isn't exercised in our fork (cleanup for a future pass).
+
+**E1.3 — `heal_pr_auto_merge.py` healer (PR #43).** D3.5 5d wired the primary auto-merge path in `outbox_notifier._auto_merge_pr` (fires on Mirror REVIEW_PASS). This healer is defense in depth for the residual gaps: notifier crashed before merge, `gh pr merge` returned non-zero (CI not green yet, network blip, transient API), Mirror PASS in an outbox the notifier never processed, post-conflict resolution with no re-trigger. **Mirror-PASS detection** scans `~/agents/logs/outbox-notifier.log` for `AUTO_MERGE ... outcome=failed` entries in the last 24h — the healer only acts on PRs the primary path already attempted, never auto-merges anything Mirror didn't review.
+
+Adapted from upstream `gm-agent-core/scripts/heal_pr_auto_merge.py` (#240): pulled `is_mergeable` defensive predicate, CANCELLED-workflow rerun (GitHub auto-cancels in-flight CI when a healer pushes; rerun unblocks), `MAX_MERGES_PER_RUN=5` blast-radius cap, HOLD_PREFIXES + HOLD_LABELS lists, benign already-merged detection. Added on top: Mirror-PASS log filter, per-PR retry budget (3 attempts) with state file `~/agents/state/heal-pr-auto-merge.json`, Telegram DMs via `larry_alerts.append_alert` (activation DM when dry-run finds a candidate, stalled DM + GitHub `automerge-stalled` label when budget exhausts, brief success DM on merge), two-layer kill-switch (`healers.disabled` blanket + `OURLIBERTY_AUTOMERGE_ENABLED` env var per phase-e-plan's "default off until verified").
+
+**Discoverability win:** Larry never has to remember to activate the healer — when the dry-run mode encounters its first real candidate, it DMs him with the exact `systemctl edit` + `restart` commands. 37 new tests (all gh shell-outs mocked). Systemd timer at 5-min cadence matches other healers. INSTALL.md updated for the 8-healer install.
+
+**Decision pattern reinforced:** the probe-before-custom-build heuristic worked twice this session — E5 (re-enable existing workspace-mcp instead of building a Google Docs API wrapper) and E1.3 (clone upstream's healer for reference, write Larry-flavored on top of what we have, don't pull wholesale). Both saved 1–2 days vs the "build it ourselves" path. Pattern captured in `feedback_probe_before_custom_build` memory.
+
+**E1 critical-path unblock:** E2 (Vercel deploy layer) can land safely on top of a hardened chain.
+
+**Next:** E2 — Vercel preview-first deploy layer. ~3–4 days estimated. Different shape (new external system + multi-day, fresh-session work). E3 (read-only dashboard) follows E2 and dogfoods E2's preview URLs. Critical path: E1 → E2 → E3 → E4.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
