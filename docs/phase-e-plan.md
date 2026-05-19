@@ -54,11 +54,11 @@ What we are NOT building in E: production-grade deploys, custom Supabase per pro
 
 | Phase | Goal | Est. effort | Depends on | Status |
 |---|---|---|---|---|
-| **E1** | Hardening (markers, watcher, auto-merge) | ~3 days | — | Not started |
+| **E1** | Hardening (markers, watcher, auto-merge) | ~3 days (actual: ~1 day) | — | **Done 2026-05-19** (PRs #40, #41, #42, #43) |
 | **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1 | Not started |
 | **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | Not started |
 | **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started |
-| **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | Not started |
+| **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | **Done 2026-05-19** (PRs #37, #38, #39) |
 | **E6** | Bench items (Ledger, audit logger, Guardian, prod deploy, etc.) | — | Trigger-based | Deferred |
 
 Critical path: **E1 → E2 → E3 → E4**. E5 can run in parallel with any of E1–E4.
@@ -345,11 +345,21 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-19 (mid session)
-**Current phase:** E5 — Google Suite via MCP — claude.ai connectors stable + workspace-mcp wired for Doc editing. E5.3 docs in progress.
-**Next concrete action:** Land this PR (settings.json + google-workspace.md + this file). Then write the E5.3 section in `agents/beacon/CLAUDE.md` (spec-drafting workflow with Google Docs — Doc-as-surface, marker-as-source-of-truth, offer-to-summarize). Then real Beacon Telegram smoke. Then E1 hardening.
+**Last updated:** 2026-05-19 (end of session)
+**Current phase:** E1 + E5 both **DONE**. Next phase: **E2 (Vercel deploy layer)**.
+**Next concrete action:** Kick off E2.0 — one-time Vercel setup walkthrough with Larry. Then E2.1 (`config/deploy_targets.json`), E2.2 (`scripts/deploy_notifier.py`), E2.3 (connect first repo to Vercel + end-to-end smoke).
 **Blockers:** None
-**Open questions for Larry:** None outstanding
+**Open questions for Larry:** None outstanding from E1/E5. E2 will surface its own (Vercel account email, GitHub-vs-token auth, dashboard repo name).
+
+**E1 completion summary (2026-05-19):**
+- ✅ **E1.1** — `render_marker` helpers in 3 handlers + `scripts/marker.py` CLI + drift tests (PR #40). 167 tests pass; agents now produce canonical marker text via Bash instead of hand-typing delimiters. PR #16's silent-dead-letter shape (bare `REVIEW_PASS`) made structurally impossible.
+- ✅ **Hygiene** — 13 stale tests fixed (PR #41): macOS path symlinks in worktree tests, cost-budget cap change from $5→$15, ledger task_type inference drift after PRs #33/#34. Full suite now 690+ green.
+- ✅ **E1.2** — `expected_agent` parameter added to `agent_runner.run_claude` (PR #42); identity-assertion preamble gating moved out of `inbox_watcher.process_task` into a centralized helper `_maybe_prepend_identity_assertion`. Watcher is 14 lines simpler. Discovered during framing that D2.5 had already done most of E1.2; this PR closed the small architectural cleanup.
+- ✅ **E1.3** — `scripts/heal_pr_auto_merge.py` healer (PR #43, 380 lines + 320 lines of tests). Adapted from upstream gm-agent-core #240 (pulled `is_mergeable`, CANCELLED-rerun, blast-radius cap) plus Larry-specific additions (Mirror-PASS detection via `outbox-notifier.log` scan, per-PR retry budget, two-layer kill-switch, Telegram DMs for activation + stalled-PR alerts). Systemd timer at 5-min cadence, default DRY-RUN mode until `OURLIBERTY_AUTOMERGE_ENABLED=true` is set per the activation DM the healer sends on first real candidate.
+
+**Critical-path E1 unblocks E2.** The deploy layer can land safely on top of a hardened chain.
+
+---
 
 **E5 progress (this session, 2026-05-18):**
 - ✅ New Google account created: `agent.beacon.ourliberty@gmail.com`
