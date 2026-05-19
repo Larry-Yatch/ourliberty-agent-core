@@ -345,11 +345,36 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-18
-**Current phase:** Pre-E1 (planning complete, kickoff awaiting Larry's go)
-**Next concrete action:** Decide whether to start E1.1 (marker render helpers) or run E1 + E5 in parallel (E5 has no prerequisites and can land alongside)
+**Last updated:** 2026-05-18 (late session)
+**Current phase:** E5 — Google Suite via MCP — verified live via CLI, Telegram smoke test in progress
+**Next concrete action:** After Telegram smoke confirms, commit `agents/beacon/.claude/settings.json` change (currently only on droplet) and tackle E5.3 (spec workflow update in Beacon's CLAUDE.md). Then E1 hardening.
 **Blockers:** None
-**Open questions for Larry:** None outstanding; all three values calls from the 2026-05-18 assessment were answered
+**Open questions for Larry:** None outstanding
+
+**E5 progress (this session, 2026-05-18):**
+- ✅ New Google account created: `agent.beacon.ourliberty@gmail.com`
+- ✅ Google Cloud OAuth client created (kept on disk as backup path, not used by current design)
+- ✅ Self-hosted workspace-mcp installed + registered (kept on disk, registration removed — reusable later if we ever want per-agent Google isolation)
+- ✅ **Decision pivot mid-session:** discovered Claude Code on droplet was inheriting Larry's personal claude.ai MCP connectors. Resolved by signing droplet into a separate Anthropic Max plan tied to the agent Google account. Cleaner architecture than self-hosted MCP.
+- ✅ Separate Anthropic Max plan signed up for the agent account
+- ✅ Personal credentials backed up on droplet (3 backup files in `~/.claude/`)
+- ✅ Droplet now auth'd as agent account via `claude auth login --claudeai` (orchestrated via PTY script + manual code paste — see `/tmp/auth_orchestrator.py` on droplet for the pattern)
+- ✅ `claude mcp list` confirms agent-account-only connectors (no personal Drive/Gmail/Calendar visible)
+- ✅ Smoke tests pass: list_recent_files + create_file via Drive against agent account
+- ✅ `agents/beacon/.claude/settings.json` updated on droplet to allow 25 Google MCP tools (Drive/Gmail/Calendar, read+create+update, no delete-class tools)
+- ⏳ Telegram smoke test (in progress with Larry — should land URL of created doc in his Beacon thread)
+
+**Architecture decisions locked this session:**
+- Droplet uses a dedicated Anthropic Max plan, NOT API key auth (Larry preferred OAuth-based subscription billing over per-token)
+- Droplet's claude.ai account = agent.beacon.ourliberty@gmail.com (same email as Google identity, simpler)
+- Drive connector has no `share_file` / `set_permissions` tool — known gap for "Beacon drafts spec doc and shares to Larry's personal account." Workaround in E5.3.
+- delete-class tools intentionally excluded from Beacon allow list (Beacon should not be able to delete user data without explicit approval)
+
+**Known follow-ups (small):**
+- `agents/beacon/.claude/settings.json` change is only on droplet; needs to land in repo via PR (small)
+- Personal credentials backups in `~/.claude/` (3 files) can be cleaned up once new auth is fully validated (~1 day)
+- workspace-mcp registration removed but install + OAuth client + client_secret.json remain on droplet (~5 min cleanup if desired)
+- E5.3 (spec workflow update in Beacon's CLAUDE.md): teach Beacon when to draft to Google Docs vs Telegram, and how to handle the doc-sharing-back-to-Larry workflow
 
 **Recent commits in agent-core that bear on this plan:**
 - PR #30 — per-agent allowlist sweep (related to E1 hardening posture)
@@ -357,6 +382,7 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 - PR #32 — push_with_rebase fallback (cycle reliability, indirect support for E1)
 - PR #33 + #34 — Ledger v2 + task_type inference (related to future Ledger work in E6)
 - PR #35 — pulse_check_i filter fix (cycle quality, indirect E1 support)
+- PR #36 — docs/phase-e-plan (this plan)
 
 ---
 

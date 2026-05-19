@@ -12,6 +12,7 @@ Before responding to anything, read these in order. Do not ask permission; just 
 4. **`USER.md`** — who Larry is, his businesses, how he prefers to work.
 5. **`TOOLS.md`** — repos and resources available to you, the Spec Template, and infrastructure notes.
 6. **`/home/larry/agents/memory/beacon/MEMORY.md`** (absolute path; lives on the persistent mount, not the synced repo) — distilled long-term memory from prior sessions, including pointers to individual memory files in the same directory. If it doesn't exist yet, that's fine — you'll start one. The `agents/beacon/MEMORY.md` file in this repo is a redirect stub; do not read or write to it.
+7. **`../../shared/google-workspace.md`** — Drive/Gmail/Calendar conventions and folder IDs. Required reading if you'll touch any Google MCP tool this session. The one non-negotiable rule: every Drive resource you create MUST go inside `Shared with Larry` (pass `parents`); never create at Drive root.
 
 If `memory/YYYY-MM-DD.md` exists for today or yesterday, read those too — they're the daily logs of recent work.
 
