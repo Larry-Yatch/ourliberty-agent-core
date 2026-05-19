@@ -169,7 +169,9 @@ class TaskTypeAttributionTests(unittest.TestCase):
         lw.attribute_task_types(rows, outbox)
         self.assertEqual(rows[0].task_type, "feature-development")
         self.assertEqual(rows[1].task_type, "doc-only")
-        self.assertEqual(rows[2].task_type, "unknown")  # no archive
+        # PR #34: when archive lookup misses, fall back to infer_task_type
+        # by prefix. "cycle-x" -> "cycle" (was "unknown" pre-PR-#34).
+        self.assertEqual(rows[2].task_type, "cycle")
 
     def test_handles_malformed_archive(self):
         outbox = self.root / "outboxes"
@@ -181,7 +183,9 @@ class TaskTypeAttributionTests(unittest.TestCase):
             model="m", cost_usd=1.0, duration_sec=10, source="inbox-watcher",
         )]
         lw.attribute_task_types(rows, outbox)
-        self.assertEqual(rows[0].task_type, "unknown")
+        # PR #34: archive unreadable -> infer_task_type fallback. "task-bad"
+        # matches no known prefix -> "unclassified" (was "unknown" pre-PR-#34).
+        self.assertEqual(rows[0].task_type, "unclassified")
 
 
 class SchemaConformanceTests(unittest.TestCase):
@@ -264,17 +268,21 @@ class SchemaConformanceTests(unittest.TestCase):
         self.assertEqual(sidecar["by_agent"]["forge"]["task_count"], 1)
         self.assertAlmostEqual(sidecar["by_agent"]["forge"]["usd"], 0.50)
         self.assertAlmostEqual(sidecar["by_task_type"]["doc-only"]["usd"], 0.25)
-        # `notify-retry-001` row → task_type unknown (no archive)
-        self.assertEqual(sidecar["by_task_type"]["unknown"]["task_count"], 1)
+        # `notify-retry-001` row → task_type "notification" (PR #34: inferred
+        # from the "notify-" prefix; pre-PR-#34 this landed in "unknown").
+        self.assertEqual(sidecar["by_task_type"]["notification"]["task_count"], 1)
 
     def test_retry_overhead_heuristic(self):
         _, sidecar, _ = lw.compute_weekly_report(
             WEEK_ENDING, self.costs, self.outbox, self.output_dir,
         )
-        # notify-retry-001 should count: starts with 'notify-'
+        # PR #33: notify-* rows are intentionally excluded from the retry
+        # overhead heuristic — they're inter-agent workflow plumbing, not
+        # retries. With only `notify-retry-001` in the fixture's retry-ish
+        # set, the new total is $0.00 (was $0.10 pre-PR-#33).
         ro = sidecar["retry_overhead"]
-        self.assertAlmostEqual(ro["total_retry_cost_usd"], 0.10)
-        self.assertAlmostEqual(ro["percent_of_total"], 0.10 / 0.85 * 100, places=5)
+        self.assertAlmostEqual(ro["total_retry_cost_usd"], 0.0)
+        self.assertAlmostEqual(ro["percent_of_total"], 0.0)
 
     def test_top_5_sorted_desc(self):
         _, sidecar, _ = lw.compute_weekly_report(
