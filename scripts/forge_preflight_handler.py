@@ -85,6 +85,16 @@ _LOOSE_FORGE_DELIMITER_RE = re.compile(
 
 MARKER_TYPES = ('proceed', 'clarify_request', 'reject')
 
+# Canonical KEYWORD for each marker type. The render path uses this to build
+# the block delimiters; the parse path uses regex constants above. Both sides
+# must agree — the round-trip tests in scripts/tests/test_forge_preflight_handler.py
+# (TestRenderMarker) fail loudly if MARKER_KEYWORDS drifts from the regexes.
+MARKER_KEYWORDS = {
+    'proceed': 'PROCEED',
+    'clarify_request': 'CLARIFY_REQUEST',
+    'reject': 'REJECT',
+}
+
 # Required fields per marker type.
 REQUIRED_FIELDS = {
     'proceed': {'task_id', 'preflight_summary'},
@@ -109,6 +119,42 @@ class MalformedForgeMarker(PreflightHandlerError):
 
 class MultipleForgeMarkers(PreflightHandlerError):
     """Forge emitted more than one marker — ambiguous which to act on."""
+
+
+# -------------------- marker rendering --------------------
+
+def render_marker(marker_type: str, **payload: Any) -> str:
+    """Build a canonical preflight-marker block from a payload dict.
+
+    Returns the exact text Forge should paste into her response — block
+    delimiters + pretty-printed JSON payload + trailing newline. Output is
+    guaranteed parseable by `parse_forge_marker`; the round-trip test
+    `TestRenderMarker.test_render_then_parse_roundtrip` enforces that.
+
+    Raises ValueError (NOT MalformedForgeMarker — render-time errors are
+    caller programming errors, not runtime parse failures) if:
+      - marker_type is not in MARKER_TYPES
+      - payload is missing any field in REQUIRED_FIELDS[marker_type]
+
+    Extra fields beyond REQUIRED_FIELDS are allowed and preserved (matches
+    the existing optional-field pattern — e.g., PROCEED may carry an
+    optional `session_id`, REJECT may carry optional `next_step`).
+    """
+    if marker_type not in MARKER_TYPES:
+        raise ValueError(
+            f'unknown marker type: {marker_type!r}. '
+            f'Valid types: {sorted(MARKER_TYPES)}'
+        )
+    required = REQUIRED_FIELDS[marker_type]
+    missing = required - set(payload.keys())
+    if missing:
+        raise ValueError(
+            f'render_marker({marker_type!r}): missing required fields: '
+            f'{sorted(missing)}. Required: {sorted(required)}'
+        )
+    keyword = MARKER_KEYWORDS[marker_type]
+    json_body = json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False)
+    return f'=== {keyword} ===\n{json_body}\n=== END_{keyword} ===\n'
 
 
 # -------------------- marker extraction --------------------

@@ -91,6 +91,37 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
 === END_REVIEW_EMERGENCY_HALT ===
 ```
 
+### How to emit a marker safely (Phase E1.1 — preferred path)
+
+**Use the `marker.py` CLI rather than hand-typing delimiters.** Hand-typed markers caused PR #16 to sit unmerged for 7+ hours: you typed bare `REVIEW_PASS` with no delimiters, the parser missed it, the notifier dead-lettered silently, the merge never fired. The CLI produces canonical output that's guaranteed parseable.
+
+Construct your payload dict, pipe it to `marker.py render mirror <type>`, and paste the EXACT stdout into your response. Bash is in your allowlist:
+
+```bash
+echo '{"task_id":"opmanual-d35-5b-shipped-note-001","pr_url":"https://github.com/x/y/pull/16","summary":"Diff implements the spec cleanly. No findings."}' \
+  | python3 ~/agent-core/scripts/marker.py render mirror review_pass
+```
+
+The output is the complete marker block (delimiters + pretty-printed JSON + trailing newline). Paste it verbatim — don't add prose between the delimiters.
+
+For markers with structured fields (`review_revision` carries a `findings` array, `review_emergency_halt` carries `evidence`), build the JSON in a heredoc:
+
+```bash
+python3 ~/agent-core/scripts/marker.py render mirror review_revision <<'JSON'
+{
+  "task_id": "...", "pr_url": "https://...",
+  "findings": [{"file": "x.py", "line_range": "L42-L50", "severity": "medium", "description": "..."}],
+  "severity": "medium", "confidence": "high"
+}
+JSON
+```
+
+Subcommands:
+- `python3 ~/agent-core/scripts/marker.py types mirror` — list all four review markers + required fields. Run if you're unsure.
+- `python3 ~/agent-core/scripts/marker.py validate mirror <type>` — pre-check a payload before rendering. Exits 0 if valid, 1 with a diagnostic if not.
+
+You CAN still hand-type a marker, and the parser will accept correctly-formatted output. But every hand-typed marker is a chance to typo. Default to the CLI — especially for `REVIEW_PASS` where a silent miss costs hours of unmerged-PR latency.
+
 ### Marker discipline (strict — mirrors Forge's preflight grammar)
 
 - **Exactly one marker per response.** Multiple markers (even two of the same type) → dead-letter back to you with a marker-error notify. Re-emit a single clean marker.

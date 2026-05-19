@@ -336,5 +336,56 @@ class RoutingHelpersTest(unittest.TestCase):
         self.assertIn('no question text recorded', reason)
 
 
+# -------------------- render_marker (E1.1) --------------------
+
+class RenderMarkerTest(unittest.TestCase):
+    """Render path tests + render <-> parse round-trip (E1.1).
+
+    Complement the parse tests above. If MARKER_KEYWORDS drifts from the
+    parser's regex source, the round-trip cases fail. If a new marker type
+    is added to MARKER_TYPES without extending MARKER_KEYWORDS or
+    REQUIRED_FIELDS, the schema-coverage test fails.
+
+    The cross-handler drift detector lives in test_marker_drift.py.
+    """
+
+    def _payloads(self) -> dict:
+        return {
+            'proceed': {'task_id': 't-001', 'preflight_summary': 'spec is buildable'},
+            'clarify_request': {'task_id': 't-001', 'question': 'which file?'},
+            'reject': {'task_id': 't-001', 'reason': 'spec contradicts itself'},
+        }
+
+    def test_render_then_parse_roundtrip(self):
+        for mtype, payload in self._payloads().items():
+            with self.subTest(mtype=mtype):
+                rendered = fph.render_marker(mtype, **payload)
+                ptype, ppayload, narrative = fph.parse_forge_marker(rendered)
+                self.assertEqual(ptype, mtype)
+                self.assertEqual(ppayload, payload)
+                self.assertEqual(narrative.strip(), '')
+
+    def test_unknown_marker_type_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'unknown marker type'):
+            fph.render_marker('bogus', task_id='t-001')
+
+    def test_missing_required_field_raises_value_error(self):
+        with self.assertRaisesRegex(ValueError, 'missing required fields'):
+            fph.render_marker('proceed', task_id='t-001')  # missing preflight_summary
+
+    def test_extra_fields_preserved_in_payload(self):
+        rendered = fph.render_marker(
+            'proceed', task_id='t-001', preflight_summary='ok', session_id='s1',
+        )
+        _, parsed, _ = fph.parse_forge_marker(rendered)
+        self.assertEqual(parsed.get('session_id'), 's1')
+
+    def test_keyword_and_required_fields_cover_every_marker_type(self):
+        for mtype in fph.MARKER_TYPES:
+            with self.subTest(mtype=mtype):
+                self.assertIn(mtype, fph.MARKER_KEYWORDS)
+                self.assertIn(mtype, fph.REQUIRED_FIELDS)
+
+
 if __name__ == '__main__':
     unittest.main()
