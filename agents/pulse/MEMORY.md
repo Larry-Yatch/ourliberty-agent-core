@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-19 (Iteration 49)
+## Status snapshot — updated 2026-05-19 (Iteration 50)
 
-Forty-nine cycles/responses run. **System: ⚠️ Drift — stuck automated cycle.** PR #37 (Beacon E5 Google Workspace conventions) merged 2026-05-19T02:09Z. Diverged-repo cluster (19+ consecutive failures, old iter numbering) fully resolved — Check A nominal since iter 47. Sync nominal. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow], PID 508506, 6h03m elapsed iter 49).
+Fifty cycles/responses run. **System: ✅ Nominal.** PR #37 (Beacon E5 Google Workspace conventions) merged 2026-05-19T02:09Z. All checks nominal — A/B/C/D/E/F/H clean. Core 6 units active. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]); no stuck cycle this invocation (PID 518328 = current session).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
