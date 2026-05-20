@@ -7422,5 +7422,302 @@ class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
         self.assertEqual(forge_tasks, [])
 
 
+class NoSessionRevisionDmTest(unittest.TestCase):
+    """Chain-gap #6 (observed 2026-05-20 on PR #59).
+
+    When Larry opens a Claude-as-Forge PR (trivial config/docs edits done
+    by Claude on Larry's behalf — source='larry', no Forge build session)
+    and Mirror emits REVIEW_REVISION, the existing
+    `_dispatch_revision_to_forge` skipped silently because there was no
+    `forge_build_session_id` to --resume against. Larry only learned
+    about the rejection if he was watching the chat live.
+
+    Fix: when forge_build_session_id is missing AND source='larry' AND
+    a reply_chat_id is present, queue a Larry DM with Mirror's findings
+    + a manual-redispatch next step. Existing happy path and the
+    non-Larry-source WARN are unchanged.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        import larry_alerts as la
+        self._la = la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _read_alerts(self):
+        path = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        if not path.exists():
+            return []
+        return [
+            json.loads(line) for line in path.read_text().splitlines()
+            if line.strip()
+        ]
+
+    def _revision_decision(self, findings=None, summary=None, confidence='high'):
+        """Build a synthetic decision dict shaped like `_classify_mirror_marker`."""
+        payload = {
+            'task_id': 't-claude-as-forge',
+            'pr_url': PR_URL_FIXTURE,
+            'severity': 'medium',
+            'confidence': confidence,
+        }
+        if findings is not None:
+            payload['findings'] = findings
+        if summary is not None:
+            payload['summary'] = summary
+        return {
+            'marker_type': 'review_revision',
+            'intent': 'review-revision',
+            'auto_promoted': False,
+            'budget_exhausted': False,
+            'payload': payload,
+            'intent_kwargs': {},
+            'notify_source': 'mirror-result',
+            'next_clarification_count': None,
+        }
+
+    # ---------------- happy path: session present, no DM, existing dispatch ----------------
+
+    def test_session_present_dispatches_revision_no_larry_dm(self):
+        # Regression: the new no-session branch MUST NOT fire when the
+        # Forge build session IS present. Existing auto-resume path runs;
+        # no Larry DM is queued (Forge picking up the revision is the
+        # closing signal, not a DM).
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-claude-as-forge',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='feat/claude-direct',
+            pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        data['forge_build_session_id'] = 'forge-build-sess-xyz'
+        data['reply_chat_id'] = 12345
+        decision = self._revision_decision(findings=[
+            {'file': 'docs/x.md', 'line_range': 'L1',
+             'severity': 'low', 'description': 'tweak wording'},
+        ])
+        on._dispatch_revision_to_forge(data, decision)
+        # Forge inbox got the revision (existing path).
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        # No Larry DM queued (chain advances via Forge).
+        self.assertEqual(self._read_alerts(), [])
+
+    # ---------------- no-session + larry + chat → DM queued ----------------
+
+    def test_no_session_larry_source_with_chat_id_queues_dm(self):
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-claude-as-forge',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='feat/claude-direct',
+            pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        # forge_build_session_id intentionally absent — Claude-as-Forge shape.
+        data['reply_chat_id'] = 12345
+        decision = self._revision_decision(
+            summary='Two findings need addressing before merge.',
+            findings=[
+                {'file': 'scripts/a.py', 'line_range': 'L10-L20',
+                 'severity': 'medium', 'description': 'Add input validation.'},
+                {'file': 'scripts/b.py', 'line_range': 'L5',
+                 'severity': 'low', 'description': 'Rename variable for clarity.'},
+            ],
+        )
+        on._dispatch_revision_to_forge(data, decision)
+        # No revision task to Forge — there's no session to resume.
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+        # Larry DM queued with the findings rendered.
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec['kind'], 'notification')
+        self.assertEqual(rec['intent'], 'review-revision')
+        self.assertEqual(rec['chat_id'], 12345)
+        self.assertEqual(rec['task_id'], 't-claude-as-forge')
+        body = rec['message']
+        self.assertIn(PR_URL_FIXTURE, body)
+        self.assertIn('t-claude-as-forge', body)
+        self.assertIn('no forge session', body.lower())
+        self.assertIn('feat/claude-direct', body)
+        self.assertIn('Two findings need addressing', body)
+        self.assertIn('Add input validation.', body)
+        self.assertIn('Rename variable for clarity.', body)
+        # Next-step instruction included.
+        self.assertIn('Mirror review', body)
+
+    # ---------------- no-session + larry + no chat_id → defensive skip ----------------
+
+    def test_no_session_larry_source_without_chat_id_skips_dm(self):
+        # Defensive: no DM target available. Fall back to the existing
+        # WARN-and-skip path; no DM is queued.
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-no-chat',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='feat/claude-direct',
+            pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        # No forge_build_session_id, no reply_chat_id.
+        decision = self._revision_decision()
+        on._dispatch_revision_to_forge(data, decision)
+        self.assertEqual(self._read_alerts(), [])
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+
+    # ---------------- no-session + source!='larry' → existing WARN path ----------------
+
+    def test_no_session_non_larry_source_retains_warn_no_dm(self):
+        # Standard Forge-driven flow with a propagation bug (no session)
+        # must NOT trip the new Larry-DM branch — the original WARN path
+        # still applies. This is the regression guard against accidental
+        # over-firing of the new branch.
+        data = _good_outbox(
+            agent='mirror', source='beacon', task_id='t-prop-bug',
+            phase='review', target_repo='ourliberty-agent-core',
+            branch='forge/t-prop-bug',
+            pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        # No forge_build_session_id (the propagation bug shape).
+        data['reply_chat_id'] = 99999  # set but irrelevant: source!='larry'
+        decision = self._revision_decision()
+        on._dispatch_revision_to_forge(data, decision)
+        # No DM queued (WARN-only path).
+        self.assertEqual(self._read_alerts(), [])
+        # No revision dispatch.
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
+        )
+        self.assertEqual(revisions, [])
+
+    # ---------------- DM body rendering: multi/single/empty findings ----------------
+
+    def test_dm_body_renders_multi_finding_payload(self):
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-multi',
+            phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        decision = self._revision_decision(findings=[
+            {'file': 'a.py', 'line_range': 'L1', 'severity': 'high',
+             'description': 'First issue.'},
+            {'file': 'b.py', 'line_range': 'L2', 'severity': 'medium',
+             'description': 'Second issue.'},
+            {'file': 'c.py', 'line_range': 'L3', 'severity': 'low',
+             'description': 'Third issue.'},
+        ])
+        body = on._render_no_session_revision_dm(data, decision)
+        self.assertIn('1. [high] a.py L1 — First issue.', body)
+        self.assertIn('2. [medium] b.py L2 — Second issue.', body)
+        self.assertIn('3. [low] c.py L3 — Third issue.', body)
+        self.assertIn('Findings:', body)
+
+    def test_dm_body_renders_single_finding_payload(self):
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-single',
+            phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        decision = self._revision_decision(findings=[
+            {'file': 'only.py', 'line_range': 'L42', 'severity': 'medium',
+             'description': 'Only issue.'},
+        ])
+        body = on._render_no_session_revision_dm(data, decision)
+        self.assertIn('1. [medium] only.py L42 — Only issue.', body)
+        # No phantom second entry.
+        self.assertNotIn('2. [', body)
+
+    def test_dm_body_handles_summary_only_no_findings(self):
+        # Mirror occasionally emits a REVIEW_REVISION payload with a
+        # summary but no structured findings list (degraded path). The
+        # DM body must still render — summary line present, no Findings
+        # header, next-step instruction intact.
+        data = _good_outbox(
+            agent='mirror', source='larry', task_id='t-summary-only',
+            phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
+            result='Reviewed.',
+        )
+        decision = self._revision_decision(
+            summary='Needs rework — see PR comments.',
+            findings=None,
+        )
+        body = on._render_no_session_revision_dm(data, decision)
+        self.assertIn('Needs rework — see PR comments.', body)
+        self.assertNotIn('Findings:', body)
+        self.assertIn('Mirror review', body)
+
+
 if __name__ == '__main__':
     unittest.main()
