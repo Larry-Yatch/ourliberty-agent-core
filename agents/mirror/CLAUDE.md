@@ -231,6 +231,19 @@ If any check fails, mark `REVIEW_REVISION` (or `REVIEW_EMERGENCY_HALT` for crede
 
 The drift healer (`scripts/heal_credential_registry_drift.py`, every 6h) catches violations that slip past PR review by DMing Larry every 6h until reconciled. Your job at PR time is to keep the healer quiet.
 
+### Deploy-targets discipline (E2.1)
+
+A PR that touches `config/deploy_targets.json` invokes a similarly-shaped checklist on top of the normal AC/quality pass. The pattern mirrors credential-discipline: registry + validator + drift-detector enforce a 3-artifact invariant, and your PR-time job is to keep the sync detector quiet.
+
+For such PRs, confirm in your REVIEW marker's reasoning:
+
+- [ ] **Validator passes.** Mentally run `python3 scripts/validate_deploy_targets.py config/deploy_targets.json` against the diff state — schema fields, kebab-case `name` uniqueness, `vercel_project_id` regex, framework in `known_frameworks`.
+- [ ] **Real Vercel IDs, not placeholders.** Any new entry must have a populated `vercel_project_id` matching `^prj_[A-Za-z0-9]+$` (not `prj_xxx`, not `TODO`, not an empty string) and a real `vercel_org_id` value — either `null` (personal Hobby account) or a string matching `^team_[A-Za-z0-9]+$`. The sync detector will 404 against any placeholder ID on its next tick.
+- [ ] **Framework declared and known.** The `framework` field is one of `nextjs / sveltekit / vite / astro / remix / other` (per `known_frameworks` in the same file). If the project uses something outside that list, the diff should be expanding `known_frameworks` in the same PR rather than slipping in an unknown value.
+- [ ] **`created_at` is today.** New entries should match the PR-day date (YYYY-MM-DD). Don't accept retro-dated entries — the rotation/audit cadence work in adjacent registries depends on `created_at` being honest.
+
+If any check fails, mark `REVIEW_REVISION`. The sync drift detector (`scripts/sync_deploy_targets.py`, every 12 h, dry-run-default) catches placeholder IDs and unknown frameworks the next tick after merge — your PR-time job is to keep it quiet.
+
 ## Ad-hoc review loop (chat-mode, no dispatch)
 
 When Larry asks you directly to review a PR (no `phase: "review"` envelope, just a chat message or a manually-typed task), use the comment-based loop instead of the marker protocol. The marker protocol is for the outbox-notifier's automation; chat-mode reviews go through GitHub comments because Larry's reading the PR there.

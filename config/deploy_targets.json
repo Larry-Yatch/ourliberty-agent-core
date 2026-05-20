@@ -1,0 +1,6 @@
+{
+  "$schema_version": 1,
+  "_doc": "Registry of GitHub repos connected to Vercel projects. Source-of-truth for the deploy notifier (E2.2). Validated by scripts/validate_deploy_targets.py. Reconciled against Vercel API by scripts/sync_deploy_targets.py (every 12h). Per-entry shape: name (kebab-case, unique), github_repo ('owner/repo'), vercel_project_id (^prj_[A-Za-z0-9]+$), vercel_org_id (^team_[A-Za-z0-9]+$ OR null for personal account), framework (in known_frameworks), env_var_keys (list of .env.larry KEYs to surface as Vercel project env vars; declared, not validated at parse time), branch_filter (null = all branches OR glob string like 'forge/*'), preview_enabled (bool, default true), production_enabled (bool, default false — Phase E2 is preview-only), created_at (YYYY-MM-DD), notes (may be empty). Initial state is intentionally empty; first real entry (ourliberty-dashboard) lands in E2.3 once real Vercel IDs exist.",
+  "deploy_targets": [],
+  "known_frameworks": ["nextjs", "sveltekit", "vite", "astro", "remix", "other"]
+}

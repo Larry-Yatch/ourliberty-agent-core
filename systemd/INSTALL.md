@@ -91,17 +91,19 @@ sudo systemctl enable --now ourliberty-agent-core-health.timer
 sudo systemctl enable --now ourliberty-watchdog.timer
 ```
 
-### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2)
+### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2 + E2.1)
 
-Ten healer scripts under `scripts/heal_*.py` watch for specific failure modes the audit identified. Each runs on its own systemd timer (5 min–12 h cadence) and is one-shot — fires, reports, exits. Enabling these closes audit Gap 8 and the credential-discipline + install-discipline gaps surfaced in E1.5.
+Eleven scripts under `scripts/heal_*.py` and `scripts/sync_*.py` watch for specific failure modes the audit identified. Each runs on its own systemd timer (5 min–12 h cadence) and is one-shot — fires, reports, exits. Enabling these closes audit Gap 8 and the credential-discipline + install-discipline + deploy-targets gaps surfaced in E1.5 / E2.1.
 
 ```bash
 # Install (copy unit files into systemd's directory)
 sudo cp ~/agent-core/systemd/ourliberty-heal-*.service /etc/systemd/system/
 sudo cp ~/agent-core/systemd/ourliberty-heal-*.timer /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-sync-deploy-targets.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-sync-deploy-targets.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 
-# Enable + start all 10 timers at once
+# Enable + start all 11 timers at once
 sudo systemctl enable --now ourliberty-heal-abandoned-inbox-tasks.timer
 sudo systemctl enable --now ourliberty-heal-blocked-inbox-age.timer
 sudo systemctl enable --now ourliberty-heal-empty-inbox-files.timer
@@ -112,9 +114,10 @@ sudo systemctl enable --now ourliberty-heal-zombie-main-workers.timer
 sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — DRY-RUN by default; see service file for activation
 sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E1.5.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default
+sudo systemctl enable --now ourliberty-sync-deploy-targets.timer  # E2.1 — DRY-RUN by default
 
 # Confirm
-systemctl list-timers 'ourliberty-heal-*' --all
+systemctl list-timers 'ourliberty-heal-*' 'ourliberty-sync-*' --all
 ```
 
 What each one does:
@@ -131,6 +134,7 @@ What each one does:
 | `pr-auto-merge` (E1.3) | 5 min | Mirror-PASSed PRs whose auto-merge primary path missed |
 | `credential-registry-drift` (E1.5.2) | 6 h | Credentials in store without registry entries; registry entries without credentials in store |
 | `systemd-install-drift` (E1.5.2) | 12 h | systemd units shipped in repo but never installed under `/etc/systemd/system/` |
+| `sync-deploy-targets` (E2.1) | 12 h | `config/deploy_targets.json` ↔ Vercel API drift (project missing on either side, name mismatch) |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
 
@@ -149,6 +153,10 @@ If step 2 is missed, the healer DMs Larry with the exact install commands; the g
 #### Credential-discipline pattern (E1.5.2)
 
 The `credential-registry-drift` healer enforces the 4-artifact rule from `shared/credentials-discipline.md` at runtime: every credential in `.env.larry` / `~/.config/gh/hosts.yml` / `~/.claude/.credentials.json` / `~/.google_workspace_mcp/credentials/` must have a matching entry in `config/token-rotation-schedule.json`, and vice versa. DMs every 6 h until reconciled (fail-closed per Larry's Q2 design decision). Activation env var: `OURLIBERTY_CREDENTIALS_HEALER_ENABLED=true` per the service file's commented activation snippet.
+
+#### Deploy-targets drift pattern (E2.1)
+
+The `sync-deploy-targets` script reconciles `config/deploy_targets.json` against the actual project list returned by the Vercel API (`GET /v9/projects`, personal Hobby account — no `teamId`). Three drift kinds: `MISSING_FROM_REGISTRY` (project exists on Vercel without a registry entry), `MISSING_FROM_VERCEL` (registry entry whose `vercel_project_id` returns 404), `NAME_MISMATCH` (both sides have the project but the human-readable names diverge). DMs every 24 h per persistent drift item (2 ticks at the 12 h timer cadence). Activation env var: `OURLIBERTY_DEPLOY_TARGETS_SYNC_ENABLED=true` per the service file's commented activation snippet. Vercel auth failures (401/403) emit a `critical`-severity `INFRASTRUCTURE_ALERT` and the unit exits non-zero so systemd surfaces it.
 
 ## Checking state
 
