@@ -24,17 +24,9 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 - **Why:** Larry wants Pulse to surface optimization opportunities (efficiency, speed, patterns) on top of her existing health monitoring; current cycle-prompt only covers health/drift
 - **Locked decisions (2026-05-15):** weekly Monday cadence + `/optimize` on-demand; heartbeat DM on empty weeks; specialization model where Pulse consumes Ledger findings and adds engineering interpretation + proposed fixes
 
-## E1.5 — Credential rotation discipline
-
-- **Status:** in flight (design PR opened 2026-05-19; Forge build dispatch next)
-- **Next:** Larry signs off on the design PR → it merges → Forge dispatched for E1.5.2 implementation
-- **Owner:** Claude (design) → Forge (build)
-- **Reference:** `docs/phase-e-plan.md` Phase E1.5 section; `config/token-rotation-schedule.json`; `shared/credentials-discipline.md`
-- **Why:** E2.0 Vercel install surfaced the gap — 8 active credentials across 4 storage locations with zero rotation tracking; DO's "rotate every 90 days" template comment had been silent since Phase A. Larry's framing: "We need to make that a part of the system."
-
 ## E2 — Deploy layer (Vercel preview-first)
 
-- **Status:** in flight (E2.0 done 2026-05-19; E2.1 design starts after E1.5 closes)
+- **Status:** in flight (E2.0 done 2026-05-19; E2.1 design starts next)
 - **Next:** E2.1 — `config/deploy_targets.json` schema design
 - **Owner:** Claude (design) → Forge (build)
 - **Reference:** `docs/phase-e-plan.md` Phase E2 section
@@ -43,6 +35,12 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 ---
 
 ## Archive
+
+### E1.5 — Credential rotation discipline — resolved 2026-05-19 (single session)
+
+- **Closed by:** PR #45 (design) + PR #46 (implementation) + PR #47 (chat-ID registry follow-up) + PR #48 (task #17 headless Beacon handler) + the task-#19 narrowing fix follow-up
+- **What shipped:** Full credential rotation system primitive — 10-entry registry across 4 storage locations, 2 drift healers (credential drift 6h + systemd install drift 12h), Pulse cycle rotation-window extension, log-parser-based scope-usage analyzer, 8 runbooks, Mirror-enforced 4-artifact convention, Beacon-owned Google Calendar events (4 scheduled audits + revocation-only entries), source-routing fix for headless-mode Mirror dispatches, headless Beacon APPROVAL_REQUEST handler, source-routing narrowing fix. Five architectural findings surfaced; four closed in-session; one (DM delivery delay) deferred to E6 polish.
+- **Reference:** `docs/operating-manual.md` Part II 2026-05-19 entry; memory `project_phase_e1_5_complete`; `config/token-rotation-schedule.json`; `shared/credentials-discipline.md`
 
 ### Auto-merge gap fix (PR #16 surface) — resolved 2026-05-19 by E1
 
