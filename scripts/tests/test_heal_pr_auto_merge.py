@@ -18,6 +18,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -81,8 +82,9 @@ class FindMirrorPassedFailuresTest(_IsolatedAgentsRoot):
         self.assertEqual(h.find_mirror_passed_failures(missing), {})
 
     def test_extracts_failed_entry_raw_url(self):
+        recent = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
         self._write_log([
-            '[2026-05-19T16:00:00+00:00] [WARN] AUTO_MERGE task=abc-001 '
+            f'[{recent}] [WARN] AUTO_MERGE task=abc-001 '
             'pr=https://github.com/x/y/pull/1 outcome=failed reason=timeout '
             'after 30s',
         ])
@@ -95,8 +97,9 @@ class FindMirrorPassedFailuresTest(_IsolatedAgentsRoot):
     def test_extracts_failed_entry_quoted_url(self):
         # The malformed-URL path in outbox_notifier uses {pr_url!r} which
         # adds surrounding quotes.
+        recent = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
         self._write_log([
-            "[2026-05-19T16:00:00+00:00] [WARN] AUTO_MERGE task=abc-002 "
+            f"[{recent}] [WARN] AUTO_MERGE task=abc-002 "
             "pr='https://github.com/x/y/pull/2' outcome=failed "
             "reason=malformed-pr-url",
         ])
@@ -104,10 +107,13 @@ class FindMirrorPassedFailuresTest(_IsolatedAgentsRoot):
         self.assertIn('https://github.com/x/y/pull/2', out)
 
     def test_keeps_most_recent_when_same_pr_fails_multiple_times(self):
+        now = datetime.now(timezone.utc)
+        older = (now - timedelta(minutes=30)).isoformat()
+        newer = (now - timedelta(minutes=5)).isoformat()
         self._write_log([
-            '[2026-05-19T10:00:00+00:00] [WARN] AUTO_MERGE task=t1 '
+            f'[{older}] [WARN] AUTO_MERGE task=t1 '
             'pr=https://github.com/x/y/pull/1 outcome=failed reason=first',
-            '[2026-05-19T11:00:00+00:00] [WARN] AUTO_MERGE task=t1 '
+            f'[{newer}] [WARN] AUTO_MERGE task=t1 '
             'pr=https://github.com/x/y/pull/1 outcome=failed reason=second',
         ])
         out = h.find_mirror_passed_failures(self.log_path)
@@ -115,8 +121,9 @@ class FindMirrorPassedFailuresTest(_IsolatedAgentsRoot):
                          'second')
 
     def test_ignores_succeeded_entries(self):
+        recent = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
         self._write_log([
-            '[2026-05-19T10:00:00+00:00] [INFO] AUTO_MERGE task=t1 '
+            f'[{recent}] [INFO] AUTO_MERGE task=t1 '
             'pr=https://github.com/x/y/pull/1 outcome=merged',
         ])
         self.assertEqual(h.find_mirror_passed_failures(self.log_path), {})
