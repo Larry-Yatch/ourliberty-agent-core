@@ -1132,6 +1132,395 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         self.assertIn('intent=result-notification', data['prompt'])
 
 
+class HeadlessClarificationRoutingTest(unittest.TestCase):
+    """task-25 — chain-routing gap #5: headless Beacon clarification-response
+    must route as `--resume` of the ORIGINAL Forge task, NOT as a fresh
+    `notify-notify-{task}` envelope. Closes the doubled-prefix branch bug +
+    depth-multiplied awareness notifies that surfaced 2026-05-20 on task-22.
+
+    Mirrors `ProcessOutboxTest` setup — temp dirs, swi/rv state rebound,
+    on.ensure_dirs(). Kept as a separate class so the test names group
+    cleanly under the task-25 fix surface.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    # ---- Happy path: Beacon clarification-response → resume envelope ----
+
+    def test_clarification_response_routes_as_resume_envelope(self):
+        """Beacon answers Forge's CLARIFY_REQUEST → continuation envelope
+        lands on Forge's inbox under the ORIGINAL task_id (NOT notify-{...}).
+        Source = beacon-clarification, intent = clarification-response,
+        phase = preflight, resume_session_id = Forge's preflight session."""
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-22-agents-root-path-isolation',
+            forge_session_id='forge-sess-original-001',
+            result='Use pytest, not unittest. The convention in this repo is pytest discovery.',
+            clarification_count=1,
+            max_clarifications=3,
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-22-agents-root-path-isolation',
+        )
+        f = self._write_outbox('beacon', 'notify-task-22.json', beacon_outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'clarification-resume-dispatched')
+
+        # The continuation envelope landed in Forge's inbox.
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        files = list(forge_inbox.glob('*.json'))
+        self.assertEqual(len(files), 1, f'expected exactly one envelope, got {files}')
+
+        dest = files[0]
+        # Filename pattern: resume-<task>-r<count>.json — NOT notify-notify-*.
+        self.assertTrue(dest.name.startswith('resume-'),
+                        f'filename should be resume-prefixed, got {dest.name}')
+        self.assertNotIn('notify-notify', dest.name)
+
+        envelope = json.loads(dest.read_text())
+        # task_id = ORIGINAL (stripped of `notify-` prefix).
+        self.assertEqual(envelope['task_id'],
+                         'task-22-agents-root-path-isolation')
+        # Resume opt-in: explicit field that the watcher honors regardless
+        # of phase. Carries Forge's preflight session.
+        self.assertEqual(envelope['resume_session_id'],
+                         'forge-sess-original-001')
+        # Source is a dialogue-leg suffix (allowed regardless of FRESH_DISPATCH_ROUTES).
+        self.assertEqual(envelope['source'], 'beacon-clarification')
+        # Intent matches the existing notify-template vocabulary.
+        self.assertEqual(envelope['intent'], 'clarification-response')
+        # Phase stays 'preflight' — semantically Forge re-runs preflight
+        # with the answer; the marker she emits next is preflight-discipline.
+        self.assertEqual(envelope['phase'], 'preflight')
+        # target_repo / branch propagated so Forge's worktree gate accepts.
+        self.assertEqual(envelope['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(envelope['branch'],
+                         'forge/task-22-agents-root-path-isolation')
+
+    def test_no_doubled_prefix_file_in_any_inbox(self):
+        """Acceptance criterion: no `notify-notify-{task}` file appears in
+        ANY inbox after the clarification-response routes. Verifies the
+        cascade stops at the continuation envelope rather than producing
+        the doubled-prefix bug shape."""
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-X',
+            forge_session_id='forge-sess-001',
+            result='Answer text that satisfies the validator floor for length' * 5,
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('beacon', 'notify-task-X.json', beacon_outbox)
+
+        on.process_outbox(f)
+
+        # No `notify-notify-*` file anywhere.
+        for agent in on.AGENT_IDS:
+            inbox = on.INBOXES_ROOT / agent
+            bad = list(inbox.glob('notify-notify-*.json'))
+            self.assertEqual(
+                bad, [],
+                f'doubled-prefix file should not exist in {agent} inbox: {bad}',
+            )
+            # Also not in archive.
+            archive = inbox / '.archive'
+            if archive.exists():
+                bad_arch = list(archive.glob('notify-notify-*.json'))
+                self.assertEqual(
+                    bad_arch, [],
+                    f'doubled-prefix file should not exist in {agent} archive: {bad_arch}',
+                )
+
+    def test_forge_marker_on_original_task_id_is_accepted_after_resume(self):
+        """Acceptance criterion: when Forge emits a marker against the
+        ORIGINAL task_id after picking up the resume envelope, the marker
+        is accepted (no marker-task-id-mismatch). Round-trip via
+        _classify_forge_marker on a synthesized Forge outbox shape."""
+        # The continuation envelope (round 1) gave Forge task_id=task-X.
+        # Forge processes, re-runs preflight, emits PROCEED with that
+        # same task_id. Her outbox naturally carries task_id=task-X.
+        forge_outbox_data = {
+            'agent': 'forge',
+            'task_id': 'task-X',  # ORIGINAL, not notify-notify-task-X
+            'source': 'beacon-clarification',
+            'original_source': None,
+            'result': (
+                'Got it.\n\n'
+                '=== PROCEED ===\n'
+                '{"task_id": "task-X", "preflight_summary": "ok."}\n'
+                '=== END_PROCEED ==='
+            ),
+            'clarification_count': 1,
+            'max_clarifications': 3,
+            'claude_session_id': 'forge-sess-001',
+        }
+        # If task_ids matched, this returns a decision; if not, raises.
+        decision = on._classify_forge_marker(forge_outbox_data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'proceed')
+        self.assertEqual(decision['intent'], 'ack-proceed')
+
+    def test_depth_multiplication_does_not_recur_across_three_rounds(self):
+        """Acceptance criterion: awareness notifies are capped at depth 1
+        regardless of how many clarification rounds occur. Run round 1 +
+        round 2 + round 3 and confirm no notify-notify-notify-* file.
+        Each round uses a distinct filename (clarification_count varies),
+        so all three continuation envelopes coexist cleanly."""
+        for round_num, count in enumerate([1, 2, 3], start=1):
+            beacon_outbox = _good_outbox(
+                agent='beacon',
+                source='forge-question',
+                task_id='notify-task-Y',
+                forge_session_id='forge-sess-Y',
+                result=f'Round {round_num} answer text long enough to satisfy validator: ' * 5,
+                clarification_count=count,
+                max_clarifications=5,
+            )
+            f = self._write_outbox('beacon', f'notify-task-Y-r{round_num}.json',
+                                   beacon_outbox)
+            res = on.process_outbox(f)
+            self.assertEqual(res, 'clarification-resume-dispatched',
+                             f'round {round_num} should have resume-dispatched')
+
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        # No `notify-*-notify-*` cascade prefix.
+        for name in [p.name for p in forge_inbox.iterdir() if p.is_file()]:
+            self.assertNotIn('notify-notify', name,
+                             f'{name} carries the doubled-prefix bug shape')
+            self.assertNotIn('notify-notify-notify', name)
+
+        # Three distinct continuation envelopes (one per round).
+        resumes = sorted(p.name for p in forge_inbox.glob('resume-*.json'))
+        self.assertEqual(
+            resumes,
+            [
+                'resume-task-Y-r1.json',
+                'resume-task-Y-r2.json',
+                'resume-task-Y-r3.json',
+            ],
+        )
+
+    def test_idempotent_when_outbox_reprocessed(self):
+        """Daemon-crash safety: if the daemon crashes between dispatch and
+        archive, the next poll re-processes the same outbox. The handler
+        should detect the prior write (inbox / archive / invalid) and skip
+        — the same idempotency shape as _handle_beacon_headless_approval_request.
+        """
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-Z',
+            forge_session_id='forge-sess-Z',
+            result='Answer text that easily clears the validator min-length floor.' * 3,
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f1 = self._write_outbox('beacon', 'notify-task-Z.json', beacon_outbox)
+        on.process_outbox(f1)
+        # Simulate daemon crash: outbox got archived but a fresh poll
+        # finds a "same identity" beacon outbox a second time. Write the
+        # outbox file again and re-run.
+        f2 = self._write_outbox('beacon', 'notify-task-Z.json', beacon_outbox)
+        res = on.process_outbox(f2)
+        # Handler still returns the dispatched sentinel (idempotency
+        # short-circuit kept the existing file in place).
+        self.assertEqual(res, 'clarification-resume-dispatched')
+        # Only one resume envelope exists (file + archive copy from
+        # round-trip archiving).
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        resumes = list(forge_inbox.glob('resume-*.json'))
+        archived_resumes = list((forge_inbox / '.archive').glob('resume-*.json'))
+        self.assertEqual(len(resumes) + len(archived_resumes), 1,
+                         f'expected exactly one continuation envelope across '
+                         f'inbox+archive, got inbox={resumes} '
+                         f'archive={archived_resumes}')
+
+    def test_missing_forge_session_id_falls_back_to_default_routing(self):
+        """Graceful degradation: pre-task-25 chains (in-flight at upgrade
+        time) won't have forge_session_id propagated. The handler must fall
+        through to default notify routing so Beacon's answer still reaches
+        Forge. The doubled-prefix bug recurs in that case, but the chain
+        completes — better than dead-lettering legacy traffic."""
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-legacy',
+            # No forge_session_id — simulates pre-task-25 cascade in flight
+            # when the upgrade ships.
+            result='Legacy answer; chain in flight at upgrade time.' * 4,
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        f = self._write_outbox('beacon', 'notify-task-legacy.json',
+                               beacon_outbox)
+        result = on.process_outbox(f)
+        # Falls through to default routing (the pre-task-25 path).
+        self.assertEqual(result, 'notified')
+        # No resume envelope (handler declined).
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        self.assertEqual(list(forge_inbox.glob('resume-*.json')), [])
+        # The legacy notify-notify-* file does appear (this is the bug
+        # shape; we're explicitly accepting it for legacy traffic). The
+        # important thing is the chain progresses.
+        notifies = list(forge_inbox.glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+
+    def test_clarify_request_notify_carries_forge_session_id(self):
+        """End-to-end propagation: when Forge emits CLARIFY_REQUEST, the
+        notify going to Beacon's inbox MUST carry `forge_session_id` so
+        `inbox_watcher._build_outbox` can propagate it across Beacon's
+        round-trip and the clarification-response handler has the field
+        when it fires. Without this field on the upstream notify, the
+        downstream resume path silently degrades to legacy behavior."""
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-pf", "question": "Which line range?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        forge_outbox = _good_outbox(
+            agent='forge',
+            source='beacon',
+            task_id='t-pf',
+            result=marker,
+            clarification_count=0,
+            max_clarifications=3,
+            claude_session_id='forge-preflight-session-XYZ',
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-pf',
+        )
+        f = self._write_outbox('forge', 't-pf.json', forge_outbox)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+
+        # The notify going to Beacon should carry the new field.
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+        notify_data = json.loads(notifies[0].read_text())
+        self.assertEqual(notify_data['forge_session_id'],
+                         'forge-preflight-session-XYZ')
+
+    def test_full_resume_cascade_one_clarification_round(self):
+        """End-to-end: Forge CLARIFY_REQUEST → notify to Beacon (carries
+        forge_session_id) → simulate Beacon's outbox (with forge_session_id
+        propagated, as inbox_watcher._build_outbox would do in production)
+        → continuation envelope routes back to Forge on the ORIGINAL task_id
+        with resume_session_id populated. No doubled-prefix file."""
+        # Round 1: Forge clarifies.
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "task-cascade", "question": "Q?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        forge_outbox = _good_outbox(
+            agent='forge',
+            source='beacon',
+            task_id='task-cascade',
+            result=marker,
+            clarification_count=0,
+            max_clarifications=3,
+            claude_session_id='forge-sess-cascade',
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-cascade',
+        )
+        f1 = self._write_outbox('forge', 'task-cascade-r1.json', forge_outbox)
+        on.process_outbox(f1)
+
+        # Confirm Beacon got a notify with forge_session_id.
+        beacon_notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(beacon_notifies), 1)
+        beacon_notify = json.loads(beacon_notifies[0].read_text())
+        self.assertEqual(beacon_notify['forge_session_id'],
+                         'forge-sess-cascade')
+        self.assertEqual(beacon_notify['clarification_count'], 1)
+
+        # Round 2: simulate Beacon's outbox (as inbox_watcher._build_outbox
+        # would emit it after Beacon processed the notify). Critically, the
+        # outbox carries forge_session_id forward via the envelope_fields
+        # propagation that task-25 added to _build_outbox.
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            source_task_file=str(beacon_notifies[0]),
+            task_id='notify-task-cascade',
+            result='Answer to the clarification question — meaningful guidance text.',
+            clarification_count=1,
+            max_clarifications=3,
+            forge_session_id='forge-sess-cascade',  # propagated by _build_outbox
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-cascade',
+        )
+        f2 = self._write_outbox('beacon', 'notify-task-cascade.json',
+                                beacon_outbox)
+        result = on.process_outbox(f2)
+        self.assertEqual(result, 'clarification-resume-dispatched')
+
+        # Continuation envelope landed on Forge's inbox keyed on the ORIGINAL.
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        resumes = list(forge_inbox.glob('resume-*.json'))
+        self.assertEqual(len(resumes), 1)
+        envelope = json.loads(resumes[0].read_text())
+        self.assertEqual(envelope['task_id'], 'task-cascade')
+        self.assertEqual(envelope['resume_session_id'], 'forge-sess-cascade')
+        self.assertEqual(envelope['phase'], 'preflight')
+        self.assertEqual(envelope['source'], 'beacon-clarification')
+
+        # No doubled-prefix file anywhere across the cascade.
+        for agent in on.AGENT_IDS:
+            self.assertEqual(
+                list((on.INBOXES_ROOT / agent).glob('notify-notify-*.json')),
+                [],
+            )
+
+
 class ClassifyForgeMarkerTest(unittest.TestCase):
     """Unit test the _classify_forge_marker helper in isolation."""
 
