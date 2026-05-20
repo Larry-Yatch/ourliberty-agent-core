@@ -1,0 +1,28 @@
+[Unit]
+Description=Poll Vercel for preview URLs + post to Telegram (E2.2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/deploy_notifier.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# E2.2 activation gate. Per shared/credentials-discipline.md: default
+# OFF until verified live. When unset (or != "true"), the notifier runs
+# in DRY-RUN mode — it logs would-DM lines and (once) DMs Larry one-time
+# activation instructions, but does NOT send per-deployment DMs. To
+# activate after E2.3 connects the first real repo:
+#   sudo systemctl edit ourliberty-deploy-notifier.service
+# then add a line in the [Service] section:
+#   Environment="OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=true"
+# then `sudo systemctl restart ourliberty-deploy-notifier.timer`.
+Environment="OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/deploy_notifier.py --once
+TimeoutStartSec=60
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-deploy-notifier
