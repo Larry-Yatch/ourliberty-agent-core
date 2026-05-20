@@ -1,0 +1,11 @@
+[Unit]
+Description=Run sync_deploy_targets every 12 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=12h
+RandomizedDelaySec=10min
+Unit=ourliberty-sync-deploy-targets.service
+
+[Install]
+WantedBy=timers.target

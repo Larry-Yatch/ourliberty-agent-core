@@ -405,11 +405,19 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-19 (end of long session — E1.5 fully closed; all 5 architectural findings addressed)
-**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). All 5 architectural findings from the E1.5 session are addressed: 4 fixed in code, 1 (DM delivery delay) deferred to E6 polish.
-**Next concrete action:** Resume E2.1 (`config/deploy_targets.json` schema design). The next-phase resume prompt at `docs/next-phase-prompt-e2-1.md` is self-contained for a fresh Claude Code session.
+**Last updated:** 2026-05-20 (E2.1 shipped via the headless Beacon → Forge → Mirror chain)
+**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). E2.1 **DONE** 2026-05-20 (`config/deploy_targets.json` registry + offline validator + Vercel-side sync drift detector; first task to land via the fully-headless chain post-#48/#49).
+**Next concrete action:** E2.2 (`scripts/deploy_notifier.py`, ~1.5 days) — the daemon that reads `deploy_targets.json` and forwards GitHub pushes to the right Vercel project. E2.3 then connects `ourliberty-dashboard` (the first real entry, with real Vercel IDs).
 **Blockers:** None
-**Open questions for Larry:** None outstanding. E2.1 will surface design questions when it kicks off.
+**Open questions for Larry:** None outstanding. E2.2 design surfaces will arise when it dispatches.
+
+**E2.1 completion summary (2026-05-20):**
+- ✅ `config/deploy_targets.json` — schema-versioned registry; initial state is intentionally empty (first real entry lands in E2.3 with real Vercel IDs).
+- ✅ `scripts/validate_deploy_targets.py` — stdlib offline validator, library + CLI surface, mirrors E1.5's `validate_token_rotation_schedule.py`.
+- ✅ `scripts/sync_deploy_targets.py` — 12 h Vercel-side drift detector with three drift kinds (`MISSING_FROM_REGISTRY`, `MISSING_FROM_VERCEL`, `NAME_MISMATCH`), 24 h re-DM window per item, dry-run-by-default activation gate (`OURLIBERTY_DEPLOY_TARGETS_SYNC_ENABLED=true`), and a critical `INFRASTRUCTURE_ALERT` path for Vercel auth failures. Cadence decision (2026-05-20): 12 h, not 6 h — Vercel state changes slowly.
+- ✅ `systemd/ourliberty-sync-deploy-targets.{service,timer}` — `Type=oneshot`, `OnBootSec=15min`, `OnUnitActiveSec=12h`, `RandomizedDelaySec=10min`, default off until activated per service-file commented snippet. `systemd-analyze verify` passes.
+- ✅ 41 validator tests + 29 sync tests; full repo suite green.
+- ✅ `systemd/INSTALL.md` updated (ten → eleven scripts); `agents/mirror/CLAUDE.md` gains an additive `deploy_targets.json` review checklist (existing E1.5 items untouched).
 
 **E1 completion summary (2026-05-19):**
 - ✅ **E1.1** — `render_marker` helpers in 3 handlers + `scripts/marker.py` CLI + drift tests (PR #40). 167 tests pass; agents now produce canonical marker text via Bash instead of hand-typing delimiters. PR #16's silent-dead-letter shape (bare `REVIEW_PASS`) made structurally impossible.
