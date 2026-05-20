@@ -13,7 +13,10 @@ Run:
 
 from __future__ import annotations
 
+import importlib
 import json
+import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -27,6 +30,34 @@ if str(_REPO_SCRIPTS) not in sys.path:
 import outbox_notifier as on        # noqa: E402
 import routing_validator as rv      # noqa: E402
 import safe_write_inbox as swi      # noqa: E402
+
+
+# Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir for the whole module so
+# tests running inside a Forge worktree don't pollute prod /home/larry/agents/
+# logs/state. Mirrors PR #53 pattern (heal_pr_auto_merge tests). Per-test
+# monkeypatches of on.AGENTS_ROOT / on.LOG_FILE / ... still override on top.
+_AGENTS_ROOT_BACKUP = None
+_AGENTS_ROOT_TMPDIR = None
+
+
+def setUpModule():  # noqa: N802 — unittest hook name
+    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
+    _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+    _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='outbox-notifier-test-')
+    os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
+    for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+        Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
+    importlib.reload(on)
+
+
+def tearDownModule():  # noqa: N802 — unittest hook name
+    if _AGENTS_ROOT_BACKUP is None:
+        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+    else:
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_BACKUP
+    if _AGENTS_ROOT_TMPDIR:
+        shutil.rmtree(_AGENTS_ROOT_TMPDIR, ignore_errors=True)
+    importlib.reload(on)
 
 
 def _good_outbox(**overrides):
