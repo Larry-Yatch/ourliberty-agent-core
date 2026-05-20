@@ -56,7 +56,7 @@ What we are NOT building in E: production-grade deploys, custom Supabase per pro
 |---|---|---|---|---|
 | **E1** | Hardening (markers, watcher, auto-merge) | ~3 days (actual: ~1 day) | — | **Done 2026-05-19** (PRs #40, #41, #42, #43) |
 | **E1.5** | Credential rotation discipline | ~1 day | E1 | In flight 2026-05-19 (design PR opened; Forge build dispatch next) |
-| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | E2.0 done 2026-05-19; E2.1 next |
+| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | E2.0 + E2.1 + E2.2 done 2026-05-20; E2.3 next |
 | **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | Not started |
 | **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started |
 | **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | **Done 2026-05-19** (PRs #37, #38, #39) |
@@ -405,11 +405,19 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-20 (E2.1 shipped via the headless Beacon → Forge → Mirror chain)
-**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). E2.1 **DONE** 2026-05-20 (`config/deploy_targets.json` registry + offline validator + Vercel-side sync drift detector; first task to land via the fully-headless chain post-#48/#49).
-**Next concrete action:** E2.2 (`scripts/deploy_notifier.py`, ~1.5 days) — the daemon that reads `deploy_targets.json` and forwards GitHub pushes to the right Vercel project. E2.3 then connects `ourliberty-dashboard` (the first real entry, with real Vercel IDs).
+**Last updated:** 2026-05-20 (E2.2 shipped same day as E2.1 via the headless Beacon → Forge → Mirror chain)
+**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). E2.1 **DONE** 2026-05-20 (`config/deploy_targets.json` registry + offline validator + Vercel-side sync drift detector; PR #51, first task to land via the fully-headless chain post-#48/#49). E2.2 **DONE** 2026-05-20 (`scripts/deploy_notifier.py` — 2-min Vercel poller for preview URLs + build failures).
+**Next concrete action:** E2.3 (~½ day, Larry-driven) — connect `ourliberty-dashboard` to Vercel via the dashboard UI, add the first real `deploy_targets.json` entry with real `vercel_project_id`, set `OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=true` + `OURLIBERTY_DEPLOY_TARGETS_SYNC_ENABLED=true` on the droplet, smoke-test by pushing a trivial change and watching the preview URL land in Larry's Telegram thread within ~2 min.
 **Blockers:** None
-**Open questions for Larry:** None outstanding. E2.2 design surfaces will arise when it dispatches.
+**Open questions for Larry:** None outstanding. E2.3 surfaces will arise when it dispatches.
+
+**E2.2 completion summary (2026-05-20):**
+- ✅ `scripts/deploy_notifier.py` — Type=oneshot 2-min poller; mirrors `sync_deploy_targets.py` patterns (stdlib urllib + kill-switch + dry-run-by-default + activation DM + state-file dedup + infra-alert throttle). State key `<uid>:<state>` so a deployment that transitions `READY → ERROR` re-DMs once with the new severity; `notified` history capped at 1000 entries (FIFO prune). Per-target `branch_filter` (null = match all; glob like `forge/*` via fnmatch). PR# resolution priority: `deployment.meta.githubPrId` → `gh pr list --head ... --repo ...` fallback → `PR #(unknown)` literal in the body. 401/403 → `critical` `INFRASTRUCTURE_ALERT` DM throttled to once per 24 h. 5xx / network → log + exit non-zero, no DM (systemd retries on the next 2-min tick).
+- ✅ Path-isolation fix scoped to this script: `AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))`. Tests monkeypatch the env var before import so they write logs / state to a tmpdir instead of polluting `~/agents/logs/deploy-notifier.log`. (Sibling healers still hardcoded; tracked as a separate followup.)
+- ✅ `systemd/ourliberty-deploy-notifier.{service,timer}` — `Type=oneshot`, `OnBootSec=2min`, `OnUnitActiveSec=2min`, `RandomizedDelaySec=15s`. Default off (`OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=false`) until E2.3 activation per the service file's commented snippet.
+- ✅ 37 unit tests with mocked `_vercel_get`, mocked `dm_larry`, mocked `gh_runner` covering: empty-registry early-return, READY/ERROR DMs, BUILDING/CANCELED skip, branch_filter glob/null/mismatch, meta-PrId / gh-CLI / unknown PR resolution, uid+state dedup + transition re-DM, dry-run activation DM (once), missing-VERCEL_TOKEN infra alert, 401 auth alert + 24h throttle, 5xx no-DM, 2-page pagination + 5-page cap, LRU prune at 1000, CLI `--once` / `--dry-run` flags, path-isolation guard.
+- ✅ `systemd/INSTALL.md` updated (eleven → twelve scripts); new `Deploy-notifier pattern (E2.2)` subsection.
+- ✅ `docs/phase-e-plan.md` Current Status block updated.
 
 **E2.1 completion summary (2026-05-20):**
 - ✅ `config/deploy_targets.json` — schema-versioned registry; initial state is intentionally empty (first real entry lands in E2.3 with real Vercel IDs).

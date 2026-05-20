@@ -1,0 +1,11 @@
+[Unit]
+Description=Run deploy_notifier every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+RandomizedDelaySec=15s
+Unit=ourliberty-deploy-notifier.service
+
+[Install]
+WantedBy=timers.target
