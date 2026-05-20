@@ -6284,20 +6284,39 @@ class LarryDirectDispatchTest(unittest.TestCase):
         self.assertEqual(result, 'archived-no-notify')
         self.assertEqual(self._auto_merge_calls, [])
 
-    def test_review_revision_with_larry_source_dms_without_merge(self):
-        # REVIEW_REVISION: Larry should see Mirror's findings, but no merge.
+    def test_review_revision_with_larry_source_dispatches_revision_not_dm(self):
+        # task-19 (2026-05-19): clean REVIEW_REVISION on a Larry-direct
+        # Mirror review now dispatches the revision to Forge — same as the
+        # source='beacon' flow — and skips the synth DM, because Forge
+        # picking up the revision IS the chain-advance signal. PR #46's
+        # original over-broad larry-direct branch hijacked this path by
+        # firing the synth DM AND skipping `_dispatch_revision_to_forge`,
+        # which is the regression the narrowing fix structurally prevents.
+        # Verified in depth by LarryDirectDispatchNarrowingTest below.
         body = _mirror_outbox_body(
             _mirror_revision_marker(confidence='high'),
             source='larry',
             reply_chat_id=12345,
+            # `_dispatch_revision_to_forge` needs a forge build session
+            # to --resume against, plus the standard PR envelope fields.
+            forge_build_session_id='forge-build-sess',
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-rev',
+            pr_url=PR_URL_FIXTURE,
+            revision_count=0,
+            max_revisions=3,
         )
         f = self._write_mirror_outbox('t-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1)
-        self.assertEqual(alerts[0]['intent'], 'review-revision')
+        # Revision dispatched to Forge.
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-rev-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        # No synth DM — the chain continues via Forge.
+        self.assertEqual(self._read_alerts(), [])
 
     def test_review_escalate_with_larry_source_dms_without_merge(self):
         body = _mirror_outbox_body(
@@ -6347,6 +6366,390 @@ class LarryDirectDispatchTest(unittest.TestCase):
         # larry_direct branch.
         self.assertIn(result, ('archived-no-notify', 'notified'))
         self.assertEqual(self._auto_merge_calls, [])
+
+
+class LarryDirectDispatchNarrowingTest(unittest.TestCase):
+    """task-19 (2026-05-19) — PR #46's source-routing fix was too broad.
+
+    PR #46 added a `larry_direct` branch that intercepted ALL markers from
+    source='larry' dispatches, including Forge's PROCEED. The result:
+    (a) `_dispatch_build_phase` never fired, so Larry-direct preflights
+    silently failed to advance to build, and (b) the synth DM template
+    was hardcoded to "Mirror requested revision …" so even ack-proceed
+    rendered the wrong body. Symptom: 2026-05-19 task #17 dispatch.
+
+    The narrowing fix:
+      * Dispatch helpers (`_dispatch_build_phase`,
+        `_dispatch_revision_to_forge`) fire regardless of larry_direct.
+      * Synth DM fires only for markers with no follow-up handler
+        (today: residual Forge CLARIFY_REQUEST with no dispatcher).
+      * Synth DM body branches on intent — no more wrong-template
+        "Mirror requested revision" leak on Forge PROCEED.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._auto_merge_calls: list[tuple[str, str]] = []
+
+        def _default_auto_merge(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return {
+                'merge_outcome': 'merged',
+                'merge_reason': 'squash-merged (test override)',
+                'pr_number': 46,
+                'repo_coords': 'test-owner/test-repo',
+            }
+
+        self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+
+        import larry_alerts as la
+        self._la = la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        # Seed a realistic agent-models.json so the build/revision dispatch
+        # exercises the production allow-list shape (forge:
+        # ourliberty-agent-core) — mirrors BuildPhaseDispatchTest.setUp.
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        path = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        if not path.exists():
+            return []
+        return [
+            json.loads(line) for line in path.read_text().splitlines()
+            if line.strip()
+        ]
+
+    # ---------------- regression 1: Forge PROCEED defers to build_phase ----------------
+
+    def test_forge_proceed_with_larry_source_dispatches_build_phase(self):
+        # The 2026-05-19 task #17 dispatch failure mode, reproduced as a
+        # regression test. Forge emitted PROCEED on a source='larry'
+        # preflight; PR #46's over-broad larry_direct branch hijacked it,
+        # DM'd the wrong template ("Mirror requested revision"), and
+        # skipped `_dispatch_build_phase`. After the narrowing fix:
+        # build phase MUST auto-dispatch, NO synth DM fires.
+        marker = (
+            '=== PROCEED ===\n'
+            '{"task_id": "t-19-proceed", '
+            '"preflight_summary": "Edit foo.py."}\n'
+            '=== END_PROCEED ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='larry', task_id='t-19-proceed',
+            claude_session_id='sess-larry-direct-proceed',
+            target_repo='ourliberty-agent-core',
+            reply_chat_id=7998341473,
+            result=f'Spec is clear; ready.\n\n{marker}',
+        )
+        f = self._write_outbox('forge', 't-19-proceed.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+
+        # Build phase dispatched — the existing handler fires for
+        # source='larry' too. Without the narrowing fix this would be 0.
+        forge_builds = list(
+            (on.INBOXES_ROOT / 'forge').glob('build-*.json')
+        )
+        self.assertEqual(
+            len(forge_builds), 1,
+            'build phase MUST auto-dispatch for source="larry" PROCEED',
+        )
+        build_data = json.loads(forge_builds[0].read_text())
+        self.assertEqual(build_data['phase'], 'build')
+        self.assertEqual(build_data['task_id'], 't-19-proceed')
+        self.assertEqual(
+            build_data['session_id'], 'sess-larry-direct-proceed',
+        )
+
+        # No back-leg notify to Beacon (no upstream agent — correct).
+        beacon_notifies = list(
+            (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
+        )
+        self.assertEqual(beacon_notifies, [])
+
+        # No synth DM — the build phase will produce the closing PR DM
+        # downstream; an intermediate "PROCEED accepted" DM would just be
+        # noise (and the old "Mirror requested revision" text was wrong).
+        self.assertEqual(self._read_alerts(), [])
+
+    # ---------------- regression 2: Forge CLARIFY defers, no wrong DM ----------------
+
+    def test_forge_clarify_with_larry_source_does_not_dispatch_build_phase(self):
+        # Forge CLARIFY_REQUEST has no follow-up dispatcher when
+        # source='larry' (no Beacon to answer). The narrowing must NOT
+        # trigger `_dispatch_build_phase` (only PROCEED does), and the
+        # synth DM that does fire must use the clarify-specific body —
+        # NOT the hardcoded "Mirror requested revision" wording PR #46
+        # leaked onto every non-terminal intent.
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "t-19-clarify", '
+            '"question": "Which config file should I modify?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        outbox = _good_outbox(
+            agent='forge', source='larry', task_id='t-19-clarify',
+            claude_session_id='sess-larry-clarify',
+            clarification_count=0, max_clarifications=3,
+            target_repo='ourliberty-agent-core',
+            reply_chat_id=7998341473,
+            result=f'Need more info.\n\n{marker}',
+        )
+        f = self._write_outbox('forge', 't-19-clarify.json', outbox)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+
+        # CLARIFY must NOT trip build-phase dispatch.
+        forge_builds = list(
+            (on.INBOXES_ROOT / 'forge').glob('build-*.json')
+        )
+        self.assertEqual(forge_builds, [])
+
+        # Synth DM fires (CLARIFY has no other closing signal); body must
+        # NOT contain the old hardcoded "Mirror requested revision" text.
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        body = alerts[0]['message']
+        self.assertNotIn('Mirror requested revision', body)
+        self.assertIn('clarification', body.lower())
+        self.assertIn('Which config file should I modify?', body)
+
+    # ---------------- regression 3: Mirror REVISION defers to revision dispatch ----------------
+
+    def test_mirror_revision_with_larry_source_dispatches_revision(self):
+        # Clean REVIEW_REVISION (high confidence, budget remaining)
+        # auto-dispatches a revision task to Forge — for source='larry'
+        # just as for source='beacon'. PR #46's branch was skipping the
+        # dispatch AND DMing Larry the wrong template; with the
+        # narrowing fix, dispatch fires and no synth DM goes out.
+        body = _mirror_outbox_body(
+            _mirror_revision_marker(
+                task_id='t-19-revision', confidence='high',
+            ),
+            task_id='t-19-revision',
+            source='larry',
+            reply_chat_id=7998341473,
+            forge_build_session_id='forge-build-sess-19',
+            target_repo='ourliberty-agent-core',
+            branch='forge/t-19-revision',
+            pr_url=PR_URL_FIXTURE,
+            revision_count=0,
+            max_revisions=3,
+        )
+        f = self._write_outbox('mirror', 't-19-revision.json', body)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(self._auto_merge_calls, [])
+
+        # Revision dispatched to Forge — the existing handler fires.
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-t-19-revision-*.json')
+        )
+        self.assertEqual(
+            len(revisions), 1,
+            'revision MUST auto-dispatch for source="larry" REVIEW_REVISION',
+        )
+
+        # No synth DM — chain continues via Forge.
+        self.assertEqual(self._read_alerts(), [])
+
+    # ---------------- regression 4: PR #46's PASS auto-merge preserved ----------------
+
+    def test_mirror_pass_with_larry_source_still_auto_merges_and_dms(self):
+        # PR #46's intended behavior MUST be preserved: source='larry' +
+        # REVIEW_PASS auto-merges the PR and DMs Larry with the standard
+        # review-pass template (NOT the synth DM).
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id='t-19-pass'),
+            task_id='t-19-pass',
+            source='larry',
+            reply_chat_id=7998341473,
+        )
+        f = self._write_outbox('mirror', 't-19-pass.json', body)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+
+        # Auto-merge fired (the PR #46 gap-fill).
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+
+        # Terminal DM via _maybe_dm_larry (NOT the synth path).
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['intent'], 'review-pass')
+        self.assertIn('Mirror approved', alerts[0]['message'])
+        self.assertIn('Auto-merged', alerts[0]['message'])
+
+    # ---------------- regression 5: PASS without chat_id archives cleanly ----------------
+
+    def test_mirror_pass_with_larry_source_no_chat_id_archives(self):
+        # Pre-existing skip preserved: without reply_chat_id there is no
+        # Larry-direct target — the marker archives via the
+        # 'no routable target' path and auto-merge does NOT fire (silent
+        # action would be worse than no action).
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id='t-19-pass-nochat'),
+            task_id='t-19-pass-nochat',
+            source='larry',
+            reply_chat_id=None,
+        )
+        f = self._write_outbox('mirror', 't-19-pass-nochat.json', body)
+
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'archived-no-notify')
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(self._read_alerts(), [])
+
+    # ---------------- regression 6: synth DM body branches on intent ----------------
+
+    def test_synth_dm_body_branches_on_intent(self):
+        # The DM template MUST render an intent-specific body. Before the
+        # fix, every non-terminal intent rendered "Mirror requested
+        # revision on PR …" — including Forge's ack-proceed. This test
+        # locks in distinct bodies per intent so the template can't
+        # silently regress to a one-size-fits-all string.
+        data = {
+            'task_id': 't-template',
+            'reply_chat_id': 7998341473,
+        }
+        bodies = {}
+        for intent, marker_type, payload in (
+            ('ack-proceed', 'proceed', {'task_id': 't-template'}),
+            (
+                'review-revision', 'review_revision',
+                {
+                    'task_id': 't-template', 'pr_url': PR_URL_FIXTURE,
+                    'findings': [
+                        {'file': 'a.py', 'line_range': 'L1',
+                         'severity': 'low', 'description': 'x'},
+                    ],
+                },
+            ),
+            (
+                'clarify', 'clarify_request',
+                {
+                    'task_id': 't-template',
+                    'question': 'Which file?',
+                },
+            ),
+        ):
+            decision = {
+                'marker_type': marker_type,
+                'intent': intent,
+                'payload': payload,
+                'intent_kwargs': {},
+                'notify_source': 'forge-result',
+                'auto_promoted': False,
+                'next_clarification_count': None,
+            }
+            # Clear any prior alerts so we read just this intent's DM.
+            alerts_file = self._root / 'blackboard' / 'larry-alerts.jsonl'
+            if alerts_file.exists():
+                alerts_file.unlink()
+            on._maybe_dm_larry_direct_synth(data, decision)
+            alerts = self._read_alerts()
+            self.assertEqual(
+                len(alerts), 1,
+                f'synth DM should fire for intent={intent}',
+            )
+            bodies[intent] = alerts[0]['message']
+
+        # ack-proceed body must mention PROCEED / build phase, NOT
+        # "Mirror requested revision".
+        self.assertNotIn('Mirror requested revision', bodies['ack-proceed'])
+        self.assertIn('PROCEED', bodies['ack-proceed'])
+        self.assertIn('build phase', bodies['ack-proceed'].lower())
+
+        # review-revision body keeps the existing wording (back-compat
+        # for any caller that legitimately routes here — today none, but
+        # the arm is kept defensively).
+        self.assertIn('Mirror requested revision', bodies['review-revision'])
+        self.assertIn(PR_URL_FIXTURE, bodies['review-revision'])
+
+        # clarify body cites the actual question, NOT a revision template.
+        self.assertNotIn('Mirror requested revision', bodies['clarify'])
+        self.assertIn('clarification', bodies['clarify'].lower())
+        self.assertIn('Which file?', bodies['clarify'])
+
+        # All three bodies must be distinct — locks in branching.
+        self.assertNotEqual(bodies['ack-proceed'], bodies['review-revision'])
+        self.assertNotEqual(bodies['ack-proceed'], bodies['clarify'])
+        self.assertNotEqual(bodies['review-revision'], bodies['clarify'])
 
 
 class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
