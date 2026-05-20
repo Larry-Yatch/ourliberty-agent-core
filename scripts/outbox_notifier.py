@@ -831,12 +831,23 @@ def _maybe_dm_larry_direct_synth(
     decision: dict[str, Any],
 ) -> None:
     """Emit a synthesized closing DM for larry-direct dispatches whose
-    intent isn't in `TERMINAL_DM_INTENTS` (review-revision today).
+    intent isn't in `TERMINAL_DM_INTENTS` and has no follow-up handler.
 
-    Normal beacon-sourced flow auto-dispatches a fix to Forge — Larry
-    stays mid-chain and gets a DM only at terminal. Larry-direct has no
-    Forge target, so review-revision IS the terminal-from-Larry's-view
-    and a DM is the only closing signal.
+    Normal beacon-sourced flow either has a dispatcher to notify (Beacon)
+    or a follow-up dispatch helper (build_phase, revision_to_forge) that
+    advances the chain. Larry-direct dispatches with neither need a DM as
+    the only closing signal.
+
+    task-19 (2026-05-19): body branches on intent. Earlier hardcoded
+    "Mirror requested revision" wording rendered for every non-terminal
+    intent — including Forge `ack-proceed` — because PR #46's larry-direct
+    branch fired for all markers, not just the ones lacking a follow-up.
+    The caller now gates this on `marker_type` so PROCEED / clean
+    REVIEW_REVISION never reach here (their dispatch helpers carry the
+    chain forward). The intent-specific bodies below cover the residual
+    cases (today: REVIEW_REVISION auto-promoted/budget-exhausted is
+    re-routed to escalate → terminal DM, so nothing actually reaches the
+    `review-revision` arm in production; arm kept for defensive parity).
 
     Failure here is non-fatal — auto-merge has either fired or not, the
     archive happens regardless.
@@ -848,13 +859,36 @@ def _maybe_dm_larry_direct_synth(
     pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
     findings = payload.get('findings') if isinstance(payload, dict) else None
     n_findings = len(findings) if isinstance(findings, list) else 0
-    message = (
-        f'Mirror requested revision on PR {pr_url or "(no pr_url)"} '
-        f'on task `{task_id}` (intent={intent}). '
-        f'{n_findings} finding(s). Larry-direct dispatch: no Forge target — '
-        f'review the findings in the PR and decide whether to revise the '
-        f'spec or apply the fix manually.'
-    )
+    if intent == 'review-revision':
+        message = (
+            f'Mirror requested revision on PR {pr_url or "(no pr_url)"} '
+            f'on task `{task_id}`. {n_findings} finding(s). Larry-direct '
+            f'dispatch: no Forge target — review the findings in the PR '
+            f'and decide whether to revise the spec or apply the fix '
+            f'manually.'
+        )
+    elif intent == 'ack-proceed':
+        message = (
+            f'Forge accepted preflight on task `{task_id}` (PROCEED). '
+            f'Larry-direct dispatch: build phase auto-dispatched; await '
+            f'the PR-opened DM when build completes.'
+        )
+    elif intent == 'clarify':
+        question = None
+        if isinstance(payload, dict):
+            question = payload.get('question')
+        message = (
+            f'Forge needs clarification on task `{task_id}` but there is '
+            f'no upstream dispatcher to answer. '
+            f'Question: {question or "(see Forge outbox)"}. Either '
+            f're-dispatch via Beacon or answer manually.'
+        )
+    else:
+        message = (
+            f'Larry-direct dispatch result on task `{task_id}` '
+            f'(intent={intent}). No upstream dispatcher and no closing '
+            f'template for this intent — review the agent outbox manually.'
+        )
     try:
         ok = larry_alerts.append_notification(
             source='outbox-notifier',
@@ -3427,17 +3461,41 @@ def process_outbox(outbox_file: Path) -> str:
                 f'larry-direct dispatch (source={source}, '
                 f'intent={marker_decision["intent"]}, '
                 f'chat={chat_id}); skipping inter-agent notify, '
-                f'continuing to auto-merge + Larry DM',
+                f'continuing to dispatch helpers + auto-merge + Larry DM',
             )
-            # Some marker intents (review-revision) intentionally skip the
-            # closing DM in normal flows because they auto-dispatch to Forge
-            # for the fix — Larry stays out of the loop until terminal. But
-            # in a Larry-direct dispatch there IS no Forge target, so Larry
-            # IS the loop. Synthesize a closing DM for intents the standard
-            # render path skips.
+            # task-19 (2026-05-19) — narrow synth-DM trigger.
+            # PR #46's source-routing fix originally synth-DM'd every non-
+            # terminal intent for source='larry', which hijacked Forge's
+            # `ack-proceed` (PROCEED) and Mirror's clean `review-revision`
+            # by rendering a wrong-template DM AND skipping the existing
+            # dispatch helpers (`_dispatch_build_phase`,
+            # `_dispatch_revision_to_forge`).
+            #
+            # Marker → existing handler matrix when source='larry':
+            #   PROCEED                  → _dispatch_build_phase (no synth)
+            #   REVIEW_REVISION (clean)  → _dispatch_revision_to_forge (no synth)
+            #   REVIEW_REVISION auto/exh → intent overridden to review-escalate
+            #                              (terminal DM via _maybe_dm_larry)
+            #   REVIEW_PASS              → auto-merge + terminal DM
+            #   REVIEW_ESCALATE          → terminal DM via _maybe_dm_larry
+            #   REVIEW_EMERGENCY_HALT    → priority broadcast via
+            #                              _trip_emergency_halt
+            #   REJECT / CLARIFY_EXHAUST → terminal DM via _maybe_dm_larry
+            #   CLARIFY_REQUEST          → no dispatcher; synth DM with
+            #                              clarify-specific body
+            mtype = marker_decision['marker_type']
+            has_followup_dispatch = (
+                (mtype == 'proceed' and agent == 'forge')
+                or (
+                    mtype == 'review_revision' and agent == 'mirror'
+                    and not marker_decision.get('auto_promoted')
+                    and not marker_decision.get('budget_exhausted')
+                )
+            )
             if (
                 marker_decision['intent'] not in TERMINAL_DM_INTENTS
                 and isinstance(chat_id, int)
+                and not has_followup_dispatch
             ):
                 _maybe_dm_larry_direct_synth(data, marker_decision)
 
@@ -3521,10 +3579,15 @@ def process_outbox(outbox_file: Path) -> str:
             if reason:
                 notify_task['mirror_escalate_reason'] = reason
 
-        # E1.5.2: only emit the inter-agent notify + the agent-only side-
-        # effects (build_phase + revision dispatch) when there's a real
-        # agent target. larry_direct dispatches skip these and fall
-        # through to the auto-merge + Larry DM blocks below.
+        # task-19 (2026-05-19) — gate ONLY the back-leg inter-agent notify
+        # on `not larry_direct`. The dispatch helpers below
+        # (`_dispatch_build_phase`, `_dispatch_revision_to_forge`) write
+        # into a different agent's inbox to advance the chain; they don't
+        # depend on having an upstream agent to notify, so they MUST fire
+        # for source='larry' too. PR #46 incorrectly hid them under the
+        # `not larry_direct` gate, which is what caused Forge's PROCEED on
+        # task-17's larry-direct preflight to silently skip build-phase
+        # dispatch (Larry had to manually bridge the build envelope).
         if not larry_direct:
             notify_filename = f'notify-{outbox_file.stem}.json'
             try:
@@ -3551,28 +3614,32 @@ def process_outbox(outbox_file: Path) -> str:
                 _archive_outbox(outbox_file)
                 return 'notify-failed'
 
-            # Phase D3 commit 4b: PROCEED → ALSO write a build-phase task to
-            # Forge's inbox. The notify-to-Beacon above is informational
-            # (Beacon journals "Forge is proceeding"); the build-phase dispatch
-            # below is what actually triggers code work. Two-invocation
-            # preflight→build with --resume per signed-off design.
-            if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
-                _dispatch_build_phase(data)
+        # Phase D3 commit 4b: PROCEED → write a build-phase task to
+        # Forge's inbox. The notify-to-Beacon above is informational
+        # (Beacon journals "Forge is proceeding"); the build-phase dispatch
+        # below is what actually triggers code work. Two-invocation
+        # preflight→build with --resume per signed-off design.
+        # task-19: fires regardless of larry_direct so Larry-direct Forge
+        # preflights still auto-advance to build.
+        if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
+            _dispatch_build_phase(data)
 
-            # D3.5 5b: REVIEW_REVISION with budget remaining + high confidence
-            # → ALSO dispatch a revision task to Forge's inbox. Beacon's notify
-            # above is informational (Shape 7, now mid-chain in 5b); the
-            # revision dispatch is what actually triggers Forge's fix. Skipped
-            # if auto_promoted (low confidence → escalate) or budget_exhausted
-            # (over max_revisions → escalate); both downgrade to Beacon-only
-            # routing via the intent override above.
-            if (
-                marker_decision['marker_type'] == 'review_revision'
-                and agent == 'mirror'
-                and not marker_decision.get('auto_promoted')
-                and not marker_decision.get('budget_exhausted')
-            ):
-                _dispatch_revision_to_forge(data, marker_decision)
+        # D3.5 5b: REVIEW_REVISION with budget remaining + high confidence
+        # → dispatch a revision task to Forge's inbox. Beacon's notify
+        # above is informational (Shape 7, now mid-chain in 5b); the
+        # revision dispatch is what actually triggers Forge's fix. Skipped
+        # if auto_promoted (low confidence → escalate) or budget_exhausted
+        # (over max_revisions → escalate); both downgrade to Beacon-only
+        # routing via the intent override above.
+        # task-19: fires regardless of larry_direct so Larry-direct Mirror
+        # reviews still drive Forge through the revision loop.
+        if (
+            marker_decision['marker_type'] == 'review_revision'
+            and agent == 'mirror'
+            and not marker_decision.get('auto_promoted')
+            and not marker_decision.get('budget_exhausted')
+        ):
+            _dispatch_revision_to_forge(data, marker_decision)
 
         # D3.5 5d — auto-merge on Mirror REVIEW_PASS. Order per Larry's
         # sign-off: merge fires BEFORE the closing DM renders so the DM
