@@ -2072,6 +2072,94 @@ def _extract_revision_summary_from_result(
     return round_num, summary
 
 
+def _render_no_session_revision_dm(
+    data: dict[str, Any], decision: dict[str, Any],
+) -> str:
+    """Compose the Larry-DM body for a no-session REVIEW_REVISION.
+
+    Chain-gap #6: Claude-as-Forge PRs (source='larry', no Forge build
+    session) can't auto-resume on revision. The DM surfaces Mirror's
+    findings + a clear manual next-step. Phrased for Telegram-on-phone
+    reading: terse, leads with the action, body under ~500 chars before
+    findings expand.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    payload = decision.get('payload') or {}
+    pr_url = data.get('pr_url') or payload.get('pr_url') or '(no pr_url)'
+    branch = data.get('branch') or '(branch unknown)'
+    summary = payload.get('summary') or payload.get('reason') or ''
+    findings = payload.get('findings')
+
+    lines = [
+        f'Mirror requested revision on {pr_url} (task `{task_id}`).',
+        'Claude-as-Forge PR — no Forge session to auto-resume.',
+    ]
+    if summary:
+        lines.append(f'Summary: {summary}')
+    if isinstance(findings, list) and findings:
+        lines.append('Findings:')
+        for i, f in enumerate(findings, 1):
+            if isinstance(f, dict):
+                sev = f.get('severity', '?')
+                file_ref = f.get('file', '?')
+                line_ref = f.get('line_range', '')
+                desc = f.get('description', '(no description)')
+                loc = f'{file_ref} {line_ref}'.strip()
+                lines.append(f'  {i}. [{sev}] {loc} — {desc}')
+            else:
+                lines.append(f'  {i}. {f}')
+    lines.append(
+        f'Next step: push the fix to `{branch}`, then ask Claude to '
+        f'dispatch a fresh Mirror review (no auto-resume available).'
+    )
+    return '\n'.join(lines)
+
+
+def _dm_larry_no_session_revision(
+    data: dict[str, Any], decision: dict[str, Any], chat_id: int,
+) -> None:
+    """Queue a Larry DM for a Claude-as-Forge REVIEW_REVISION with no session.
+
+    Chain-gap #6 (2026-05-20). Same shape as `_maybe_dm_larry` but fires
+    from inside the revision-dispatch handler when the auto-resume path
+    can't run. Uses `append_notification` (1:1 with a task event, no
+    cooldown — losing this DM is exactly the symptom we're fixing).
+    """
+    task_id = data.get('task_id') or 'unknown'
+    pr_url = data.get('pr_url') or (
+        (decision.get('payload') or {}).get('pr_url') if isinstance(
+            decision.get('payload'), dict
+        ) else None
+    ) or '(no pr_url)'
+    message = _render_no_session_revision_dm(data, decision)
+    try:
+        ok = larry_alerts.append_notification(
+            source='outbox-notifier',
+            intent='review-revision',
+            message=message,
+            chat_id=chat_id,
+            task_id=task_id,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'no-session revision DM append raised for chat {chat_id} '
+            f'(task={task_id}): {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return
+    if ok:
+        log(
+            f'queued no-session revision DM to chat {chat_id} for PR {pr_url} '
+            f'(task={task_id}); Claude-as-Forge — no Forge session to resume'
+        )
+    else:
+        log(
+            f'no-session revision DM append failed for chat {chat_id} '
+            f'(task={task_id}); Larry will not be notified of the revision',
+            'WARN',
+        )
+
+
 def _dispatch_revision_to_forge(
     data: dict[str, Any], decision: dict[str, Any],
 ) -> None:
@@ -2098,6 +2186,23 @@ def _dispatch_revision_to_forge(
     task_id = data.get('task_id') or 'unknown'
     forge_session = data.get('forge_build_session_id')
     if not forge_session:
+        # Chain-gap #6 (observed 2026-05-20 on PR #59). When Larry opens a
+        # Claude-as-Forge PR (trivial config/docs edits — source='larry',
+        # no Forge build session), Mirror's REVIEW_REVISION has no Forge
+        # session to --resume against. The auto-resume chain doesn't apply;
+        # instead, surface the findings to Larry via Telegram DM so the
+        # rejection isn't silent. Without this branch, Larry only learns
+        # about the revision rejection if he's watching the chat live.
+        #
+        # Gated on source='larry' (the Claude-as-Forge marker) AND an
+        # int reply_chat_id (a DM target). For source!='beacon' but also
+        # not 'larry' (system sources without chats), keep the original
+        # WARN — there's no DM target to escalate to.
+        routing_source = data.get('original_source') or data.get('source')
+        chat_id = data.get('reply_chat_id')
+        if routing_source == 'larry' and isinstance(chat_id, int):
+            _dm_larry_no_session_revision(data, decision, chat_id)
+            return
         log(
             f'REVIEW_REVISION on task {task_id} has no forge_build_session_id '
             f'(propagation gap?); revision dispatch would have no session to '
