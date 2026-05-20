@@ -1993,6 +1993,82 @@ Adapted from upstream `gm-agent-core/scripts/heal_pr_auto_merge.py` (#240): pull
 
 **Next:** E2 — Vercel preview-first deploy layer. ~3–4 days estimated. Different shape (new external system + multi-day, fresh-session work). E3 (read-only dashboard) follows E2 and dogfoods E2's preview URLs. Critical path: E1 → E2 → E3 → E4.
 
+## Phase E2.0 + E1.5 — Vercel install + Credential Rotation Discipline (2026-05-19, single ~6-hour session)
+
+Status: Shipped 2026-05-19. **E2.0 done. E1.5 + E1.5.2 closed. Task #17 + Task #19 follow-ups also landed same session.** Five PRs total: #45 (design), #46 (implementation), #47 (chat-ID registry follow-up), #48 (task #17 headless Beacon APPROVAL_REQUEST handler), #49 (task #19 source-routing narrowing fix).
+
+Phase E2.0 was the small one-time Vercel signup + token install that unblocks E2.1-E2.3 (deploy layer). Phase E1.5 was a phase inserted MID-SESSION — surfaced organically by auditing `.env.larry` during the Vercel install. The audit revealed eight active credentials across four storage locations (`.env.larry` + gh CLI keychain + Claude Max OAuth + workspace-mcp OAuth), seventeen empty placeholder slots in `.env.larry` accumulated since Phase A, and zero tracking of rotation cadences. The DigitalOcean template comment "rotate every 90 days" had been silent for eleven days. Larry's framing: *"Can you make it so the calendar reminder is part of Beacon's calendar, and Beacon walks me through the process? We need to make that a part of the system."*
+
+E1.5 became "credential rotation as a system primitive": a registry file, a Mirror-enforced 4-artifact convention, two drift healers (credential drift + systemd install drift), a Pulse cycle extension that DMs Larry on upcoming rotations, a log-parser-based scope-usage analyzer for the scope-audit cycles, and Beacon-owned Google Calendar events as the visible reminder layer. The phase ran across two PRs (#45 design + #46 implementation) plus a fix-on-first-dogfood follow-up (#47), plus two architectural-finding closeouts (#48 task #17, #49 task #19).
+
+### Decisions locked during the session
+
+- **Default rotation cadence: 365 days (Dial 4)** — matches the Vercel PAT max; cognitive load matches. DigitalOcean's 90-day vendor-mandated cadence overrides on a per-entry basis.
+- **Drift healer posture: fail-closed, DM every 6h until reconciled** (Q2 option A). The failure mode of a missing entry is "your token silently lapses and your droplet stops deploying"; the cost exceeds the cost of repeated DMs. DMs stop the moment the entry is added.
+- **Scope-audit DM body: (B) usage-analysis** — not just "list current scopes, ask Larry." Pulse runs `scripts/scope_usage_parser.py` on the credential's scope namespace and proposes specific drops in the DM. Log-parser approach (not call-site instrumentation) for the first cycle in 2027 — defer dedicated instrumentation unless log-parsing proves too fragile.
+- **Empty-slot cleanup in `.env.larry`: remove the 17 placeholders, don't keep with comments** (Option B). Empty slots violate the 4-artifact discipline — they're "credentials without real existence." Re-add via the discipline when needed.
+- **Registry covers all 4 storage locations, not just `.env.larry`** (Option B). Anything less misses the actual most-important credentials (gh-OAuth, Claude Max, Google OAuth refresh). Schema gained one field (`storage_location`); healer gained a small dispatch table mapping location-type → scanner.
+- **Vercel account ownership: Larry's personal email** (Path A from E2.0 design). Vercel is your deploy infrastructure, not an agent capability surface. The agent only needs a token; it doesn't need to own the account.
+- **Token rotation discipline as 4-artifact rule**: every new credential ships with credential + registry entry + runbook + Beacon calendar event, in ONE PR. Split = silent drift window. Mirror enforces; drift healer fails closed on any orphan.
+
+### What shipped (highlights)
+
+- `/home/larry/credentials/.env.larry` populated with `VERCEL_TOKEN=<60-char vcp_* PAT>` (Hobby tier, 1-year expiration). 17 empty placeholder lines removed post-PR-#46.
+- `config/token-rotation-schedule.json` (194 lines after #47): 10-entry registry across 4 storage locations + `known_storage_locations` scanner-strategy map.
+- `shared/credentials-discipline.md`: the Mirror-enforced 4-artifact rule.
+- `docs/runbooks/` (new directory) with 8 runbooks: canonical Vercel rotation + telegram bot rotation + 3 scope-audit runbooks + 3 stubs for not-yet-wired credentials.
+- `scripts/validate_token_rotation_schedule.py` (~310 LOC + ~380 LOC tests, 25 tests): schema + semantic validator.
+- `scripts/heal_credential_registry_drift.py` (~566 LOC + ~415 LOC tests, ~30 tests): every-6h drift healer with fail-closed DMs + activation pattern matching E1.3.
+- `scripts/heal_systemd_install_drift.py` (~316 LOC + ~240 LOC tests, ~15 tests): every-12h sibling healer for systemd unit install drift. Born from finding the E1.3 healer's missing install.
+- `scripts/scope_usage_parser.py` (~224 LOC + ~200 LOC tests, ~15 tests): log-parser scope-usage analyzer (deliberately not call-site instrumentation; defer until logs prove too fragile).
+- `scripts/outbox_notifier.py` modified across PR #46 (source-routing fix), PR #48 (headless Beacon APPROVAL_REQUEST handler), PR #49 (source-routing narrowing fix). Net ~+500 LOC across the three PRs + ~+600 LOC of tests.
+- `runbooks/cycle-prompt.md` additive: Pulse credential rotation check section (60-day window, 14-day DM dedup).
+- `systemd/` with two new unit+timer pairs for the new healers, installed operationally post-PR-#46.
+- `agents/mirror/CLAUDE.md` + `agents/beacon/CLAUDE.md` additive sections for credential-discipline enforcement and headless-dispatch path.
+- `INSTALL.md` updated (healer count 8 → 10) with install-drift-pattern callout.
+- Four calendar events on Beacon's agent calendar (Vercel + 3 annual scope audits), Larry invited as guest on each. Dogfoods E5.3 Beacon-owns-Google-Workspace pattern.
+
+### Architectural findings surfaced + closed
+
+Three manual bridges were required during the session to keep the chain moving — each surfaced a real architectural gap in headless-mode operation. **All five findings were tracked; four were closed in code; one was deferred:**
+
+1. **Source-routing gap** — `outbox_notifier` skipped auto-merge when source was `'larry'`. Surfaced on PR #45's Mirror dispatch. **FIXED in PR #46** via the source-routing addition. Validated on PR #47.
+2. **Healer install drift** — E1.3's `heal-pr-auto-merge.{service,timer}` shipped to repo but never installed on droplet. **FIXED operationally** (cp + daemon-reload + enable+start) + **systemically** via new `heal_systemd_install_drift.py` healer in PR #46.
+3. **DM delivery delay** — `larry-alerts.jsonl` queue → Telegram DM hop ran ~8 min. **Noted, deferred** to E6 polish.
+4. **Headless Beacon APPROVAL_REQUEST handler** — Beacon's APPROVAL_REQUEST marker had no headless handler. Required a manual bridge during PR #46's chain (extract marker payload, write Forge preflight envelope directly). **CLOSED in PR #48 task #17** via `_handle_beacon_headless_approval_request`.
+5. **PR #46 source-routing fix over-broad interception** — PR #46's fix intercepted ALL `source='larry'` markers (including Forge's PROCEED), DM'ing wrong template + skipping `_dispatch_build_phase`. Surfaced on task #17 dispatch (required a fifth manual bridge for build phase). **CLOSED in PR #49 task #19** via narrowing precondition + template fix.
+
+### Verification (operational, on droplet)
+
+- `python3 scripts/validate_token_rotation_schedule.py config/token-rotation-schedule.json` exits 0 (10 entries; all fields populated; all runbook_path refs resolve).
+- Both new healers active: `systemctl is-active ourliberty-heal-credential-registry-drift.timer ourliberty-heal-systemd-install-drift.timer` → `active active`.
+- Credential drift healer first real run reported `MISSING_REGISTRY_ENTRY:TELEGRAM_CHAT_ID_LARRY` + `MISSING_REGISTRY_ENTRY:TELEGRAM_ALLOWED_CHAT_IDS` — design oversight from PR #45. **The discipline caught its own designer's gap on first run.** Fixed in PR #47.
+- After PR #47: drift healer re-run logged `reconciled_gc=2`, state file `{"drifts": {}}`. **Zero drift.**
+- E1.3 healer first real activation fired during this session via a synthetic AUTO_MERGE-failure log line targeting PR #45. Activation DM landed on Telegram; Larry ran `systemctl edit` + `restart`; healer re-ran in live mode and merged PR #45 at 23:56:27Z. **First real activation of the E1.3 discoverability pattern.**
+- Source-routing fix validated end-to-end on PR #47 (`source='larry'` Mirror dispatch → REVIEW_PASS → notifier routed correctly + auto-merge fired).
+- PR #49 narrowing fix validated end-to-end (task #19's own chain ran fully autonomously after the manual build-phase bridge; subsequent dispatches on freshly-restarted notifier should be clean).
+
+### Total spend + scope
+
+- **5 PRs merged** (#45 #46 #47 #48 #49). All auto-merged via the chain (with manual bridges where the headless-mode gaps surfaced).
+- **+~5000 LOC across the session** (#45 +448, #46 +3768, #47 +34, #48 ~+200, #49 ~+550).
+- **Test suite: 733 → ~1050+** (~+110 in #46 + ~+8 in #48 + ~+30 in #49). All green throughout.
+- **Total LLM spend: ~$25** across all dispatches.
+- **Wall clock: ~6.5 hours** of focused engagement (interspersed with async build/review chains running in background).
+
+### Codified additions worth recalling next session
+
+14. **Three-to-five manual bridges per Claude-driven headless cycle was the friction discovered today.** Pattern documented in `feedback_headless_mode_chain_gaps` memory. After PR #46 + #48 + #49, the most common bridge paths are now closed; future headless cycles should run autonomously unless a new inter-agent handoff is introduced.
+15. **The "build complete" instinct prevented a thin design** — Larry's choice of (B) usage-analysis over (A) just-list-scopes added implementation work but produced the durable shape. Annual scope audits will surface real drop-candidates with usage data, not just "review your scopes."
+16. **The drift healer caught its designer's oversight on first run** — discipline working as designed. If a fail-closed healer doesn't fire on day-one, the registry isn't covering enough.
+17. **Headless mode requires explicit handler entries for every inter-agent handoff** — agent OS was designed assuming Telegram bot interception. Claude-driven sessions are a second mode that needs first-class handler support. Whenever a NEW inter-agent handoff is added, also add the headless-mode handler.
+18. **Calendar events as the visible reminder layer** — the system's discipline (registry + healer) is invisible to the operator. Beacon-owned calendar events on the operator's personal calendar are the visible interface. Pattern works.
+19. **Bug fixes can introduce regressions even with tests** — PR #46's source-routing fix closed finding #1 but introduced finding #5. PR #49 narrowed it. The fix-introducing-a-regression shape is worth watching for; the dogfood-as-test pattern surfaced it within minutes of dispatch.
+
+### Next
+
+**E2.1 — `config/deploy_targets.json` schema design**. Resumption prompt for the next session is at `docs/next-phase-prompt-e2-1.md` (self-contained for a fresh Claude Code session).
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

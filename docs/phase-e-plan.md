@@ -405,9 +405,9 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-19 (E1.5 closed; task #17 closed — headless Beacon APPROVAL_REQUEST handler)
-**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers landed; PRs #45, #46, #47). Task #17 **DONE** (this PR closes the fourth architectural finding from the E1.5 session — outbox_notifier now auto-routes Claude-driven headless Beacon dispatches without manual bridging).
-**Next concrete action:** Resume E2.1 (`config/deploy_targets.json`). Task #19 (fifth architectural finding — source-routing fix's accidental skip of build-phase auto-dispatch after a PROCEED marker) is queued for a separate small PR.
+**Last updated:** 2026-05-19 (end of long session — E1.5 fully closed; all 5 architectural findings addressed)
+**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). All 5 architectural findings from the E1.5 session are addressed: 4 fixed in code, 1 (DM delivery delay) deferred to E6 polish.
+**Next concrete action:** Resume E2.1 (`config/deploy_targets.json` schema design). The next-phase resume prompt at `docs/next-phase-prompt-e2-1.md` is self-contained for a fresh Claude Code session.
 **Blockers:** None
 **Open questions for Larry:** None outstanding. E2.1 will surface design questions when it kicks off.
 
