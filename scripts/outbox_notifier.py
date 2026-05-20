@@ -72,7 +72,7 @@ import safe_write_inbox             # noqa: E402
 import trust_policy                 # noqa: E402
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
 INBOXES_ROOT = AGENTS_ROOT / 'inboxes'
 OUTBOXES_ROOT = AGENTS_ROOT / 'outboxes'
 BLACKBOARD = AGENTS_ROOT / 'blackboard'
