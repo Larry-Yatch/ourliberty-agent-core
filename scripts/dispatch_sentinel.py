@@ -54,7 +54,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import larry_alerts  # noqa: E402
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
 STATE_FILE = AGENTS_ROOT / 'state' / 'dispatch-sentinel.json'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'dispatch-sentinel.log'
 ALERTS_LOG = AGENTS_ROOT / 'blackboard' / 'sentinel-alerts.jsonl'

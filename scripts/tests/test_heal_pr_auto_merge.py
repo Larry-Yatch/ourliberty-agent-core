@@ -11,8 +11,10 @@ Run:
 """
 from __future__ import annotations
 
+import importlib
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -26,13 +28,43 @@ if str(_REPO_SCRIPTS) not in sys.path:
 import heal_pr_auto_merge as h  # noqa: E402
 
 
+class _IsolatedAgentsRoot(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.
+
+    Why: heal_pr_auto_merge's LOG_FILE / STATE_FILE / HEARTBEAT_FILE /
+    KILL_SWITCH derive from AGENTS_ROOT at import time. Without this
+    redirection, running these tests in a worktree pollutes prod
+    `/home/larry/agents/...` state. Reload the module so its module-level
+    constants pick up the override.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._isolated_tmp = tempfile.mkdtemp(prefix='agents-root-')
+        for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+            os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
+        self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        importlib.reload(h)
+
+    def tearDown(self):
+        if self._isolated_env_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        importlib.reload(h)
+        shutil.rmtree(self._isolated_tmp, ignore_errors=True)
+        super().tearDown()
+
+
 # -------------------- log scanning --------------------
 
-class FindMirrorPassedFailuresTest(unittest.TestCase):
+class FindMirrorPassedFailuresTest(_IsolatedAgentsRoot):
     """The healer only acts on PRs that already had a Mirror-PASS attempt.
     That signal comes from outbox-notifier.log AUTO_MERGE entries."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.log_path = Path(self.tmp.name) / 'outbox-notifier.log'
@@ -106,7 +138,7 @@ class FindMirrorPassedFailuresTest(unittest.TestCase):
 
 # -------------------- mergeability predicate --------------------
 
-class IsMergeableTest(unittest.TestCase):
+class IsMergeableTest(_IsolatedAgentsRoot):
     """Per-PR pre-merge gate. Pulled verbatim from upstream + stalled-label."""
 
     def _pr(self, **overrides) -> dict:
@@ -178,7 +210,7 @@ class IsMergeableTest(unittest.TestCase):
 
 # -------------------- CANCELLED-workflow rerun helper --------------------
 
-class FindCancelledChecksTest(unittest.TestCase):
+class FindCancelledChecksTest(_IsolatedAgentsRoot):
 
     def test_returns_cancelled_when_no_other_problem(self):
         pr = {'statusCheckRollup': [
@@ -207,9 +239,10 @@ class FindCancelledChecksTest(unittest.TestCase):
 
 # -------------------- state file CRUD --------------------
 
-class StateFileTest(unittest.TestCase):
+class StateFileTest(_IsolatedAgentsRoot):
 
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self._orig = h.STATE_FILE
@@ -217,6 +250,7 @@ class StateFileTest(unittest.TestCase):
 
     def tearDown(self):
         h.STATE_FILE = self._orig
+        super().tearDown()
 
     def test_load_missing_returns_empty(self):
         self.assertEqual(h.load_state(), {'prs': {}})
@@ -244,12 +278,13 @@ class StateFileTest(unittest.TestCase):
 
 # -------------------- per-PR orchestration (mocked gh) --------------------
 
-class ProcessPrTest(unittest.TestCase):
+class ProcessPrTest(_IsolatedAgentsRoot):
     """The most important test surface: dry-run vs live, budget, stalled,
     no-mirror-pass, not-mergeable branches. Subprocess invocations are
     mocked so the test never hits gh."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self._orig_state = h.STATE_FILE
@@ -268,6 +303,7 @@ class ProcessPrTest(unittest.TestCase):
         h.STATE_FILE = self._orig_state
         h.dm_larry = self._orig_dm
         h.add_stalled_label = self._orig_label
+        super().tearDown()
 
     def _pr(self, **overrides) -> dict:
         base = {
@@ -371,9 +407,10 @@ class ProcessPrTest(unittest.TestCase):
 
 # -------------------- kill-switch + activation gate --------------------
 
-class KillSwitchTest(unittest.TestCase):
+class KillSwitchTest(_IsolatedAgentsRoot):
 
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self._orig = h.KILL_SWITCH
@@ -381,6 +418,7 @@ class KillSwitchTest(unittest.TestCase):
 
     def tearDown(self):
         h.KILL_SWITCH = self._orig
+        super().tearDown()
 
     def test_absent_means_inactive(self):
         self.assertFalse(h.kill_switch_active())
@@ -390,7 +428,7 @@ class KillSwitchTest(unittest.TestCase):
         self.assertTrue(h.kill_switch_active())
 
 
-class AutomergeEnabledTest(unittest.TestCase):
+class AutomergeEnabledTest(_IsolatedAgentsRoot):
 
     def test_unset_means_disabled(self):
         with patch.dict(os.environ, {}, clear=False):

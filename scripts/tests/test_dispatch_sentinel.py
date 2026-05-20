@@ -11,8 +11,10 @@ Run:
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -25,6 +27,37 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import dispatch_sentinel as ds  # noqa: E402
 import larry_alerts  # noqa: E402
+
+
+class _IsolatedAgentsRoot(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.
+
+    Why: dispatch_sentinel's STATE_FILE / LOG_FILE / ALERTS_LOG /
+    LEASES_DIR / IN_FLIGHT_DIR / AGENT_MODELS_FILE derive from AGENTS_ROOT
+    at import time. Without this redirection, running tests in a worktree
+    pollutes prod `/home/larry/agents/...` state. Reload the module so its
+    module-level constants pick up the override. The existing per-test
+    attribute overrides (which point at a separate test root) layer on
+    top — fine, just redundant defense-in-depth.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._isolated_tmp = tempfile.mkdtemp(prefix='agents-root-')
+        for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+            os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
+        self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        importlib.reload(ds)
+
+    def tearDown(self):
+        if self._isolated_env_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        importlib.reload(ds)
+        shutil.rmtree(self._isolated_tmp, ignore_errors=True)
+        super().tearDown()
 
 
 def _redirect_larry_alerts(root: Path) -> dict:
@@ -47,10 +80,11 @@ def _restore_larry_alerts(originals: dict) -> None:
         setattr(larry_alerts, name, value)
 
 
-class SentinelScansTest(unittest.TestCase):
+class SentinelScansTest(_IsolatedAgentsRoot):
     """The three scan kinds + per-model thresholds + dedup."""
 
     def setUp(self):
+        super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
         self._originals = {
@@ -76,6 +110,7 @@ class SentinelScansTest(unittest.TestCase):
             setattr(ds, name, value)
         _restore_larry_alerts(self._la_originals)
         self._tmp.cleanup()
+        super().tearDown()
 
     def _write_inbox_task(self, agent, name, mtime_age_seconds, body=None):
         inbox = self._root / 'inboxes' / agent
@@ -165,10 +200,11 @@ class SentinelScansTest(unittest.TestCase):
         self.assertEqual(ds._per_model_threshold('unknown-model'), ds.DEFAULT_IN_FLIGHT_THRESHOLD)
 
 
-class SentinelMainTest(unittest.TestCase):
+class SentinelMainTest(_IsolatedAgentsRoot):
     """End-to-end main() — alerts dedup across runs, GC on resolution."""
 
     def setUp(self):
+        super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
         self._originals = {
@@ -194,6 +230,7 @@ class SentinelMainTest(unittest.TestCase):
             setattr(ds, name, value)
         _restore_larry_alerts(self._la_originals)
         self._tmp.cleanup()
+        super().tearDown()
 
     def _stale_inbox(self, agent='beacon', name='stale.json'):
         inbox = self._root / 'inboxes' / agent
@@ -231,10 +268,11 @@ class SentinelMainTest(unittest.TestCase):
         self.assertEqual(state2['alerted'], {}, 'gc should drop resolved alerts')
 
 
-class SentinelLarryAlertsTest(unittest.TestCase):
+class SentinelLarryAlertsTest(_IsolatedAgentsRoot):
     """D3.5-prep additions — larry-alerts hook + cold-start re-arming (C2 fix)."""
 
     def setUp(self):
+        super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
         self._originals = {
@@ -260,6 +298,7 @@ class SentinelLarryAlertsTest(unittest.TestCase):
             setattr(ds, name, value)
         _restore_larry_alerts(self._la_originals)
         self._tmp.cleanup()
+        super().tearDown()
 
     def _stale_inbox(self, agent='beacon', name='stale.json'):
         inbox = self._root / 'inboxes' / agent
