@@ -405,9 +405,9 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-19 (mid-session — E2.0 + E1.5 design landed)
-**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **in flight** (design PR opened; Forge build dispatch next).
-**Next concrete action:** Land the E1.5 design PR (this one), then dispatch Forge for E1.5.2 implementation. After E1.5 closes, resume E2.1 (`config/deploy_targets.json`).
+**Last updated:** 2026-05-19 (E1.5 closed; task #17 closed — headless Beacon APPROVAL_REQUEST handler)
+**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers landed; PRs #45, #46, #47). Task #17 **DONE** (this PR closes the fourth architectural finding from the E1.5 session — outbox_notifier now auto-routes Claude-driven headless Beacon dispatches without manual bridging).
+**Next concrete action:** Resume E2.1 (`config/deploy_targets.json`). Task #19 (fifth architectural finding — source-routing fix's accidental skip of build-phase auto-dispatch after a PROCEED marker) is queued for a separate small PR.
 **Blockers:** None
 **Open questions for Larry:** None outstanding. E2.1 will surface design questions when it kicks off.
 
