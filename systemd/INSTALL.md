@@ -91,9 +91,9 @@ sudo systemctl enable --now ourliberty-agent-core-health.timer
 sudo systemctl enable --now ourliberty-watchdog.timer
 ```
 
-### Self-healing healers (Phase D2.5)
+### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2)
 
-Seven healer scripts under `scripts/heal_*.py` watch for specific failure modes the audit identified. Each runs on its own systemd timer (5–15 min cadence) and is one-shot — fires, reports, exits. Enabling these closes audit Gap 8.
+Ten healer scripts under `scripts/heal_*.py` watch for specific failure modes the audit identified. Each runs on its own systemd timer (5 min–12 h cadence) and is one-shot — fires, reports, exits. Enabling these closes audit Gap 8 and the credential-discipline + install-discipline gaps surfaced in E1.5.
 
 ```bash
 # Install (copy unit files into systemd's directory)
@@ -101,7 +101,7 @@ sudo cp ~/agent-core/systemd/ourliberty-heal-*.service /etc/systemd/system/
 sudo cp ~/agent-core/systemd/ourliberty-heal-*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 
-# Enable + start all 8 timers at once
+# Enable + start all 10 timers at once
 sudo systemctl enable --now ourliberty-heal-abandoned-inbox-tasks.timer
 sudo systemctl enable --now ourliberty-heal-blocked-inbox-age.timer
 sudo systemctl enable --now ourliberty-heal-empty-inbox-files.timer
@@ -109,7 +109,9 @@ sudo systemctl enable --now ourliberty-heal-recovery-already-merged.timer
 sudo systemctl enable --now ourliberty-heal-restart-dedup-obsolete.timer
 sudo systemctl enable --now ourliberty-heal-silent-loop-death.timer
 sudo systemctl enable --now ourliberty-heal-zombie-main-workers.timer
-sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — runs in DRY-RUN mode by default; see service file for activation
+sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — DRY-RUN by default; see service file for activation
+sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E1.5.2 — DRY-RUN by default
+sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default
 
 # Confirm
 systemctl list-timers 'ourliberty-heal-*' --all
@@ -126,8 +128,27 @@ What each one does:
 | `restart-dedup-obsolete` | 5 min | Stale `RESTART_DEDUP` duplicate markers |
 | `silent-loop-death` | 10 min | Self-scheduled re-queue loops that died without leaving a trace |
 | `zombie-main-workers` | 5 min | `claude` agent processes still running in deleted worktree paths |
+| `pr-auto-merge` (E1.3) | 5 min | Mirror-PASSed PRs whose auto-merge primary path missed |
+| `credential-registry-drift` (E1.5.2) | 6 h | Credentials in store without registry entries; registry entries without credentials in store |
+| `systemd-install-drift` (E1.5.2) | 12 h | systemd units shipped in repo but never installed under `/etc/systemd/system/` |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
+
+#### Install-audit pattern (E1.5.2)
+
+The `systemd-install-drift` healer above is itself an audit primitive: it catches every PR that ships a new `systemd/*.service` or `*.timer` but doesn't get installed on the droplet. Motivating example: PR #43 shipped `heal-pr-auto-merge.{service,timer}` to the repo, but they were never copied to `/etc/systemd/system/` — the gap stayed silent until E1.5 review caught it.
+
+The pattern: any PR that adds a unit file is operator-completed when:
+
+1. The file lands in `systemd/` in the repo (PR merge).
+2. `sudo cp ~/agent-core/systemd/<unit> /etc/systemd/system/` + `sudo systemctl daemon-reload` + (for timers) `sudo systemctl enable --now <unit>` on the droplet.
+3. The drift healer's next tick (within 12 h) finds no drift — confirms the install landed.
+
+If step 2 is missed, the healer DMs Larry with the exact install commands; the gap closes within one tick.
+
+#### Credential-discipline pattern (E1.5.2)
+
+The `credential-registry-drift` healer enforces the 4-artifact rule from `shared/credentials-discipline.md` at runtime: every credential in `.env.larry` / `~/.config/gh/hosts.yml` / `~/.claude/.credentials.json` / `~/.google_workspace_mcp/credentials/` must have a matching entry in `config/token-rotation-schedule.json`, and vice versa. DMs every 6 h until reconciled (fail-closed per Larry's Q2 design decision). Activation env var: `OURLIBERTY_CREDENTIALS_HEALER_ENABLED=true` per the service file's commented activation snippet.
 
 ## Checking state
 

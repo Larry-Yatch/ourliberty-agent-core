@@ -1,0 +1,27 @@
+[Unit]
+Description=Self-healing healer — systemd install drift (E1.5.2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_systemd_install_drift.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# E1.5.2 activation gate. Default OFF until verified live. When unset (or
+# != "true"), the healer runs in DRY-RUN mode — it logs install drifts
+# and DMs Larry one-time activation instructions, but does NOT send
+# per-unit DMs. To activate after verification:
+#   sudo systemctl edit ourliberty-heal-systemd-install-drift.service
+# then add:
+#   Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true"
+# then `sudo systemctl restart ourliberty-heal-systemd-install-drift.timer`.
+Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_systemd_install_drift.py
+TimeoutStartSec=60
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-systemd-install-drift

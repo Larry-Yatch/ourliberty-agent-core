@@ -152,6 +152,36 @@ gh pr list --state merged --search "head:forge/ merged:>$(date -u -d '4 hours ag
 
 The journal entry's `Forge:` line (added in Section 4 below) captures this digest. Once D3.5 ships Mirror's auto-merge loop, the `> 24h old` threshold drops to e.g. `> 72h` (only blocked-on-Larry PRs surface; Mirror handles the rest). Until then, 24h gives Mirror's manual stand-in (me, via the Telegram approval flow) a window to act before Pulse escalates.
 
+#### Credential rotation check (E1.5.2)
+
+Read `config/token-rotation-schedule.json` once per cycle. For each entry:
+
+```
+Skip if rotation_type == "revocation_only" (no schedule).
+
+For rotation_type in {scheduled, scope_audit, auto_refresh}:
+  • If next_rotation_due is past today: severity=warning, OVERDUE
+  • Elif next_rotation_due is within 60 days: severity=info, UPCOMING
+  • Else: skip (out of window).
+
+For scope_audit entries inside the 60-day window, ALSO invoke
+  `python3 ~/agent-core/scripts/scope_usage_parser.py` (or import
+  analyze_scope_usage(name, days=90) directly) and include the
+  {scope: count} breakdown in the DM body — Larry's audit decision
+  is data-backed, not guesswork.
+```
+
+DM via `scripts/larry_alerts.append_notification` with `intent="rotation-window"` and a body that names: the credential, severity (info/warning), `next_rotation_due`, the runbook path, and (for scope_audit) the scope-usage breakdown. The matching Beacon-owned Google Calendar event URL (registry `calendar_event_url` field, if present) goes in the body for one-click access.
+
+**Dedup discipline.** Each rotation event DMs at most once per **14-day window** per credential. Track via `~/agents/state/pulse-rotation-window-dms.json`: `{credential_name: last_dm_iso}`. On each cycle, skip credentials whose `last_dm_iso` is within 14 days; reset the entry on terminal events (rotation completed = `last_rotated_at` field advanced past previous value).
+
+Note in the journal under a `Rotations:` line:
+```
+Rotations: 0 overdue, 1 upcoming-within-60d (CLAUDE_MAX_OAUTH due 2027-05-18) — DMed.
+```
+
+This check is additive — it fires every cycle and adds at most one line to the journal entry plus zero or more DMs.
+
 #### I. Optimization mode (weekly, Monday)
 
 Check I is **additive to Checks A–H, not a replacement**. It fires only on Monday cycles after Ledger's weekly run has landed. Off-Monday cycles skip this block entirely — your A–H output is unchanged.
