@@ -3051,11 +3051,152 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
     return True
 
 
+def _handle_beacon_headless_approval_request(
+    data: dict[str, Any], result_text: str,
+) -> Optional[str]:
+    """Handle a headless Beacon APPROVAL_REQUEST emission (Claude-driven).
+
+    Task #17 (2026-05-19) — fourth architectural finding from the E1.5
+    session. Beacon's APPROVAL_REQUEST had two existing handlers:
+      1. Chat-mode (beacon_telegram_bot.py): Larry chats Beacon on Telegram,
+         bot intercepts the marker, consults trust_policy, DMs Larry, on
+         approval writes Forge's preflight envelope.
+      2. Auto-replan-after-Mirror-ESCALATE (_route_beacon_replan_approval
+         in this file): Mirror REVIEW_ESCALATE → Beacon emits a revised
+         APPROVAL_REQUEST in her outbox response.
+
+    Neither path covers the third case: Claude in a Larry-session drops a
+    dispatch envelope into Beacon's inbox (source='larry', non-chat); Beacon
+    emits a clean APPROVAL_REQUEST in her result text; nothing processes it.
+    This handler closes that gap by translating the marker into a Forge
+    preflight task, mirroring the chat-mode path through
+    `beacon_approval_handler.dispatch_approved` without the Telegram
+    round-trip.
+
+    Trust policy is NOT consulted on this path. The assumption is that the
+    upstream Larry-session that dropped the envelope into Beacon's inbox
+    already had Larry's explicit approval — Claude doesn't dispatch Beacon
+    headlessly without it. (Future approval-gate dial: check an optional
+    `pre_approved` envelope field and fall back to trust_policy.evaluate
+    when missing. Deferred — implicit-via-source=larry is sufficient for
+    the one-operator system today.)
+
+    Args:
+        data: the Beacon outbox envelope.
+        result_text: Beacon's result string (carries the marker block).
+
+    Returns:
+        Path string of the written Forge preflight task on a successful
+        dispatch, or the existing path on an idempotent skip — both signal
+        "handled; caller should archive without falling through to default
+        notify routing."
+        None when the path declined (gate failed, no marker, malformed
+        marker, write failure) so the caller falls through to default
+        routing and Beacon's narrative still reaches downstream consumers.
+    """
+    if data.get('agent') != 'beacon' or data.get('source') != 'larry':
+        return None
+    task_id = data.get('task_id') or 'unknown'
+    if not isinstance(result_text, str) or not result_text:
+        return None
+
+    try:
+        payload, _narrative = approval.extract_approval_request(result_text)
+    except approval.MalformedApprovalMarker as e:
+        log(
+            f'beacon headless APPROVAL_REQUEST malformed for task '
+            f'{task_id}: {e}; falling through to default routing',
+            'WARN',
+        )
+        return None
+
+    if payload is None:
+        # No marker emitted — let default routing notify back informationally.
+        return None
+
+    # Marker's task_id is authoritative for the downstream Forge work; the
+    # envelope's task_id was the upstream Larry-session dispatch ticket and
+    # may differ. Mirrors chat-mode's `dispatch_approved`, which keys the
+    # written filename on `payload["task_id"]`.
+    marker_task_id = payload.get('task_id') or task_id
+
+    forge_task: dict[str, Any] = {
+        'task_id': marker_task_id,
+        'prompt': payload.get('prompt') or '',
+        'source': 'beacon',
+        'target_agent': 'forge',
+        'phase': 'preflight',
+        'dispatched_by': 'outbox-notifier',
+    }
+    # Propagate envelope/marker fields the way chat-mode does — marker
+    # values win when both are present (Beacon's marker is the spec).
+    target_repo = payload.get('target_repo') or data.get('target_repo')
+    if target_repo:
+        forge_task['target_repo'] = target_repo
+    pr_title = payload.get('pr_title') or data.get('pr_title')
+    if pr_title:
+        forge_task['pr_title'] = pr_title
+    max_clar = payload.get('max_clarifications')
+    if max_clar is None:
+        max_clar = data.get('max_clarifications')
+    if isinstance(max_clar, int) and max_clar >= 0:
+        forge_task['max_clarifications'] = max_clar
+    for field in ('task_type', 'summary', 'changed_files'):
+        if payload.get(field) is not None:
+            forge_task[field] = payload[field]
+    if data.get('reply_chat_id') is not None:
+        forge_task['reply_chat_id'] = data['reply_chat_id']
+
+    # Idempotency — same shape as _dispatch_mirror_review and
+    # _dispatch_build_phase. Guards against re-processing the same outbox
+    # if the notifier crashes between dispatch and archive.
+    forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+    filename = f'{marker_task_id}.json'
+    for candidate in (
+        forge_inbox / filename,
+        forge_inbox / '.archive' / filename,
+        forge_inbox / '.invalid' / filename,
+    ):
+        if candidate.exists():
+            log(
+                f'headless-approval-request already dispatched for task '
+                f'{marker_task_id} (file or archive or .invalid present); '
+                f'skipping duplicate write',
+            )
+            return str(candidate)
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='forge',
+            task_dict=forge_task,
+            source_agent='beacon',
+            filename=filename,
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'headless-approval-request dispatch FAILED for task '
+            f"{marker_task_id}: {type(e).__name__}: {e}. Beacon's "
+            f'APPROVAL_REQUEST marker was emitted but Forge was not '
+            f'dispatched; Larry must manually re-dispatch.',
+            'WARN',
+        )
+        return None
+
+    log(
+        f'headless-approval-request dispatched forge <- beacon '
+        f'(task={marker_task_id}, file={dest.name})'
+    )
+    return str(dest)
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
        'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error' |
-       'notified-replan'.
+       'notified-replan' | 'headless-approval-dispatched'.
     """
     try:
         data = json.loads(outbox_file.read_text())
@@ -3177,6 +3318,26 @@ def process_outbox(outbox_file: Path) -> str:
         if _route_beacon_replan_approval(data):
             _archive_outbox(outbox_file)
             return 'notified-replan'
+
+    # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
+    # When Claude in a Larry-session drops a dispatch envelope into Beacon's
+    # inbox (source='larry'), her result text may contain an APPROVAL_REQUEST
+    # marker. The chat-mode bot path doesn't fire on outbox-derived markers,
+    # and the 5c replan path is gated to inbound_intent=review-escalate, so
+    # without this handler the marker would sit in Beacon's archive doing
+    # nothing — the failure shape that required three manual bridges in PR
+    # #46 + PR #47 on 2026-05-19. The handler auto-translates Beacon's
+    # marker into a Forge preflight task. Trust policy is NOT consulted —
+    # implicit Larry-session approval covers the headless case. Fires
+    # BEFORE marker classification so Beacon's non-Forge-marker result text
+    # doesn't fall through to default notify-to-self routing.
+    if agent == 'beacon' and source == 'larry':
+        dispatched = _handle_beacon_headless_approval_request(
+            data, data.get('result', '') or '',
+        )
+        if dispatched is not None:
+            _archive_outbox(outbox_file)
+            return 'headless-approval-dispatched'
 
     # Forge preflight marker check. Markers override default routing rules
     # because the preflight protocol is intentionally multi-hop and the

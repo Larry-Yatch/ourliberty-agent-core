@@ -6349,5 +6349,255 @@ class LarryDirectDispatchTest(unittest.TestCase):
         self.assertEqual(self._auto_merge_calls, [])
 
 
+class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
+    """Task #17 (2026-05-19) — Claude drops a dispatch envelope into
+    Beacon's inbox with source='larry'; Beacon's outbox result text
+    carries a clean APPROVAL_REQUEST marker; the notifier auto-translates
+    that marker into a Forge preflight task without consulting trust_policy
+    or DMing Larry (implicit upstream-session approval).
+
+    Mirrors the BeaconReplanLoopTest setUp/tearDown — full tmpdir reroute
+    of AGENTS_ROOT + INBOXES_ROOT + OUTBOXES_ROOT + ROUTING_EVENTS_LOG so
+    safe_write_inbox lands its synthetic dispatches under the tmpdir.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _marker(self, **overrides):
+        """Build a syntactically clean APPROVAL_REQUEST block. Required
+        fields per beacon_approval_handler.REQUIRED_FIELDS: task_id,
+        summary, target_agent, prompt."""
+        payload = {
+            'task_id': 'task-headless-001',
+            'summary': 'Add a CLI flag to scripts/foo.py.',
+            'target_agent': 'forge',
+            'prompt': 'x' * 200,
+            'target_repo': 'ourliberty-agent-core',
+            'task_type': 'feature-development',
+            'pr_title': 'feat(foo): add --bar flag',
+        }
+        payload.update(overrides)
+        return (
+            f'=== APPROVAL_REQUEST ===\n{json.dumps(payload)}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+
+    def _headless_outbox(
+        self,
+        marker_text=None,
+        narrative_prefix=(
+            "I reviewed the Larry-session spec and have a plan to propose."
+        ),
+        envelope_task_id='dispatch-larry-001',
+        reply_chat_id=7998341473,
+        **overrides,
+    ):
+        if marker_text is None:
+            marker_text = self._marker()
+        result = (
+            f'{narrative_prefix}\n\n{marker_text}'
+            if marker_text else narrative_prefix
+        )
+        body = _good_outbox(
+            agent='beacon',
+            source='larry',
+            task_id=envelope_task_id,
+            result=result,
+        )
+        if reply_chat_id is not None:
+            body['reply_chat_id'] = reply_chat_id
+        body.update(overrides)
+        return body
+
+    # ---------------- happy path ----------------
+
+    def test_happy_path_writes_forge_preflight_envelope(self):
+        body = self._headless_outbox()
+        f = self._write_outbox('beacon', 'larry-001.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(len(forge_tasks), 1)
+        written = json.loads(forge_tasks[0].read_text())
+        self.assertEqual(written['task_id'], 'task-headless-001')
+        # Source on the Forge envelope is 'beacon' — anchors back-leg
+        # routing so subsequent markers from Forge notify Beacon (not Larry
+        # directly) per the standard dispatcher relationship.
+        self.assertEqual(written['source'], 'beacon')
+        self.assertEqual(written['phase'], 'preflight')
+        self.assertEqual(written['target_agent'], 'forge')
+        self.assertEqual(written['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(written['pr_title'], 'feat(foo): add --bar flag')
+        self.assertEqual(written['reply_chat_id'], 7998341473)
+        self.assertEqual(written['dispatched_by'], 'outbox-notifier')
+        self.assertEqual(written['task_type'], 'feature-development')
+
+    # ---------------- source/agent gates ----------------
+
+    def test_source_beacon_chatmode_artifact_does_not_fire(self):
+        # Chat-mode dispatches arrive with source != 'larry' (the bot
+        # writes them with whatever the chat-mode source is). The
+        # headless handler must defer to the chat-mode path entirely.
+        body = self._headless_outbox()
+        body['source'] = 'beacon'   # not 'larry' → handler skips
+        # Direct call to verify the gate, since process_outbox would
+        # short-circuit on its own gate for this source.
+        result = on._handle_beacon_headless_approval_request(
+            body, body['result'],
+        )
+        self.assertIsNone(result)
+        # No Forge inbox writes happened.
+        forge_dir = on.INBOXES_ROOT / 'forge'
+        self.assertFalse(any(forge_dir.glob('*.json')))
+
+    def test_agent_not_beacon_does_not_fire(self):
+        body = self._headless_outbox()
+        body['agent'] = 'forge'
+        result = on._handle_beacon_headless_approval_request(
+            body, body['result'],
+        )
+        self.assertIsNone(result)
+
+    def test_no_marker_in_result_falls_through_to_default_routing(self):
+        # source='larry' + no APPROVAL_REQUEST marker in Beacon's response
+        # → handler declines and default routing takes over. The Beacon
+        # outbox archives via _should_notify_back returning False for a
+        # 'larry' source (system source).
+        body = self._headless_outbox(
+            marker_text='',
+            narrative_prefix=(
+                'Read the spec; nothing to approve yet — need a clarification.'
+            ),
+        )
+        f = self._write_outbox('beacon', 'larry-noplan.json', body)
+        status = on.process_outbox(f)
+        # 'larry' is a system source; default routing archives it.
+        self.assertEqual(status, 'archived-no-notify')
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(forge_tasks, [])
+
+    # ---------------- malformed marker ----------------
+
+    def test_malformed_marker_missing_required_fields_does_not_crash(self):
+        # APPROVAL_REQUEST block present but JSON is missing required
+        # fields (e.g. no `prompt`). The MalformedApprovalMarker exception
+        # is caught, the function logs WARN and returns None, default
+        # routing takes over. No Forge envelope is written.
+        bad_payload = json.dumps({
+            'task_id': 'task-missing-fields',
+            'summary': 'incomplete',
+            'target_agent': 'forge',
+            # `prompt` deliberately omitted
+        })
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._headless_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'larry-bad.json', body)
+        status = on.process_outbox(f)
+        # Did not raise; did not dispatch; fell through.
+        self.assertNotEqual(status, 'headless-approval-dispatched')
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(forge_tasks, [])
+
+    # ---------------- idempotency ----------------
+
+    def test_idempotent_duplicate_outbox_does_not_double_dispatch(self):
+        # Re-processing the same outbox after a crash/replay must not
+        # write a second Forge preflight envelope.
+        body = self._headless_outbox()
+        f = self._write_outbox('beacon', 'larry-idem.json', body)
+        on.process_outbox(f)
+        # Re-write the same outbox + reprocess.
+        f2 = self._write_outbox('beacon', 'larry-idem.json', body)
+        status2 = on.process_outbox(f2)
+        # Idempotency-skip still archives — the return signals the marker
+        # was handled (existing file exists), just not re-written.
+        self.assertEqual(status2, 'headless-approval-dispatched')
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(len(forge_tasks), 1)
+
+    # ---------------- marker task_id authoritative ----------------
+
+    def test_marker_task_id_wins_over_envelope_task_id(self):
+        # Envelope task_id ('dispatch-larry-001') is the upstream dispatch
+        # ticket; Beacon's marker carries the downstream Forge work id
+        # ('task-headless-001'). Forge's envelope must be keyed by the
+        # marker's task_id — that's what the chat-mode flow does (via
+        # dispatch_approved's `f'{payload["task_id"]}.json'`).
+        body = self._headless_outbox(
+            envelope_task_id='dispatch-larry-001',
+            marker_text=self._marker(task_id='real-forge-work-001'),
+        )
+        f = self._write_outbox('beacon', 'dispatch-larry-001.json', body)
+        on.process_outbox(f)
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(len(forge_tasks), 1)
+        self.assertEqual(forge_tasks[0].name, 'real-forge-work-001.json')
+        written = json.loads(forge_tasks[0].read_text())
+        self.assertEqual(written['task_id'], 'real-forge-work-001')
+
+    # ---------------- regression: chat-mode (source!='larry') untouched ----------------
+
+    def test_chat_mode_envelope_untouched_by_headless_handler(self):
+        # A Beacon outbox produced by the chat-mode path (source !=
+        # 'larry') falls through the headless gate and hits default
+        # routing. Confirms we did not break the chat-mode flow.
+        body = self._headless_outbox()
+        # Chat-mode source — the bot wrote Beacon's inbox task with this.
+        body['source'] = 'telegram-webhook'
+        f = self._write_outbox('beacon', 'chat-001.json', body)
+        status = on.process_outbox(f)
+        # 'telegram-webhook' is a system source; default routing archives.
+        self.assertNotEqual(status, 'headless-approval-dispatched')
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
+        self.assertEqual(forge_tasks, [])
+
+
 if __name__ == '__main__':
     unittest.main()

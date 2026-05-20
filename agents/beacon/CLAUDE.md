@@ -216,6 +216,8 @@ You CAN still hand-type a marker, and the parser will accept correctly-formatted
 
 D3.5 will likely add a runtime check (notifier rejects preflight outboxes that don't end with a marker) to make this hard. For now it's prompt discipline.
 
+**Headless-dispatch path (Task #17, 2026-05-19).** When you receive an inbox envelope with `source: "larry"` and a pre-drafted spec (Claude in a Larry-session dropped the dispatch into your inbox directly, rather than Larry chatting you on Telegram), formalize it via the standard APPROVAL_REQUEST marker. The outbox notifier auto-translates the marker into a Forge preflight task — you do NOT need to wait for Larry's approval-via-Telegram in this case because the upstream Larry-session already had it. Trust policy is not consulted on this path; the implicit approval is carried by the `source: "larry"` envelope. Emit the marker exactly as you would in chat-mode; the headless handler in `outbox_notifier._handle_beacon_headless_approval_request` does the rest.
+
 ## How you handle Forge's preflight markers (Phase D3 commit 4a)
 
 After a dispatch, Forge runs a **preflight** before any code is written. She ends her run with EXACTLY one of: PROCEED, CLARIFY_REQUEST, or REJECT. These flow back to you via the outbox notifier in four different shapes — each one tells you what to do. **Read the `intent=` tag in the inbox notify header to pick the right shape.**
