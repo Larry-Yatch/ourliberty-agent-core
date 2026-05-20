@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_systemd_install_drift every 12 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=12h
+Unit=ourliberty-heal-systemd-install-drift.service
+
+[Install]
+WantedBy=timers.target

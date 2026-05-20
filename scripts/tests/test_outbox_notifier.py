@@ -6153,5 +6153,201 @@ class CostDmTemplateTest(unittest.TestCase):
         self.assertIn('?', body)
 
 
+class LarryDirectDispatchTest(unittest.TestCase):
+    """E1.5.2 source-routing fix: when Larry dispatches Mirror directly
+    (source='larry') and propagates reply_chat_id, the notifier should
+    (a) skip the inter-agent notify (no agent to route to), (b) fire
+    auto-merge if the marker is REVIEW_PASS, and (c) DM Larry the result
+    via the existing reply_chat_id chain.
+
+    The bug this fixes: PR #45 dispatch on 2026-05-19 — Larry sent the
+    design PR straight to Mirror; Mirror's REVIEW_PASS was archived with
+    'no routable target' WARN because _primary_agent_id('larry') is None.
+    Auto-merge had to fall through to heal-pr-auto-merge (E1.3) instead.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._auto_merge_calls: list[tuple[str, str]] = []
+
+        def _default_auto_merge(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return {
+                'merge_outcome': 'merged',
+                'merge_reason': 'squash-merged (test override)',
+                'pr_number': 45,
+                'repo_coords': 'test-owner/test-repo',
+            }
+
+        self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_mirror_outbox(self, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        path = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+    def test_review_pass_with_larry_source_and_chat_id_auto_merges(self):
+        # The bug fix: source='larry' + reply_chat_id set must trigger
+        # the auto-merge path (and not the 'no routable target' archive).
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='larry',
+            reply_chat_id=12345,
+        )
+        f = self._write_mirror_outbox('t-direct.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+        # Auto-merge fired.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+        # No beacon notify (no agent target — that's the whole point).
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(notifies, [])
+        # Larry got a DM (review-pass with merged outcome).
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['chat_id'], 12345)
+        self.assertEqual(alerts[0]['intent'], 'review-pass')
+
+    def test_review_pass_with_larry_source_no_chat_id_archives(self):
+        # Regression: without reply_chat_id, there's no Larry-direct target
+        # either — preserve the existing 'no routable target' archive path.
+        # Auto-merge MUST NOT fire in this case (no closing DM = silent
+        # action).
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='larry',
+            reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('t-no-chat.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'archived-no-notify')
+        self.assertEqual(self._auto_merge_calls, [])
+
+    def test_review_revision_with_larry_source_dms_without_merge(self):
+        # REVIEW_REVISION: Larry should see Mirror's findings, but no merge.
+        body = _mirror_outbox_body(
+            _mirror_revision_marker(confidence='high'),
+            source='larry',
+            reply_chat_id=12345,
+        )
+        f = self._write_mirror_outbox('t-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(self._auto_merge_calls, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['intent'], 'review-revision')
+
+    def test_review_escalate_with_larry_source_dms_without_merge(self):
+        body = _mirror_outbox_body(
+            _mirror_escalate_marker(),
+            source='larry',
+            reply_chat_id=12345,
+        )
+        f = self._write_mirror_outbox('t-esc.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(self._auto_merge_calls, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['intent'], 'review-escalate')
+
+    def test_nominal_source_beacon_flow_unchanged(self):
+        # The fix MUST NOT change the existing beacon-dispatched review
+        # flow. Mirror sourced from Beacon should still notify Beacon and
+        # auto-merge.
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='beacon',
+            reply_chat_id=99,
+        )
+        f = self._write_mirror_outbox('t-beacon.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        # Auto-merge fired.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        # Beacon notify written.
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(len(notifies), 1)
+
+    def test_no_marker_with_larry_source_falls_through_to_default(self):
+        # Chat-mode response (no marker) with source='larry' must follow
+        # the existing default routing — NOT trip the new larry_direct
+        # branch, which is marker-specific. Default routing for source
+        # 'larry' archives via _should_notify_back returning False.
+        body = _mirror_outbox_body(
+            result='Reviewed in chat mode, no marker emitted.',
+            source='larry',
+            reply_chat_id=12345,
+        )
+        f = self._write_mirror_outbox('t-chat.json', body)
+        result = on.process_outbox(f)
+        # Default path archives non-agent-source outboxes; no marker = no
+        # larry_direct branch.
+        self.assertIn(result, ('archived-no-notify', 'notified'))
+        self.assertEqual(self._auto_merge_calls, [])
+
+
 if __name__ == '__main__':
     unittest.main()

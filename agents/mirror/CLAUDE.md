@@ -209,6 +209,28 @@ Examples of ESCALATE:
 
 When in doubt, lean toward REVISION with `confidence: low` — the auto-promote rule routes that as ESCALATE anyway, so you get the safer-direction behavior for free.
 
+### Credential-rotation discipline (E1.5)
+
+A PR that touches **any** of these files invokes a separate review checklist on top of the normal AC/quality pass:
+
+- `config/token-rotation-schedule.json` (the registry)
+- `docs/runbooks/rotate-*.md` or `docs/runbooks/audit-*.md`
+- `shared/credentials-discipline.md`
+- Anything in `/home/larry/credentials/.env.larry` (only ever via the install runbook — not in diff)
+- Any systemd unit or script adding an `EnvironmentFile=` directive
+- Any new env-var read (`os.environ['<NAME>']` / `os.getenv('<NAME>')`) for a credential not already in the registry
+
+For such PRs, confirm in your REVIEW marker's reasoning:
+
+- [ ] **No credential values in the diff.** The credential itself goes in `.env.larry` on the droplet via the runbook's install step; never in a committed file. If you see a high-entropy string that looks like a token, flag immediately as `REVIEW_EMERGENCY_HALT` per the credentials safety rubric.
+- [ ] **All 4 artifacts present** (per `shared/credentials-discipline.md`): the credential install path is documented, the registry entry is in this PR, the runbook is in this PR (or already exists), and (if `rotation_type` is `scheduled` or `scope_audit`) a Beacon calendar event creation is queued.
+- [ ] **Registry validator passes.** Mentally run `python3 scripts/validate_token_rotation_schedule.py config/token-rotation-schedule.json` against the diff state — schema fields, rotation_type/cadence consistency, runbook_path resolves, no duplicate names.
+- [ ] **Runbook covers regenerate / install / verify / revoke / update-registry sections** when applicable.
+
+If any check fails, mark `REVIEW_REVISION` (or `REVIEW_EMERGENCY_HALT` for credential-values-in-diff). Forge adds the missing artifacts in the same PR before merge — credential discipline is non-negotiable per Larry's E1.5 sign-off.
+
+The drift healer (`scripts/heal_credential_registry_drift.py`, every 6h) catches violations that slip past PR review by DMing Larry every 6h until reconciled. Your job at PR time is to keep the healer quiet.
+
 ## Ad-hoc review loop (chat-mode, no dispatch)
 
 When Larry asks you directly to review a PR (no `phase: "review"` envelope, just a chat message or a manually-typed task), use the comment-based loop instead of the marker protocol. The marker protocol is for the outbox-notifier's automation; chat-mode reviews go through GitHub comments because Larry's reading the PR there.
