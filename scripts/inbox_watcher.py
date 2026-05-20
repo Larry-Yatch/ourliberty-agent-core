@@ -317,7 +317,15 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
                            'max_revisions', 'pr_url',
                            'previous_findings',
                            'replan_count', 'max_replans',
-                           'mirror_escalate_reason'):
+                           'mirror_escalate_reason',
+                           # task-25 (2026-05-20) — Forge's preflight session
+                           # ID, threaded through Beacon's clarification
+                           # round-trip so the clarification-response leg
+                           # can --resume Forge in her original session +
+                           # worktree (closes chain-routing gap #5: the
+                           # `notify-notify-{task}` doubled-prefix branch
+                           # bug). Symmetric with forge_build_session_id.
+                           'forge_session_id'):
         if task.get(envelope_field) is not None:
             outbox[envelope_field] = task[envelope_field]
     # `inbound_intent` is special — sourced from task['intent'] (not
@@ -384,7 +392,16 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     # carry claude_session_id for telemetry, but those sessions belong to
     # the SENDER not the target, so consuming them blindly would resume the
     # wrong agent's conversation.
-    resume_session_id = (
+    #
+    # task-25 (2026-05-20) — additional explicit opt-in via `resume_session_id`.
+    # outbox_notifier's clarification-response handler writes a resume envelope
+    # under phase='preflight' (Forge re-runs preflight with the answer), so the
+    # phase-based gate above can't authorize it. Instead the dispatcher names
+    # the field `resume_session_id` to make the intent unambiguous — this is
+    # the TARGET agent's session to resume, distinct from any sender-side
+    # `session_id` that may also ride the envelope for telemetry. Closes the
+    # `notify-notify-{task}` doubled-prefix cascade (chain-routing gap #5).
+    resume_session_id = task.get("resume_session_id") or (
         task.get("session_id")
         if task.get("phase") in ("build", "revision")
         else None

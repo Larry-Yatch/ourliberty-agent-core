@@ -3226,11 +3226,193 @@ def _handle_beacon_headless_approval_request(
     return str(dest)
 
 
+def _handle_beacon_clarification_response(
+    data: dict[str, Any],
+) -> Optional[str]:
+    """Route Beacon's clarification-response as `--resume` of Forge's original task.
+
+    task-25 (2026-05-20) — fifth chain-routing gap. When Beacon answers
+    Forge's CLARIFY_REQUEST in headless mode, her outbox has source
+    `forge-question` and her task_id is `notify-<original>`. The default
+    notify-routing path turns that into `notify-notify-{task}.json` in
+    Forge's inbox with envelope task_id=`notify-notify-{task}` — the
+    watcher then spawns a brand-new worktree on a doubled-prefix branch
+    (`forge/notify-notify-{task}-...`), Forge re-runs preflight in a
+    fresh session without her original context, and the cascade
+    depth-multiplies on each subsequent round (`notify-notify-notify-...`
+    awareness notifies).
+
+    The chat-mode bot (beacon_telegram_bot.py) doesn't have this bug
+    because Larry's chat reply is routed differently. The headless
+    path needs the parallel handler — same pattern as PR #46/#48's
+    fixes for gaps #1–#4.
+
+    This handler writes a continuation envelope to Forge's inbox keyed on
+    the ORIGINAL task_id with:
+      * task_id = original (stripped of `notify-` prefix)
+      * source = 'beacon-clarification' (existing dialogue-leg suffix)
+      * intent = 'clarification-response'
+      * phase = 'preflight' (Forge re-runs preflight with the answer)
+      * resume_session_id = forge_session_id (threaded through Beacon's
+        round-trip via inbox_watcher._build_outbox propagation; the
+        watcher's task-25 gate consumes this regardless of phase)
+      * filename = `resume-<task>-r<count>.json` — unique per round
+        (clarification_count discriminates) and idempotent on retry
+
+    The default notify-{task}.json path is skipped, so no doubled-prefix
+    file ever lands in any inbox and no `forge/notify-notify-*` branch
+    ever gets created. Depth-multiplication is inherently prevented
+    because the cascade stops at the continuation envelope.
+
+    Returns the str(dest) path on dispatch (or skip-because-already-there),
+    or None when the path declined (missing forge_session_id, write failure,
+    or shape mismatch). None falls through to the default routing path so
+    Beacon's response still reaches Forge as an informational notify (a
+    legacy-compatible fallback — pre-task-25 chains will still complete,
+    just with the doubled-prefix cosmetic bug until the next dispatch
+    crosses this code path).
+    """
+    if data.get('agent') != 'beacon':
+        return None
+    source = data.get('source', '')
+    if not source.endswith('-question'):
+        return None
+
+    # Without Forge's session, we can't --resume — fall through to default
+    # routing (legacy behavior) so the chain still progresses, just without
+    # the resume optimization. Logging at INFO so this case is visible if
+    # the upstream forge_session_id propagation breaks.
+    forge_session_id = data.get('forge_session_id')
+    if not forge_session_id:
+        log(
+            f'clarification-response on task {data.get("task_id", "?")} '
+            f'has no forge_session_id (Forge\'s preflight session not '
+            f'threaded through); falling through to default notify routing — '
+            f'the resume optimization will be skipped this round.',
+        )
+        return None
+
+    # `data['task_id']` is the task_id Beacon's inbox file used, which is
+    # `notify-<original>` because the previous hop wrote the notify with
+    # that prefix. Strip it back to the original; if the prefix is absent
+    # for some reason, accept the value as-is (defensive).
+    notify_task_id = data.get('task_id') or ''
+    if notify_task_id.startswith('notify-'):
+        original_task_id = notify_task_id[len('notify-'):]
+    else:
+        original_task_id = notify_task_id
+    if not original_task_id:
+        log(
+            f'clarification-response with empty task_id (source={source}); '
+            f'cannot derive original — falling through to default routing',
+            'WARN',
+        )
+        return None
+
+    # Compose the resume-envelope prompt using the existing
+    # clarification-response template + the original task_id (so the
+    # narrative says "your earlier CLARIFY_REQUEST on `task-X`", NOT the
+    # `notify-task-X` form the default-routing path would have rendered).
+    remaining = fph.clarifications_remaining(data)
+    prompt = build_notify_prompt(
+        intent='clarification-response',
+        sender='beacon',
+        task_id=original_task_id,
+        success=data.get('exit_code', 0) == 0,
+        output=data.get('result', '') or '',
+        error=data.get('error') or '',
+        intent_kwargs={'remaining': remaining},
+    )
+
+    forge_task: dict[str, Any] = {
+        'task_id': original_task_id,
+        'prompt': prompt,
+        'source': 'beacon-clarification',
+        'intent': 'clarification-response',
+        'phase': 'preflight',
+        'resume_session_id': forge_session_id,
+        # _notify_depth captures the hop position for telemetry; we reset
+        # to 1 because the doubled-prefix cascade is what this handler
+        # exists to stop.
+        '_notify_depth': 1,
+    }
+    if data.get('reply_chat_id') is not None:
+        forge_task['reply_chat_id'] = data['reply_chat_id']
+    # Propagate clarification budget so Forge knows how many CLARIFY_REQUESTs
+    # remain. Beacon's response is one round; count is what the envelope
+    # already carries (incremented by the marker handler when Forge first
+    # emitted CLARIFY_REQUEST, propagated through Beacon's round-trip).
+    if data.get('clarification_count') is not None:
+        forge_task['clarification_count'] = data['clarification_count']
+    if data.get('max_clarifications') is not None:
+        forge_task['max_clarifications'] = data['max_clarifications']
+    # Propagate target_repo/branch/pr_title/pr_body so Forge's worktree
+    # gate accepts the continuation envelope. Same shape as the default
+    # routing path which propagates these via the
+    # `4b post-test-2 fix` block.
+    for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body', 'pr_url'):
+        if data.get(f_name):
+            forge_task[f_name] = data[f_name]
+
+    # Filename — `resume-<task>-r<count>.json`. The clarification_count
+    # discriminator makes the filename unique per round, so multi-round
+    # cascades (Forge clarifies, Beacon answers, Forge clarifies again,
+    # Beacon answers again) produce distinct files in inbox/.archive.
+    # Idempotent on retry: if the daemon crashes between dispatch and
+    # archive, the next poll re-processes the outbox; the second write
+    # hits the inbox+archive+invalid existence check and skips. Same
+    # idempotency shape as _handle_beacon_headless_approval_request.
+    count_for_filename = data.get('clarification_count', 0) or 0
+    filename = f'resume-{original_task_id}-r{count_for_filename}.json'
+    forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+    for candidate in (
+        forge_inbox / filename,
+        forge_inbox / '.archive' / filename,
+        forge_inbox / '.invalid' / filename,
+    ):
+        if candidate.exists():
+            log(
+                f'clarification-response continuation already dispatched '
+                f'for task {original_task_id} round {count_for_filename} '
+                f'(file or archive or .invalid present); skipping duplicate '
+                f'write',
+            )
+            return str(candidate)
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='forge',
+            task_dict=forge_task,
+            source_agent='beacon-clarification',
+            filename=filename,
+        )
+    except (
+        safe_write_inbox.DispatchRejected,
+        safe_write_inbox.RoutingDenied,
+    ) as e:
+        log(
+            f'clarification-response continuation dispatch FAILED for task '
+            f'{original_task_id}: {type(e).__name__}: {e}. Falling through '
+            f'to default notify routing so the response still reaches '
+            f'Forge (just without the resume optimization).',
+            'WARN',
+        )
+        return None
+
+    log(
+        f'clarification-response continuation dispatched forge <- beacon '
+        f'(task={original_task_id}, round={count_for_filename}, '
+        f'resume={forge_session_id[:12]}..., file={dest.name})'
+    )
+    return str(dest)
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
        'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error' |
-       'notified-replan' | 'headless-approval-dispatched'.
+       'notified-replan' | 'headless-approval-dispatched' |
+       'clarification-resume-dispatched'.
     """
     try:
         data = json.loads(outbox_file.read_text())
@@ -3521,6 +3703,20 @@ def process_outbox(outbox_file: Path) -> str:
             notify_task['reply_chat_id'] = data['reply_chat_id']
         if data.get('claude_session_id'):
             notify_task['session_id'] = data['claude_session_id']
+        # task-25 (2026-05-20) — Forge's session is also stashed under a
+        # distinct field that survives Beacon's round-trip via
+        # inbox_watcher._build_outbox propagation. The `session_id` field
+        # above goes to Beacon's notify but `_build_outbox` doesn't include
+        # `session_id` in its envelope_fields list, so it's lost on Beacon's
+        # outbox. Without `forge_session_id` riding through, the
+        # clarification-response leg back to Forge has no way to --resume
+        # her original preflight session, and the watcher creates a fresh
+        # `notify-notify-{task}` worktree (chain-routing gap #5). Only set
+        # when the agent emitting the marker is Forge; Mirror markers don't
+        # need this hop since her revision cascade uses
+        # `forge_build_session_id` instead.
+        if agent == 'forge' and data.get('claude_session_id'):
+            notify_task['forge_session_id'] = data['claude_session_id']
         # Propagate clarification budget so the next leg has the counter.
         if marker_decision['next_clarification_count'] is not None:
             notify_task['clarification_count'] = marker_decision['next_clarification_count']
@@ -3710,6 +3906,22 @@ def process_outbox(outbox_file: Path) -> str:
 
         _archive_outbox(outbox_file)
         return 'larry-direct-marker' if larry_direct else 'notified-marker'
+
+    # task-25 (2026-05-20) — headless Beacon clarification-response handler.
+    # Fires BEFORE default notify routing for `agent=beacon AND
+    # source=*-question` outboxes (Beacon answering Forge's CLARIFY_REQUEST
+    # in headless mode). Writes a resume envelope to Forge's inbox keyed on
+    # the ORIGINAL task_id so Forge --resumes her preflight session in her
+    # original worktree on her original branch. Closes chain-routing gap #5
+    # (the `notify-notify-{task}` doubled-prefix branch + depth-multiplied
+    # awareness notifies surfaced live 2026-05-20 on task-22's dispatch).
+    # Returning a non-None path means "handled — don't fall through". None
+    # falls through to default routing for graceful degradation when
+    # forge_session_id failed to propagate (legacy chains).
+    clar_resume = _handle_beacon_clarification_response(data)
+    if clar_resume is not None:
+        _archive_outbox(outbox_file)
+        return 'clarification-resume-dispatched'
 
     # ---- Default (non-marker) routing path — unchanged from D3-notifier ----
 
