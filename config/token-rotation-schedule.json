@@ -137,6 +137,40 @@
       "owner_role": "larry",
       "scopes": ["bot:pulse"],
       "notes": "Shares runbook with other Telegram bots."
+    },
+    {
+      "name": "TELEGRAM_CHAT_ID_LARRY",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "identifier",
+      "purpose": "Larry's numeric Telegram chat ID; target for all DM routing (larry_alerts.append_alert/notification reply_chat_id)",
+      "rotation_type": "revocation_only",
+      "cadence_days": null,
+      "created_at": "2026-05-08",
+      "last_rotated_at": "2026-05-08",
+      "next_rotation_due": null,
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-telegram-bot-token.md",
+      "severity_if_lapsed": "high",
+      "owner_role": "larry",
+      "scopes": ["identifier:chat-id"],
+      "notes": "This is an identifier, not a secret — numeric chat ID resolved via @userinfobot. Included in registry so drift healer accepts it as expected presence; not a rotation candidate. Discovered missing during first credential-drift healer run on 2026-05-19."
+    },
+    {
+      "name": "TELEGRAM_ALLOWED_CHAT_IDS",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "identifier",
+      "purpose": "Comma-separated list of authorized Telegram chat IDs (currently just Larry); used by Telegram bot ACLs to gate inbound chat",
+      "rotation_type": "revocation_only",
+      "cadence_days": null,
+      "created_at": "2026-05-08",
+      "last_rotated_at": "2026-05-08",
+      "next_rotation_due": null,
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-telegram-bot-token.md",
+      "severity_if_lapsed": "medium",
+      "owner_role": "larry",
+      "scopes": ["identifier:chat-id-list"],
+      "notes": "Identifier, not a secret. Add new chat IDs here as the system gains authorized operators. Discovered missing during first credential-drift healer run on 2026-05-19."
     }
   ],
   "known_storage_locations": {
