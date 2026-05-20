@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-AGENTS_ROOT = Path('/home/larry/agents')
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-systemd-install-drift.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-systemd-install-drift.heartbeat'

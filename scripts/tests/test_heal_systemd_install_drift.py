@@ -9,6 +9,9 @@ Run:
 """
 from __future__ import annotations
 
+import importlib
+import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -21,6 +24,35 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import heal_systemd_install_drift as h  # noqa: E402
+
+
+class _IsolatedAgentsRoot(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.
+
+    Why: heal_systemd_install_drift's LOG_FILE / STATE_FILE / HEARTBEAT_FILE
+    / KILL_SWITCH derive from AGENTS_ROOT at import time. Without this
+    redirection, running tests in a worktree pollutes prod
+    `/home/larry/agents/...` state. Reload the module so its module-level
+    constants pick up the override.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._isolated_tmp = tempfile.mkdtemp(prefix='agents-root-')
+        for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+            os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
+        self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        importlib.reload(h)
+
+    def tearDown(self):
+        if self._isolated_env_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        importlib.reload(h)
+        shutil.rmtree(self._isolated_tmp, ignore_errors=True)
+        super().tearDown()
 
 
 def _make_repo_systemd(td: Path, units: list[str]) -> Path:
@@ -39,7 +71,7 @@ def _make_installed(td: Path, units: list[str]) -> Path:
     return d
 
 
-class ListUnitsTest(unittest.TestCase):
+class ListUnitsTest(_IsolatedAgentsRoot):
     def test_lists_service_and_timer_files(self):
         with tempfile.TemporaryDirectory() as td:
             r = _make_repo_systemd(Path(td), [
@@ -56,7 +88,7 @@ class ListUnitsTest(unittest.TestCase):
         self.assertEqual(h.list_repo_units(Path('/tmp/nope-xyzzy')), [])
 
 
-class DetectDriftTest(unittest.TestCase):
+class DetectDriftTest(_IsolatedAgentsRoot):
     def test_no_drift_when_all_installed(self):
         with tempfile.TemporaryDirectory() as td:
             r = _make_repo_systemd(Path(td), ['a.service', 'a.timer'])
@@ -81,7 +113,7 @@ class DetectDriftTest(unittest.TestCase):
             self.assertEqual(h.detect_drift(r, i), [])
 
 
-class DedupTest(unittest.TestCase):
+class DedupTest(_IsolatedAgentsRoot):
     def test_first_drift_is_re_DM_eligible(self):
         self.assertTrue(h._should_re_dm({'units': {}}, 'a.timer'))
 
@@ -100,8 +132,9 @@ class DedupTest(unittest.TestCase):
         ))
 
 
-class OrchestrationTest(unittest.TestCase):
+class OrchestrationTest(_IsolatedAgentsRoot):
     def setUp(self):
+        super().setUp()
         self._dm_calls: list[dict] = []
 
         def fake_dm(message, subject, suggested_action, severity='warning'):

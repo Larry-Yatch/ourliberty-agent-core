@@ -10,6 +10,9 @@ Run:
 """
 from __future__ import annotations
 
+import importlib
+import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -22,6 +25,35 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import sync_deploy_targets as s  # noqa: E402
+
+
+class _IsolatedAgentsRoot(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.
+
+    Why: sync_deploy_targets's LOG_FILE / STATE_FILE / HEARTBEAT_FILE /
+    KILL_SWITCH derive from AGENTS_ROOT at import time. Without this
+    redirection, running tests in a worktree pollutes prod
+    `/home/larry/agents/...` state. Reload the module so its module-level
+    constants pick up the override.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._isolated_tmp = tempfile.mkdtemp(prefix='agents-root-')
+        for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+            os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
+        self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        importlib.reload(s)
+
+    def tearDown(self):
+        if self._isolated_env_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        importlib.reload(s)
+        shutil.rmtree(self._isolated_tmp, ignore_errors=True)
+        super().tearDown()
 
 
 def _registry(entries=None):
@@ -55,7 +87,7 @@ def _vercel_project(pid, name):
     return {'id': pid, 'name': name}
 
 
-class LoadVercelTokenTest(unittest.TestCase):
+class LoadVercelTokenTest(_IsolatedAgentsRoot):
     def test_extracts_unquoted_value(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / '.env'
@@ -84,7 +116,7 @@ class LoadVercelTokenTest(unittest.TestCase):
         self.assertIsNone(s.load_vercel_token(Path('/tmp/no-such-env-xyzzy')))
 
 
-class DetectDriftTest(unittest.TestCase):
+class DetectDriftTest(_IsolatedAgentsRoot):
     def test_empty_registry_empty_vercel_no_drift(self):
         drifts, live = s.detect_drift(_registry([]), [])
         self.assertEqual(drifts, [])
@@ -116,7 +148,7 @@ class DetectDriftTest(unittest.TestCase):
         self.assertEqual(drifts, [])
 
 
-class DedupTest(unittest.TestCase):
+class DedupTest(_IsolatedAgentsRoot):
     def test_first_drift_is_re_dm_eligible(self):
         state = {'drifts': {}, '_meta': {}}
         self.assertTrue(s._should_re_dm(state, 'ghost', 'MISSING_FROM_VERCEL'))
@@ -140,8 +172,9 @@ class DedupTest(unittest.TestCase):
         ))
 
 
-class OrchestrationTest(unittest.TestCase):
+class OrchestrationTest(_IsolatedAgentsRoot):
     def setUp(self):
+        super().setUp()
         self._dm_calls = []
 
         def fake_dm(message, subject, suggested_action, severity='warning'):
@@ -318,7 +351,7 @@ class OrchestrationTest(unittest.TestCase):
         self.assertEqual(counts['reconciled_gc'], 1)
 
 
-class KillSwitchTest(unittest.TestCase):
+class KillSwitchTest(_IsolatedAgentsRoot):
     def test_kill_switch_exits_clean(self):
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.object(s, 'KILL_SWITCH', Path(td) / 'on'):
@@ -331,7 +364,7 @@ class KillSwitchTest(unittest.TestCase):
                 self.assertEqual(counts['dm_sent'], 0)
 
 
-class CliFlagsTest(unittest.TestCase):
+class CliFlagsTest(_IsolatedAgentsRoot):
     def test_dry_run_flag_forces_dry_run(self):
         parsed = s._parse_args(['sync_deploy_targets.py', '--dry-run', '--once'])
         self.assertTrue(parsed.dry_run)
@@ -343,7 +376,7 @@ class CliFlagsTest(unittest.TestCase):
         self.assertTrue(parsed.once)
 
 
-class RenderingTest(unittest.TestCase):
+class RenderingTest(_IsolatedAgentsRoot):
     def test_missing_from_vercel_message_mentions_404(self):
         msg, subj, sug = s._render_missing_from_vercel(
             'ghost', {'vercel_project_id': 'prj_ghost', 'github_repo': 'foo/bar'},

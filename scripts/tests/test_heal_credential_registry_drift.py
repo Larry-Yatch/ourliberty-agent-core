@@ -11,7 +11,10 @@ Run:
 """
 from __future__ import annotations
 
+import importlib
 import json
+import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -24,6 +27,35 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import heal_credential_registry_drift as h  # noqa: E402
+
+
+class _IsolatedAgentsRoot(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.
+
+    Why: heal_credential_registry_drift's LOG_FILE / STATE_FILE /
+    HEARTBEAT_FILE / KILL_SWITCH derive from AGENTS_ROOT at import time.
+    Without this redirection, running tests in a worktree pollutes prod
+    `/home/larry/agents/...` state. Reload the module so its module-level
+    constants pick up the override.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._isolated_tmp = tempfile.mkdtemp(prefix='agents-root-')
+        for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
+            os.makedirs(os.path.join(self._isolated_tmp, sub), exist_ok=True)
+        self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
+        importlib.reload(h)
+
+    def tearDown(self):
+        if self._isolated_env_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_env_orig
+        importlib.reload(h)
+        shutil.rmtree(self._isolated_tmp, ignore_errors=True)
+        super().tearDown()
 
 
 def _registry(entries=None):
@@ -73,7 +105,7 @@ def _cred(name, location='env_file:/home/larry/credentials/.env.larry', **overri
     return base
 
 
-class ScanEnvFileTest(unittest.TestCase):
+class ScanEnvFileTest(_IsolatedAgentsRoot):
     def test_returns_keys_with_nonempty_values(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / '.env'
@@ -92,7 +124,7 @@ class ScanEnvFileTest(unittest.TestCase):
         )
 
 
-class ScanClaudeCliTest(unittest.TestCase):
+class ScanClaudeCliTest(_IsolatedAgentsRoot):
     def test_detects_active_oauth(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 'creds.json'
@@ -113,7 +145,7 @@ class ScanClaudeCliTest(unittest.TestCase):
         )
 
 
-class ScanWorkspaceMcpTest(unittest.TestCase):
+class ScanWorkspaceMcpTest(_IsolatedAgentsRoot):
     def test_returns_token_when_json_file_present(self):
         with tempfile.TemporaryDirectory() as td:
             d = Path(td)
@@ -132,7 +164,7 @@ class ScanWorkspaceMcpTest(unittest.TestCase):
             self.assertEqual(h.scan_workspace_mcp(Path(td)), set())
 
 
-class DetectDriftTest(unittest.TestCase):
+class DetectDriftTest(_IsolatedAgentsRoot):
     def test_no_drift_when_registry_and_scans_match(self):
         reg = _registry([
             _cred('FOO_TOKEN'),
@@ -196,7 +228,7 @@ class DetectDriftTest(unittest.TestCase):
         self.assertEqual(drifts, [])
 
 
-class DedupTest(unittest.TestCase):
+class DedupTest(_IsolatedAgentsRoot):
     def test_first_drift_is_re_dm_eligible(self):
         state = {'drifts': {}}
         self.assertTrue(h._should_re_dm(state, 'FOO', 'MISSING_CREDENTIAL'))
@@ -236,7 +268,7 @@ class DedupTest(unittest.TestCase):
         self.assertEqual(gone, ['BAR:MISSING_REGISTRY_ENTRY'])
 
 
-class KillSwitchTest(unittest.TestCase):
+class KillSwitchTest(_IsolatedAgentsRoot):
     def test_kill_switch_exits_clean(self):
         with tempfile.TemporaryDirectory() as td:
             with mock.patch.object(h, 'KILL_SWITCH', Path(td) / 'on'):
@@ -249,8 +281,9 @@ class KillSwitchTest(unittest.TestCase):
                 self.assertEqual(counts['dm_sent'], 0)
 
 
-class OrchestrationTest(unittest.TestCase):
+class OrchestrationTest(_IsolatedAgentsRoot):
     def setUp(self):
+        super().setUp()
         self._dm_calls = []
 
         def fake_dm(message, subject, suggested_action, severity='warning'):
@@ -392,7 +425,7 @@ class OrchestrationTest(unittest.TestCase):
         )
 
 
-class RenderingTest(unittest.TestCase):
+class RenderingTest(_IsolatedAgentsRoot):
     def test_missing_registry_entry_message_mentions_4_artifacts(self):
         msg, subj, sug = h._render_missing_registry_entry(
             'FOO', {'storage_location': 'env_file:/home/larry/credentials/.env.larry'},
