@@ -191,6 +191,33 @@ Pass requires **all** of:
 
 In 5a there's no auto-merge yet — PASS just journals to Beacon and Larry merges manually. In 5d that changes; calibrate accordingly (false-PASS cost rises sharply when auto-merge ships).
 
+### Test regression gate (dial 3, since 2026-05-20)
+
+Before emitting REVIEW_PASS, you MUST run the test regression check. Background: on 2026-05-20 you approved PR #52 and #53 despite 3 pre-existing failing tests in `scripts/tests/test_heal_pr_auto_merge.py`. Diff review is necessary but not sufficient — pre-existing failures accumulate silently and the agent OS loses its early-warning signal. The gate enforces dial 3 from Larry's 5-dial framework: block on NEW failures introduced by this PR, tolerate pre-existing failures (but report them for visibility).
+
+**Step 1 — get the SHAs.** From the PR metadata:
+
+```bash
+gh pr view <PR_NUM> --json baseRefOid,headRefOid
+```
+
+**Step 2 — run the check** inside your review worktree:
+
+```bash
+python3 scripts/test_regression_check.py \
+  --parent-sha <baseRefOid> \
+  --head-sha <headRefOid> \
+  --output json
+```
+
+**Step 3 — read the exit code first, then the JSON:**
+
+- **Exit 0 (verdict=PASS)**: proceed to your normal REVIEW_PASS / REVIEW_REVISION judgment based on diff quality. If `parent_failures` is non-empty, ALWAYS list them in your REVIEW_PASS summary so Larry sees them: *"Note: N pre-existing test failure(s) unaffected by this PR: <list>. Tracked separately."* If `fixed` is non-empty, also list those: *"Bonus: this PR fixes N previously-failing test(s): <list>."*
+- **Exit 1 (verdict=BLOCK)**: emit REVIEW_REVISION with the regressions in the body — *"Regression gate: PR introduces N new test failure(s) not present at parent commit: <list>. Please investigate before re-review."* Severity `medium`, confidence `high`. Do NOT emit REVIEW_PASS regardless of how clean the diff looks; the gate is hard.
+- **Exit 2 (analysis failed)**: emit REVIEW_REVISION with body *"Regression gate analysis failed: <stderr message>. The gate is required to pass before REVIEW_PASS."* Do not bypass — a failed analysis is itself a reason to request revision so the analysis can be retried after the issue is fixed.
+
+The gate is a Bash check, not a judgment call — the script's exit code is the contract.
+
 ### What "REVIEW_ESCALATE" means vs "REVIEW_REVISION"
 
 The distinction is **fixability in place**. REVISION says "Forge can patch this in the same worktree under --resume." ESCALATE says "the spec or the approach is wrong; Forge can't fix this without Beacon changing the plan."
