@@ -235,8 +235,15 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
 **Goal:** End terminal dependency for visibility. A web page at `dashboard.ourliberty.dev` (or similar) that shows what's happening on the droplet without you SSH-ing in.
 
 ### Prerequisites
-- E2 complete (this dashboard *is* the dogfood deploy)
-- A subdomain for it (e.g., `dashboard.ourliberty.dev`) — DNS is already with you, ~15 min config
+- E2 complete (this dashboard *is* the dogfood deploy) ✅ (as of 2026-05-20)
+- `ourliberty-dashboard` GitHub repo + Vercel project ✅ (created in E2.3, project_id `prj_b1jhpIqS8VDyZfDQvIoyzm32Rf6b`)
+- Two subdomains via DNS — `dashboard.ourliberty.dev` (Vercel) + `api.ourliberty.dev` (droplet via Nginx + Certbot). ~15-20 min DNS + TLS config in E3.3.
+
+### Architecture decisions locked 2026-05-20
+- **Subdomain pattern (Q1=A):** two separate subdomains. `dashboard.*` points at Vercel via CNAME; `api.*` points at droplet IP `134.209.44.80` via A record, Nginx terminates TLS via Let's Encrypt.
+- **Auth (Q2=A):** static shared-secret header `X-Dashboard-Token: <token>`. Token generated once, stored in `.env.larry` on droplet + as a Vercel project env var on the dashboard side. Joins the credential-rotation registry per E1.5 discipline (4 artifacts: token + registry entry + runbook + Beacon-owned annual scope-audit calendar event).
+- **Update cadence (Q3=3 of 5):** 30s polling via SWR. Tune up to 15s (dial 2) if active-watching UX feels laggy, down to 60s (dial 4) if droplet load becomes a signal.
+- **Transport (Q4=A):** HTTP polling. SSE is a Phase E6 trigger ("if Larry watches the dashboard for >10 min stretches and 30s feels laggy, build SSE then").
 
 ### Architecture
 
@@ -270,21 +277,22 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
   - `/costs/week` — same, weekly
   - `/cycle-journal/recent?n=5` — last N Pulse cycle entries
   - `/healers/status` — each healer's last run + success/fail
-- Auth: shared secret in header (`X-Dashboard-Token`), token in `ourliberty-secrets.env`
-- Bind to localhost only initially; we'll add an Nginx reverse proxy with HTTPS in E3.3
-- Systemd service: `ourliberty-dashboard-api.service`
+- Auth: shared secret in header (`X-Dashboard-Token`), token at `DASHBOARD_API_TOKEN` in `/home/larry/credentials/.env.larry`. Registered in `config/token-rotation-schedule.json` per E1.5 discipline (annual scope-audit, severity=high). CORS allows `Origin: https://dashboard.ourliberty.dev` only.
+- Bind to localhost only initially; Nginx reverse proxy with HTTPS lands in E3.3
+- Systemd service: `ourliberty-dashboard-api.service` (Type=simple, Restart=on-failure, EnvironmentFile=/home/larry/credentials/.env.larry)
 
 **E3.2 — Next.js dashboard UI** (~1.5 days)
 
-- New repo: `ourliberty-dashboard`
-- Next.js + Tailwind (industry default, well-supported by Claude/Forge)
+- Repo: `ourliberty-dashboard` (already exists, scaffolded in E2.3 with `create-next-app --typescript --tailwind --app`)
+- Next.js + TypeScript + Tailwind + App Router (industry default, well-supported by Claude/Forge)
 - Pages:
   - `/` — overview: 4 agent status cards, today's cost, in-flight tasks, last 5 cycle entries
   - `/tasks` — recent tasks table, sortable
   - `/costs` — cost trends (daily/weekly)
   - `/healers` — healer status grid
-- Auto-refresh every 30s via SWR or react-query
-- API token via Next.js env var (`DASHBOARD_API_TOKEN` — set in Vercel project settings, never in code)
+- Auto-refresh every 30s via SWR (locked Q3=3 of 5 — see Architecture decisions above)
+- API token via Next.js env var `DASHBOARD_API_TOKEN` set in Vercel project settings (never committed). SWR fetcher wraps the `X-Dashboard-Token` header on every call.
+- Loading state: spinner + last-known-good cached data. Error state: subtle banner "API unreachable — retrying every 30s" + keep showing cached data. Polish (skeleton screens, transitions) is E4+ territory.
 
 **E3.3 — Nginx + HTTPS for the API** (~½ day, Larry-driven, I narrate)
 
