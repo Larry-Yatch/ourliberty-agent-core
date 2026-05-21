@@ -1,0 +1,23 @@
+[Unit]
+Description=Ourliberty Dashboard read-only JSON API (E3.1)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/dashboard_api.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/home/larry/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/env python3 -m uvicorn scripts.dashboard_api:app --host 127.0.0.1 --port 8000 --log-level info
+Restart=on-failure
+RestartSec=5s
+StandardOutput=append:/home/larry/agents/logs/dashboard-api.log
+StandardError=append:/home/larry/agents/logs/dashboard-api.log
+SyslogIdentifier=ourliberty-dashboard-api
+
+[Install]
+WantedBy=multi-user.target
