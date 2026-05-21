@@ -166,6 +166,51 @@ The `sync-deploy-targets` script reconciles `config/deploy_targets.json` against
 
 The `deploy-notifier` script polls Vercel's `GET /v6/deployments?state=READY,ERROR` every 2 min, filters by the GitHub repos in `config/deploy_targets.json`, and DMs Larry via the shared `larry_alerts` queue. READY → `warning`-severity DM with the preview URL. ERROR → `critical`-severity DM with the inspect link. BUILDING / QUEUED / INITIALIZING / CANCELED are skipped silently. Per-target `branch_filter` (null = match all branches; glob like `forge/*` for feature-branch-only) gates which deployments surface. PR number comes from `deployment.meta.githubPrId` first; falls back to `gh pr list --head <branch> --repo <repo>`; renders `PR #(unknown)` if both miss. Dedup is keyed by `<uid>:<state>` so a deployment that transitions READY → ERROR re-DMs; the same uid+state pair is never re-DMed. State file at `~/agents/state/deploy-notifier.json` capped at the 1000 most-recent entries (FIFO prune). Activation env var: `OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=true` per the service file's commented activation snippet — default dry-run logs `would-DM` lines and fires a one-time activation prompt on first real event. Vercel auth failures (401/403) emit a `critical` `INFRASTRUCTURE_ALERT` throttled to one DM per 24 h; the unit exits non-zero so systemd surfaces transient errors via its retry path. Empty `deploy_targets` array → no API call, no DM, clean exit (`E2.3` lands the first real target).
 
+### Dashboard API (E3.1)
+
+`scripts/dashboard_api.py` is a FastAPI service that exposes the agent OS state as 7 read-only GET endpoints (`/health`, `/agents/status`, `/tasks/recent`, `/costs/today`, `/costs/week`, `/cycle-journal/recent`, `/healers/status`) for consumption by the upcoming E3.2 Next.js dashboard. The service binds to `127.0.0.1:8000` — Nginx + Let's Encrypt will front it in E3.3 on `https://api.ourliberty.dev/*`.
+
+This is the **first non-stdlib runtime dependency on the droplet**, so the install path is two steps:
+
+```bash
+# 1. Install FastAPI + uvicorn (and httpx, used by the test client).
+#    --break-system-packages is required on Debian 12+ per PEP 668; the
+#    droplet doesn't use a venv for agent-core, so user-site is the right
+#    landing zone.
+pip3 install --user --break-system-packages fastapi 'uvicorn[standard]' httpx
+
+# 2. Generate the auth token. 43-char URL-safe base64.
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+# Then append to ~/credentials/.env.larry (mode 0600):
+#   DASHBOARD_API_TOKEN=<paste-here>
+# The same token also goes into the Vercel project env vars (E3.2) —
+# Production + Preview + Development — so the dashboard UI can reach
+# the API through Nginx in E3.3.
+
+# 3. Install the systemd unit.
+sudo cp ~/agent-core/systemd/ourliberty-dashboard-api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-dashboard-api.service
+sudo systemctl status ourliberty-dashboard-api.service
+
+# 4. Smoke-test from the droplet itself (still localhost-only at this phase).
+source /home/larry/credentials/.env.larry
+curl -sS -H "X-Dashboard-Token: $DASHBOARD_API_TOKEN" \
+  http://127.0.0.1:8000/health
+# expected: {"status":"ok","version":"<sha>","agents_root":"/home/larry/agents",...}
+
+# Auth check: no header → 401.
+curl -sS -o /dev/null -w 'HTTP %{http_code}\n' http://127.0.0.1:8000/health
+# expected: HTTP 401
+
+# 5. Tail logs.
+tail -F /home/larry/agents/logs/dashboard-api.log
+```
+
+The service has no timer — it's a `Type=simple` long-running daemon, restarted by systemd on failure (`Restart=on-failure`, `RestartSec=5s`). Auth is enforced via the `X-Dashboard-Token` header (constant-time compare via `secrets.compare_digest`). CORS allows exactly one origin: `https://dashboard.ourliberty.dev` — preview-deploy URLs are routed via a Vercel env-var indirection in E3.2 and do not widen CORS here. The FastAPI auto-docs route at `/docs` is gated by the same auth dependency.
+
+**Credential discipline.** The `DASHBOARD_API_TOKEN` is registered in `config/token-rotation-schedule.json` with a 365 d rotation cadence. Rotation procedure lives at `docs/runbooks/rotate-dashboard-api-token.md` and covers BOTH the droplet `.env.larry` half AND the Vercel project env-var half — the token is shared by both sides and must rotate together to avoid breaking the dashboard.
+
 ## Checking state
 
 ```bash

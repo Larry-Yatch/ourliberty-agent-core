@@ -156,6 +156,23 @@
       "notes": "This is an identifier, not a secret — numeric chat ID resolved via @userinfobot. Included in registry so drift healer accepts it as expected presence; not a rotation candidate. Discovered missing during first credential-drift healer run on 2026-05-19."
     },
     {
+      "name": "DASHBOARD_API_TOKEN",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "shared_secret",
+      "purpose": "Read-only dashboard API auth (E3.1); shared between droplet API (scripts/dashboard_api.py) and Vercel-hosted Next.js UI in E3.2",
+      "rotation_type": "scheduled",
+      "cadence_days": 365,
+      "created_at": "2026-05-20",
+      "last_rotated_at": "2026-05-20",
+      "next_rotation_due": "2027-05-20",
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-dashboard-api-token.md",
+      "severity_if_lapsed": "high",
+      "owner_role": "larry",
+      "scopes": ["dashboard-read"],
+      "notes": "Shared secret, not OAuth. Rotation requires updating BOTH .env.larry on the droplet AND the Vercel project env vars (Production + Preview + Development); both must change in the same window or the dashboard breaks. calendar_event_url is intentionally null at PR time per the E3.1 spec § 4.6 item 4 — Larry will DM Beacon post-merge to create the annual scope-audit calendar event and a follow-up small commit will paste the URL here."
+    },
+    {
       "name": "TELEGRAM_ALLOWED_CHAT_IDS",
       "storage_location": "env_file:/home/larry/credentials/.env.larry",
       "credential_type": "identifier",

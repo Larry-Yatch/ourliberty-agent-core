@@ -1,0 +1,1022 @@
+#!/usr/bin/env python3
+"""dashboard_api.py — read-only droplet status JSON API (E3.1).
+
+A FastAPI service exposing 7 GET endpoints that surface agent OS state for
+the upcoming E3.2 Next.js dashboard. Binds to 127.0.0.1:8000; Nginx fronts
+it in E3.3. Every endpoint requires the `X-Dashboard-Token` header,
+compared in constant time against `DASHBOARD_API_TOKEN` from
+`/home/larry/credentials/.env.larry` (loaded via systemd EnvironmentFile).
+
+Design (mirrors `deploy_notifier.py` E2.2 path-isolation pattern):
+  - `AGENTS_ROOT` honors `OURLIBERTY_AGENTS_ROOT` env override so the test
+    suite redirects filesystem reads to a tmpdir without polluting
+    `~/agents/`.
+  - Pure `_reader_*` functions per endpoint take `agents_root` + optional
+    params and return plain dicts — directly callable from tests without
+    spinning up the HTTP layer.
+  - Pydantic response models give us free OpenAPI schema + free validation.
+  - CORS allows exactly one origin: `https://dashboard.ourliberty.dev`.
+    Preview-URL hostnames are handled in E3.2 via a Vercel env-var
+    indirection, not by widening CORS here.
+  - Auto-docs at `/docs` and `/openapi.json` are gated by the same auth
+    dependency.
+
+External (non-stdlib) deps: fastapi, uvicorn[standard]. Installed on the
+droplet via `pip3 install --user fastapi 'uvicorn[standard]'` — see
+`systemd/INSTALL.md` "Dashboard API (E3.1)" subsection.
+
+Run locally (after pip install):
+    DASHBOARD_API_TOKEN=dev uvicorn scripts.dashboard_api:app \\
+        --host 127.0.0.1 --port 8000 --log-level info
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import secrets
+import subprocess
+import sys
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security.utils import get_authorization_scheme_param  # noqa: F401  # reserved
+from pydantic import BaseModel, Field
+
+
+# ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
+
+def _agents_root() -> Path:
+    return Path(os.environ.get(
+        'OURLIBERTY_AGENTS_ROOT', '/home/larry/agents',
+    ))
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+# ---- agent + healer registries ----
+
+AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
+# Bot-driven agents have always-on systemd .service units; the other two
+# are inbox-watcher-dispatched. Per spec §8: return null for the latter
+# and disambiguate via `bot_model`.
+BOT_MODEL: dict[str, str] = {
+    'beacon': 'systemd-bot',
+    'forge': 'systemd-bot',
+    'mirror': 'inbox-watcher',
+    'pulse': 'inbox-watcher',
+}
+
+# Best-effort fallback cadence for healers whose systemd timer can't be
+# parsed at request time. Used to compute "stale" (>2× cadence since last
+# heartbeat). All values are minutes.
+HEALER_CADENCE_MIN_FALLBACK: dict[str, int] = {
+    'deploy-notifier': 2,
+    'sync-deploy-targets': 12 * 60,
+    'heal-pr-auto-merge': 5,
+    'heal-credential-registry-drift': 6 * 60,
+    'heal-systemd-install-drift': 6 * 60,
+    'heal-abandoned-inbox-tasks': 5,
+    'heal-blocked-inbox-age': 5,
+    'heal-empty-inbox-files': 30,
+    'heal-recovery-already-merged': 30,
+    'heal-restart-dedup-obsolete': 30,
+    'heal-silent-loop-death': 5,
+    'heal-zombie-main-workers': 5,
+}
+
+# Cap the cycle-journal entry body returned in JSON so a runaway file
+# doesn't bloat /cycle-journal/recent responses.
+JOURNAL_BODY_CAP_BYTES = 4 * 1024
+
+# Cycle journal header. The real file uses headers like
+# `## Iteration 58 — 2026-05-21 00:41 UTC (interactive)`. Be lenient: any
+# `## ` H2 with an ISO-ish date or "Iteration N" prefix kicks off a new
+# entry. Per spec §8 we surface parse_warnings rather than 500-ing.
+JOURNAL_HEADER_RE = re.compile(
+    r'^##\s+(?:Iteration\s+\d+\s*[—–-]\s*)?'  # optional "Iteration N — "
+    r'(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})(?:\s+UTC)?'
+    r'(?:\s*\(([^)]*)\))?'  # optional "(interactive)" tag
+    r'\s*$',
+    re.IGNORECASE,
+)
+
+# Headline regex: first ## H2 in the body that looks like a date line is
+# treated as the headline (we just take the H2 line itself, stripped).
+# In the real journal, the "Found:" / "Did:" sections under each entry
+# tend to be bold-labeled bullets; we surface the iteration tag as
+# headline for now and let the UI render body_markdown.
+
+# Auth.
+HEADER_NAME = 'X-Dashboard-Token'
+TOKEN_ENV = 'DASHBOARD_API_TOKEN'
+
+# CORS.
+CORS_ORIGIN = 'https://dashboard.ourliberty.dev'
+
+# Limits.
+TASKS_RECENT_MAX = 100
+CYCLE_JOURNAL_MAX_N = 50
+
+# Healer log scan window (tail count). 200 lines is enough to see the
+# last few WARN/ERROR markers for cheap classification.
+HEALER_LOG_TAIL_LINES = 200
+
+# subprocess timeouts. Short — these run on every /agents/status hit.
+SYSTEMCTL_TIMEOUT_S = 5.0
+
+
+# ---- Pydantic response models ----
+
+class HealthResponse(BaseModel):
+    status: str
+    version: str
+    agents_root: str
+    timestamp: str
+
+
+class AgentStatus(BaseModel):
+    name: str
+    bot_active: Optional[bool]
+    bot_model: str
+    in_flight_count: int
+    in_flight_task_ids: list[str]
+    last_activity_at: Optional[str]
+    last_outbox_archive_at: Optional[str]
+
+
+class AgentsStatusResponse(BaseModel):
+    agents: list[AgentStatus]
+    as_of: str
+
+
+class TaskRecent(BaseModel):
+    task_id: str
+    agent: Optional[str]
+    spec_summary: str
+    outcome: str
+    pr_url: Optional[str]
+    started_at: Optional[str]
+    completed_at: Optional[str]
+    duration_seconds: Optional[float]
+    cost_usd: Optional[float]
+
+
+class TasksRecentResponse(BaseModel):
+    tasks: list[TaskRecent]
+    limit: int
+    returned: int
+    as_of: str
+
+
+class CostsTodayResponse(BaseModel):
+    date_utc: str
+    total_usd: float
+    by_agent: dict[str, float]
+    task_count: int
+    as_of: str
+
+
+class CostsByDay(BaseModel):
+    date_utc: str
+    total_usd: float
+    task_count: int
+
+
+class CostsWeekResponse(BaseModel):
+    window_start_utc: str
+    window_end_utc: str
+    total_usd: float
+    by_day: list[CostsByDay]
+    by_agent: dict[str, float]
+    task_count: int
+    as_of: str
+
+
+class CycleEntry(BaseModel):
+    started_at: Optional[str]
+    headline: str
+    findings_count: int
+    body_markdown: str
+
+
+class CycleJournalResponse(BaseModel):
+    entries: list[CycleEntry]
+    n: int
+    returned: int
+    as_of: str
+    parse_warnings: list[str] = Field(default_factory=list)
+
+
+class HealerStatus(BaseModel):
+    name: str
+    last_run_at: Optional[str]
+    last_result: str
+    last_summary: str
+    next_scheduled_at: Optional[str]
+    kill_switch_active: bool
+
+
+class HealersStatusResponse(BaseModel):
+    healers: list[HealerStatus]
+    as_of: str
+
+
+# ---- helpers ----
+
+def _now_utc_iso(now: Optional[datetime] = None) -> str:
+    return (now or datetime.now(timezone.utc)).isoformat()
+
+
+def _iso(ts: Optional[float]) -> Optional[str]:
+    if ts is None:
+        return None
+    return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+
+
+def _safe_mtime(path: Path) -> Optional[float]:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _git_short_sha() -> str:
+    """Best-effort short git sha; 'dev' if not in a git repo."""
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(_repo_root()), 'rev-parse', '--short', 'HEAD'],
+            capture_output=True, text=True, timeout=2,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return 'dev'
+    if proc.returncode != 0:
+        return 'dev'
+    sha = proc.stdout.strip()
+    return sha or 'dev'
+
+
+def _systemctl_is_active(unit: str, timeout: float = SYSTEMCTL_TIMEOUT_S) -> Optional[bool]:
+    """Return True/False, or None if systemctl isn't callable / errored."""
+    try:
+        proc = subprocess.run(
+            ['systemctl', 'is-active', unit],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    # Exit codes: 0=active, 3=inactive/failed/unknown. We treat any non-0
+    # as "not active" rather than None unless the call itself blew up.
+    out = proc.stdout.strip()
+    if out == 'active':
+        return True
+    if out in ('inactive', 'failed', 'activating', 'deactivating', 'unknown'):
+        return False
+    # Defensive: unfamiliar output → unknown.
+    return None
+
+
+def _list_timer_next(unit: str, timeout: float = SYSTEMCTL_TIMEOUT_S) -> Optional[str]:
+    """Return the next-scheduled ISO timestamp for `ourliberty-<unit>.timer`, or None."""
+    timer_unit = unit if unit.endswith('.timer') else f'{unit}.timer'
+    try:
+        proc = subprocess.run(
+            [
+                'systemctl', 'list-timers', timer_unit,
+                '--no-pager', '--no-legend',
+            ],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    line = proc.stdout.strip().splitlines()[0] if proc.stdout.strip() else ''
+    if not line:
+        return None
+    # `list-timers --no-legend` columns: NEXT LEFT LAST PASSED UNIT ACTIVATES
+    # NEXT is typically `Wed 2026-05-21 02:00:00 UTC` (4 tokens). Best-effort.
+    parts = line.split()
+    if len(parts) < 4:
+        return None
+    nxt = ' '.join(parts[1:4])  # date + time + tz
+    try:
+        # systemd typically uses "YYYY-MM-DD HH:MM:SS TZ"
+        dt = datetime.strptime(nxt, '%Y-%m-%d %H:%M:%S %Z')
+        return dt.replace(tzinfo=dt.tzinfo or timezone.utc).isoformat()
+    except ValueError:
+        # Fall through; some locales prefix a weekday.
+        try:
+            stripped = ' '.join(parts[2:5]) if parts[1].endswith(parts[1][-4:]) else nxt
+            dt = datetime.strptime(stripped, '%Y-%m-%d %H:%M:%S %Z')
+            return dt.replace(tzinfo=dt.tzinfo or timezone.utc).isoformat()
+        except ValueError:
+            return None
+
+
+# ---- auth dependency ----
+
+def _expected_token() -> Optional[str]:
+    """Read the expected token at request time so a service restart can
+    pick up a rotated token without rebuilding the app object."""
+    tok = os.environ.get(TOKEN_ENV, '').strip()
+    return tok or None
+
+
+def _require_token(request: Request) -> str:
+    provided = request.headers.get(HEADER_NAME)
+    if provided is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'missing {HEADER_NAME}',
+        )
+    expected = _expected_token()
+    if not expected:
+        # Server misconfigured — refuse to claim auth passed.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'invalid {HEADER_NAME}',
+        )
+    # Constant-time compare. Encode to bytes to avoid the early-exit
+    # ascii-only short-circuit some Python builds had pre-3.7.
+    if not secrets.compare_digest(provided.encode('utf-8'), expected.encode('utf-8')):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'invalid {HEADER_NAME}',
+        )
+    return provided
+
+
+# ---- pure readers (no FastAPI in signatures) ----
+
+def _reader_health(agents_root: Path, now: Optional[datetime] = None) -> dict[str, Any]:
+    return {
+        'status': 'ok',
+        'version': _git_short_sha(),
+        'agents_root': str(agents_root),
+        'timestamp': _now_utc_iso(now),
+    }
+
+
+def _agent_inbox_pending(agents_root: Path, agent: str) -> tuple[int, list[str]]:
+    """Return (count, sorted-task-ids) of pending inbox tasks for `agent`."""
+    inbox = agents_root / 'inboxes' / agent
+    if not inbox.is_dir():
+        return 0, []
+    task_ids: list[str] = []
+    try:
+        for entry in inbox.iterdir():
+            if not entry.is_file():
+                continue
+            name = entry.name
+            if not name.startswith('task-') or not name.endswith('.json'):
+                continue
+            task_ids.append(name[:-len('.json')])
+    except OSError:
+        return 0, []
+    task_ids.sort()
+    return len(task_ids), task_ids
+
+
+def _agent_archive_mtimes(agents_root: Path, agent: str) -> tuple[Optional[float], Optional[float]]:
+    """Return (last_activity_mtime, last_outbox_archive_mtime).
+
+    last_activity_mtime = max(outbox/.archive/*.json + inbox/.archive/*.json)
+    last_outbox_archive_mtime = max(outbox/.archive/*.json)
+    """
+    outbox_archive = agents_root / 'outboxes' / agent / '.archive'
+    inbox_archive = agents_root / 'inboxes' / agent / '.archive'
+    outbox_max: Optional[float] = None
+    inbox_max: Optional[float] = None
+    if outbox_archive.is_dir():
+        try:
+            for f in outbox_archive.iterdir():
+                if f.is_file() and f.name.endswith('.json'):
+                    mt = _safe_mtime(f)
+                    if mt is not None and (outbox_max is None or mt > outbox_max):
+                        outbox_max = mt
+        except OSError:
+            pass
+    if inbox_archive.is_dir():
+        try:
+            for f in inbox_archive.iterdir():
+                if f.is_file() and f.name.endswith('.json'):
+                    mt = _safe_mtime(f)
+                    if mt is not None and (inbox_max is None or mt > inbox_max):
+                        inbox_max = mt
+        except OSError:
+            pass
+    candidates = [m for m in (outbox_max, inbox_max) if m is not None]
+    last_activity = max(candidates) if candidates else None
+    return last_activity, outbox_max
+
+
+def _reader_agents_status(
+    agents_root: Path, now: Optional[datetime] = None,
+    is_active_fn=None,
+) -> dict[str, Any]:
+    is_active = is_active_fn or _systemctl_is_active
+    agents: list[dict[str, Any]] = []
+    for name in AGENT_NAMES:
+        model = BOT_MODEL[name]
+        if model == 'systemd-bot':
+            bot_active = is_active(f'ourliberty-{name}-bot.service')
+        else:
+            bot_active = None
+        count, ids = _agent_inbox_pending(agents_root, name)
+        last_act, last_outbox = _agent_archive_mtimes(agents_root, name)
+        agents.append({
+            'name': name,
+            'bot_active': bot_active,
+            'bot_model': model,
+            'in_flight_count': count,
+            'in_flight_task_ids': ids,
+            'last_activity_at': _iso(last_act),
+            'last_outbox_archive_at': _iso(last_outbox),
+        })
+    return {'agents': agents, 'as_of': _now_utc_iso(now)}
+
+
+# ---- costs.jsonl + outbox-archive readers ----
+
+def _load_costs_jsonl(agents_root: Path) -> list[dict[str, Any]]:
+    """Parse every line of costs.jsonl; silently skip malformed lines."""
+    path = agents_root / 'blackboard' / 'costs.jsonl'
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    try:
+        with path.open('r') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(obj, dict):
+                    rows.append(obj)
+    except OSError:
+        return []
+    return rows
+
+
+def _ts_to_dt(ts_str: Optional[str]) -> Optional[datetime]:
+    if not isinstance(ts_str, str):
+        return None
+    try:
+        dt = datetime.fromisoformat(ts_str)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _scan_outbox_archive_by_task(agents_root: Path) -> dict[str, dict[str, Any]]:
+    """For each archived outbox task, return the most-recent result file
+    keyed by task_id. Used to fill in outcome / pr_url / completed_at on
+    /tasks/recent."""
+    by_task: dict[str, dict[str, Any]] = {}
+    for agent in AGENT_NAMES:
+        archive = agents_root / 'outboxes' / agent / '.archive'
+        if not archive.is_dir():
+            continue
+        try:
+            for f in archive.iterdir():
+                if not f.is_file() or not f.name.endswith('.json'):
+                    continue
+                mt = _safe_mtime(f)
+                if mt is None:
+                    continue
+                # Filename shape: <task_id>.json or <task_id>.<n>.json (re-runs).
+                stem = f.name[:-len('.json')]
+                # Drop trailing .<digit> suffix on duplicates.
+                if '.' in stem:
+                    base, _, tail = stem.rpartition('.')
+                    if tail.isdigit():
+                        stem = base
+                task_id = stem
+                try:
+                    payload = json.loads(f.read_text())
+                except (json.JSONDecodeError, OSError):
+                    payload = {}
+                prev = by_task.get(task_id)
+                if prev is None or mt > prev['__mtime']:
+                    by_task[task_id] = {
+                        '__mtime': mt,
+                        'agent': agent,
+                        'payload': payload if isinstance(payload, dict) else {},
+                    }
+        except OSError:
+            continue
+    return by_task
+
+
+def _outcome_from_outbox(payload: dict[str, Any]) -> str:
+    """Best-effort outcome classification from an outbox archive payload."""
+    # Forge outbox shapes: {"intent": "build-result", "status": "SUCCESS", ...}
+    # Mirror outbox shapes carry a `result_marker` field with REVIEW_PASS etc.
+    marker = payload.get('result_marker') or payload.get('marker')
+    if isinstance(marker, str):
+        m = marker.upper()
+        if 'REVIEW_PASS' in m:
+            return 'review_pass'
+        if 'REVIEW_REVISION' in m:
+            return 'review_revision'
+        if 'REVIEW_ESCALATE' in m:
+            return 'review_escalate'
+        if 'REVIEW_EMERGENCY_HALT' in m or 'EMERGENCY_HALT' in m:
+            return 'review_emergency_halt'
+    intent = payload.get('intent')
+    if isinstance(intent, str):
+        i = intent.lower()
+        if i == 'review-pass':
+            return 'review_pass'
+        if i == 'review-revision':
+            return 'review_revision'
+        if i == 'review-escalate':
+            return 'review_escalate'
+        if i == 'review-emergency-halt':
+            return 'review_emergency_halt'
+    return 'unknown'
+
+
+def _pr_url_from_outbox(payload: dict[str, Any]) -> Optional[str]:
+    """Pull a github PR URL out of a payload if one is reachable."""
+    for key in ('pr_url', 'url'):
+        v = payload.get(key)
+        if isinstance(v, str) and v.startswith('https://github.com/'):
+            return v
+    summary = payload.get('summary')
+    if isinstance(summary, str):
+        m = re.search(r'https://github\.com/[^\s)]+', summary)
+        if m:
+            return m.group(0)
+    return None
+
+
+def _reader_tasks_recent(
+    agents_root: Path, limit: int = 20, now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Return up to `limit` most-recent tasks, joined across costs.jsonl
+    (cost + duration + agent) and outbox archives (outcome + pr_url + completion).
+
+    `in_flight` tasks (present in inboxes but not yet archived) are
+    surfaced with cost_usd=None, completed_at=None.
+    """
+    costs = _load_costs_jsonl(agents_root)
+
+    # Aggregate costs per task_id — sum costs and durations across multiple
+    # cycle entries; pick earliest ts as started_at; pick agent from most
+    # recent entry; tolerate missing fields.
+    by_task: dict[str, dict[str, Any]] = {}
+    for row in costs:
+        tid = row.get('task_id')
+        if not isinstance(tid, str) or not tid:
+            continue
+        dt = _ts_to_dt(row.get('ts'))
+        cost = row.get('cost_usd')
+        cost_v = float(cost) if isinstance(cost, (int, float)) else 0.0
+        dur = row.get('duration_sec')
+        dur_v = float(dur) if isinstance(dur, (int, float)) else 0.0
+        agent = row.get('agent') if isinstance(row.get('agent'), str) else None
+        prev = by_task.get(tid)
+        if prev is None:
+            by_task[tid] = {
+                'task_id': tid,
+                'agent': agent,
+                'cost_usd': cost_v,
+                'duration_seconds': dur_v,
+                'started_at': dt,
+                'completed_at': dt,
+            }
+        else:
+            prev['cost_usd'] += cost_v
+            prev['duration_seconds'] += dur_v
+            if agent is not None:
+                prev['agent'] = agent
+            if dt is not None:
+                if prev['started_at'] is None or dt < prev['started_at']:
+                    prev['started_at'] = dt
+                if prev['completed_at'] is None or dt > prev['completed_at']:
+                    prev['completed_at'] = dt
+
+    archive_idx = _scan_outbox_archive_by_task(agents_root)
+
+    # Build in-flight set: inbox entries not yet archived.
+    in_flight: dict[str, str] = {}
+    for agent in AGENT_NAMES:
+        count, ids = _agent_inbox_pending(agents_root, agent)
+        for tid in ids:
+            if tid not in archive_idx:
+                in_flight[tid] = agent
+
+    rows: list[TaskRecent] = []
+    for tid, c in by_task.items():
+        outbox = archive_idx.get(tid)
+        if outbox is not None:
+            outcome = _outcome_from_outbox(outbox['payload'])
+            pr_url = _pr_url_from_outbox(outbox['payload'])
+            completed_dt = datetime.fromtimestamp(outbox['__mtime'], tz=timezone.utc)
+            spec_summary = ''
+            payload = outbox['payload']
+            if isinstance(payload.get('summary'), str):
+                spec_summary = payload['summary'][:200]
+            elif isinstance(payload.get('intent'), str):
+                spec_summary = payload['intent']
+            agent = outbox['agent'] or c['agent']
+        elif tid in in_flight:
+            outcome = 'in_flight'
+            pr_url = None
+            completed_dt = None
+            spec_summary = ''
+            agent = in_flight[tid] or c['agent']
+        else:
+            outcome = 'unknown'
+            pr_url = None
+            completed_dt = c['completed_at']
+            spec_summary = ''
+            agent = c['agent']
+        rows.append(TaskRecent(
+            task_id=tid,
+            agent=agent,
+            spec_summary=spec_summary,
+            outcome=outcome,
+            pr_url=pr_url,
+            started_at=c['started_at'].isoformat() if c['started_at'] else None,
+            completed_at=completed_dt.isoformat() if completed_dt else None,
+            duration_seconds=c['duration_seconds'] if c['duration_seconds'] > 0 else None,
+            cost_usd=c['cost_usd'] if c['cost_usd'] > 0 else None,
+        ))
+
+    # Surface in-flight tasks that have no cost rows yet (newly dispatched).
+    for tid, agent in in_flight.items():
+        if tid in by_task:
+            continue
+        rows.append(TaskRecent(
+            task_id=tid,
+            agent=agent,
+            spec_summary='',
+            outcome='in_flight',
+            pr_url=None,
+            started_at=None,
+            completed_at=None,
+            duration_seconds=None,
+            cost_usd=None,
+        ))
+
+    # Most-recent first by completed_at (fallback to started_at, then task_id).
+    def _sort_key(r: TaskRecent) -> tuple[int, str]:
+        ts = r.completed_at or r.started_at or ''
+        return (1 if ts else 0, ts)
+    rows.sort(key=_sort_key, reverse=True)
+    truncated = rows[:limit]
+
+    return {
+        'tasks': [r.model_dump() for r in truncated],
+        'limit': limit,
+        'returned': len(truncated),
+        'as_of': _now_utc_iso(now),
+    }
+
+
+def _reader_costs_today(
+    agents_root: Path, now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
+    total = 0.0
+    by_agent: dict[str, float] = {}
+    task_ids: set[str] = set()
+    for row in _load_costs_jsonl(agents_root):
+        dt = _ts_to_dt(row.get('ts'))
+        if dt is None:
+            continue
+        if dt.astimezone(timezone.utc).date() != today:
+            continue
+        cost = row.get('cost_usd')
+        if isinstance(cost, (int, float)):
+            total += float(cost)
+            agent = row.get('agent')
+            if isinstance(agent, str):
+                by_agent[agent] = by_agent.get(agent, 0.0) + float(cost)
+        tid = row.get('task_id')
+        if isinstance(tid, str) and tid:
+            task_ids.add(tid)
+    return {
+        'date_utc': today.isoformat(),
+        'total_usd': round(total, 4),
+        'by_agent': {k: round(v, 4) for k, v in by_agent.items()},
+        'task_count': len(task_ids),
+        'as_of': _now_utc_iso(now),
+    }
+
+
+def _reader_costs_week(
+    agents_root: Path, now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
+    window_start = today - timedelta(days=6)
+    # Initialize buckets so empty days still appear.
+    by_day_buckets: dict[date, dict[str, Any]] = {}
+    for i in range(7):
+        d = window_start + timedelta(days=i)
+        by_day_buckets[d] = {'total_usd': 0.0, 'task_ids': set()}
+    total = 0.0
+    by_agent: dict[str, float] = {}
+    task_ids: set[str] = set()
+    for row in _load_costs_jsonl(agents_root):
+        dt = _ts_to_dt(row.get('ts'))
+        if dt is None:
+            continue
+        d = dt.astimezone(timezone.utc).date()
+        if d < window_start or d > today:
+            continue
+        cost = row.get('cost_usd')
+        if isinstance(cost, (int, float)):
+            total += float(cost)
+            by_day_buckets[d]['total_usd'] += float(cost)
+            agent = row.get('agent')
+            if isinstance(agent, str):
+                by_agent[agent] = by_agent.get(agent, 0.0) + float(cost)
+        tid = row.get('task_id')
+        if isinstance(tid, str) and tid:
+            task_ids.add(tid)
+            by_day_buckets[d]['task_ids'].add(tid)
+    by_day = [
+        {
+            'date_utc': d.isoformat(),
+            'total_usd': round(buckets['total_usd'], 4),
+            'task_count': len(buckets['task_ids']),
+        }
+        for d, buckets in sorted(by_day_buckets.items())
+    ]
+    return {
+        'window_start_utc': window_start.isoformat(),
+        'window_end_utc': today.isoformat(),
+        'total_usd': round(total, 4),
+        'by_day': by_day,
+        'by_agent': {k: round(v, 4) for k, v in by_agent.items()},
+        'task_count': len(task_ids),
+        'as_of': _now_utc_iso(now),
+    }
+
+
+# ---- cycle journal reader ----
+
+def _reader_cycle_journal(
+    agents_root: Path, n: int = 5, now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Parse the cycle journal at `<repo>/runbooks/cycle-journal.md` and
+    return the most-recent N entries. Lenient parser: surface
+    parse_warnings rather than 500-ing."""
+    path = _repo_root() / 'runbooks' / 'cycle-journal.md'
+    warnings: list[str] = []
+    if not path.exists():
+        return {
+            'entries': [],
+            'n': n,
+            'returned': 0,
+            'as_of': _now_utc_iso(now),
+            'parse_warnings': [f'cycle journal not found at {path}'],
+        }
+    try:
+        text = path.read_text(encoding='utf-8', errors='replace')
+    except OSError as e:
+        return {
+            'entries': [],
+            'n': n,
+            'returned': 0,
+            'as_of': _now_utc_iso(now),
+            'parse_warnings': [f'read error: {e}'],
+        }
+    lines = text.splitlines()
+    entries: list[dict[str, Any]] = []
+    current: Optional[dict[str, Any]] = None
+    for raw in lines:
+        m = JOURNAL_HEADER_RE.match(raw)
+        if m:
+            if current is not None:
+                entries.append(current)
+            date_part = m.group(1)
+            time_part = m.group(2)
+            try:
+                started = datetime.strptime(
+                    f'{date_part} {time_part}', '%Y-%m-%d %H:%M',
+                ).replace(tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                started = None
+                warnings.append(f'unparseable date in header: {raw!r}')
+            current = {
+                'started_at': started,
+                'headline': raw.strip().lstrip('#').strip(),
+                'findings_count': 0,
+                '_body': [raw],
+            }
+            continue
+        if current is None:
+            # Pre-amble before any header — ignore.
+            continue
+        current['_body'].append(raw)
+        # Count findings: lines matching "**(X) ...:**" or "- **(X)" patterns
+        # used in the actual journal.
+        if re.match(r'\s*-?\s*\*\*\([A-Z]\)\s', raw):
+            current['findings_count'] += 1
+    if current is not None:
+        entries.append(current)
+    # Entries are in file order (most-recent-first if file is newest-on-top,
+    # which it is — see runbooks/cycle-journal.md).
+    n_capped = max(0, min(int(n), CYCLE_JOURNAL_MAX_N))
+    truncated = entries[:n_capped]
+    out_entries: list[dict[str, Any]] = []
+    for e in truncated:
+        body = '\n'.join(e['_body'])
+        if len(body.encode('utf-8')) > JOURNAL_BODY_CAP_BYTES:
+            # Truncate by bytes; back off if mid-multibyte char.
+            encoded = body.encode('utf-8')[:JOURNAL_BODY_CAP_BYTES]
+            body = encoded.decode('utf-8', errors='ignore') + '\n…[truncated]'
+        out_entries.append({
+            'started_at': e['started_at'],
+            'headline': e['headline'],
+            'findings_count': e['findings_count'],
+            'body_markdown': body,
+        })
+    return {
+        'entries': out_entries,
+        'n': n_capped,
+        'returned': len(out_entries),
+        'as_of': _now_utc_iso(now),
+        'parse_warnings': warnings,
+    }
+
+
+# ---- healers reader ----
+
+def _classify_healer_log(log_path: Path, tail: int = HEALER_LOG_TAIL_LINES) -> tuple[str, str]:
+    """Return (last_result, last_summary). Reads up to `tail` last lines."""
+    if not log_path.exists():
+        return 'stale', 'log file not found'
+    try:
+        with log_path.open('rb') as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            chunk_size = min(size, 64 * 1024)
+            f.seek(max(0, size - chunk_size))
+            data = f.read().decode('utf-8', errors='replace')
+    except OSError as e:
+        return 'error', f'log read failed: {e}'
+    last_lines = data.splitlines()[-tail:]
+    if not last_lines:
+        return 'stale', 'log empty'
+    has_error = any('ERROR' in ln for ln in last_lines)
+    has_warn = any('WARN' in ln for ln in last_lines)
+    last_summary = last_lines[-1].strip()
+    if len(last_summary) > 200:
+        last_summary = last_summary[:197] + '...'
+    if has_error:
+        return 'error', last_summary
+    if has_warn:
+        return 'warn', last_summary
+    return 'ok', last_summary
+
+
+def _reader_healers_status(
+    agents_root: Path, now: Optional[datetime] = None,
+    list_timer_fn=None,
+) -> dict[str, Any]:
+    list_timer = list_timer_fn or _list_timer_next
+    now = now or datetime.now(timezone.utc)
+    blackboard = agents_root / 'blackboard'
+    kill_switch_active = (agents_root / 'healers.disabled').exists()
+    healers: list[dict[str, Any]] = []
+    if not blackboard.is_dir():
+        return {'healers': healers, 'as_of': _now_utc_iso(now)}
+    try:
+        heartbeats = sorted(
+            f for f in blackboard.iterdir()
+            if f.is_file() and f.name.endswith('.heartbeat')
+        )
+    except OSError:
+        heartbeats = []
+    for hb in heartbeats:
+        name = hb.name[:-len('.heartbeat')]
+        last_run_mt = _safe_mtime(hb)
+        last_run_at = _iso(last_run_mt)
+        log_path = agents_root / 'logs' / f'{name}.log'
+        last_result, last_summary = _classify_healer_log(log_path)
+        # Staleness: heartbeat older than 2× expected cadence.
+        cadence_min = HEALER_CADENCE_MIN_FALLBACK.get(name)
+        if last_run_mt is not None and cadence_min:
+            age_sec = (now.timestamp() - last_run_mt)
+            if age_sec > (cadence_min * 60 * 2):
+                last_result = 'stale'
+                last_summary = (
+                    f'last heartbeat {int(age_sec // 60)}min ago; '
+                    f'expected cadence {cadence_min}min'
+                )
+        next_at = list_timer(f'ourliberty-{name}')
+        healers.append({
+            'name': name,
+            'last_run_at': last_run_at,
+            'last_result': last_result,
+            'last_summary': last_summary,
+            'next_scheduled_at': next_at,
+            'kill_switch_active': kill_switch_active,
+        })
+    return {'healers': healers, 'as_of': _now_utc_iso(now)}
+
+
+# ---- FastAPI app ----
+
+app = FastAPI(
+    title='Ourliberty Dashboard API',
+    description=(
+        'Read-only droplet status surface for the E3 dashboard. '
+        'All endpoints require the X-Dashboard-Token header.'
+    ),
+    version='0.1.0',
+    # Disable default unauthenticated docs routes; we re-register gated
+    # versions below so /docs and /openapi.json require the same token.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[CORS_ORIGIN],
+    allow_methods=['GET', 'OPTIONS'],
+    allow_headers=[HEADER_NAME, 'Content-Type'],
+    allow_credentials=False,
+    max_age=600,
+)
+
+
+@app.get('/health', response_model=HealthResponse, dependencies=[Depends(_require_token)])
+def get_health() -> dict[str, Any]:
+    return _reader_health(_agents_root())
+
+
+@app.get('/agents/status', response_model=AgentsStatusResponse, dependencies=[Depends(_require_token)])
+def get_agents_status() -> dict[str, Any]:
+    return _reader_agents_status(_agents_root())
+
+
+@app.get('/tasks/recent', response_model=TasksRecentResponse, dependencies=[Depends(_require_token)])
+def get_tasks_recent(
+    limit: int = Query(20, ge=1, le=TASKS_RECENT_MAX),
+) -> dict[str, Any]:
+    return _reader_tasks_recent(_agents_root(), limit=limit)
+
+
+@app.get('/costs/today', response_model=CostsTodayResponse, dependencies=[Depends(_require_token)])
+def get_costs_today() -> dict[str, Any]:
+    return _reader_costs_today(_agents_root())
+
+
+@app.get('/costs/week', response_model=CostsWeekResponse, dependencies=[Depends(_require_token)])
+def get_costs_week() -> dict[str, Any]:
+    return _reader_costs_week(_agents_root())
+
+
+@app.get('/cycle-journal/recent', response_model=CycleJournalResponse, dependencies=[Depends(_require_token)])
+def get_cycle_journal_recent(
+    n: int = Query(5, ge=1, le=CYCLE_JOURNAL_MAX_N),
+) -> dict[str, Any]:
+    return _reader_cycle_journal(_agents_root(), n=n)
+
+
+@app.get('/healers/status', response_model=HealersStatusResponse, dependencies=[Depends(_require_token)])
+def get_healers_status() -> dict[str, Any]:
+    return _reader_healers_status(_agents_root())
+
+
+# Auth-gate the FastAPI auto-docs surfaces too. We override the routes
+# FastAPI installed for /docs and /openapi.json to require the same token.
+
+@app.get('/docs', include_in_schema=False, dependencies=[Depends(_require_token)])
+def _docs(request: Request):
+    from fastapi.openapi.docs import get_swagger_ui_html
+    return get_swagger_ui_html(openapi_url='/openapi.json', title=f'{app.title} — Swagger UI')
+
+
+@app.get('/openapi.json', include_in_schema=False, dependencies=[Depends(_require_token)])
+def _openapi_json():
+    return app.openapi()
+
+
+if __name__ == '__main__':
+    # Direct `python3 -m scripts.dashboard_api` invocation; production
+    # goes through uvicorn in the systemd unit.
+    import uvicorn
+    uvicorn.run(
+        'scripts.dashboard_api:app',
+        host='127.0.0.1', port=8000, log_level='info',
+    )
