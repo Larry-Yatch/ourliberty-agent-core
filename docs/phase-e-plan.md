@@ -270,21 +270,22 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
   - `/costs/week` — same, weekly
   - `/cycle-journal/recent?n=5` — last N Pulse cycle entries
   - `/healers/status` — each healer's last run + success/fail
-- Auth: shared secret in header (`X-Dashboard-Token`), token in `ourliberty-secrets.env`
-- Bind to localhost only initially; we'll add an Nginx reverse proxy with HTTPS in E3.3
-- Systemd service: `ourliberty-dashboard-api.service`
+- Auth: shared secret in header (`X-Dashboard-Token`), token at `DASHBOARD_API_TOKEN` in `/home/larry/credentials/.env.larry`. Registered in `config/token-rotation-schedule.json` per E1.5 discipline (annual scope-audit, severity=high). CORS allows `Origin: https://dashboard.ourliberty.dev` only.
+- Bind to localhost only initially; Nginx reverse proxy with HTTPS lands in E3.3
+- Systemd service: `ourliberty-dashboard-api.service` (Type=simple, Restart=on-failure, EnvironmentFile=/home/larry/credentials/.env.larry)
 
 **E3.2 — Next.js dashboard UI** (~1.5 days)
 
-- New repo: `ourliberty-dashboard`
-- Next.js + Tailwind (industry default, well-supported by Claude/Forge)
+- Repo: `ourliberty-dashboard` (already exists, scaffolded in E2.3 with `create-next-app --typescript --tailwind --app`)
+- Next.js + TypeScript + Tailwind + App Router (industry default, well-supported by Claude/Forge)
 - Pages:
   - `/` — overview: 4 agent status cards, today's cost, in-flight tasks, last 5 cycle entries
   - `/tasks` — recent tasks table, sortable
   - `/costs` — cost trends (daily/weekly)
   - `/healers` — healer status grid
-- Auto-refresh every 30s via SWR or react-query
-- API token via Next.js env var (`DASHBOARD_API_TOKEN` — set in Vercel project settings, never in code)
+- Auto-refresh every 30s via SWR (locked Q3=3 of 5 — see Architecture decisions above)
+- API token via Next.js env var `DASHBOARD_API_TOKEN` set in Vercel project settings (never committed). SWR fetcher wraps the `X-Dashboard-Token` header on every call.
+- Loading state: spinner + last-known-good cached data. Error state: subtle banner "API unreachable — retrying every 30s" + keep showing cached data. Polish (skeleton screens, transitions) is E4+ territory.
 
 **E3.3 — Nginx + HTTPS for the API** (~½ day, Larry-driven, I narrate)
 
