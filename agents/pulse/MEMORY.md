@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-20 (Iteration 57)
+## Status snapshot — updated 2026-05-21 (Iteration 58)
 
-Fifty-seven cycles/responses run. **System: ✅ Nominal.** All checks clean — A (main, clean, HEAD=origin/main=c93c4ad), B (sync 39m ago at 16:05Z), C (6/6 units active), D (all inboxes empty), E (0 open PRs), F (PID 616611 fresh 80s). E1.5 phase deliverables complete (PRs #45–#49). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). G-rule fired iter 57 for Telegram getUpdates URL errors (3rd consecutive cycle); dispatched to Beacon for investigation.
+Fifty-eight cycles/responses run. **System: ✅ Nominal.** All checks clean — A (main, clean, HEAD=origin/main=a8739c5 PR #60), B (sync 34m ago at 00:06Z), C (6/6 units active), D (all inboxes empty, iter-57 Telegram dispatch archived/processed), E (0 open PRs), F (PID 676209 fresh ~9s CPU). E2 phase deliverables complete (PRs #51–#60, 10 PRs in one session): deploy_targets, deploy_notifier (Vercel polling), ourliberty-dashboard registration, Mirror regression gate, and 5 notifier/path-isolation fixes. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). G-rule Telegram getUpdates dispatch processed by Beacon (iter 57); monitoring for recurrence.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -47,7 +47,7 @@ Fifty-seven cycles/responses run. **System: ✅ Nominal.** All checks clean — 
 ## Pending watch items (not yet patterns / pending resolution)
 
 
-- **2026-05-20 (iter 57) — Telegram getUpdates "Network is unreachable" — G-rule dispatched.** 3 consecutive cycles (iters 55–57) observed [Errno 101] ENETUNREACH on Telegram getUpdates long-polling. Outbound sendMessage (notifications) unaffected; beacon delivered idx=50 at 23:09Z May 19. G-rule fired iter 57. Dispatched to Beacon as `cycle-finding-telegram-getupdate-net-errors-20260520T164419Z.json` (dedup_identity=cycle-fix:telegram-getupdate-network-errors-persistent). Close when Beacon confirms bots handle gracefully (add calibration note) or Forge ships a fix.
+- **2026-05-20 (iter 57) — Telegram getUpdates "Network is unreachable" — G-rule dispatched; dispatch processed.** 3 consecutive cycles (iters 55–57) observed [Errno 101] ENETUNREACH on Telegram getUpdates long-polling. Outbound sendMessage (notifications) unaffected; beacon delivered idx=62 at 23:19Z May 20. G-rule fired iter 57. Dispatch `cycle-finding-telegram-getupdate-net-errors-20260520T164419Z.json` archived (processed) by iter 58. No Beacon response file in Pulse outbox — Beacon likely DM'd Larry or handled via notification path. Continue monitoring forge/mirror logs for recurrence. Close when Beacon confirms bots handle gracefully or Forge ships a fix.
 
 - **2026-05-18 — pulse_check_i.py journal writes not auto-committed (1st Monday, 3 blocks).** pulse_check_i.py ran three times on 2026-05-18: skip (pre-sentinel), first digest (23.6% — pre-fix), corrected digest (3.8% — post-PRs #33+#35). Each appended to journal; no commit step. Also: no idempotency guard — Check I re-runs whenever sentinel+sidecar present, regardless of prior run today. **If recurs 2026-05-25 (2nd Monday), dispatch to Beacon:** (a) add commit step to pulse_check_i.py after journal write; (b) add idempotency guard (skip if check-i-<week>.json already written at mode=digest today). Monitoring.
 
