@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-21 (Iteration 60)
+## Status snapshot — updated 2026-05-21 (Iteration 63)
 
-Sixty cycles/responses run. **System: ✅ Nominal.** All checks clean — A (HEAD==origin/main=1c20387 PR #73), B (sync 36m ago at 08:08Z), C (6/6 units active; beacon delivering idx=78–80 at 07:59Z), D (all inboxes empty; new: task-29 requeue failure in forge/.invalid/), E (0 open PRs), F (fresh session + concurrent automated cycle PID 736374 fresh 3 min). Phase E3 closed out (PR #69, 06:53Z); ourliberty-dashboard elevated to T0 (PRs #65–#68); inbox-watcher MemoryMax raised 2G→4G (PR #71). task-29 (E3.2 dashboard-ui build) failed with requeue_count >= 3; E3.2 spec exists (PR #64) but frontend build pending. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon resolution.
+Sixty-three cycles/responses run. **System: ✅ Nominal.** Iter 63 findings — A (ahead by 1 unpushed commit; pushed at cycle end: 4fa36bc→1c1cf8b), B (sync 37m ago at 20:09Z), C (6/6 units active; Beacon last 18:27Z idx=81), D (all inboxes empty; system-fixes-structural-bot-001 dispatched+processed by Forge, reject-intent returned, idx=81 delivered to Larry), E (0 open PRs), F (fresh session). New watch item: "interactive cycle commits but doesn't push" — 1st occurrence (iter 62 f0bb00b unpushed). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -45,6 +45,8 @@ Sixty cycles/responses run. **System: ✅ Nominal.** All checks clean — A (HEA
 - **2026-05-15 — D3.5 infrastructure decommission. CLOSED iter 35.** Pattern: 4 services (ourliberty-orchestrator, ourliberty-telegram-webhook, ourliberty-github-webhook, ourliberty-merge-watcher.timer) showed as inactive every cycle from iter 23 onward (12 consecutive, iters 23–34). Permanent fix: PR #18 "pulse: close iter 23b — codify D3.5 active-set + decommissioned services" merged 2026-05-15T05:51Z. `runbooks/cycle-prompt.md` Check C codifies the 6-unit active set + 4 decommissioned services as explicit "do not escalate" exclusion list. iter 23b escalation marked resolved. **Closed. No further tracking needed.**
 
 ## Pending watch items (not yet patterns / pending resolution)
+
+- **2026-05-21 (iter 63) — Interactive cycle commits but doesn't push (1st captured occurrence).** Iter 62 journal commit f0bb00b ("Pulse cycle 20260521T163000Z") was made locally but never pushed to GitHub — origin/main still at 4fa36bc when iter 63 started. Pushed at iter 63 cycle end (4fa36bc→1c1cf8b). Prior interactive cycles (iters 59–61) did push. Root cause unclear — iter 62 may have committed without a push step. Monitor: if next 2 interactive cycles also land ahead-of-origin, dispatch to Beacon to add explicit `git push origin main` to the interactive cycle end-commit flow. Not at G-rule threshold yet (need 3+).
 
 - **2026-05-21 (iter 60) — task-29 E3.2 dashboard-ui build: requeue_count >= 3 (1st occurrence).** forge/.invalid/task-29-dashboard-ui-e3-2.json.reason created 05:46Z May 21; base JSON absent (cleared by watcher after rejection). E3.2 dashboard-ui spec shipped (PR #64, 05:30Z); ourliberty-dashboard T0 elevation complete (PRs #65–#68); E3 closed out (PR #69). Frontend build task may need re-dispatch with fixed config (ourliberty-dashboard worktree path added in PR #66 at 05:44Z — task may have failed before that landed). Close when new E3.2 build task is dispatched or Larry confirms E3.2 frontend deferred.
 
