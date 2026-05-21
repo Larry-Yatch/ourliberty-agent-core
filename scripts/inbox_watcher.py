@@ -65,14 +65,52 @@ REQUEUE_MAX = 3
 # Phase D3 commit 4b: logical target_repo name → canonical filesystem path.
 # Worktrees are spawned via `git worktree add` from the canonical. The agent's
 # `allowed_repos` (in agent-models.json) gates which logical names may be
-# targeted; this map resolves them to disk paths at dispatch time.
-#
-# TODO: when allowed_repos grows beyond one entry, surface this in
-# config/agent-models.json under a top-level "repo_paths" block.
-CANONICAL_REPO_PATHS: dict[str, Path] = {
-    "ourliberty-agent-core": HOME / "agent-core",
-    "ourliberty-dashboard": HOME / "ourliberty-dashboard",
-}
+# targeted; _load_repo_paths() resolves them to disk paths at dispatch time.
+# Source of truth is the top-level "repo_paths" block in agent-models.json
+# (task-30 — folded out of the prior hardcoded mapping). Script-relative
+# config path (matches outbox_notifier.py) so worktree smoke tests pick up
+# the worktree's own config, while production daemons (installed at
+# /home/larry/agent-core/scripts/) still hit the canonical config file.
+_MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "agent-models.json"
+_REPO_PATHS_CACHE: dict[str, Path] | None = None
+
+
+def _load_repo_paths() -> dict[str, Path]:
+    """Return logical target_repo → canonical filesystem Path.
+
+    Reads the top-level ``repo_paths`` block in ``config/agent-models.json``
+    once and caches the result. Raises ``RuntimeError`` (fail-loud) when the
+    block is missing or any value is non-absolute or escapes ``/home/larry/``
+    (the systemd sandbox ReadWritePaths constraint — paths outside this tree
+    would fail later at worktree creation anyway).
+    """
+    global _REPO_PATHS_CACHE
+    if _REPO_PATHS_CACHE is not None:
+        return _REPO_PATHS_CACHE
+    try:
+        cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        raise RuntimeError(
+            f"could not read {_MODELS_CONFIG_PATH}: {e} — cannot resolve "
+            "target_repo → filesystem path"
+        ) from e
+    block = cfg.get("repo_paths") if isinstance(cfg, dict) else None
+    if not isinstance(block, dict) or not block:
+        raise RuntimeError(
+            "config/agent-models.json missing required 'repo_paths' block — "
+            "cannot resolve target_repo → filesystem path"
+        )
+    resolved: dict[str, Path] = {}
+    for name, raw in block.items():
+        if not isinstance(raw, str) or not raw.startswith("/home/larry/"):
+            raise RuntimeError(
+                f"config/agent-models.json repo_paths[{name!r}]={raw!r} must "
+                "be an absolute path under /home/larry/ (matches systemd "
+                "ReadWritePaths)"
+            )
+        resolved[name] = Path(raw)
+    _REPO_PATHS_CACHE = resolved
+    return resolved
 
 _shutdown = threading.Event()
 
@@ -429,7 +467,7 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     if agent_block.get("worktree_enabled"):
         target_repo = task.get("target_repo")
         canonical_path = (
-            CANONICAL_REPO_PATHS.get(target_repo) if target_repo else None
+            _load_repo_paths().get(target_repo) if target_repo else None
         )
         if canonical_path is None:
             log(

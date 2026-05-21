@@ -11,12 +11,16 @@ for Larry-Yatch/ourliberty-agent-core (2026-05-12, Phase D3 commit 4b — Gap 10
 in docs/upstream-audit.md). Adaptations:
 
   - paths joe→larry; gm-agents→agents; growth-mastery→agent-core
-  - ``CANONICAL_REPOS`` list (not a single REPO_DIR) so multi-repo expansion
-    is one-line when ``allowed_repos`` in agent-models.json grows beyond
-    ``ourliberty-agent-core``.
+  - canonical repo list (not a single REPO_DIR) so multi-repo expansion
+    is one config edit when ``allowed_repos`` in agent-models.json grows
+    beyond ``ourliberty-agent-core``.
   - 4b followup #2: worktree base ``~/agent-worktrees/`` instead of upstream's
     ``/tmp/wt-`` — see worktree_manager.py for the PrivateTmp namespace
     rationale.
+  - task-30: logical-name → filesystem-path mapping lives in the top-level
+    ``repo_paths`` block of ``config/agent-models.json``; loaded lazily via
+    ``_load_canonical_repos()`` (fail-loud on missing block or paths outside
+    ``/home/larry/``).
 
 stdlib only.
 """
@@ -28,18 +32,46 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Canonical repos. Each is the working tree from which Forge worktrees are
-# spawned (``git worktree add --detach --from-here``). ``git worktree list``
-# only reports worktrees of the specific canonical it's run against, so the
-# cleanup loop must iterate every canonical.
-#
-# TODO(D5+): when ``allowed_repos`` in config/agent-models.json grows beyond
-# the agent-core repo, populate this list from that config so logical-name →
-# filesystem-path mapping lives in one place.
-CANONICAL_REPOS = [
-    Path('/home/larry/agent-core'),
-    Path('/home/larry/ourliberty-dashboard'),
-]
+_MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
+_REPO_PATHS_CACHE: list[Path] | None = None
+
+
+def _load_canonical_repos() -> list[Path]:
+    """Return the canonical repo Paths from ``config/agent-models.json``.
+
+    Reads the top-level ``repo_paths`` block once and caches the result.
+    Raises ``RuntimeError`` (fail-loud) when the block is missing or any
+    value is non-absolute or escapes ``/home/larry/`` (the systemd sandbox
+    ReadWritePaths constraint — paths outside this tree would fail later
+    at ``git worktree`` invocation anyway).
+    """
+    global _REPO_PATHS_CACHE
+    if _REPO_PATHS_CACHE is not None:
+        return _REPO_PATHS_CACHE
+    try:
+        cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        raise RuntimeError(
+            f"could not read {_MODELS_CONFIG_PATH}: {e} — cannot resolve "
+            "canonical repo paths"
+        ) from e
+    block = cfg.get('repo_paths') if isinstance(cfg, dict) else None
+    if not isinstance(block, dict) or not block:
+        raise RuntimeError(
+            "config/agent-models.json missing required 'repo_paths' block — "
+            "cannot resolve canonical repo paths"
+        )
+    repos: list[Path] = []
+    for name, raw in block.items():
+        if not isinstance(raw, str) or not raw.startswith('/home/larry/'):
+            raise RuntimeError(
+                f"config/agent-models.json repo_paths[{name!r}]={raw!r} must "
+                "be an absolute path under /home/larry/ (matches systemd "
+                "ReadWritePaths)"
+            )
+        repos.append(Path(raw))
+    _REPO_PATHS_CACHE = repos
+    return repos
 
 # Path prefix that identifies a managed worktree. Must agree with
 # worktree_manager.WORKTREE_BASE + WORKTREE_PREFIX.
@@ -216,7 +248,7 @@ def main() -> int:
         log(f'In-flight task stems: {sorted(active_stems)}')
     total_removed = 0
     total_kept = 0
-    for canonical in CANONICAL_REPOS:
+    for canonical in _load_canonical_repos():
         removed, kept = sweep_canonical(canonical, active_stems)
         total_removed += removed
         total_kept += kept
