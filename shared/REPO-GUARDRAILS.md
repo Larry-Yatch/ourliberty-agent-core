@@ -11,6 +11,7 @@ This file is the authoritative truth of which repos exist, who can touch them, a
 | Tier | Purpose | Repo | Default authority |
 |---|---|---|---|
 | T0 (sandbox) | This source-of-truth repo (agent OS) | `Larry-Yatch/ourliberty-agent-core` | Beacon read+comment, Forge read+PR+merge (with Mirror gate), Pulse read |
+| T0 (sandbox) | Phase E3 dashboard (Vercel-hosted Next.js UI for droplet visibility) | `Larry-Yatch/ourliberty-dashboard` | Same as above |
 | T0 (sandbox) | Prototype 1 — RAG + meaning layer | `Larry-Yatch/proto-mini-brains` *(planned)* | Same as above |
 | T0 (sandbox) | Prototype 2 — Interview pipeline | `Larry-Yatch/proto-interview-pipeline` *(planned)* | Same as above |
 | Reference | Upstream study mirror | `Larry-Yatch/gm-agent-core-upstream-mirror` | **Read-only by all agents** |
