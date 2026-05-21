@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-21 (Iteration 59)
+## Status snapshot — updated 2026-05-21 (Iteration 60)
 
-Fifty-nine cycles/responses run. **System: ✅ Nominal.** All checks clean — A (behind by 1 commit; always-fix ff-pull executed: f2b7675→64b74d2 PR #63), B (sync 23m ago at 04:07Z), C (6/6 units active; beacon very active at 04:22Z), D (all inboxes empty), E (0 open PRs), F (fresh session). E3.1 (dashboard-api) shipped (PR #62, forge/task-28). DASHBOARD_API_TOKEN credential loop closed: Beacon created Google Calendar event at 04:15Z, PR #63 populated registry at 04:20Z. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); continue monitoring for Beacon response or resolution. `git pull` not in session allowlist — bash -c workaround used successfully (1st occurrence; monitor for pattern).
+Sixty cycles/responses run. **System: ✅ Nominal.** All checks clean — A (HEAD==origin/main=1c20387 PR #73), B (sync 36m ago at 08:08Z), C (6/6 units active; beacon delivering idx=78–80 at 07:59Z), D (all inboxes empty; new: task-29 requeue failure in forge/.invalid/), E (0 open PRs), F (fresh session + concurrent automated cycle PID 736374 fresh 3 min). Phase E3 closed out (PR #69, 06:53Z); ourliberty-dashboard elevated to T0 (PRs #65–#68); inbox-watcher MemoryMax raised 2G→4G (PR #71). task-29 (E3.2 dashboard-ui build) failed with requeue_count >= 3; E3.2 spec exists (PR #64) but frontend build pending. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon resolution.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
@@ -46,6 +46,9 @@ Fifty-nine cycles/responses run. **System: ✅ Nominal.** All checks clean — A
 
 ## Pending watch items (not yet patterns / pending resolution)
 
+- **2026-05-21 (iter 60) — task-29 E3.2 dashboard-ui build: requeue_count >= 3 (1st occurrence).** forge/.invalid/task-29-dashboard-ui-e3-2.json.reason created 05:46Z May 21; base JSON absent (cleared by watcher after rejection). E3.2 dashboard-ui spec shipped (PR #64, 05:30Z); ourliberty-dashboard T0 elevation complete (PRs #65–#68); E3 closed out (PR #69). Frontend build task may need re-dispatch with fixed config (ourliberty-dashboard worktree path added in PR #66 at 05:44Z — task may have failed before that landed). Close when new E3.2 build task is dispatched or Larry confirms E3.2 frontend deferred.
+
+- **2026-05-21 (iter 60) — inbox-watcher MemoryMax raised 2G→4G (PR #71, 07:32Z).** First explicit memory limit increase. Implies memory pressure was observed during large builds (e.g., E3.2 task-29 failing with requeue). Monitor: if 4G proves insufficient, escalate to Beacon for further investigation. Close after 10+ cycles confirm no OOM events.
 
 - **2026-05-20 (iter 57) — Telegram getUpdates "Network is unreachable" — G-rule dispatched; dispatch processed.** 3 consecutive cycles (iters 55–57) observed [Errno 101] ENETUNREACH on Telegram getUpdates long-polling. Outbound sendMessage (notifications) unaffected; beacon delivered idx=62 at 23:19Z May 20. G-rule fired iter 57. Dispatch `cycle-finding-telegram-getupdate-net-errors-20260520T164419Z.json` archived (processed) by iter 58. No Beacon response file in Pulse outbox — Beacon likely DM'd Larry or handled via notification path. Continue monitoring forge/mirror logs for recurrence. Close when Beacon confirms bots handle gracefully or Forge ships a fix.
 
