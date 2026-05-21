@@ -2213,7 +2213,6 @@ After all 4 PRs landed, the droplet pulled main, the watcher + outbox-notifier w
 Optional small follow-ups (none blocking, dispatch when convenient):
 - Move `CANONICAL_REPO_PATHS` to `config/agent-models.json` under `repo_paths` (TODO in both `inbox_watcher.py:70-71` and `cleanup_stale_worktrees.py:36-38`). Trigger: 3rd repo addition.
 - Investigate Mirror's first-pass marker-error pattern on short PRs.
-- The Atlas package scan Larry referenced mid-session (paused).
 
 ---
 
