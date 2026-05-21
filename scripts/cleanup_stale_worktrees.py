@@ -38,6 +38,7 @@ from pathlib import Path
 # filesystem-path mapping lives in one place.
 CANONICAL_REPOS = [
     Path('/home/larry/agent-core'),
+    Path('/home/larry/ourliberty-dashboard'),
 ]
 
 # Path prefix that identifies a managed worktree. Must agree with
