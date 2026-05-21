@@ -37,7 +37,7 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
-MemoryMax=2G
+MemoryMax=4G
 TasksMax=512
 
 [Install]
