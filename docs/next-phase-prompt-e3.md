@@ -4,7 +4,7 @@
 
 ---
 
-Phase E2 (Deploy Layer) fully shipped 2026-05-20 — 9 PRs in one day (#51 E2.1 deploy_targets registry, #52 E2.2 deploy_notifier, #53 AGENTS_ROOT path isolation, #54 stale tests, #55 chain gap #5, #56 outbox_notifier isolation, #57 Mirror regression gate dial-3, #58 E2.3 deploy_targets entry, #59 docs closeout, #60 chain gap #6). End-to-end smoke verified: `git push` to `ourliberty-dashboard` → Vercel preview build → Telegram DM in ~5 min.
+Phase E2 (Deploy Layer) fully shipped 2026-05-20 — 10 PRs in one day (#51 E2.1 deploy_targets registry, #52 E2.2 deploy_notifier, #53 AGENTS_ROOT path isolation, #54 stale tests, #55 chain gap #5, #56 outbox_notifier isolation, #57 Mirror regression gate dial-3, #58 E2.3 deploy_targets entry, #59 docs closeout, #60 chain gap #6). End-to-end smoke verified: `git push` to `ourliberty-dashboard` → Vercel preview build → Telegram DM in ~5 min.
 
 **Next phase per the canonical roadmap is E3 — Dashboard B (read-only).** Replace the default Next.js scaffold at `https://ourliberty-dashboard-*.vercel.app` with a real read-only dashboard rendering droplet state (agent status, recent tasks, costs, cycle-journal, healer status). ~3 days estimate.
 
