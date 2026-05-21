@@ -22,7 +22,7 @@
       "inbox_model": "claude-opus-4-7",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
-      "allowed_repos": ["ourliberty-agent-core"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
       "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
     },
     "mirror": {
@@ -32,7 +32,7 @@
       "inbox_model": "claude-opus-4-7",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
-      "allowed_repos": ["ourliberty-agent-core"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
       "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge)."
     },
     "pulse": {
@@ -101,6 +101,11 @@
     {
       "date": "2026-05-15",
       "change": "loop_bounds.cost_per_task_usd raised from $5 to $15. Trigger: upcoming Ledger build dispatch (build-ledger-001) spans 12+ files + longer preflight read across two specs; $5 cap risked tripping mid-build. $15 gives headroom without removing the gate.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-20",
+      "change": "E3.2 allowlist expansion: add 'ourliberty-dashboard' to forge.allowed_repos + mirror.allowed_repos. Trigger: task-29-dashboard-ui-e3-2 dispatch dead-lettered because target_repo='ourliberty-dashboard' was not on the allowlist — Forge's worktree_manager and routing_validator gated the write. Trust-boundary expansion is intentional: Forge will commit + open PRs against the dashboard repo (E3.2 + future UI iterations); Mirror will checkout + review-test the PRs. Same Larry-Yatch GitHub OAuth account, same per-task cost cap, same dial-3 regression gate scope. No code changes — pure config expansion. This is chain gap #7 (allowlist scope) — surfaced 2026-05-20 by the FIRST non-agent-core dispatch attempt.",
       "author": "Claude (via Larry's session)"
     }
   ]
