@@ -2158,5 +2158,64 @@ After the 7 PRs above (E2.1 + E2.2 + 4 followups + Mirror gate) merged + cooled,
 
 ---
 
+## Phase E3 — Dashboard B (Shipped 2026-05-21)
+
+`https://dashboard.ourliberty.dev` is live with read-only droplet state. End-to-end stack: browser → Vercel (Next.js, Vercel-managed TLS) → server-side Next.js route handler that proxies to → Caddy (Let's Encrypt TLS, auto-renew) on droplet → uvicorn FastAPI on `127.0.0.1:8000` → reads `~/agents/blackboard/`, `~/agents/state/`, `~/agents/logs/`, `costs.jsonl`, `runbooks/cycle-journal.md`. SWR auto-refresh every 30 s with `keepPreviousData` for graceful API-down handling.
+
+### Three sub-phases, ~50 min of chain wall-clock, ~$25 total LLM (including ~$5 cross-repo gap recovery)
+
+**E3.1 — Droplet FastAPI (PR #62, $7.65 chain).**
+- `scripts/dashboard_api.py` exposes 7 GET endpoints: `/health`, `/agents/status` (with `bot_model` discriminator added to disambiguate systemd-bot vs inbox-watcher agents), `/tasks/recent`, `/costs/today`, `/costs/week`, `/cycle-journal/recent`, `/healers/status`.
+- Constant-time `secrets.compare_digest` on `X-Dashboard-Token`; CORS allows exactly `https://dashboard.ourliberty.dev`.
+- `OURLIBERTY_AGENTS_ROOT` env override mirrors the E2.2 isolation pattern so tests don't pollute prod logs.
+- 50 unit tests (≥30 target exceeded). systemd `Type=simple` long-running unit. Full E1.5 4-artifact credential discipline for `DASHBOARD_API_TOKEN` (PR #63 followed up the calendar URL into the registry).
+
+**E3.2 — Next.js dashboard UI (PR #1 in ourliberty-dashboard, $9.94 chain incl. recovery).**
+- App Router + TS strict + Tailwind 4 (CSS-first `@theme inline`, no `tailwind.config.js`) + SWR.
+- **Server-side proxy pattern** at `app/api/proxy/[...path]/route.ts` is load-bearing. The browser only ever hits same-origin proxy routes. `X-Dashboard-Token` is added server-side from `process.env`. This sidesteps E3.1's intentionally-narrow CORS (preview deploys at `*-pr-N.vercel.app` would otherwise fail CORS) AND keeps the token out of the client bundle. Verified: `grep -r DASHBOARD_API_TOKEN .next/static` returns zero matches.
+- 4 routes (`/`, `/tasks`, `/costs`, `/healers`), 9 components, typed `lib/api.ts` SWR hook, `lib/types.ts` mirroring all 7 E3.1 response shapes, `lib/env.ts` server-side loader, 20 Vitest tests.
+- `README.md` documents an SSH-tunnel local-dev workflow (`ssh -L 8000:127.0.0.1:8000 -N larry@134.209.44.80` + `.env.local`).
+
+**E3.3 — Caddy auto-TLS + DNS + Vercel custom domain (no PR, purely operational).**
+- Pivoted from the originally-planned nginx + certbot to Caddy because Caddy was already installed on the droplet (port 80 conflict on nginx install caught this) and Caddy's auto-TLS via ACME is dramatically simpler. Wrote `/etc/caddy/Caddyfile` with `api.ourliberty.dev { reverse_proxy 127.0.0.1:8000 }` + a `:80, :443 { respond "Not Found" 404 }` fallback for non-matching hostnames.
+- Cloudflare DNS (DNS-only / gray-cloud on both records): `A api → 134.209.44.80`, `CNAME dashboard → cname.vercel-dns.com`. Cloudflare propagation was near-instant.
+- Caddy's ACME flow provisioned the Let's Encrypt cert via HTTP-01 challenge within ~1 second of DNS resolving. Auto-renews; no certbot maintenance needed.
+- Vercel: added `dashboard.ourliberty.dev` as a custom domain (Vercel-managed TLS auto-provisioned) + `DASHBOARD_API_URL=https://api.ourliberty.dev` env var (Production + Preview). Redeploy triggered to bake in the new env var.
+
+### The cross-repo dispatch gap fan — recovery PRs #65-#68
+
+The first-ever Forge dispatch against a non-`ourliberty-agent-core` `target_repo` (task-29 → `ourliberty-dashboard`) surfaced 8 chain gaps in sequence. The agent OS implicitly assumed `target_repo == "ourliberty-agent-core"` in at least 8 places across 4 architectural layers. Each gap only became visible after the previous was closed:
+
+- **PR #65 — chain gap #7** (`config/agent-models.json` allowed_repos): Beacon dead-lettered the dispatch cleanly + diagnosed the gap precisely (`agent-models.json:25` and `:35`). Trust-boundary edit shipped as Claude-as-Forge.
+- **PR #66 — chain gap #8** (canonical filesystem paths): `scripts/inbox_watcher.py:72` `CANONICAL_REPO_PATHS` dict + `scripts/cleanup_stale_worktrees.py:39` `CANONICAL_REPOS` list. Both files have TODOs to move the mapping to `config/agent-models.json` under `repo_paths`; deferred because the refactor would introduce new code paths needing tests. Auto-merge failed on this PR because Mirror's marker hallucinated `lyatch-ourliberty` as the org name (one-off); manual merge unblocked it.
+- **PR #67 — chain gaps #9-#13** (T0 tier classification): `shared/REPO-GUARDRAILS.md` T0 table, `agents/mirror/CLAUDE.md` tier list, `agents/forge/CLAUDE.md` tier list (line 27) + allowed_repos statement (line 125), `agents/forge/TOOLS.md` repo authority table, and the critical `scripts/heal_pr_auto_merge.py:77` `REPOS` list. **Without the REPOS update**, Mirror PASS on a dashboard PR would silently never auto-merge.
+- **PR #68 — chain gap #14** (systemd ReadWritePaths sandbox): `systemd/ourliberty-inbox-watcher.service` + `systemd/ourliberty-outbox-notifier.service` `ReadWritePaths` allowlist excluded `/home/larry/ourliberty-dashboard`. `git worktree add` hit "fatal: Read-only file system" inside the systemd namespace.
+
+After all 4 PRs landed, the droplet pulled main, the watcher + outbox-notifier were restarted to reload cached config, and the quarantined task-29 envelope was moved from `~/agents/inboxes/forge/.invalid/` back to the active inbox. Forge picked it up cleanly, built E3.2 in 16.75 min, opened PR #1 on ourliberty-dashboard, Mirror reviewed clean, auto-merge fired.
+
+### Notable observations
+
+- **Mirror's first-pass marker-error pattern.** PRs #63, #64, #65, #66, #68 all had Mirror's first review attempt emit `REVIEW_PASS` without `===` delimiters; the parser couldn't extract JSON. All self-recovered on second-pass retry. Cost: ~$0.30 wasted per first attempt. Pattern is consistent enough to be worth investigating — probably needs a CLAUDE.md emphasis tweak for short-PR contexts. Not blocking.
+- **Caddy >> nginx for this use case.** Already-installed + auto-TLS-via-ACME meant E3.3 went from "~½ day Larry-driven" to "~10 min Claude-driven." If we'd known up front Caddy was installed, we'd have written E3.3 as a 1-line Caddyfile addition from the start. Lesson: always inventory the droplet before spec'ing infra.
+- **Forge handled Next 16 + Tailwind 4 unfamiliarity cleanly.** This repo's `AGENTS.md` flagged the training-data gap up front; Forge read `node_modules/next/dist/docs/` during preflight and emitted clean code (single SWR v2 quirk caught at build time: `dataUpdatedAt` not exposed → wrote a small `useDataUpdatedAt(data)` hook). Zero CLARIFY_REQUESTs.
+- **The token never entered Claude's chat context during the runtime install.** Generated on droplet via `python3 -c "import secrets; print(secrets.token_urlsafe(32))"` piped directly into `.env.larry`; only the byte-length echoed for verification. Then sourced server-side for the smoke test. (Larry pasted it into Vercel manually via Chrome MCP — the screenshot incidentally captured the value, which prompted a transparency note in chat. Acceptable exposure given the token isn't yet load-bearing and rotation is one runbook step away.)
+
+### Codified additions
+
+27. **First cross-repo dispatch surfaces a gap fan.** When adding a new `target_repo` to the agent OS, pre-stage all 8 gap fixes in ONE bundled PR before any task-N dispatch attempt: `agent-models.json` allowed_repos (Forge + Mirror), `inbox_watcher.py` `CANONICAL_REPO_PATHS`, `cleanup_stale_worktrees.py` `CANONICAL_REPOS`, `REPO-GUARDRAILS.md` T0 row, both agent CLAUDE.mds + Forge TOOLS.md tier lists, `heal_pr_auto_merge.py` `REPOS`, and both watcher + notifier systemd `ReadWritePaths`. Then operationally: clone the repo at the canonical path on the droplet, pull on droplet post-merge, `sudo cp` updated units to `/etc/systemd/system/`, `daemon-reload`, restart both services. Doing this as a single bundled PR (vs. discovering gaps one-at-a-time) cuts recovery cost from ~$5 + 25-30 min to ~$1.50 + ~10 min for the next repo.
+28. **Caddy is the default reverse-proxy on this droplet.** Don't install nginx. Caddy's auto-TLS-via-ACME makes new HTTPS subdomains a 3-line Caddyfile change + Cloudflare DNS record. Add new `api.*` style subdomains by appending a block to `/etc/caddy/Caddyfile` and `sudo systemctl reload caddy`.
+29. **Phase E (Spec → Deployed Prototype) is fully shipped.** E1 + E1.5 + E2 + E3 + E5 all DONE across 2026-05-19 → 2026-05-21. The agent OS can now: dispatch a spec, build the code, review it, auto-merge it, deploy a preview, AND show real-time state in a public dashboard. Critical-path Phase E goals all met. Phase E4 (interactive dashboard) is the next critical-path item but trigger-gated on ≥1 week of E3 usage so the "I wish I could do X from here" list accumulates.
+
+### Next
+
+**Pause for usage.** No urgent next-phase work. Dashboard at `https://dashboard.ourliberty.dev` is live; spend a week using it. Things to watch for that would form E4's scope: when you find yourself opening a terminal to do something you wish you could click from the dashboard, jot it down (a `runbooks/e4-wish-list.md` or just a note). E4 dispatches when that list has 3-5 concrete items.
+
+Optional small follow-ups (none blocking, dispatch when convenient):
+- Move `CANONICAL_REPO_PATHS` to `config/agent-models.json` under `repo_paths` (TODO in both `inbox_watcher.py:70-71` and `cleanup_stale_worktrees.py:36-38`). Trigger: 3rd repo addition.
+- Investigate Mirror's first-pass marker-error pattern on short PRs.
+- The Atlas package scan Larry referenced mid-session (paused).
+
+---
+
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
 

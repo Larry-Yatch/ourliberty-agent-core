@@ -55,10 +55,10 @@ What we are NOT building in E: production-grade deploys, custom Supabase per pro
 | Phase | Goal | Est. effort | Depends on | Status |
 |---|---|---|---|---|
 | **E1** | Hardening (markers, watcher, auto-merge) | ~3 days (actual: ~1 day) | — | **Done 2026-05-19** (PRs #40, #41, #42, #43) |
-| **E1.5** | Credential rotation discipline | ~1 day | E1 | In flight 2026-05-19 (design PR opened; Forge build dispatch next) |
-| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | E2.0 + E2.1 + E2.2 done 2026-05-20; E2.3 next |
-| **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | Not started |
-| **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started |
+| **E1.5** | Credential rotation discipline | ~1 day | E1 | **Done 2026-05-19** (PRs #45, #46, #47) |
+| **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | **Done 2026-05-20** (10 PRs same day: #51-#60) |
+| **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | **Done 2026-05-21** (PR #62, PR #1 in ourliberty-dashboard, + 4 recovery PRs #65-#68); public dashboard at `dashboard.ourliberty.dev` |
+| **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started (trigger: 1 week of E3 usage) |
 | **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | **Done 2026-05-19** (PRs #37, #38, #39) |
 | **E6** | Bench items (Ledger, audit logger, Guardian, prod deploy, etc.) | — | Trigger-based | Deferred |
 
@@ -413,11 +413,68 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-20 (E3.1 dashboard API shipped — read-only droplet status surface; E2 was FULLY SHIPPED earlier same day)
-**Current phase:** E1 + E5 **DONE**. E2.0 **DONE**. E1.5 **DONE** (design + implementation + drift healers; PRs #45, #46, #47). Task #17 **DONE** (headless Beacon APPROVAL_REQUEST handler; PR #48). Task #19 **DONE** (source-routing narrowing fix; PR #49). E2.1 **DONE** 2026-05-20 (`config/deploy_targets.json` registry + offline validator + Vercel-side sync drift detector; PR #51). E2.2 **DONE** 2026-05-20 (`scripts/deploy_notifier.py` — 2-min Vercel poller for preview URLs + build failures; PR #52). AGENTS_ROOT path-isolation fix (PR #53) for 5 healer/sync scripts. Stale time-bound tests in heal_pr_auto_merge fixed (PR #54). Chain gap #5 — headless clarify-response routing — **CLOSED** in PR #55. outbox_notifier path-isolation (PR #56). Mirror regression gate (dial 3, regression-only) shipped in PR #57 with `scripts/test_regression_check.py` helper. **E2.3 DONE** 2026-05-20 (`ourliberty-dashboard` GitHub repo created with Next.js + TS + Tailwind + App Router scaffold; imported into Vercel Hobby project `prj_b1jhpIqS8VDyZfDQvIoyzm32Rf6b`; deploy_targets entry landed via PR #58; both kill-switches `OURLIBERTY_DEPLOY_NOTIFIER_ENABLED` + `OURLIBERTY_DEPLOY_TARGETS_SYNC_ENABLED` activated via override.conf on droplet; smoke test verified — git push to `test/e2-3-smoke` branch → Vercel build → deploy-notifier tick → Telegram DMs landed in Larry's chat at 16:29 MDT, ~5 min total git-to-Telegram lag). **E3.1 DONE** 2026-05-20 (`scripts/dashboard_api.py` — FastAPI service exposing 7 read-only GET endpoints behind X-Dashboard-Token auth + CORS allowlist; binds to 127.0.0.1:8000; systemd `Type=simple` long-running unit; 50 unit tests; full 4-artifact credential discipline for `DASHBOARD_API_TOKEN` with rotation runbook covering both droplet and Vercel halves).
-**Next concrete action:** E3.2 — replace the default Next.js scaffold at `ourliberty-dashboard-*.vercel.app` with a real read-only dashboard rendering the droplet state surfaced by E3.1. Then E3.3 — Nginx + Let's Encrypt to expose `https://api.ourliberty.dev/*` → `localhost:8000/*`.
+**Last updated:** 2026-05-21 (E3 FULLY SHIPPED — public dashboard live at `https://dashboard.ourliberty.dev`)
+**Current phase:** **E1, E2, E3, E5 all DONE.** E1 + E5 (2026-05-19). E2 (2026-05-20, PRs #51-#60). E3.1 (PR #62), E3.2 (PR #1 in `ourliberty-dashboard`), E3.3 (Caddy auto-TLS + Cloudflare DNS + Vercel custom domain, no PR — operational). 4 recovery PRs #65-#68 closed 8 cross-repo chain gaps surfaced by the first non-agent-core dispatch.
+**Next concrete action:** **Pause for usage.** E4 (interactive dashboard) trigger: ≥1 week of E3 usage so the "I wish I could do X from here" list accumulates. No urgent next-phase work. Optional small follow-ups (none blocking): move `CANONICAL_REPO_PATHS` to config (TODO in `inbox_watcher.py:70-71` + `cleanup_stale_worktrees.py:36-38`), investigate Mirror's first-pass marker-error pattern on short PRs.
 **Blockers:** None
-**Open questions for Larry:** None outstanding. E2.3 surfaces will arise when it dispatches.
+**Open questions for Larry:** None outstanding. E3 surfaces resolved through the cross-repo gap recovery.
+
+**E3 completion summary (2026-05-21) — public dashboard live:**
+
+`https://dashboard.ourliberty.dev` serves the live droplet dashboard end-to-end: 4 agent status cards (with `bot_model` discrimination — systemd-bot vs inbox-watcher), today's spend with by-agent breakdown, in-flight task count, recent cycle-journal entries (relative-time formatted), SWR auto-refresh every 30 s, dark theme, mobile-usable. Full proxy isolation — `DASHBOARD_API_TOKEN` never enters the browser bundle (verified `grep -r DASHBOARD_API_TOKEN .next/static` → 0 matches).
+
+Stack: browser → Vercel (`dashboard.ourliberty.dev`, Vercel-managed TLS, valid through 2026-08-19) → Next.js route handler `app/api/proxy/[...path]/route.ts` (adds `X-Dashboard-Token` server-side) → Caddy (`api.ourliberty.dev`, Let's Encrypt TLS, valid through 2026-08-19, auto-renew) → uvicorn FastAPI on `127.0.0.1:8000`.
+
+**Total E3 cost:** ~$25.27 LLM across 4 PRs (E3.1, E3.2, and 4 recovery PRs) + 3 dead-letters. ~50 min of chain wall-clock for the core work; ~3 hours including the cross-repo gap saga.
+
+**E3.2 completion summary (2026-05-21, PR #1 in ourliberty-dashboard):**
+
+- ✅ Replaces the default Next.js scaffold. App Router + TS strict + Tailwind 4 (CSS-first `@theme inline`, no `tailwind.config.js`) + SWR.
+- ✅ **Server-side proxy pattern.** `app/api/proxy/[...path]/route.ts` is a catch-all Next 16 route handler. Forwards GET to `${DASHBOARD_API_URL}/${path}` with `X-Dashboard-Token` from `process.env`. 5 s timeout → 504; fetch throw → 502; upstream non-2xx → status + body passthrough; `Cache-Control: no-store` on success. Browser only hits same-origin proxy routes, so CORS doesn't matter for preview-deploy hostnames and the token never leaves the server.
+- ✅ 4 pages: `/` overview (4 `<AgentStatusCard>` grid + today's `<CostBlock>` + in-flight count + recent cycle-journal list), `/tasks` (20-row table), `/costs` (today + 7-day breakdown by agent + by day), `/healers` (responsive card grid with last_result badges + kill_switch warnings).
+- ✅ 9 components: `<Nav>` with `usePathname()` active highlighting, `<AgentStatusCard>`, `<TaskRow>`, `<CostBlock>`, `<HealerCard>`, `<LoadingState>`, `<ErrorBanner>`, `<RelativeTime>` (`Intl.RelativeTimeFormat` + 60 s re-render), `<LastRefresh>`.
+- ✅ Typed `lib/api.ts` `useDashboardData<T>(path)` SWR hook + `lib/types.ts` mirroring all 7 E3.1 response shapes + `lib/env.ts` server-side env loader with `MissingEnvError`.
+- ✅ 20 Vitest tests across proxy route (forwarding + 405 + 500 + 502 + 504 + passthrough + no-store), env loader, `formatRelative`.
+- ✅ Bundle-leakage check: `.next/static` has 0 matches for `DASHBOARD_API_TOKEN`. 4 matches in `.next/server` are server-only `process.env.DASHBOARD_API_TOKEN` lookups (var name, not value).
+- ✅ `README.md` rewritten with SSH-tunnel local-dev workflow (`ssh -L 8000:127.0.0.1:8000 -N larry@134.209.44.80` + `.env.local`). `.env.local.example` committed.
+
+**E3.3 completion summary (2026-05-21) — no PR, purely operational:**
+
+- ✅ Caddy was already on droplet (port 80 conflict caught the planned Nginx install). Pivoted to Caddy + auto-TLS rather than nginx + certbot — simpler. Removed the nginx package, kept Caddy.
+- ✅ `/etc/caddy/Caddyfile` rewritten with `api.ourliberty.dev { reverse_proxy 127.0.0.1:8000 }` block + `:80, :443 { respond "Not Found" 404 }` fallback for non-matching hostnames. Backup at `/etc/caddy/Caddyfile.bak.<ts>`.
+- ✅ Cloudflare DNS (Cloudflare-hosted zone, gray-cloud / DNS only): `A api.ourliberty.dev → 134.209.44.80`, `CNAME dashboard.ourliberty.dev → cname.vercel-dns.com`. Propagation was near-instant. Both records must be DNS only (not proxied) — Caddy provisions our own TLS for the api side, Vercel manages TLS for the dashboard side, and Cloudflare's orange-cloud proxy would conflict with both.
+- ✅ Caddy's ACME flow provisioned the Let's Encrypt cert via HTTP-01 challenge within ~1 second of DNS resolving. Auto-renews; no certbot maintenance needed.
+- ✅ Vercel: added `dashboard.ourliberty.dev` as a custom domain on the `ourliberty-dashboard` project (Vercel-managed TLS auto-provisioned). Added `DASHBOARD_API_URL=https://api.ourliberty.dev` env var (Production + Preview, alongside the existing `DASHBOARD_API_TOKEN`). Redeployed the merge commit via the Deployments UI so the new env vars baked in.
+- ✅ Firewall already had 80/443 open (Caddy's existing setup). No ufw changes.
+
+**Cross-repo chain gap recovery (2026-05-20/21) — PRs #65-#68:**
+
+First-ever Forge dispatch against a non-`ourliberty-agent-core` `target_repo` surfaced 8 chain gaps across 4 architectural layers. Each was at a different layer, so they only revealed themselves as the previous gap was closed.
+
+- **PR #65 — chain gap #7** (allowlist scope): `config/agent-models.json` `forge.allowed_repos` + `mirror.allowed_repos` += `ourliberty-dashboard`. Beacon dead-lettered the dispatch cleanly + diagnosed the gap precisely.
+- **PR #66 — chain gap #8** (canonical filesystem paths): `scripts/inbox_watcher.py:72` `CANONICAL_REPO_PATHS` dict + `scripts/cleanup_stale_worktrees.py:39` `CANONICAL_REPOS` list both gained the dashboard repo entry. Both files have TODOs to move this mapping to `config/agent-models.json` under a `repo_paths` block — deferred (would add new code paths needing tests; not blocking E3).
+- **PR #67 — chain gaps #9-#13** (T0 tier classification): `shared/REPO-GUARDRAILS.md` T0 row, `agents/mirror/CLAUDE.md` tier list, `agents/forge/CLAUDE.md` tier list (line 27) + allowed_repos statement (line 125), `agents/forge/TOOLS.md` repo authority table, and the critical `scripts/heal_pr_auto_merge.py:77` `REPOS` list — without that REPOS update, Mirror PASS on a dashboard PR would silently fail to auto-merge.
+- **PR #68 — chain gap #14** (systemd sandbox): `systemd/ourliberty-inbox-watcher.service` + `systemd/ourliberty-outbox-notifier.service` `ReadWritePaths` += `/home/larry/ourliberty-dashboard`. Without this, `git worktree add` against the dashboard canonical repo hit "Read-only file system" inside the systemd namespace (ProtectHome=read-only + path not whitelisted).
+
+**Operational requirements surfaced (not git gaps but operational gates worth documenting):**
+
+- New repo MUST be cloned at `/home/larry/<repo-name>` on the droplet before dispatch (no auto-clone today).
+- `inbox_watcher.py` reads `agent-models.json` at process startup — config edits require `sudo systemctl restart ourliberty-inbox-watcher.service`. Same for any Python source change (`CANONICAL_REPO_PATHS`).
+- systemd unit changes need `sudo cp` to `/etc/systemd/system/` + `daemon-reload` + restart.
+
+**Mirror oddities (non-blocking, worth tracking):**
+
+- **First-pass marker-error pattern.** PRs #63, #64, #65, #66, #68 all had Mirror's first review attempt emit `REVIEW_PASS` without the `===` delimiters; parser couldn't extract JSON. All self-recovered on second-pass retry. ~$0.30 wasted per first attempt. Worth investigating Mirror's CLAUDE.md marker-discipline emphasis for short-PR contexts.
+- **One-off URL hallucination on PR #66.** Marker payload contained `pr_url: ".../lyatch-ourliberty/ourliberty-agent-core/pull/66"` (wrong org name). Auto-merge failed; fixed by manual `gh pr merge 66 --squash --delete-branch`. Did not recur.
+
+**Larry-actions completed during E3 ship:**
+
+- Vercel `DASHBOARD_API_TOKEN` env var set via Chrome MCP
+- Cloudflare A + CNAME records added via Chrome MCP
+- Vercel `dashboard.ourliberty.dev` custom domain added via Chrome MCP
+- Vercel `DASHBOARD_API_URL` env var added via Chrome MCP
+- Vercel redeploy triggered to bake in env vars
+- Beacon DM for `DASHBOARD_API_TOKEN` rotation calendar event (PR #63 pasted URL into registry)
 
 **E3.1 completion summary (2026-05-20):**
 - ✅ `scripts/dashboard_api.py` — FastAPI app exposing 7 read-only GET endpoints (`/health`, `/agents/status`, `/tasks/recent`, `/costs/today`, `/costs/week`, `/cycle-journal/recent`, `/healers/status`). Pydantic response models per endpoint (free OpenAPI schema); pure `_reader_*` helpers so tests can call readers directly without TestClient. `OURLIBERTY_AGENTS_ROOT` env override mirrors the E2.2 `deploy_notifier.py` pattern for tmpdir isolation. Constant-time `secrets.compare_digest` on the `X-Dashboard-Token` header; CORS allows exactly one origin (`https://dashboard.ourliberty.dev`) — preview URLs route through a Vercel env-var indirection in E3.2 rather than widening CORS here. FastAPI auto-docs at `/docs` + `/openapi.json` gated by the same auth dependency. Cycle-journal parser is lenient (regex matches `## Iteration N — YYYY-MM-DD HH:MM UTC` headers and surfaces `parse_warnings` rather than 500-ing on unfamiliar entries). `bot_active=null` + new `bot_model` field disambiguates systemd-bot (beacon/forge) from inbox-watcher (mirror/pulse). subprocess calls to `systemctl is-active` + `systemctl list-timers` are best-effort with 5 s timeouts; return None on failure rather than blowing up the request.
