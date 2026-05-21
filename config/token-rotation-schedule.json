@@ -165,7 +165,7 @@
       "created_at": "2026-05-20",
       "last_rotated_at": "2026-05-20",
       "next_rotation_due": "2027-05-20",
-      "calendar_event_url": null,
+      "calendar_event_url": "https://www.google.com/calendar/event?eid=aGIydG9yNmlqbHVuOWt1OGhpdHM1ZDVuaTggYWdlbnQuYmVhY29uLm91cmxpYmVydHlAbQ",
       "runbook_path": "docs/runbooks/rotate-dashboard-api-token.md",
       "severity_if_lapsed": "high",
       "owner_role": "larry",
