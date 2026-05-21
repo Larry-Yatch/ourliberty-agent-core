@@ -71,6 +71,7 @@ REQUEUE_MAX = 3
 # config/agent-models.json under a top-level "repo_paths" block.
 CANONICAL_REPO_PATHS: dict[str, Path] = {
     "ourliberty-agent-core": HOME / "agent-core",
+    "ourliberty-dashboard": HOME / "ourliberty-dashboard",
 }
 
 _shutdown = threading.Event()
