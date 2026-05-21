@@ -73,8 +73,10 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pr-auto-merge.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-pr-auto-merge.json'
 OUTBOX_NOTIFIER_LOG = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
 
-# Single repo today; E2 will extend when Vercel projects come online.
-REPOS = ['Larry-Yatch/ourliberty-agent-core']
+# E3.2 extended REPOS to include ourliberty-dashboard (first Forge dispatch
+# against a non-agent-core target). Healer reads Mirror PASS markers from
+# outbox_notifier.log and tries to merge matching PRs across all repos here.
+REPOS = ['Larry-Yatch/ourliberty-agent-core', 'Larry-Yatch/ourliberty-dashboard']
 
 GH_TIMEOUT_S = 30
 MAX_MERGES_PER_RUN = 5

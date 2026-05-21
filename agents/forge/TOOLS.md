@@ -14,6 +14,7 @@
 | Repo | Authority | Why it's there |
 |---|---|---|
 | `Larry-Yatch/ourliberty-agent-core` | Read + branch + PR; direct commits to main allowed for config-only changes | This is the agent OS itself. Substantive changes get PRs for Mirror review. |
+| `Larry-Yatch/ourliberty-dashboard` | Read + branch + PR | Phase E3 dashboard — Vercel-hosted Next.js UI consuming droplet API. |
 | `Larry-Yatch/proto-mini-brains` *(planned)* | Read + branch + PR | Prototype 1. |
 | `Larry-Yatch/proto-interview-pipeline` *(planned)* | Read + branch + PR | Prototype 2. |
 | Other `proto-*` as they're created | Read + branch + PR | Per-prototype repos. |
