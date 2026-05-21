@@ -77,6 +77,10 @@
     "cost_per_task_usd": 15.0,
     "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
   },
+  "repo_paths": {
+    "ourliberty-agent-core": "/home/larry/agent-core",
+    "ourliberty-dashboard": "/home/larry/ourliberty-dashboard"
+  },
   "_history": [
     {
       "date": "2026-05-08",
@@ -106,6 +110,11 @@
     {
       "date": "2026-05-20",
       "change": "E3.2 allowlist expansion: add 'ourliberty-dashboard' to forge.allowed_repos + mirror.allowed_repos. Trigger: task-29-dashboard-ui-e3-2 dispatch dead-lettered because target_repo='ourliberty-dashboard' was not on the allowlist — Forge's worktree_manager and routing_validator gated the write. Trust-boundary expansion is intentional: Forge will commit + open PRs against the dashboard repo (E3.2 + future UI iterations); Mirror will checkout + review-test the PRs. Same Larry-Yatch GitHub OAuth account, same per-task cost cap, same dial-3 regression gate scope. No code changes — pure config expansion. This is chain gap #7 (allowlist scope) — surfaced 2026-05-20 by the FIRST non-agent-core dispatch attempt.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-21",
+      "change": "task-30: add top-level 'repo_paths' block (logical repo name → canonical filesystem path). Folds the two hardcoded mappings (scripts/inbox_watcher.py CANONICAL_REPO_PATHS dict + scripts/cleanup_stale_worktrees.py CANONICAL_REPOS list) into this single source of truth. Both scripts now lazy-load this block via module-level _load_repo_paths()/_load_canonical_repos() helpers and fail-loud on missing block or paths outside /home/larry/ (matches systemd ReadWritePaths). Closes the TODOs in PR #66; collapses the cross-repo onboarding runbook from 10 steps to 8.",
       "author": "Claude (via Larry's session)"
     }
   ]
