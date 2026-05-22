@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-22 (Iteration 64)
+## Status snapshot — updated 2026-05-22 (Iteration 65)
 
-Sixty-four cycles/responses run. **System: ✅ Nominal.** Iter 64 findings — A (clean, on main, synced), B (sync 34m ago at 00:10Z, no-change), C (6/6 units active; Beacon last 00:40Z idx=82 review-pass; Forge/Mirror/Pulse Telegram getUpdates errors ongoing but inbox_watcher nominal — PR #74 processed+merged), D (all inboxes empty), E (0 open PRs), F (nominal). Forge shipped PR #74 "Emit task_type: 'cycle' in run_cycle.sh cost-capture" (merged 00:36Z). Push divergence: PR #74 merge landed on remote while iter 64 was mid-cycle; rebased journal commit onto origin/main cleanly (no conflicts, independent files). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response.
+Sixty-five cycles/responses run. **System: ✅ Nominal.** Iter 65 findings (04:44Z Fri) — A (clean, on main, HEAD=287a4f1=origin/main), B (sync 32m ago, no-change), C (6/6 units active; Forge/Mirror/Pulse Telegram getUpdates errors calibrated ongoing; Beacon last 00:40Z idx=82), D (all inboxes empty), E (0 open PRs), F (nominal). 0 new Forge PRs since iter 64. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
