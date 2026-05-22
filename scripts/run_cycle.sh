@@ -69,6 +69,7 @@ if command -v jq >/dev/null 2>&1 && [ -s "$CYCLE_OUT" ]; then
             ts: $ts,
             agent: "pulse",
             task_id: ("cycle-" + ($ts | gsub("[^0-9]"; ""))),
+            task_type: "cycle",
             model: (.modelUsage // {} | keys | first // "claude-sonnet-4-6"),
             cost_usd: (.total_cost_usd // .cost_usd // null),
             input_tokens: (.usage.input_tokens // null),
