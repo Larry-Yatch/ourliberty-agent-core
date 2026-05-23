@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-23 (Iteration 72)
+## Status snapshot — updated 2026-05-23 (Iteration 73)
 
-Seventy-two cycles/responses run. **System: ✅ Nominal.** Iter 72 findings (~08:30Z May 23) — A (clean, on main, HEAD=a427633=origin/main), B (sync 08:15:20Z no-change at a427633, ~15m ago), C (6/6 units active inferred; Forge/Mirror ENETUNREACH calibrated ongoing; Beacon last idx=82 00:40Z May 22), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (all 350-363d out). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25).
+Seventy-three cycles/responses run. **System: ✅ Nominal.** Iter 73 findings (~12:30Z May 23) — A (clean, on main, HEAD=b0658f6=origin/main), B (sync 12:15:50Z no-change at b0658f6, ~15m ago), C (6/6 units active; Forge/Mirror ENETUNREACH calibrated ongoing; Beacon last idx=82 00:40Z May 22), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (all 349-362d out). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
