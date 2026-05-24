@@ -182,21 +182,24 @@ Rotations: 0 overdue, 1 upcoming-within-60d (CLAUDE_MAX_OAUTH due 2027-05-18) �
 
 This check is additive — it fires every cycle and adds at most one line to the journal entry plus zero or more DMs.
 
-#### I. Optimization mode (weekly, Monday)
+#### I. Optimization mode (Mon/Wed/Fri/Sun)
 
-Check I is **additive to Checks A–H, not a replacement**. It fires only on Monday cycles after Ledger's weekly run has landed. Off-Monday cycles skip this block entirely — your A–H output is unchanged.
+Check I is **additive to Checks A–H, not a replacement**. It fires on Mon/Wed/Fri/Sun cycles, re-reading Ledger's most recent weekly sidecar each time. Tue/Thu/Sat cycles skip this block entirely — your A–H output is unchanged.
 
 ```
 Trigger conditions:
-  • Today is Monday (UTC weekday == 0), AND
+  • Today is one of Mon/Wed/Fri/Sun (UTC weekday ∈ {0, 2, 4, 6}), AND
   • EMERGENCY_HALT not present, AND
-  • Ledger's sentinel ~/agents/blackboard/ledger/ledger-ready-<this-Monday> exists.
+  • Ledger's sentinel ~/agents/blackboard/ledger/ledger-ready-<most-recent-Monday>
+    exists.
 
-If any condition fails on Monday, journal a one-line skip note and proceed
-to Check G.
+If any condition fails on a firing day, journal a one-line skip note and
+proceed to Check G.
 ```
 
-**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. The analyzer reads Ledger's JSON sidecar + Pulse's engineering signals (retry overhead, recurring-task repeats from outbox archives, σ anomalies), synthesizes up to 3 proposed optimizations tagged with effort + impact, emits a Telegram DM, appends a `**Check I:**` block to this journal, and writes a structured JSON audit record at `~/agents/blackboard/pulse-check-i/check-i-<week>.json`.
+Ledger itself remains weekly (Monday). Check I reads the same sidecar across all 4 firings of a given week; this gives the loop more chances to surface or escalate signals as the week progresses without making Ledger any chattier.
+
+**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. The analyzer reads Ledger's JSON sidecar + Pulse's engineering signals (retry overhead, recurring-task repeats from outbox archives, σ anomalies), synthesizes up to 3 proposed optimizations tagged with effort + impact, emits a Telegram DM, appends a `**Check I:**` block to this journal, and writes a structured JSON audit record at `~/agents/blackboard/pulse-check-i/check-i-<firing-date>.json` (one record per firing — same week's sidecar produces 4 audit files).
 
 ```bash
 python3 ~/agent-core/scripts/pulse_check_i.py
@@ -206,13 +209,13 @@ Behaviors you can rely on:
 
 | Scenario | Analyzer behavior | Your action |
 |---|---|---|
-| Monday + sentinel + sidecar present, proposals synthesized | Emits digest DM + journal block | Note Check I fired with proposal count in your cycle entry |
-| Monday + sentinel + sidecar present, no proposals | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
-| Monday + sidecar missing/stale | Skips with journal note; no DM | Note Check I skipped: Ledger report unavailable |
+| Firing day + sentinel + sidecar present, proposals synthesized | Emits digest DM + journal block | Note Check I fired with proposal count in your cycle entry |
+| Firing day + sentinel + sidecar present, no proposals | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
+| Firing day + sidecar missing/stale | Skips with journal note; no DM | Note Check I skipped: Ledger report unavailable |
 | EMERGENCY_HALT tripped | Exits 0 silently; no DM, no journal | Same as for Checks A-H during halt |
-| Not Monday | Exits 0 with stderr note; no DM, no journal | Do not invoke; journal nothing for Check I |
+| Tue/Thu/Sat (off day) | Exits 0 with stderr note; no DM, no journal | Do not invoke; journal nothing for Check I |
 
-**On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Monday weekday gate. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
+**On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Mon/Wed/Fri/Sun weekday gate. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
 
 **Proposals format (deterministic v1 — tune after week 2 per spec § 8):**
 - Effort: `small` / `medium` / `large`

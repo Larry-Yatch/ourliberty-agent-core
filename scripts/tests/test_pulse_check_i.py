@@ -10,7 +10,7 @@ Validates:
   - DM body shapes for heartbeat / digest / skipped
   - Journal block contents for each mode
   - EMERGENCY_HALT short-circuit
-  - Monday-gate enforcement (skip when not Monday and not --force)
+  - Weekday-gate enforcement (skip on Tue/Thu/Sat unless --force)
   - End-to-end main() with --no-dm --no-journal
 
 Run:
@@ -26,6 +26,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -350,10 +351,15 @@ class EndToEndTests(unittest.TestCase):
             *extra,
         ]
 
+    def _audit_path(self) -> Path:
+        # Audit filename now uses firing date (today UTC), not week_ending.
+        today = datetime.now(timezone.utc).date().isoformat()
+        return self.output_dir / f"check-i-{today}.json"
+
     def test_e2e_digest_writes_audit_record(self):
         rc = pci.main(self._argv())
         self.assertEqual(rc, 0)
-        out = self.output_dir / f"check-i-{WEEK_ENDING}.json"
+        out = self._audit_path()
         self.assertTrue(out.exists())
         with open(out) as f:
             audit = json.load(f)
@@ -364,7 +370,7 @@ class EndToEndTests(unittest.TestCase):
         os.remove(self.sidecar_dir / f"weekly-{WEEK_ENDING}.json")
         rc = pci.main(self._argv())
         self.assertEqual(rc, 0)
-        out = self.output_dir / f"check-i-{WEEK_ENDING}.json"
+        out = self._audit_path()
         with open(out) as f:
             audit = json.load(f)
         self.assertEqual(audit["mode"], "skipped")
@@ -375,39 +381,138 @@ class EndToEndTests(unittest.TestCase):
         rc = pci.main(self._argv() + ["--halt-flag", str(halt)])
         self.assertEqual(rc, 0)
         # No audit record should land
-        out = self.output_dir / f"check-i-{WEEK_ENDING}.json"
+        out = self._audit_path()
         self.assertFalse(out.exists())
 
+    def test_audit_filename_uses_firing_date_not_week_ending(self):
+        # Even with --week-ending pointing to 2026-05-18, the audit file
+        # name should reflect today's date, so each weekly firing gets
+        # its own file.
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        today = datetime.now(timezone.utc).date().isoformat()
+        firing_out = self.output_dir / f"check-i-{today}.json"
+        week_ending_out = self.output_dir / f"check-i-{WEEK_ENDING}.json"
+        self.assertTrue(firing_out.exists())
+        if today != WEEK_ENDING:
+            self.assertFalse(week_ending_out.exists())
 
-class MondayGateTests(unittest.TestCase):
-    """Skip when not Monday, unless --force or --week-ending is given."""
+
+class WeekdayGateTests(unittest.TestCase):
+    """Fire on Mon/Wed/Fri/Sun, skip on Tue/Thu/Sat unless --force."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
         self.output_dir = self.root / "out"
         self.journal = self.root / "cycle-journal.md"
         self.halt_flag = self.root / "halt-not-set"
         self.sidecar_dir.mkdir(parents=True)
+        # Provide a sidecar so a non-gated run produces an audit file.
+        (self.sidecar_dir / f"weekly-{WEEK_ENDING}.json").write_text(
+            json.dumps(_sidecar())
+        )
 
-    def test_force_bypasses_gate(self):
-        # Even if `now` is not Monday (which we can't easily mock without
-        # patching), --force + --week-ending makes the gate moot.
-        rc = pci.main([
-            "--week-ending", WEEK_ENDING,
+    def _argv_no_week_ending(self) -> list[str]:
+        # Omit --week-ending so the weekday gate is consulted.
+        return [
             "--sidecar-dir", str(self.sidecar_dir),
-            "--outbox-root", str(self.root / "outboxes"),
+            "--outbox-root", str(self.outbox_root),
             "--output-dir", str(self.output_dir),
             "--journal", str(self.journal),
             "--halt-flag", str(self.halt_flag),
             "--no-dm", "--no-journal",
-            "--force",
-        ])
+        ]
+
+    def _patch_now(self, *, year: int, month: int, day: int):
+        """Patch pulse_check_i.datetime.now to return a fixed UTC time."""
+        fixed = datetime(year, month, day, 8, 0, 0, tzinfo=timezone.utc)
+
+        class _FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):  # noqa: D401
+                return fixed
+
+        return mock.patch.object(pci, "datetime", _FrozenDateTime)
+
+    def _audit_glob(self) -> list[Path]:
+        if not self.output_dir.exists():
+            return []
+        return sorted(self.output_dir.glob("check-i-*.json"))
+
+    def test_fires_on_monday(self):
+        # 2026-05-18 is a Monday (weekday 0).
+        with self._patch_now(year=2026, month=5, day=18):
+            rc = pci.main(self._argv_no_week_ending())
         self.assertEqual(rc, 0)
-        out = self.output_dir / f"check-i-{WEEK_ENDING}.json"
-        self.assertTrue(out.exists())
+        self.assertEqual(
+            [p.name for p in self._audit_glob()],
+            ["check-i-2026-05-18.json"],
+        )
+
+    def test_fires_on_wednesday(self):
+        # 2026-05-20 is a Wednesday (weekday 2).
+        with self._patch_now(year=2026, month=5, day=20):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            [p.name for p in self._audit_glob()],
+            ["check-i-2026-05-20.json"],
+        )
+
+    def test_fires_on_friday(self):
+        # 2026-05-22 is a Friday (weekday 4).
+        with self._patch_now(year=2026, month=5, day=22):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            [p.name for p in self._audit_glob()],
+            ["check-i-2026-05-22.json"],
+        )
+
+    def test_fires_on_sunday(self):
+        # 2026-05-24 is a Sunday (weekday 6).
+        with self._patch_now(year=2026, month=5, day=24):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            [p.name for p in self._audit_glob()],
+            ["check-i-2026-05-24.json"],
+        )
+
+    def test_skips_on_tuesday(self):
+        # 2026-05-19 is a Tuesday (weekday 1) — off day.
+        with self._patch_now(year=2026, month=5, day=19):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._audit_glob(), [])
+
+    def test_skips_on_thursday(self):
+        # 2026-05-21 is a Thursday (weekday 3) — off day.
+        with self._patch_now(year=2026, month=5, day=21):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._audit_glob(), [])
+
+    def test_skips_on_saturday(self):
+        # 2026-05-23 is a Saturday (weekday 5) — off day.
+        with self._patch_now(year=2026, month=5, day=23):
+            rc = pci.main(self._argv_no_week_ending())
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._audit_glob(), [])
+
+    def test_force_bypasses_gate_on_off_day(self):
+        # Tuesday + --force should still run.
+        with self._patch_now(year=2026, month=5, day=19):
+            rc = pci.main(self._argv_no_week_ending() + ["--force"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            [p.name for p in self._audit_glob()],
+            ["check-i-2026-05-19.json"],
+        )
 
 
 if __name__ == "__main__":

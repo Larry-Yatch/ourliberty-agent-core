@@ -13,20 +13,21 @@ tagged with effort + impact, and emits:
     nothing is actionable; full digest shape when proposals exist).
   - A `**Check I:**` block appended to `runbooks/cycle-journal.md`.
   - A structured JSON sidecar at `~/agents/blackboard/pulse-check-i/
-    check-i-YYYY-MM-DD.json` for audit and test verification.
+    check-i-YYYY-MM-DD.json` (firing date) for audit and test verification.
 
 Determinism: no LLM in the loop. Pulse-the-LLM running /cycle may invoke
-this script as part of its Monday cycle and extend the digest with prose;
-the deterministic baseline ensures the acceptance criteria in spec § 6
-hold regardless.
+this script as part of its Mon/Wed/Fri/Sun cycles and extend the digest
+with prose; the deterministic baseline ensures the acceptance criteria
+in spec § 6 hold regardless.
 
 Triggers:
-  - Scheduled: `/cycle` on Monday morning, after Ledger's sentinel exists.
-    cycle-prompt.md § Check I gates this.
+  - Scheduled: `/cycle` on Mon/Wed/Fri/Sun, after Ledger's sentinel
+    exists. cycle-prompt.md § Check I gates this. Ledger itself remains
+    weekly Monday; Check I re-reads the same sidecar each firing.
   - Manual: `/optimize` on Telegram. If the sidecar is >24h old, the bot
     refreshes Ledger first (out of scope for this module; the bot handles
-    the orchestration). This script accepts `--force` to skip the Monday
-    weekday gate.
+    the orchestration). This script accepts `--force` to skip the
+    Mon/Wed/Fri/Sun weekday gate.
 
 Stdlib only.
 """
@@ -49,6 +50,11 @@ from typing import Any, Optional
 SCHEMA_VERSION = "v1"
 SIDECAR_MAX_AGE_DAYS = 7
 SIDECAR_FRESH_MAX_AGE_HOURS = 24  # /optimize threshold
+
+# Weekdays on which Check I fires (Monday=0 ... Sunday=6).
+# Mon/Wed/Fri/Sun cadence — Ledger remains weekly Monday; Check I re-reads
+# the same sidecar on each firing.
+CHECK_I_FIRING_WEEKDAYS = frozenset({0, 2, 4, 6})
 
 # Heuristic thresholds — tune after week 2 per spec § 8.
 RETRY_OVERHEAD_PCT_THRESHOLD = 15.0
@@ -456,7 +462,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument(
         "--force",
         action="store_true",
-        help="Skip the Monday weekday gate. Used by /optimize.",
+        help="Skip the Mon/Wed/Fri/Sun weekday gate. Used by /optimize.",
     )
     p.add_argument(
         "--no-dm",
@@ -484,10 +490,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     else:
         week_ending_dt = _default_week_ending(now)
 
-    # Spec § 6: fires only on Monday cycles unless forced (`/optimize`).
-    if not args.force and not args.week_ending and now.weekday() != 0:
-        print(f"[pulse-check-i] today is not Monday (weekday={now.weekday()});"
-              f" skipping. Use --force or /optimize for ad-hoc runs.")
+    # Spec § 6: fires on Mon/Wed/Fri/Sun cycles unless forced (`/optimize`).
+    if (
+        not args.force
+        and not args.week_ending
+        and now.weekday() not in CHECK_I_FIRING_WEEKDAYS
+    ):
+        print(f"[pulse-check-i] today is not in (Mon/Wed/Fri/Sun) "
+              f"(weekday={now.weekday()}); skipping. "
+              f"Use --force or /optimize for ad-hoc runs.")
         return 0
 
     week_ending = week_ending_dt.date().isoformat()
@@ -517,7 +528,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         fired_at=now,
     )
 
-    out_path = output_dir / f"check-i-{week_ending}.json"
+    # Audit filename uses firing date so the 4 weekly firings each get
+    # their own record. Sidecar lookup above still uses week_ending —
+    # Ledger remains weekly Monday.
+    firing_date = now.date().isoformat()
+    out_path = output_dir / f"check-i-{firing_date}.json"
     _atomic_write(out_path, json.dumps(check_i, indent=2) + "\n")
 
     dm_body = render_dm(check_i)
