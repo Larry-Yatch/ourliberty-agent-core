@@ -2088,6 +2088,120 @@ class ClassifyMirrorMarkerTest(unittest.TestCase):
             on._classify_mirror_marker(data)
 
 
+class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
+    """Multi-turn outbox-overwrite recovery (mirror-multiturn-outbox-overwrite-001).
+
+    Reproduces 2026-05-24 PR #77: Mirror invoked Monitor at 22:00:31Z, emitted
+    REVIEW_PASS at 22:01:33Z while Monitor was still pending, Monitor fired its
+    timeout event at 22:05:31Z waking her for an extra turn, and her final-turn
+    text — "Monitor timed out after the review was already complete" —
+    overwrote the `result` field. AUTO_MERGE never fired; PR #77 sat for ~1.5h
+    until Larry merged manually. Fix: fall back to the Claude session log when
+    the outbox `result` has no marker.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._projects_root = Path(self._tmp.name)
+        self._patcher = mock.patch.object(
+            on, 'CLAUDE_PROJECTS_ROOT', self._projects_root,
+        )
+        self._patcher.start()
+
+    def tearDown(self):
+        self._patcher.stop()
+        self._tmp.cleanup()
+
+    def _write_session_log(self, session_id, assistant_turns):
+        """Build a synthetic Claude session jsonl with the given assistant turns.
+
+        `assistant_turns` is a list of strings — each becomes one assistant
+        message with a single text content block. Order is preserved.
+        """
+        project_dir = self._projects_root / '-fake-project'
+        project_dir.mkdir(parents=True, exist_ok=True)
+        path = project_dir / f'{session_id}.jsonl'
+        with path.open('w') as fh:
+            for text in assistant_turns:
+                fh.write(json.dumps({
+                    'type': 'assistant',
+                    'message': {
+                        'role': 'assistant',
+                        'content': [{'type': 'text', 'text': text}],
+                    },
+                }) + '\n')
+        return path
+
+    def test_recovers_pass_marker_when_result_overwritten_by_post_marker_turn(self):
+        # Exactly the PR #77 shape: Monitor timeout text in the final turn,
+        # REVIEW_PASS in the prior turn that's gone from `result`.
+        session_id = 'sess-multi-turn-pass'
+        self._write_session_log(session_id, [
+            'Reviewed the PR diff. AC coverage clean.',
+            _mirror_pass_marker(summary='Coverage clean. Approving.'),
+            'Monitor timed out after the review was already complete; '
+            'no action needed.',
+        ])
+        data = _mirror_outbox_body(
+            result='Monitor timed out after the review was already complete; '
+                   'no action needed.',
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
+        self.assertIn('Coverage clean', decision['intent_kwargs']['summary'])
+
+    def test_recovers_latest_marker_when_verdict_changed_across_turns(self):
+        # PASS then REVISION across turns — the revised verdict wins.
+        session_id = 'sess-verdict-changed'
+        self._write_session_log(session_id, [
+            _mirror_pass_marker(summary='Initial approval.'),
+            _mirror_revision_marker(confidence='high'),
+            'Final notes after my revised verdict.',
+        ])
+        data = _mirror_outbox_body(
+            result='Final notes after my revised verdict.',
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_revision')
+        self.assertEqual(decision['intent'], 'review-revision')
+
+    def test_fallback_returns_none_when_session_log_absent(self):
+        # No log file at all — happy-path null behavior preserved.
+        data = _mirror_outbox_body(
+            result='Just chat output, no marker.',
+            claude_session_id='sess-does-not-exist',
+        )
+        self.assertIsNone(on._classify_mirror_marker(data))
+
+    def test_fallback_skips_when_no_session_id(self):
+        # Missing claude_session_id — don't probe the filesystem.
+        data = _mirror_outbox_body(
+            result='Just chat output, no marker.',
+            claude_session_id=None,
+        )
+        self.assertIsNone(on._classify_mirror_marker(data))
+
+    def test_happy_path_does_not_consult_session_log(self):
+        # Marker IS in `result` — we must NOT scan the log (perf + correctness:
+        # the result-field verdict is authoritative when present, regardless
+        # of what intermediate turns may have flirted with).
+        data = _mirror_outbox_body(
+            _mirror_pass_marker(summary='Clean.'),
+            claude_session_id='sess-should-not-be-read',
+        )
+        # Make the helper raise if called — proves we never reached it.
+        with mock.patch.object(
+            on, '_recover_marker_text_from_session_log',
+            side_effect=AssertionError('fallback should not be invoked'),
+        ):
+            decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+
+
 class MirrorMarkerRoutingTest(unittest.TestCase):
     """process_outbox integration: Mirror outbox → Beacon notify, marker-error
     cascade on malformed markers."""
