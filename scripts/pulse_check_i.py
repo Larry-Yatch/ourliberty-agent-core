@@ -24,10 +24,9 @@ Triggers:
   - Scheduled: `/cycle` on Mon/Wed/Fri/Sun, after Ledger's sentinel
     exists. cycle-prompt.md § Check I gates this. Ledger itself remains
     weekly Monday; Check I re-reads the same sidecar each firing.
-  - Manual: `/optimize` on Telegram. If the sidecar is >24h old, the bot
-    refreshes Ledger first (out of scope for this module; the bot handles
-    the orchestration). This script accepts `--force` to skip the
-    Mon/Wed/Fri/Sun weekday gate.
+  - Manual: `/optimize` on Telegram. If the sidecar is missing or >24h old,
+    this script auto-invokes `scripts/run_ledger.sh` to refresh it before
+    proceeding. `--force` skips the Mon/Wed/Fri/Sun weekday gate.
 
 Stdlib only.
 """
@@ -37,8 +36,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -49,7 +50,12 @@ from typing import Any, Optional
 
 SCHEMA_VERSION = "v1"
 SIDECAR_MAX_AGE_DAYS = 7
-SIDECAR_FRESH_MAX_AGE_HOURS = 24  # /optimize threshold
+# Trigger an auto-refresh (run_ledger.sh) when the sidecar is missing or
+# older than this many hours. Above SIDECAR_MAX_AGE_DAYS the >7d stale-skip
+# takes over instead.
+SIDECAR_REFRESH_AGE_HOURS = 24.0
+SIDECAR_REFRESH_TIMEOUT_SEC = 120
+SCRIPT_DIR = Path(__file__).resolve().parent
 
 # Weekdays on which Check I fires (Monday=0 ... Sunday=6).
 # Mon/Wed/Fri/Sun cadence — Ledger remains weekly Monday; Check I re-reads
@@ -120,6 +126,47 @@ def _sidecar_age_hours(sidecar_dir: Path, week_ending: str,
     now = now or datetime.now(timezone.utc)
     mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
     return (now - mtime).total_seconds() / 3600.0
+
+
+def _refresh_sidecar() -> None:
+    """Invoke run_ledger.sh as a best-effort subprocess.
+
+    Any failure (non-zero exit, timeout, missing script) is logged but does
+    not raise — Check I falls back to whatever sidecar state exists on disk.
+    """
+    script = SCRIPT_DIR / "run_ledger.sh"
+    started = time.monotonic()
+    try:
+        result = subprocess.run(
+            ["bash", str(script)],
+            timeout=SIDECAR_REFRESH_TIMEOUT_SEC,
+            check=False,
+            capture_output=True,
+        )
+        took = time.monotonic() - started
+        print(
+            f"[pulse-check-i] sidecar refresh: invoked run_ledger.sh, "
+            f"exit={result.returncode}, took {took:.1f}s"
+        )
+        if result.returncode != 0:
+            stderr_tail = (result.stderr or b"").decode(
+                "utf-8", errors="replace"
+            ).strip().splitlines()[-3:]
+            print(
+                f"[pulse-check-i] WARN: run_ledger.sh non-zero; "
+                f"stderr tail: {stderr_tail}"
+            )
+    except subprocess.TimeoutExpired:
+        took = time.monotonic() - started
+        print(
+            f"[pulse-check-i] WARN: run_ledger.sh timed out after "
+            f"{took:.1f}s (limit {SIDECAR_REFRESH_TIMEOUT_SEC}s); continuing"
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"[pulse-check-i] WARN: run_ledger.sh invocation failed: "
+            f"{type(exc).__name__}: {exc}; continuing"
+        )
 
 
 # --- engineering signals ---
@@ -508,13 +555,23 @@ def main(argv: Optional[list[str]] = None) -> int:
     journal_path = Path(args.journal)
 
     sidecar = _load_sidecar(sidecar_dir, week_ending)
+    age_hours = _sidecar_age_hours(sidecar_dir, week_ending, now=now)
+
+    # Auto-refresh: missing or >24h old → invoke run_ledger.sh, then re-read.
+    # The 7d stale-skip below still applies against the (possibly refreshed)
+    # sidecar, so a refresh that fails leaves the existing logic intact.
+    if sidecar is None or (age_hours is not None
+                           and age_hours > SIDECAR_REFRESH_AGE_HOURS):
+        _refresh_sidecar()
+        sidecar = _load_sidecar(sidecar_dir, week_ending)
+        age_hours = _sidecar_age_hours(sidecar_dir, week_ending, now=now)
+
     sidecar_filename = (
         f"weekly-{week_ending}.json" if sidecar is not None else None
     )
 
     # Stale check: spec § 6, sidecar > 7 days old → skip.
     if sidecar is not None:
-        age_hours = _sidecar_age_hours(sidecar_dir, week_ending, now=now)
         if age_hours is not None and age_hours > SIDECAR_MAX_AGE_DAYS * 24:
             sidecar = None
             sidecar_filename = None

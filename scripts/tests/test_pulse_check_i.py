@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -368,7 +370,13 @@ class EndToEndTests(unittest.TestCase):
 
     def test_e2e_skipped_when_sidecar_missing(self):
         os.remove(self.sidecar_dir / f"weekly-{WEEK_ENDING}.json")
-        rc = pci.main(self._argv())
+        # Auto-refresh would invoke run_ledger.sh for real; mock it as a
+        # no-op refresh that doesn't create a sidecar, so the skip path runs.
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            rc = pci.main(self._argv())
         self.assertEqual(rc, 0)
         out = self._audit_path()
         with open(out) as f:
@@ -513,6 +521,114 @@ class WeekdayGateTests(unittest.TestCase):
             [p.name for p in self._audit_glob()],
             ["check-i-2026-05-19.json"],
         )
+
+
+class SidecarRefreshTests(unittest.TestCase):
+    """Auto-refresh of stale Ledger sidecar via run_ledger.sh (closed-loop step 3)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.sidecar_dir.mkdir(parents=True)
+        self.sidecar_path = self.sidecar_dir / f"weekly-{WEEK_ENDING}.json"
+
+    def _write_sidecar(self, age_hours: float = 0.0) -> None:
+        self.sidecar_path.write_text(json.dumps(_sidecar()))
+        if age_hours > 0:
+            past = time.time() - age_hours * 3600.0
+            os.utime(self.sidecar_path, (past, past))
+
+    def _argv(self, *extra: str) -> list[str]:
+        return [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            "--no-dm", "--no-journal",
+            "--force",
+            *extra,
+        ]
+
+    def test_fresh_sidecar_does_not_refresh(self):
+        self._write_sidecar(age_hours=1.0)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        run_mock.assert_not_called()
+
+    def test_sidecar_just_under_threshold_does_not_refresh(self):
+        self._write_sidecar(age_hours=23.0)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        run_mock.assert_not_called()
+
+    def test_missing_sidecar_triggers_refresh(self):
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        run_mock.assert_called_once()
+        call_args = run_mock.call_args[0][0]
+        self.assertEqual(call_args[0], "bash")
+        self.assertTrue(call_args[1].endswith("run_ledger.sh"))
+
+    def test_stale_25h_sidecar_triggers_refresh(self):
+        self._write_sidecar(age_hours=25.0)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        run_mock.assert_called_once()
+
+    def test_8d_stale_sidecar_routes_to_stale_skip(self):
+        # 8d old: refresh fires (>24h), mocked refresh doesn't update the
+        # file, then the >7d stale-skip path takes over → skipped mode.
+        self._write_sidecar(age_hours=8 * 24)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout=b"", stderr=b"",
+            )
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        today = datetime.now(timezone.utc).date().isoformat()
+        with open(self.output_dir / f"check-i-{today}.json") as f:
+            audit = json.load(f)
+        self.assertEqual(audit["mode"], "skipped")
+
+    def test_refresh_failure_does_not_crash(self):
+        self._write_sidecar(age_hours=25.0)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(
+                args=[], returncode=1, stdout=b"", stderr=b"boom\n",
+            )
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        today = datetime.now(timezone.utc).date().isoformat()
+        self.assertTrue((self.output_dir / f"check-i-{today}.json").exists())
+
+    def test_refresh_timeout_does_not_crash(self):
+        self._write_sidecar(age_hours=25.0)
+        with mock.patch.object(pci.subprocess, "run") as run_mock:
+            run_mock.side_effect = subprocess.TimeoutExpired(
+                cmd=["bash", "run_ledger.sh"], timeout=120,
+            )
+            rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        today = datetime.now(timezone.utc).date().isoformat()
+        self.assertTrue((self.output_dir / f"check-i-{today}.json").exists())
 
 
 if __name__ == "__main__":
