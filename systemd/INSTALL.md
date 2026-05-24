@@ -211,6 +211,24 @@ The service has no timer — it's a `Type=simple` long-running daemon, restarted
 
 **Credential discipline.** The `DASHBOARD_API_TOKEN` is registered in `config/token-rotation-schedule.json` with a 365 d rotation cadence. Rotation procedure lives at `docs/runbooks/rotate-dashboard-api-token.md` and covers BOTH the droplet `.env.larry` half AND the Vercel project env-var half — the token is shared by both sides and must rotate together to avoid breaking the dashboard.
 
+### Supabase Python client (E4.0)
+
+The Supabase Python client (`supabase-py`) is the droplet-side library for talking to the `ourliberty-pm-dashboard` Supabase project. E4.0a wires the credential discipline; E4.3+ adds the first consumer (`pm_writer`). The install is the same `pip3 --user --break-system-packages` pattern used for the Dashboard API:
+
+```bash
+# Install supabase-py (the official client). Brings httpx, postgrest,
+# gotrue, realtime as transitive deps — ~50MB total on disk.
+pip3 install --user --break-system-packages supabase
+
+# Verify the import works.
+python3 -c "from supabase import create_client; print('ok')"
+# expected: ok
+```
+
+No systemd unit yet — `supabase-py` is a library, not a service. The first long-running consumer will be `pm_writer` (E4.3); its service file will land at that time.
+
+**Credential discipline.** Three credentials are wired in `config/token-rotation-schedule.json` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), all sharing the rotation runbook at `docs/runbooks/rotate-supabase-keys.md`. The service-role key is on a 90-day scheduled cadence (RLS-bypassing → short cadence → bounded blast radius); the URL + anon key are revocation-only (rotate on suspected leak). First-time project setup is documented at `docs/runbooks/setup-supabase-pm-project.md`.
+
 ## Checking state
 
 ```bash
