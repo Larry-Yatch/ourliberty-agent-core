@@ -147,7 +147,7 @@ Notes:
 - Path: `~/agents/blackboard/ledger/ledger-ready-YYYY-MM-DD`.
 - Written via `Path.touch()` AFTER both `.md` and `.json` are fsync'd via `atomic_write`.
 - Existence means: "both report files are durably written, fully consistent with the JSON schema above, and immutable for this week."
-- Pulse Check I polls this path (existence check) for up to 30 minutes on Monday before reading the JSON sidecar. If the sentinel is missing after 30 min, Pulse skips Check I with a journal note (per `pulse-check-i.md` § 7).
+- Pulse Check I polls this path (existence check) for up to 30 minutes on each firing day (Mon/Wed/Fri/Sun) before reading the JSON sidecar. If the sentinel is missing after 30 min, Pulse skips Check I with a journal note (per `pulse-check-i.md` § 7). The sidecar itself is written once weekly on Monday — Check I re-reads the same file on later firings.
 
 ---
 
