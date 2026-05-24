@@ -21,5 +21,12 @@
     ],
     "version": 1,
     "default_action": "force_ask",
-    "rules": []
+    "rules": [
+        {
+            "source": "pulse-auto-dispatch",
+            "target": "*",
+            "action": "force_ask",
+            "_note": "Closed-loop step 4 (2026-05-24). Pulse-auto-dispatch envelopes route through trust_policy via outbox_notifier._route_beacon_pulse_auto_dispatch_approval. v1 ships force_ask only — Skipping Larry's approval for Pulse-judged dispatches is out of scope per closed-loop spec § 5. Redundant with default_action today but kept explicit so the operator sees this source has been considered. Edit `action` to auto_approve to wire in carve-outs as Larry builds confidence."
+        }
+    ]
 }

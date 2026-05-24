@@ -131,6 +131,16 @@ MAX_MARKER_ERROR_RETRIES = 3
 # her telegram bot and must NOT also fire here.
 _BEACON_REPLAN_INBOUND_INTENTS = frozenset({'review-escalate'})
 
+# Closed-loop step 4 (2026-05-24) — `source` values on a Beacon outbox that
+# trigger the Pulse-auto-dispatch extraction path. When Pulse decides a
+# weekly proposal is worth pursuing, she drops a dispatch envelope into
+# Beacon's inbox with this source. Beacon processes the brief and emits a
+# clean APPROVAL_REQUEST marker; the notifier extracts it, runs it through
+# trust_policy (NOT implicit Larry approval — Pulse's judgment is distinct
+# from a Larry-session dispatch), and routes to the standard approval-DM
+# pipeline. Step 5 wires Pulse to write the envelope.
+_BEACON_AUTO_DISPATCH_SOURCES = frozenset({'pulse-auto-dispatch'})
+
 # D3.5 commit 5a — extract Forge's PR URL from a build-phase outbox result.
 # Forge's CLAUDE.md mandates the build response include either
 # `PR opened: <url>` (new PR opened this dispatch) OR `PR updated: <url>`
@@ -3284,6 +3294,227 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
     return True
 
 
+def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
+    """Handle Beacon's APPROVAL_REQUEST emitted in response to a
+    Pulse-auto-dispatch inbox envelope (closed-loop step 4).
+
+    Pulse-auto-dispatch is the third Beacon-outbox APPROVAL_REQUEST trigger,
+    sibling to:
+      - `_route_beacon_replan_approval` (Mirror REVIEW_ESCALATE → replan)
+      - `_handle_beacon_headless_approval_request` (Larry-session dispatch)
+
+    Key shape differences from those siblings:
+      - No replan budget (this is initial dispatch, not a revision round).
+      - No Mirror-reason discipline gate (no Mirror finding to reference).
+      - Trust policy IS consulted (unlike the headless source='larry' path);
+        Pulse's auto-dispatch judgment is NOT implicit Larry approval. v1
+        config ships only `force_ask` for this source so every Pulse-driven
+        dispatch still pings Larry — auto-approve carve-outs are a future
+        dial per closed-loop spec § 5.
+
+    Discipline gate: payload `task_id` must match envelope `task_id`. Beacon's
+    Shape 8 guidance keys the marker's task_id to the upstream envelope so a
+    drift here signals she's responding to the wrong dispatch.
+
+    Returns:
+      True if the auto-dispatch path took over (caller archives the outbox
+        and does NOT fall through to default routing).
+      False if the path declined (no marker, malformed marker, discipline
+        gate failure, missing chat_id, or trust_policy raised). Caller
+        falls through to default routing so Beacon's narrative still
+        reaches downstream consumers.
+
+    No marker-error cascade (mirrors the 5c replan path's behavior — log
+    WARN and fall through; Beacon's CLAUDE.md is the first-line gate).
+    """
+    task_id = data.get('task_id') or 'unknown'
+    result_text = data.get('result') or ''
+    if not isinstance(result_text, str) or not result_text:
+        return False
+
+    try:
+        payload, _narrative = approval.extract_approval_request(result_text)
+    except approval.MalformedApprovalMarker as e:
+        log(
+            f'beacon pulse-auto-dispatch APPROVAL_REQUEST malformed for task '
+            f'{task_id}: {e}; falling through to default routing',
+            'WARN',
+        )
+        return False
+
+    if payload is None:
+        # No marker emitted — Beacon's push-back narrative reaches Mirror
+        # via default routing.
+        return False
+
+    # Discipline gate: marker task_id must match envelope task_id. Strip
+    # any `notify-` prefix on the envelope side (the notifier prefixes
+    # filenames for disambiguation; Beacon's marker uses the original id).
+    envelope_task_id = task_id
+    if envelope_task_id.startswith('notify-'):
+        envelope_task_id = envelope_task_id[len('notify-'):]
+    marker_task_id = payload.get('task_id')
+    if marker_task_id != envelope_task_id:
+        log(
+            f'beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch '
+            f'(envelope={envelope_task_id}, marker={marker_task_id!r}); '
+            f'falling through to default routing',
+            'WARN',
+        )
+        return False
+
+    reply_chat_id = data.get('reply_chat_id')
+    is_valid_chat = isinstance(reply_chat_id, int)
+    if not is_valid_chat:
+        log(
+            f'beacon pulse-auto-dispatch APPROVAL_REQUEST for task {task_id} '
+            f'has no valid reply_chat_id (got {reply_chat_id!r}); cannot '
+            f'route approval DM, falling through',
+            'WARN',
+        )
+        return False
+
+    # Trust policy — source='pulse-auto-dispatch' so the policy file can
+    # carve out per-source rules independently of beacon-sourced dispatches.
+    # Bypass approval.trust_decision (which hardcodes source='beacon') and
+    # call trust_policy.evaluate directly with the Pulse source.
+    policy_task = {
+        'source': 'pulse-auto-dispatch',
+        'target_agent': payload.get('target_agent', 'forge'),
+        'task_type': payload.get('task_type'),
+        'target_repo': payload.get('target_repo'),
+        'changed_files': payload.get('changed_files', []),
+    }
+    try:
+        action_str, rule = trust_policy.evaluate(policy_task)
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge invariant
+        log(
+            f'trust_policy.evaluate raised on beacon pulse-auto-dispatch '
+            f'for task {task_id}: {type(e).__name__}: {e}; falling through',
+            'WARN',
+        )
+        return False
+
+    if action_str == 'reject':
+        log(
+            f'trust_policy rejected beacon pulse-auto-dispatch for task '
+            f'{task_id} (rule={rule}); DMing Larry the rejection',
+        )
+        msg = approval.format_policy_rejection(payload, rule or {})
+        if not larry_alerts.append_notification(
+            source='outbox-notifier',
+            intent='reject',
+            message=msg,
+            chat_id=reply_chat_id,
+            task_id=task_id,
+        ):
+            log(
+                f'BEACON_PULSE_AUTO_DISPATCH_ALERT_WRITE_FAILED task={task_id} '
+                f'trust-policy reject DM did not queue (disk full?)',
+                'WARN',
+            )
+        return True
+
+    # Replay dedup — same shape as the replan path (Med-X1). Same outbox
+    # processed twice (notifier crash between resolve() and archive, or a
+    # retry from upstream) must not double-dispatch.
+    existing = approval.find_by_id_any_state(marker_task_id)
+    if existing is not None:
+        log(
+            f'beacon pulse-auto-dispatch APPROVAL_REQUEST for task {task_id} '
+            f'already has an entry (id={existing["id"]}, '
+            f'status={existing.get("status", "pending")}); skipping duplicate '
+            f'add_pending + alert queue',
+        )
+        return True
+
+    # Honor /pause — mirror the 5c-followup-3 pattern: queue durably with
+    # queued_during_pause=True, skip the DM, surface on /resume.
+    is_paused = approval.is_paused()
+    entry = approval.add_pending(
+        payload,
+        chat_id=reply_chat_id,
+        queued_during_pause=is_paused,
+    )
+    if is_paused:
+        log(
+            f'beacon pulse-auto-dispatch APPROVAL_REQUEST queued during '
+            f'/pause for task {task_id}; will be DMed on /resume',
+        )
+        return True
+
+    if action_str == 'auto_approve':
+        try:
+            approval.dispatch_approved(entry)
+            approval.resolve(
+                entry['id'], 'approved',
+                note=f'auto_approved by rule (pulse-auto-dispatch): {rule}',
+            )
+            log(
+                f'beacon pulse-auto-dispatch auto-approved + dispatched: '
+                f'task={task_id}, rule={rule}',
+            )
+            msg = approval.format_auto_approve_confirmation(entry, rule or {})
+            if not larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-pass',
+                message=msg,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                log(
+                    f'BEACON_PULSE_AUTO_DISPATCH_ALERT_WRITE_FAILED '
+                    f'task={task_id} auto-approve confirmation did not '
+                    f'queue (disk full?)',
+                    'WARN',
+                )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge invariant
+            log(
+                f'beacon pulse-auto-dispatch auto-approve dispatch FAILED '
+                f'for task {task_id}: {type(e).__name__}: {e}',
+                'WARN',
+            )
+            msg = (
+                f'Beacon pulse-auto-dispatch auto-approve dispatch failed '
+                f'for task `{task_id}`: {type(e).__name__}: {e}. Entry '
+                f'remains pending; reply `reject: ...` to clear or retry '
+                f'manually.'
+            )
+            if not larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='review-escalate',
+                message=msg,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            ):
+                log(
+                    f'BEACON_PULSE_AUTO_DISPATCH_ALERT_WRITE_FAILED '
+                    f'task={task_id} auto-approve failure DM did not '
+                    f'queue (disk full?)',
+                    'WARN',
+                )
+        return True
+
+    # force_ask path — queue the approval-request alert.
+    body = approval.format_approval_dm(entry)
+    if not larry_alerts.append_approval_request(
+        chat_id=reply_chat_id,
+        approval_id=entry['id'],
+        body=body,
+    ):
+        log(
+            f'BEACON_PULSE_AUTO_DISPATCH_ALERT_WRITE_FAILED task={task_id} '
+            f'force_ask approval-request did not queue (disk full?); '
+            f'pending entry exists; reminder timer will surface at 6h',
+            'WARN',
+        )
+    log(
+        f'beacon pulse-auto-dispatch APPROVAL_REQUEST queued for force_ask: '
+        f'task={task_id}, chat_id={reply_chat_id}',
+    )
+    return True
+
+
 def _handle_beacon_headless_approval_request(
     data: dict[str, Any], result_text: str,
 ) -> Optional[str]:
@@ -3610,8 +3841,8 @@ def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
        'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error' |
-       'notified-replan' | 'headless-approval-dispatched' |
-       'clarification-resume-dispatched'.
+       'notified-replan' | 'notified-pulse-auto-dispatch' |
+       'headless-approval-dispatched' | 'clarification-resume-dispatched'.
     """
     try:
         data = json.loads(outbox_file.read_text())
@@ -3733,6 +3964,20 @@ def process_outbox(outbox_file: Path) -> str:
         if _route_beacon_replan_approval(data):
             _archive_outbox(outbox_file)
             return 'notified-replan'
+
+    # Closed-loop step 4 (2026-05-24) — Beacon outbox responding to a
+    # Pulse-auto-dispatch envelope. Pulse drops a dispatch brief into
+    # Beacon's inbox with source='pulse-auto-dispatch'; Beacon emits an
+    # APPROVAL_REQUEST in her outbox; this branch extracts it and routes
+    # through the trust_policy → larry-DM approval pipeline so Larry sees
+    # the spec marker and replies approve/modify/reject. Distinct from the
+    # 5c replan branch (no Mirror reason, no replan budget) and the
+    # headless source='larry' branch (trust policy IS consulted because
+    # Pulse's judgment is not implicit Larry approval).
+    if agent == 'beacon' and source in _BEACON_AUTO_DISPATCH_SOURCES:
+        if _route_beacon_pulse_auto_dispatch_approval(data):
+            _archive_outbox(outbox_file)
+            return 'notified-pulse-auto-dispatch'
 
     # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
     # When Claude in a Larry-session drops a dispatch envelope into Beacon's
