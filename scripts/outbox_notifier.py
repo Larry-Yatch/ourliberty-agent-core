@@ -87,6 +87,18 @@ EMERGENCY_HALT_FLAG = BLACKBOARD / 'EMERGENCY_HALT'
 # `total_cost_usd`); the gate stays on the local name.
 COSTS_FILE = BLACKBOARD / 'costs.jsonl'
 
+# Mirror multi-turn outbox-overwrite recovery (mirror-multiturn-outbox-overwrite-001):
+# the outbox `result` field holds only the final assistant turn from `claude -p`,
+# so if Mirror's session keeps running after emitting a review marker (e.g. a
+# Monitor tool started before the marker fires its timeout event later, waking
+# Mirror for an extra turn), the marker gets clobbered. The full session
+# transcript lives on disk under Claude Code's per-project session-log tree;
+# `_recover_marker_text_from_session_log` reads it as a fallback. Overridable
+# via env so tests can point at a fixture dir.
+CLAUDE_PROJECTS_ROOT = Path(
+    os.environ.get('CLAUDE_PROJECTS_ROOT', str(HOME / '.claude' / 'projects'))
+)
+
 AGENT_IDS = ['beacon', 'forge', 'mirror', 'pulse']
 
 POLL_INTERVAL_SECONDS = 5
@@ -1583,6 +1595,65 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         )
 
 
+def _recover_marker_text_from_session_log(
+    session_id: Optional[str],
+) -> Optional[str]:
+    """Pull marker-bearing assistant text out of a Mirror Claude session log.
+
+    Returns the assistant-turn text containing the LATEST valid review marker
+    (so a revised verdict wins over an earlier one), or None when the session
+    log is missing, unreadable, or carries no parseable marker. Intermediate
+    turns whose text raises Malformed/Multiple marker errors are skipped —
+    that's mid-session noise (e.g. Mirror reasoning about the marker grammar
+    in prose), not her final verdict.
+
+    Used by `_classify_mirror_marker` as a fallback when the outbox `result`
+    field — which captures only the final `claude -p` assistant turn — has no
+    marker. See the `CLAUDE_PROJECTS_ROOT` comment for the failure shape.
+    """
+    if not session_id:
+        return None
+    try:
+        candidates = list(CLAUDE_PROJECTS_ROOT.glob(f'*/{session_id}.jsonl'))
+    except OSError:
+        return None
+    if not candidates:
+        return None
+    log_path = candidates[0]
+    last_marker_text: Optional[str] = None
+    try:
+        with log_path.open('r', encoding='utf-8') as fh:
+            for line in fh:
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg = entry.get('message')
+                if not isinstance(msg, dict) or msg.get('role') != 'assistant':
+                    continue
+                content = msg.get('content')
+                if not isinstance(content, list):
+                    continue
+                text_parts = [
+                    c.get('text', '') for c in content
+                    if isinstance(c, dict) and c.get('type') == 'text'
+                ]
+                combined = '\n'.join(t for t in text_parts if t)
+                if not combined.strip():
+                    continue
+                try:
+                    marker_type, _payload, _narrative = mrh.parse_mirror_marker(
+                        combined,
+                    )
+                except (mrh.MalformedMirrorMarker, mrh.MultipleMirrorMarkers):
+                    continue
+                if marker_type is not None:
+                    last_marker_text = combined
+    except OSError:
+        return None
+    return last_marker_text
+
+
 def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Mirror outbox for a review marker. Returns routing decision or None.
 
@@ -1603,10 +1674,33 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     take the default routing path).
     """
     result_text = data.get('result', '')
-    if not isinstance(result_text, str) or not result_text.strip():
-        return None
+    if not isinstance(result_text, str):
+        result_text = ''
 
-    marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
+    marker_type, payload, _narrative = (None, None, '')
+    if result_text.strip():
+        marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
+
+    # Multi-turn recovery (mirror-multiturn-outbox-overwrite-001): the outbox
+    # `result` field captures only the final assistant turn. If Mirror's session
+    # ran past the marker (e.g. a Monitor tool fired its timeout event after
+    # REVIEW_PASS, waking her for an extra turn), the marker is on disk in the
+    # session log but absent from `result`. Fall back to scanning the session
+    # log; pick the LATEST turn whose text parses as a valid marker so a
+    # revised verdict still wins over an earlier one.
+    if marker_type is None:
+        recovered = _recover_marker_text_from_session_log(
+            data.get('claude_session_id'),
+        )
+        if recovered:
+            marker_type, payload, _narrative = mrh.parse_mirror_marker(recovered)
+            if marker_type is not None:
+                log(
+                    f'recovered mirror {marker_type} marker from session log '
+                    f'(session={(data.get("claude_session_id") or "")[:12]}..., '
+                    f'task={data.get("task_id")!r}); outbox `result` had no marker'
+                )
+
     if marker_type is None:
         return None
 
