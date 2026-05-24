@@ -210,12 +210,13 @@ Behaviors you can rely on:
 | Scenario | Analyzer behavior | Your action |
 |---|---|---|
 | Firing day + sentinel + sidecar present, proposals synthesized | Emits digest DM + journal block | Note Check I fired with proposal count in your cycle entry |
-| Firing day + sentinel + sidecar present, no proposals | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
+| Firing day + sentinel + sidecar present, no proposals **but some signal** (σ anomalies, high-repeat tasks, or retry overhead ≥ 15%) | Emits heartbeat DM ("chain shapes nominal") + journal block | Note Check I heartbeat fired |
+| Firing day + sentinel + sidecar present, **no signal** (no proposals, no anomalies, no repeats, retry overhead < 15%) + not `--force` | Skips DM; writes audit JSON (`mode='no-signal'`) + journal one-liner | Note Check I no-signal day, no DM |
 | Firing day + sidecar missing/stale | Skips with journal note; no DM | Note Check I skipped: Ledger report unavailable |
 | EMERGENCY_HALT tripped | Exits 0 silently; no DM, no journal | Same as for Checks A-H during halt |
 | Tue/Thu/Sat (off day) | Exits 0 with stderr note; no DM, no journal | Do not invoke; journal nothing for Check I |
 
-**On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Mon/Wed/Fri/Sun weekday gate. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
+**On-demand `/optimize` path:** the Telegram bot (or you, manually) invokes `python3 ~/agent-core/scripts/pulse_check_i.py --force`. The `--force` flag skips the Mon/Wed/Fri/Sun weekday gate **and** bypasses the no-signal DM suppression, so on-demand callers always get a reply even when the week looks quiet. If the bot determines Ledger's sidecar is >24h old, it should refresh Ledger first (run `bash ~/agent-core/scripts/run_ledger.sh`), then invoke the analyzer.
 
 **Proposals format (deterministic v1 — tune after week 2 per spec § 8):**
 - Effort: `small` / `medium` / `large`

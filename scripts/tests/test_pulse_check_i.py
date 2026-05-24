@@ -205,16 +205,39 @@ class AssembleCheckITests(unittest.TestCase):
         self.assertEqual(result["proposals"], [])
         self.assertIsNone(result["ledger_headline"])
 
-    def test_heartbeat_mode_when_no_proposals(self):
+    def test_no_signal_mode_when_default_sidecar(self):
+        # Default sidecar has no proposals, no anomalies, no repeats, and
+        # retry_pct=0 — closed-loop spec § 4 calls this no-signal.
         result = pci.assemble_check_i(
             sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
             sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
         )
-        self.assertEqual(result["mode"], "heartbeat")
+        self.assertEqual(result["mode"], "no-signal")
+        self.assertFalse(result["has_signal"])
         self.assertEqual(result["proposals"], [])
-        self.assertIsNotNone(result["ledger_headline"])
         self.assertEqual(result["ledger_headline"]["total_usd"], 0.50)
         self.assertEqual(result["ledger_headline"]["anomaly_count"], 0)
+
+    def test_heartbeat_mode_when_sub_threshold_anomaly_present(self):
+        # Sub-3σ anomaly: no proposal synthesized, but real_anoms is
+        # non-empty → heartbeat (signal present, no actionable proposal).
+        s = _sidecar(anomalies=[{
+            "task_id": "mild-anom",
+            "agent": "forge",
+            "task_type": "feature-development",
+            "cost_usd": 1.40,
+            "baseline_usd": 0.90,
+            "sigma_above": 2.2,
+            "context": "",
+        }])
+        result = pci.assemble_check_i(
+            sidecar=s, repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+        )
+        self.assertEqual(result["mode"], "heartbeat")
+        self.assertTrue(result["has_signal"])
+        self.assertEqual(result["proposals"], [])
+        self.assertEqual(result["ledger_headline"]["anomaly_count"], 1)
 
     def test_digest_mode_when_proposals_synthesized(self):
         s = _sidecar(retry_pct=25.0, retry_usd=4.0)
@@ -223,6 +246,7 @@ class AssembleCheckITests(unittest.TestCase):
             sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
         )
         self.assertEqual(result["mode"], "digest")
+        self.assertTrue(result["has_signal"])
         self.assertEqual(len(result["proposals"]), 1)
         self.assertEqual(result["engineering_signals"]["retry_overhead_pct"], 25.0)
 
@@ -234,7 +258,7 @@ class AssembleCheckITests(unittest.TestCase):
         expected = {
             "schema_version", "week_ending", "ledger_sidecar", "fired_at",
             "mode", "skip_reason", "ledger_headline",
-            "engineering_signals", "proposals",
+            "engineering_signals", "proposals", "has_signal",
         }
         self.assertEqual(set(result.keys()), expected)
         self.assertEqual(result["schema_version"], "v1")
@@ -271,14 +295,41 @@ class DmRenderingTests(unittest.TestCase):
         self.assertIn(WEEK_ENDING, body)
 
     def test_heartbeat_dm_uses_chain_shapes_phrase(self):
+        # Heartbeat now requires a signal alongside the absent-proposals
+        # state — a sub-3σ anomaly qualifies.
+        s = _sidecar(
+            delta={"absolute_usd": 0.1, "percent": 5.0},
+            anomalies=[{
+                "task_id": "mild-anom",
+                "agent": "forge",
+                "task_type": "feature-development",
+                "cost_usd": 1.40,
+                "baseline_usd": 0.90,
+                "sigma_above": 2.2,
+                "context": "",
+            }],
+        )
         result = pci.assemble_check_i(
-            sidecar=_sidecar(delta={"absolute_usd": 0.1, "percent": 5.0}),
-            repeats=[], week_ending=WEEK_ENDING,
+            sidecar=s, repeats=[], week_ending=WEEK_ENDING,
             sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
         )
+        self.assertEqual(result["mode"], "heartbeat")
         body = pci.render_dm(result)
         self.assertIn("chain shapes nominal", body)
         self.assertIn("$0.50", body)
+
+    def test_no_signal_dm_body(self):
+        # /optimize (--force) on a no-signal week still renders a DM; it
+        # should clearly say no signal rather than reuse the heartbeat
+        # phrasing.
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+        )
+        self.assertEqual(result["mode"], "no-signal")
+        body = pci.render_dm(result)
+        self.assertIn("no signal", body.lower())
+        self.assertIn(WEEK_ENDING, body)
 
     def test_digest_dm_enumerates_proposals(self):
         s = _sidecar(retry_pct=25.0, retry_usd=3.0)
@@ -304,13 +355,32 @@ class JournalBlockTests(unittest.TestCase):
         self.assertIn("Skipped", block)
 
     def test_heartbeat_block(self):
+        s = _sidecar(anomalies=[{
+            "task_id": "mild-anom",
+            "agent": "forge",
+            "task_type": "feature-development",
+            "cost_usd": 1.40,
+            "baseline_usd": 0.90,
+            "sigma_above": 2.2,
+            "context": "",
+        }])
         result = pci.assemble_check_i(
-            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar=s, repeats=[], week_ending=WEEK_ENDING,
             sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
         )
         block = pci.render_journal_block(result)
         self.assertIn("heartbeat", block.lower())
         self.assertIn("Ledger total", block)
+
+    def test_no_signal_block(self):
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+        )
+        block = pci.render_journal_block(result)
+        self.assertIn("**Check I", block)
+        self.assertIn("no-signal", block)
+        self.assertIn("DM suppressed", block)
 
     def test_digest_block_lists_proposals(self):
         s = _sidecar(retry_pct=25.0, retry_usd=3.0)
@@ -404,6 +474,146 @@ class EndToEndTests(unittest.TestCase):
         self.assertTrue(firing_out.exists())
         if today != WEEK_ENDING:
             self.assertFalse(week_ending_out.exists())
+
+
+class DmSuppressionTests(unittest.TestCase):
+    """Closed-loop spec § 4: scheduled no-signal runs skip the DM but
+    still write the audit JSON + journal entry. /optimize (--force)
+    bypasses suppression and always DMs.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.sidecar_dir.mkdir(parents=True)
+
+        # Track every append_alert invocation in this list.
+        self.append_calls: list[dict] = []
+
+        outer = self
+
+        class _FakeLarryAlerts:
+            @staticmethod
+            def append_alert(**kwargs):
+                outer.append_calls.append(kwargs)
+                return True
+
+        self._sys_modules_patch = mock.patch.dict(
+            sys.modules, {"larry_alerts": _FakeLarryAlerts}
+        )
+        self._sys_modules_patch.start()
+        self.addCleanup(self._sys_modules_patch.stop)
+
+    def _write_sidecar(self, sidecar: dict) -> None:
+        (self.sidecar_dir / f"weekly-{WEEK_ENDING}.json").write_text(
+            json.dumps(sidecar)
+        )
+
+    def _argv(self, *extra: str) -> list[str]:
+        # Note: deliberately omitting --no-dm so the DM path runs (and
+        # gets intercepted by the fake larry_alerts).
+        return [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            "--force",  # bypass weekday gate; suppression still applies
+            *extra,
+        ]
+
+    def _audit(self) -> dict:
+        today = datetime.now(timezone.utc).date().isoformat()
+        with open(self.output_dir / f"check-i-{today}.json") as f:
+            return json.load(f)
+
+    def test_scheduled_no_signal_run_suppresses_dm(self):
+        # No proposals, no anomalies, no repeats, retry overhead 5% →
+        # has_signal=False. Without --force, DM is suppressed; audit
+        # JSON + journal still land.
+        self._write_sidecar(_sidecar(retry_pct=5.0, retry_usd=0.10))
+        # Simulate a scheduled run by passing --week-ending (which is
+        # already in _argv) and NOT --force. _argv defaults to --force,
+        # so build a scheduled argv explicitly.
+        argv = [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+        ]
+        rc = pci.main(argv)
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.append_calls, [],
+                         "DM should be suppressed on scheduled no-signal run")
+        audit = self._audit()
+        self.assertEqual(audit["mode"], "no-signal")
+        self.assertFalse(audit["has_signal"])
+        self.assertTrue(self.journal.exists())
+        self.assertIn("DM suppressed", self.journal.read_text())
+
+    def test_force_bypasses_no_signal_suppression(self):
+        # Same no-signal inputs, but --force → DM fires.
+        self._write_sidecar(_sidecar(retry_pct=5.0, retry_usd=0.10))
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.append_calls), 1,
+                         "--force should bypass no-signal suppression")
+        audit = self._audit()
+        self.assertEqual(audit["mode"], "no-signal")
+
+    def test_heartbeat_with_signal_still_dms(self):
+        # Sub-3σ anomaly: no proposal but has_signal=True → heartbeat
+        # mode, DM fires even without --force.
+        self._write_sidecar(_sidecar(anomalies=[{
+            "task_id": "mild-anom",
+            "agent": "forge",
+            "task_type": "feature-development",
+            "cost_usd": 1.40,
+            "baseline_usd": 0.90,
+            "sigma_above": 2.2,
+            "context": "",
+        }]))
+        argv = [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+        ]
+        rc = pci.main(argv)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.append_calls), 1,
+                         "heartbeat (signal present, no proposals) should DM")
+        audit = self._audit()
+        self.assertEqual(audit["mode"], "heartbeat")
+        self.assertTrue(audit["has_signal"])
+
+    def test_digest_run_dms(self):
+        # Retry overhead 22% → proposal → digest → has_signal → DM.
+        self._write_sidecar(_sidecar(retry_pct=22.0, retry_usd=3.0))
+        argv = [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+        ]
+        rc = pci.main(argv)
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.append_calls), 1)
+        audit = self._audit()
+        self.assertEqual(audit["mode"], "digest")
 
 
 class WeekdayGateTests(unittest.TestCase):
