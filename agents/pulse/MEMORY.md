@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-24 (Iteration 80)
+## Status snapshot — updated 2026-05-24 (Iteration 81)
 
-Eighty cycles/responses run. **System: ✅ Nominal.** Iter 80 findings (16:30Z May 24) — A (clean, on main, HEAD=48b5573=origin/main), B (sync 16:18:47Z no-change at 48b5573, ~12m ago), C (6/6 units active; Forge new log 14:40Z timeout — same calibrated class; Beacon last idx=82 18:40Z May 21), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (0 overdue, 0 upcoming within 60d). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25 tomorrow) — pulse_check_i.py triple-write/idempotency watch fires on 2nd Monday run; Ledger sentinel not yet present.
+Eighty-one cycles/responses run. **System: ✅ Nominal.** Iter 81 findings (20:46Z May 24) — A (clean, on main, HEAD=6350799=origin/main), B (sync 20:19:20Z no-change at 6350799, ~27m ago), C (6/6 units active; Beacon fresh 20:44Z replied to Larry's optimize query; Forge 14:40Z timeout — calibrated; Mirror 01:11Z May 24 HTTP 502 — calibrated), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (0 overdue, 0 upcoming within 60d). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25 tomorrow) — pulse_check_i.py triple-write/idempotency watch fires on 2nd Monday run; Ledger sentinel not yet present.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
