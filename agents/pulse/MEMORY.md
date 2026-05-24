@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-23 (Iteration 75)
+## Status snapshot — updated 2026-05-24 (Iteration 77)
 
-Seventy-five cycles/responses run. **System: ✅ Nominal.** Iter 75 findings (~20:30Z May 23) — A (clean, on main, HEAD=d1c9c5e=origin/main), B (sync 20:16:50Z no-change at d1c9c5e, ~15m ago), C (6/6 units active; Forge/Mirror ENETUNREACH calibrated ongoing; Beacon last idx=82 00:40Z May 22), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (all 350-362d out). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25).
+Seventy-seven cycles/responses run. **System: ✅ Nominal.** Iter 77 findings (04:45Z May 24) — A (clean, on main, HEAD=3a844a6=origin/main), B (sync 04:17:30Z no-change at 3a844a6, ~28m ago), C (6/6 units active; Forge/Mirror Telegram errors calibrated ongoing — Mirror now showing HTTP 502 + timeout in addition to earlier ENETUNREACH, same class; Beacon last idx=82 00:40Z May 22), D (all inboxes empty, .invalid all old/closed, no new), E (0 open PRs), F (nominal), H (0 Forge PRs), rotations (all 349-361d out). Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Telegram getUpdates G-rule dispatch processed (iter 57); pending Beacon response. Next notable event: Monday Check I (2026-05-25) — pulse_check_i.py triple-write/idempotency watch fires on this run.
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
