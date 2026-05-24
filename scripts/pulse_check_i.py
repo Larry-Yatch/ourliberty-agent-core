@@ -277,10 +277,18 @@ def assemble_check_i(
 ) -> dict[str, Any]:
     """Return the structured Check I result.
 
-    Three modes:
+    Four modes:
       - `skipped` — sidecar unavailable; no DM, just a journal note.
-      - `heartbeat` — sidecar present but no proposals; minimal DM.
+      - `no-signal` — sidecar present, no proposals, no anomalies, no
+        repeats, retry overhead below threshold. Scheduled runs suppress
+        the DM (closed-loop spec § 4); `--force` (/optimize) still DMs.
+      - `heartbeat` — sidecar present, no proposals, but some signal
+        present (anomalies / repeats / elevated retry overhead). DM
+        still fires so Larry sees the underlying signal.
       - `digest` — sidecar + proposals; full DM.
+
+    `has_signal` is included in the returned dict so the DM gate at the
+    call site can decide whether to suppress without re-deriving it.
     """
     if sidecar is None:
         return {
@@ -293,6 +301,7 @@ def assemble_check_i(
             "ledger_headline": None,
             "engineering_signals": None,
             "proposals": [],
+            "has_signal": False,
         }
 
     total_usd = float(sidecar.get("total_usd", 0.0) or 0.0)
@@ -307,7 +316,16 @@ def assemble_check_i(
     overhead_usd = float(retry_overhead.get("total_retry_cost_usd", 0.0) or 0.0)
 
     proposals = synthesize_proposals(sidecar, repeats)
-    mode = "digest" if proposals else "heartbeat"
+    has_signal = bool(
+        proposals or real_anoms or repeats
+        or overhead_pct >= RETRY_OVERHEAD_PCT_THRESHOLD
+    )
+    if proposals:
+        mode = "digest"
+    elif has_signal:
+        mode = "heartbeat"
+    else:
+        mode = "no-signal"
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -328,6 +346,7 @@ def assemble_check_i(
             "high_repeat_tasks": repeats,
         },
         "proposals": proposals,
+        "has_signal": has_signal,
     }
 
 
@@ -360,6 +379,14 @@ def render_dm(check_i: dict[str, Any]) -> str:
         delta_phrase = (
             f" ({sign}${abs(_round2(absolute)):.2f}, "
             f"{sign}{abs(_round2(percent)):.1f}% vs prior)"
+        )
+
+    if mode == "no-signal":
+        return (
+            f"🩺 Pulse Check I (week of {week}): no signal — "
+            f"no proposals, no anomalies, no high-repeat tasks, "
+            f"retry overhead within bounds. "
+            f"Ledger total ${_round2(total_usd):.2f}{delta_phrase}."
         )
 
     if mode == "heartbeat":
@@ -424,6 +451,10 @@ def render_journal_block(check_i: dict[str, Any]) -> str:
             f"`{r['task_id']}`×{r['retry_count']}" for r in repeats[:5]
         )
         lines.append(f"- High-repeat tasks: {names}")
+
+    if mode == "no-signal":
+        lines.append("- Mode: no-signal — DM suppressed (scheduled run)")
+        return "\n".join(lines)
 
     if mode == "heartbeat":
         lines.append("- Mode: heartbeat (no proposed optimizations)")
@@ -537,7 +568,19 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     dm_body = render_dm(check_i)
     dm_result = "skipped (--no-dm)"
-    if not args.no_dm:
+    # Closed-loop spec § 4: on scheduled runs with no signal, skip the DM
+    # but still write audit JSON + journal entry. /optimize (--force)
+    # bypasses suppression so on-demand callers always get a reply.
+    suppress_dm = (
+        check_i.get("mode") != "skipped"
+        and not check_i.get("has_signal", True)
+        and not args.force
+    )
+    if args.no_dm:
+        pass
+    elif suppress_dm:
+        dm_result = "suppressed (no signal, scheduled run)"
+    else:
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import larry_alerts  # type: ignore
