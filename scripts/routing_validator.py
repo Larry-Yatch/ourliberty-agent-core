@@ -66,6 +66,11 @@ FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     # bypasses this table.
     'forge-question': {'beacon'},
     'mirror-question': {'beacon'},
+    # Closed-loop step 5 (2026-05-24). Pulse Check I auto-dispatches small,
+    # dollar-quantified proposals to Beacon's inbox under a distinct source
+    # so policy / extraction can carve out per-source rules (step 4 wired
+    # the Beacon-outbox extraction path keyed on this exact source).
+    'pulse-auto-dispatch': {'beacon'},
 }
 
 # Source suffixes that mark dialogue-leg messages. The notifier writes these

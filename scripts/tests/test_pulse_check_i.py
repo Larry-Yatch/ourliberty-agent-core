@@ -841,5 +841,300 @@ class SidecarRefreshTests(unittest.TestCase):
         self.assertTrue((self.output_dir / f"check-i-{today}.json").exists())
 
 
+class AutoDispatchTests(unittest.TestCase):
+    """Closed-loop step 5: eligible proposals (effort=small + $-quantified
+    impact) auto-dispatch to Beacon's inbox via safe_write_inbox. Dedup
+    state file prevents re-dispatching the same proposal within
+    AUTO_DISPATCH_DEDUP_WINDOW_DAYS.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state_path = Path(self.tmp.name) / "dispatched.json"
+        self.fired_at = datetime(2026, 5, 24, 8, 0, 0, tzinfo=timezone.utc)
+        # Track calls into a fake safe_write_inbox.safe_write_inbox.
+        self.calls: list[dict] = []
+
+        def _fake_swi(target_agent, task_dict, source_agent, filename):
+            self.calls.append({
+                "target_agent": target_agent,
+                "task_dict": dict(task_dict),
+                "source_agent": source_agent,
+                "filename": filename,
+            })
+            return Path(self.tmp.name) / "inboxes" / target_agent / filename
+
+        self._swi_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox", side_effect=_fake_swi,
+        )
+        self._swi_patch.start()
+        self.addCleanup(self._swi_patch.stop)
+
+    def _eligible_proposal(self) -> dict:
+        return {
+            "title": "Review high-σ anomaly task `burned-task-007`",
+            "effort": "small",
+            "impact": "$9.20 task vs $1.10 baseline (3.7σ above)",
+            "rationale": "Ledger flagged this task at 3.7σ above baseline.",
+        }
+
+    def _medium_proposal(self) -> dict:
+        return {
+            "title": "Investigate retry / clarification cost sources",
+            "effort": "medium",
+            "impact": "~$2.50/wk reclaimable (20.0% of total spend)",
+            "rationale": "Retry overhead is above the 15% threshold.",
+        }
+
+    def _small_no_dollar(self) -> dict:
+        return {
+            "title": "Quick rename - no quantified savings",
+            "effort": "small",
+            "impact": "modest readability improvement",
+            "rationale": "Naming drift in three files; one-pass cleanup.",
+        }
+
+    def _check_i(self, proposals: list[dict]) -> dict:
+        return {
+            "schema_version": "v1",
+            "week_ending": WEEK_ENDING,
+            "fired_at": self.fired_at.isoformat(),
+            "mode": "digest",
+            "has_signal": True,
+            "proposals": proposals,
+            "ledger_headline": {"total_usd": 5.0, "anomaly_count": 1},
+            "engineering_signals": {},
+        }
+
+    def test_eligible_proposal_dispatches(self):
+        p = self._eligible_proposal()
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([p]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(len(self.calls), 1)
+        call = self.calls[0]
+        self.assertEqual(call["target_agent"], "beacon")
+        self.assertEqual(call["source_agent"], "pulse-auto-dispatch")
+        env = call["task_dict"]
+        self.assertEqual(env["source"], "pulse-auto-dispatch")
+        self.assertEqual(env["target_agent"], "beacon")
+        self.assertEqual(env["target_repo"], "ourliberty-agent-core")
+        self.assertEqual(env["phase"], "preflight")
+        self.assertTrue(env["task_id"].startswith("pulse-auto-"))
+        self.assertTrue(env["task_id"].endswith("-20260524"))
+        self.assertGreaterEqual(len(env["prompt"]), 100)
+        self.assertIn("burned-task-007", env["prompt"])
+        # Dedup state persists this dispatch.
+        self.assertTrue(self.state_path.exists())
+        state = json.loads(self.state_path.read_text())
+        key = pci._proposal_dedup_key(p)
+        self.assertIn(key, state)
+        self.assertEqual(state[key]["task_id"], env["task_id"])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["task_id"], env["task_id"])
+
+    def test_recent_dispatch_skipped(self):
+        from datetime import timedelta as _td
+        p = self._eligible_proposal()
+        key = pci._proposal_dedup_key(p)
+        prior_ts = (self.fired_at - _td(days=3)).isoformat()
+        self.state_path.write_text(json.dumps({
+            key: {"task_id": "pulse-auto-old-20260521", "dispatched_at": prior_ts},
+        }))
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([p]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(records, [])
+        state = json.loads(self.state_path.read_text())
+        self.assertEqual(state[key]["task_id"], "pulse-auto-old-20260521")
+
+    def test_old_dispatch_redispatches(self):
+        from datetime import timedelta as _td
+        p = self._eligible_proposal()
+        key = pci._proposal_dedup_key(p)
+        prior_ts = (self.fired_at - _td(days=10)).isoformat()
+        self.state_path.write_text(json.dumps({
+            key: {"task_id": "pulse-auto-stale-20260514", "dispatched_at": prior_ts},
+        }))
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([p]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(len(records), 1)
+        state = json.loads(self.state_path.read_text())
+        self.assertNotEqual(state[key]["task_id"], "pulse-auto-stale-20260514")
+        self.assertEqual(state[key]["dispatched_at"], self.fired_at.isoformat())
+
+    def test_medium_effort_not_dispatched(self):
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([self._medium_proposal()]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(records, [])
+        self.assertFalse(self.state_path.exists())
+
+    def test_small_without_dollar_not_dispatched(self):
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([self._small_no_dollar()]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(self.calls, [])
+        self.assertEqual(records, [])
+
+    def test_dispatch_rejected_does_not_crash(self):
+        self._swi_patch.stop()
+        self._swi_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox",
+            side_effect=pci.safe_write_inbox.DispatchRejected("simulated reject"),
+        )
+        self._swi_patch.start()
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([self._eligible_proposal()]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(records, [])
+        self.assertFalse(self.state_path.exists())
+
+    def test_routing_denied_does_not_crash(self):
+        self._swi_patch.stop()
+        self._swi_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox",
+            side_effect=pci.safe_write_inbox.RoutingDenied("simulated denial"),
+        )
+        self._swi_patch.start()
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([self._eligible_proposal()]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(records, [])
+
+    def test_eligibility_helper_direct(self):
+        self.assertTrue(pci._is_auto_dispatch_eligible(self._eligible_proposal()))
+        self.assertFalse(pci._is_auto_dispatch_eligible(self._medium_proposal()))
+        self.assertFalse(pci._is_auto_dispatch_eligible(self._small_no_dollar()))
+
+    def test_corrupt_state_file_treated_as_empty(self):
+        self.state_path.write_text("{not valid json")
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i([self._eligible_proposal()]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(len(records), 1)
+        self.assertEqual(len(self.calls), 1)
+        state = json.loads(self.state_path.read_text())
+        self.assertIsInstance(state, dict)
+
+    def test_dedup_key_stable_across_runs(self):
+        p1 = self._eligible_proposal()
+        p2 = self._eligible_proposal()
+        self.assertEqual(
+            pci._proposal_dedup_key(p1),
+            pci._proposal_dedup_key(p2),
+        )
+        p3 = dict(p1)
+        p3["title"] = "Review high-σ anomaly task `different-task-id`"
+        self.assertNotEqual(
+            pci._proposal_dedup_key(p1),
+            pci._proposal_dedup_key(p3),
+        )
+
+
+class AutoDispatchEndToEndTests(unittest.TestCase):
+    """Drive `main()` with a sidecar producing a small-effort $-quantified
+    proposal; confirm the wiring between main() and auto_dispatch_proposals.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.state_file = self.root / "dispatched.json"
+        self.sidecar_dir.mkdir(parents=True)
+        (self.sidecar_dir / f"weekly-{WEEK_ENDING}.json").write_text(
+            json.dumps(_sidecar(anomalies=[{
+                "task_id": "burned-task-007",
+                "agent": "forge",
+                "task_type": "feature-development",
+                "cost_usd": 9.20,
+                "baseline_usd": 1.10,
+                "sigma_above": 3.7,
+                "context": "",
+            }]))
+        )
+        self.calls: list[dict] = []
+        outer = self
+
+        def _fake_swi(target_agent, task_dict, source_agent, filename):
+            outer.calls.append({
+                "target_agent": target_agent,
+                "task_dict": dict(task_dict),
+                "source_agent": source_agent,
+                "filename": filename,
+            })
+            return outer.root / "inboxes" / target_agent / filename
+
+        self._swi_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox", side_effect=_fake_swi,
+        )
+        self._swi_patch.start()
+        self.addCleanup(self._swi_patch.stop)
+
+    def _argv(self, *extra: str) -> list[str]:
+        return [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            "--dispatch-state-file", str(self.state_file),
+            "--no-dm", "--no-journal", "--force",
+            *extra,
+        ]
+
+    def test_e2e_eligible_proposal_dispatches(self):
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.calls), 1)
+        env = self.calls[0]["task_dict"]
+        self.assertEqual(env["source"], "pulse-auto-dispatch")
+        self.assertEqual(env["target_agent"], "beacon")
+        self.assertTrue(self.state_file.exists())
+
+    def test_e2e_no_auto_dispatch_flag_skips_dispatch(self):
+        rc = pci.main(self._argv("--no-auto-dispatch"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(self.calls, [])
+        self.assertFalse(self.state_file.exists())
+
+    def test_e2e_dedup_window_skips_second_run(self):
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.calls), 1)
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.calls), 1,
+                         "second run within dedup window should not dispatch")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -34,8 +34,10 @@ Stdlib only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -43,8 +45,15 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# scripts/ on sys.path so sibling-module imports work whether the script is
+# invoked directly or via `python3 -m`. safe_write_inbox itself adjusts
+# sys.path; doing it here too keeps imports order-independent.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from task_type_inference import infer_task_type
 from typing import Any, Optional
+
+import safe_write_inbox  # noqa: E402 — sys.path adjusted above
 
 # --- constants ---
 
@@ -76,6 +85,17 @@ DEFAULT_HALT_FLAG = HOME / "agents" / "blackboard" / "EMERGENCY_HALT"
 DEFAULT_JOURNAL = (
     Path(__file__).resolve().parents[1] / "runbooks" / "cycle-journal.md"
 )
+
+# Closed-loop step 5 (2026-05-24) — auto-dispatch tunables.
+# Eligible-proposal heuristic: effort='small' AND impact contains a dollar
+# amount. Deliberately narrow per closed-loop spec § 5 — judgment-shaped
+# proposals still surface in the digest DM for Larry to triage.
+AUTO_DISPATCH_DOLLAR_RE = re.compile(r"\$\d")
+# Same proposal recurring across Check I runs should only dispatch once
+# per window. 7 days lines up with the weekly Ledger cadence — a recurring
+# σ-anomaly that survives a week is genuinely new evidence.
+AUTO_DISPATCH_DEDUP_WINDOW_DAYS = 7
+DEFAULT_DISPATCH_STATE_FILE = HOME / "agents" / "state" / "pulse-check-i-dispatched.json"
 
 
 # --- IO helpers ---
@@ -306,6 +326,217 @@ def synthesize_proposals(
         })
 
     return proposals[:MAX_PROPOSALS_PER_DIGEST]
+
+
+# --- auto-dispatch (closed-loop step 5) ---
+
+
+def _is_auto_dispatch_eligible(proposal: dict[str, Any]) -> bool:
+    """A proposal auto-dispatches iff effort=='small' and impact mentions $N.
+
+    The dollar-amount check is the proxy for "quantified" — without it the
+    candidate is judgment-shaped and should stay in the digest DM. v1 is
+    deliberately narrow per closed-loop spec § 5; tune after observation.
+    """
+    if proposal.get("effort") != "small":
+        return False
+    impact = proposal.get("impact") or ""
+    if not isinstance(impact, str):
+        return False
+    return bool(AUTO_DISPATCH_DOLLAR_RE.search(impact))
+
+
+def _proposal_dedup_key(proposal: dict[str, Any]) -> str:
+    """SHA-1 of stable proposal fields. The same recurring proposal across
+    Check I runs maps to the same key — different proposals collide only on
+    a real content collision (which would still semantically mean "same fix"
+    so a single dispatch is correct).
+    """
+    blob = "␟".join([
+        str(proposal.get("title") or ""),
+        str(proposal.get("impact") or ""),
+        str(proposal.get("rationale") or ""),
+    ])
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+
+def _short_proposal_slug(proposal: dict[str, Any]) -> str:
+    """Stable filesystem-safe slug from proposal content (first 10 hex of
+    the dedup key). Avoids using the title directly so renames in
+    synthesize_proposals don't change the slug shape.
+    """
+    return _proposal_dedup_key(proposal)[:10]
+
+
+def _build_dispatch_envelope(
+    proposal: dict[str, Any],
+    fired_at: datetime,
+    sidecar: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Construct the inbox envelope Beacon will receive.
+
+    Beacon's job on arrival is to draft a spec following the standard
+    template and emit an APPROVAL_REQUEST marker (step 4 wired the
+    extraction). The envelope carries enough context that Beacon doesn't
+    need to re-derive the optimization candidate from sidecar files.
+    """
+    slug = _short_proposal_slug(proposal)
+    task_id = f"pulse-auto-{slug}-{fired_at.strftime('%Y%m%d')}"
+    title = str(proposal.get("title") or "(untitled proposal)")
+    rationale = str(proposal.get("rationale") or "")
+    impact = str(proposal.get("impact") or "")
+    evidence_lines: list[str] = []
+    # Surface a compact slice of the sidecar so Beacon can quote concrete
+    # numbers in the spec without round-tripping back to disk.
+    if sidecar:
+        head_total = sidecar.get("total_usd")
+        if head_total is not None:
+            evidence_lines.append(f"- Ledger weekly total: ${float(head_total):.2f}")
+        anomalies = sidecar.get("anomalies") or []
+        if anomalies and isinstance(anomalies[0], dict):
+            a = anomalies[0]
+            if a.get("task_id") != "_ramp_up_notice":
+                evidence_lines.append(
+                    f"- Top anomaly: task=`{a.get('task_id')}` "
+                    f"cost=${float(a.get('cost_usd', 0.0)):.2f} "
+                    f"baseline=${float(a.get('baseline_usd', 0.0)):.2f} "
+                    f"σ={float(a.get('sigma_above', 0.0)):.1f}"
+                )
+    evidence_block = "\n".join(evidence_lines) if evidence_lines else "(no sidecar evidence threaded)"
+    prompt = (
+        f"{title}\n\n"
+        f"Rationale: {rationale}\n\n"
+        f"Impact: {impact}\n\n"
+        f"Evidence from Ledger sidecar:\n{evidence_block}\n\n"
+        f"This is an auto-dispatched optimization candidate from Pulse "
+        f"Check I (closed-loop step 5). Read the relevant sidecar / outbox "
+        f"archives, then draft a spec following the standard template and "
+        f"emit an APPROVAL_REQUEST marker. Larry approves before any build."
+    )
+    return {
+        "task_id": task_id,
+        "source": "pulse-auto-dispatch",
+        "target_agent": "beacon",
+        "target_repo": "ourliberty-agent-core",
+        "task_type": "feature-development",
+        "phase": "preflight",
+        "prompt": prompt,
+    }
+
+
+def _load_dispatch_state(path: Path) -> dict[str, dict[str, Any]]:
+    """Read dedup state. Fail-open on any error — better to over-dispatch
+    once than to silently never fire. Returns {dedup_key: {task_id,
+    dispatched_at_iso}}.
+    """
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[pulse-check-i] WARN: dispatch state read failed ({e}); "
+              f"treating as empty")
+        return {}
+
+
+def _save_dispatch_state(path: Path, state: dict[str, dict[str, Any]]) -> None:
+    """Persist dedup state. Best-effort — failure logs a WARN but does not
+    propagate (the dispatch already succeeded; a missed state-write means
+    we may re-dispatch next run, which is recoverable).
+    """
+    try:
+        _atomic_write(path, json.dumps(state, indent=2) + "\n")
+    except OSError as e:
+        print(f"[pulse-check-i] WARN: dispatch state write failed ({e})")
+
+
+def _is_within_dedup_window(
+    entry: dict[str, Any], now: datetime, window_days: int,
+) -> bool:
+    """True iff entry['dispatched_at'] is within `window_days` of `now`."""
+    iso = entry.get("dispatched_at")
+    if not isinstance(iso, str):
+        return False
+    try:
+        ts = datetime.fromisoformat(iso)
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return (now - ts) < timedelta(days=window_days)
+
+
+def auto_dispatch_proposals(
+    check_i: dict[str, Any],
+    fired_at: datetime,
+    state_path: Path,
+    sidecar: Optional[dict[str, Any]] = None,
+) -> list[dict[str, Any]]:
+    """Dispatch eligible proposals to Beacon's inbox, honoring dedup.
+
+    Returns the list of dispatch records actually written (each
+    `{task_id, dedup_key, dispatched_at}`). Skipped proposals (ineligible
+    or in dedup window) and write failures (DispatchRejected / RoutingDenied)
+    are logged but do not propagate.
+    """
+    proposals = check_i.get("proposals") or []
+    if not proposals:
+        return []
+    state = _load_dispatch_state(state_path)
+    dispatched_now: list[dict[str, Any]] = []
+    for p in proposals:
+        if not _is_auto_dispatch_eligible(p):
+            continue
+        key = _proposal_dedup_key(p)
+        prior = state.get(key)
+        if prior and _is_within_dedup_window(
+            prior, fired_at, AUTO_DISPATCH_DEDUP_WINDOW_DAYS,
+        ):
+            print(f"[pulse-check-i] auto-dispatch dedup skip: "
+                  f"key={key[:10]} prior_task={prior.get('task_id')} "
+                  f"dispatched_at={prior.get('dispatched_at')}")
+            continue
+        envelope = _build_dispatch_envelope(p, fired_at, sidecar=sidecar)
+        task_id = envelope["task_id"]
+        try:
+            dest = safe_write_inbox.safe_write_inbox(
+                target_agent="beacon",
+                task_dict=envelope,
+                source_agent="pulse-auto-dispatch",
+                filename=f"{task_id}.json",
+            )
+        except safe_write_inbox.DispatchRejected as e:
+            print(f"[pulse-check-i] WARN: auto-dispatch rejected for "
+                  f"task={task_id}: {e}")
+            continue
+        except safe_write_inbox.RoutingDenied as e:
+            print(f"[pulse-check-i] WARN: auto-dispatch routing denied for "
+                  f"task={task_id}: {e}")
+            continue
+        except Exception as e:  # noqa: BLE001 — never crash Check I on dispatch
+            print(f"[pulse-check-i] WARN: auto-dispatch unexpected error for "
+                  f"task={task_id}: {type(e).__name__}: {e}")
+            continue
+        record = {
+            "task_id": task_id,
+            "dedup_key": key,
+            "dispatched_at": fired_at.isoformat(),
+            "dest": str(dest),
+        }
+        dispatched_now.append(record)
+        state[key] = {
+            "task_id": task_id,
+            "dispatched_at": fired_at.isoformat(),
+        }
+        print(f"[pulse-check-i] auto-dispatched: task={task_id} "
+              f"dest={dest} key={key[:10]}")
+    if dispatched_now:
+        _save_dispatch_state(state_path, state)
+    return dispatched_now
 
 
 # --- digest assembly ---
@@ -552,6 +783,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         action="store_true",
         help="Skip appending to cycle-journal.md (test / dry-run).",
     )
+    p.add_argument(
+        "--no-auto-dispatch",
+        action="store_true",
+        help="Skip the auto-dispatch step (test / dry-run).",
+    )
+    p.add_argument(
+        "--dispatch-state-file",
+        default=str(DEFAULT_DISPATCH_STATE_FILE),
+        help="Dedup state file for auto-dispatch (closed-loop step 5).",
+    )
     args = p.parse_args(argv)
 
     halt_flag = Path(args.halt_flag)
@@ -657,11 +898,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         block = render_journal_block(check_i)
         append_journal(journal_path, block)
 
+    # Closed-loop step 5 — auto-dispatch eligible proposals to Beacon's
+    # inbox. Wrapped in a try/except defensively: even an unhandled error
+    # here must not regress the digest path. Eligibility is narrow (small
+    # effort + $-quantified); ineligible proposals continue to surface
+    # via the digest DM for Larry to triage.
+    dispatched: list[dict[str, Any]] = []
+    if not args.no_auto_dispatch:
+        try:
+            dispatched = auto_dispatch_proposals(
+                check_i=check_i,
+                fired_at=now,
+                state_path=Path(args.dispatch_state_file),
+                sidecar=sidecar,
+            )
+        except Exception as e:  # noqa: BLE001 — Check I must never crash
+            print(f"[pulse-check-i] WARN: auto-dispatch step crashed "
+                  f"({type(e).__name__}: {e}); continuing")
+
     print(f"[pulse-check-i] mode={check_i['mode']}")
     print(f"[pulse-check-i] wrote {out_path}")
     print(f"[pulse-check-i] DM: {dm_result}")
     if not args.no_journal:
         print(f"[pulse-check-i] journal: appended to {journal_path}")
+    print(f"[pulse-check-i] auto-dispatched: {len(dispatched)}")
     return 0
 
 
