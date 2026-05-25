@@ -199,6 +199,7 @@ Temporary route handler at `app/api/supabase-smoke/route.ts` that does the same 
 | Client library: JS (dashboard) | `@supabase/supabase-js` (official) | Standard Next.js pattern; most mature client. |
 | Server-side-only on dashboard | service-role key never to browser | Security baseline. Verified by build-time check + Mirror review. |
 | Smoke test route lifecycle | Created + removed in same PR | Don't leave debug surfaces in production. Mirror enforces. |
+| "Automatically expose new tables" UNCHECKED → explicit GRANT migration required | LOCKED 2026-05-24 post-shipment | Supabase's "Automatically expose new tables" toggle (set OFF for defense-in-depth during E4.0 setup) ALSO blocks auto-grants to `service_role` on new tables — not just to `anon`/`authenticated` as the UI label suggests. Every schema migration that creates tables MUST include `GRANT ALL ON ALL TABLES/SEQUENCES IN SCHEMA public TO service_role` (+ matching `ALTER DEFAULT PRIVILEGES` for future tables) OR a hotfix migration must follow (as 0002 did for E4.1). Surfaced when E4.1's `programs` table returned `42501: permission denied for table programs` post-`supabase db push`. |
 
 ---
 
