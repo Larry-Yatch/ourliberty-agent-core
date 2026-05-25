@@ -192,23 +192,74 @@ def _refresh_sidecar() -> None:
 # --- engineering signals ---
 
 
+_MARKER_ERROR_PREFIX = "marker-error-"
+_DEAD_LETTER_MARKER_PREFIX = "dead-letter-marker-"
+
+
+def _unwrap_marker_error_base(stem: str) -> str | None:
+    """Recover the underlying base task_id from a marker-error wrapped stem.
+
+    Marker-error retries chain: each failed marker emission wraps the prior
+    stem with another `marker-error-` prefix and appends a `-<N>` numeric
+    suffix. e.g. `opmanual-d35-5b-shipped-note-001` → first retry as
+    `marker-error-opmanual-d35-5b-shipped-note-001-1` → second retry as
+    `marker-error-marker-error-opmanual-d35-5b-shipped-note-001-1-2` → ...
+
+    Returns the un-wrapped base (here `opmanual-d35-5b-shipped-note-001`)
+    or None if the stem is not a marker-error file.
+    """
+    if not stem.startswith(_MARKER_ERROR_PREFIX):
+        return None
+    depth = 0
+    body = stem
+    while body.startswith(_MARKER_ERROR_PREFIX):
+        body = body[len(_MARKER_ERROR_PREFIX):]
+        depth += 1
+    # Strip the trailing `-<digit>` cascade-depth markers (one per wrap).
+    for _ in range(depth):
+        idx = body.rfind("-")
+        if idx == -1 or not body[idx + 1:].isdigit():
+            break
+        body = body[:idx]
+    return body
+
+
 def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
-    """Scan outbox archives for tasks with multiple retry suffixes.
+    """Scan outbox archives for tasks with real retry signal.
 
-    A `task_id.json` written by the inbox-watcher is the canonical archive.
-    Retries land as `task_id.1.json`, `task_id.2.json`, etc. (rotation by
-    safe_write_inbox when a result with the same task_id appears). A task
-    with ≥ HIGH_REPEAT_COUNT_THRESHOLD suffixes is a candidate for templating
-    / fast-pathing — these are the patterns Check I surfaces.
+    `retry_count` reflects the number of *actual retry events* observed for
+    a base task_id — not the count of archive entries. The inbox-watcher's
+    `safe_write_inbox` rotates any second result with the same task_id to
+    `<task>.1.json`, `<task>.2.json`, etc. Those rotations are ambiguous:
+    they may be marker-error driven retries, beacon-clarification revision
+    rounds, or just chain phases (Forge result + Mirror result both landing
+    under the same canonical id). Counting them all as "retries" produced
+    false-positive templating proposals (see Pulse audits 2026-05-24/25 on
+    `opmanual-d35-5b-shipped-note-001` and `task-34-e4-2-mission-control-
+    migration`), so v2 instead counts only artifacts with unambiguous retry
+    semantics.
 
-    Excludes `notify-*` task_ids (the inter-agent workflow channel).
-    A task that goes Forge -> Mirror -> auto-merge produces three notify-<id>
-    files in Beacon's outbox archive (forge-result, mirror-result, auto-merge),
-    all with the same notify-<id> task_id, which safe_write_inbox rotates as
-    `.1.json`, `.2.json`. Counting these as retries is the same v1 measurement
-    bug that PR #33 fixed in Ledger's compute_retry_overhead one level up.
+    Counted as retry events:
+      - `marker-error-<base>-<N>.json` (and arbitrarily-nested
+        `marker-error-marker-error-...-<base>-<N>-<M>-....json` wrappings)
+        — each standalone file in the archive is one failed-marker retry of
+        the underlying base task. The base is recovered by unwrapping the
+        nested `marker-error-` prefixes and stripping the same number of
+        trailing `-<digit>` depth markers.
 
-    Returns a list of {task_id, agent, retry_count} sorted desc by retries.
+    Skipped (NOT retries):
+      - `notify-*` — inter-agent workflow channel; same v1 bug PR #33 fixed
+        in Ledger's compute_retry_overhead one level up.
+      - `dead-letter-marker-*` — terminal infra-failure marker, written
+        once after a marker-error cascade exceeds retry budget. The cascade
+        itself already contributes retry events; counting the dead-letter
+        too would double-count.
+      - Canonical `<task>.json` and `<task>.N.json` plain rotations — these
+        are normal chain phases or revision rounds via the rotation-on-
+        collision behavior, not retries by the originating dispatch.
+
+    Returns a list of {task_id, agent, retry_count} for entries meeting
+    HIGH_REPEAT_COUNT_THRESHOLD, sorted desc by retry_count then task_id.
     """
     counts: dict[tuple[str, str], int] = {}
     if not outbox_root.exists():
@@ -222,14 +273,15 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
             if not name.endswith(".json"):
                 continue
             stem = name[: -len(".json")]
-            # task_id may have a numeric retry suffix: stem.split(".")[-1] is
-            # digit-only iff there's a retry suffix. base task_id is the prefix.
-            parts = stem.rsplit(".", 1)
-            if len(parts) == 2 and parts[1].isdigit():
-                base = parts[0]
-            else:
-                base = stem
-            # Exclude workflow notify-* rotations. These are not retries.
+            # dead-letter-marker is a terminal recovery artifact, not a retry.
+            if stem.startswith(_DEAD_LETTER_MARKER_PREFIX):
+                continue
+            base = _unwrap_marker_error_base(stem)
+            if base is None:
+                # Plain canonical entry or `.N.json` rotation — not a retry
+                # event under v2 semantics.
+                continue
+            # Inherited exclusion: notify-* underlying base is workflow noise.
             if infer_task_type(base) == "notification":
                 continue
             key = (agent_dir.name, base)

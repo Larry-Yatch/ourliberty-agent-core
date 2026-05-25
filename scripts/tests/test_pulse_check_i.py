@@ -160,38 +160,149 @@ class RetryRepeatGatherTests(unittest.TestCase):
         archive.mkdir(parents=True, exist_ok=True)
         (archive / filename).write_text("{}")
 
-    def test_counts_retry_suffixes(self):
-        self._archive("forge", "task-a.json")
-        self._archive("forge", "task-a.1.json")
-        self._archive("forge", "task-a.2.json")
-        self._archive("forge", "task-b.json")
+    def test_marker_error_cascade_counts_each_wrap(self):
+        # v2 semantics: each marker-error standalone archive entry is one
+        # retry event for the unwrapped base task_id.
+        self._archive("forge", "task-a.json")  # canonical entry, skipped
+        self._archive("forge", "marker-error-task-a-1.json")
+        self._archive("forge", "marker-error-marker-error-task-a-1-2.json")
+        self._archive(
+            "forge",
+            "marker-error-marker-error-marker-error-task-a-1-2-3.json",
+        )
         repeats = pci.gather_retry_repeats(self.outbox)
-        # task-a has 3 archives -> ≥ HIGH_REPEAT_COUNT_THRESHOLD
         self.assertEqual(len(repeats), 1)
         self.assertEqual(repeats[0]["task_id"], "task-a")
         self.assertEqual(repeats[0]["agent"], "forge")
+        # 3 marker-error files for base 'task-a' = 3 retry events.
         self.assertEqual(repeats[0]["retry_count"], 3)
 
     def test_below_threshold_excluded(self):
+        # Two marker-error events for the same base — below threshold (3).
         self._archive("forge", "task-x.json")
-        self._archive("forge", "task-x.1.json")  # only 2 — below threshold
+        self._archive("forge", "marker-error-task-x-1.json")
+        self._archive("forge", "marker-error-marker-error-task-x-1-2.json")
         self.assertEqual(pci.gather_retry_repeats(self.outbox), [])
 
     def test_sorted_desc(self):
+        # Both bases have marker-error cascades of differing depth.
         self._archive("forge", "alpha.json")
-        self._archive("forge", "alpha.1.json")
-        self._archive("forge", "alpha.2.json")
+        self._archive("forge", "marker-error-alpha-1.json")
+        self._archive("forge", "marker-error-marker-error-alpha-1-2.json")
+        self._archive(
+            "forge",
+            "marker-error-marker-error-marker-error-alpha-1-2-3.json",
+        )
         self._archive("mirror", "bravo.json")
-        self._archive("mirror", "bravo.1.json")
-        self._archive("mirror", "bravo.2.json")
-        self._archive("mirror", "bravo.3.json")
+        self._archive("mirror", "marker-error-bravo-1.json")
+        self._archive("mirror", "marker-error-marker-error-bravo-1-2.json")
+        self._archive(
+            "mirror",
+            "marker-error-marker-error-marker-error-bravo-1-2-3.json",
+        )
+        self._archive(
+            "mirror",
+            (
+                "marker-error-marker-error-marker-error-marker-error-"
+                "bravo-1-2-3-4.json"
+            ),
+        )
         repeats = pci.gather_retry_repeats(self.outbox)
         self.assertEqual(repeats[0]["task_id"], "bravo")  # higher count first
         self.assertEqual(repeats[0]["retry_count"], 4)
+        self.assertEqual(repeats[1]["task_id"], "alpha")
+        self.assertEqual(repeats[1]["retry_count"], 3)
+
+    def test_plain_rotations_without_marker_error_not_counted(self):
+        # v2 semantics: a `.json` + `.1.json` + `.2.json` archive is the
+        # `task-34-e4-2-mission-control-migration` false-positive shape —
+        # those are chain phases or revision rounds, not retries. Must NOT
+        # appear in repeats.
+        self._archive("forge", "task-rotonly.json")
+        self._archive("forge", "task-rotonly.1.json")
+        self._archive("forge", "task-rotonly.2.json")
+        self._archive("forge", "task-rotonly.3.json")
+        self._archive("forge", "task-rotonly.4.json")
+        self._archive("forge", "task-rotonly.5.json")
+        self.assertEqual(pci.gather_retry_repeats(self.outbox), [])
+
+    def test_canonical_single_entry_absent(self):
+        # A task that landed once and was archived — no retry signal.
+        self._archive("forge", "task-once.json")
+        self.assertEqual(pci.gather_retry_repeats(self.outbox), [])
+
+    def test_dead_letter_marker_skipped(self):
+        # Terminal infra-failure artifact; the cascade preceding it already
+        # contributes the retry events. Counting the dead-letter too would
+        # double-count. With threshold 3, two marker-errors alone don't
+        # flag — confirming the dead-letter wasn't accidentally counted as
+        # the third event.
+        self._archive("forge", "task-dl.json")
+        self._archive("forge", "marker-error-task-dl-1.json")
+        self._archive("forge", "marker-error-marker-error-task-dl-1-2.json")
+        self._archive(
+            "forge",
+            "dead-letter-marker-marker-error-marker-error-task-dl-1-2.json",
+        )
+        self.assertEqual(pci.gather_retry_repeats(self.outbox), [])
+
+    def test_notify_marker_error_skipped(self):
+        # notify-* base remains workflow noise even when marker-error wrapped.
+        self._archive("beacon", "notify-task-z.json")
+        self._archive("beacon", "marker-error-notify-task-z-1.json")
+        self._archive(
+            "beacon", "marker-error-marker-error-notify-task-z-1-2.json",
+        )
+        self._archive(
+            "beacon",
+            "marker-error-marker-error-marker-error-notify-task-z-1-2-3.json",
+        )
+        self.assertEqual(pci.gather_retry_repeats(self.outbox), [])
+
+    def test_mixed_archive_only_marker_errors_count(self):
+        # task-foo has plain rotations + a 3-deep marker-error cascade.
+        # task-bar has only plain rotations. Only task-foo should surface.
+        self._archive("forge", "task-foo.json")
+        self._archive("forge", "task-foo.1.json")
+        self._archive("forge", "task-foo.2.json")
+        self._archive("forge", "marker-error-task-foo-1.json")
+        self._archive("forge", "marker-error-marker-error-task-foo-1-2.json")
+        self._archive(
+            "forge",
+            "marker-error-marker-error-marker-error-task-foo-1-2-3.json",
+        )
+        self._archive("forge", "task-bar.json")
+        self._archive("forge", "task-bar.1.json")
+        self._archive("forge", "task-bar.2.json")
+        repeats = pci.gather_retry_repeats(self.outbox)
+        self.assertEqual(len(repeats), 1)
+        self.assertEqual(repeats[0]["task_id"], "task-foo")
+        self.assertEqual(repeats[0]["retry_count"], 3)
 
     def test_missing_outbox_root(self):
         nonexistent = Path(self.tmp.name) / "nope"
         self.assertEqual(pci.gather_retry_repeats(nonexistent), [])
+
+    def test_unwrap_marker_error_base_helper(self):
+        # Direct unit coverage on the helper used by gather_retry_repeats.
+        self.assertEqual(
+            pci._unwrap_marker_error_base("marker-error-foo-1"),
+            "foo",
+        )
+        self.assertEqual(
+            pci._unwrap_marker_error_base(
+                "marker-error-marker-error-foo-1-2"
+            ),
+            "foo",
+        )
+        self.assertEqual(
+            pci._unwrap_marker_error_base(
+                "marker-error-opmanual-d35-5b-shipped-note-001-1"
+            ),
+            "opmanual-d35-5b-shipped-note-001",
+        )
+        self.assertIsNone(pci._unwrap_marker_error_base("plain-task"))
+        self.assertIsNone(pci._unwrap_marker_error_base("plain-task.1"))
 
 
 class AssembleCheckITests(unittest.TestCase):
