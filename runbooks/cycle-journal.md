@@ -4,6 +4,38 @@
 
 ---
 
+## Iteration 86 — 2026-05-25 20:47 UTC (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Source repo: dirty tree.** M MEMORY.md (staged) + M runbooks/cycle-journal.md (unstaged) — uncommitted iter 85 writes. Same recurring interactive-cycle limitation. Branch=main, not behind origin. ⚠️
+- **(B) Sync health: error.** sync.json status=error "Uncommitted changes in working tree" at 20:22:43Z. Root cause: dirty tree from Check A. Resolves at commit. ⚠️
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 2026-05-25T20:46:50Z (live architecture session with Larry — very fresh). Forge: 2026-05-24T14:40:31Z (read timeout — calibrated). Mirror: 2026-05-24T01:11:43Z (~43h — HTTP 502/timeout, calibrated). Pulse: 2026-05-25T00:59:26Z (~20h — /optimize response, calibrated). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. No new .invalid files. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 0 open PRs. 3 merged since iter 85: #103 fix(chain-discipline) 19:16Z, #101 pulse(check-i) 18:48Z, #102 fix(cleanup) 18:34Z. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. pulse-rotation-window-dms.json absent. ✅
+- **Check I: skipped (judgment call — idempotency bug active).** Firing day (Monday). Idempotency fix NOT yet landed (APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry authorization). 4 blocks already written today. Running again would produce a 5th duplicate with no new signal (same sidecar). Skipping. Analysis current from iter 85. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. ⚠️
+
+**Did:** Nothing. No always-fix conditions triggered. Committing operational writes at cycle end (resolves A+B).
+**Escalated:** Nothing new. Check I idempotency APPROVAL_REQUEST pending Larry (iter 83 dispatch → Beacon). Iter 43/49 [yellow] stuck-cycle remains open.
+**Forge:** 3 shipped since iter 85 (#101 check-i heuristic, #102 cleanup/MemoryHigh, #103 chain-discipline — 18:34Z–19:16Z). 0 open.
+**Patterns:** inbox-watcher Fix A+B shipped (#102 — worktree 24h→4h + MemoryHigh=3G); monitoring 5+ cycles for memory.events.max suppression before closing. Check I retry heuristic corrected (#101 — marker-error events, not archive rotations); applies next Monday. Chain-discipline marker parser + regression guard shipped (#103). Check I idempotency fix still pending Larry authorization. Telegram network errors ongoing (G-rule dispatched iter 57).
+**Learned:** PR #102 closes Fix A+B on inbox-watcher memory watch item (monitoring phase). PR #101 changes Check I retry baseline for next run. MEMORY.md updated.
+
+---
+
+## Off-cycle investigation — 2026-05-25 17:37 UTC (dispatch: inbox-watcher memleak)
+
+**Trigger:** Larry dispatch `pulse-investigate-inbox-watcher-memleak-001` (off-cycle, read-only + profiling).
+**Finding:** inbox-watcher 3.97GB cgroup memory is **82% page cache** (file=3.26GB), NOT anonymous RSS leaks or zombie processes. Three ourliberty-dashboard worktrees with ~720MB node_modules each (wt-forge-task-32: 724MB/19.5h, wt-mirror-task-32: 712MB/19.2h, wt-forge-task-36: 727MB/12.6h) are the dominant source. When Forge/Mirror run pnpm builds in these worktrees, node_modules files fill the cgroup's page cache. Cleanup timer IS installed (ourliberty-cleanup-stale-worktrees.timer, daily); last ran 02:42Z — found nothing >24h old (all worktrees were fresh); next run ~20:42 MDT. The 24h retention window × heavy dashboard build day = 2.16GB page cache held for up to 24h. No zombies. No orphan RSS (bash tool calls have living claude parents). 868 memory.events.max = 868 synchronous direct-reclaim events (latency spikes); no OOM, no swap. Dispatch-prompt hypothesis (orphaned child processes / anonymous RSS leaks) RULED OUT.
+**Proposed fixes (priority order):** (A) reduce cleanup retention 24h→4h in `scripts/cleanup_stale_worktrees.py:83`; (B) add `MemoryHigh=3G` to `50-MemoryMax.conf` drop-in to prevent direct-reclaim latency; (C) pnpm shared store for dashboard worktrees (medium effort, Beacon spec needed); (D) process-group kill on timeout in `agent_runner.py` (minor).
+**Deliverables written:** `blackboard/pulse-escalations.json` (new entry severity=high, iter=off-cycle-inv); `larry_alerts` DM queued (subject=inbox-watcher-memleak-root-cause, severity=warning).
+
+---
+
 ## Iteration 84 — 2026-05-25 12:30 UTC (interactive)
 
 **Health:** ⚠️ Drift
