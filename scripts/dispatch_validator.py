@@ -43,6 +43,11 @@ ALLOWED_SOURCES = {
     # back to Forge when her preflight marker is malformed. Treated as a
     # system source (not a dialogue leg) — see routing_validator.SYSTEM_SOURCES.
     'outbox-notifier',
+    # Closed-loop step 5 (2026-05-24): Pulse Check I auto-dispatches
+    # small-effort dollar-quantified proposals to Beacon's inbox. The
+    # outbox_notifier branch added in step 4 (PR #82) keys off this exact
+    # source on Beacon's outbox; the envelope source must match.
+    'pulse-auto-dispatch',
 }
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
