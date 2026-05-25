@@ -48,6 +48,8 @@ This is the largest single phase in the E plan by scope. It's also the highest-l
 | Deploy preview URL delivery | **Telegram DM (primary) + dashboard comms-inbox (record)** | Phone-friendly click-through preserved. Locked 2026-05-24 round 2. |
 | Active-project pinning | **Sticky per-chat-id** (no time-decay; explicit `/switch-project` to change) | State file: `~/agents/state/active_projects.json`. Lowest friction for sustained work in one project. Locked 2026-05-24 round 2. |
 | Dashboard landing | **Programs grid + horizontal tabs per Program** | Cross-Program awareness up front; tabs let you swap context without grid bounce. Locked 2026-05-24 round 3. |
+| Sub-phase ordering | **E4.0 → E4.1 → E4.1b (0003) → E4.2 → E4.4 → E4.3 → E4.5** | E4.4 reordered before E4.3 because round-4's UI CRUD lock removed E4.4's dependency on `pm_writer`. UI can stand alone via Next.js Route Handlers + supabase-js. Visual feedback earliest. Locked 2026-05-24 round 5. |
+| E4.4 dispatch shape | **3 sub-sub-phases (E4.4a / E4.4b / E4.4c)** | Original ~2500 LOC monolithic estimate exceeds Forge dispatch reliability zone (~1000 LOC). Splitting also gets visual feedback after E4.4a (~½ day) instead of after the whole rebuild ships. Locked 2026-05-24 round 5. |
 | Project detail default view | **Kanban by task status** (list view available as alternate) | Matches Mission Control muscle memory. List available but not the default. Locked 2026-05-24 round 3. |
 | First-of-day digest format | **5-7 bullets ~7am MDT**: yesterday's merges, today's in-flight tasks, blockers needing decision, costs vs. budget | Default; configurable later. Locked 2026-05-24 round 3. |
 | Mission Control parallel-run length | **≥1 week; Larry calls cutover** | Decommission once Larry confirms he hasn't gone back to MC. No fixed deadline. Locked 2026-05-24 round 3. |
@@ -325,15 +327,27 @@ Sub-phases ship in order (E4.0 → E4.5). Parallel dispatches can ship anytime t
 - Dry-run mode (default) prints what would be inserted; `--apply` actually writes.
 - Larry runs it once with `--dry-run`, reviews output, then `--apply`.
 
-### E4.3 — Backend extension: droplet `pm_writer.py` + Beacon CLAUDE.md updates (Forge dispatch ~1 day)
+### E4.4 — Dashboard UI rebuild (REORDERED before E4.3, locked 2026-05-24 round 5; SPLIT into 3 sub-sub-phases)
+
+**Why reordered before E4.3:** Round-4 lock put UI CRUD in E4.4's scope (UI writes directly to Supabase via Next.js Route Handlers). That removed the dependency on `pm_writer` being wired first — dashboard can stand alone. Larry's stated need (visual feedback before further design choices) is satisfied earliest by shipping E4.4 first.
+
+**Why split into 3 sub-sub-phases:** Original monolithic estimate ~2-3 days, 1500-2500 LOC. That's at the edge of Forge dispatch reliability (Joe's Sage caps ~1000 LOC). Splitting also gets visual feedback faster.
+
+Full sub-spec: [agents/beacon/specs/e4-4-dashboard-ui-rebuild.md](specs/e4-4-dashboard-ui-rebuild.md).
+
+- **E4.4a — MVP read-only** (~½ day, ~500 LOC, ~$6 LLM): Programs grid → Projects list → Project detail → Tasks list → Task detail with Events timeline. All RENDER, no MUTATION. Larry sees his real Mission Control data in `dashboard.ourliberty.dev` for the first time.
+- **E4.4b — Kanban + drag-drop** (~½ day, ~400 LOC, ~$5 LLM): Switch list views to kanban-by-status; @dnd-kit drag-drop. First MUTATION endpoint (PATCH only for status changes).
+- **E4.4c — CRUD + forms** (~1 day, ~800 LOC, ~$10 LLM): + New buttons, inline edit, delete via overflow. Full CRUD per overview § 5.4 "Direct UI CRUD" subsection.
+
+Each sub-sub-phase ships as an independent Forge dispatch with Larry review between. Total estimate: ~$25-35 LLM, ~2-2.5h wall clock, ~50-60 min Larry-time spread across the 3 dispatches.
+
+### E4.3 — Backend extension: droplet `pm_writer.py` + Beacon CLAUDE.md updates (Forge dispatch ~1 day; FOLLOWS E4.4 per round 5)
 
 - New `scripts/pm_writer.py` — small library: `pm_writer.create_project(...)`, `pm_writer.create_task(...)`, `pm_writer.append_event(...)`, `pm_writer.set_status(...)`, etc.
 - Outbox-notifier marker handlers updated to call `pm_writer.append_event` at each handler.
 - Beacon CLAUDE.md teaches her to call `pm_writer.create_project` on `/new-project` commands and to pin active project per-chat in a `~/agents/state/active_projects.json` file.
 - Forge dispatch envelope validator adds optional `project_id` field; Beacon populates it on construction.
 - Unit tests on the pm_writer library; integration tests behind a `PM_WRITER_TEST_SUPABASE_URL` env (skipped in normal CI).
-
-### E4.4 — Dashboard UI rebuild (Forge dispatch ~2-3 days, biggest sub-phase)
 
 - Rewrite `ourliberty-dashboard` Next.js app per § 5.4.
 - New routes: `/programs`, `/programs/[id]`, `/projects/[id]`, `/tasks/[id]`, `/comms-inbox`.
