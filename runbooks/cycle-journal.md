@@ -2074,3 +2074,35 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 - Mode: digest — 1 proposal(s):
   1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
      Rationale: Outbox archives show this task_id retried 6 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-25):**
+
+- Ledger total: $251.49; 0 anomaly(ies)
+- Retry overhead: $5.50 (2.2%)
+- High-repeat tasks: `task-34-e4-2-mission-control-migration`×6, `closed-loop-beacon-outbox-pulse-trigger-004`×4, `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 6 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+---
+
+## Iteration 85 — 2026-05-25 16:46 UTC (interactive)
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Source repo: nominal.** gitStatus (session start): branch=main, clean tree, HEAD=d05e143=origin/main. Not behind, not ahead. ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-25T16:21:40Z (~25m before cycle start), status=no-change at d05e143. Within 2h threshold. ✅
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 2026-05-25T12:48Z (alert idx=136 delivered — check-i-2026-05-25, ~4h — calibrated). Forge: 2026-05-24T14:40Z (read timeout — calibrated). Mirror: 2026-05-24T01:11Z (~39h — HTTP 502/timeout, calibrated). Pulse: 2026-05-25T00:59Z (~16h — /optimize DM, calibrated). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. No new .invalid files. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 0 Forge PRs merged in last 4h. 0 open. Last shipped: PR #99 (inbox-watcher 4G→8G, iter 83, ~05:15Z today). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (89d out, outside 60d window). pulse-rotation-window-dms.json absent — no DMs sent. ✅
+- **Check I: fired (Monday 2026-05-25, 4th block today — idempotency bug still active).** Ledger sentinel present. Analyzer mode=digest. DM queued. $251.49/week. 1 proposal: [medium] task-34-e4-2-mission-control-migration template. 0 auto-dispatches. 4th duplicate "Check I (2026-05-25)" block today (/optimize ~01:00Z + iter 83 08:48Z + iter 84 12:30Z + iter 85 16:46Z). Fix APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Invoked pulse_check_i.py per Monday firing schedule. No other always-fix conditions triggered.
+**Escalated:** Nothing new. Check I idempotency APPROVAL_REQUEST still pending Larry (escalated iter 83). Iter 43/49 [yellow] stuck-cycle open.
+**Forge:** 0 shipped since iter 84. 0 open.
+**Patterns:** Check I 4th duplicate block today — idempotency bug accumulating; fix pending Larry authorization. Telegram network errors ongoing (G-rule dispatched iter 57, awaiting Beacon response). Inbox-watcher MemoryMax at 8G — monitoring.
+**Learned:** Nothing new. Same sidecar, same proposal, 4th duplicate block. Fix chain correct; blocked only on Larry authorization.
