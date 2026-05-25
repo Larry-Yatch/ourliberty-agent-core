@@ -2216,5 +2216,112 @@ Optional small follow-ups (none blocking, dispatch when convenient):
 
 ---
 
+## Phase E4 — Unified PM Dashboard (in progress, started 2026-05-24)
+
+Phase E4 reshaped from the original "interactive dashboard" sketch into a unified PM surface that hosts both Larry's personal projects (migrated from Marvin Mission Control) AND the agent OS's build initiatives in the same Programs > Projects > Tasks model, backed by Supabase as the system's first persistent DB primitive.
+
+**Trigger:** ~6 hours of real E3 dashboard usage on 2026-05-21 surfaced the Telegram-as-database antipattern (chat conflating state-surface + comms-channel roles). Larry's adjacent need for unified personal PM (currently in Marvin Mission Control) closed the design loop.
+
+### Design rounds (all 2026-05-24)
+
+- **Round 1**: project entity (defined, not inferred), backend (hybrid droplet+Next.js), default Program for agent-OS work ("Agent OS Development"), type discriminator enum (`personal | agent_os_build | client | research`).
+- **Round 2**: Plan-First sections (7 of Joe's 12), skip rule (trivial Claude-as-Forge only), deploy preview URL routing (Telegram-primary), active-project pinning (sticky per-chat).
+- **Round 3**: dashboard landing (Programs grid + horizontal tabs), default project view (kanban by task status), first-of-day digest format, MC parallel-run length (≥1 week).
+- **Round 4**: Direct UI CRUD locked into E4.4 scope (surfaced gap during E4.2 dispatch planning — Larry asked "do we have a system for creating new projects/tasks via the dashboard like Mission Control?").
+- **Round 5**: E4.4 reordered before E4.3 (UI CRUD removed the dependency on `pm_writer`); E4.4 split into 3 sub-sub-phases (a/b/c) to fit within Forge dispatch reliability zone.
+
+### Sub-phases shipped (same day, 2026-05-24)
+
+Cost rollup: **~$60 LLM total** across ~14 PRs + 2 hotfix dispatches + 1 calibration bundle + 1 emergency memory-cap bump.
+
+**E4.0 — Supabase activation** ($5.50 + Larry-actions ~25 min Chrome-MCP):
+- PR #78 (agent-core): Supabase credential discipline — registry entries (URL + anon + service-role), `rotate-supabase-keys.md` expanded from stub, new `setup-supabase-pm-project.md` runbook, `systemd/INSTALL.md` Supabase Python section.
+- PR #2 (ourliberty-dashboard): `@supabase/supabase-js` install, `lib/supabase-server.ts` server-side admin client helper, env loader extension, `.env.local.example` updates.
+- Larry walked through Supabase project creation via Chrome MCP: project `ourliberty-pm-dashboard` in Our Liberty org under Larry-Yatch GitHub identity (Supabase has no Google SSO), us-east-1 region, Free tier, "Automatically expose new tables" UNCHECKED for defense-in-depth.
+- 3 spec deviations bundled into calibration PR #84: GitHub ownership instead of agent.beacon.ourliberty Google, Supabase legacy JWT API keys (not new `sb_*` format), `.env.larry` slot drift (runbook claimed slots existed; they didn't — live-patched with an idempotent bootstrap script that appends missing slots).
+
+**E4.1 — Schema v1 + 0002 GRANT + 0003 external_id** ($5 + 3× `supabase db push`):
+- PR #3 (ourliberty-dashboard): 5 tables (programs/projects/tasks/events/decisions) + indexes + triggers + RLS-enabled-zero-policies + 6 seed Programs + GHA `supabase db lint` workflow + `supabase/SCHEMA.md`. **Note for future schemas: Postgres 17 is the Supabase default in 2026 (not 15 as the original spec assumed).**
+- PR #4 (dashboard, $0.50 hotfix): `0002_grant_service_role.sql` — `GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role` + `ALTER DEFAULT PRIVILEGES`. Surfaced when post-push validation returned `42501: permission denied for table programs`. The "Automatically expose new tables: UNCHECKED" toggle blocks **all** Data API roles including service_role — not just `anon`/`authenticated` as the UI label suggests.
+- PR #5 (dashboard, $0.50 hotfix): `0003_add_external_id_to_programs_projects.sql` — `external_id` was only on `tasks` in 0001 but E4.2 needed it on programs + projects for idempotency. Spec/schema inconsistency was Claude's error in the original E4.1 spec.
+- PR #95 (agent-core): live-state note added to E4.1 spec acknowledging 0002 + 0003 are now in prod (so future Forge dispatches read the spec as authoritative-for-current-state, not just-as-shipped).
+
+**E4.2 — Mission Control migration script** ($11 + ~$5 wasted on failed Forge attempts):
+- task-34 first dispatch (agent-core): Forge preflight REJECTed correctly — caught the missing `external_id` columns above.
+- task-34 retry got stuck: chain dedup blocked round-2 clarification-response because round-1 had already been answered earlier.
+- Pivot: dispatched as `task-34b` with fresh task_id; merged as PR #96.
+- `scripts/migrate_mission_control.py` (~250 LOC) + tests + runbook `docs/runbooks/migrate-mission-control.md`.
+- Live migration applied: 1 new program ("The 'Thing'") + 28 projects + 13 tasks inserted into Supabase from Marvin Mission Control via Tailscale-HTTP-fetched JSON files (`/tmp/mc-export/` on Larry's Mac via `curl http://100.124.212.15:3002/api/{programs,projects,assignees}`).
+- One UX wart: strict case-insensitive exact name match treated MC's "The 'Thing'" (curly quotes) and the 0001 seed "The Thing" (no quotes) as different programs → duplicate. Manually cleaned up via `DELETE FROM programs WHERE name = 'The Thing' AND external_id IS NULL` + `UPDATE programs SET name = 'The Thing' WHERE external_id = 'prog-002'`.
+
+**E4 overview spec rounds 4 + 5** (PRs #90 + #98):
+- PR #90 ($0.30 chain): added "Direct UI CRUD" subsection to overview § 5.4 locking + New Program/Project/Task/Decision buttons, inline-edit on fields, delete via overflow as REQUIRED in E4.4 scope.
+- PR #98 ($0.50 chain, round-2 after Mirror REVIEW_REVISION): new E4.4 sub-spec at `agents/beacon/specs/e4-4-dashboard-ui-rebuild.md` + overview reorder (E4.4 before E4.3) + sub-sub-phase split (a/b/c). Mirror caught an orphan-bullet bug (the old E4.4 detail bullets were left under E4.3 after the section was reorganized) → 13-line cleanup commit, auto-merged.
+
+**E4.4a — MVP read-only dashboard** (PR #6 in ourliberty-dashboard, **$11.08** — well over $6 estimate):
+- 15 files: 5 page routes (`/`, `/programs/[id]`, `/projects/[id]`, `/tasks/[id]`, comms-inbox stub), 4 GET Route Handlers (`/api/pm/{programs,projects,tasks,events}`), 5 components (`<ProgramCard>`, `<ProjectListRow>`, `<TaskListRow>`, `<EventLogRow>`, `<TaskTimeline>`), `lib/types.ts` extension, `lib/pm-queries.ts`.
+- Larry's real Mission Control data now visible at `dashboard.ourliberty.dev`: Programs grid → click into Program → Projects list → click into Project → Tasks list → click into Task → Events timeline.
+- Existing E3 features (agent runtime cards / costs / healers) preserved — `app/api/proxy/[...path]/route.ts` untouched.
+- Cost overrun ($11 vs $6) attributable to Next.js + Supabase TypeScript scaffolding being heavier than spec-estimated. Future estimates should account for ~1.5-2× the LOC count in tokens.
+
+### Calibration + ops PRs (also same day)
+
+| PR | Scope | Cost |
+|---|---|---|
+| #71 (morning) | inbox-watcher MemoryMax 2G→4G after watchdog warning | $0.30 |
+| #84 | E4.0 post-setup calibration (GitHub ownership, legacy keys, slot drift) | $0.30 |
+| #95 | E4.1 spec live-state note (0002 + 0003 in prod) | $0.30 |
+| #97 | Mirror discipline tightening (marker.task_id-match, paste-stdout) + Supabase GRANT note in E4.0 spec | $0.30 |
+| #99 (evening) | inbox-watcher MemoryMax 4G→8G after second watchdog CRITICAL alert | $0.30 |
+
+### Mirror discipline gaps surfaced
+
+Three patterns emerged across today's ~10 Mirror reviews:
+
+1. **`task_id` in marker payload doesn't match envelope's `task_id`** — 3 occurrences (PR #5, PR #89 retry, PR #95). Notifier dead-letters with `MalformedMirrorMarker`; retry budget catches it (~$0.30 wasted per first attempt). Codified in `agents/mirror/CLAUDE.md` via PR #97.
+2. **marker.py CLI invoked but stdout NOT pasted into response** — 1 occurrence (PR #89 first attempt). `output_tokens: 22` with meta-message "Marker already emitted; monitor timeout is moot" — but no actual marker block in response text. Notifier sees nothing; auto-merge never fires. Codified in `agents/mirror/CLAUDE.md` via PR #97.
+3. **Cross-repo Mirror reviews require `source='beacon'`, not `source='larry'`** — 1 occurrence (dashboard PR #4 first attempt). `IDENTITY_MISMATCH: expected=mirror loaded=none` because the dashboard repo's `CLAUDE.md` is a Next.js project doc, not Mirror persona. Memory updated at `feedback_headless_mode_chain_gaps.md`; `source='larry'` strict-checks target repo CLAUDE.md, `source='beacon'` skips that check.
+
+### Forge discipline gaps still pending (deferred dispatch)
+
+Sibling issues to Mirror's that haven't been fixed via CLAUDE.md tightening yet:
+
+1. **Preflight marker error on most short dispatches** — Forge invokes marker.py for PROCEED/CLARIFY/REJECT but stops short of pasting stdout. Notifier marker-errors; retry typically succeeds. Same shape as Mirror gap #2 above.
+2. **IDENTITY_MISMATCH on re-dispatched envelopes** — surfaced when re-dropping a previously-dispatched envelope. Forge's session loaded Beacon's CLAUDE.md instead of its own (possibly stale state from prior session resume). Workaround: dispatch with fresh task_id (suffix like `-b` or `-take2`).
+3. **Chain dedup blocking valid round-2 clarifies** — once Beacon answers a clarify, re-dispatching the same task hits `clarification-response continuation already dispatched for task X round 1; skipping duplicate write` and refuses to send a new round-2 response. Forced the `task-34` → `task-34b` workaround in E4.2.
+
+Bundle for a future dispatch: "`agents/forge/CLAUDE.md` tightening + chain dedup gap closure."
+
+### Child-process leak (real issue, deferred)
+
+Inbox-watcher cgroup MemoryMax bumped twice today at doubling cadence — 2G→4G in morning (PR #71), 4G→8G at night (PR #99). Parent process RSS ~17 MB; children consume up to ~4.3 GB while only one Claude subprocess is actively running. The rest is accumulated dead-process memory not being garbage-collected.
+
+Likely suspects: ProcessGroup not killed on parent exit, lingering pipes/file descriptors holding allocations, Node.js/Bun subprocesses spawned by Claude tool-use not being reaped. Real fix is engineering work (~1-2h with a healer-style dispatch examining ProcessGroup management + cgroup quota per-subprocess + reaper script for orphans). Deferred to a dedicated dispatch.
+
+8G should last through E4.4b + E4.4c without watchdog firing again. If it bumps again before the leak is investigated, that's the trigger to prioritize the dispatch.
+
+### Chain bugs observed (not fixed; flagged)
+
+- **0-byte WIP placeholder PRs getting auto-merged** (PR #94 today): the watcher pushes an empty checkpoint commit when setting up a worktree branch; somehow it got promoted to a real PR and auto-merged. Zero-files changed, low blast radius, but the chain shouldn't open or merge an empty PR.
+- **Mirror's 8-min cost for short docs PRs** (PR #95 was a 3-LOC diff and cost $1.33 / 8 min): Mirror's reading the whole spec context not just the diff. For trivial docs PRs this is wasteful. Possible CLAUDE.md tweak: "for docs-only diffs under 20 LOC, focus the review on the diff itself + immediate surrounding context, not the full document."
+
+### What ships next
+
+**E4.4b** (kanban + drag-drop) is the next dispatch per the E4.4 sub-spec plan. After Larry validates E4.4a's render quality + data fidelity, dispatch E4.4b. Then **E4.4c** (CRUD + forms). Then **E4.3** (`pm_writer` + Beacon CLAUDE.md updates). Then **E4.5** (Mission Control decommission) after ≥1 week of new-dashboard usage.
+
+### Codified additions worth recalling next session
+
+30. **`Automatically expose new tables` UNCHECKED also blocks `service_role` auto-grants on new tables.** Supabase's UI label suggests it only affects `anon`/`authenticated`, but the toggle is broader. Every schema migration that creates tables MUST include `GRANT ALL ... TO service_role` + `ALTER DEFAULT PRIVILEGES` (or a hotfix migration must follow). Codified in E4.0 sub-spec § 6.
+31. **Forward-only migration discipline.** Don't edit shipped migrations (0001, 0002, etc.); patch via new migrations (0003, 0004, etc.). Specs that document the schema add a "live-state note" at the top of their SQL block pointing at follow-up migrations (E4.1 spec § 4.3 pattern).
+32. **Cross-repo Mirror reviews require `source='beacon'`.** `source='larry'` triggers strict identity-assertion against the target repo's CLAUDE.md, which fails for any repo that isn't agent-core (their CLAUDE.md is project-specific, not agent persona). Memory updated.
+33. **marker.py CLI is necessary BUT NOT SUFFICIENT.** Mirror + Forge must PASTE the stdout into their response text — the notifier parses the response, not Bash's stdout history. Codified in Mirror CLAUDE.md via PR #97; Forge's CLAUDE.md still pending.
+34. **Marker payload `task_id` MUST match envelope `task_id` EXACTLY, including on retries.** Mismatch dead-letters with `MalformedMirrorMarker`. Codified.
+35. **Memory cap bumps are a stopgap; investigate child-process leak.** Inbox-watcher cgroup bumped from 2G to 8G in one day at doubling cadence. Real fix is process-group / reaper investigation. Deferred dispatch.
+36. **Re-dispatching after a REJECT requires a fresh `task_id`.** Chain dedup blocks otherwise; even valid round-2 clarification-responses get refused. Use suffix like `-b` or `-take2`.
+37. **Supabase free-tier `Postgres 17` is the 2026 default** (not 15 as the original E4.1 spec assumed). Migration SQL is portable from 11+ so 0001 worked, but worth noting for future schema specs.
+38. **Phase E now ships a real persistent data layer.** The agent OS has Supabase as a system primitive. Future per-product Supabases (TruPath, AI Co, etc.) follow this template — one project per product, owned by that product's billing identity, full E1.5 4-artifact credential discipline. Templates exist at `docs/runbooks/setup-supabase-pm-project.md` (initial setup) and `docs/runbooks/rotate-supabase-keys.md` (rotation).
+
+---
+
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
 

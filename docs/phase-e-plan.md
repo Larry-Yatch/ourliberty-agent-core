@@ -58,7 +58,7 @@ What we are NOT building in E: production-grade deploys, custom Supabase per pro
 | **E1.5** | Credential rotation discipline | ~1 day | E1 | **Done 2026-05-19** (PRs #45, #46, #47) |
 | **E2** | Deploy layer (Vercel preview-first) | ~3–4 days | E1, E1.5 | **Done 2026-05-20** (10 PRs same day: #51-#60) |
 | **E3** | Dashboard B (read-only) | ~3 days | E2 (dogfood) | **Done 2026-05-21** (PR #62, PR #1 in ourliberty-dashboard, + 4 recovery PRs #65-#68); public dashboard at `dashboard.ourliberty.dev` |
-| **E4** | Dashboard C (interactive) | ~1 week | E3 + 1 week's usage | Not started (trigger: 1 week of E3 usage) |
+| **E4** | Unified PM Dashboard (rewritten 2026-05-24 from "Dashboard C interactive") | ~3 weeks wall clock | E3 + dogfood trigger | **In progress 2026-05-24** — E4.0 + E4.1 + E4.2 + E4.4a shipped same day; E4.4b/c + E4.3 + E4.5 pending. ~14 PRs + ~$60 LLM so far. |
 | **E5** | Google Suite via MCP for Beacon | ~½ day | — (can run parallel) | **Done 2026-05-19** (PRs #37, #38, #39) |
 | **E6** | Bench items (Ledger, audit logger, Guardian, prod deploy, etc.) | — | Trigger-based | Deferred |
 
@@ -311,34 +311,40 @@ Auto-merge command is the missing piece of the Mirror PASS chain. Upstream has i
 
 ---
 
-## Phase E4 — Dashboard C (Interactive)
+## Phase E4 — Unified PM Dashboard (REWRITTEN 2026-05-24)
 
-**Goal:** Replace Telegram as your primary cockpit. Buttons to approve markers, pause/resume agents, drop new spec tasks.
+**Original scope** (this section, pre-2026-05-24): "Dashboard C (Interactive)" — buttons to approve markers, pause/resume agents, drop new spec tasks. That was the sketch.
 
-### Prerequisites
-- E3 deployed and used for ≥1 week
-- A list of "I wish I could do X from here" notes you've kept while using E3
+**Actual scope** (current): unified PM surface hosting Larry's personal projects (migrated from Marvin Mission Control) AND agent OS build initiatives in the same Programs > Projects > Tasks model, backed by Supabase as the system's first persistent DB primitive. Trigger: ~6h of real E3 usage on 2026-05-21 surfaced the Telegram-as-database antipattern + Larry's adjacent need for unified personal PM.
 
-### Tasks (sketch; refine after E3 usage feedback)
+**Goal:** Replace Marvin Mission Control with a unified dashboard. Telegram demoted to actionable comms only (clarifications, approvals, escalations); dashboard owns state surface.
 
-**E4.1 — Mutation API endpoints** (~2 days)
-- `POST /approvals/{task_id}/approve` — bypasses Telegram approval flow
-- `POST /approvals/{task_id}/reject` — same
-- `POST /tasks` — drop a new task into the appropriate inbox (with full validation)
-- `POST /agents/{name}/pause` — set EMERGENCY_HALT marker for one agent
-- `POST /agents/{name}/resume` — clear it
-- Auth: same shared-secret pattern + an HMAC signature on mutating requests
+**Prerequisites:** E3 deployed (✅ shipped 2026-05-21). ≥6h of E3 usage to surface the gaps (✅ provided the trigger).
 
-**E4.2 — Dashboard UI updates** (~3 days)
-- Add buttons + confirmation dialogs
-- Add a "draft a task" form (spec textarea, agent dropdown, priority)
-- Toast notifications when actions succeed
+### Canonical sub-spec docs (read these for scope, not the bullets below)
 
-**E4.3 — Telegram parity audit** (~½ day)
-- Confirm every Telegram action has a dashboard equivalent
-- Keep Telegram running in parallel; don't deprecate yet
+- `agents/beacon/specs/e4-overview.md` — phase overview + locked decisions table (14 rows across 5 design rounds)
+- `agents/beacon/specs/e4-0-supabase-activation.md` — Supabase activation (✅ shipped)
+- `agents/beacon/specs/e4-1-schema-v1.md` — schema v1 + 0002 + 0003 calibrations (✅ shipped)
+- `agents/beacon/specs/e4-2-mission-control-migration.md` — MC → Supabase migration script (✅ shipped)
+- `agents/beacon/specs/e4-4-dashboard-ui-rebuild.md` — UI rebuild split into 3 sub-sub-phases (E4.4a ✅ shipped; E4.4b/c pending)
 
-**Success criteria:** You can run a full spec → PR → review → merge cycle without touching Telegram or terminal.
+### Sub-phase status (2026-05-24)
+
+| Sub-phase | Status | PRs |
+|---|---|---|
+| E4.0 — Supabase activation | ✅ shipped 2026-05-24 | #78 agent-core + #2 dashboard |
+| E4.1 — Schema v1 + 0002 GRANT + 0003 external_id | ✅ shipped 2026-05-24 | #3 + #4 + #5 dashboard + #95 agent-core spec |
+| E4.2 — Mission Control migration script | ✅ shipped 2026-05-24 | #96 agent-core |
+| E4.4a — MVP read-only dashboard UI | ✅ shipped 2026-05-24 | #6 dashboard |
+| E4.4b — Kanban + drag-drop | 🟡 next | — |
+| E4.4c — CRUD + forms | ⏳ pending after E4.4b | — |
+| E4.3 — `pm_writer` + Beacon CLAUDE.md | ⏳ pending after E4.4 (reordered round 5) | — |
+| E4.5 — Mission Control decommission | ⏳ pending after ≥1 week of new dashboard usage | — |
+
+**Success criteria** (for full E4): Larry uses `dashboard.ourliberty.dev` daily for ≥1 week without going back to Mission Control; Telegram traffic drops ≥60%; agent OS dispatches auto-populate Supabase Tasks with full Events timeline visible in dashboard.
+
+**Parallel small dispatches** (independent of E4.4 a/b/c sequence): P-1 (comms narrowing), P-2 (Plan-First Protocol), P-3 (adversarial fix auditor), P-4 (Promise-Before-Work + Unified Verifier + Sweep ledger). Defined in overview spec § 6.
 
 ---
 
@@ -413,11 +419,11 @@ Then ask: "where did we stop, and what's the next concrete task?" The Current St
 
 ## Current Status
 
-**Last updated:** 2026-05-21 (E3 FULLY SHIPPED — public dashboard live at `https://dashboard.ourliberty.dev`)
-**Current phase:** **E1, E2, E3, E5 all DONE.** E1 + E5 (2026-05-19). E2 (2026-05-20, PRs #51-#60). E3.1 (PR #62), E3.2 (PR #1 in `ourliberty-dashboard`), E3.3 (Caddy auto-TLS + Cloudflare DNS + Vercel custom domain, no PR — operational). 4 recovery PRs #65-#68 closed 8 cross-repo chain gaps surfaced by the first non-agent-core dispatch.
-**Next concrete action:** **Pause for usage.** E4 (interactive dashboard) trigger: ≥1 week of E3 usage so the "I wish I could do X from here" list accumulates. No urgent next-phase work. Optional small follow-ups (none blocking): move `CANONICAL_REPO_PATHS` to config (TODO in `inbox_watcher.py:70-71` + `cleanup_stale_worktrees.py:36-38`), investigate Mirror's first-pass marker-error pattern on short PRs.
-**Blockers:** None
-**Open questions for Larry:** None outstanding. E3 surfaces resolved through the cross-repo gap recovery.
+**Last updated:** 2026-05-24 (E4 IN PROGRESS — E4.0 + E4.1 + E4.2 + E4.4a all shipped same day; Larry's real Mission Control data now live in `dashboard.ourliberty.dev`)
+**Current phase:** **E1, E1.5, E2, E3, E5 all DONE.** **E4 in progress.** Today (2026-05-24) shipped: E4.0 (Supabase activation; PRs #78 agent-core + #2 dashboard), E4.1 schema v1 + 0002 GRANT hotfix + 0003 external_id (PRs #3 + #4 + #5 dashboard + PR #95 spec calibration), E4.2 Mission Control migration script (PR #96 agent-core; 28 projects + 13 tasks + 6 programs live in Supabase), E4.4a MVP read-only dashboard UI (PR #6 dashboard). Plus 5 calibration / ops PRs (#71 memory cap 2G→4G, #84 E4.0 calibration, #97 Mirror discipline, #99 memory cap 4G→8G, #98 E4.4 sub-spec + reorder). E4.4 reordered before E4.3 (round-5 lock) because round-4 UI CRUD removed E4.4's dependency on `pm_writer`. Sub-spec docs at `agents/beacon/specs/e4-overview.md` + `e4-0-supabase-activation.md` + `e4-1-schema-v1.md` + `e4-2-mission-control-migration.md` + `e4-4-dashboard-ui-rebuild.md` are authoritative for current scope.
+**Next concrete action:** **E4.4b dispatch** (kanban + drag-drop). Trigger: Larry validates E4.4a's render quality + data fidelity at `dashboard.ourliberty.dev`. Then E4.4c (CRUD + forms). Then E4.3 (`pm_writer` + Beacon CLAUDE.md). Then E4.5 (Mission Control decommission) after ≥1 week of new-dashboard usage.
+**Blockers:** None. Child-process leak in inbox-watcher (memory cap bumped 2× today, now at 8G) is real but 8G should last through E4.4b/c; investigation deferred to a dedicated dispatch.
+**Open questions for Larry:** None outstanding. Pending validation of E4.4a UX (what feels wrong / what's missing) before E4.4b dispatches.
 
 **E3 completion summary (2026-05-21) — public dashboard live:**
 
