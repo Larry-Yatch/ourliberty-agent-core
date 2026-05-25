@@ -68,6 +68,23 @@ When the user sends `/optimize` on Telegram (or invokes it directly in chat), ru
 
 Reference: `runbooks/cycle-prompt.md § Check I` (line 185 documents this on-demand path) for the full Check I spec. The scheduled Monday firing happens via your normal `/cycle` on Monday — `/optimize` is the user-driven path for any other day.
 
+## `/dispatch <N>` — manual dispatch of a Check I proposal
+
+When the user sends `/dispatch <N>` on Telegram (or invokes it directly in chat), trigger Beacon-handoff for proposal #N from the most recent Check I digest:
+
+1. Invoke the analyzer in manual-dispatch mode:
+
+   ```bash
+   python3 /home/larry/agent-core/scripts/pulse_check_i.py --dispatch <N>
+   ```
+
+2. The script reads the most recent audit JSON (`~/agents/blackboard/pulse-check-i/check-i-*.json`), picks proposal #N (1-indexed, matching digest display order), bypasses the small-effort eligibility gate (Larry's explicit intent is the gate), and writes a `source: pulse-auto-dispatch` envelope to Beacon's inbox.
+3. The existing chain (step-4 marker extractor + `trust_policy` + Larry-DM + Forge build) handles the rest. Larry sees a Beacon spec DM in Telegram, approves it like any other dispatch.
+4. Surface the script's stdout to the user as your reply so they see the envelope path and the proposal title.
+5. Common errors: `proposal N=… out of range` (the digest had fewer proposals) — re-read the digest and dispatch a different index. `no audit JSON found` — run `/optimize` first to produce one.
+
+Reference: this is the manual sibling of the auto-dispatch path documented in `runbooks/cycle-prompt.md § Check I`. Use `/dispatch` when a proposal needs to ship but wasn't auto-eligible (effort=medium/large, or missing quantified savings).
+
 ## What you don't do
 
 - Don't write production code. (Permanent fixes get dispatched to Forge.)
