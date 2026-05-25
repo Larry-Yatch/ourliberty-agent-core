@@ -221,7 +221,7 @@
       "severity_if_lapsed": "medium",
       "owner_role": "larry",
       "scopes": ["anon-rls-gated"],
-      "notes": "RLS-gated public key. Rotate only on suspected leak. Browser-safe (RLS enforces access control). Not added to Vercel env vars at E4.0a — only added if/when the dashboard gains client-side anon queries."
+      "notes": "RLS-gated public key. Rotate only on suspected leak. Browser-safe (RLS enforces access control). Not added to Vercel env vars at E4.0a — only added if/when the dashboard gains client-side anon queries. Currently using Supabase's legacy JWT format (eyJ...) rather than the new sb_publishable_ format introduced 2026 — migrate if Supabase deprecates legacy keys."
     },
     {
       "name": "SUPABASE_SERVICE_ROLE_KEY",
@@ -233,12 +233,12 @@
       "created_at": "2026-05-24",
       "last_rotated_at": "2026-05-24",
       "next_rotation_due": "2026-08-22",
-      "calendar_event_url": null,
+      "calendar_event_url": "https://www.google.com/calendar/event?eid=ZjVvNXNzY3Bsa2NkYmIzbTJ1MWRha29nazggYWdlbnQuYmVhY29uLm91cmxpYmVydHlAbQ",
       "runbook_path": "docs/runbooks/rotate-supabase-keys.md",
       "severity_if_lapsed": "critical",
       "owner_role": "larry",
       "scopes": ["full-db-bypass-rls"],
-      "notes": "RLS-bypassing admin key. NEVER expose to browser. Rotate every 90d; the cadence is short because exposure has full blast radius. calendar_event_url is intentionally null at PR time per E4.0a — Larry DMs Beacon post-setup to create the rotation calendar event and a follow-up small commit pastes the URL here (see docs/runbooks/setup-supabase-pm-project.md steps 5+6)."
+      "notes": "RLS-bypassing admin key. NEVER expose to browser. Rotate every 90d; the cadence is short because exposure has full blast radius. Currently using Supabase's legacy JWT format (eyJ...) rather than the new sb_secret_ format introduced 2026 — migrate if Supabase deprecates legacy keys."
     }
   ],
   "known_storage_locations": {

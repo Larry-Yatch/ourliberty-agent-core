@@ -67,9 +67,33 @@ The anon and service-role keys are easy to confuse — both are `eyJ...` JWTs. T
 
 We use the same `pbpaste | ssh ...` pattern documented in `docs/runbooks/rotate-vercel-token.md` step 2, adapted to handle three values. The pattern guarantees the secrets never land in shell history, never get written to a temp file outside your laptop's clipboard, and arrive at `.env.larry` with mode `0600`.
 
-The slots already exist in `.env.larry` as empty `SUPABASE_*=` lines (landed 2026-05-19 as the forward-looking stub). The install commands below replace those empty values in-place.
+### 3.0 — Bootstrap the slots (one-time, idempotent)
 
-Run each of the three install commands separately. **For each one: first copy the value to your clipboard from your Notes scratch buffer (Step 2), then run the command.** The clipboard contents flow through `pbpaste` and over SSH into `.env.larry`.
+The install commands in 3a/3b/3c below use regex-replace (`re.subn` with `^SUPABASE_*=`), which requires the slots to ALREADY exist in `.env.larry`. The forward-looking stub at `rotate-supabase-keys.md` referenced these slots but they were never actually created — verified during the first real activation on 2026-05-24. **Run this bootstrap command first; it's idempotent (only appends missing slots):**
+
+```bash
+ssh larry@134.209.44.80 'python3 -c "
+import re, os, tempfile
+p = \"/home/larry/credentials/.env.larry\"
+content = open(p).read()
+needed = [\"SUPABASE_URL\", \"SUPABASE_ANON_KEY\", \"SUPABASE_SERVICE_ROLE_KEY\"]
+appended = []
+for name in needed:
+    if not re.search(rf\"^{name}=\", content, flags=re.M):
+        content += (\"\" if content.endswith(\"\n\") else \"\n\") + f\"{name}=\n\"
+        appended.append(name)
+if appended:
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(p))
+    os.write(fd, content.encode()); os.close(fd); os.chmod(tmp, 0o600); os.rename(tmp, p)
+    print(\"appended slots:\", appended)
+else:
+    print(\"all slots already exist\")
+"'
+```
+
+Expected first-run output: `appended slots: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']`. Re-runs: `all slots already exist`.
+
+Run each of the three install commands below separately. **For each one: first copy the value to your clipboard from your Notes scratch buffer (Step 2), then run the command.** The clipboard contents flow through `pbpaste` and over SSH into `.env.larry`.
 
 ### 3a. Install SUPABASE_URL
 
