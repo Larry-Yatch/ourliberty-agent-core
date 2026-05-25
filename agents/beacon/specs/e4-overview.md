@@ -51,6 +51,7 @@ This is the largest single phase in the E plan by scope. It's also the highest-l
 | Project detail default view | **Kanban by task status** (list view available as alternate) | Matches Mission Control muscle memory. List available but not the default. Locked 2026-05-24 round 3. |
 | First-of-day digest format | **5-7 bullets ~7am MDT**: yesterday's merges, today's in-flight tasks, blockers needing decision, costs vs. budget | Default; configurable later. Locked 2026-05-24 round 3. |
 | Mission Control parallel-run length | **≥1 week; Larry calls cutover** | Decommission once Larry confirms he hasn't gone back to MC. No fixed deadline. Locked 2026-05-24 round 3. |
+| Direct UI CRUD in dashboard | **REQUIRED in E4.4 scope**: + New Program/Project/Task buttons, inline-edit on all fields, delete-via-overflow with confirm. Also `+ New Decision` in Project sidebar. | Without UI CRUD, daily PM work would require opening Telegram for routine adds/edits — that's the comms-channel-overload pattern E4 was built to fix. Locked 2026-05-24 round 4 after gap surfaced during E4.2 dispatch planning. |
 
 ---
 
@@ -231,6 +232,26 @@ The current E3 dashboard (`ourliberty-dashboard` repo) is 4 read-only pages (Ove
 - **Inside a Program**: horizontal tabs across the top let you switch between Programs without going back to the grid. Active Program highlighted. Stays on the Projects view as you switch.
 - **Projects view (default kanban)**: columns = status (notstarted | inprogress | blocked | done). Cards = Projects with reporting_brief preview, blocker badge, priority indicator, owner. Drag-drop between columns to change status. Drag-drop between Programs (via the top tabs as drop targets) preserved from Mission Control.
 
+**Direct UI CRUD — locked 2026-05-24 round 4 (added after gap surfaced)**
+
+The PM dashboard MUST support direct UI creation + edit + delete of projects and tasks, matching Mission Control's daily-use ergonomics. Without this, you'd be forced to open Telegram for routine "add a task" work — the exact comms-channel-overload pattern E4 was supposed to fix.
+
+- **`+ New Program`** action in the Programs grid landing — modal form (name, description, color picker, project_type? — probably no — and Program-level status). Auto-positions at end.
+- **`+ New Project`** action in each Program's kanban view (top-right of column header OR floating button) → modal or right-side drawer with fields: name, description, reporting_brief, owner, priority, project_type (`personal | agent_os_build | client | research`), links. Status defaults to `notstarted`.
+- **`+ New Task`** action inside Project detail view → inline row at bottom of kanban column OR modal. Fields: name, description, assignee, due_date. Defaults: `task_type='human'`, `agent=null`, `status='pending'`.
+- **Inline edit on Project cards** (click any visible field → editable input → save on blur/Enter; escape cancels). Covers: name, reporting_brief, owner, priority, blocker_type, blocker_note, next_action.
+- **Click a Project card → opens detail drawer** with full field set editable (Mission Control's side-panel pattern). All fields editable inline including `links` (add/remove pairs).
+- **Inline edit on Task rows** similar pattern. Covers: name, description, assignee, due_date.
+- **Delete via overflow menu** (`⋯` icon on each Project/Task card) → confirm modal. Hard delete (CASCADE on FK handles cleanup).
+- **`+ New Decision`** action in Project detail sidebar → inline form (title, context, options_considered as JSON-shaped repeater, decision, reversibility, decided_by defaults to "larry").
+
+**Two creation paths converge on Supabase:**
+
+- **UI path (this spec):** browser → Next.js Route Handler → `getSupabaseServer().table(...)` → insert/update.
+- **Telegram path (`/new-project`, `/new-task`):** Telegram → Beacon → `pm_writer.create_project(...)` → insert.
+
+Both write to the same Supabase, both use the service-role key server-side. The UI path is the everyday surface; the Telegram path is for hands-busy moments (driving, on phone, mid-meeting) and for agent OS dispatches that auto-create Task rows.
+
 **Project detail view (default = kanban by task status, locked 2026-05-24 round 3)**
 - Header: name, status, priority, owner, dates, links to Google Docs.
 - Body: tasks kanban — columns by task status (pending | in_progress | blocked | completed | cancelled). Cards show task name, agent (if any), assignee, due_date, cost. Both human and agent_dispatch tasks shown together, distinguished by an icon.
@@ -312,16 +333,20 @@ Sub-phases ship in order (E4.0 → E4.5). Parallel dispatches can ship anytime t
 - Forge dispatch envelope validator adds optional `project_id` field; Beacon populates it on construction.
 - Unit tests on the pm_writer library; integration tests behind a `PM_WRITER_TEST_SUPABASE_URL` env (skipped in normal CI).
 
-### E4.4 — Dashboard UI rebuild (Forge dispatch ~2 days, biggest sub-phase)
+### E4.4 — Dashboard UI rebuild (Forge dispatch ~2-3 days, biggest sub-phase)
 
 - Rewrite `ourliberty-dashboard` Next.js app per § 5.4.
 - New routes: `/programs`, `/programs/[id]`, `/projects/[id]`, `/tasks/[id]`, `/comms-inbox`.
-- New components: `<ProgramCard>`, `<ProjectKanbanCard>`, `<TaskTimeline>`, `<EventLogRow>`, `<BlockerBadge>`, `<CostRollup>`.
+- New components: `<ProgramCard>`, `<ProjectKanbanCard>`, `<TaskTimeline>`, `<EventLogRow>`, `<BlockerBadge>`, `<CostRollup>`, plus the CRUD set: `<ProgramFormModal>`, `<ProjectFormDrawer>`, `<TaskFormInline>`, `<DecisionFormInline>`, `<InlineEditableField>`, `<ConfirmDeleteModal>`.
+- **Direct UI CRUD (per § 5.4 "Direct UI CRUD" subsection, locked round 4):** + New Program/Project/Task/Decision buttons; inline edit on all visible fields; delete via overflow menu with confirm. Both UI path and Telegram `/new-*` path converge on Supabase.
+- API mutations: Next.js Route Handlers at `/api/programs`, `/api/projects`, `/api/tasks`, `/api/decisions` (POST/PATCH/DELETE) using service-role server-side per § 5.3.
 - Drag-drop via `@dnd-kit/core` (battle-tested, accessible).
 - SWR for live droplet-state cards; direct Supabase queries (via Next.js Route Handlers) for PM data.
-- New Vitest tests for the kanban drag logic, the timeline renderer, the route handlers.
+- Optimistic updates on CRUD operations (SWR mutate pattern) so UI feels instant.
+- New Vitest tests for the kanban drag logic, the timeline renderer, the route handlers, the inline-edit field component, the CRUD route handlers (mocked supabase).
 - Live-deployed to `dashboard.ourliberty.dev` once merged (Vercel auto-deploy).
-- The OLD read-only dashboard is REPLACED; no parallel maintenance. The new dashboard absorbs all E3 features (agent status, tasks list, costs, healers) and adds the PM surface.
+- The OLD read-only dashboard is REPLACED; no parallel maintenance. The new dashboard absorbs all E3 features (agent status, tasks list, costs, healers) AND adds the PM surface with full CRUD.
+- **Scope grew round 4 from "view + drag-drop" to "view + drag-drop + CRUD"** — estimated effort bump from ~2 days to ~2-3 days; estimated cost from $25-40 to $30-50 LLM.
 
 ### E4.5 — Mission Control decommission + Marvin cleanup (Larry-actions: ~½ hour, Claude assists)
 
@@ -417,7 +442,7 @@ Risks:
 | E4.1 Schema v1 | ~$5 (Forge dispatch) | ½ day | 15 min review + approve `supabase db push` |
 | E4.2 Migration script | ~$5 (Forge dispatch) | ½ day | ~30 min copy files + run script + verify in UI |
 | E4.3 pm_writer + Beacon updates | ~$8 (Forge dispatch, biggest of the API layer) | 1 day | ~15 min smoke test |
-| E4.4 Dashboard UI rebuild | ~$25-40 (multi-dispatch likely; biggest unknown) | 2 days | Spot-check Vercel previews + final approval |
+| E4.4 Dashboard UI rebuild (incl. CRUD per round 4) | ~$30-50 (multi-dispatch likely; biggest unknown) | 2-3 days | Spot-check Vercel previews + final approval |
 | E4.5 Decommission | $0 | ½ hour | ~½ hour ops |
 | P-1 Comms narrowing | ~$5 | 1 day | None |
 | P-2 Plan-First Protocol | ~$10 | 1-2 days | Read first auto-generated plan + provide feedback |
