@@ -187,7 +187,8 @@ Temporary route handler at `app/api/supabase-smoke/route.ts` that does the same 
 
 | Decision | Value | Rationale |
 |---|---|---|
-| Project owner Google account | `agent.beacon.ourliberty@gmail.com` | Per E4 overview round 1 decision. Tenant separation. |
+| Project owner | **Larry-Yatch GitHub** (overrode 2026-05-24 during setup) | Originally locked as `agent.beacon.ourliberty@gmail.com`. Overridden during activation: Supabase has no Google SSO, and matching Vercel's existing posture (also Larry-Yatch GitHub) beats splitting identities for the PM dashboard's infra. Tenant-separation argument re-engaged in Phase F when per-product Supabases land. |
+| API key format | **Legacy JWT (`eyJ...`)** — not the new `sb_publishable_/sb_secret_` format | Supabase introduced new API key format mid-2026. Our runbook + lib/supabase-server.ts + install validators all assume the legacy JWT shape; switching to new format would break them. Stick with legacy until Supabase announces deprecation, then migrate. |
 | Region | `us-east-1` (AWS Virginia) | Geographically close to NYC3 droplet. Latency-optimized. |
 | Pricing tier | Free | Sufficient for PM workload (500MB DB, unlimited API requests, RLS-included). Upgrade to Pro ($25/mo) only when needed. |
 | Project naming | `ourliberty-pm-dashboard` | Distinct from future per-product Supabase projects (TruPath, AI Co will be `ourliberty-trupath`, etc.). |
