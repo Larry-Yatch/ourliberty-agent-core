@@ -4,6 +4,29 @@
 
 ---
 
+## Iteration 83 — 2026-05-25 09:00 UTC (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Source repo: dirty tree.** M runbooks/cycle-journal.md — uncommitted iter 82 journal write (written 00:46Z, never committed because interactive cycles don't auto-commit). Known interactive-cycle limitation; resolving at cycle end with commit. Branch=main, not behind origin. ⚠️
+- **(B) Sync health: error.** sync.json status=error "Uncommitted changes in working tree" at 08:20:34Z. Root cause: dirty tree from Check A. Sync blocked since iter 82. Resolves when tree is committed at cycle end. ⚠️
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 07:05Z (Ledger weekly alert delivery idx=134 — fresh). Forge: 2026-05-24T14:40:31Z (read timeout — calibrated). Mirror: 2026-05-23T19:11:43-0600 = 2026-05-24T01:11Z (~32h — calibrated HTTP 502/timeout). Pulse: 2026-05-24T18:58:37-0600 = 2026-05-25T00:58Z (~8h — /optimize call, calibrated). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty (0 active files). .invalid: forge×3, pulse×3 — old/closed per prior cycles. No new .invalid files. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. inbox-watcher MemoryMax raised 4G→8G today (PR #99 — "second bump same day") — not a process-liveness concern but noted under H/G. ✅
+- **(H) Forge digest.** 0 open Forge PRs. 18 PRs merged today (00:10Z–05:15Z): #82 (closed-loop step 4), #83 (closed-loop step 5 FINAL), #84 (E4.0 post-setup calibration), #85 (E4.1 spec), #86 (pulse --dispatch CLI), #87–#88 WIP session-start, #89 (E4.2 sub-spec), #90 (E4 UI CRUD lock), #91–#94 WIP session-start, #95 (E4.1 spec calibrate), #96 (E4.2 migration script), #97 (E4 calibration bundle), #98 (E4.4 sub-spec), #99 (inbox-watcher 4G→8G). Heavy E4 build day. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (89d out, outside window). All other scheduled/scope_audit entries 348–360d out. ✅
+- **Check I: fired (Monday 2026-05-25, 2nd week).** Ledger sentinel present. Analyzer ran mode=digest. DM queued. $251.49/week (+$135.58 / +117% vs last week $115.91 — heavy build week: closed-loop steps 1–5, full E4 spec + implementation burst). 0 sigma anomalies. Retry overhead: $5.50 (2.2% — well within bounds). High-repeat: task-34-e4-2-mission-control-migration ×6 (top); others historical. 1 proposal: [medium] template task-34-e4-2-mission-control-migration. 0 auto-dispatched (medium effort). **Idempotency bug confirmed week 2:** two "Check I (2026-05-25)" blocks in journal (first from /optimize at ~01:00Z, second from this cycle at 08:48Z). G-rule fires → Beacon dispatch. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Dispatched cycle-fix-check-i-idempotency-20260525T084813Z.json to ~/agents/inboxes/beacon/ (Check I idempotency fix). Committing operational writes at cycle end (resolves A+B dirty tree + sync error).
+**Escalated:** Nothing new to Larry. Check I idempotency dispatch routed to Beacon. Iter 43/49 [yellow] stuck-cycle escalation remains open.
+**Forge:** 18 shipped today (#82–#99, 00:10Z–05:15Z — closed-loop FINAL + full E4 burst). 0 open.
+**Patterns:** Check I double-write confirmed on 2nd consecutive Monday (G-rule: dispatch sent to Beacon for idempotency guard). Telegram network errors ongoing (G-rule dispatched iter 57, awaiting Beacon response). Inbox-watcher MemoryMax raised 4G→8G today (2nd raise in 4 days; 3rd occurrence needed for G-rule; monitoring for iter 84+).
+**Learned:** Check I idempotency fix dispatched to Beacon. Cost +117% this week ($251.49) — explainable by closed-loop + E4 build burst; no anomalies. Inbox-watcher at 8G — MEMORY.md watch item updated.
+
+---
+
 ## Iteration 82 — 2026-05-25 00:46 UTC (interactive)
 
 **Health:** ✅ Nominal
@@ -1986,3 +2009,21 @@
 - Mode: digest — 1 proposal(s):
   1. [medium] Template / fast-path repeating shape `opmanual-d35-5b-shipped-note-001` — 4 repeats observed this week; templating would collapse most retry cycles
      Rationale: Outbox archives show this task_id retried 4 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-25):**
+
+- Ledger total: $205.69; 0 anomaly(ies)
+- Retry overhead: $4.95 (2.4%)
+- High-repeat tasks: `task-34-e4-2-mission-control-migration`×6, `closed-loop-beacon-outbox-pulse-trigger-004`×4, `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 6 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-25):**
+
+- Ledger total: $251.49; 0 anomaly(ies)
+- Retry overhead: $5.50 (2.2%)
+- High-repeat tasks: `task-34-e4-2-mission-control-migration`×6, `closed-loop-beacon-outbox-pulse-trigger-004`×4, `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 6 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
