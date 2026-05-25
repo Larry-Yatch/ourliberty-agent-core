@@ -4,6 +4,29 @@
 
 ---
 
+## Iteration 82 — 2026-05-25 00:46 UTC (interactive)
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Source repo: nominal.** Session gitStatus: branch=main, clean tree, HEAD=08494af8=origin/main (sync.json confirms success at 08494af8, 00:20:39Z). ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-25T00:20:39Z (~26m ago), status=success ("Synced fe0fc0d → 08494af8"). Within 2h threshold. ✅
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: fresh log 2026-05-25T00:46:17Z (seconds before cycle — active, approved closed-loop-005, responded to Larry's "something broken?" query). Forge: last 2026-05-24T14:40:31Z (~10h — calibrated timeout). Mirror: last 2026-05-24T01:11:43Z (~23.6h — calibrated 502/timeout). Pulse: calibrated. ✅
+- **(D) Inboxes: nominal.** Beacon/Forge/Pulse inboxes empty. Mirror inbox: review-closed-loop-pulse-auto-dispatch-005-rev1.json — created 2026-05-25T00:42:56Z (3.4 min old, well under 1h). Mirror review for PR #83 revision round 1 in flight. ✅
+- **(E) PRs: nominal.** 1 open: #83 `feat(pulse-check-i): auto-dispatch small-effort proposals to Beacon (closed-loop step 5, FINAL)` (forge/closed-loop-pulse-auto-dispatch-005, created 00:28Z, 18 min old, reviewDecision="" — Mirror review dispatched via inbox task). Not at 30m clean+green threshold. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 1 open PR: #83 (18 min old, < 24h). 6 PRs merged in last 4h: #75 (cadence step 1), #77 (no-signal suppress, step 2), #79 (auto-refresh Ledger sidecar, step 3), #80 (fix outbox-notifier overwrite), #78 (E4.0a Supabase credential discipline), #82 (APPROVAL_REQUEST extraction, step 4). Closed-loop pipeline burst nominal — steps 1–4 all landed. ✅
+- **Credential rotations: nominal.** New entry since iter 81: SUPABASE_SERVICE_ROLE_KEY (90d rotation, due 2026-08-22 = 89d out, outside 60d window). All other scheduled/scope_audit/auto_refresh entries 348–362d out. 0 overdue, 0 upcoming within 60d. ✅
+- **Check I: skipped.** Firing day (Mon 2026-05-25 UTC). Ledger sentinel `ledger-ready-2026-05-25` not yet present at 00:46 UTC — Ledger hasn't run yet today. pulse_check_i.py triple-write/idempotency watch active; will fire when sentinel lands. ✅
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Nothing. No always-fix conditions triggered.
+**Escalated:** Nothing new. Iter 43/49 [yellow] stuck-cycle escalation remains open.
+**Forge:** 6 shipped since iter 81 (#75, #77, #78, #79, #80, #82 — closed-loop steps 1–4 + E4.0a Supabase). 1 open: #83 (step 5 FINAL, under Mirror revision review round 1).
+**Patterns:** Telegram network errors ongoing (G-rule dispatched iter 57, awaiting Beacon response). No new patterns. Closed-loop steps 1–4 landed in burst; step 5 PR #83 under review.
+**Learned:** SUPABASE_SERVICE_ROLE_KEY added (90d cadence, due 2026-08-22). First 90d credential in registry — enters 60d window 2026-06-23. Check I idempotency watch deferred; Ledger sentinel not present at cycle time.
+
+---
+
 ## Iteration 81 — 2026-05-24 20:46 UTC (interactive)
 
 **Health:** ✅ Nominal
