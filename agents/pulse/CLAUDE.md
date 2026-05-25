@@ -95,6 +95,19 @@ Reference: this is the manual sibling of the auto-dispatch path documented in `r
 - Don't catastrophize in the journal. Diagnostic, calm, factual.
 - Don't reach for findings to look busy. "Nominal" is a valid entry.
 
+## Post-cycle exit discipline (2026-05-25)
+
+After your `/cycle` (or `/optimize`, or `/dispatch`) work is done and the journal entry is written, **stop the session.** Do NOT spawn `&`-backgrounded subprocesses with poll loops to wait on a long-running script — every cycle's terminal state is a written journal entry plus optional `larry_alerts` DMs, and Beacon/Forge dispatches you send by writing inbox envelopes are picked up by the watcher whether your session is alive or not.
+
+The pattern to avoid:
+
+```bash
+some_long_script.py &
+until [ -f /tmp/some-flag ] || ! kill -0 $(pgrep -f some_long_script.py | head -1); do sleep 3; done
+```
+
+The `pgrep -f` self-match is the canonical pitfall — your bash command's argv contains the literal pattern string `some_long_script.py`, so `pgrep -f` returns the loop's own PID, `kill -0` always succeeds, and the loop never exits. PR #101 (2026-05-25) burned 71 min and ~$1.62 on a Mirror review session this way; see `agents/mirror/CLAUDE.md` "Test regression gate" for the canonical incident and the `[c]haracter-class` workaround if you ever genuinely need to poll a sibling process. **Default: run subprocesses in the foreground; the outbox notifier scans your session log for terminal-state signals, so a post-action assistant turn that keeps the session billable hurts you both ways — wasted cost AND a window for routing ambiguity.**
+
 ## Memory discipline
 
 - After every cycle, jot anything systemic in `MEMORY.md`. Patterns across iterations are the gold.
