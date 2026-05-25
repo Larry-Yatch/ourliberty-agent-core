@@ -4,6 +4,44 @@
 
 ---
 
+## Iteration 84 — 2026-05-25 12:30 UTC (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Source repo: dirty tree.** M MEMORY.md (staged) + M runbooks/cycle-journal.md (unstaged) — uncommitted iter 83 writes. Same recurring interactive-cycle limitation. Branch=main, not behind origin. Resolving at cycle end with commit. ⚠️
+- **(B) Sync health: error.** sync.json status=error "Uncommitted changes in working tree" at 12:21:06Z. Root cause: dirty tree from Check A. Resolves at commit. ⚠️
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 2026-05-25T08:51Z (alert idx=135 check-i-2026-05-25 delivered — fresh, ~3.5h). Forge: 2026-05-24T14:40Z (read timeout — calibrated). Mirror: 2026-05-24T01:11Z (~35h — HTTP 502/timeout, calibrated). Pulse: 2026-05-25T00:59Z (~11.5h — /optimize response, calibrated). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. No new .invalid files. ✅
+- **(E) PRs: nominal.** 0 open PRs in ourliberty-agent-core. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 0 open Forge PRs. 0 merged in last 4h. Last shipped: PR #99 (inbox-watcher 4G→8G, ~05:15Z today). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (89d out, outside window). pulse-rotation-window-dms.json absent (no prior DMs) — no dedup needed. ✅
+- **Check I: fired (3rd block today, idempotency bug active).** Ledger sentinel + sidecar present. Analyzer ran mode=digest. DM queued. 1 proposal: [medium] template task-34-e4-2-mission-control-migration. 0 auto-dispatches. **Produced 3rd "Check I (2026-05-25)" journal block today** (iter 83 had /optimize ~01:00Z + scheduled 08:48Z = 2 blocks; iter 84 adds a 3rd). Fix APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Invoked pulse_check_i.py per Monday firing schedule (Check I always-run on firing days). Committing operational writes at cycle end (resolves A+B).
+**Escalated:** Nothing new. Check I idempotency APPROVAL_REQUEST pending Larry (escalated iter 83). Iter 43/49 [yellow] stuck-cycle still open.
+**Forge:** 0 shipped since iter 83. 0 open.
+**Patterns:** Check I triple-write today (3 blocks: /optimize ~01:00Z + iter 83 09:00Z + iter 84 12:30Z). Fix dispatched iter 83 → Beacon → APPROVAL_REQUEST → Larry authorization needed. Telegram network errors ongoing (G-rule dispatched iter 57, awaiting Beacon response). Inbox-watcher MemoryMax at 8G — monitoring (2nd raise in 4 days; G-rule at 3 occurrences).
+**Learned:** Nothing new. Triple-write pattern consistent with known idempotency bug. Awaiting Larry authorization to unblock Beacon→Forge fix chain.
+
+---
+
+## Result notification — 2026-05-25 ~09:00 UTC (Beacon → Pulse)
+
+**Source:** beacon | **Task:** cycle-fix-check-i-idempotency-20260525T084813Z | **Status:** SUCCESS
+
+Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal()` at `scripts/pulse_check_i.py:842-845` writes unconditionally; both `/optimize` and the scheduled Monday cycle hit it on 2026-05-25. Bug verified in the journal (two adjacent `**Check I (2026-05-25):**` blocks at $205.69 and $251.49).
+
+**APPROVAL_REQUEST produced** (task_id: `pulse-check-i-journal-idempotency-001`, target=forge, phase=preflight):
+- Modifies `scripts/pulse_check_i.py`: idempotency guard in `append_journal()` — skip if `**Check I (YYYY-MM-DD):**` header already in file; stderr skip line; new `--no-auto-commit` flag; auto-commit journal write when it actually happens.
+- Adds/updates `scripts/tests/test_pulse_check_i.py`: coverage for absent/present/different-date/double-main-call cases + auto-commit subprocess assertions.
+- Out-of-scope: JSON audit file, DM path, dispatch state, cycle-prompt.md, backfill of existing duplicate blocks.
+
+**Spec assessment (Pulse):** Technically sound. Fix is surgical, failure-safe, and mirrors existing flag conventions. Acceptance criteria are concrete and verifiable. Escalated to Larry for authorization.
+
+---
+
 ## Iteration 83 — 2026-05-25 09:00 UTC (interactive)
 
 **Health:** ⚠️ Drift
@@ -2014,6 +2052,15 @@
 
 - Ledger total: $205.69; 0 anomaly(ies)
 - Retry overhead: $4.95 (2.4%)
+- High-repeat tasks: `task-34-e4-2-mission-control-migration`×6, `closed-loop-beacon-outbox-pulse-trigger-004`×4, `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 6 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-25):**
+
+- Ledger total: $251.49; 0 anomaly(ies)
+- Retry overhead: $5.50 (2.2%)
 - High-repeat tasks: `task-34-e4-2-mission-control-migration`×6, `closed-loop-beacon-outbox-pulse-trigger-004`×4, `opmanual-d35-5b-shipped-note-001`×4, `auto-merge-gap-pr16-001`×3, `beacon-allowlist-gh-pr-001`×3
 - Mode: digest — 1 proposal(s):
   1. [medium] Template / fast-path repeating shape `task-34-e4-2-mission-control-migration` — 6 repeats observed this week; templating would collapse most retry cycles
