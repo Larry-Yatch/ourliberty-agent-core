@@ -222,6 +222,13 @@ python3 scripts/test_regression_check.py \
 
 The gate is a Bash check, not a judgment call — the script's exit code is the contract.
 
+**Run synchronously. Never background this check.** The script takes 1–10 minutes (pytest runs twice — once at parent SHA, once at head SHA — both with internal timeouts per `--timeout-per-sha`). Run it as a foreground Bash command and wait for the exit code. Do NOT background it (`&`) and poll for a flag file. Two failure modes have actually fired and burned the full 4h `timeout=14400s` Mirror window:
+
+1. **Self-matching pgrep.** A poll loop like `until [ -f /tmp/regression-done ] || ! kill -0 $(pgrep -f test_regression_check.py | head -1); do sleep 3; done` matches its own shell process via `pgrep -f` — the bash command line contains the literal pattern string `test_regression_check.py`, so `pgrep` returns the poll loop's own PID, `kill -0` always succeeds, and the loop never exits. If you must poll a backgrounded process anywhere else, use the bracket-regex trick: `pgrep -f '[t]est_regression_check.py'` (the brackets are a one-char character class; the literal pattern in your own argv contains the brackets and won't match the bracketless regex).
+2. **Missing completion flag.** `test_regression_check.py` does not write any `/tmp/regression-done` flag. If you start it backgrounded and poll for one, you'll wait forever until the watcher's hard timeout kills the whole review.
+
+Either failure hangs the entire Mirror review and blocks every PR queued behind it. Just run the check foreground.
+
 ### What "REVIEW_ESCALATE" means vs "REVIEW_REVISION"
 
 The distinction is **fixability in place**. REVISION says "Forge can patch this in the same worktree under --resume." ESCALATE says "the spec or the approach is wrong; Forge can't fix this without Beacon changing the plan."
