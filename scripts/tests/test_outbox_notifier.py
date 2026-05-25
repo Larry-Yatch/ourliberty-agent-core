@@ -5019,6 +5019,304 @@ class BeaconReplanLoopTest(unittest.TestCase):
 # ValidateReplanDisciplineTest.test_short_mirror_reason_adapts_threshold.
 
 
+# -------------------- closed-loop step 4 — Pulse-auto-dispatch trigger --------------------
+
+
+class BeaconPulseAutoDispatchTest(unittest.TestCase):
+    """Closed-loop step 4: Beacon outbox with source='pulse-auto-dispatch'
+    + APPROVAL_REQUEST marker → notifier extracts, runs trust_policy with
+    source='pulse-auto-dispatch', adds pending, queues larry-alert.
+
+    Setup/teardown mirrors BeaconReplanLoopTest exactly — same tmpdir
+    reroute of AGENTS_ROOT + INBOXES_ROOT + OUTBOXES_ROOT + larry_alerts +
+    pending-approvals state + trust_policy paths.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._la = la
+        import beacon_approval_handler as ah
+        self._ah_original = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'state' / 'pending-approvals.json'
+        self._ah = ah
+        import trust_policy as tp
+        self._tp = tp
+        self._tp_original_runtime = tp.RUNTIME_POLICY_PATH
+        self._tp_original_repo = tp.REPO_POLICY_PATH
+        tp.RUNTIME_POLICY_PATH = self._root / 'trust-policy.json'
+        tp.REPO_POLICY_PATH = self._root / 'trust-policy-repo.json'
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        for name, value in self._la_originals.items():
+            setattr(self._la, name, value)
+        self._ah.PENDING_APPROVALS_PATH = self._ah_original
+        self._tp.RUNTIME_POLICY_PATH = self._tp_original_runtime
+        self._tp.REPO_POLICY_PATH = self._tp_original_repo
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _set_policy(self, default_action='force_ask', rules=None):
+        policy = {
+            'version': 1,
+            'default_action': default_action,
+            'rules': rules or [],
+        }
+        self._tp.RUNTIME_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        self._tp.RUNTIME_POLICY_PATH.write_text(json.dumps(policy))
+
+    def _write_outbox(self, agent, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _read_alerts(self):
+        if not self._la.ALERTS_FILE.exists():
+            return []
+        lines = self._la.ALERTS_FILE.read_text().splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
+    def _pulse_auto_dispatch_outbox(
+        self,
+        marker_text=None,
+        narrative_prefix='Plan for the Pulse-flagged proposal below.',
+        reply_chat_id=7998341473,
+        task_id='task-001',
+        **overrides,
+    ):
+        """Synthetic Beacon outbox responding to a Pulse-auto-dispatch
+        inbox envelope. Marker payload's task_id matches the envelope
+        task_id by default so the discipline gate passes."""
+        if marker_text is None:
+            marker_text = _beacon_approval_request_marker(task_id=task_id)
+        result = (
+            f'{narrative_prefix}\n\n{marker_text}'
+            if marker_text else narrative_prefix
+        )
+        body = _good_outbox(
+            agent='beacon',
+            source='pulse-auto-dispatch',
+            task_id=task_id,
+            result=result,
+        )
+        if reply_chat_id is not None:
+            body['reply_chat_id'] = reply_chat_id
+        body.update(overrides)
+        return body
+
+    # ----- happy path: marker extracted, force_ask queued -----
+
+    def test_approval_request_force_ask_queues_alert(self):
+        body = self._pulse_auto_dispatch_outbox()
+        f = self._write_outbox('beacon', 'beacon-pad.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        pending = state.get('pending', [])
+        self.assertEqual(len(pending), 1)
+        entry = pending[0]
+        self.assertEqual(entry['id'], 'task-001')
+        self.assertEqual(entry['chat_id'], 7998341473)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 1)
+        rec = approval_records[0]
+        self.assertEqual(rec['approval_id'], 'task-001')
+        self.assertEqual(rec['chat_id'], 7998341473)
+        self.assertIn('task-001', rec['body'])
+
+    # ----- no marker → falls through to default routing -----
+
+    def test_no_marker_falls_through(self):
+        body = self._pulse_auto_dispatch_outbox(marker_text='')
+        f = self._write_outbox('beacon', 'beacon-pad-noop.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 0)
+
+    # ----- malformed marker → WARN + fall through -----
+
+    def test_malformed_marker_falls_through(self):
+        bad_payload = json.dumps({'task_id': 'task-001'})  # missing fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._pulse_auto_dispatch_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-pad-bad.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- discipline gate: task_id mismatch falls through -----
+
+    def test_task_id_mismatch_falls_through(self):
+        marker = _beacon_approval_request_marker(task_id='task-WRONG')
+        body = self._pulse_auto_dispatch_outbox(marker_text=marker)
+        f = self._write_outbox('beacon', 'beacon-pad-mismatch.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+
+    # ----- missing chat_id → fall through -----
+
+    def test_missing_reply_chat_id_falls_through(self):
+        body = self._pulse_auto_dispatch_outbox(reply_chat_id=None)
+        body.pop('reply_chat_id', None)
+        f = self._write_outbox('beacon', 'beacon-pad-nochat.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-pulse-auto-dispatch')
+
+    # ----- trust_policy: reject path DMs Larry the rejection -----
+
+    def test_trust_policy_reject_queues_rejection_dm(self):
+        self._set_policy(default_action='reject')
+        body = self._pulse_auto_dispatch_outbox()
+        f = self._write_outbox('beacon', 'beacon-pad-rej.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        alerts = self._read_alerts()
+        notifs = [a for a in alerts if a.get('kind') == 'notification']
+        self.assertEqual(len(notifs), 1)
+        self.assertEqual(notifs[0]['intent'], 'reject')
+
+    # ----- trust_policy: auto_approve path dispatches + resolves -----
+
+    def test_trust_policy_auto_approve_dispatches(self):
+        self._set_policy(default_action='auto_approve')
+        body = self._pulse_auto_dispatch_outbox()
+        f = self._write_outbox('beacon', 'beacon-pad-aa.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 0)
+        self.assertEqual(len(state.get('history', [])), 1)
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        self.assertEqual(len(forge_tasks), 1)
+
+    # ----- replay dedup: second run skips add_pending -----
+
+    def test_replay_dedups_pending_by_task_id(self):
+        body = self._pulse_auto_dispatch_outbox()
+        f1 = self._write_outbox('beacon', 'beacon-pad-rep.json', body)
+        on.process_outbox(f1)
+        f2 = self._write_outbox('beacon', 'beacon-pad-rep2.json', body)
+        result = on.process_outbox(f2)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+        state = self._ah.load_state()
+        self.assertEqual(len(state.get('pending', [])), 1)
+        alerts = self._read_alerts()
+        approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
+        self.assertEqual(len(approval_records), 1)
+
+    # ----- source guard: replan branch does NOT fire on pulse-auto-dispatch -----
+
+    def test_pulse_auto_dispatch_does_not_trigger_replan_branch(self):
+        """Defensive: pulse-auto-dispatch with inbound_intent='review-escalate'
+        somehow set on the envelope must still route through the pulse path
+        (which uses the source gate), not the replan path."""
+        body = self._pulse_auto_dispatch_outbox()
+        # Even if the envelope were mis-tagged with the replan intent, the
+        # source-keyed pulse gate should claim it first by position.
+        f = self._write_outbox('beacon', 'beacon-pad-srcguard.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+
+    # ----- regression: replan path still fires on review-escalate -----
+
+    def test_replan_path_still_fires_on_review_escalate(self):
+        """Regression guard: adding the new branch did not displace the
+        replan branch. A review-escalate envelope still routes there."""
+        # Reuse the replan helper shape by hand (avoid reaching into another
+        # test class). Source is 'mirror-result' + inbound_intent triggers
+        # the replan branch.
+        marker = _beacon_approval_request_marker(task_id='task-001')
+        body = _good_outbox(
+            agent='beacon',
+            source='mirror-result',
+            task_id='notify-task-001',
+            result=f'Plan revision.\n\n{marker}',
+        )
+        body['inbound_intent'] = 'review-escalate'
+        body['replan_count'] = 0
+        body['max_replans'] = 2
+        body['mirror_escalate_reason'] = (
+            'Address Mirror concern about missing input validation in the parser.'
+        )
+        body['reply_chat_id'] = 7998341473
+        f = self._write_outbox('beacon', 'beacon-replan-reg.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-replan')
+
+    # ----- regression: headless source='larry' path still fires -----
+
+    def test_headless_larry_source_path_still_fires(self):
+        """Regression guard: source='larry' headless path is unchanged."""
+        marker = _beacon_approval_request_marker(task_id='task-001')
+        body = _good_outbox(
+            agent='beacon',
+            source='larry',
+            task_id='task-001',
+            result=f'Plan ready.\n\n{marker}',
+        )
+        body['reply_chat_id'] = 7998341473
+        f = self._write_outbox('beacon', 'beacon-headless-reg.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'headless-approval-dispatched')
+
+
 # -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
 
 
