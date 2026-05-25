@@ -993,12 +993,20 @@ class AutoDispatchTests(unittest.TestCase):
         self.assertEqual(records, [])
 
     def test_dispatch_rejected_does_not_crash(self):
+        # Stop the setUp-installed patcher and replace with one whose
+        # side_effect raises. Crucially, register addCleanup for the NEW
+        # patcher — the setUp addCleanup captured the original patcher's
+        # bound .stop, so reassigning self._swi_patch alone would leak
+        # the replacement past tearDown and corrupt later tests'
+        # safe_write_inbox.safe_write_inbox global.
         self._swi_patch.stop()
-        self._swi_patch = mock.patch.object(
+        new_patch = mock.patch.object(
             pci.safe_write_inbox, "safe_write_inbox",
             side_effect=pci.safe_write_inbox.DispatchRejected("simulated reject"),
         )
-        self._swi_patch.start()
+        new_patch.start()
+        self.addCleanup(new_patch.stop)
+        self._swi_patch = new_patch
         records = pci.auto_dispatch_proposals(
             check_i=self._check_i([self._eligible_proposal()]),
             fired_at=self.fired_at,
@@ -1008,12 +1016,16 @@ class AutoDispatchTests(unittest.TestCase):
         self.assertFalse(self.state_path.exists())
 
     def test_routing_denied_does_not_crash(self):
+        # Same pattern as test_dispatch_rejected_does_not_crash: register
+        # cleanup for the replacement patcher so it's removed in tearDown.
         self._swi_patch.stop()
-        self._swi_patch = mock.patch.object(
+        new_patch = mock.patch.object(
             pci.safe_write_inbox, "safe_write_inbox",
             side_effect=pci.safe_write_inbox.RoutingDenied("simulated denial"),
         )
-        self._swi_patch.start()
+        new_patch.start()
+        self.addCleanup(new_patch.stop)
+        self._swi_patch = new_patch
         records = pci.auto_dispatch_proposals(
             check_i=self._check_i([self._eligible_proposal()]),
             fired_at=self.fired_at,
