@@ -349,19 +349,6 @@ Each sub-sub-phase ships as an independent Forge dispatch with Larry review betw
 - Forge dispatch envelope validator adds optional `project_id` field; Beacon populates it on construction.
 - Unit tests on the pm_writer library; integration tests behind a `PM_WRITER_TEST_SUPABASE_URL` env (skipped in normal CI).
 
-- Rewrite `ourliberty-dashboard` Next.js app per § 5.4.
-- New routes: `/programs`, `/programs/[id]`, `/projects/[id]`, `/tasks/[id]`, `/comms-inbox`.
-- New components: `<ProgramCard>`, `<ProjectKanbanCard>`, `<TaskTimeline>`, `<EventLogRow>`, `<BlockerBadge>`, `<CostRollup>`, plus the CRUD set: `<ProgramFormModal>`, `<ProjectFormDrawer>`, `<TaskFormInline>`, `<DecisionFormInline>`, `<InlineEditableField>`, `<ConfirmDeleteModal>`.
-- **Direct UI CRUD (per § 5.4 "Direct UI CRUD" subsection, locked round 4):** + New Program/Project/Task/Decision buttons; inline edit on all visible fields; delete via overflow menu with confirm. Both UI path and Telegram `/new-*` path converge on Supabase.
-- API mutations: Next.js Route Handlers at `/api/programs`, `/api/projects`, `/api/tasks`, `/api/decisions` (POST/PATCH/DELETE) using service-role server-side per § 5.3.
-- Drag-drop via `@dnd-kit/core` (battle-tested, accessible).
-- SWR for live droplet-state cards; direct Supabase queries (via Next.js Route Handlers) for PM data.
-- Optimistic updates on CRUD operations (SWR mutate pattern) so UI feels instant.
-- New Vitest tests for the kanban drag logic, the timeline renderer, the route handlers, the inline-edit field component, the CRUD route handlers (mocked supabase).
-- Live-deployed to `dashboard.ourliberty.dev` once merged (Vercel auto-deploy).
-- The OLD read-only dashboard is REPLACED; no parallel maintenance. The new dashboard absorbs all E3 features (agent status, tasks list, costs, healers) AND adds the PM surface with full CRUD.
-- **Scope grew round 4 from "view + drag-drop" to "view + drag-drop + CRUD"** — estimated effort bump from ~2 days to ~2-3 days; estimated cost from $25-40 to $30-50 LLM.
-
 ### E4.5 — Mission Control decommission + Marvin cleanup (Larry-actions: ~½ hour, Claude assists)
 
 - After Larry has used the new dashboard for ≥1 week without going back to Mission Control:
