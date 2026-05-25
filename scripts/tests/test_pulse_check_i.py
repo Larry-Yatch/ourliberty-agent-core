@@ -1148,5 +1148,187 @@ class AutoDispatchEndToEndTests(unittest.TestCase):
                          "second run within dedup window should not dispatch")
 
 
+class ManualDispatchTests(unittest.TestCase):
+    """Larry-driven `--dispatch <N>` path. Bypasses _is_auto_dispatch_eligible
+    (any-effort accepted), warns-but-proceeds on dedup hit, and surfaces
+    errors via non-zero exit code so /dispatch gives clear feedback.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.output_dir = self.root / "pulse-check-i"
+        self.output_dir.mkdir(parents=True)
+        self.state_path = self.root / "dispatched.json"
+
+        self.calls: list[dict] = []
+        outer = self
+
+        def _fake_swi(target_agent, task_dict, source_agent, filename):
+            outer.calls.append({
+                "target_agent": target_agent,
+                "task_dict": dict(task_dict),
+                "source_agent": source_agent,
+                "filename": filename,
+            })
+            return outer.root / "inboxes" / target_agent / filename
+
+        self._swi_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox", side_effect=_fake_swi,
+        )
+        self._swi_patch.start()
+        self.addCleanup(self._swi_patch.stop)
+
+    def _medium_proposal(self) -> dict:
+        return {
+            "title": "Investigate retry / clarification cost sources",
+            "effort": "medium",
+            "impact": "~$2.50/wk reclaimable (20.0% of total spend)",
+            "rationale": "Retry overhead is above the 15% threshold.",
+        }
+
+    def _small_proposal(self) -> dict:
+        return {
+            "title": "Quick rename - no quantified savings",
+            "effort": "small",
+            "impact": "modest readability improvement",
+            "rationale": "Naming drift in three files; one-pass cleanup.",
+        }
+
+    def _write_audit(self, proposals: list[dict], firing_date: str = "2026-05-24") -> Path:
+        path = self.output_dir / f"check-i-{firing_date}.json"
+        path.write_text(json.dumps({
+            "schema_version": "v1",
+            "week_ending": "2026-05-18",
+            "mode": "digest",
+            "has_signal": True,
+            "proposals": proposals,
+            "ledger_headline": {"total_usd": 5.0, "anomaly_count": 1},
+            "engineering_signals": {},
+        }))
+        return path
+
+    def _argv(self, *extra: str) -> list[str]:
+        return [
+            "--output-dir", str(self.output_dir),
+            "--dispatch-state-file", str(self.state_path),
+            *extra,
+        ]
+
+    def test_dispatch_medium_proposal_succeeds(self):
+        self._write_audit([self._medium_proposal()])
+        rc = pci.main(self._argv("--dispatch", "1"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.calls), 1)
+        call = self.calls[0]
+        self.assertEqual(call["target_agent"], "beacon")
+        self.assertEqual(call["source_agent"], "pulse-auto-dispatch")
+        env = call["task_dict"]
+        self.assertEqual(env["source"], "pulse-auto-dispatch")
+        self.assertEqual(env["target_agent"], "beacon")
+        self.assertEqual(env["target_repo"], "ourliberty-agent-core")
+        self.assertEqual(env["phase"], "preflight")
+        self.assertTrue(env["task_id"].startswith("pulse-auto-"))
+        self.assertTrue(self.state_path.exists())
+        state = json.loads(self.state_path.read_text())
+        key = pci._proposal_dedup_key(self._medium_proposal())
+        self.assertIn(key, state)
+        self.assertEqual(state[key]["task_id"], env["task_id"])
+
+    def test_dispatch_out_of_range_exits_1(self):
+        self._write_audit([self._medium_proposal()])
+        rc = pci.main(self._argv("--dispatch", "3"))
+        self.assertEqual(rc, 1)
+        self.assertEqual(self.calls, [])
+        self.assertFalse(self.state_path.exists())
+
+    def test_dispatch_zero_exits_1(self):
+        self._write_audit([self._medium_proposal()])
+        rc = pci.main(self._argv("--dispatch", "0"))
+        self.assertEqual(rc, 1)
+        self.assertEqual(self.calls, [])
+
+    def test_dispatch_dedup_hit_proceeds_anyway(self):
+        from datetime import timedelta as _td
+        p = self._medium_proposal()
+        self._write_audit([p])
+        key = pci._proposal_dedup_key(p)
+        # Seed dedup state with a recent dispatch (within 7d window).
+        prior_ts = (datetime.now(timezone.utc) - _td(days=2)).isoformat()
+        self.state_path.write_text(json.dumps({
+            key: {"task_id": "pulse-auto-prior-20260522", "dispatched_at": prior_ts},
+        }))
+        rc = pci.main(self._argv("--dispatch", "1"))
+        self.assertEqual(rc, 0)
+        # Manual override: SWI was still called.
+        self.assertEqual(len(self.calls), 1)
+        # State row was overwritten with the new dispatch (not the prior).
+        state = json.loads(self.state_path.read_text())
+        self.assertNotEqual(state[key]["task_id"], "pulse-auto-prior-20260522")
+
+    def test_dispatch_audit_override_reads_specified_file(self):
+        older = self._write_audit(
+            [self._medium_proposal()], firing_date="2026-05-21",
+        )
+        newer = self._write_audit(
+            [self._small_proposal()], firing_date="2026-05-24",
+        )
+        # Force mtimes so older is genuinely older than newer; the default
+        # "most-recent" resolver would otherwise pick `newer`.
+        old_t = time.time() - 3600
+        os.utime(older, (old_t, old_t))
+        os.utime(newer, (time.time(), time.time()))
+        rc = pci.main(self._argv("--dispatch", "1", "--audit", str(older)))
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(self.calls), 1)
+        # We dispatched the medium proposal from `older`, not the small
+        # one from `newer`.
+        self.assertIn("retry", self.calls[0]["task_dict"]["prompt"].lower())
+
+    def test_dispatch_no_audit_files_exits_1(self):
+        # output_dir exists but is empty.
+        rc = pci.main(self._argv("--dispatch", "1"))
+        self.assertEqual(rc, 1)
+        self.assertEqual(self.calls, [])
+
+    def test_dispatch_rejected_exits_1_state_unchanged(self):
+        self._write_audit([self._medium_proposal()])
+        self._swi_patch.stop()
+        new_patch = mock.patch.object(
+            pci.safe_write_inbox, "safe_write_inbox",
+            side_effect=pci.safe_write_inbox.DispatchRejected("simulated reject"),
+        )
+        new_patch.start()
+        self.addCleanup(new_patch.stop)
+        self._swi_patch = new_patch
+        rc = pci.main(self._argv("--dispatch", "1"))
+        self.assertEqual(rc, 1)
+        self.assertFalse(self.state_path.exists())
+
+    def test_dispatch_picks_most_recent_audit_by_default(self):
+        older = self._write_audit(
+            [self._small_proposal()], firing_date="2026-05-21",
+        )
+        newer = self._write_audit(
+            [self._medium_proposal()], firing_date="2026-05-24",
+        )
+        old_t = time.time() - 3600
+        os.utime(older, (old_t, old_t))
+        os.utime(newer, (time.time(), time.time()))
+        rc = pci.main(self._argv("--dispatch", "1"))
+        self.assertEqual(rc, 0)
+        # The medium proposal from `newer` has "retry" in the prompt; the
+        # small proposal from `older` does not.
+        self.assertIn("retry", self.calls[0]["task_dict"]["prompt"].lower())
+
+    def test_dispatch_audit_file_missing_exits_1(self):
+        rc = pci.main(self._argv(
+            "--dispatch", "1", "--audit", str(self.root / "does-not-exist.json"),
+        ))
+        self.assertEqual(rc, 1)
+        self.assertEqual(self.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -539,6 +539,98 @@ def auto_dispatch_proposals(
     return dispatched_now
 
 
+# --- manual dispatch (Larry-driven /dispatch <N>) ---
+
+
+def _find_latest_audit(output_dir: Path) -> Optional[Path]:
+    """Return the most-recently-modified `check-i-*.json` in output_dir, or
+    None if the directory is empty / missing. Manual dispatch defaults to
+    this when --audit isn't supplied.
+    """
+    if not output_dir.is_dir():
+        return None
+    candidates = sorted(
+        output_dir.glob("check-i-*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def manual_dispatch_proposal(
+    audit_path: Path,
+    n: int,
+    state_path: Path,
+    fired_at: datetime,
+    sidecar: Optional[dict[str, Any]] = None,
+) -> int:
+    """Dispatch proposal #N (1-indexed) from the audit JSON at audit_path.
+
+    Bypasses _is_auto_dispatch_eligible — Larry's explicit /dispatch is the
+    gate. Dedup hits log a WARN and proceed (manual override). Returns 0 on
+    successful dispatch, 1 on any error (missing file, out-of-range N,
+    safe_write_inbox failure).
+    """
+    try:
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"[pulse-check-i] manual-dispatch ERROR: cannot read audit "
+              f"{audit_path}: {e}")
+        return 1
+
+    proposals = audit.get("proposals") or []
+    if n < 1 or n > len(proposals):
+        print(f"[pulse-check-i] manual-dispatch ERROR: proposal N={n} out "
+              f"of range. Audit {audit_path} has {len(proposals)} "
+              f"proposal(s); valid N is 1..{len(proposals) or 0}.")
+        return 1
+
+    proposal = proposals[n - 1]
+    envelope = _build_dispatch_envelope(proposal, fired_at, sidecar=sidecar)
+    task_id = envelope["task_id"]
+    key = _proposal_dedup_key(proposal)
+
+    state = _load_dispatch_state(state_path)
+    prior = state.get(key)
+    if prior and _is_within_dedup_window(
+        prior, fired_at, AUTO_DISPATCH_DEDUP_WINDOW_DAYS,
+    ):
+        print(f"[pulse-check-i] manual-dispatch WARN: proposal previously "
+              f"dispatched at {prior.get('dispatched_at')} as task_id "
+              f"{prior.get('task_id')}; manual override proceeding.")
+
+    try:
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent="beacon",
+            task_dict=envelope,
+            source_agent="pulse-auto-dispatch",
+            filename=f"{task_id}.json",
+        )
+    except safe_write_inbox.DispatchRejected as e:
+        print(f"[pulse-check-i] manual-dispatch ERROR: rejected for "
+              f"task={task_id}: {e}")
+        return 1
+    except safe_write_inbox.RoutingDenied as e:
+        print(f"[pulse-check-i] manual-dispatch ERROR: routing denied for "
+              f"task={task_id}: {e}")
+        return 1
+    except Exception as e:  # noqa: BLE001
+        print(f"[pulse-check-i] manual-dispatch ERROR: unexpected for "
+              f"task={task_id}: {type(e).__name__}: {e}")
+        return 1
+
+    state[key] = {
+        "task_id": task_id,
+        "dispatched_at": fired_at.isoformat(),
+    }
+    _save_dispatch_state(state_path, state)
+    title = str(proposal.get("title") or "(untitled proposal)")
+    print(f"[pulse-check-i] manual-dispatch: proposal N={n} [{title}] "
+          f"→ beacon inbox {dest}")
+    return 0
+
+
 # --- digest assembly ---
 
 
@@ -793,7 +885,41 @@ def main(argv: Optional[list[str]] = None) -> int:
         default=str(DEFAULT_DISPATCH_STATE_FILE),
         help="Dedup state file for auto-dispatch (closed-loop step 5).",
     )
+    p.add_argument(
+        "--dispatch",
+        type=int,
+        metavar="N",
+        help="Manual dispatch: send proposal N (1-indexed) from the most "
+             "recent audit JSON to Beacon's inbox. Bypasses the small-effort "
+             "eligibility gate and dedup window — Larry's /dispatch is the "
+             "gate.",
+    )
+    p.add_argument(
+        "--audit",
+        help="Override the audit JSON path for --dispatch. Defaults to the "
+             "most-recently-modified `check-i-*.json` in --output-dir.",
+    )
     args = p.parse_args(argv)
+
+    if args.dispatch is not None:
+        output_dir = Path(args.output_dir)
+        if args.audit:
+            audit_path = Path(args.audit)
+        else:
+            latest = _find_latest_audit(output_dir)
+            if latest is None:
+                print(f"[pulse-check-i] manual-dispatch ERROR: no audit JSON "
+                      f"found in {output_dir}. Run /optimize first to "
+                      f"produce one.")
+                return 1
+            audit_path = latest
+        now = datetime.now(timezone.utc)
+        return manual_dispatch_proposal(
+            audit_path=audit_path,
+            n=args.dispatch,
+            state_path=Path(args.dispatch_state_file),
+            fired_at=now,
+        )
 
     halt_flag = Path(args.halt_flag)
     if halt_flag.exists():
