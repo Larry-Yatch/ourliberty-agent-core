@@ -79,7 +79,7 @@ MANAGED_WORKTREE_PREFIX = '/home/larry/agent-worktrees/wt-'
 
 LOG_FILE = Path('/home/larry/agents/logs/worktree-cleanup.log')
 IN_FLIGHT_DIR = Path('/home/larry/agents/state/in-flight')
-MAX_AGE_SECONDS = 86400  # 24 hours
+MAX_AGE_SECONDS = 14400  # 4 hours — tightened 2026-05-25 per Pulse off-cycle-inv finding; in-flight guard at load_active_task_stems() prevents collateral removal of active worktrees
 GIT_TIMEOUT_SEC = 60
 
 
