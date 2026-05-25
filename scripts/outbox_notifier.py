@@ -87,14 +87,18 @@ EMERGENCY_HALT_FLAG = BLACKBOARD / 'EMERGENCY_HALT'
 # `total_cost_usd`); the gate stays on the local name.
 COSTS_FILE = BLACKBOARD / 'costs.jsonl'
 
-# Mirror multi-turn outbox-overwrite recovery (mirror-multiturn-outbox-overwrite-001):
+# Multi-turn marker recovery (mirror-multiturn-outbox-overwrite-001 +
+# chain-discipline-marker-parser-and-regression-check-001):
 # the outbox `result` field holds only the final assistant turn from `claude -p`,
-# so if Mirror's session keeps running after emitting a review marker (e.g. a
+# so if the agent's session keeps running after emitting a marker (e.g. a
 # Monitor tool started before the marker fires its timeout event later, waking
-# Mirror for an extra turn), the marker gets clobbered. The full session
-# transcript lives on disk under Claude Code's per-project session-log tree;
-# `_recover_marker_text_from_session_log` reads it as a fallback. Overridable
-# via env so tests can point at a fixture dir.
+# the agent for an extra turn; or a poll loop misbehaves after a REVIEW_PASS),
+# the marker gets clobbered. The full session transcript lives on disk under
+# Claude Code's per-project session-log tree; `_scan_session_log_for_latest_marker_text`
+# walks every assistant turn and picks the LATEST one that parses as a valid
+# marker — this is the authoritative source, with `result` used only as a
+# fallback when the session log is unavailable. Overridable via env so tests
+# can point at a fixture dir.
 CLAUDE_PROJECTS_ROOT = Path(
     os.environ.get('CLAUDE_PROJECTS_ROOT', str(HOME / '.claude' / 'projects'))
 )
@@ -1120,10 +1124,31 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     the default routing path).
     """
     result_text = data.get('result', '')
-    if not isinstance(result_text, str) or not result_text.strip():
-        return None
+    if not isinstance(result_text, str):
+        result_text = ''
 
-    marker_type, payload, _narrative = fph.parse_forge_marker(result_text)
+    # chain-discipline-marker-parser-and-regression-check-001 (2026-05-25):
+    # scan the session log FIRST and pick the latest valid marker across all
+    # assistant turns. Same rationale as `_classify_mirror_marker` — the
+    # outbox `result` captures only the final `claude -p` turn, so any
+    # post-marker chatter from Forge would mask her decision. Fall back to
+    # final-turn parsing only when the session log is unavailable.
+    marker_type, payload, _narrative = (None, None, '')
+    recovered = _recover_forge_marker_text_from_session_log(
+        data.get('claude_session_id'),
+    )
+    if recovered:
+        marker_type, payload, _narrative = fph.parse_forge_marker(recovered)
+        if marker_type is not None:
+            log(
+                f'classified forge {marker_type} marker from session log scan '
+                f'(session={(data.get("claude_session_id") or "")[:12]}..., '
+                f'task={data.get("task_id")!r})'
+            )
+
+    if marker_type is None and result_text.strip():
+        marker_type, payload, _narrative = fph.parse_forge_marker(result_text)
+
     if marker_type is None:
         # D3.5 commit 5a — preflight-discipline runtime gate (deferred from
         # 4b's followup-2 doc). A `phase=preflight` outbox MUST end with one
@@ -1605,21 +1630,32 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         )
 
 
-def _recover_marker_text_from_session_log(
+def _scan_session_log_for_latest_marker_text(
     session_id: Optional[str],
+    parser,
+    skip_exceptions: tuple,
 ) -> Optional[str]:
-    """Pull marker-bearing assistant text out of a Mirror Claude session log.
+    """Walk a Claude session log and return the latest assistant-turn text
+    that parses as a valid marker under ``parser``.
 
-    Returns the assistant-turn text containing the LATEST valid review marker
-    (so a revised verdict wins over an earlier one), or None when the session
-    log is missing, unreadable, or carries no parseable marker. Intermediate
-    turns whose text raises Malformed/Multiple marker errors are skipped —
-    that's mid-session noise (e.g. Mirror reasoning about the marker grammar
-    in prose), not her final verdict.
+    Returns the combined text of the LATEST assistant turn whose parse returns
+    a non-None marker_type (so a revised verdict still wins over an earlier
+    one), or None when the session log is missing, unreadable, or carries no
+    parseable marker. Intermediate turns whose text raises one of
+    ``skip_exceptions`` are skipped — that's mid-session noise (e.g. an agent
+    reasoning about the marker grammar in prose), not her final verdict.
 
-    Used by `_classify_mirror_marker` as a fallback when the outbox `result`
-    field — which captures only the final `claude -p` assistant turn — has no
-    marker. See the `CLAUDE_PROJECTS_ROOT` comment for the failure shape.
+    ``parser`` is one of ``mrh.parse_mirror_marker`` / ``fph.parse_forge_marker``
+    and must return ``(marker_type, payload, narrative)`` or raise. The caller
+    passes the parser's own Malformed/Multiple exception types as
+    ``skip_exceptions``.
+
+    Per chain-discipline-marker-parser-and-regression-check-001 (2026-05-25)
+    this is now the AUTHORITATIVE classification path, called BEFORE the
+    outbox `result` fallback. The outbox `result` field only captures the
+    final `claude -p` assistant turn; if the agent's session continued past
+    the marker emit (Monitor timeout firing late, a misbehaving poll loop
+    after REVIEW_PASS, etc.) the marker is invisible to a final-turn parser.
     """
     if not session_id:
         return None
@@ -1652,16 +1688,39 @@ def _recover_marker_text_from_session_log(
                 if not combined.strip():
                     continue
                 try:
-                    marker_type, _payload, _narrative = mrh.parse_mirror_marker(
-                        combined,
-                    )
-                except (mrh.MalformedMirrorMarker, mrh.MultipleMirrorMarkers):
+                    marker_type, _payload, _narrative = parser(combined)
+                except skip_exceptions:
                     continue
                 if marker_type is not None:
                     last_marker_text = combined
     except OSError:
         return None
     return last_marker_text
+
+
+def _recover_marker_text_from_session_log(
+    session_id: Optional[str],
+) -> Optional[str]:
+    """Mirror-parser binding of `_scan_session_log_for_latest_marker_text`.
+
+    Retained for back-compat with prior multi-turn-recovery call sites.
+    """
+    return _scan_session_log_for_latest_marker_text(
+        session_id,
+        mrh.parse_mirror_marker,
+        (mrh.MalformedMirrorMarker, mrh.MultipleMirrorMarkers),
+    )
+
+
+def _recover_forge_marker_text_from_session_log(
+    session_id: Optional[str],
+) -> Optional[str]:
+    """Forge-parser binding of `_scan_session_log_for_latest_marker_text`."""
+    return _scan_session_log_for_latest_marker_text(
+        session_id,
+        fph.parse_forge_marker,
+        (fph.MalformedForgeMarker, fph.MultipleForgeMarkers),
+    )
 
 
 def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -1687,29 +1746,35 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     if not isinstance(result_text, str):
         result_text = ''
 
+    # chain-discipline-marker-parser-and-regression-check-001 (2026-05-25):
+    # scan the session log FIRST and pick the latest valid marker across all
+    # assistant turns. The outbox `result` field captures only the final
+    # `claude -p` assistant turn — if Mirror's session ran past the marker
+    # (Monitor timeout firing after REVIEW_PASS; a misbehaving poll loop
+    # holding the session open; any post-marker chatter), final-turn parsing
+    # can either miss the marker entirely or, worse, return a different
+    # verdict from a later non-marker turn. Always-scan-latest-wins is the
+    # authoritative path; result_text is a fallback for when the session log
+    # is unavailable (no session_id, missing file, etc.).
     marker_type, payload, _narrative = (None, None, '')
-    if result_text.strip():
-        marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
+    recovered = _recover_marker_text_from_session_log(
+        data.get('claude_session_id'),
+    )
+    if recovered:
+        marker_type, payload, _narrative = mrh.parse_mirror_marker(recovered)
+        if marker_type is not None:
+            log(
+                f'classified mirror {marker_type} marker from session log scan '
+                f'(session={(data.get("claude_session_id") or "")[:12]}..., '
+                f'task={data.get("task_id")!r})'
+            )
 
-    # Multi-turn recovery (mirror-multiturn-outbox-overwrite-001): the outbox
-    # `result` field captures only the final assistant turn. If Mirror's session
-    # ran past the marker (e.g. a Monitor tool fired its timeout event after
-    # REVIEW_PASS, waking her for an extra turn), the marker is on disk in the
-    # session log but absent from `result`. Fall back to scanning the session
-    # log; pick the LATEST turn whose text parses as a valid marker so a
-    # revised verdict still wins over an earlier one.
-    if marker_type is None:
-        recovered = _recover_marker_text_from_session_log(
-            data.get('claude_session_id'),
-        )
-        if recovered:
-            marker_type, payload, _narrative = mrh.parse_mirror_marker(recovered)
-            if marker_type is not None:
-                log(
-                    f'recovered mirror {marker_type} marker from session log '
-                    f'(session={(data.get("claude_session_id") or "")[:12]}..., '
-                    f'task={data.get("task_id")!r}); outbox `result` had no marker'
-                )
+    if marker_type is None and result_text.strip():
+        # Session log unavailable or carried no marker — fall back to
+        # final-turn parsing on the outbox `result`. This preserves the
+        # malformed-marker dead-letter behavior when the only marker the
+        # agent emitted is broken JSON.
+        marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
 
     if marker_type is None:
         return None

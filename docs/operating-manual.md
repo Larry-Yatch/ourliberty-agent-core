@@ -2321,6 +2321,60 @@ Likely suspects: ProcessGroup not killed on parent exit, lingering pipes/file de
 37. **Supabase free-tier `Postgres 17` is the 2026 default** (not 15 as the original E4.1 spec assumed). Migration SQL is portable from 11+ so 0001 worked, but worth noting for future schema specs.
 38. **Phase E now ships a real persistent data layer.** The agent OS has Supabase as a system primitive. Future per-product Supabases (TruPath, AI Co, etc.) follow this template — one project per product, owned by that product's billing identity, full E1.5 4-artifact credential discipline. Templates exist at `docs/runbooks/setup-supabase-pm-project.md` (initial setup) and `docs/runbooks/rotate-supabase-keys.md` (rotation).
 
+## Phase E4 followup — PR #101 Mirror review hang: chain-discipline + parser fix (2026-05-25)
+
+Closes a two-bug interaction surfaced when Mirror reviewed PR #101 (the pulse-check-i marker-error counter fix). Mirror approved the diff in her session output but the auto-merge never fired; her session stayed alive 71 min until Larry manually killed it and merged the PR by hand. The session cost ~$1.62 of LLM time waiting on a self-matching `pgrep` loop.
+
+### Symptom
+
+Mirror started reviewing PR #101 at 19:23 UTC, ran the regression gate, emitted REVIEW_PASS at 19:25 UTC, and then — instead of letting her session exit naturally — invented a backgrounded poll loop to "wait until the regression check finishes" *after* the check had already returned synchronously and *after* she had already emitted REVIEW_PASS. The loop never exited; her session stayed billable for 71 min until manually killed. When agent_runner subsequently woke her after the kill, she emitted a new final turn — *"Acknowledged — moot now"* — which became the outbox `result`. Auto-merge never fired despite REVIEW_PASS being on disk in her session log. PR #101 was manually merged via commit `f4dee2b`.
+
+### Root cause #1 — self-matching `pgrep -f`
+
+Mirror invented:
+
+```bash
+python3 scripts/test_regression_check.py ... &
+until [ -f /tmp/regression-done ] || ! kill -0 $(pgrep -f test_regression_check.py | head -1); do sleep 3; done
+```
+
+`pgrep -f` matches the loop's own shell process via argv — the bash command line contains the literal pattern string `test_regression_check.py`, so `pgrep` returns the poll loop's own PID, `kill -0` always succeeds, and the loop never exits. Two structural fixes against repeating it:
+
+1. **agents/mirror/CLAUDE.md** had the canonical regression-gate command + foreground-only instruction since dial-3 shipped (PR #87, 2026-05-20), but the self-matching `pgrep` warning was missing until hotfix `0fc8f92` (this same incident's first patch, also 2026-05-25). The fix added warning paragraphs at L227-L228 of that doc.
+2. **scripts/test_regression_check.py** now prints a foreground-only WARNING to stderr at startup (this PR). Any future agent invoking the script — Mirror, a healer, a manual debug session — sees the warning regardless of whether their CLAUDE.md was up-to-date when their session loaded.
+
+### Root cause #2 — marker parser blind to earlier turns
+
+The outbox notifier's `_classify_mirror_marker` parsed only the final `claude -p` assistant turn from the outbox `result` field. When agent_runner woke Mirror after the kill and she emitted *"Acknowledged — moot now"* as the new final turn, that text overwrote the `result`. The existing multi-turn recovery (PR #80) was structured as a fallback: only fire if final-turn parsing returned None. *"Acknowledged — moot now"* contains no marker delimiters so it parsed as None — recovery should have fired and found her earlier REVIEW_PASS. The exact failure-mode classification (whether recovery did fire and find nothing, or fired and matched stale text, or was somehow gated) remains ambiguous from logs alone, but the structural fix is the same regardless:
+
+The classifier now **always scans the session log first** and picks the LATEST assistant turn that parses as a valid marker. The outbox `result` is only consulted as a fallback when the session log is unavailable (no `claude_session_id`, missing file, no marker found in any turn). Applied symmetrically to `_classify_forge_marker` so PROCEED / CLARIFY_REQUEST / REJECT markers don't suffer the same failure mode.
+
+The shared helper `_scan_session_log_for_latest_marker_text(session_id, parser, skip_exceptions)` is parser-agnostic; Mirror and Forge each get a thin wrapper binding it to their parser.
+
+### Discipline addition — post-marker exit
+
+Added `## Post-marker exit discipline` sections to `agents/forge/CLAUDE.md` + `agents/pulse/CLAUDE.md`, modeled on Mirror's L225-L230 regression-gate paragraphs. The discipline generalizes Mirror's regression-gate incident to ANY terminal marker (or terminal preamble): after emitting it, stop the session — don't spawn `&`-backgrounded work, don't write self-matching `pgrep -f` poll loops. The parser fix above closes one failure mode (later assistant turns no longer mask the marker), but the cost-amplification mode (a 71-min billable session waiting on a hung loop) is a CLAUDE.md discipline question, not a code bug.
+
+### What shipped
+
+- **scripts/outbox_notifier.py:** marker classification now always-scan-latest-wins across all assistant turns; `result_text` is a fallback path. Applies to both Mirror and Forge classifiers. New helper `_scan_session_log_for_latest_marker_text` (parser-agnostic); thin per-agent wrappers retained.
+- **scripts/test_regression_check.py:** foreground-only WARNING printed to stderr at every invocation.
+- **agents/forge/CLAUDE.md + agents/pulse/CLAUDE.md:** new "Post-marker exit discipline" sections.
+- **scripts/tests/test_outbox_notifier.py:** 3 new tests covering Mirror's always-scan-latest-wins behavior + the existing `test_happy_path_does_not_consult_session_log` updated to assert the inverted precedence.
+
+### Verification
+
+Full `scripts/tests/` suite green post-change. The existing PR #80 multi-turn-recovery tests remain green because they exercise the same scan-the-log-and-pick-latest behavior — only the precedence ordering changed. The previously-named `test_happy_path_does_not_consult_session_log` was inverted to `test_happy_path_consults_session_log_first` to reflect the new contract.
+
+### Recovery cost
+
+$1.62 burned on the hung Mirror session; PR #101 manually merged via `f4dee2b` after Larry confirmed Mirror's REVIEW_PASS by reading the session JSONL directly.
+
+### Codified additions worth recalling next session
+
+39. **Marker classification is always-scan-latest-wins across all assistant turns** (chain-discipline-marker-parser-and-regression-check-001, 2026-05-25). The outbox `result` field is only the final `claude -p` turn; the session JSONL is the authoritative source. Mirror and Forge classifiers both use the session-log scan as the primary path now, with `result_text` as a fallback for when the log is unavailable. Earlier `parse_*_marker` returning None on a final-turn text no longer suppresses a valid earlier marker.
+40. **`pgrep -f <pat>` self-matches its caller's argv.** The bash command line that runs `pgrep -f foo` contains the literal string `foo`, so `pgrep` returns the caller's own PID, `kill -0` succeeds forever, and any "wait until the child exits" poll loop hangs. Workaround when you genuinely need to poll a sibling process: `pgrep -f '[f]oo'` — the brackets are a one-char character class; the literal pattern in the caller's argv contains the brackets and won't match the bracketless regex. Default: don't poll; run subprocesses in the foreground.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

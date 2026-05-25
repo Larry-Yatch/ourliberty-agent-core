@@ -2185,21 +2185,103 @@ class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
         )
         self.assertIsNone(on._classify_mirror_marker(data))
 
-    def test_happy_path_does_not_consult_session_log(self):
-        # Marker IS in `result` — we must NOT scan the log (perf + correctness:
-        # the result-field verdict is authoritative when present, regardless
-        # of what intermediate turns may have flirted with).
+    def test_happy_path_consults_session_log_first(self):
+        # chain-discipline-marker-parser-and-regression-check-001 (2026-05-25):
+        # precedence is inverted from the original PR #80 design. The session
+        # log is now the AUTHORITATIVE source; the outbox `result` is only a
+        # fallback. This test pins the new contract: the classifier MUST call
+        # the recovery helper on every classification, not just when result
+        # parsing returns None. Previously this test was named
+        # `test_happy_path_does_not_consult_session_log` and asserted the
+        # opposite — it was updated in the same PR that inverted the
+        # precedence.
+        session_id = 'sess-marker-in-both'
+        self._write_session_log(session_id, [
+            _mirror_pass_marker(summary='Coverage clean.'),
+        ])
         data = _mirror_outbox_body(
-            _mirror_pass_marker(summary='Clean.'),
-            claude_session_id='sess-should-not-be-read',
+            _mirror_pass_marker(summary='Result-text copy.'),
+            claude_session_id=session_id,
         )
-        # Make the helper raise if called — proves we never reached it.
-        with mock.patch.object(
-            on, '_recover_marker_text_from_session_log',
-            side_effect=AssertionError('fallback should not be invoked'),
-        ):
-            decision = on._classify_mirror_marker(data)
+        decision = on._classify_mirror_marker(data)
         self.assertEqual(decision['marker_type'], 'review_pass')
+        # When both paths produce the same marker, session-log-first means
+        # the session-log copy wins — assert via the summary text.
+        self.assertEqual(
+            decision['intent_kwargs']['summary'], 'Coverage clean.',
+        )
+
+    def test_session_log_scan_runs_before_result_text_parse(self):
+        # Always-scan-latest-wins regression: even when result_text would
+        # parse cleanly to a marker, the session log scan runs first. Mirror
+        # said REVIEW_REVISION in turn N, then her final turn was an
+        # innocuous REVIEW_PASS-shaped text. The notifier picks the latest
+        # valid marker across all turns — and the session log carries the
+        # full sequence, so REVIEW_PASS in the final turn of the log wins,
+        # which is the same as result_text would give. We pin the
+        # ordering: even if the log scan returned a DIFFERENT marker than
+        # result_text, the log scan's answer is authoritative.
+        session_id = 'sess-different-from-result'
+        self._write_session_log(session_id, [
+            _mirror_revision_marker(confidence='high'),
+        ])
+        data = _mirror_outbox_body(
+            # result_text would parse as REVIEW_PASS, but the session log
+            # carries REVIEW_REVISION and should win.
+            _mirror_pass_marker(summary='Stale result-text.'),
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_revision')
+
+    def test_pr_101_shape_post_marker_chatter_does_not_mask_pass(self):
+        # PR #101 reproduction. Mirror emitted REVIEW_PASS, then her session
+        # was held open by a self-matching pgrep poll loop, and when
+        # agent_runner woke her after the kill she emitted "Acknowledged —
+        # moot now" as the new final turn. Outbox `result` captured only
+        # the new final turn. With the old final-turn-first precedence,
+        # REVIEW_PASS was missed and auto-merge never fired. With the new
+        # always-scan-first precedence, REVIEW_PASS from the earlier
+        # turn wins.
+        session_id = 'sess-pr-101-shape'
+        self._write_session_log(session_id, [
+            'Reviewed PR diff. Coverage clean. All ACs met.',
+            _mirror_pass_marker(summary='AC coverage clean. Approving.'),
+            'Acknowledged — moot now.',
+        ])
+        data = _mirror_outbox_body(
+            result='Acknowledged — moot now.',
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
+        self.assertIn(
+            'AC coverage clean', decision['intent_kwargs']['summary'],
+        )
+
+    def test_session_log_with_no_markers_falls_back_to_result_text(self):
+        # When the session log exists but carries no parseable marker in any
+        # turn, the classifier MUST fall back to result_text parsing — this
+        # preserves the malformed-marker dead-letter path (a broken marker
+        # in result_text still raises and goes through the marker-error
+        # cascade) and matches the documented fallback semantics.
+        session_id = 'sess-no-markers-anywhere'
+        self._write_session_log(session_id, [
+            'Reading the diff.',
+            'Still reading.',
+            'Done reading; about to decide.',
+        ])
+        data = _mirror_outbox_body(
+            _mirror_pass_marker(summary='Decided in result text.'),
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(
+            decision['intent_kwargs']['summary'], 'Decided in result text.',
+        )
 
 
 class MirrorMarkerRoutingTest(unittest.TestCase):

@@ -285,7 +285,34 @@ def render_text(report: dict) -> str:
     return '\n'.join(lines).rstrip() + '\n'
 
 
+def _emit_foreground_warning() -> None:
+    """Print a foreground-only-invocation warning to stderr at startup.
+
+    chain-discipline-marker-parser-and-regression-check-001 (2026-05-25): on
+    PR #101 Mirror invented a backgrounded `& ... until ! kill -0 $(pgrep -f
+    test_regression_check.py | head -1) ...` poll loop AFTER emitting
+    REVIEW_PASS. `pgrep -f` self-matched the loop's own argv, `kill -0`
+    always succeeded, the loop never exited, and Mirror's session stayed
+    alive 71 min until manually killed. Auto-merge then never fired because
+    a post-marker assistant turn ("Acknowledged — moot now") masked her
+    REVIEW_PASS from final-turn parsing. The parser bug is now fixed at the
+    notifier layer (always-scan-latest-wins across all assistant turns); the
+    warning here closes the other side of the loop by surfacing the
+    foreground requirement on every invocation.
+    """
+    print(
+        'WARNING: test_regression_check.py must be run FOREGROUND.\n'
+        '  Do not background with & and poll for completion.\n'
+        '  Self-matching `pgrep -f` loops have hung Mirror reviews for 71 min '
+        'on PR #101 (2026-05-25).\n'
+        '  The script has no completion flag file; the only completion signal '
+        'is the exit code returned synchronously.',
+        file=sys.stderr,
+    )
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _emit_foreground_warning()
     parser = argparse.ArgumentParser(
         prog='test_regression_check',
         description='Compare failing-test sets between two SHAs and emit a regression verdict.',

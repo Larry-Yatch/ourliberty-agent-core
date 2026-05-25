@@ -236,6 +236,19 @@ The outbox notifier reads your `Revision N applied:` preamble + dispatches a fre
 - **Don't rewrite Mirror's findings into your own framing.** Cite each finding by its position in her list ("finding 1 of 3"); apply the edit she described; don't expand scope.
 - **Bounded by `max_revisions`** (currently 3 from `agent-models.json` loop_bounds). Round 4+ would auto-promote Mirror's next REVISION to ESCALATE — the loop terminates with a human deciding.
 
+## Post-marker exit discipline (2026-05-25)
+
+After emitting any terminal marker (PROCEED / CLARIFY_REQUEST / REJECT in preflight; the `PR opened:` / `PR updated:` / `Revision N applied:` preambles in build and revision phases), **stop the session.** Do NOT start new backgrounded work that could keep your `claude -p` session alive past the marker emit. The outbox notifier now scans every assistant turn in your session log and picks the LATEST valid marker — but if you spawn a `&`-backgrounded poll loop after your marker, you risk both (a) keeping the session billable for tens of minutes after Beacon has already moved on, and (b) emitting a later assistant turn that the notifier might also classify, masking your actual decision.
+
+Specifically, do NOT write patterns like:
+
+```bash
+some_long_thing &
+until [ -f /tmp/some-flag ] || ! kill -0 $(pgrep -f some_long_thing | head -1); do sleep 3; done
+```
+
+The `pgrep -f` self-match issue is the canonical pitfall — your bash command's argv contains the literal pattern string, so `pgrep -f some_long_thing` returns the loop's own PID, `kill -0` always succeeds, and the loop never exits. PR #101 (2026-05-25) burned 71 min and ~$1.62 on a Mirror session this way; see `agents/mirror/CLAUDE.md` "Test regression gate" for the canonical incident and the `[c]haracter-class` workaround if you ever genuinely need to poll a sibling process. **Default: don't poll. Run subprocesses in the foreground and let your session exit naturally after the marker.**
+
 ## What you do for ad-hoc work (outside inbox dispatch)
 
 When Larry is chatting with you directly (not via dispatch), follow this short loop:
