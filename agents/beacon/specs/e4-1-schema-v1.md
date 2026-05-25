@@ -62,9 +62,12 @@ Standard Supabase CLI ignores: `.branches`, `.temp`, `volumes/`, dump files. One
 
 The big one. Self-contained SQL migration. Content (Forge implements; this is the contract):
 
+**Live-state note (post-shipment, 2026-05-24):** 0001 shipped as below + two forward-only migrations followed: 0002 (GRANT to service_role — closed 42501 errors caught by post-push validation) and 0003 (added `external_id` to programs + projects to match the pattern already on tasks, unblocked the E4.2 Mission Control migration's idempotency lookups). The CURRENT schema in prod is the union: 0001 + 0002 + 0003. Don't read this SQL block as the authoritative current state — read it as "what 0001 originally shipped." Authoritative current state is `ourliberty-dashboard/supabase/migrations/` (all three migration files).
+
 ```sql
 -- 0001_initial_pm_schema.sql — Phase E4.1 — Programs/Projects/Tasks/Events/Decisions
 -- Idempotent NOT required (migrations run once); transactional (supabase db push wraps in txn).
+-- NOTE (post-shipment): programs and projects also have external_id TEXT (added via 0003).
 
 -- ============================================================
 -- Programs (top-level grouping)
