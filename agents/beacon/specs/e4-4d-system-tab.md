@@ -43,7 +43,7 @@ E4.4d closes the visibility gap. The substrate exists; the surface doesn't.
 A working System view delivers when ALL of the following are true:
 
 - Larry can open `dashboard.ourliberty.dev/operations/system` and within 5 seconds see whether each agent (Forge / Mirror / Pulse / Beacon) is idle or running; if running, what task and for how long.
-- Today's 71-min Mirror hang would have surfaced as a red "stuck" indicator no later than minute 25 of the hang, with the exact `kill <pid>` command shown on the card for copy-paste.
+- Today's 71-min Mirror hang on PR #101 (a `feature-development` task_type review) would have surfaced as a stuck indicator at minute 35 of the hang per Mirror's `feature-development` threshold (D4 override), with the exact `kill <pid>` command shown on the card for copy-paste — ~36 min earlier than the manual catch.
 - Today's 2G→4G→8G memory cadence would have been visible in the cgroup-stats view in real time (last update ≤30s old), not first surfaced as a watchdog DM.
 - Larry can browse the last 50 chain events (dispatches, completions, marker emits, AUTO_MERGEs, marker-errors) in a scrollable feed, with timestamps in his local zone.
 - Pulse escalations (from `pulse-escalations.json`), Beacon larry-alerts (from `larry-alerts.jsonl`), and dispatch sentinel alerts (from `sentinel-alerts.jsonl`) surface in a dedicated Escalations + Alerts panel with `needs_response=true` entries pinned at top. Today's `inbox-watcher-memleak-root-cause` finding (high severity) would have appeared there immediately when Pulse wrote it, with "Mark as read" available to clear it after Larry acts.
@@ -75,28 +75,26 @@ A working System view delivers when ALL of the following are true:
 
 ```sql
 CREATE TABLE chain_events (
-  event_id          uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-  emitted_at        timestamptz   NOT NULL,
-  ingested_at       timestamptz   NOT NULL DEFAULT now(),
-  source            text          NOT NULL CHECK (source IN ('poll', 'push')),
-  agent             text          NOT NULL CHECK (agent IN ('forge', 'mirror', 'pulse', 'beacon', 'watcher', 'outbox-notifier', 'healer')),
-  event_type        text          NOT NULL,  -- validated application-side; see "event_type discipline" below
-  task_id           text          NULL,      -- nullable for events not tied to a task
-  pr_url            text          NULL,
-  model             text          NULL,      -- 'claude-opus-4-7' etc.
-  cost_usd          numeric(10,4) NULL,
-  duration_sec      numeric(8,2)  NULL,
-  marker_verdict    text          NULL,      -- 'review_pass' | 'review_revision' | 'review_escalate' | 'review_emergency_halt' | 'proceed' | 'clarify_request' | 'reject'
-  payload           jsonb         NULL,      -- event-specific extras (claude_session_id, attempts, errors, etc.)
-  dedup_hash        text          NOT NULL UNIQUE  -- sha256(emitted_at || agent || event_type || task_id || marker_verdict)
+  event_id     TEXT          PRIMARY KEY,  -- deterministic: sha1(task_id || event_type || ts)
+  ts           TIMESTAMPTZ   NOT NULL,     -- agent-side timestamp (when it happened, not parsed)
+  agent        TEXT          NOT NULL,     -- beacon | forge | mirror | pulse | ledger | notifier | watcher | healer
+  task_id      TEXT          NULL,         -- nullable for events not tied to a task
+  event_type   TEXT          NOT NULL,     -- validated application-side; see "event_type discipline" below
+  pr_url       TEXT          NULL,         -- top-level (not in payload) so PR pipeline panel can filter
+  cost_usd     NUMERIC       NULL,         -- top-level so Active Sessions can sum
+  payload      JSONB         NULL          -- everything else (marker contents, duration, model, error reasons, etc.)
 );
 
-CREATE INDEX chain_events_emitted_at_idx ON chain_events (emitted_at DESC);
+CREATE INDEX chain_events_ts_idx ON chain_events (ts DESC);
 CREATE INDEX chain_events_task_id_idx ON chain_events (task_id) WHERE task_id IS NOT NULL;
-CREATE INDEX chain_events_agent_event_type_idx ON chain_events (agent, event_type);
+CREATE INDEX chain_events_event_type_idx ON chain_events (event_type);
+CREATE INDEX chain_events_event_type_ts_idx ON chain_events (event_type, ts DESC);
+CREATE INDEX chain_events_pr_url_idx ON chain_events (pr_url) WHERE pr_url IS NOT NULL;
 ```
 
-`dedup_hash` is the load-bearing detail: the poll daemon may re-parse the same journal lines after restart. Insert uses `ON CONFLICT (dedup_hash) DO NOTHING` to make ingestion idempotent.
+`event_id` as a deterministic sha1 of `(task_id, event_type, ts)` is the load-bearing detail: the poll daemon may re-parse the same journal lines after restart, and both writers (poller in MVP-2, push-instrumented watcher/notifier in a future PR) compute the same `event_id` for the same logical event. Insert uses `INSERT ... ON CONFLICT (event_id) DO NOTHING` to make ingestion idempotent. This is also what makes the push-upgrade trivial: same dedup property, different writer.
+
+Top-level columns chosen for filter/sort use: `pr_url` (PR pipeline panel filters on it) and `cost_usd` (Active Sessions sums it). Everything else (marker JSON, duration, model name, error reasons) goes into `payload` JSONB to keep the schema flat.
 
 **event_type discipline (application-side validation, not DB-level):**
 
@@ -105,7 +103,7 @@ The DB column is plain `text` with no CHECK constraint and no Postgres ENUM. Typ
 - `scripts/chain_event_shipper.py` defines a module-level constant: `KNOWN_EVENT_TYPES = frozenset({...})` listing every accepted value (initial set: `session_start`, `session_done`, `marker_emit`, `auto_merge`, `marker_error`, `cost_budget`, `review_request`, `build_dispatched`, `preflight_proceed`, `preflight_clarify`, `preflight_reject`, `escalation`, `larry_alert`, `sentinel_alert`, `healer_fire`).
 - Shipper rejects any event with `event_type not in KNOWN_EVENT_TYPES`, logs a WARN line with the offender, drops the event. Never inserts unknown types.
 - Adding a new event type = a single-line PR to the constant, reviewed by Mirror (typos caught at code review).
-- A new weekly healer (`scripts/heal_chain_event_type_audit.py`, runs Sundays) executes `SELECT DISTINCT event_type FROM chain_events WHERE emitted_at > now() - interval '7 days'` and DMs Larry if anything landed that's not in the allowlist (belt-and-suspenders against hot-patched code or schema drift).
+- A new weekly healer (`scripts/heal_chain_event_type_audit.py`, runs Sundays) executes `SELECT DISTINCT event_type FROM chain_events WHERE ts > now() - interval '7 days'` and DMs Larry if anything landed that's not in the allowlist (belt-and-suspenders against hot-patched code or schema drift).
 
 Standard event-log pattern (Segment / Snowplow / similar). Trades DB-level safety for write-path flexibility; adding new event types ships as code review not migration.
 
@@ -116,29 +114,31 @@ CREATE VIEW agent_sessions AS
 SELECT
   s.task_id,
   s.agent,
-  s.emitted_at        AS started_at,
-  d.emitted_at        AS completed_at,
-  s.model,
-  s.payload->>'task_type'           AS task_type,
-  s.payload->>'claude_session_id'   AS claude_session_id,
+  s.ts                                AS started_at,
+  d.ts                                AS completed_at,
+  s.payload->>'model'                 AS model,
+  s.payload->>'task_type'             AS task_type,
+  s.payload->>'claude_session_id'     AS claude_session_id,
   CASE
     WHEN d.event_id IS NULL THEN 'running'
     WHEN d.payload->>'success' = 'true' THEN 'completed'
     ELSE 'failed'
-  END                 AS state,
-  COALESCE(d.duration_sec,
-           EXTRACT(EPOCH FROM (now() - s.emitted_at)))  AS duration_sec_live,
-  d.cost_usd          AS cost_usd
+  END                                 AS state,
+  COALESCE(
+    (d.payload->>'duration_sec')::numeric,
+    EXTRACT(EPOCH FROM (now() - s.ts))
+  )                                   AS duration_sec_live,
+  d.cost_usd                          AS cost_usd
 FROM chain_events s
 LEFT JOIN chain_events d
   ON d.task_id = s.task_id
   AND d.agent = s.agent
   AND d.event_type = 'session_done'
-  AND d.emitted_at > s.emitted_at
+  AND d.ts > s.ts
 WHERE s.event_type = 'session_start';
 ```
 
-Sessions with no matching `session_done` and `started_at > now() - interval '4 hours'` are "running." Beyond 4h they're considered orphaned (matches watcher's `timeout=14400s`) and a downstream healer-monitor surfaces them.
+Sessions with no matching `session_done` and `started_at > now() - interval '4 hours'` are "running." Beyond 4h they're considered orphaned (matches watcher's `timeout=14400s`).
 
 **B3 — PR pipeline state as on-read API route (NOT a Supabase view):**
 
@@ -166,6 +166,7 @@ CREATE POLICY "service-role-full" ON chain_events FOR ALL TO service_role USING 
 ```
 
 This is the same pattern PR #4 (migration 0002) had to hotfix after 0001 shipped without GRANTs. Forge ships these in 0004 from day 1.
+
 
 ### 5.2 Ingestion daemon (decision A — poll initially)
 
@@ -222,7 +223,7 @@ Response:
 }
 ```
 
-Cache: 5-second TTL in-process.
+No server-side cache (per locked decision C — "No caching at the droplet layer. All three endpoints are file/proc reads (<10ms). The dashboard can cache client-side if it wants.").
 
 **`GET /api/system/cgroup-stats`**
 
@@ -243,7 +244,7 @@ Response:
 }
 ```
 
-Cache: 5-second TTL.
+No server-side cache (same rationale).
 
 **`GET /api/system/worktrees`**
 
@@ -268,7 +269,7 @@ Response:
 }
 ```
 
-Cache: 30-second TTL (filesystem stat is cheap but `du -s` per worktree adds up).
+No server-side cache (same rationale). `du -s` cost noted; if it becomes a problem the response can omit `size_mb` and let the dashboard compute it from a directory listing.
 
 **Caddy routing:** existing reverse proxy already terminates `dashboard.ourliberty.dev` and proxies to Vercel. New endpoints reachable via the existing Next.js `app/api/proxy/[...path]/route.ts` route handler (extend the allowlist to include `/api/system/*` paths). No Caddy config change required.
 
@@ -279,63 +280,89 @@ Cache: 30-second TTL (filesystem stat is cheap but `du -s` per worktree adds up)
 
 ### 5.4 Stuck-detection thresholds (decision D verbatim)
 
+Three global thresholds + one task_type-based Mirror override. Per Beacon's locked decision D: tighter defaults than gut-instinct, loosen with production data via Pulse Check III (§ 5.10).
+
 Thresholds live in `config/system_tab_thresholds.json`:
 
 ```json
 {
   "_meta": {
     "owner": "stuck-detector",
-    "tweak_via": "edit this file + systemctl reload ourliberty-chain-event-shipper",
-    "rationale": "Tighter defaults per decision D1; loosen with production data over first 2 weeks"
+    "tweak_via": "edit this file + commit; dashboard reads on next poll (no service reload needed)",
+    "rationale": "Locked 2026-05-25 round D: D1=15min tighter start, D2=10min, D3=2min, D4 Mirror task_type override"
   },
-  "session_duration_seconds": {
-    "forge": {
-      "preflight":  { "warn": 300,  "alert": 600  },
-      "build":      { "warn": 900,  "alert": 1800 },
-      "_default":   { "warn": 600,  "alert": 1200 }
-    },
-    "mirror": {
-      "review":            { "warn": 600,  "alert": 1200 },
-      "review-regression": { "warn": 1200, "alert": 1800 },
-      "_default":          { "warn": 900,  "alert": 1500 }
-    },
-    "pulse": {
-      "cycle":         { "warn": 900,  "alert": 1800 },
-      "investigation": { "warn": 1800, "alert": 3600 },
-      "_default":      { "warn": 1200, "alert": 2400 }
-    },
-    "beacon": {
-      "notify":   { "warn": 180, "alert": 300 },
-      "approval": { "warn": 300, "alert": 600 },
-      "_default": { "warn": 240, "alert": 480 }
-    }
-  },
-  "no_journal_output_seconds": {
-    "_default": { "warn": 300, "alert": 600 }
-  },
-  "inbox_envelope_not_picked_up_seconds": {
-    "_default": { "warn": 300, "alert": 600 }
+  "session_duration_seconds_default": 900,
+  "no_journal_output_seconds": 600,
+  "envelope_not_picked_up_seconds": 120,
+  "mirror_review_overrides_seconds": {
+    "doc-only":            900,
+    "bug-investigation":  1500,
+    "feature-development": 2100,
+    "_default":           1500
   }
 }
 ```
 
-**Reading the table:** session running longer than `warn` shows yellow stuck indicator in the dashboard; longer than `alert` shows red. Today's 71-min Mirror hang would have hit `alert=1200s` (20 min) at minute 20 of the hang and shown red ever since.
+**Reading the values (per Beacon's lock):**
 
-**Task-type detection:** the chain_event_shipper writes the dispatched `task_type` and `phase` from the envelope into `chain_events.payload.task_type`. Stuck-detector keys lookup off `(agent, task_type)`. Unknown task_types fall back to `_default`.
+- **D1 = 15 min (900s) — global "session running too long" threshold.** Any agent session running longer than this gets the stuck indicator. Tighter than gut-instinct (would have flagged PR #101 at minute 15, ~56 min earlier than the manual catch), accepting some false alarms for legitimate long Mirror reviews. Beacon's framing: "tighter start, loosen with data."
+- **D2 = 10 min (600s) — no-journal-output threshold.** Active sessions stream Claude output continuously; silence is suspicious. Fast enough to catch hangs, lenient enough for big-think turns.
+- **D3 = 2 min (120s) — envelope-not-picked-up threshold.** Inbox-watcher polls every 5s; typical pickup is <10s. If an envelope sits >2 min the watcher itself is in trouble (whole chain dead), so fast signal matters most here.
+- **D4 = Mirror task_type override on D1.** Mirror reviews can legitimately run longer than 15 min on big PRs. The override looks up `payload.task_type` from the session's `session_start` event in chain_events and applies a longer threshold:
+  - `doc-only` → 15 min (matches global; doc reviews are fast)
+  - `bug-investigation` → 25 min
+  - `feature-development` → 35 min
+  - unknown or missing task_type → 25 min (default override)
 
-**Mirror "review-regression" detection:** Mirror runs `python3 scripts/test_regression_check.py` when reviewing. The shipper detects this from the journal "Running" line OR (more reliably) by reading Mirror's session JSONL for the test_regression_check.py bash call. If detected within 60s of session start, the threshold elevates to `review-regression` for that session.
+PR #101 would have flagged at minute 35 (it was a feature-development Mirror review), 36 min earlier than the manual catch. Today's PR #104 Mirror review on a doc-only task would have used the 15-min global threshold.
+
+**No warn/alert split.** Beacon's lock uses single thresholds — stuck or not. Yellow/red gradient could be reintroduced later via Pulse Check III if production data shows value, but MVP-2 keeps it binary.
+
+**Task_type comes from the envelope.** The chain_event_shipper writes `task_type` into `chain_events.payload.task_type` from the envelope's `task_type` field. Stuck-detector reads it from the latest `session_start` event for that task_id. If absent, uses Mirror `_default` (25 min) or non-Mirror global (15 min).
 
 **Tightening with data:** Pulse runs Check III (§ 5.10) every 14 days against `chain_events`, computes p90/p99 per `(agent, task_type)` bucket, and proposes refined thresholds via Telegram DM. Larry approves with a one-line shortcut; Beacon applies via a small Claude-as-Forge PR. Self-optimizing loop, no manual analysis cadence required.
 
-### 5.5 Stuck-detector deployment shape (MVP-2 surface-only)
+### 5.5 Stuck-detector deployment shape (dashboard-side per decision C; MVP-2 surface-only)
 
-**Stuck detection runs in TWO places, each for a different surface:**
+**Per Beacon's locked decision C:** stuck-detection logic lives DASHBOARD-side, NOT on the droplet. The droplet API stays stateless (just exposes raw data); the dashboard combines three inputs and computes stuck-state per session. Keeps thresholds tunable without a droplet redeploy.
 
-1. **Computed-on-read in the droplet API** (`/api/system/active-sessions` response includes `stuck` + `stuck_reason` per session). Reads thresholds, compares against live duration. This drives the dashboard's red/yellow indicator. Cheap.
+**Three input sources the dashboard joins:**
 
-2. **Healer-based for alerting** (NEW `ourliberty-heal-stuck-session.timer`, every 5 min): reads same thresholds, walks active sessions, identifies new stuck-state crossings (transitioning warn→alert that haven't been DMed). DMs Larry via `larry_alerts.append_alert(source='heal-stuck-session', subject=<task_id>, severity=high)`. Cooldown: same alert key not re-DMed within 30 min.
+1. `/api/system/active-sessions` from droplet API — per-session duration, agent, task_id.
+2. `chain_events` from Supabase — latest `session_start` event's `payload.task_type` per task_id (for Mirror's task_type override per § 5.4); also used for no-journal-output detection (last event timestamp per session compared to D2).
+3. Inbox state from droplet API — envelope dispatched-at timestamps for envelopes still sitting unpicked (compared to D3).
 
-**The non-negotiable constraint:** the stuck-detector NEVER acts on the stuck session. No `kill`, no `systemctl restart`, no PR-close. Surface only. Both the API endpoint and the healer are read-only against the running session state. The healer enforces this in code — any attempt to add an action path requires explicitly removing the `# MVP-2: surface-only, no auto-action` comment block AND adding an `OURLIBERTY_STUCK_AUTOACTION_ENABLED=false` kill-switch in the same diff.
+**Where the computation runs:**
+
+A new Next.js Route Handler at `app/api/operations/stuck-sessions/route.ts` does the join. Reads thresholds from a dashboard-bundled copy of `system_tab_thresholds.json` (synced from the agent-core repo via a CI step on dashboard repo builds, OR fetched at runtime from a small `/api/system/thresholds` droplet endpoint — pick one in PR-D). Returns:
+
+```json
+{
+  "stuck_sessions": [
+    {
+      "task_id": "...",
+      "agent": "mirror",
+      "task_type": "feature-development",
+      "duration_sec": 2400,
+      "threshold_sec": 2100,
+      "stuck_reason": "exceeded_session_duration",
+      "pid": 1080351,
+      "started_at": "2026-05-25T..."
+    }
+  ],
+  "stuck_envelopes": [
+    {"agent": "forge", "task_id": "...", "waiting_sec": 180, "threshold_sec": 120}
+  ]
+}
+```
+
+The dashboard frontend polls this route and renders the Active Sessions cards with red indicators + the unstick recipe (§ 5.6) per stuck session.
+
+**No droplet-side stuck-detection endpoint.** No new healer. The dashboard is the single source of truth for stuck-state interpretation.
+
+**The non-negotiable constraint:** the stuck-detector NEVER acts on the stuck session. No `kill`, no `systemctl restart`, no PR-close. Read-only computation, displayed in the dashboard. Any future PR introducing an action path requires an `OURLIBERTY_STUCK_AUTOACTION_ENABLED=false` kill-switch + explicit code-review approval.
+
+**Trade-off this design accepts (be honest):** dashboard-side detection means stuck-state is only "discovered" when Larry (or the dashboard's auto-refresh) loads the page. There's no proactive DM-on-stuck for MVP-2. The Pulse Check III feedback loop (§ 5.10) operates over 14-day windows so it doesn't help real-time. If Larry isn't looking at the dashboard, a stuck session continues unstuck until the watcher's 4h timeout. Accepted for MVP-2 because: (a) the dashboard is the visibility surface we're building, so the user IS expected to look at it; (b) proactive DM-on-stuck is a useful MVP-3 addition once we know what threshold churn looks like in production. Deferred per § 4.
 
 ### 5.6 Unstick action surface (read-only copy-paste recipes)
 
@@ -360,7 +387,7 @@ This is the bridge from "I see a problem" to "I act on it" without leaving the d
 
 **System view layout (single page, 5 sections, responsive grid):**
 
-1. **Active Sessions** (top, most prominent) — one card per running agent. Empty state: "No active sessions" with subtle styling. Each card shows agent badge, task_id, task_type, model, duration (live-updating), cumulative cost, stuck indicator (green/yellow/red), and the copy-paste unstick recipes (only when yellow or red).
+1. **Active Sessions** (top, most prominent) — one card per running agent. Empty state: "No active sessions" with subtle styling. Each card shows agent badge, task_id, task_type, model, duration (live-updating), cumulative cost, stuck indicator (binary: green = within threshold, red = stuck per § 5.4), and the copy-paste unstick recipes (only shown when stuck).
 
 2. **Escalations + Alerts** (right column on desktop, below Sessions on mobile — high signal, deserves prominence) — filtered view of `chain_events` where `event_type IN ('escalation', 'larry_alert', 'sentinel_alert')`. Pinned-at-top: any entries where `payload.needs_response = true` (unactioned Pulse findings). Each row: timestamp, source badge (Pulse / Beacon / Sentinel), severity (yellow/red), headline, "Mark as read" button (writes a Supabase update flipping a `read` boolean per-event, scoped to dashboard sessions). Auto-refresh: poll every 10s. This is the "what should I look at next" panel.
 
@@ -420,7 +447,7 @@ Manual threshold tuning eventually drifts away from reality. Pulse already runs 
 **What it computes (per `(agent, task_type)`):**
 - Median, p90, p99 duration from `chain_events` in the last 30 days
 - Sample size — skip the bucket if <10 data points (insufficient signal)
-- Proposed `warn` = p90, proposed `alert` = p99 (with floor adjustments to keep alert ≥ warn × 1.25)
+- Proposed threshold = p90 (or p95 if dataset is wider — see "Tuning Pulse's percentile choice" below)
 
 **What it writes:**
 - `~/agents/blackboard/pulse-threshold-proposals.json` — current vs proposed values per bucket, sample sizes, one-line rationale, `applied: false` flag
@@ -440,6 +467,21 @@ Manual threshold tuning eventually drifts away from reality. Pulse already runs 
 **Why this fits Pulse's existing pattern:**
 
 Pulse's `pulse-high-repeat-heuristic-tighten-001` (PR #101 today) was Pulse tuning her OWN observation heuristics based on production data. Check III is the same shape: read events, compute stats, propose self-tightening. New `scripts/pulse_check_iii.py` + a `Check III` section in `agents/pulse/CLAUDE.md` + a Beacon CLAUDE.md update for the `approve threshold-update-<date>` shortcut. Mirrors Check I's structure exactly.
+
+### 5.11 Post-brief additions during Claude-as-Forge spec writing (provenance)
+
+The original Beacon spec round (Telegram 2026-05-25 14:29 → 15:12 MDT) locked the six decisions A–F captured in § 2. The full sub-spec doc was authored later that day in a separate Claude-as-Forge session (Larry's interactive Claude Code session, not via Forge dispatch). During that session, Larry approved four scope additions inline that aren't in the original locked decisions:
+
+| Addition | Approved during | Justification |
+|---|---|---|
+| **5th view: Escalations + Alerts panel** (§ 5.7 panel 2) ingesting `pulse-escalations.json`, `larry-alerts.jsonl`, `sentinel-alerts.jsonl` from `~/agents/blackboard/` | Chunk-2 walkthrough of spec sections | Larry's words: *"Seems to me that escalations and Larry Alerts panel would be very useful to have in version one."* The 4-view brief deferred this to MVP-3; Larry decided the value vs. cost was favorable for V1. |
+| **Pulse Check III self-optimizing threshold loop** (§ 5.10) on 14-day cadence + proposal artifact + Beacon `approve threshold-update-<date>` shortcut | Chunk-3 walkthrough during the § 5.4 threshold discussion | Larry's words: *"We can make that self-optimizing, can't we?"* Brief locked manual threshold tuning; Larry added the autonomous tuning layer. Pattern memorialized as reusable (`feedback_self_optimizing_config_via_pulse_check_pattern.md`) with a 10-surface backlog. |
+| **Operating-manual.md Part II doctrine entry** in PR-B (codifies the self-optimizing pattern as agent-OS doctrine so Pulse/Beacon/Forge/Mirror agents on the droplet see it) | Chunk-3 follow-up on durability of the pattern across future sessions | Larry asked whether the pattern would surface at the right times in future sessions. The operating-manual entry is the durable record (the auto-memory entry only loads in Claude Code sessions at Larry's local project path). |
+| **Migration 0005 `chain_events_read_flag.sql` + `/api/operations/mark-event-read/route.ts`** | Implied by the Escalations + Alerts panel addition above | The "Mark as read" affordance on escalation entries needs a per-event read-state column. Couldn't fit into 0004 without re-shipping it. Ships in PR-D alongside the panel component. |
+
+These four are explicit Larry approvals during interactive walkthrough, NOT silent scope-creep. They're documented here so Mirror's review can verify provenance + so future-Larry reading the spec knows what came from Beacon's spec round vs. what was added during spec writing.
+
+If any of these four should be peeled out of MVP-2 into a separate MVP-2.5 sub-phase, that's Larry's call — flag for him before Forge dispatches PR-D.
 
 ---
 
@@ -498,7 +540,9 @@ Each PR is independently mergeable + reviewable. Mirror reviews each. Larry vali
 - `ourliberty-dashboard/app/operations/page.tsx` (NEW)
 - `ourliberty-dashboard/app/operations/system/page.tsx` (NEW)
 - `ourliberty-dashboard/app/api/operations/pr-pipeline/route.ts` (NEW)
+- `ourliberty-dashboard/app/api/operations/stuck-sessions/route.ts` (NEW) — dashboard-side stuck-detection computation per § 5.5 (joins droplet `/api/system/active-sessions` + Supabase `chain_events` + thresholds config; returns stuck-sessions + stuck-envelopes lists)
 - `ourliberty-dashboard/app/api/operations/mark-event-read/route.ts` (NEW) — POST handler for the "Mark as read" button on escalation/alert entries
+- Thresholds-config delivery for the stuck-sessions route: either CI-sync `config/system_tab_thresholds.json` from agent-core into the dashboard repo's build artifacts, OR add a `/api/system/thresholds` droplet endpoint that returns the JSON. PR-D picks one and documents in the README.
 - `ourliberty-dashboard/app/api/proxy/[...path]/route.ts` — extend allowlist for `/api/system/*`
 - `ourliberty-dashboard/supabase/migrations/0005_chain_events_read_flag.sql` (NEW) — adds `read_at timestamptz NULL` to chain_events for per-event read-state tracking
 - `ourliberty-dashboard/components/<ActiveSessionCard>`, `<EscalationsAlertsPanel>`, `<SystemHealthPanel>`, `<ChainEventFeed>`, `<PRPipelineTable>`, `<UnstickRecipe>`, `<StaleDataBanner>` (all NEW — 7 components)
@@ -509,7 +553,7 @@ Each PR is independently mergeable + reviewable. Mirror reviews each. Larry vali
 
 **Acceptance:** Larry opens `dashboard.ourliberty.dev/operations/system`, sees all 5 sections render with real data. The Escalations + Alerts panel shows pinned-at-top pulse-escalations.json entries with `needs_response=true`. "Mark as read" toggles persist across page reloads. Simulates each degradation mode by stopping each upstream — banners surface correctly. Chain event feed shows the same events forensically dug out via SSH today.
 
-**Reviewer focus (Mirror):** graceful degradation paths all reachable; copy-paste recipes are EXACT strings (no smart quotes, no autocorrect); read-flag persistence (write race with concurrent dashboard sessions); pinned-at-top sort stability for escalations; accessibility (keyboard nav on cards); responsive layout.
+**Reviewer focus (Mirror):** graceful degradation paths all reachable; copy-paste recipes are EXACT strings (no smart quotes, no autocorrect); stuck-detection logic in `stuck-sessions/route.ts` correctly applies D1 / D2 / D3 / D4-Mirror-task_type override per § 5.4; read-flag persistence (write race with concurrent dashboard sessions); pinned-at-top sort stability for escalations; accessibility (keyboard nav on cards); responsive layout.
 
 ### Sequencing
 
@@ -554,7 +598,7 @@ Each PR has its own acceptance per § 6. MVP-2 as a whole is accepted when:
 
 - [ ] All 4 PRs merged, all Mirror reviews passed, all Vercel deployments green.
 - [ ] `dashboard.ourliberty.dev/operations/system` renders the 4 sections with real data.
-- [ ] A simulated stuck session (manually `sleep 9999` injected as a Forge subprocess) surfaces in Active Sessions with red indicator within 25 min of injection.
+- [ ] A simulated stuck session (manually `sleep 9999` injected as a Forge subprocess) surfaces in Active Sessions with red indicator within the threshold window (15 min for non-Mirror, or Mirror task_type-specific override per § 5.4) of injection.
 - [ ] Killing the simulated stuck session via copy-paste recipe removes it from Active Sessions within one poll cycle.
 - [ ] All 4 graceful-degradation modes (Supabase down, droplet API down, both down, ingestion daemon stale) display the expected banners when triggered.
 - [ ] Larry uses the System tab to answer "what's going on right now" without SSHing for a full work day.
