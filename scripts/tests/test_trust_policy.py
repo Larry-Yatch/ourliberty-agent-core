@@ -254,7 +254,21 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         self.assertTrue(repo_default.exists(), f'missing default policy at {repo_default}')
         policy = tp.load_policy(repo_default)
         self.assertEqual(policy['default_action'], 'force_ask')
-        self.assertEqual(policy['rules'], [])
+        # Shipped policy carries exactly one documentary rule: the
+        # closed-loop step-4 pulse-auto-dispatch force_ask carve-out.
+        # It is intentionally redundant with default_action so the
+        # operator sees the source has been considered.
+        self.assertEqual(len(policy['rules']), 1)
+        self.assertEqual(policy['rules'][0]['source'], 'pulse-auto-dispatch')
+        self.assertEqual(policy['rules'][0]['action'], 'force_ask')
+
+        # The documentary rule resolves to force_ask via the evaluator.
+        action, _ = tp.evaluate(
+            {'source': 'pulse-auto-dispatch', 'target_agent': 'beacon',
+             'task_type': 'doc-only', 'target_repo': 'ourliberty-agent-core'},
+            policy,
+        )
+        self.assertEqual(action, 'force_ask')
 
         # Even for the dispatch shape we most want to auto-approve later, default policy says force_ask.
         for source, target in [
