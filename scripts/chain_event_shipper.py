@@ -351,7 +351,7 @@ def make_event(
 # from inbox_watcher's structured logging:
 #
 #   { "_SOURCE_REALTIME_TIMESTAMP": "...",
-#     "MESSAGE": "session_start agent=forge task_id=... model=...",
+#     "MESSAGE": "inbox_watcher: [forge] start task=... model=...",
 #     "OURLIBERTY_EVENT_TYPE": "session_start",
 #     "OURLIBERTY_AGENT": "forge",
 #     "OURLIBERTY_TASK_ID": "...",
@@ -361,17 +361,29 @@ def make_event(
 #
 # Real-world inbox_watcher today doesn't emit those OURLIBERTY_* fields
 # yet — the parser falls back to regex on MESSAGE for compatibility. The
-# push-instrumented PR will add the structured fields.
+# actual MESSAGE today looks like:
+#
+#   inbox_watcher: [forge] start task=<id> model=<m> timeout=<n>s resume=<sid>
+#   inbox_watcher: [beacon] done task=<id> success=True duration=<N>s
+#                  attempts=<n> cost=$<N>
+#
+# The regex below extracts agent, verb, task_id, and the optional fields
+# we care about. Trailing fields we don't capture (timeout=, resume=,
+# attempts=) are tolerated by not anchoring the tail.
 
 _JOURNAL_SESSION_RE = re.compile(
-    r'session_(?P<verb>start|done)\s+'
-    r'(?:agent=(?P<agent>\S+)\s+)?'
-    r'task_id=(?P<task_id>\S+)'
-    r'(?:\s+model=(?P<model>\S+))?'
-    r'(?:\s+task_type=(?P<task_type>\S+))?'
-    r'(?:\s+success=(?P<success>\S+))?'
-    r'(?:\s+duration_sec=(?P<duration_sec>[\d.]+))?'
-    r'(?:\s+cost_usd=(?P<cost_usd>[\d.]+))?'
+    r'inbox_watcher:\s+'
+    r'\[(?P<agent>[^\]]+)\]\s+'
+    r'(?P<verb>start|done)\s+'
+    r'task=(?P<task_id>\S+)'
+    r'(?P<tail>.*)$'
+)
+
+# Recognized kv tokens on the tail after `task=<id>`. Tokens we don't list
+# (timeout=, resume=, attempts=) are silently tolerated.
+_JOURNAL_TAIL_KV_RE = re.compile(
+    r'\b(?P<key>model|success|duration|cost)='
+    r'(?P<val>\$?[^\s]+)'
 )
 
 
@@ -408,15 +420,22 @@ def parse_journal_record(record: dict[str, Any]) -> Optional[ChainEvent]:
     event_type = 'session_start' if verb == 'start' else 'session_done'
     agent = m.group('agent') or 'unknown'
     task_id = m.group('task_id')
+    tail_kv = {kv.group('key'): kv.group('val')
+               for kv in _JOURNAL_TAIL_KV_RE.finditer(m.group('tail') or '')}
+    duration_raw = tail_kv.get('duration')
+    if duration_raw and duration_raw.endswith('s'):
+        duration_raw = duration_raw[:-1]
+    cost_raw = tail_kv.get('cost')
+    if cost_raw and cost_raw.startswith('$'):
+        cost_raw = cost_raw[1:]
     payload = {
-        'model': m.group('model'),
-        'task_type': m.group('task_type'),
-        'success': m.group('success'),
-        'duration_sec': _maybe_float(m.group('duration_sec')),
+        'model': tail_kv.get('model'),
+        'success': tail_kv.get('success'),
+        'duration_sec': _maybe_float(duration_raw),
         'message': message,
     }
     payload = {k: v for k, v in payload.items() if v is not None}
-    cost = _maybe_float(m.group('cost_usd'))
+    cost = _maybe_float(cost_raw)
     return make_event(
         agent=agent, event_type=event_type, ts=ts, task_id=task_id,
         cost_usd=cost, payload=payload, source='journal',
