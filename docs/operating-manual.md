@@ -2488,6 +2488,41 @@ PR #105's own Mirror review (review #3 of this PR-chain, the eventual PASS) used
 47. **A daemon's running code is not its source file.** When a PR merges that modifies a daemon's Python source (`outbox_notifier.py`, `inbox_watcher.py`, healer scripts), the live process keeps the old code in memory until restarted. `heal_stale_daemon_code.py` catches this drift every 30 min by comparing `systemctl show <unit> --property=ActiveEnterTimestamp` against the script's mtime. If you see the alert, `sudo systemctl restart <unit>` is the fix; verify with `systemctl show <unit> --property=ActiveEnterTimestamp` to confirm the timestamp is post-merge.
 48. **Self-optimizing-config-via-Pulse-Check is now a documented pattern.** Whenever an operational config surface is a hand-tuned constant (thresholds, retry budgets, cadences, caps, memory limits), the canonical mechanism is: Pulse periodic Check → proposal artifact at `~/agents/blackboard/pulse-<name>-proposals.json` → Telegram DM to Larry → Beacon `approve <name>-update-<date>` shortcut → Claude-as-Forge config-only PR → Mirror auto-merges. Guardrails: no auto-apply, bounded delta (>50% flagged as regime-change-suspected), sample-size floor (≥10 data points per bucket). First instance ships with E4.4d as Pulse Check III for stuck-detection thresholds. Backlog of 10 candidate surfaces in the project list at `dashboard.ourliberty.dev/projects/1b36f0d2-5f2c-4d45-9f13-6806a4c5fa42` (Operational Config Self-Optimization).
 
+## Phase E4 followup — `heal_pipeline_stall.py` (Joe pipeline_watcher analog, 2026-05-26)
+
+Codifies the manager-duty pattern Larry and Claude executed manually throughout the 2026-05-25 session: scan the pipeline state every 15 min, identify stalls, DM Larry with what stalled + recommended action. Adapted from `GrowthMastery-ai/gm-agent-core/scripts/pipeline_watcher.py` (Joe's "you never have to discover a stall on your own" doctrine, 2026-04-15).
+
+### What shipped
+
+- **scripts/heal_pipeline_stall.py** (new) — five concrete stall checks running every 15 min via systemd timer. Silent unless a stall is detected. Each alert dedup'd per unique stall key with 1-hour cooldown. Never acts on the stall — surface only, same posture as `dispatch_sentinel.py`.
+- **scripts/tests/test_heal_pipeline_stall.py** (new) — pytest coverage of all five checks, regex patterns against real outbox-notifier log shapes, kill-switch behavior, dedup state file persistence, end-to-end run smoke.
+- **systemd/ourliberty-heal-pipeline-stall.service + .timer** (new) — `Type=oneshot`, runs every 15 min with 2-min jitter to avoid lock-step with other healers. `MemoryMax=256M`, hardened sandbox.
+- **runbooks/heal-pipeline-stall.md** (new) — operational runbook covering all five checks, the action recipes in each DM, kill switch, threshold tuning, and the manual-run path.
+
+### The five stall checks
+
+1. **Forge built but no PR opened** (>2h) — outbox-notifier shows `[forge] done success=True` but no PR with matching `forge/<task>` branch exists on either tracked repo.
+2. **PR opened but no Mirror review-request dispatched** (30 min for doc PRs, 60 min for code PRs gated by title prefix heuristic) — PR exists on a `forge/` branch but no `review-request dispatched mirror` log line for the task.
+3. **Mirror PASS but PR still OPEN** (>30 min) — `marker-notified ... intent=review-pass` line exists but the PR for that task is still OPEN. Catches the 2026-05-25 PR #101 and PR #104 stall shape.
+4. **Mirror reviewed but no marker classified** (>30 min) — `notified beacon <- mirror (mirror-result, depth=1)` line exists but no follow-up `marker-notified beacon <- mirror` for the same task. Catches marker-shape drift (the bug PR #105 was supposed to prevent at the discipline layer; this healer catches the cases where the discipline mandate gets bypassed). Skipped if the PR auto-merged after the generic notify (a follow-up Mirror dispatch eventually classified).
+5. **Retry-cap exhausted in last 30 min** — `All retries exhausted` log lines in the inbox-watcher journal recent window. Surfaces dead-lettered tasks.
+
+### Why this fills a real gap
+
+Throughout the 2026-05-25 session, Larry and Claude manually performed exactly these five checks via SSH each time a status answer was needed. Every "what's happening?" question routed through (a) journalctl inspection, (b) outbox-notifier.log grep, (c) `gh pr view`, (d) Mirror session JSONL forensics. The cost was real — multi-hour debugging sessions where the chain stalled silently and nobody discovered it until somebody asked. This healer makes the discovery automatic.
+
+### Self-test plan after merge
+
+- Trigger an artificial stall (drop a synthetic `[forge] done task=test-stall-X success=True` line with a ts >2h ago into a sandbox log file, point the healer at it) and verify the alert fires within 15 min.
+- Verify dedup state file persists across runs (`~/agents/blackboard/heal-pipeline-stall-state.json`).
+- Verify `heal_stale_daemon_code.py` (PR #105) consumes the heartbeat file when this healer is stopped.
+
+### Codified additions worth recalling next session
+
+49. **Pipeline-stall detection is a healer, not an agent.** Joe's `pipeline_watcher.py` model: zero-LLM Python script, N hard-coded checks, ONE Telegram DM per unique stall with 1-hour dedup. Our `heal_pipeline_stall.py` follows the same pattern. Manager duty (status answers, "where is everything?") gets split: zero-LLM healers for cheap deterministic checks (this script + `dispatch_sentinel.py` + `heal_pr_auto_merge.py` + `heal_stale_daemon_code.py`); LLM judgment (Pulse `/cycle` once upgraded per the deferred spec) for holistic interpretation when hard rules aren't enough. Avoids the cost of an always-on LLM "Maestro" agent — Joe explicitly chose this architecture; we follow.
+50. **The `notified beacon <- mirror (mirror-result, depth=1)` log shape is the marker-invisibility signal.** When Mirror's marker is classified successfully, the notifier ALSO writes `marker-notified beacon <- mirror (mirror-result, intent=review-X, ...)`. The generic `notified ... depth=1` without a follow-up `marker-notified` means the parser failed to extract a verdict — the canonical signature of marker-shape drift (PR #105 mandates marker.py to prevent this at the source; the healer catches recurrences). Check 4 of `heal_pipeline_stall.py` looks for this exact pattern. When investigating "Mirror reviewed but the chain didn't react," this is the log signature to grep.
+51. **Joe's pipeline_watcher.py is the canonical model for "watchdog scripts that DM."** Five concrete checks, ONE alert per unique key per hour, recommended action shipped INSIDE the alert text. No reasoning, no LLM, no judgment. Future watchdog candidates should mirror its shape: terse docstring naming the N checks, stable alert keys, dedup state file in blackboard, kill switch, heartbeat for stale-daemon healer to consume.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
