@@ -2523,6 +2523,62 @@ Throughout the 2026-05-25 session, Larry and Claude manually performed exactly t
 50. **The `notified beacon <- mirror (mirror-result, depth=1)` log shape is the marker-invisibility signal.** When Mirror's marker is classified successfully, the notifier ALSO writes `marker-notified beacon <- mirror (mirror-result, intent=review-X, ...)`. The generic `notified ... depth=1` without a follow-up `marker-notified` means the parser failed to extract a verdict — the canonical signature of marker-shape drift (PR #105 mandates marker.py to prevent this at the source; the healer catches recurrences). Check 4 of `heal_pipeline_stall.py` looks for this exact pattern. When investigating "Mirror reviewed but the chain didn't react," this is the log signature to grep.
 51. **Joe's pipeline_watcher.py is the canonical model for "watchdog scripts that DM."** Five concrete checks, ONE alert per unique key per hour, recommended action shipped INSIDE the alert text. No reasoning, no LLM, no judgment. Future watchdog candidates should mirror its shape: terse docstring naming the N checks, stable alert keys, dedup state file in blackboard, kill switch, heartbeat for stale-daemon healer to consume.
 
+## E4.4d PR-B — Ingestion daemon + Pulse Check III + self-optimizing config doctrine (2026-05-26)
+
+Second of four sequenced PRs implementing E4.4d (Operations tab + System view). PR-A shipped the `chain_events` migration; this PR ships the writer-side substrate that populates it plus the analyzer that makes thresholds self-optimizing. PR-C ships the droplet API endpoints; PR-D ships the UI.
+
+### What shipped
+
+- **`scripts/chain_event_shipper.py`** (NEW) — poll-based daemon tailing five sources (journalctl `ourliberty-inbox-watcher.service`, `~/agents/logs/outbox-notifier.log`, `~/agents/blackboard/pulse-escalations.json` snapshot, `~/agents/blackboard/larry-alerts.jsonl`, `~/agents/blackboard/sentinel-alerts.jsonl`). Each source has its own resumable cursor: journalctl `--cursor-file`; (inode, byte_offset, first-64-byte fingerprint) tuple per log/jsonl file; (mtime, sha256) for the Pulse snapshot. Writes to `chain_events` via supabase-py `upsert(on_conflict='event_id', ignore_duplicates=True)`, deterministic `event_id = sha1(task_id|event_type|ts)` per spec § 5.1. Bounded local spill buffer (10K lines / 5 MB) on Supabase failure; flushes FIFO on reconnect; drops oldest under chronic outage. Heartbeats every 30s.
+- **`scripts/heal_chain_event_shipper_heartbeat.py`** + timer (every 5 min) — DMs Larry if the heartbeat is >10 min stale.
+- **`scripts/heal_chain_event_type_audit.py`** + timer (weekly Sun 06:00) — queries `chain_events` for the past 7 days and DMs Larry if any `event_type` rows landed that aren't in the `KNOWN_EVENT_TYPES` allowlist. Belt-and-suspenders against hot-patched daemons, manual SQL, or push-instrumented writers that bypass the shipper's gate.
+- **`scripts/pulse_check_iii.py`** + tests — Check III analyzer per spec § 5.10. Queries `chain_events` for the last 30 days of session_start/session_done pairs, computes p90/p99/median per (agent, task_type) bucket, enforces sample-size floor (≥10) + bounded-delta flagging (>50% Δ → `regime-change-suspected`), detects rollback signals (tightened threshold + >3 false-positive alerts within 7d → propose un-tightening). Writes proposal artifact to `~/agents/blackboard/pulse-threshold-proposals.json` + archived copy. Queues a `larry_alerts.append_alert` digest. **Never edits config.**
+- **`systemd/ourliberty-chain-event-shipper.service`** — `Type=simple`, `Restart=on-failure`, `MemoryMax=512M / MemoryHigh=256M` per spec § 5.2. Activation gate (`OURLIBERTY_CHAIN_SHIPPER_ENABLED=false` by default).
+- **`agents/pulse/CLAUDE.md`** — new "Check III — stuck-threshold review" section explaining the 14-day Sunday-anchored cadence, surface-only discipline, and the script invocation.
+- **`agents/beacon/CLAUDE.md`** — new "Pulse Check III approvals" section teaching the `approve threshold-update-<date>` / `reject threshold-update-<date>` shortcuts. Idempotency enforced via `applied: true` flag in the archived artifact; re-running an approve for an already-applied date is a no-op WARN.
+- **`runbooks/chain-event-shipper.md`** (NEW) — operational runbook (start/stop, cursor reset, buffer flush, adding a new event_type, Check III approval flow).
+- **`systemd/INSTALL.md`** — append the three new units to the install table.
+- This entry in operating-manual Part II.
+
+### The self-optimizing-config-via-Pulse-Check doctrine (codified)
+
+Entry #48 (PR #105) introduced the pattern; this PR ships the first instance (Pulse Check III) and codifies the doctrine as reusable agent-OS infrastructure. The five-step loop, generalizable to any operational config surface where hand-tuning eventually drifts away from reality:
+
+1. **Pulse periodic Check** queries chain_events (or another data substrate) for the relevant signal — durations, costs, retry counts, memory peaks, cleanup ages, whatever the config tunes.
+2. **Proposal artifact** at `~/agents/blackboard/pulse-<name>-proposals.json` with current vs. proposed values, sample sizes, one-line rationale, `applied: false` flag, and an `as_of` date.
+3. **Telegram DM to Larry** via `larry_alerts.append_alert` carrying the digest.
+4. **Beacon shortcut** `approve <name>-update-<date>` / `reject <name>-update-<date>` reads the dated artifact, dispatches a small Claude-as-Forge PR (config-only, `task_type: doc-only` so trust policy auto-approves).
+5. **Mirror auto-merges** the PR. On merge, Beacon flips `applied: true` in the archived artifact, which makes future replays of the same shortcut a no-op WARN.
+
+**Discipline boundaries (non-negotiable):**
+
+- **No auto-apply.** Pulse proposes, Larry approves. Same posture as the stuck-detector: surface signal, never act on it.
+- **Bounded delta.** Changes >50% from current ship with `high-attention: regime-change-suspected` so Larry knows before approving.
+- **Sample-size floor.** Buckets with fewer than ~10 observations skip silently; better to wait than tune on noise.
+- **Idempotent shortcuts.** Re-running the approve command for an already-applied date is a WARN, never a duplicate PR. The `applied: true` flag is the gate; without an archived artifact, the shortcut aborts and DMs Larry.
+- **Rollback detection.** If a recently-applied tightening produced false positives within the rollback window, the next Check automatically proposes un-tightening with `rollback: true` in the rationale.
+
+**Backlog of candidate surfaces** (10 total; current first instance in bold; full list tracked in PM project `dashboard.ourliberty.dev/projects/1b36f0d2-5f2c-4d45-9f13-6806a4c5fa42` "Operational Config Self-Optimization"):
+
+- **Stuck-detection thresholds** (`config/system_tab_thresholds.json` — shipped this PR as Pulse Check III)
+- Cost-budget cap per task_type (`config/agent-models.json loop_bounds.cost_per_task_usd`)
+- Memory thresholds (systemd `MemoryMax` / `MemoryHigh` per service)
+- Cleanup retention windows (worktree TTL, dedup-marker TTL, inbox-archive TTL)
+- Healer retry budgets (`MAX_RETRIES_PER_PR`, `MAX_MERGES_PER_RUN`, etc.)
+- Cycle cadences (`/cycle` frequency, Check I/II/III cadences themselves)
+- Plus four more enumerated in the PM project record
+
+### Reviewer focus (Mirror, this PR)
+
+Dedup correctness (deterministic `event_id`; no double-INSERTs). Cursor resume after restart across all five sources. Buffer overflow behavior under sustained Supabase outage (bounded local buffer, no OOM, oldest drops with WARN). `KNOWN_EVENT_TYPES` discipline (unknown types route to a sentinel-rejected count, not silently dropped or mislabeled). No PII or credentials in log payloads (the `sanitize_payload` walker redacts on credential-shaped keys before INSERT). `pulse-escalations.json` snapshot-overwrite handling (cursor is `(mtime, content_sha256)`, daemon detects rewrites instead of assuming append-only). Check III analyzer correctness (sample-size floor enforced; bounded-delta flagging prevents wild swings; rollback-signal detection catches regressive tightenings). Beacon shortcut idempotency (re-applying `approve threshold-update-<date>` for an already-applied date is a no-op WARN, not a double-apply).
+
+### Codified additions worth recalling next session
+
+52. **Five-source poll-daemon pattern.** The shipper's cursor + buffer + sanitize machinery is genuinely reusable. Future event-source ingestion (e.g. healer-fire events, third-party webhooks captured to a file, dispatch-sentinel JSONL) follows the same shape: a parser per source, a per-source cursor, a fingerprint-aware tail iterator for rotation safety, an `upsert(ignore_duplicates=True)` sink with a bounded write-ahead spill. Spec § 5.1 + 5.2 cover the design; `scripts/chain_event_shipper.py` is the reference implementation.
+53. **First-bytes file fingerprint catches reused-inode rotations.** Inode-equality + size-shrinkage detection alone misses the case where a file is deleted and recreated at the same size (Linux tmpfs/ext4 frequently reuses freed inodes). The fingerprint of the first 64 bytes (only computed when the file is ≥64 bytes — smaller files can't yield a stable prefix) closes that gap. Pattern is small enough to copy directly: `FileCursor` includes `fp_sha` and `tail_file` rewinds when `cursor.fp_sha != current_fp`.
+54. **Pulse Check III is the first concrete instance of doctrine #48.** Entry #48 named the self-optimizing-config-via-Pulse-Check pattern; this PR codifies it as agent-OS doctrine with discipline boundaries (no auto-apply, bounded delta, sample-size floor, idempotent shortcut) and ships the first instance against stuck-detection thresholds. The 10-surface backlog in PM project `1b36f0d2-5f2c-4d45-9f13-6806a4c5fa42` is the canonical list of where to apply the pattern next.
+55. **Application-side event-type validation, not DB-level.** Spec § 5.1 chose plain TEXT for `chain_events.event_type` over a Postgres ENUM. The trade-off: adding a new event_type is a single-line Python PR (Mirror catches typos at code review) instead of a migration; the cost is a belt-and-suspenders weekly audit healer to catch any drift. The audit healer is itself a reusable pattern: any allowlist gated in code (not schema) earns a weekly auditor that re-checks the data layer for drift.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

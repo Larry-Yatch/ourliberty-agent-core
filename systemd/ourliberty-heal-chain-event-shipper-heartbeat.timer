@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_chain_event_shipper_heartbeat every 5 minutes (E4.4d PR-B)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-chain-event-shipper-heartbeat.service
+
+[Install]
+WantedBy=timers.target

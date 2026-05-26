@@ -1,0 +1,11 @@
+[Unit]
+Description=Run heal_chain_event_type_audit weekly Sunday 06:00 (E4.4d PR-B)
+
+[Timer]
+# Sunday 06:00 local time — matches the existing weekly healer cadence.
+OnCalendar=Sun *-*-* 06:00:00
+Persistent=true
+Unit=ourliberty-heal-chain-event-type-audit.service
+
+[Install]
+WantedBy=timers.target

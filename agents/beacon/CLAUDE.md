@@ -400,6 +400,37 @@ channel. Journal the halt + reason; do NOT attempt any further dispatch
 
 Mirror is a single agent with a fallible judgment surface. For all four shapes above, the rule of thumb: **if Mirror's verdict surprises you given what you know about the spec, sanity-check before automating around it.** A REVIEW_PASS on something Larry explicitly asked to be reviewed manually is worth a second look; a REVIEW_ESCALATE on a one-line doc fix is worth questioning. In 5a everything is manual anyway so this is implicit; in 5b–5d the automation is bounded by loop budgets (`max_revisions`, `max_replans`, `cost_per_task_usd`) which catch the worst pathologies.
 
+## Pulse Check III approvals — `approve threshold-update-<date>` / `reject threshold-update-<date>` (E4.4d PR-B)
+
+Pulse runs Check III every 14 days (Sundays) and writes a threshold-proposal artifact to `~/agents/blackboard/pulse-threshold-proposals.json` plus an archived copy under `pulse-check-iii/check-iii-<date>.json`. Larry approves via Telegram with:
+
+```
+approve threshold-update-<YYYY-MM-DD>
+```
+
+…or rejects with:
+
+```
+reject threshold-update-<YYYY-MM-DD>     (optional reason after the colon)
+```
+
+When you see either message on Telegram targeting one of those shapes, your job is to dispatch a Claude-as-Forge config-only PR that applies the proposal artifact's `proposed_threshold_sec` values to `config/system_tab_thresholds.json`. **Read the artifact for that date first; do not act on an artifact that doesn't exist.** Concretely:
+
+1. **Locate the artifact.** Read `~/agents/blackboard/pulse-check-iii/check-iii-<date>.json` (the date-stamped archive). The path is the source of truth — the unstamped `pulse-threshold-proposals.json` may have been overwritten by a later cycle.
+2. **Idempotency check.** If the archived artifact already has `applied: true`, this approval is a no-op WARN. Reply to Larry: *"threshold-update-<date> was already applied earlier; no action."* Do NOT emit another APPROVAL_REQUEST.
+3. **Reject path.** If Larry sent `reject`, write `applied: false, rejected: true, rejected_reason: <text>` to both the archived artifact and the live unstamped artifact (if it still has the same `as_of`). No PR. Confirm to Larry.
+4. **Approve path.** Construct a small config patch that:
+   - Reads `config/system_tab_thresholds.json` (PR-C's file).
+   - For each proposal: if `agent == "mirror"`, update `mirror_review_overrides_seconds[task_type]` to `proposed_threshold_sec`. Otherwise update `session_duration_seconds_default` (but ONLY if the bucket is `_default` — never overwrite the global default from a non-default bucket).
+   - Updates the `_meta.last_threshold_update` field to the artifact's `as_of`.
+   - Writes the file with `indent=2`.
+5. **Dispatch.** Emit an APPROVAL_REQUEST marker via `marker.py` (per chain-discipline-v2). `task_id` = `threshold-update-<date>-001` (idempotent: re-running with the same `task_id` is harmless since trust policy / inbox dedup absorbs replays). `prompt` includes the diff Forge needs to write + the path to the artifact for cross-reference. Set `task_type: doc-only` so trust policy auto-approves a config-only PR.
+6. **Flip applied flag after merge.** When Mirror's REVIEW_PASS notify arrives for that task, your handler edits the archived artifact's `applied: true` field. This is what makes future replays of the same shortcut a no-op WARN.
+
+**Shortcut idempotency is non-negotiable.** Re-running `approve threshold-update-<date>` for an already-applied date must NEVER produce a second PR. The `applied: true` flag in the archived artifact is the gate. If you cannot find the archived artifact, abort and DM Larry — don't guess at thresholds.
+
+**Cross-reference:** `agents/pulse/CLAUDE.md` Check III section documents the producer side; spec § 5.10 has the full architecture.
+
 ## Memory discipline
 
 - When something matters across sessions, write it down. Daily notes go in `memory/YYYY-MM-DD.md`. Distilled long-term memory goes in `MEMORY.md`.
