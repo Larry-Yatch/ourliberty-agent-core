@@ -77,6 +77,10 @@
     "cost_per_task_usd": 15.0,
     "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
   },
+  "auto_merge_queue": {
+    "watchdog_dm_hours": 24,
+    "_note": "D3.5 5d-prime serializer watchdog. When a PR sits in the auto-merge queue (held behind an overlapping in-flight PR) for longer than this, the notifier sweep DMs Larry once. Raise during planned multi-day absences so the queue doesn't spam him; lower during high-throughput periods. Read by outbox_notifier._load_auto_merge_watchdog_hours_from_config; cache invalidates on daemon restart."
+  },
   "repo_paths": {
     "ourliberty-agent-core": "/home/larry/agent-core",
     "ourliberty-dashboard": "/home/larry/ourliberty-dashboard"
@@ -115,6 +119,11 @@
     {
       "date": "2026-05-21",
       "change": "task-30: add top-level 'repo_paths' block (logical repo name → canonical filesystem path). Folds the two hardcoded mappings (scripts/inbox_watcher.py CANONICAL_REPO_PATHS dict + scripts/cleanup_stale_worktrees.py CANONICAL_REPOS list) into this single source of truth. Both scripts now lazy-load this block via module-level _load_repo_paths()/_load_canonical_repos() helpers and fail-loud on missing block or paths outside /home/larry/ (matches systemd ReadWritePaths). Closes the TODOs in PR #66; collapses the cross-repo onboarding runbook from 10 steps to 8.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-26",
+      "change": "D3.5 5d-prime: add top-level 'auto_merge_queue' block with watchdog_dm_hours=24. Tunable for the AUTO_MERGE serializer's watchdog DM (fires once when a queued PR sits behind a blocker for >24h). Outbox_notifier reads via _load_auto_merge_watchdog_hours_from_config; default 24 is Larry's pick — raise during planned absences. Ships alongside the serializer gates in scripts/outbox_notifier.py that eliminate the 2026-05-26 PR-B + PR-C overlap-conflict incident class.",
       "author": "Claude (via Larry's session)"
     }
   ]

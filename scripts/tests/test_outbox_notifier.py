@@ -2322,6 +2322,14 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
             }
         self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
         on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        # D3.5 5d-prime — bypass the serializer gates in this test class.
+        # The gates' `gh pr view --json mergeable` and `gh pr list` calls
+        # aren't mocked here; the bypass preserves the D3.5 5d contract
+        # (merge-outcome rendering via _AUTO_MERGE_FN_OVERRIDE).
+        # Serializer-specific tests in test_auto_merge_serializer.py mock
+        # subprocess.run end-to-end and exercise the gates directly.
+        self._original_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
         # Reroute larry_alerts file targets into the tmpdir so the
         # EMERGENCY_HALT priority DM + cost-budget DMs don't write to
         # ~/agents during tests.
@@ -2358,6 +2366,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         for name, value in self._la_originals.items():
             setattr(la, name, value)
         on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._original_skip_serializer
         rv.REPO_ROOT = self._rv_root
         rv.invalidate_cache()
         self._tmp.cleanup()
@@ -6636,6 +6645,11 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
             return dict(self._merge_outcome_override)
         self._orig_override = on._AUTO_MERGE_FN_OVERRIDE
         on._AUTO_MERGE_FN_OVERRIDE = _override
+        # D3.5 5d-prime — bypass serializer gates (this class predates
+        # the gates and asserts D3.5 5d behavior; the gates' gh calls
+        # aren't mocked here).
+        self._orig_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
         on.ensure_dirs()
 
     def tearDown(self):
@@ -6647,6 +6661,7 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
         for name, value in self._la_originals.items():
             setattr(la, name, value)
         on._AUTO_MERGE_FN_OVERRIDE = self._orig_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._orig_skip_serializer
         rv.REPO_ROOT = self._rv_root
         rv.invalidate_cache()
         self._tmp.cleanup()
@@ -7110,6 +7125,14 @@ class LarryDirectDispatchTest(unittest.TestCase):
 
         self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
         on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        # D3.5 5d-prime — bypass the serializer gates in this test class.
+        # The gates' `gh pr view --json mergeable` and `gh pr list` calls
+        # aren't mocked here; the bypass preserves the D3.5 5d contract
+        # (merge-outcome rendering via _AUTO_MERGE_FN_OVERRIDE).
+        # Serializer-specific tests in test_auto_merge_serializer.py mock
+        # subprocess.run end-to-end and exercise the gates directly.
+        self._original_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
         import larry_alerts as la
         self._la_originals = {
             'AGENTS_ROOT': la.AGENTS_ROOT,
@@ -7143,6 +7166,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
         for name, value in self._la_originals.items():
             setattr(la, name, value)
         on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._original_skip_serializer
         rv.REPO_ROOT = self._rv_root
         rv.invalidate_cache()
         self._tmp.cleanup()
@@ -7331,6 +7355,14 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
 
         self._original_auto_merge_override = on._AUTO_MERGE_FN_OVERRIDE
         on._AUTO_MERGE_FN_OVERRIDE = _default_auto_merge
+        # D3.5 5d-prime — bypass the serializer gates in this test class.
+        # The gates' `gh pr view --json mergeable` and `gh pr list` calls
+        # aren't mocked here; the bypass preserves the D3.5 5d contract
+        # (merge-outcome rendering via _AUTO_MERGE_FN_OVERRIDE).
+        # Serializer-specific tests in test_auto_merge_serializer.py mock
+        # subprocess.run end-to-end and exercise the gates directly.
+        self._original_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
 
         import larry_alerts as la
         self._la = la
@@ -7382,6 +7414,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         for name, value in self._la_originals.items():
             setattr(self._la, name, value)
         on._AUTO_MERGE_FN_OVERRIDE = self._original_auto_merge_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._original_skip_serializer
         rv.REPO_ROOT = self._rv_root
         rv.MODELS_CONFIG_PATH = self._rv_models_path
         rv.invalidate_cache()
