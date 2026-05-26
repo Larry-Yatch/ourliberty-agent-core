@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 90 — 2026-05-26 12:50 UTC (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Source repo: wrong branch.** VM clone on `larry/pulse-cycle-upgrade-spec` (PR #108 spec branch), not `main`. Clean tree. Working-copy discipline violated — 2nd occurrence (iter 87 was `larry/e4-4d-system-tab-spec`). Not yet at G-rule threshold. ⚠️ [never-auto → escalated]
+- **(B) Sync health: deferred failure.** Last sync 2026-05-26T12:26:03Z (~24m ago), status=no-change at 9afc10f (pre-branch-switch, still within 2h window). Next sync attempt will fail "Wrong branch" — root cause is Check A. Resolves when repo returns to main. ⚠️
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 2026-05-26T12:46:46Z (fresh — dispatching Mirror review tasks for PRs #107 and #108). Forge: 2026-05-24T14:40Z (~46h — calibrated timeout/ENETUNREACH). Mirror: 2026-05-23T19:11Z (~65h — calibrated HTTP 502/timeout). Pulse: 2026-05-24T18:59Z (~42h — /optimize response, calibrated). ✅
+- **(D) Inboxes: nominal.** Mirror: 1 active task — `review-pr-108-pulse-cycle-upgrade-spec.json` (12:41Z, ~9m old, queued while Mirror reviews PR #107 which was consumed at 12:38Z). All other inboxes empty. .invalid: forge×3, pulse×3 — all old/closed per prior cycles. No new .invalid files. ✅
+- **(E) PRs: nominal.** 2 open larry/ PRs, both in active Mirror review: #107 `feat(healer): heal_pipeline_stall.py` (12:29Z, ~21m old, Mirror review consumed 12:38Z); #108 `spec(pulse): /cycle upgrade — active meta-orchestrator` (12:37Z, ~13m old, Mirror review queued 12:41Z). Neither at clean+green > 30m threshold. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 0 open forge/ PRs. 0 forge/ merged since iter 89. Two larry/ PRs (#107, #108) newly opened, both under Mirror review. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~88d out). ✅
+- **Check I: skipped.** UTC Tuesday 2026-05-26 (off day — fires Mon/Wed/Fri/Sun). Next firing: Wednesday 2026-05-27. ✅
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Wrote [yellow] escalation to blackboard (Check A wrong branch). Journal append written to spec branch (not committed — cycle writes should not pollute PR #108 diff; commit deferred until repo returns to main).
+**Escalated:** [yellow] Check A/B: VM clone on `larry/pulse-cycle-upgrade-spec`, sync will fail on next attempt. Fix: `git -C ~/agent-core checkout main` after PR #107/#108 work is done.
+**Forge:** 0 open. 0 forge/ merged since iter 89. PRs #107 and #108 (larry/ spec branches) newly opened, both in Mirror review pipeline.
+**Patterns:** Wrong-branch VM clone: 2nd occurrence (iter 87 = e4-4d-system-tab-spec, now = pulse-cycle-upgrade-spec). Not at G-rule threshold (need 3). Telegram ENETUNREACH/502/timeout ongoing (G-rule dispatched iter 57). Check I idempotency pending Larry authorization. Stuck-cycle timeout guard pending Larry authorization (iter 43). inbox-watcher MemoryMax Fix A+B monitoring.
+**Learned:** Beacon active and dispatching Mirror reviews promptly for both new PRs. heal_pipeline_stall.py (PR #107) and pulse /cycle upgrade spec (PR #108) are the two new bodies of work entering review.
+
+---
+
 ## Iteration 89 — 2026-05-26 08:47 UTC (interactive)
 
 **Health:** ✅ Nominal
