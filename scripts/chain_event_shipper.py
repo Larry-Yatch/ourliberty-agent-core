@@ -677,9 +677,9 @@ def iter_journalctl(
 ) -> Iterator[dict[str, Any]]:
     """Yield parsed journalctl JSON records since the last cursor.
 
-    once=True spawns `journalctl --no-follow ...` so the call returns after
-    draining the available records (suitable for the daemon's drain pass).
-    Live-follow mode (once=False) is reserved for ad-hoc debugging.
+    once=True spawns `journalctl ...` in its default non-follow mode so it
+    drains the available records and exits (suitable for the daemon's drain
+    pass). once=False is reserved for a future live-follow use case.
 
     The subprocess writes its position to cursor_file so the next call
     resumes cleanly.
@@ -692,8 +692,6 @@ def iter_journalctl(
         f'--cursor-file={cursor_file}',
         '--no-pager',
     ]
-    if once:
-        cmd.append('--no-follow')
     try:
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -718,6 +716,15 @@ def iter_journalctl(
         with contextlib.suppress(Exception):
             proc.terminate()
             proc.wait(timeout=2)
+        if proc.returncode is not None and proc.returncode != 0:
+            stderr_text = ''
+            if proc.stderr is not None:
+                with contextlib.suppress(Exception):
+                    stderr_text = proc.stderr.read() or ''
+            logging.getLogger('chain_event_shipper').warning(
+                'journalctl exited non-zero: returncode=%d stderr=%r',
+                proc.returncode, stderr_text[:500],
+            )
 
 
 # -------------------- Supabase sink --------------------
