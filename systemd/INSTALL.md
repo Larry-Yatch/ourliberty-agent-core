@@ -118,6 +118,11 @@ sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E
 sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-sync-deploy-targets.timer  # E2.1 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-deploy-notifier.timer  # E2.2 — DRY-RUN by default
+sudo systemctl enable --now ourliberty-heal-chain-event-shipper-heartbeat.timer  # E4.4d PR-B
+sudo systemctl enable --now ourliberty-heal-chain-event-type-audit.timer  # E4.4d PR-B (weekly Sundays)
+
+# Long-running ingestion daemon (not a timer; default disabled at activation gate)
+sudo systemctl enable ourliberty-chain-event-shipper.service  # E4.4d PR-B — service is OFF until OURLIBERTY_CHAIN_SHIPPER_ENABLED=true (see service file)
 
 # Confirm
 systemctl list-timers 'ourliberty-heal-*' 'ourliberty-sync-*' 'ourliberty-deploy-*' --all
@@ -139,6 +144,8 @@ What each one does:
 | `systemd-install-drift` (E1.5.2) | 12 h | systemd units shipped in repo but never installed under `/etc/systemd/system/` |
 | `sync-deploy-targets` (E2.1) | 12 h | `config/deploy_targets.json` ↔ Vercel API drift (project missing on either side, name mismatch) |
 | `deploy-notifier` (E2.2) | 2 min | Vercel preview-URL READY + build-ERROR events for configured deploy targets |
+| `chain-event-shipper-heartbeat` (E4.4d PR-B) | 5 min | `chain_event_shipper.heartbeat` file mtime > 10 min stale (daemon hung or crashed) |
+| `chain-event-type-audit` (E4.4d PR-B) | weekly Sun 06:00 | `chain_events` rows whose `event_type` is not in the application-side `KNOWN_EVENT_TYPES` allowlist |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
 

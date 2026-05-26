@@ -1,0 +1,1083 @@
+#!/usr/bin/env python3
+"""chain_event_shipper.py — poll-based ingestion daemon for chain_events.
+
+Phase E4.4d PR-B. Spec: agents/beacon/specs/e4-4d-system-tab.md § 5.1, § 5.2.
+
+The daemon tails five sources and INSERTs parsed events into the Supabase
+chain_events table (created by PR-A migration 0004). Each insert uses a
+deterministic event_id (sha1 of task_id+event_type+ts) so the table's PK
+absorbs double-inserts (cursor-replay after restart, push-instrumented
+writer in a future PR — same dedup property regardless of writer).
+
+Five sources, each with its own cursor for resume-after-restart:
+
+  1. journalctl -fu ourliberty-inbox-watcher.service --output=json
+     (session_start, session_done events)
+  2. ~/agents/logs/outbox-notifier.log
+     (marker_emit, auto_merge, marker_error, cost_budget, review_request,
+      build_dispatched, preflight_*, healer_fire)
+  3. ~/agents/blackboard/pulse-escalations.json (snapshot, overwritten)
+     (event_type='escalation')
+  4. ~/agents/blackboard/larry-alerts.jsonl (append-only)
+     (event_type='larry_alert' or 'sentinel_alert' depending on source field)
+  5. ~/agents/blackboard/sentinel-alerts.jsonl (append-only)
+     (event_type='sentinel_alert')
+
+Cursor shapes:
+  - journalctl: --cursor-file at AGENTS_ROOT/state/chain-event-cursor.journal
+  - log/jsonl files: (inode, byte_offset) tuple per file
+  - pulse-escalations.json: (file_mtime, content_sha256)
+
+Buffer: on Supabase write failure, events spill to
+AGENTS_ROOT/state/chain-event-buffer.jsonl (cap 10,000 lines / ~5 MB).
+On reconnect, buffer drains FIFO. If buffer fills under chronic outage,
+oldest events drop with a WARN log entry (audit healer DMs Larry).
+
+Health: writes a heartbeat to AGENTS_ROOT/blackboard/chain-event-shipper.heartbeat
+every 30 seconds. heal_chain_event_shipper_heartbeat.py reads mtime and DMs
+Larry if stale > 10 min.
+
+Operator interface:
+  - default: run as a daemon, loops until SIGTERM
+  - --once: single drain pass then exit (for tests / debugging)
+  - --no-backfill: skip backfill on first run (default behavior; flag is a
+    no-op kept for explicitness)
+  - OURLIBERTY_CHAIN_SHIPPER_ENABLED=false → exit early (kill-switch)
+  - ~/agents/healers.disabled → exit early (blanket kill-switch)
+"""
+from __future__ import annotations
+
+import argparse
+import contextlib
+import hashlib
+import json
+import logging
+import os
+import re
+import signal
+import subprocess
+import sys
+import threading
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterable, Iterator, Optional
+
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
+LOG_FILE = AGENTS_ROOT / 'logs' / 'chain-event-shipper.log'
+HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'chain-event-shipper.heartbeat'
+KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
+
+JOURNAL_CURSOR_FILE = AGENTS_ROOT / 'state' / 'chain-event-cursor.journal'
+LOG_CURSORS_FILE = AGENTS_ROOT / 'state' / 'chain-event-cursors.json'
+PULSE_CURSOR_FILE = AGENTS_ROOT / 'state' / 'chain-event-cursor-pulse.json'
+BUFFER_FILE = AGENTS_ROOT / 'state' / 'chain-event-buffer.jsonl'
+
+OUTBOX_NOTIFIER_LOG = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
+PULSE_ESCALATIONS_JSON = AGENTS_ROOT / 'blackboard' / 'pulse-escalations.json'
+LARRY_ALERTS_JSONL = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
+SENTINEL_ALERTS_JSONL = AGENTS_ROOT / 'blackboard' / 'sentinel-alerts.jsonl'
+
+HEARTBEAT_INTERVAL_SEC = 30
+DRAIN_INTERVAL_SEC = 30
+PULSE_POLL_INTERVAL_SEC = 30
+BUFFER_MAX_LINES = 10_000
+BUFFER_MAX_BYTES = 5 * 1024 * 1024
+SUPABASE_TIMEOUT_SEC = 15
+JOURNALCTL_UNIT = 'ourliberty-inbox-watcher.service'
+
+# Per spec § 5.1: event_type validation is application-side. Any value not in
+# this set rejected with a WARN log + the audit healer (weekly) DMs Larry.
+KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
+    'session_start',
+    'session_done',
+    'marker_emit',
+    'auto_merge',
+    'marker_error',
+    'cost_budget',
+    'review_request',
+    'build_dispatched',
+    'preflight_proceed',
+    'preflight_clarify',
+    'preflight_reject',
+    'escalation',
+    'larry_alert',
+    'sentinel_alert',
+    'healer_fire',
+})
+
+# PII / credential redaction. Any payload field key matching one of these
+# patterns (case-insensitive substring) gets its value replaced with the
+# string '<redacted>' before INSERT. Cheap line of defense — the upstream
+# log writers SHOULD never embed credentials in markers, but defense in
+# depth at the ingestion layer means a single source-side slip doesn't
+# leak to Supabase + the public dashboard.
+_REDACT_KEY_SUBSTRS = (
+    'token', 'secret', 'password', 'passwd', 'api_key', 'apikey',
+    'service_role', 'authorization', 'auth_header', 'bearer',
+    'private_key', 'session_id',
+)
+
+
+# -------------------- logging + heartbeat --------------------
+
+def _setup_logging(level: int = logging.INFO) -> logging.Logger:
+    logger = logging.getLogger('chain_event_shipper')
+    if logger.handlers:
+        return logger
+    logger.setLevel(level)
+    fmt = logging.Formatter(
+        '[%(asctime)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%dT%H:%M:%S%z',
+    )
+    stream = logging.StreamHandler(sys.stdout)
+    stream.setFormatter(fmt)
+    logger.addHandler(stream)
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(LOG_FILE, encoding='utf-8')
+        fh.setFormatter(fmt)
+        logger.addHandler(fh)
+    except OSError:
+        pass
+    return logger
+
+
+def heartbeat() -> None:
+    try:
+        HEARTBEAT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        HEARTBEAT_FILE.write_text(datetime.now(timezone.utc).isoformat())
+    except OSError:
+        pass
+
+
+# -------------------- dedup hash + payload sanitization --------------------
+
+def compute_event_id(task_id: Optional[str], event_type: str, ts: str) -> str:
+    """Deterministic sha1 of (task_id|<none>, event_type, ts).
+
+    Per spec § 5.1: any writer (poller now, push-instrumented in a future
+    PR) computes the same event_id for the same logical event. The PK
+    absorbs double-inserts via ON CONFLICT DO NOTHING.
+    """
+    raw = f'{task_id or ""}|{event_type}|{ts}'.encode('utf-8')
+    return hashlib.sha1(raw).hexdigest()
+
+
+def sanitize_payload(payload: Any) -> Any:
+    """Walk payload and redact values for keys matching credential patterns.
+
+    Recursive on dicts + lists. Leaves scalars alone. Never raises.
+    """
+    if isinstance(payload, dict):
+        out = {}
+        for key, val in payload.items():
+            kl = str(key).lower()
+            if any(needle in kl for needle in _REDACT_KEY_SUBSTRS):
+                out[key] = '<redacted>'
+            else:
+                out[key] = sanitize_payload(val)
+        return out
+    if isinstance(payload, list):
+        return [sanitize_payload(v) for v in payload]
+    return payload
+
+
+# -------------------- cursor persistence --------------------
+
+_FINGERPRINT_BYTES = 64
+
+
+@dataclass
+class FileCursor:
+    """Per-file cursor for log/jsonl tail.
+
+    Tuple of (inode, byte_offset, first_bytes_sha1). The first-bytes
+    fingerprint catches the rotation-with-reused-inode-and-equal-size
+    case that inode+offset alone can miss (logrotate's create-and-then-
+    write pattern, manual delete+recreate, etc.).
+    """
+    inode: int = 0
+    offset: int = 0
+    fp_sha: str = ''
+
+    def to_dict(self) -> dict[str, Any]:
+        return {'inode': self.inode, 'offset': self.offset,
+                'fp_sha': self.fp_sha}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> 'FileCursor':
+        return cls(
+            inode=int(d.get('inode', 0)),
+            offset=int(d.get('offset', 0)),
+            fp_sha=str(d.get('fp_sha', '')),
+        )
+
+
+def _file_fingerprint(path: Path) -> str:
+    """Hex sha1 of the first _FINGERPRINT_BYTES of the file.
+
+    Returns '' if the file is smaller than _FINGERPRINT_BYTES — the
+    fingerprint must be computed on a stable prefix, and a partial read
+    of a file that's still being written would change on the next
+    append. For files smaller than the fingerprint threshold, the
+    rotation check falls back to inode+offset+size-shrinkage only.
+    """
+    try:
+        st = path.stat()
+        if st.st_size < _FINGERPRINT_BYTES:
+            return ''
+        with open(path, 'rb') as fh:
+            head = fh.read(_FINGERPRINT_BYTES)
+    except OSError:
+        return ''
+    if len(head) < _FINGERPRINT_BYTES:
+        return ''
+    return hashlib.sha1(head).hexdigest()
+
+
+@dataclass
+class PulseCursor:
+    """Cursor for pulse-escalations.json snapshot (overwritten on each Pulse cycle)."""
+    mtime: float = 0.0
+    sha256: str = ''
+
+    def to_dict(self) -> dict[str, Any]:
+        return {'mtime': self.mtime, 'sha256': self.sha256}
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> 'PulseCursor':
+        return cls(mtime=float(d.get('mtime', 0.0)), sha256=str(d.get('sha256', '')))
+
+
+def load_log_cursors() -> dict[str, FileCursor]:
+    if not LOG_CURSORS_FILE.exists():
+        return {}
+    try:
+        data = json.loads(LOG_CURSORS_FILE.read_text())
+        return {k: FileCursor.from_dict(v) for k, v in data.items()}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_log_cursors(cursors: dict[str, FileCursor]) -> None:
+    try:
+        LOG_CURSORS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        LOG_CURSORS_FILE.write_text(
+            json.dumps({k: c.to_dict() for k, c in cursors.items()}, indent=2)
+        )
+    except OSError:
+        pass
+
+
+def load_pulse_cursor() -> PulseCursor:
+    if not PULSE_CURSOR_FILE.exists():
+        return PulseCursor()
+    try:
+        return PulseCursor.from_dict(json.loads(PULSE_CURSOR_FILE.read_text()))
+    except (json.JSONDecodeError, OSError):
+        return PulseCursor()
+
+
+def save_pulse_cursor(cursor: PulseCursor) -> None:
+    try:
+        PULSE_CURSOR_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PULSE_CURSOR_FILE.write_text(json.dumps(cursor.to_dict()))
+    except OSError:
+        pass
+
+
+# -------------------- canonical event record --------------------
+
+@dataclass
+class ChainEvent:
+    """In-memory shape of one row destined for chain_events."""
+    event_id: str
+    ts: str
+    agent: str
+    task_id: Optional[str]
+    event_type: str
+    pr_url: Optional[str] = None
+    cost_usd: Optional[float] = None
+    payload: dict[str, Any] = field(default_factory=dict)
+    source: str = ''  # which input source produced this (journal/log/pulse/larry/sentinel)
+
+    def to_row(self) -> dict[str, Any]:
+        row: dict[str, Any] = {
+            'event_id': self.event_id,
+            'ts': self.ts,
+            'agent': self.agent,
+            'event_type': self.event_type,
+            'payload': sanitize_payload(self.payload),
+        }
+        if self.task_id:
+            row['task_id'] = self.task_id
+        if self.pr_url:
+            row['pr_url'] = self.pr_url
+        if self.cost_usd is not None:
+            row['cost_usd'] = self.cost_usd
+        return row
+
+
+def make_event(
+    *, agent: str, event_type: str, ts: str,
+    task_id: Optional[str] = None,
+    pr_url: Optional[str] = None,
+    cost_usd: Optional[float] = None,
+    payload: Optional[dict[str, Any]] = None,
+    source: str = '',
+) -> Optional[ChainEvent]:
+    """Build a ChainEvent, validating event_type against KNOWN_EVENT_TYPES.
+
+    Returns None if event_type is unknown — caller logs WARN; the row is
+    never sent to Supabase. The weekly audit healer separately catches any
+    unknown types that DO land (hot-patched code, drift, etc.).
+    """
+    if event_type not in KNOWN_EVENT_TYPES:
+        return None
+    event_id = compute_event_id(task_id, event_type, ts)
+    return ChainEvent(
+        event_id=event_id, ts=ts, agent=agent, task_id=task_id,
+        event_type=event_type, pr_url=pr_url, cost_usd=cost_usd,
+        payload=payload or {}, source=source,
+    )
+
+
+# -------------------- source parsers --------------------
+
+# journalctl --output=json emits one JSON object per line. We care about
+# session start/done events written by inbox_watcher. The expected shape
+# from inbox_watcher's structured logging:
+#
+#   { "_SOURCE_REALTIME_TIMESTAMP": "...",
+#     "MESSAGE": "session_start agent=forge task_id=... model=...",
+#     "OURLIBERTY_EVENT_TYPE": "session_start",
+#     "OURLIBERTY_AGENT": "forge",
+#     "OURLIBERTY_TASK_ID": "...",
+#     "OURLIBERTY_MODEL": "claude-opus-4-7",
+#     "OURLIBERTY_TASK_TYPE": "feature-development"
+#   }
+#
+# Real-world inbox_watcher today doesn't emit those OURLIBERTY_* fields
+# yet — the parser falls back to regex on MESSAGE for compatibility. The
+# push-instrumented PR will add the structured fields.
+
+_JOURNAL_SESSION_RE = re.compile(
+    r'session_(?P<verb>start|done)\s+'
+    r'(?:agent=(?P<agent>\S+)\s+)?'
+    r'task_id=(?P<task_id>\S+)'
+    r'(?:\s+model=(?P<model>\S+))?'
+    r'(?:\s+task_type=(?P<task_type>\S+))?'
+    r'(?:\s+success=(?P<success>\S+))?'
+    r'(?:\s+duration_sec=(?P<duration_sec>[\d.]+))?'
+    r'(?:\s+cost_usd=(?P<cost_usd>[\d.]+))?'
+)
+
+
+def parse_journal_record(record: dict[str, Any]) -> Optional[ChainEvent]:
+    """Parse one journalctl JSON record. Returns None if not a chain event."""
+    message = record.get('MESSAGE') or ''
+    if isinstance(message, list):
+        # journalctl wraps binary messages as a list of byte ints
+        try:
+            message = bytes(message).decode('utf-8', errors='replace')
+        except Exception:
+            return None
+    ts = _journal_ts(record)
+    structured_type = record.get('OURLIBERTY_EVENT_TYPE')
+    if structured_type:
+        agent = record.get('OURLIBERTY_AGENT') or 'watcher'
+        task_id = record.get('OURLIBERTY_TASK_ID')
+        payload = {
+            'model': record.get('OURLIBERTY_MODEL'),
+            'task_type': record.get('OURLIBERTY_TASK_TYPE'),
+            'message': message,
+        }
+        cost = record.get('OURLIBERTY_COST_USD')
+        return make_event(
+            agent=agent, event_type=structured_type, ts=ts, task_id=task_id,
+            cost_usd=float(cost) if cost else None,
+            payload={k: v for k, v in payload.items() if v is not None},
+            source='journal',
+        )
+    m = _JOURNAL_SESSION_RE.search(message)
+    if not m:
+        return None
+    verb = m.group('verb')
+    event_type = 'session_start' if verb == 'start' else 'session_done'
+    agent = m.group('agent') or 'unknown'
+    task_id = m.group('task_id')
+    payload = {
+        'model': m.group('model'),
+        'task_type': m.group('task_type'),
+        'success': m.group('success'),
+        'duration_sec': _maybe_float(m.group('duration_sec')),
+        'message': message,
+    }
+    payload = {k: v for k, v in payload.items() if v is not None}
+    cost = _maybe_float(m.group('cost_usd'))
+    return make_event(
+        agent=agent, event_type=event_type, ts=ts, task_id=task_id,
+        cost_usd=cost, payload=payload, source='journal',
+    )
+
+
+def _journal_ts(record: dict[str, Any]) -> str:
+    """Extract an ISO8601 ts from a journal record."""
+    # journalctl's __REALTIME_TIMESTAMP is microseconds since epoch (as string)
+    raw = (record.get('__REALTIME_TIMESTAMP') or
+           record.get('_SOURCE_REALTIME_TIMESTAMP'))
+    if raw:
+        try:
+            dt = datetime.fromtimestamp(int(raw) / 1_000_000, tz=timezone.utc)
+            return dt.isoformat()
+        except (ValueError, OSError):
+            pass
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _maybe_float(v: Any) -> Optional[float]:
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+# outbox-notifier.log lines have the shape (see outbox_notifier.log() helper):
+#   [2026-05-25T19:42:13Z] [INFO] MARKER_EMIT agent=forge task=<id> verdict=PROCEED
+#   [2026-05-25T19:42:13Z] [INFO] AUTO_MERGE task=<id> pr=<url> outcome=merged ...
+#   [2026-05-25T19:42:13Z] [INFO] MARKER_ERROR agent=mirror task=<id> reason=...
+#   [2026-05-25T19:42:13Z] [INFO] COST_BUDGET task=<id> agent=forge cost_usd=1.23 limit_usd=5
+#   [2026-05-25T19:42:13Z] [INFO] REVIEW_REQUEST task=<id> pr=<url>
+#   [2026-05-25T19:42:13Z] [INFO] BUILD_DISPATCHED task=<id> agent=forge
+#   [2026-05-25T19:42:13Z] [INFO] HEALER_FIRE name=<healer> outcome=...
+
+_LOG_LINE_RE = re.compile(
+    r'^\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]\s+'
+    r'\[(?P<level>\w+)\]\s+(?P<rest>.*)$'
+)
+_KV_RE = re.compile(r"(\w+)=('([^']*)'|\"([^\"]*)\"|(\S+))")
+
+_LOG_EVENT_KEYWORDS = {
+    'MARKER_EMIT': 'marker_emit',
+    'AUTO_MERGE': 'auto_merge',
+    'MARKER_ERROR': 'marker_error',
+    'COST_BUDGET': 'cost_budget',
+    'REVIEW_REQUEST': 'review_request',
+    'BUILD_DISPATCHED': 'build_dispatched',
+    'HEALER_FIRE': 'healer_fire',
+    'PREFLIGHT_PROCEED': 'preflight_proceed',
+    'PREFLIGHT_CLARIFY': 'preflight_clarify',
+    'PREFLIGHT_REJECT': 'preflight_reject',
+}
+
+
+def _parse_kv_pairs(rest: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for m in _KV_RE.finditer(rest):
+        key = m.group(1)
+        val = m.group(3) or m.group(4) or m.group(5) or ''
+        out[key] = val
+    return out
+
+
+def parse_log_line(line: str) -> Optional[ChainEvent]:
+    """Parse one outbox-notifier.log line. Returns None if not a chain event."""
+    m = _LOG_LINE_RE.match(line.rstrip('\n'))
+    if not m:
+        return None
+    rest = m.group('rest')
+    keyword = None
+    for kw in _LOG_EVENT_KEYWORDS:
+        if rest.startswith(kw):
+            keyword = kw
+            break
+    if not keyword:
+        return None
+    event_type = _LOG_EVENT_KEYWORDS[keyword]
+    kv = _parse_kv_pairs(rest[len(keyword):])
+    ts = _normalize_iso_ts(m.group('ts'))
+    task_id = kv.get('task') or kv.get('task_id')
+    agent = kv.get('agent') or 'notifier'
+    pr_url = kv.get('pr')
+    cost = _maybe_float(kv.get('cost_usd'))
+    payload = {k: v for k, v in kv.items()
+               if k not in ('task', 'task_id', 'agent', 'pr', 'cost_usd')}
+    payload['raw_keyword'] = keyword
+    return make_event(
+        agent=agent, event_type=event_type, ts=ts, task_id=task_id,
+        pr_url=pr_url, cost_usd=cost, payload=payload, source='outbox_log',
+    )
+
+
+def _normalize_iso_ts(raw: str) -> str:
+    """Normalize a log-line timestamp to ISO8601 UTC."""
+    s = raw.replace(' ', 'T')
+    # Treat naive as UTC (outbox_notifier writes UTC isoformat)
+    if 'Z' not in s and '+' not in s and '-' not in s[-6:]:
+        s = s + '+00:00'
+    elif s.endswith('Z'):
+        s = s[:-1] + '+00:00'
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+    except ValueError:
+        return datetime.now(timezone.utc).isoformat()
+
+
+# pulse-escalations.json is a snapshot rewritten by Pulse each cycle. We
+# don't tail it; we compare content_sha256 against the last cursor and if
+# different, walk the array and emit one 'escalation' event per entry
+# whose synthetic event_id has not been seen (dedup via PK).
+def parse_pulse_escalations(content: str) -> list[ChainEvent]:
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        return []
+    entries = data.get('escalations') if isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        return []
+    out: list[ChainEvent] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        ts = entry.get('ts') or entry.get('timestamp') or \
+            datetime.now(timezone.utc).isoformat()
+        task_id = entry.get('task_id') or entry.get('headline') or entry.get('id')
+        payload = {
+            'severity': entry.get('severity'),
+            'headline': entry.get('headline'),
+            'needs_response': entry.get('needs_response'),
+            'detail': entry.get('detail'),
+            'source_finding': entry.get('source') or 'pulse',
+        }
+        payload = {k: v for k, v in payload.items() if v is not None}
+        ev = make_event(
+            agent='pulse', event_type='escalation', ts=ts,
+            task_id=task_id, payload=payload, source='pulse_escalations',
+        )
+        if ev:
+            out.append(ev)
+    return out
+
+
+def parse_jsonl_line(line: str, *, source: str) -> Optional[ChainEvent]:
+    """Parse one larry-alerts.jsonl or sentinel-alerts.jsonl entry."""
+    try:
+        rec = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(rec, dict):
+        return None
+    ts = rec.get('ts') or datetime.now(timezone.utc).isoformat()
+    if source == 'larry_alerts':
+        event_type = 'larry_alert'
+        agent = rec.get('source') or 'beacon'
+    elif source == 'sentinel_alerts':
+        event_type = 'sentinel_alert'
+        agent = rec.get('source') or 'sentinel'
+    else:
+        return None
+    subject = rec.get('subject') or rec.get('intent') or ''
+    task_id = rec.get('task_id') or subject or None
+    payload = {k: v for k, v in rec.items()
+               if k not in ('ts', 'source', 'task_id')}
+    return make_event(
+        agent=agent, event_type=event_type, ts=ts, task_id=task_id,
+        payload=payload, source=source,
+    )
+
+
+# -------------------- file tail iterators --------------------
+
+def tail_file(
+    path: Path, cursor: FileCursor, *, max_lines: int = 1000,
+) -> Iterator[tuple[str, FileCursor]]:
+    """Yield (line, updated_cursor) tuples since the cursor position.
+
+    Detects log rotation via inode mismatch: closes the old fd, re-opens
+    the new file from byte 0, and updates the cursor accordingly.
+    Stops after max_lines per drain pass so the daemon doesn't starve
+    other sources under a fast-writing log.
+    """
+    if not path.exists():
+        return
+    try:
+        st = path.stat()
+    except OSError:
+        return
+    current_inode = st.st_ino
+    current_fp = _file_fingerprint(path)
+    start_offset = cursor.offset
+    rotated = (
+        (cursor.inode and cursor.inode != current_inode) or
+        (cursor.fp_sha and current_fp and cursor.fp_sha != current_fp) or
+        (cursor.offset > st.st_size)
+    )
+    if rotated:
+        start_offset = 0
+    new_cursor = FileCursor(inode=current_inode, offset=start_offset,
+                            fp_sha=current_fp)
+    yielded = 0
+    try:
+        with open(path, 'rb') as fh:
+            fh.seek(start_offset)
+            while yielded < max_lines:
+                raw = fh.readline()
+                if not raw:
+                    break
+                if not raw.endswith(b'\n'):
+                    # Partial line — leave offset before it for next drain.
+                    break
+                try:
+                    line = raw.decode('utf-8', errors='replace')
+                except Exception:
+                    new_cursor.offset = fh.tell()
+                    continue
+                new_cursor.offset = fh.tell()
+                yielded += 1
+                yield line, FileCursor(inode=new_cursor.inode,
+                                       offset=new_cursor.offset,
+                                       fp_sha=new_cursor.fp_sha)
+    except OSError:
+        return
+
+
+# -------------------- journalctl tail --------------------
+
+def iter_journalctl(
+    cursor_file: Path = JOURNAL_CURSOR_FILE,
+    unit: str = JOURNALCTL_UNIT,
+    once: bool = True,
+    timeout_sec: float = 10.0,
+) -> Iterator[dict[str, Any]]:
+    """Yield parsed journalctl JSON records since the last cursor.
+
+    once=True spawns `journalctl --no-follow ...` so the call returns after
+    draining the available records (suitable for the daemon's drain pass).
+    Live-follow mode (once=False) is reserved for ad-hoc debugging.
+
+    The subprocess writes its position to cursor_file so the next call
+    resumes cleanly.
+    """
+    cursor_file.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        'journalctl',
+        '-u', unit,
+        '--output=json',
+        f'--cursor-file={cursor_file}',
+        '--no-pager',
+    ]
+    if once:
+        cmd.append('--no-follow')
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, bufsize=1,
+        )
+    except FileNotFoundError:
+        return
+    try:
+        assert proc.stdout is not None
+        deadline = time.monotonic() + timeout_sec if once else None
+        for line in proc.stdout:
+            if deadline and time.monotonic() > deadline:
+                break
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                continue
+    finally:
+        with contextlib.suppress(Exception):
+            proc.terminate()
+            proc.wait(timeout=2)
+
+
+# -------------------- Supabase sink --------------------
+
+class SupabaseSink:
+    """Wraps the supabase-py client with insert-or-buffer semantics.
+
+    Constructed lazily so unit tests (which monkey-patch insert) don't
+    need the supabase package installed.
+    """
+
+    def __init__(self, table: str = 'chain_events') -> None:
+        self.table_name = table
+        self._client = None
+
+    def _ensure_client(self) -> None:
+        if self._client is not None:
+            return
+        url = os.environ.get('SUPABASE_URL')
+        key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+        if not url or not key:
+            raise RuntimeError(
+                'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — '
+                'cannot connect to Supabase.'
+            )
+        try:
+            from supabase import create_client  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError(
+                'supabase-py is not installed. '
+                'pip3 install --user --break-system-packages supabase'
+            ) from exc
+        self._client = create_client(url, key)
+
+    def insert_rows(self, rows: list[dict[str, Any]]) -> None:
+        """INSERT a batch with PK conflict treated as no-op.
+
+        Uses upsert(ignore_duplicates=True, on_conflict='event_id') which
+        translates to PostgREST's `Prefer: resolution=ignore-duplicates`,
+        matching `INSERT ... ON CONFLICT (event_id) DO NOTHING`.
+        """
+        if not rows:
+            return
+        self._ensure_client()
+        assert self._client is not None
+        self._client.table(self.table_name).upsert(
+            rows, on_conflict='event_id', ignore_duplicates=True,
+        ).execute()
+
+
+# -------------------- buffer (write-ahead spill on Supabase failure) --------------------
+
+class EventBuffer:
+    """Append-only spill file for events that couldn't reach Supabase.
+
+    Bounded by line count + byte size. When over the cap, the OLDEST lines
+    drop. This is intentional: under chronic Supabase outage we'd rather
+    keep tailing fresh events than block waiting for replay capacity.
+    """
+
+    def __init__(self, path: Path = BUFFER_FILE,
+                 max_lines: int = BUFFER_MAX_LINES,
+                 max_bytes: int = BUFFER_MAX_BYTES) -> None:
+        self.path = path
+        self.max_lines = max_lines
+        self.max_bytes = max_bytes
+
+    def append(self, rows: list[dict[str, Any]]) -> int:
+        """Append rows to the buffer. Returns count of rows dropped due to cap."""
+        if not rows:
+            return 0
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path, 'a', encoding='utf-8') as fh:
+            for row in rows:
+                fh.write(json.dumps(row, ensure_ascii=False) + '\n')
+        return self._trim_if_overflowing()
+
+    def _trim_if_overflowing(self) -> int:
+        if not self.path.exists():
+            return 0
+        try:
+            size = self.path.stat().st_size
+        except OSError:
+            return 0
+        if size <= self.max_bytes:
+            with open(self.path, 'r', encoding='utf-8') as fh:
+                lines = fh.readlines()
+            if len(lines) <= self.max_lines:
+                return 0
+        with open(self.path, 'r', encoding='utf-8') as fh:
+            lines = fh.readlines()
+        if len(lines) <= self.max_lines and \
+                sum(len(line.encode('utf-8')) for line in lines) <= self.max_bytes:
+            return 0
+        # Drop oldest until under both caps.
+        dropped = 0
+        while lines and (
+            len(lines) > self.max_lines or
+            sum(len(line.encode('utf-8')) for line in lines) > self.max_bytes
+        ):
+            lines.pop(0)
+            dropped += 1
+        with open(self.path, 'w', encoding='utf-8') as fh:
+            fh.writelines(lines)
+        return dropped
+
+    def drain(self) -> list[dict[str, Any]]:
+        """Read all buffered rows; caller must clear() on successful flush."""
+        if not self.path.exists():
+            return []
+        out: list[dict[str, Any]] = []
+        with open(self.path, 'r', encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        return out
+
+    def clear(self) -> None:
+        if self.path.exists():
+            self.path.unlink()
+
+
+# -------------------- main daemon loop --------------------
+
+@dataclass
+class DrainStats:
+    journal: int = 0
+    outbox_log: int = 0
+    pulse_escalations: int = 0
+    larry_alerts: int = 0
+    sentinel_alerts: int = 0
+    dropped_unknown_type: int = 0
+    dropped_buffer_overflow: int = 0
+    inserted: int = 0
+    buffered: int = 0
+    flushed_from_buffer: int = 0
+
+
+def drain_once(
+    sink: SupabaseSink,
+    buffer: EventBuffer,
+    log_cursors: dict[str, FileCursor],
+    pulse_cursor: PulseCursor,
+    logger: logging.Logger,
+    *,
+    journal_iter_fn=None,
+    pulse_path: Path = PULSE_ESCALATIONS_JSON,
+    outbox_log_path: Path = OUTBOX_NOTIFIER_LOG,
+    larry_alerts_path: Path = LARRY_ALERTS_JSONL,
+    sentinel_alerts_path: Path = SENTINEL_ALERTS_JSONL,
+) -> tuple[DrainStats, PulseCursor]:
+    """Walk all five sources, build event rows, INSERT or buffer.
+
+    Pure-function-shaped for testing: pass mocked sink + buffer +
+    cursors + journal_iter_fn and verify the resulting DrainStats.
+    """
+    stats = DrainStats()
+    events: list[ChainEvent] = []
+    unknown_types: list[str] = []
+
+    # 1. journalctl
+    j_iter = journal_iter_fn() if journal_iter_fn else iter_journalctl()
+    for record in j_iter:
+        ev = parse_journal_record(record)
+        if ev:
+            events.append(ev)
+            stats.journal += 1
+        else:
+            # Detect unknown event_type so the WARN log is loud.
+            structured_type = record.get('OURLIBERTY_EVENT_TYPE')
+            if structured_type and structured_type not in KNOWN_EVENT_TYPES:
+                unknown_types.append(structured_type)
+                stats.dropped_unknown_type += 1
+
+    # 2. outbox-notifier.log
+    log_cursor = log_cursors.get('outbox_log', FileCursor())
+    new_log_cursor = log_cursor
+    for line, updated in tail_file(outbox_log_path, log_cursor):
+        new_log_cursor = updated
+        ev = parse_log_line(line)
+        if ev:
+            events.append(ev)
+            stats.outbox_log += 1
+    log_cursors['outbox_log'] = new_log_cursor
+
+    # 3. pulse-escalations.json (snapshot)
+    new_pulse_cursor = pulse_cursor
+    if pulse_path.exists():
+        try:
+            stat = pulse_path.stat()
+            content = pulse_path.read_text()
+            content_sha = hashlib.sha256(content.encode('utf-8')).hexdigest()
+            if content_sha != pulse_cursor.sha256:
+                pulse_events = parse_pulse_escalations(content)
+                events.extend(pulse_events)
+                stats.pulse_escalations += len(pulse_events)
+                new_pulse_cursor = PulseCursor(mtime=stat.st_mtime,
+                                               sha256=content_sha)
+        except OSError as e:
+            logger.warning('pulse-escalations read failed: %s', e)
+
+    # 4. larry-alerts.jsonl
+    larry_cursor = log_cursors.get('larry_alerts', FileCursor())
+    new_larry = larry_cursor
+    for line, updated in tail_file(larry_alerts_path, larry_cursor):
+        new_larry = updated
+        ev = parse_jsonl_line(line, source='larry_alerts')
+        if ev:
+            events.append(ev)
+            stats.larry_alerts += 1
+    log_cursors['larry_alerts'] = new_larry
+
+    # 5. sentinel-alerts.jsonl
+    sentinel_cursor = log_cursors.get('sentinel_alerts', FileCursor())
+    new_sentinel = sentinel_cursor
+    for line, updated in tail_file(sentinel_alerts_path, sentinel_cursor):
+        new_sentinel = updated
+        ev = parse_jsonl_line(line, source='sentinel_alerts')
+        if ev:
+            events.append(ev)
+            stats.sentinel_alerts += 1
+    log_cursors['sentinel_alerts'] = new_sentinel
+
+    for ut in unknown_types:
+        logger.warning(
+            'UNKNOWN_EVENT_TYPE event_type=%s — dropped (will be flagged by '
+            'weekly audit healer if it lands via another writer)', ut,
+        )
+
+    rows = [ev.to_row() for ev in events]
+
+    # Try to flush buffer FIRST so older events ship before new ones —
+    # FIFO ordering matters for downstream dedupless consumers (none today
+    # but the schema is queryable in time order).
+    pending_buffer = buffer.drain()
+    all_rows = pending_buffer + rows
+
+    if not all_rows:
+        return stats, new_pulse_cursor
+
+    try:
+        sink.insert_rows(all_rows)
+        stats.inserted = len(all_rows)
+        stats.flushed_from_buffer = len(pending_buffer)
+        buffer.clear()
+    except Exception as e:
+        logger.warning(
+            'Supabase insert failed (%s); buffering %d rows',
+            type(e).__name__, len(all_rows),
+        )
+        # Re-buffer the rows we just drained PLUS the fresh ones.
+        # buffer.drain() didn't clear the file — but the rows are already
+        # on disk. The cleanest semantic: clear, then append everything.
+        buffer.clear()
+        dropped = buffer.append(all_rows)
+        stats.buffered = len(all_rows)
+        stats.dropped_buffer_overflow = dropped
+        if dropped:
+            logger.warning(
+                'BUFFER_OVERFLOW dropped=%d oldest events; chronic outage?', dropped,
+            )
+
+    return stats, new_pulse_cursor
+
+
+# -------------------- run / argparse --------------------
+
+_should_stop = threading.Event()
+
+
+def _sigterm_handler(signum, frame):  # noqa: ARG001
+    _should_stop.set()
+
+
+def kill_switch_active() -> bool:
+    if KILL_SWITCH.exists():
+        return True
+    if os.environ.get('OURLIBERTY_CHAIN_SHIPPER_ENABLED', '').lower() == 'false':
+        return True
+    return False
+
+
+def run_loop(logger: logging.Logger) -> int:
+    """Daemon loop: drain → heartbeat → sleep, until SIGTERM or kill-switch."""
+    signal.signal(signal.SIGTERM, _sigterm_handler)
+    signal.signal(signal.SIGINT, _sigterm_handler)
+
+    sink = SupabaseSink()
+    buffer = EventBuffer()
+    log_cursors = load_log_cursors()
+    pulse_cursor = load_pulse_cursor()
+
+    logger.info(
+        'chain_event_shipper starting: drain_interval=%ds heartbeat=%ds',
+        DRAIN_INTERVAL_SEC, HEARTBEAT_INTERVAL_SEC,
+    )
+
+    last_heartbeat = 0.0
+    while not _should_stop.is_set():
+        if kill_switch_active():
+            logger.info('kill-switch active; exiting cleanly')
+            return 0
+        try:
+            stats, pulse_cursor = drain_once(
+                sink, buffer, log_cursors, pulse_cursor, logger,
+            )
+            save_log_cursors(log_cursors)
+            save_pulse_cursor(pulse_cursor)
+            if any((stats.journal, stats.outbox_log, stats.pulse_escalations,
+                    stats.larry_alerts, stats.sentinel_alerts,
+                    stats.dropped_unknown_type, stats.dropped_buffer_overflow,
+                    stats.flushed_from_buffer)):
+                logger.info(
+                    'drain: journal=%d log=%d pulse=%d larry=%d sentinel=%d '
+                    'inserted=%d buffered=%d flushed=%d dropped_unknown=%d '
+                    'dropped_overflow=%d',
+                    stats.journal, stats.outbox_log, stats.pulse_escalations,
+                    stats.larry_alerts, stats.sentinel_alerts,
+                    stats.inserted, stats.buffered, stats.flushed_from_buffer,
+                    stats.dropped_unknown_type, stats.dropped_buffer_overflow,
+                )
+        except Exception as e:
+            logger.error('drain_once raised: %s: %s', type(e).__name__, e)
+
+        now = time.monotonic()
+        if now - last_heartbeat >= HEARTBEAT_INTERVAL_SEC:
+            heartbeat()
+            last_heartbeat = now
+
+        _should_stop.wait(timeout=DRAIN_INTERVAL_SEC)
+
+    logger.info('chain_event_shipper stopping (SIGTERM)')
+    return 0
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--once', action='store_true',
+                        help='Single drain pass then exit (for tests).')
+    parser.add_argument('--no-backfill', action='store_true',
+                        help='No-op; backfill is never on by default.')
+    parser.add_argument('--log-level', default='INFO')
+    args = parser.parse_args(argv)
+
+    logger = _setup_logging(getattr(logging, args.log_level.upper(), logging.INFO))
+
+    if kill_switch_active():
+        logger.info('kill-switch active at startup; exiting cleanly')
+        return 0
+
+    if args.once:
+        sink = SupabaseSink()
+        buffer = EventBuffer()
+        log_cursors = load_log_cursors()
+        pulse_cursor = load_pulse_cursor()
+        try:
+            stats, pulse_cursor = drain_once(
+                sink, buffer, log_cursors, pulse_cursor, logger,
+            )
+        finally:
+            save_log_cursors(log_cursors)
+            save_pulse_cursor(pulse_cursor)
+            heartbeat()
+        logger.info('--once drain complete: %s', stats)
+        return 0
+
+    return run_loop(logger)
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Exception as exc:
+        logging.getLogger('chain_event_shipper').error(
+            'FATAL: %s: %s', type(exc).__name__, exc,
+        )
+        sys.exit(1)

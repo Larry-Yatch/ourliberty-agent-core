@@ -68,6 +68,70 @@ When the user sends `/optimize` on Telegram (or invokes it directly in chat), ru
 
 Reference: `runbooks/cycle-prompt.md § Check I` (line 185 documents this on-demand path) for the full Check I spec. The scheduled Monday firing happens via your normal `/cycle` on Monday — `/optimize` is the user-driven path for any other day.
 
+## Check III — stuck-threshold review (every 14 days, anchored to Sunday cycles)
+
+The chain_events table (E4.4d) records every agent session start/done. Once
+~30 days of data accumulate, the right stuck-detector thresholds aren't
+gut-feel anymore — they're observable. Check III closes that loop on a
+14-day cadence so thresholds stay aligned with real production duration
+distributions without manual analysis.
+
+**When it fires (during your normal `/cycle`):**
+
+1. Today must be Sunday (cycle-prompt's Check I gate already runs Sundays).
+2. EITHER no prior Check III artifact exists in `~/agents/blackboard/pulse-check-iii/`,
+   OR the most-recent artifact's `as_of` is ≥ 14 days old.
+3. If both conditions hold, fire Check III alongside Check I (they don't
+   compete — Check I queries the cost sidecar, Check III queries
+   `chain_events`).
+
+**What you run:**
+
+```bash
+python3 /home/larry/agent-core/scripts/pulse_check_iii.py
+```
+
+The script:
+1. Queries Supabase `chain_events` for the last 30 days of session_start +
+   session_done pairs per task_id.
+2. Computes median / p90 / p99 duration per (agent, task_type) bucket.
+3. Skips buckets with sample size <10 (insufficient signal).
+4. Compares against current values in `config/system_tab_thresholds.json`.
+5. Flags >50% deltas as `high-attention: regime-change-suspected`.
+6. Detects rollback signals (a tightening that produced >3 false-positive
+   stuck alerts within 7 days of applying → propose un-tightening).
+7. Writes `~/agents/blackboard/pulse-threshold-proposals.json` (and an
+   archive copy under `pulse-check-iii/check-iii-<date>.json`).
+8. Queues a `larry_alerts.append_alert` digest. Beacon's standard 5-min
+   alert sweep DMs Larry.
+
+**What you do with the output:**
+
+Surface the script's stdout in your journal entry as the Check III block,
+just like Check I. Do NOT auto-apply, NOT auto-DM separately (the
+`append_alert` digest is the DM). Do NOT edit `config/system_tab_thresholds.json`
+yourself — that's Beacon's path via the `approve threshold-update-<date>`
+shortcut. You just produce the proposal artifact and trust the chain.
+
+**Discipline boundaries (non-negotiable):**
+
+- **No auto-apply.** Pulse proposes, Larry approves, Beacon dispatches to
+  Forge for a config-only PR, Mirror auto-merges. Same posture as the
+  stuck-detector itself: surface signal, never act.
+- **Sample-size floor (10).** Buckets with <10 observations skip silently.
+  Better to wait another cycle than tune on noise.
+- **Bounded delta (50%).** A proposal that would move a threshold >50%
+  from current ships with `high-attention: regime-change-suspected`. It
+  doesn't block the proposal; it makes the diff loud so Larry knows
+  before approving.
+- **No-change OK.** "No proposed changes this cycle" is a valid Check III
+  output if everything's within ±10% of current. Empty digest still
+  counts as the cycle running.
+
+**Reference:** spec at `agents/beacon/specs/e4-4d-system-tab.md` § 5.10
+(the architecture decision + guardrails) and the script source for the
+exact algorithm.
+
 ## `/dispatch <N>` — manual dispatch of a Check I proposal
 
 When the user sends `/dispatch <N>` on Telegram (or invokes it directly in chat), trigger Beacon-handoff for proposal #N from the most recent Check I digest:

@@ -1,0 +1,46 @@
+[Unit]
+Description=Chain-event ingestion daemon — ships 5 sources into chain_events (E4.4d PR-B)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/chain_event_shipper.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/chain-event-shipper.md
+After=network.target ourliberty-inbox-watcher.service
+Wants=ourliberty-inbox-watcher.service
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Activation gate. Default OFF until verified against the live chain_events
+# table (PR-A migration must be applied first). To activate after verification:
+#   sudo systemctl edit ourliberty-chain-event-shipper.service
+# then add an [Service] override line:
+#   Environment="OURLIBERTY_CHAIN_SHIPPER_ENABLED=true"
+# then `sudo systemctl restart ourliberty-chain-event-shipper.service`.
+Environment="OURLIBERTY_CHAIN_SHIPPER_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/chain_event_shipper.py
+Restart=on-failure
+RestartSec=15s
+TimeoutStopSec=20s
+# Spec § 5.2: bounded memory so a runaway tail-loop never starves the droplet.
+# Per spec these may be revisited post-merge if 24h journalctl load reveals
+# tightness; see PR body flags.
+MemoryMax=512M
+MemoryHigh=256M
+Nice=10
+# Hardening (matches existing healer / dashboard-api pattern).
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs /home/larry/agents/state /home/larry/credentials
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-chain-event-shipper
+
+[Install]
+WantedBy=multi-user.target
