@@ -26,21 +26,35 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
-_ORIGINAL_TOKEN = os.environ.get('DASHBOARD_API_TOKEN')
-os.environ['DASHBOARD_API_TOKEN'] = 'test-token-value'
+# Set the token BEFORE importing dashboard_api so the FastAPI app's
+# auth dependency can resolve it at request time. Sibling test modules
+# (e.g. test_dashboard_api.py) may pop this env var in their own
+# tearDownModule(); each TestCase below re-sets it in setUp() so the
+# fix survives any cross-module teardown ordering under
+# `unittest discover`.
+TOKEN = 'test-token-value'
+os.environ.setdefault('DASHBOARD_API_TOKEN', TOKEN)
 
 import dashboard_api as da  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-TOKEN = 'test-token-value'
 AUTH = {'X-Dashboard-Token': TOKEN}
 
 
-def tearDownModule():  # noqa: N802 — unittest API
-    if _ORIGINAL_TOKEN is None:
-        os.environ.pop('DASHBOARD_API_TOKEN', None)
-    else:
-        os.environ['DASHBOARD_API_TOKEN'] = _ORIGINAL_TOKEN
+class _TokenSetMixin:
+    """Re-set DASHBOARD_API_TOKEN in every setUp.
+
+    test_dashboard_api.py's tearDownModule pops the env var unconditionally
+    if its own _ORIGINAL_TOKEN snapshot was None at its import time —
+    which it is under `unittest discover` since this module isn't loaded
+    yet at that point. Re-setting in setUp is the most robust shape: it
+    survives any teardown ordering and any other test module's env
+    mutations.
+    """
+
+    def setUp(self):  # noqa: D401 — unittest hook
+        os.environ['DASHBOARD_API_TOKEN'] = TOKEN
+        super().setUp()
 
 
 # ---------- fixture helpers ----------
@@ -110,8 +124,9 @@ def _client(agents_root: Path, cgroup_base: Path, worktrees_root: Path) -> TestC
 # ==================== auth ====================
 
 
-class SystemAuthTest(unittest.TestCase):
+class SystemAuthTest(_TokenSetMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-sys-auth-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
         self.cg = _build_cgroup(self.tmp, pids=[])
@@ -140,8 +155,9 @@ class SystemAuthTest(unittest.TestCase):
 # ==================== /api/system/active-sessions ====================
 
 
-class ActiveSessionsTest(unittest.TestCase):
+class ActiveSessionsTest(_TokenSetMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-sys-as-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
 
@@ -213,8 +229,9 @@ class ActiveSessionsTest(unittest.TestCase):
 # ==================== /api/system/cgroup-stats ====================
 
 
-class CgroupStatsTest(unittest.TestCase):
+class CgroupStatsTest(_TokenSetMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-sys-cg-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
 
@@ -269,8 +286,9 @@ class CgroupStatsTest(unittest.TestCase):
 # ==================== /api/system/worktrees ====================
 
 
-class WorktreesTest(unittest.TestCase):
+class WorktreesTest(_TokenSetMixin, unittest.TestCase):
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-sys-wt-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
 
@@ -326,10 +344,11 @@ class WorktreesTest(unittest.TestCase):
 # ==================== uncached behavior ====================
 
 
-class UncachedTest(unittest.TestCase):
+class UncachedTest(_TokenSetMixin, unittest.TestCase):
     """Each request must re-read filesystem. No in-process caching."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-sys-cache-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
 
