@@ -10,7 +10,7 @@
 
 ---
 
-## Five checks (in order)
+## Seven checks (in order)
 
 ### 1. Forge built but no PR opened
 
@@ -52,6 +52,28 @@
 
 **Action recipe in DM:** Read the journal for the full retry trace, then check the dead-letter dir (`~/agents/inboxes/*/.invalid/`).
 
+### 6. REVIEW_REVISION dispatched with no Forge session (chain discipline v3 GAP 1)
+
+**Detects:** `outbox-notifier.log` has a WARN line matching `REVIEW_REVISION on task <task_id> has no forge_build_session_id`.
+
+**Cause:** Mirror requested a revision on a PR that wasn't built through the standard Forge dispatch chain. Most common cause: Claude-as-Forge PR (Larry asked Claude to author a quick fix), OR a manually-pushed branch. The auto-resume path requires Forge's build session to `--resume` against; without it, the revision dispatch can't run. The direct fix in `outbox_notifier.py` already broadcasts a `larry_alerts.append_alert` when the path fires; this healer check is defense in depth in case that alert was suppressed (per-subject cooldown), the queue file was unwriteable, or the WARN was investigated late.
+
+**Action recipe in DM:** Open the PR, read Mirror's findings (her latest review comment OR `grep "no forge_build_session_id" ~/agents/logs/outbox-notifier.log | grep "<task_id>"`), then either:
+  - Apply the revisions to the PR branch by hand (`git commit`/`git push` directly), OR
+  - Re-dispatch the work via Beacon with a fresh task_id so a new Forge build session threads through the chain.
+
+**False-positive silencing:** This check is fundamentally additive — if the direct fix already DMed Larry, the per-task 6h cooldown on the healer side will suppress duplicate DMs. If a single task generates repeated WARNs (e.g. a daemon log replay), the per-`subject` cooldown is `pipeline-stall:no-session-revision:<task_id>` — clear it manually via `rm ~/agents/state/alert-cooldown/warning/heal-pipeline-stall_pipeline-stall_no-session-revision_<task_id>` to re-allow.
+
+### 7. Open PR with no review-request dispatch logged (chain discipline v3 GAP 3)
+
+**Detects:** An OPEN PR on a tracked repo older than 60 min that has NO matching `beacon → mirror review-request` event in `~/agents/logs/routing-events.jsonl`. Match heuristic: the PR's `headRefName` either ends with the routing event's `task_id` (the `forge/<task>` / `larry/<task>` convention) or contains the `task_id` as a substring.
+
+**Cause:** The notifier's auto-dispatch only fires for PRs opened via the build-phase pipeline (Forge emits `PR opened: <url>` in her build result; the notifier scrapes it). PRs authored outside that pipeline — Claude-as-Forge, manual pushes, GitHub UI commits — never auto-dispatch. Without a manual route, Mirror never reviews and the PR sits.
+
+**Action recipe in DM:** Dispatch the review manually via Beacon chat: `dispatch mirror review pr=<pr_url>`. Verify the dispatch fired with `tail -50 ~/agents/logs/routing-events.jsonl | grep <branch>`. The DM body includes the full PR URL and a pre-formed dispatch command — paste-and-send.
+
+**False-positive silencing:** If a PR is intentionally not getting auto-routed (e.g. a draft, an experimental branch Larry wants to keep manual), the per-PR cooldown lives at `~/agents/state/alert-cooldown/warning/heal-pipeline-stall_pipeline-stall_unrouted-pr_PR#<N>`. Touching the cooldown file extends suppression by another 60 min; the 1h cadence repeats the DM if the PR is still open + still unrouted by the next tick. The longer-term silencer is to close the PR or route it manually.
+
 ---
 
 ## State + observability
@@ -76,7 +98,7 @@
 
 ## Tuning thresholds
 
-The five threshold constants live near the top of `scripts/heal_pipeline_stall.py`:
+The threshold constants live near the top of `scripts/heal_pipeline_stall.py`:
 
 | Constant | Default | What it gates |
 |---|---|---|
@@ -86,6 +108,8 @@ The five threshold constants live near the top of `scripts/heal_pipeline_stall.p
 | `MIRROR_PASS_UNMERGED_MIN` | 30 | Check 3 — PASS classified but PR still OPEN |
 | `MIRROR_MARKER_INVISIBLE_MIN` | 30 | Check 4 — Mirror notified but no marker classified |
 | `RETRY_EXHAUST_WINDOW_MIN` | 30 | Check 5 — retry-cap exhausted recency window |
+| `PR_UNROUTED_MIN_AGE_MIN` | 60 | Check 7 — minimum PR age before flagging as unrouted |
+| `ROUTING_EVENTS_LOOKBACK_HOURS` | 168 | Check 7 — how far back into routing-events.jsonl to scan |
 | `ALERT_DEDUP_HOURS` | 1 | Suppress same alert key within window |
 | `LOG_LOOKBACK_HOURS` | 24 | How far back into outbox-notifier.log to read |
 

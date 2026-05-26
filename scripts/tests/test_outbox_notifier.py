@@ -8144,9 +8144,10 @@ class NoSessionRevisionDmTest(unittest.TestCase):
 
     # ---------------- no-session + larry + no chat_id → defensive skip ----------------
 
-    def test_no_session_larry_source_without_chat_id_skips_dm(self):
-        # Defensive: no DM target available. Fall back to the existing
-        # WARN-and-skip path; no DM is queued.
+    def test_no_session_larry_source_without_chat_id_queues_broadcast_alert(self):
+        # Chain discipline v3 GAP 1 (2026-05-26): when there's no chat_id to
+        # target a notification at, fall back to broadcast `append_alert`
+        # so Larry still sees the rejection on the next bot sweep.
         data = _good_outbox(
             agent='mirror', source='larry', task_id='t-no-chat',
             phase='review', target_repo='ourliberty-agent-core',
@@ -8155,21 +8156,34 @@ class NoSessionRevisionDmTest(unittest.TestCase):
             result='Reviewed.',
         )
         # No forge_build_session_id, no reply_chat_id.
-        decision = self._revision_decision()
+        decision = self._revision_decision(
+            findings=[{
+                'file': 'a.py', 'line_range': 'L1', 'severity': 'medium',
+                'description': 'Add validation.',
+            }],
+        )
         on._dispatch_revision_to_forge(data, decision)
-        self.assertEqual(self._read_alerts(), [])
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
         )
         self.assertEqual(revisions, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec.get('severity'), 'warning')
+        self.assertNotEqual(rec.get('kind'), 'notification')  # broadcast, not chat-targeted
+        self.assertIn('t-no-chat', rec.get('subject', ''))
+        self.assertIn('No Forge build session', rec.get('message', ''))
+        self.assertIn('Add validation.', rec.get('message', ''))
 
-    # ---------------- no-session + source!='larry' → existing WARN path ----------------
+    # ---------------- no-session + source!='larry' → broadcast alert (v3 GAP 1) ----------------
 
-    def test_no_session_non_larry_source_retains_warn_no_dm(self):
-        # Standard Forge-driven flow with a propagation bug (no session)
-        # must NOT trip the new Larry-DM branch — the original WARN path
-        # still applies. This is the regression guard against accidental
-        # over-firing of the new branch.
+    def test_no_session_non_larry_source_queues_broadcast_alert(self):
+        # Chain discipline v3 GAP 1 (2026-05-26): when routing-source is
+        # not 'larry' (e.g. Beacon dispatched the revision), the
+        # chat-targeted `_dm_larry_no_session_revision` path cannot fire.
+        # The original WARN-only fallthrough was silent today on the
+        # `feedback_claude_as_forge_boundaries` PR. Must now broadcast.
         data = _good_outbox(
             agent='mirror', source='beacon', task_id='t-prop-bug',
             phase='review', target_repo='ourliberty-agent-core',
@@ -8177,17 +8191,22 @@ class NoSessionRevisionDmTest(unittest.TestCase):
             pr_url=PR_URL_FIXTURE,
             result='Reviewed.',
         )
-        # No forge_build_session_id (the propagation bug shape).
         data['reply_chat_id'] = 99999  # set but irrelevant: source!='larry'
         decision = self._revision_decision()
         on._dispatch_revision_to_forge(data, decision)
-        # No DM queued (WARN-only path).
-        self.assertEqual(self._read_alerts(), [])
-        # No revision dispatch.
+        # No revision dispatch (no session to resume).
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
         )
         self.assertEqual(revisions, [])
+        # Broadcast alert queued (v3 GAP 1 fix).
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec.get('severity'), 'warning')
+        self.assertNotEqual(rec.get('kind'), 'notification')
+        self.assertIn('t-prop-bug', rec.get('subject', ''))
+        self.assertIn('beacon', rec.get('message', ''))
 
     # ---------------- DM body rendering: multi/single/empty findings ----------------
 
@@ -8244,6 +8263,94 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         self.assertIn('Needs rework — see PR comments.', body)
         self.assertNotIn('Findings:', body)
         self.assertIn('Mirror review', body)
+
+
+class PrUrlAllowlistAndRewriteTest(unittest.TestCase):
+    """Chain discipline v3 GAP 2 (2026-05-26).
+
+    PR #107 review surfaced Mirror emitting a pr_url with `lyatch/agent-core`
+    (missing 'L', stripped 'ourliberty-' prefix); AUTO_MERGE couldn't act.
+    `_validate_or_rewrite_pr_url` runs at the call site BEFORE _parse_pr_url
+    and either passes through (allowlisted), rewrites once + passes through
+    (known-wrong prefix variant), or fails closed (DM Larry; no merge).
+    """
+
+    def test_allowlisted_url_passes_through_unchanged(self):
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(result, url)
+        self.assertIsNone(reason)
+
+    def test_allowlisted_url_dashboard_passes_through(self):
+        url = 'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/42'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(result, url)
+        self.assertIsNone(reason)
+
+    def test_lyatch_owner_typo_rewritten_to_canonical(self):
+        # The PR #107 shape: missing 'L', missing 'ourliberty-' prefix.
+        url = 'https://github.com/lyatch/agent-core/pull/107'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(
+            result,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107',
+        )
+        self.assertIsNotNone(reason)
+        self.assertIn('lyatch/agent-core', reason)
+
+    def test_larryyatch_owner_no_hyphen_rewritten(self):
+        url = 'https://github.com/LarryYatch/dashboard/pull/9'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(
+            result,
+            'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/9',
+        )
+        self.assertIsNotNone(reason)
+
+    def test_lowercase_owner_only_rewritten(self):
+        # Owner is canonical-but-lowercased; repo is already canonical.
+        url = 'https://github.com/larry-yatch/ourliberty-agent-core/pull/3'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(
+            result,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/3',
+        )
+
+    def test_unknown_owner_fails_closed(self):
+        url = 'https://github.com/some-attacker/malicious-repo/pull/1'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertIsNone(result)
+        self.assertIsNotNone(reason)
+        self.assertIn('not in allowlist', reason)
+
+    def test_unknown_repo_with_known_owner_fails_closed(self):
+        # Even with the correct owner, an unknown repo (not in the
+        # known-wrong rewrite table AND not allowlisted) must fail.
+        url = 'https://github.com/Larry-Yatch/some-other-repo/pull/1'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertIsNone(result)
+        self.assertIsNotNone(reason)
+
+    def test_malformed_url_fails_closed(self):
+        url = 'not-a-github-url'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertIsNone(result)
+        self.assertIsNotNone(reason)
+        self.assertIn('github.com PR shape', reason)
+
+    def test_empty_url_fails_closed(self):
+        result, reason = on._validate_or_rewrite_pr_url('')
+        self.assertIsNone(result)
+        self.assertIsNotNone(reason)
+
+    def test_url_with_trailing_path_preserved_after_rewrite(self):
+        # Anchor/fragment after the PR number should survive rewriting.
+        url = 'https://github.com/lyatch/agent-core/pull/107/files'
+        result, reason = on._validate_or_rewrite_pr_url(url)
+        self.assertEqual(
+            result,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107/files',
+        )
 
 
 if __name__ == '__main__':
