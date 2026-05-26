@@ -81,6 +81,13 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-pipeline-stall.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall-state.json'
 OUTBOX_NOTIFIER_LOG = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
+# `[forge] done task=X success=True` lines are emitted by inbox_watcher.py to
+# THIS file, NOT by outbox_notifier.py to OUTBOX_NOTIFIER_LOG. Check 1 reads
+# inbox_watcher.log; all other checks (review-request dispatched,
+# marker-notified, AUTO_MERGE, notified depth=1) read OUTBOX_NOTIFIER_LOG.
+# Mirror PR #107 review (2026-05-26) caught this — original Check 1 silently
+# no-op'd because it grepped the wrong file.
+INBOX_WATCHER_LOG = AGENTS_ROOT / 'logs' / 'inbox_watcher.log'
 
 # Repos with active dispatch chains. Mirrors heal_pr_auto_merge.REPOS.
 REPOS = [
@@ -276,15 +283,21 @@ def _task_id_from_branch(branch: str) -> Optional[str]:
 
 # ---------- Check 1: Forge built but no PR opened ----------
 
-def check_forge_built_no_pr(notifier_lines: list[str], open_prs: list[dict],
+def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
-    matches the task_id on any tracked repo. Returns list of alert dicts."""
+    matches the task_id on any tracked repo. Returns list of alert dicts.
+
+    Reads from `inbox_watcher.log` (NOT `outbox-notifier.log`) — the
+    `[forge] done task=X success=True` shape is emitted by
+    `inbox_watcher.py` to its own log. Verified against production logs
+    (Mirror PR #107 review): outbox-notifier.log has zero matches for
+    this pattern; inbox_watcher.log has hundreds."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=FORGE_BUILT_NO_PR_MIN)
     all_prs = open_prs + merged_prs
     alerts: list[dict] = []
     seen_tasks: set[str] = set()
-    for line in notifier_lines:
+    for line in watcher_lines:
         m = _FORGE_DONE_RE.search(line)
         if not m:
             continue
@@ -523,6 +536,7 @@ def run() -> int:
     state = load_state()
     try:
         notifier_lines = _read_recent_log_lines(OUTBOX_NOTIFIER_LOG, LOG_LOOKBACK_HOURS)
+        watcher_lines = _read_recent_log_lines(INBOX_WATCHER_LOG, LOG_LOOKBACK_HOURS)
         open_prs = _all_open_prs()
         merged_prs = _all_merged_prs_recent()
     except Exception as e:
@@ -531,7 +545,7 @@ def run() -> int:
 
     all_alerts: list[dict] = []
     try:
-        all_alerts += check_forge_built_no_pr(notifier_lines, open_prs, merged_prs, state)
+        all_alerts += check_forge_built_no_pr(watcher_lines, open_prs, merged_prs, state)
     except Exception as e:
         log(f'check_forge_built_no_pr failed: {type(e).__name__}: {e}', 'ERROR')
     try:

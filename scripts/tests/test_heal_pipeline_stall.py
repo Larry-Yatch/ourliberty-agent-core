@@ -28,9 +28,32 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 
 def _ts(minutes_ago: int) -> str:
-    """Produce a log-line timestamp `minutes_ago` minutes before now."""
+    """Produce an outbox-notifier-shape log-line timestamp `minutes_ago` minutes
+    before now. Format: `2026-05-26 13:08:39` (human-readable). Used inside the
+    `[<ts>] [notifier] [INFO] ...` line shape that outbox_notifier.py emits."""
     dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
     return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _watcher_ts(minutes_ago: int) -> str:
+    """Produce an inbox_watcher-shape log-line timestamp `minutes_ago` minutes
+    before now. Format: ISO-8601 with microseconds + UTC offset
+    (e.g. `2026-05-26T04:46:20.823929+00:00`). Used inside the
+    `[<ts>] inbox_watcher: [forge] done task=X success=True duration=...`
+    line shape that inbox_watcher.py emits."""
+    dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.%f+00:00')
+
+
+def _watcher_forge_done_line(task: str, minutes_ago: int,
+                             duration_sec: float = 125.0, cost_usd: float = 1.08) -> str:
+    """Helper to construct a verbatim-shape inbox_watcher.log [forge] done line.
+    Production sample (2026-05-26 inbox_watcher.log):
+        [2026-05-26T04:46:20.823929+00:00] inbox_watcher: [forge] done task=chain-discipline-v2-marker-shape-and-stale-daemon-001 success=True duration=125.02s attempts=1 cost=$1.08064725
+    """
+    return (f'[{_watcher_ts(minutes_ago)}] inbox_watcher: [forge] done '
+            f'task={task} success=True duration={duration_sec:.2f}s '
+            f'attempts=1 cost=${cost_usd:.8f}')
 
 
 class _TempAgentsRootMixin:
@@ -58,11 +81,27 @@ class _TempAgentsRootMixin:
 class TestRegexPatterns(_TempAgentsRootMixin, unittest.TestCase):
     """Verify regex patterns match real outbox_notifier log shapes."""
 
-    def test_forge_done_regex_matches_real_shape(self) -> None:
-        line = '[2026-05-25 13:08:39] [notifier] [INFO] [forge] done task=chain-discipline-v2-marker-shape-and-stale-daemon-001 success=True'
+    def test_forge_done_regex_matches_real_inbox_watcher_log_shape(self) -> None:
+        """Verbatim production line from /home/larry/agents/logs/inbox_watcher.log
+        (sampled 2026-05-26 morning). The `[forge] done task=X success=True` shape
+        is emitted by inbox_watcher.py to its OWN log, NOT by outbox_notifier.py
+        to outbox-notifier.log. Mirror PR #107 review caught the original
+        regex-on-wrong-file bug; this fixture is verbatim production so a future
+        log-format change is detected by test failure."""
+        line = '[2026-05-26T04:46:20.823929+00:00] inbox_watcher: [forge] done task=chain-discipline-v2-marker-shape-and-stale-daemon-001 success=True duration=125.02s attempts=1 cost=$1.08064725'
         m = self.hps._FORGE_DONE_RE.search(line)
         self.assertIsNotNone(m)
         self.assertEqual(m.group('task'), 'chain-discipline-v2-marker-shape-and-stale-daemon-001')
+
+    def test_forge_done_regex_does_not_match_outbox_notifier_shape(self) -> None:
+        """The notifier doesn't emit [forge] done lines (verified empirically
+        via grep across 1814 lines of production outbox-notifier.log: zero
+        matches). Defensive test: ensure we don't accidentally re-introduce
+        a regex that matches an outbox-notifier-formatted line, which would
+        indicate a regression to the original bug shape."""
+        notifier_only_line = '[2026-05-26 06:54:41] [notifier] [INFO] review-request dispatched mirror <- beacon (task=build-X)'
+        m = self.hps._FORGE_DONE_RE.search(notifier_only_line)
+        self.assertIsNone(m)
 
     def test_marker_notified_mirror_regex_matches_pass(self) -> None:
         line = '[2026-05-25 13:16:54] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-chain-discipline-marker-parser-and-regression-check-001.json)'
@@ -116,27 +155,27 @@ class TestHeartbeat(_TempAgentsRootMixin, unittest.TestCase):
 class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
 
     def test_fires_when_no_matching_pr(self) -> None:
-        lines = [f'[{_ts(180)}] [notifier] [INFO] [forge] done task=test-stalled-task-001 success=True']
+        lines = [_watcher_forge_done_line('test-stalled-task-001', minutes_ago=180)]
         alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
         self.assertEqual(len(alerts), 1)
         self.assertIn('test-stalled-task-001', alerts[0]['message'])
         self.assertEqual(alerts[0]['key'], 'forge_built_no_pr:test-stalled-task-001')
 
     def test_skips_when_open_pr_exists(self) -> None:
-        lines = [f'[{_ts(180)}] [notifier] [INFO] [forge] done task=test-task-002 success=True']
+        lines = [_watcher_forge_done_line('test-task-002', minutes_ago=180)]
         open_prs = [{'headRefName': 'forge/test-task-002', 'number': 99, '_repo': 'x/y'}]
         alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
         self.assertEqual(alerts, [])
 
     def test_respects_threshold(self) -> None:
         # 60 min < FORGE_BUILT_NO_PR_MIN (120)
-        lines = [f'[{_ts(60)}] [notifier] [INFO] [forge] done task=recent-task-001 success=True']
+        lines = [_watcher_forge_done_line('recent-task-001', minutes_ago=60)]
         alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
         self.assertEqual(alerts, [])
 
     def test_accepts_merged_pr(self) -> None:
         """A merged PR for the task means Forge's work shipped — not a stall."""
-        lines = [f'[{_ts(180)}] [notifier] [INFO] [forge] done task=merged-task-001 success=True']
+        lines = [_watcher_forge_done_line('merged-task-001', minutes_ago=180)]
         merged_prs = [{'headRefName': 'forge/merged-task-001', 'number': 50, '_repo': 'x/y'}]
         alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
         self.assertEqual(alerts, [])
@@ -375,6 +414,36 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
             mock_sub.return_value.stderr = ''
             self.hps.run()
         self.assertEqual(mock_alert.call_count, 2)
+
+    def test_check1_reads_from_inbox_watcher_log_not_outbox_notifier(self) -> None:
+        """Defensive test: Check 1's `[forge] done` line must come from
+        inbox_watcher.log (NOT outbox-notifier.log). The patched
+        `_read_recent_log_lines` returns DIFFERENT lines depending on which
+        file is passed — forge-done shape ONLY in the inbox_watcher.log
+        slot. Regression check on the bug Mirror caught in PR #107 review."""
+
+        def side_effect(log_path, hours):
+            # log_path is a Path object; compare by name.
+            if 'inbox_watcher.log' in str(log_path):
+                return [_watcher_forge_done_line('e2e-watcher-source-001', minutes_ago=180)]
+            # outbox-notifier.log gets nothing — production reality.
+            return []
+
+        with patch.object(self.hps, '_all_open_prs', return_value=[]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', side_effect=side_effect), \
+             patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            self.hps.run()
+        # Exactly one alert — Check 1's forge_built_no_pr fires from the
+        # inbox_watcher.log source.
+        self.assertEqual(mock_alert.call_count, 1)
+        call = mock_alert.call_args
+        self.assertIn('forge-no-pr', call.kwargs['subject'])
+        self.assertIn('e2e-watcher-source-001', call.kwargs['subject'])
 
 
 if __name__ == '__main__':
