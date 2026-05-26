@@ -371,9 +371,19 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
             # Trigger Check 3: Mirror PASSed >30 min ago but PR is still OPEN.
             f'[{_ts(60)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-end2end-stuck-001.json)',
         ]
+        # Satisfy Check 7 too: provide a routing event so the PR isn't
+        # flagged as unrouted (chain discipline v3 GAP 3 added Check 7).
+        routing_events = [{
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'end2end-stuck-001',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }]
         with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
              patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
              patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
              patch('subprocess.run') as mock_sub, \
              patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
             mock_sub.return_value.returncode = 0
@@ -404,9 +414,27 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
             f'[{_ts(90)}] [notifier] [INFO] review-request dispatched mirror <- beacon (task=stall-b-001, file=r.json, pr=https://example/801)',
             f'[{_ts(45)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-stall-b-001.json)',
         ]
+        # Satisfy Check 7 too: routing events for both PRs.
+        routing_events = [
+            {
+                'source_agent': 'beacon',
+                'target_agent_final': 'mirror',
+                'phase': 'review',
+                'task_id': 'stall-a-001',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                'source_agent': 'beacon',
+                'target_agent_final': 'mirror',
+                'phase': 'review',
+                'task_id': 'stall-b-001',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            },
+        ]
         with patch.object(self.hps, '_all_open_prs', return_value=prs), \
              patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
              patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
+             patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
              patch('subprocess.run') as mock_sub, \
              patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
             mock_sub.return_value.returncode = 0
@@ -444,6 +472,170 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
         call = mock_alert.call_args
         self.assertIn('forge-no-pr', call.kwargs['subject'])
         self.assertIn('e2e-watcher-source-001', call.kwargs['subject'])
+
+
+class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.TestCase):
+    """Chain discipline v3 GAP 1 (2026-05-26). Healer-level defense:
+    re-flag any `no forge_build_session_id` WARN line not already
+    suppressed by the direct-fix alert's cooldown."""
+
+    def test_fires_when_warn_line_present(self):
+        line = (
+            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'feedback-claude-as-forge-001 has no forge_build_session_id '
+            f"(routing_source='beacon', chat_id=None); revision dispatch "
+            f'would have no session to --resume — skipping.'
+        )
+        alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('feedback-claude-as-forge-001', alerts[0]['message'])
+        self.assertIn(
+            'pipeline-stall:no-session-revision:feedback-claude-as-forge-001',
+            alerts[0]['subject'],
+        )
+
+    def test_dedup_per_task(self):
+        # Two WARN lines for the same task → one alert.
+        lines = [
+            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'dup-task has no forge_build_session_id',
+            f'[{_ts(40)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'dup-task has no forge_build_session_id',
+        ]
+        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
+        self.assertEqual(len(alerts), 1)
+
+    def test_silent_when_no_warn_lines(self):
+        lines = [
+            f'[{_ts(45)}] [notifier] [INFO] business as usual',
+        ]
+        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
+        self.assertEqual(alerts, [])
+
+    def test_silent_against_pre_v3_warn_shape_is_still_caught(self):
+        """The pre-v3 WARN line had a different trailing diagnostic
+        ('propagation gap?'); the prefix is identical so the regex
+        catches both shapes."""
+        line = (
+            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'legacy-task has no forge_build_session_id (propagation gap?)'
+        )
+        alerts = self.hps.check_revision_dispatched_with_no_session([line], {})
+        self.assertEqual(len(alerts), 1)
+
+
+class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
+    """Chain discipline v3 GAP 3 (2026-05-26). Externally-authored PRs
+    that skip the notifier's review-request auto-dispatch must DM Larry
+    with the manual dispatch text."""
+
+    def _make_pr(self, number, branch, age_min, repo='Larry-Yatch/ourliberty-agent-core'):
+        return {
+            'number': number,
+            'headRefName': branch,
+            'title': 'feat: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=age_min)
+            ).isoformat(),
+            '_repo': repo,
+        }
+
+    def test_fires_for_pr_with_no_routing_event(self):
+        prs = [self._make_pr(500, 'larry/manual-pr-001', age_min=180)]
+        alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #500', alerts[0]['message'])
+        self.assertIn('routing-events.jsonl', alerts[0]['message'])
+
+    def test_silent_when_routing_event_matches_task_id(self):
+        prs = [self._make_pr(501, 'forge/routed-task-001', age_min=180)]
+        events = [{
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'routed-task-001',
+            'timestamp': '2026-05-26T10:00:00+00:00',
+        }]
+        alerts = self.hps.check_unrouted_open_prs(prs, events, {})
+        self.assertEqual(alerts, [])
+
+    def test_respects_min_age_threshold(self):
+        # PR < 1h old: don't race with in-flight auto-dispatch.
+        prs = [self._make_pr(502, 'larry/fresh-pr-001', age_min=30)]
+        alerts = self.hps.check_unrouted_open_prs(prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_silent_when_routing_event_matches_branch_substring(self):
+        """Defensive matching: task_id appearing in the branch name (not
+        the task suffix) still counts as routed."""
+        prs = [self._make_pr(
+            503,
+            'feat/something-routed-task-002-extra',
+            age_min=180,
+        )]
+        events = [{
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'routed-task-002',
+            'timestamp': '2026-05-26T10:00:00+00:00',
+        }]
+        alerts = self.hps.check_unrouted_open_prs(prs, events, {})
+        self.assertEqual(alerts, [])
+
+    def test_non_review_routing_events_do_not_match(self):
+        """A `marker-error` or `notify` routing event for the same task
+        is not a review dispatch — don't suppress."""
+        prs = [self._make_pr(504, 'forge/notify-only-001', age_min=180)]
+        events = [{
+            'source_agent': 'outbox-notifier',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'notify-only-001',
+            'intent': 'marker-error',
+            'timestamp': '2026-05-26T10:00:00+00:00',
+        }]
+        alerts = self.hps.check_unrouted_open_prs(prs, events, {})
+        # `source_agent='outbox-notifier'` is NOT 'beacon' → no match.
+        self.assertEqual(len(alerts), 1)
+
+
+class TestReadRecentRoutingEvents(_TempAgentsRootMixin, unittest.TestCase):
+    """Chain discipline v3 GAP 3 — the routing-events.jsonl reader."""
+
+    def test_returns_only_recent_records(self):
+        path = self.agents_root / 'logs' / 'routing-events.jsonl'
+        recent_ts = datetime.now(timezone.utc).isoformat()
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        path.write_text(
+            json.dumps({'task_id': 'recent', 'timestamp': recent_ts}) + '\n'
+            + json.dumps({'task_id': 'old', 'timestamp': old_ts}) + '\n'
+        )
+        # Re-import after env change (TempAgentsRootMixin handles this).
+        self.hps.ROUTING_EVENTS_LOG = path
+        events = self.hps._read_recent_routing_events(hours=24 * 7)
+        task_ids = {e.get('task_id') for e in events}
+        self.assertIn('recent', task_ids)
+        self.assertNotIn('old', task_ids)
+
+    def test_tolerates_malformed_lines(self):
+        path = self.agents_root / 'logs' / 'routing-events.jsonl'
+        ts = datetime.now(timezone.utc).isoformat()
+        path.write_text(
+            '{"bad json missing comma"\n'
+            + json.dumps({'task_id': 'good', 'timestamp': ts}) + '\n'
+            + '\n'  # blank line
+        )
+        self.hps.ROUTING_EVENTS_LOG = path
+        events = self.hps._read_recent_routing_events(hours=24)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['task_id'], 'good')
+
+    def test_missing_file_returns_empty(self):
+        # No file written → empty list, not exception.
+        self.hps.ROUTING_EVENTS_LOG = self.agents_root / 'logs' / 'does-not-exist.jsonl'
+        events = self.hps._read_recent_routing_events(hours=24)
+        self.assertEqual(events, [])
 
 
 if __name__ == '__main__':

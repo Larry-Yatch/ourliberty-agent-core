@@ -41,6 +41,20 @@ action. Never self-heals; never auto-dispatches. Five concrete checks:
      log lines from inbox-watcher journal in the recent window. Surfaces
      when an agent is hard-failing repeatedly and stuck in dead-letter.
 
+  6. **REVIEW_REVISION dispatched with no Forge session** — outbox-notifier
+     logged `no forge_build_session_id` for a REVIEW_REVISION (chain
+     discipline v3 GAP 1, 2026-05-26). The direct fix already DMs Larry
+     via `larry_alerts.append_alert` when the path fires; this check is
+     defense-in-depth in case the alert was suppressed by per-subject
+     cooldown or the queue file was unreadable at the moment.
+
+  7. **Open PRs with no review-request dispatch logged** — open PR on a
+     tracked repo older than 1h with no matching `review-request`
+     entry in `~/agents/logs/routing-events.jsonl` (chain discipline v3
+     GAP 3). Catches externally-authored PRs (Claude-as-Forge, manual
+     pushes) that skip the notifier's auto-dispatch entirely; the chain
+     can't pick them up without a manual Beacon dispatch.
+
 Every alert: ONE Telegram DM via `larry_alerts.append_alert` (cooldown
 1h per unique stall key). Each alert states: what stalled, how long,
 recommended action, the specific log grep to run for details.
@@ -129,6 +143,30 @@ _AUTO_MERGE_MERGED_RE = re.compile(
     r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
     r'.*AUTO_MERGE task=(?P<task>\S+).*outcome=merged'
 )
+# Chain discipline v3 GAP 1 (Check 6). Matches the WARN line emitted by
+# outbox_notifier.py when REVIEW_REVISION fires on an envelope with no
+# `forge_build_session_id`. Production line shape:
+#   [<ts>] [notifier] [WARN] REVIEW_REVISION on task <task> has no
+#   forge_build_session_id (routing_source='beacon', chat_id=None);
+#   revision dispatch would have no session to --resume — skipping.
+# The task token is non-greedy up to the first space so the regex matches
+# both the pre-v3 ("propagation gap?") shape and the v3 ("routing_source=…")
+# shape — the direct fix changed the trailing diagnostic, not the prefix.
+_NO_FORGE_SESSION_RE = re.compile(
+    r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
+    r'.*REVIEW_REVISION on task (?P<task>\S+) has no forge_build_session_id'
+)
+
+# Chain discipline v3 GAP 3 (Check 7). routing-events.jsonl carries one
+# JSON object per line; the shape we read has these fields:
+#   action, source_agent, target_agent_requested, target_agent_final,
+#   filename_requested, filename_final, truncated, rerouted,
+#   reroute_reason, task_id, intent, phase, target_repo, timestamp
+# A review-request dispatch from Beacon to Mirror is uniquely identified
+# by source_agent='beacon', target_agent_final='mirror', phase='review'.
+ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
+ROUTING_EVENTS_LOOKBACK_HOURS = 24 * 7  # PRs aren't routed faster than this
+PR_UNROUTED_MIN_AGE_MIN = 60            # don't race with in-flight auto-dispatch
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -525,6 +563,165 @@ def check_retry_exhausted(state: dict) -> list[dict]:
     return alerts
 
 
+# ---------- Check 6: REVIEW_REVISION dispatched with no Forge session ----------
+
+def check_revision_dispatched_with_no_session(notifier_lines: list[str],
+                                              state: dict) -> list[dict]:
+    """Scan outbox-notifier.log for `no forge_build_session_id` WARN lines
+    on REVIEW_REVISION. Each unique task_id seen in the lookback window
+    produces one alert. The direct fix in `outbox_notifier.py` already
+    DMs Larry via `larry_alerts.append_alert`; this check is defense in
+    depth (catches per-subject-cooldown suppression or queue-file write
+    failures at the source).
+
+    Chain discipline v3 GAP 1 (2026-05-26). Same 6h-cooldown idempotency
+    as Checks 1-5 via the shared state dict + `should_alert/record_alert`.
+    """
+    alerts: list[dict] = []
+    seen_tasks: set[str] = set()
+    for line in notifier_lines:
+        m = _NO_FORGE_SESSION_RE.search(line)
+        if not m:
+            continue
+        task = m.group('task')
+        if task in seen_tasks:
+            continue
+        seen_tasks.add(task)
+        ts = _parse_ts(m.group('ts'))
+        elapsed_min = (
+            int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
+            if ts else 0
+        )
+        key = f'no_session_revision:{task}'
+        alerts.append({
+            'key': key,
+            'message': (
+                f'REVIEW_REVISION on task `{task}` fired without a Forge build '
+                f'session ({elapsed_min} min ago). Auto-resume cannot run — the '
+                f'PR was authored outside the dispatch chain (Claude-as-Forge '
+                f'or manual). Apply Mirror\'s revisions manually, or re-dispatch '
+                f'via Beacon with a fresh task_id to thread a new session.'
+            ),
+            'subject': f'pipeline-stall:no-session-revision:{task}',
+            'suggested_action': (
+                f'Read Mirror\'s findings: '
+                f'`grep "no forge_build_session_id" ~/agents/logs/outbox-notifier.log | grep "{task}"`. '
+                f'Apply the revisions to the PR branch by hand, OR re-dispatch '
+                f'via Beacon: `dispatch forge --task fix-{task}-revisions ...`.'
+            ),
+        })
+    return alerts
+
+
+# ---------- Check 7: Open PRs with no review-request dispatch logged ----------
+
+def _read_recent_routing_events(hours: int) -> list[dict]:
+    """Return parsed routing-event records from `ROUTING_EVENTS_LOG` whose
+    `timestamp` field is within `hours` of now. Tolerates malformed JSON
+    lines (skips them) and missing/empty file (returns [])."""
+    if not ROUTING_EVENTS_LOG.exists():
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    out: list[dict] = []
+    try:
+        with open(ROUTING_EVENTS_LOG, errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                ts_str = rec.get('timestamp')
+                if not isinstance(ts_str, str):
+                    continue
+                ts = _parse_ts(ts_str)
+                if ts and ts >= cutoff:
+                    out.append(rec)
+    except OSError as e:
+        log(f'read {ROUTING_EVENTS_LOG} failed: {e}', 'WARN')
+    return out
+
+
+def check_unrouted_open_prs(open_prs: list[dict],
+                            routing_events: list[dict],
+                            state: dict) -> list[dict]:
+    """Find OPEN PRs older than `PR_UNROUTED_MIN_AGE_MIN` that have NO
+    matching review-request dispatch entry in routing-events.jsonl.
+
+    Match heuristic (defensive against task_id ↔ branch drift): the PR's
+    headRefName must end with the routing-event's task_id, OR the routing
+    event's task_id must appear verbatim in the PR's branch (for
+    `forge/<task>` and `larry/<task>` prefixes, this is exact-suffix
+    match). A review-request event is identified by
+    `source_agent='beacon' AND target_agent_final='mirror' AND
+    phase='review'`.
+
+    Chain discipline v3 GAP 3 (2026-05-26). Catches externally-authored
+    PRs (Claude-as-Forge, manual pushes) that skip the notifier's
+    auto-dispatch entirely. Same 6h-cooldown idempotency as other checks.
+    """
+    review_dispatch_task_ids: set[str] = set()
+    for rec in routing_events:
+        if (
+            rec.get('source_agent') == 'beacon'
+            and rec.get('target_agent_final') == 'mirror'
+            and rec.get('phase') == 'review'
+        ):
+            task = rec.get('task_id')
+            if isinstance(task, str) and task:
+                review_dispatch_task_ids.add(task)
+
+    now = datetime.now(timezone.utc)
+    alerts: list[dict] = []
+    for pr in open_prs:
+        branch = pr.get('headRefName', '')
+        if not branch:
+            continue
+        created = _parse_ts(pr.get('createdAt', ''))
+        if not created:
+            continue
+        elapsed_min = int((now - created).total_seconds() / 60)
+        if elapsed_min < PR_UNROUTED_MIN_AGE_MIN:
+            continue
+        branch_task = _task_id_from_branch(branch)
+        matched = False
+        for task_id in review_dispatch_task_ids:
+            if branch_task and branch_task == task_id:
+                matched = True
+                break
+            if task_id in branch:
+                matched = True
+                break
+        if matched:
+            continue
+        pr_html_url = pr.get('html_url') or (
+            f'https://github.com/{pr["_repo"]}/pull/{pr["number"]}'
+        )
+        key = f'unrouted_open_pr:{pr["_repo"]}:{pr["number"]}'
+        alerts.append({
+            'key': key,
+            'message': (
+                f'PR #{pr["number"]} ({pr["_repo"]}) on branch `{branch}` opened '
+                f'{elapsed_min} min ago has NO review-request dispatch logged in '
+                f'routing-events.jsonl. Externally-authored PRs skip the '
+                f'notifier\'s auto-dispatch — Mirror won\'t review until Larry '
+                f'manually routes it.'
+            ),
+            'subject': f'pipeline-stall:unrouted-pr:PR#{pr["number"]}',
+            'suggested_action': (
+                f'Dispatch a Mirror review via Beacon chat: '
+                f'`dispatch mirror review pr={pr_html_url}`. '
+                f'Verify routing fires: '
+                f'`tail -50 ~/agents/logs/routing-events.jsonl | grep "{branch}"`.'
+            ),
+        })
+    return alerts
+
+
 # ---------- Main ----------
 
 def run() -> int:
@@ -539,6 +736,7 @@ def run() -> int:
         watcher_lines = _read_recent_log_lines(INBOX_WATCHER_LOG, LOG_LOOKBACK_HOURS)
         open_prs = _all_open_prs()
         merged_prs = _all_merged_prs_recent()
+        routing_events = _read_recent_routing_events(ROUTING_EVENTS_LOOKBACK_HOURS)
     except Exception as e:
         log(f'pre-flight read failed: {type(e).__name__}: {e}', 'ERROR')
         return 0
@@ -564,6 +762,17 @@ def run() -> int:
         all_alerts += check_retry_exhausted(state)
     except Exception as e:
         log(f'check_retry_exhausted failed: {type(e).__name__}: {e}', 'ERROR')
+    try:
+        all_alerts += check_revision_dispatched_with_no_session(notifier_lines, state)
+    except Exception as e:
+        log(
+            f'check_revision_dispatched_with_no_session failed: '
+            f'{type(e).__name__}: {e}', 'ERROR'
+        )
+    try:
+        all_alerts += check_unrouted_open_prs(open_prs, routing_events, state)
+    except Exception as e:
+        log(f'check_unrouted_open_prs failed: {type(e).__name__}: {e}', 'ERROR')
 
     if not all_alerts:
         log('no stalls detected', 'INFO')

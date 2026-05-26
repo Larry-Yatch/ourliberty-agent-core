@@ -216,6 +216,36 @@ _GH_PR_URL_RE = re.compile(
     r'^https?://github\.com/([^/]+/[^/]+)/pull/(\d+)',
 )
 
+# Chain discipline v3 GAP 2 (2026-05-26) — pr_url repo-coords allowlist.
+# PR #107 review surfaced Mirror emitting a pr_url with `lyatch/agent-core`
+# (missing 'L', stripped 'ourliberty-' prefix); AUTO_MERGE couldn't act on
+# the mangled URL. Validate the parsed (owner/repo) against the allowlist
+# before any gate runs; on mismatch, attempt a canonical-form rewrite once
+# against the known-wrong prefixes below. If the rewrite resolves to an
+# allowlisted repo, log INFO PR_URL_REWRITTEN + proceed; otherwise queue an
+# alert to Larry and skip the merge attempt.
+_PR_URL_REPO_ALLOWLIST = (
+    'Larry-Yatch/ourliberty-agent-core',
+    'Larry-Yatch/ourliberty-dashboard',
+)
+
+# Wrong-prefix variants observed in the wild OR plausibly typo-derivable
+# from the canonical owner. Lowercase-comparison driven, so the rewrite
+# logic stays case-tolerant. Order doesn't matter — the rewrite tries each.
+_PR_URL_WRONG_OWNER_PREFIXES = (
+    'lyatch',
+    'larryyatch',
+    'larry-yatch',  # case-only variant of the canonical owner
+)
+
+# Wrong repo-name variants observed in the wild. Mirror stripped the
+# 'ourliberty-' prefix on PR #107; we re-add it on rewrite. Order matters
+# only so far as the rewrite picks the first allowlisted match.
+_PR_URL_REPO_REWRITES = {
+    'agent-core': 'ourliberty-agent-core',
+    'dashboard': 'ourliberty-dashboard',
+}
+
 # D3.5 commit 5d — fallback cap when config is missing/malformed. The
 # config (`loop_bounds.cost_per_task_usd`) has been pre-staged since 5a at
 # $5.00; the live value Larry signed off on at Q7=3 is what gets enforced.
@@ -2432,6 +2462,74 @@ def _dm_larry_no_session_revision(
         )
 
 
+def _alert_no_session_revision_broadcast(
+    data: dict[str, Any], decision: dict[str, Any],
+    routing_source: Optional[str],
+) -> None:
+    """Broadcast a Larry alert for a no-session REVIEW_REVISION when the
+    chat-targeted DM path can't fire.
+
+    Chain discipline v3 GAP 1. Complements `_dm_larry_no_session_revision`
+    (which targets a specific chat_id when source='larry'). This variant
+    uses `larry_alerts.append_alert` so the rejection reaches Larry via
+    the broadcast bot sweep when routing was via Beacon or there's no
+    chat_id on the envelope. Subject keys on task_id so the per-subject
+    60-min cooldown doesn't suppress genuinely-different rejections.
+    """
+    task_id = data.get('task_id') or 'unknown'
+    payload = decision.get('payload') or {}
+    pr_url = data.get('pr_url') or (
+        payload.get('pr_url') if isinstance(payload, dict) else None
+    ) or '(no pr_url)'
+    branch = data.get('branch') or '(branch unknown)'
+    summary = payload.get('summary') or payload.get('reason') or ''
+    findings = payload.get('findings')
+
+    body_lines = [
+        f'Mirror requested revision on {pr_url} (task `{task_id}`).',
+        f'No Forge build session on envelope (routing_source={routing_source!r}); '
+        f'auto-resume cannot fire — chain protocol assumes Forge owns the build '
+        f'session. Externally-authored PR needs manual reconciliation.',
+    ]
+    if summary:
+        body_lines.append(f'Summary: {summary}')
+    if isinstance(findings, list) and findings:
+        body_lines.append('Findings:')
+        for i, f in enumerate(findings[:5], 1):
+            if isinstance(f, dict):
+                sev = f.get('severity', '?')
+                file_ref = f.get('file', '?')
+                line_ref = f.get('line_range', '')
+                desc = f.get('description', '(no description)')
+                loc = f'{file_ref} {line_ref}'.strip()
+                body_lines.append(f'  {i}. [{sev}] {loc} — {desc}')
+            else:
+                body_lines.append(f'  {i}. {f}')
+        if len(findings) > 5:
+            body_lines.append(f'  … and {len(findings) - 5} more')
+    message = '\n'.join(body_lines)
+
+    suggested_action = (
+        f'Forge built this PR outside the dispatch chain — apply Mirror\'s '
+        f'revisions manually on branch `{branch}`, or re-dispatch via Beacon '
+        f'with a fresh task_id to thread a new forge_build_session_id.'
+    )
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=message,
+            subject=f'no-session-revision:{task_id}',
+            suggested_action=suggested_action,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'no-session revision broadcast alert raised for task {task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _dispatch_revision_to_forge(
     data: dict[str, Any], decision: dict[str, Any],
 ) -> None:
@@ -2475,10 +2573,19 @@ def _dispatch_revision_to_forge(
         if routing_source == 'larry' and isinstance(chat_id, int):
             _dm_larry_no_session_revision(data, decision, chat_id)
             return
+        # Chain discipline v3 GAP 1 (2026-05-26): the chat-targeted DM path
+        # above can't fire when routing_source != 'larry' (e.g. Beacon
+        # dispatched the revision) or there's no reply_chat_id on the
+        # envelope. The original WARN-only fallthrough was silent today on
+        # `feedback_claude_as_forge_boundaries`. Broadcast a per-task alert
+        # via larry_alerts so the rejection isn't invisible until manual
+        # log inspection. Healer Check 6 covers any escape from this path.
+        _alert_no_session_revision_broadcast(data, decision, routing_source)
         log(
             f'REVIEW_REVISION on task {task_id} has no forge_build_session_id '
-            f'(propagation gap?); revision dispatch would have no session to '
-            f'--resume — skipping. Larry should manually re-dispatch.',
+            f'(routing_source={routing_source!r}, chat_id={chat_id!r}); '
+            f'revision dispatch would have no session to --resume — skipping. '
+            f'Broadcast alert queued for manual re-dispatch.',
             'WARN',
         )
         return
@@ -2844,6 +2951,111 @@ def _dispatch_mirror_review_rerun(
             f're-review dispatch FAILED for task {task_id} round {round_num}: '
             f'{type(e).__name__}: {e}. Forge already wrote her revision; '
             f'Larry must manually re-dispatch.',
+            'WARN',
+        )
+
+
+def _validate_or_rewrite_pr_url(pr_url: str) -> tuple[Optional[str], Optional[str]]:
+    """Validate `pr_url`'s repo coords against the allowlist; on mismatch,
+    attempt a single canonical-form rewrite using known-wrong prefixes.
+
+    Chain discipline v3 GAP 2. Returns `(canonical_url, rewrite_reason)`:
+
+      - `(pr_url, None)` — already allowlisted; no rewrite needed.
+      - `(canonical_url, reason)` — rewrite succeeded; caller should log
+        INFO PR_URL_REWRITTEN and proceed with `canonical_url`.
+      - `(None, reason)` — neither validation nor rewrite resolves to an
+        allowlisted repo. Caller should alert Larry and skip the merge.
+
+    The `reason` string is a short human-readable diagnostic for log/alert
+    rendering. No shell-out; pure string manipulation against the
+    regex-extracted (owner, repo) tuple.
+    """
+    if not isinstance(pr_url, str) or not pr_url:
+        return None, 'empty or non-string pr_url'
+    m = _GH_PR_URL_RE.search(pr_url)
+    if not m:
+        return None, f'pr_url does not match github.com PR shape: {pr_url!r}'
+    repo_coords = m.group(1)
+    if repo_coords in _PR_URL_REPO_ALLOWLIST:
+        return pr_url, None
+    # Mismatch — try a canonical-form rewrite. Split owner/repo,
+    # case-insensitively check whether owner is one of the known-wrong
+    # variants, and whether repo is one of the known-wrong (or repo-prefix-
+    # stripped) shapes.
+    parts = repo_coords.split('/', 1)
+    if len(parts) != 2:
+        return None, f'pr_url repo coords malformed: {repo_coords!r}'
+    owner, repo = parts
+    owner_lower = owner.lower()
+    repo_lower = repo.lower()
+    rewritten_owner: Optional[str] = None
+    if owner_lower in _PR_URL_WRONG_OWNER_PREFIXES:
+        rewritten_owner = 'Larry-Yatch'
+    rewritten_repo: Optional[str] = None
+    if repo_lower in _PR_URL_REPO_REWRITES:
+        rewritten_repo = _PR_URL_REPO_REWRITES[repo_lower]
+    elif repo in (canonical.split('/', 1)[1] for canonical in _PR_URL_REPO_ALLOWLIST):
+        rewritten_repo = repo  # repo name was already canonical
+    if rewritten_owner is None and rewritten_repo is None:
+        return None, (
+            f'pr_url repo coords {repo_coords!r} not in allowlist '
+            f'(neither owner nor repo matched known-wrong variants)'
+        )
+    final_owner = rewritten_owner or owner
+    final_repo = rewritten_repo or repo
+    canonical_coords = f'{final_owner}/{final_repo}'
+    if canonical_coords not in _PR_URL_REPO_ALLOWLIST:
+        return None, (
+            f'pr_url rewrite produced {canonical_coords!r} which is still '
+            f'not in allowlist'
+        )
+    # Substitute the corrected coords back into the URL. Preserve the
+    # post-PR-number tail (anchor, query string, etc.) by splicing at the
+    # regex match boundaries.
+    canonical_url = pr_url[:m.start(1)] + canonical_coords + pr_url[m.end(1):]
+    return canonical_url, f'rewrote {repo_coords!r} → {canonical_coords!r}'
+
+
+def _alert_larry_pr_url_unrewritable(
+    pr_url: str, task_id: str, reason: str,
+    canonical_guess: Optional[str] = None,
+) -> None:
+    """Queue a Larry alert when pr_url validation + rewrite both fail.
+
+    Chain discipline v3 GAP 2. Fires when Mirror's pr_url can't be
+    resolved to an allowlisted repo even after one canonical-form retry.
+    Alert subject keys on task_id so the per-subject cooldown doesn't
+    suppress different mangled PRs. Suggested action carries the
+    canonical-form guess (if any) so Larry can paste-and-fix.
+    """
+    body_lines = [
+        f'Mirror REVIEW_PASS on task `{task_id}` carried an unrecognized '
+        f'pr_url; AUTO_MERGE was NOT attempted.',
+        f'Original pr_url: {pr_url}',
+        f'Validator: {reason}',
+    ]
+    if canonical_guess:
+        body_lines.append(f'Canonical-form guess: {canonical_guess}')
+    suggested_action = (
+        f'Verify the PR URL is for a tracked repo '
+        f'({", ".join(_PR_URL_REPO_ALLOWLIST)}). If the guess is correct, '
+        f'manually merge: `gh pr merge <N> --repo <owner/repo> --squash '
+        f'--delete-branch`. If Mirror emitted a mangled URL, file a '
+        f'marker-discipline followup so the test catches the shape.'
+    )
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message='\n'.join(body_lines),
+            subject=f'pr-url-unrewritable:{task_id}',
+            suggested_action=suggested_action,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'pr_url unrewritable alert raised for task {task_id}: '
+            f'{type(e).__name__}: {e}',
             'WARN',
         )
 
@@ -5232,8 +5444,59 @@ def process_outbox(outbox_file: Path) -> str:
                 # When both gates pass, the gate helper itself fires the
                 # merge (via _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr)
                 # and runs the post-merge release pass.
-                parsed = _parse_pr_url(pr_url)
-                if parsed is None:
+                # Chain discipline v3 GAP 2 (2026-05-26): validate the
+                # pr_url's repo coords against the allowlist BEFORE any
+                # gate or shell-out. On allowlist hit: pass-through. On
+                # mismatch: attempt a single canonical-form rewrite using
+                # the known-wrong-prefix table. If the rewrite resolves
+                # to an allowlisted repo, log INFO PR_URL_REWRITTEN and
+                # use the rewritten URL downstream. If it doesn't, queue
+                # an alert + render a failed-outcome DM without firing
+                # the merge — we never call gh pr merge with an
+                # unverified URL.
+                canonical_url, rewrite_reason = _validate_or_rewrite_pr_url(pr_url)
+                if canonical_url is None:
+                    canonical_guess: Optional[str] = None
+                    if rewrite_reason and '→' in rewrite_reason:
+                        canonical_guess = rewrite_reason.split('→', 1)[1].strip().strip("'")
+                    log(
+                        f'AUTO_MERGE task={data.get("task_id", "?")} '
+                        f'pr={pr_url!r} outcome=failed '
+                        f'reason=pr-url-allowlist-mismatch ({rewrite_reason})',
+                        'WARN',
+                    )
+                    _alert_larry_pr_url_unrewritable(
+                        pr_url=pr_url,
+                        task_id=data.get('task_id') or 'unknown',
+                        reason=rewrite_reason or 'unknown',
+                        canonical_guess=canonical_guess,
+                    )
+                    merge_result = {
+                        'merge_outcome': 'failed',
+                        'merge_reason': (
+                            f'pr_url not in allowlist; AUTO_MERGE skipped '
+                            f'({rewrite_reason})'
+                        ),
+                        'pr_number': '?',
+                        'repo_coords': '?',
+                    }
+                    # Skip the parse-and-gate block; the unconditional
+                    # marker_decision write below picks up merge_result.
+                    parsed = None
+                    pr_url_gate_failed = True
+                else:
+                    if canonical_url != pr_url:
+                        log(
+                            f'PR_URL_REWRITTEN from={pr_url!r} '
+                            f'to={canonical_url!r} task={data.get("task_id", "?")} '
+                            f'({rewrite_reason})'
+                        )
+                        pr_url = canonical_url
+                    parsed = _parse_pr_url(pr_url)
+                    pr_url_gate_failed = False
+                if pr_url_gate_failed:
+                    pass  # merge_result already set above
+                elif parsed is None:
                     log(
                         f'AUTO_MERGE task={data.get("task_id", "?")} '
                         f'pr={pr_url!r} outcome=failed reason=malformed-pr-url '
