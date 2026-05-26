@@ -399,7 +399,7 @@ This is the bridge from "I see a problem" to "I act on it" without leaving the d
 
 **Refresh + caching cadence:**
 
-- Active Sessions: 5s poll (driven by droplet API's 5s cache).
+- Active Sessions: 5s poll (droplet endpoints are no-cache file/proc reads per § 5.3; client-side polling cadence is the freshness contract).
 - Escalations + Alerts: 10s poll (Supabase query).
 - System Health: 5s poll.
 - Chain Event Feed: 10s poll (Supabase query).
@@ -476,7 +476,7 @@ The original Beacon spec round (Telegram 2026-05-25 14:29 → 15:12 MDT) locked 
 |---|---|---|
 | **5th view: Escalations + Alerts panel** (§ 5.7 panel 2) ingesting `pulse-escalations.json`, `larry-alerts.jsonl`, `sentinel-alerts.jsonl` from `~/agents/blackboard/` | Chunk-2 walkthrough of spec sections | Larry's words: *"Seems to me that escalations and Larry Alerts panel would be very useful to have in version one."* The 4-view brief deferred this to MVP-3; Larry decided the value vs. cost was favorable for V1. |
 | **Pulse Check III self-optimizing threshold loop** (§ 5.10) on 14-day cadence + proposal artifact + Beacon `approve threshold-update-<date>` shortcut | Chunk-3 walkthrough during the § 5.4 threshold discussion | Larry's words: *"We can make that self-optimizing, can't we?"* Brief locked manual threshold tuning; Larry added the autonomous tuning layer. Pattern memorialized as reusable (`feedback_self_optimizing_config_via_pulse_check_pattern.md`) with a 10-surface backlog. |
-| **Operating-manual.md Part II doctrine entry** in PR-B (codifies the self-optimizing pattern as agent-OS doctrine so Pulse/Beacon/Forge/Mirror agents on the droplet see it) | Chunk-3 follow-up on durability of the pattern across future sessions | Larry asked whether the pattern would surface at the right times in future sessions. The operating-manual entry is the durable record (the auto-memory entry only loads in Claude Code sessions at Larry's local project path). |
+| **Operating-manual.md Part II doctrine entry** in PR-B (codifies the self-optimizing pattern as agent-OS doctrine so Pulse/Beacon/Forge/Mirror agents on the droplet see it) | Chunk-3 follow-up on durability of the pattern across future sessions | Derived requirement (no captured verbatim quote — flagged honestly): the Pulse Check III pattern in the row above needs a durable surface beyond Larry's local Claude Code session for Pulse/Beacon/Forge/Mirror agents on the droplet to see it. The operating-manual entry is that surface. Larry approved the addition inline during the Chunk-3 walkthrough. |
 | **Migration 0005 `chain_events_read_flag.sql` + `/api/operations/mark-event-read/route.ts`** | Implied by the Escalations + Alerts panel addition above | The "Mark as read" affordance on escalation entries needs a per-event read-state column. Couldn't fit into 0004 without re-shipping it. Ships in PR-D alongside the panel component. |
 
 These four are explicit Larry approvals during interactive walkthrough, NOT silent scope-creep. They're documented here so Mirror's review can verify provenance + so future-Larry reading the spec knows what came from Beacon's spec round vs. what was added during spec writing.
@@ -532,7 +532,7 @@ Each PR is independently mergeable + reviewable. Mirror reviews each. Larry vali
 
 **Acceptance:** `curl http://127.0.0.1:8000/api/system/active-sessions` returns valid JSON. Test scenarios: live Mirror session running (returns it); no sessions (empty array); cgroup service stopped (503). Same for cgroup-stats and worktrees.
 
-**Reviewer focus (Mirror):** error contracts; cache TTL behavior; `/proc/<pid>` race conditions (process dies mid-read); no shell injection via task_id or worktree names.
+**Reviewer focus (Mirror):** error contracts; `/proc/<pid>` race conditions (process dies mid-read); no shell injection via task_id or worktree names; no server-side caching introduced (per locked decision C, § 5.3).
 
 ### PR-D: Operations tab + System view UI (~1.5 days, ~$10 LLM)
 
@@ -582,7 +582,7 @@ Comparable to E4.4a's actual spend (~$15 across the build + review). Within E4 p
 | Chain_events grows unbounded over time | Default ingestion is unbounded; PR-A includes a comment noting need for retention policy (likely 90 days) before E4.4d-followup | Migration 0005 adds TTL + cron pruning |
 | Ingestion daemon misclassifies event types and pollutes chain_events | Dedup_hash catches double-inserts; unit tests cover all parser branches; if production shows misclassification, daemon stop + targeted `DELETE FROM chain_events WHERE ...` + bug fix re-deploy | `systemctl stop ourliberty-chain-event-shipper`; selective DELETE; redeploy fix |
 | Public read access exposes commercially-sensitive data | Decision F accepted this risk explicitly; mitigation is "V2 protects in separate project"; in MVP-2 the exposed surface is operational metadata only | Set anon GRANT to none via emergency migration; UI breaks but data is private |
-| Droplet API endpoint perf degrades with high session count | Sessions are typically ≤2 active; cache TTL bounds re-reads; if Larry's workload grows, cache TTL can lengthen | Adjust cache TTL in `dashboard_api.py`; restart service |
+| Droplet API endpoint perf degrades with high session count | Sessions are typically ≤2 active; endpoints are file/proc reads <10ms each per § 5.3 (no server-side cache by locked decision C); client-side 5s polling bounds load | Increase client-side poll interval in dashboard; if needed, add dashboard-layer caching (still no droplet-side cache) |
 | `gh` rate-limit hits during PR-heavy days | 30s cache + 50-PR limit per call keeps usage well under 5000/hr. Banner explains stale state if hit | Increase cache TTL to 5 min; degraded freshness, no broken behavior |
 | Stuck-detector false positives DM Larry too often | 30 min cooldown per alert key; thresholds editable in config file without redeploy | Tweak thresholds; restart healer |
 | Healer false-restarts something it shouldn't | Constraint § 5.5 forbids auto-action; healer code reviewer (Mirror) blocks any PR adding action paths | Constraint is enforced by code review; no rollback needed |
