@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 87 — 2026-05-26 00:35 UTC (interactive)
+
+**Health:** ⚠️ Drift
+**Found:**
+- **(A) Source repo: wrong branch.** VM clone on `larry/e4-4d-system-tab-spec` (PR #104 spec branch), not `main`. Working-copy discipline violated. Clean tree. Sync script errored: "Wrong branch: larry/e4-4d-system-tab-spec" at 00:23Z. ⚠️ [never-auto → escalated]
+- **(B) Sync health: error.** sync.json status=error "Wrong branch" (00:23Z). Root cause: Check A. Resolves when repo returns to main. ⚠️
+- **(C) Agent liveness: 6/6 units active.** Beacon: 2026-05-25T23:09Z — fresh (approved Mirror review dispatch for PR #104). Forge: 2026-05-24T14:40Z (read timeout — calibrated). Mirror: 2026-05-24T01:11Z (~47h — HTTP 502, calibrated). Pulse: 2026-05-25T00:59Z (~23h — /optimize DM, calibrated). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. No new .invalid files. ✅
+- **(E) PRs: nominal.** 1 open: #104 `spec(e4-4d): Operations tab + System view` (larry/e4-4d-system-tab-spec, created 23:04Z, ~1.5h old, reviewDecision="" — Mirror review dispatched 23:09Z by Beacon, in flight). Not at APPROVED+clean+green threshold. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 0 open forge/ PRs. 0 merged in last 4h. Last shipped: iter 86 (PRs #101–#103). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (88d out). ✅
+- **Check I: skipped.** UTC Tuesday 2026-05-26 (off day — fires Mon/Wed/Fri/Sun only). ✅
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+
+**Did:** Wrote [yellow] escalation to blackboard (Check A wrong branch). Journal append written to spec branch (not committed — cycle writes should not pollute PR #104 diff; commit deferred until repo returns to main).
+**Escalated:** [yellow] Check A/B: VM clone on `larry/e4-4d-system-tab-spec`, sync blocked. Fix: `git -C ~/agent-core checkout main` after PR #104 work is done.
+**Forge:** 0 open. 0 merged since iter 86.
+**Patterns:** Telegram network errors ongoing (Forge/Mirror/Pulse) — G-rule dispatched iter 57, no visible Beacon response. Wrong-branch state: 1st occurrence of VM clone being on a larry/ spec branch — not a G-rule trigger yet, but a clean working-copy discipline reminder.
+**Learned:** PR #104 in Mirror review (Beacon dispatched 23:09Z May 25). When doing interactive spec work on VM clone, restore `git checkout main` before the next automated cycle to unblock sync.
+
+---
+
 ## Iteration 86 — 2026-05-25 20:47 UTC (interactive)
 
 **Health:** ⚠️ Drift
