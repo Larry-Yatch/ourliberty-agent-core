@@ -52,7 +52,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Allow `import larry_alerts` from scripts/ directory.
@@ -565,7 +565,7 @@ def check_bots() -> dict:
 def run_all_checks() -> dict:
     """Run every check, persist summary to system-health.json."""
     results = {
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': datetime.now(timezone.utc).isoformat(),
         'checks': {
             'inbox_watcher': check_inbox_watcher(),
             'outbox_notifier': check_outbox_notifier(),
