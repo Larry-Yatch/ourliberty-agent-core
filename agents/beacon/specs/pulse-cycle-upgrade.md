@@ -122,6 +122,10 @@ Verbatim adoption of Joe's framing:
 - Target noise pattern reduces by >50% measured over 6 h
 - An orphan/stuck condition self-recovers without cycle intervention
 
+**Clock anchor + source (added 2026-05-26 per Mirror PR #108 review).** The 24 h window is measured in **wall-clock UTC** from the **systemic-fix dispatch event** as recorded in `chain_events` (the row whose `event_type` is the dispatch and whose `task_id` corresponds to the fix). For prompt-edit / CLAUDE.md / cycle-prompt.md fixes specifically, use the § 5.5 fresh-process-spawn timestamp instead — those fixes don't take effect at dispatch time and the 24 h window must start when a fresh agent process can actually exhibit the new behavior. This dual anchor is deliberate; the cycle-action ledger records both the dispatch ts AND the verification-anchor ts so any future iter can reproduce the verification window from chain_events alone.
+
+The 6 h noise-pattern-drop window (second bullet above) is measured in wall-clock UTC from the same dispatch event for code/healer fixes, or from the fresh-process-spawn timestamp for prompt-edit fixes.
+
 TODO comments, "I'll watch this" deferrals, and untested patches DO NOT count.
 
 **Healer first-execution accounting.** When a new healer's first run drains an existing backlog AND establishes future prevention, that single ship counts as ONE systemic fix — not "1 one-off + 1 systemic." The healer IS the systemic mechanism; its first execution is the empirical proof.
