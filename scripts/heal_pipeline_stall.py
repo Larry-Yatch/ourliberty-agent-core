@@ -63,6 +63,20 @@ Never acts on the stall. Surface only. The healer never kills processes,
 never merges PRs, never re-dispatches anything. Same posture as Joe's
 `pipeline_watcher.py` and our `dispatch_sentinel.py`.
 
+Scan window
+-----------
+All seven Checks gate their stall-trigger event timestamp against
+``SCAN_WINDOW_SECONDS`` (default 86400s = 24h). Events older than the
+window are skipped silently — they represent historical record, not a
+current stall. This retires already-resolved incidents instead of
+re-firing on log lines from yesterday. Three false positives on
+2026-05-26 (Mirror PASS unmerged for tasks Larry had already merged
+manually, plus an outbox-notifier WARN replay from the prior day) drove
+the explicit window. The 24h default is long enough to cover overnight
+quiet periods but short enough that a stall older than a day is past
+the point where another DM helps — at that age the action is human
+investigation, not another notification.
+
 State: `~/agents/blackboard/heal-pipeline-stall-state.json`
 Heartbeat: `~/agents/blackboard/heal-pipeline-stall.heartbeat`
 Kill switch: `~/agents/healers.disabled`
@@ -121,6 +135,13 @@ RETRY_EXHAUST_WINDOW_MIN = 30        # 30 min — All retries exhausted in this 
 LOG_LOOKBACK_HOURS = 24              # Read at most this far back into outbox-notifier.log
 JOURNAL_LOOKBACK_HOURS = 1           # Read at most this far back for retry-exhausted lines
 ALERT_DEDUP_HOURS = 1                # Same stall key not re-DMed within this window
+
+# Bounded scan window for stall-trigger events. Events whose anchor
+# timestamp is older than this are treated as historical record, not
+# stalls, and produce no alert. See module docstring's "Scan window"
+# section for rationale. Tunable: edit the constant, then
+# `sudo systemctl restart ourliberty-heal-pipeline-stall.timer`.
+SCAN_WINDOW_SECONDS = 86400          # 24h
 
 # Log line patterns from outbox_notifier's log() helper.
 _FORGE_DONE_RE = re.compile(
@@ -222,6 +243,21 @@ def should_alert(state: dict, key: str) -> bool:
 
 def record_alert(state: dict, key: str) -> None:
     state[key] = datetime.now(timezone.utc).isoformat()
+
+
+def _within_scan_window(ts: Optional[datetime],
+                        now: Optional[datetime] = None) -> bool:
+    """True iff `ts` is no older than SCAN_WINDOW_SECONDS ago. Inclusive at
+    the boundary — an event exactly at `now - SCAN_WINDOW_SECONDS` is in.
+    Returns False for None (un-parseable timestamps are not stall triggers).
+
+    Used by every Check that anchors a stall on an event timestamp. Events
+    older than the window are historical record, not current stalls."""
+    if ts is None:
+        return False
+    if now is None:
+        now = datetime.now(timezone.utc)
+    return (now - ts).total_seconds() <= SCAN_WINDOW_SECONDS
 
 
 def _parse_ts(ts_str: str) -> Optional[datetime]:
@@ -345,6 +381,11 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
         ts = _parse_ts(m.group('ts'))
         if not ts or ts > cutoff:
             continue
+        if not _within_scan_window(ts):
+            # Historical record — not a stall. Skip silently per Scan
+            # window discipline (see module docstring).
+            seen_tasks.add(task)
+            continue
         # PR with matching branch on any repo?
         if any(_task_id_from_branch(pr.get('headRefName', '')) == task for pr in all_prs):
             seen_tasks.add(task)
@@ -388,6 +429,10 @@ def check_pr_no_mirror_dispatch(notifier_lines: list[str], open_prs: list[dict],
         created = _parse_ts(pr.get('createdAt', ''))
         if not created:
             continue
+        if not _within_scan_window(created, now=now):
+            # PR opened > SCAN_WINDOW_SECONDS ago — past the point where
+            # another DM is the right response. Skip per Scan window.
+            continue
         elapsed_min = int((now - created).total_seconds() / 60)
         # Threshold gating: code PRs get longer (regression check is legitimate work).
         # Heuristic: any PR title starting with `fix(`, `feat(`, `refactor(` is code; everything
@@ -429,6 +474,8 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
             continue
         ts = _parse_ts(m.group('ts'))
         if not ts:
+            continue
+        if not _within_scan_window(ts):
             continue
         task = m.group('task')
         prev = pass_times.get(task)
@@ -480,7 +527,7 @@ def check_mirror_marker_invisible(notifier_lines: list[str], state: dict) -> lis
         if m:
             ts = _parse_ts(m.group('ts'))
             task = m.group('task')
-            if ts:
+            if ts and _within_scan_window(ts):
                 prev = generic_notify.get(task)
                 if prev is None or ts > prev:
                     generic_notify[task] = ts
@@ -586,12 +633,15 @@ def check_revision_dispatched_with_no_session(notifier_lines: list[str],
         task = m.group('task')
         if task in seen_tasks:
             continue
-        seen_tasks.add(task)
         ts = _parse_ts(m.group('ts'))
-        elapsed_min = (
-            int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
-            if ts else 0
-        )
+        if not _within_scan_window(ts):
+            # Historical WARN replay — direct-fix DM already fired
+            # within its own cooldown when the event was fresh; another
+            # alert now would be noise. Skip per Scan window.
+            seen_tasks.add(task)
+            continue
+        seen_tasks.add(task)
+        elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'no_session_revision:{task}'
         alerts.append({
             'key': key,
@@ -683,6 +733,11 @@ def check_unrouted_open_prs(open_prs: list[dict],
             continue
         created = _parse_ts(pr.get('createdAt', ''))
         if not created:
+            continue
+        if not _within_scan_window(created, now=now):
+            # PR is older than SCAN_WINDOW_SECONDS — long-standing
+            # un-routed PR has had ample alert cycles; another DM here
+            # is noise. Skip per Scan window.
             continue
         elapsed_min = int((now - created).total_seconds() / 60)
         if elapsed_min < PR_UNROUTED_MIN_AGE_MIN:
