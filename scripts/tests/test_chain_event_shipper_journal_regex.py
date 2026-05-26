@@ -16,9 +16,11 @@ journal=0.
 """
 from __future__ import annotations
 
+import logging
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -120,6 +122,91 @@ class TestJournalRegexDefensive(unittest.TestCase):
             ),
         }
         self.assertIsNone(ces.parse_journal_record(rec))
+
+
+class _FakePopen:
+    """Stand-in for subprocess.Popen used by iter_journalctl tests."""
+
+    def __init__(self, stdout_lines, stderr_text='', returncode=0):
+        self.stdout = iter(stdout_lines)
+        self.stderr = mock.MagicMock()
+        self.stderr.read.return_value = stderr_text
+        self.returncode = returncode
+
+    def terminate(self):
+        pass
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+
+class TestJournalctlCmdConstruction(unittest.TestCase):
+    """Pins the journalctl invocation against systemd version drift.
+
+    Droplet runs systemd 255 where `--no-follow` was rejected as an
+    unrecognized option — the shipper drained zero records for hours.
+    journalctl defaults to non-follow (drain-and-exit), so the flag is
+    redundant; this test asserts we never add it back.
+    """
+
+    def test_cmd_does_not_pass_no_follow(self):
+        captured = {}
+
+        def fake_popen(cmd, **kwargs):
+            captured['cmd'] = cmd
+            return _FakePopen(stdout_lines=[], returncode=0)
+
+        with mock.patch.object(ces.subprocess, 'Popen', side_effect=fake_popen):
+            list(ces.iter_journalctl(once=True, timeout_sec=0.1))
+
+        self.assertIn('cmd', captured)
+        self.assertNotIn('--no-follow', captured['cmd'])
+        self.assertEqual(captured['cmd'][0], 'journalctl')
+
+
+class TestJournalctlStderrOnNonZeroExit(unittest.TestCase):
+    """Surfaces journalctl stderr so flag/argument breakage is loud.
+
+    The original failure was silent: stderr was discarded and the daemon
+    logged journal=0 indefinitely. This test ensures non-zero exits
+    surface the stderr text as a warning.
+    """
+
+    def test_warning_logged_with_stderr_text(self):
+        stderr_text = "journalctl: unrecognized option '--no-follow'"
+
+        def fake_popen(cmd, **kwargs):
+            return _FakePopen(
+                stdout_lines=[], stderr_text=stderr_text, returncode=1,
+            )
+
+        logger = logging.getLogger('chain_event_shipper')
+        with mock.patch.object(ces.subprocess, 'Popen', side_effect=fake_popen):
+            with self.assertLogs(logger, level='WARNING') as cm:
+                list(ces.iter_journalctl(once=True, timeout_sec=0.1))
+
+        joined = '\n'.join(cm.output)
+        self.assertIn('journalctl exited non-zero', joined)
+        self.assertIn('unrecognized option', joined)
+        self.assertIn('returncode=1', joined)
+
+    def test_no_warning_on_clean_exit(self):
+        def fake_popen(cmd, **kwargs):
+            return _FakePopen(stdout_lines=[], returncode=0)
+
+        logger = logging.getLogger('chain_event_shipper')
+        with mock.patch.object(ces.subprocess, 'Popen', side_effect=fake_popen):
+            # assertNoLogs would be cleaner but is 3.10+; use assertLogs
+            # with a sentinel to verify the warning path stayed silent.
+            with self.assertLogs(logger, level='DEBUG') as cm:
+                logger.debug('sentinel')  # ensure assertLogs has something
+                list(ces.iter_journalctl(once=True, timeout_sec=0.1))
+
+        warnings = [
+            m for m in cm.output
+            if m.startswith('WARNING') and 'journalctl exited' in m
+        ]
+        self.assertEqual(warnings, [])
 
 
 if __name__ == '__main__':
