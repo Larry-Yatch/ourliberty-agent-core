@@ -1,0 +1,2 @@
+{"message": {"role": "user", "content": [{"type": "text", "text": "is PR-B in flight?"}]}}
+{"message": {"role": "assistant", "content": [{"type": "text", "text": "**Plain-language:** No — PR-B is pending YOUR approval, not in flight. The DM hit your queue at 12:55Z; nothing moves until you reply `go` or `approve`.\n\n**Current state:**\n- PR-A: building (Forge in-session, marker pending)\n- PR-B: pending your approval DM\n- PR-C: just dispatched, queued behind PR-A in Forge's inbox\n\nLet me know when you're ready to release PR-B."}]}}
