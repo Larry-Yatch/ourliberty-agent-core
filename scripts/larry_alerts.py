@@ -35,6 +35,13 @@ ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
 COOLDOWN_ROOT = AGENTS_ROOT / 'state' / 'alert-cooldown'
 OFFSET_FILE = AGENTS_ROOT / 'state' / 'beacon-alerts-offset.txt'
 
+# Translation layer (stopgap until Pulse cycle upgrade ships healer-alert
+# triage; see docs/operating-manual.md Part II #68). Lookup by (source,
+# subject) at format_dm time; matched alerts get a plain-language layered
+# render; unmatched alerts get the raw body + a "[no translation]" footer
+# so silence-on-unmatched is impossible.
+TRANSLATIONS_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-translations.json'
+
 CRITICAL_COOLDOWN_SEC = 10 * 60       # 10 min — terse and load-bearing
 WARNING_COOLDOWN_SEC = 60 * 60        # 60 min — Larry's Dial 3 pick
 
@@ -292,6 +299,117 @@ def write_offset(offset: int) -> None:
         pass
 
 
+# ---------- translation layer (stopgap; see operating-manual.md #68) ----------
+
+
+_TRANSLATIONS_CACHE: Optional[dict] = None
+
+
+def _load_translations() -> dict:
+    """Read config/alert-translations.json once per process. Returns the
+    nested-by-source dict, or {} if the file is missing/malformed (the
+    caller falls back to raw-body + [no translation] footer in that case)."""
+    global _TRANSLATIONS_CACHE
+    if _TRANSLATIONS_CACHE is not None:
+        return _TRANSLATIONS_CACHE
+    try:
+        with open(TRANSLATIONS_FILE, encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    _TRANSLATIONS_CACHE = data
+    return data
+
+
+def translate_alert(source: str, subject: Optional[str]) -> Optional[dict]:
+    """Look up a translation for (source, subject). Returns the translation
+    entry (dict with severity / plain_language_summary / recommended_action)
+    or None on miss.
+
+    Lookup rule (per dispatch CLARIFY response):
+      1. Exact match on the full subject.
+      2. Longest-prefix match: strip trailing ':'-segments from subject one
+         at a time, retrying after each strip until a key matches.
+
+    Source must match exactly. Subject=None never matches (alerts without a
+    subject can't be translated under V1 — there's no key shape for them)."""
+    if not subject:
+        return None
+    translations = _load_translations()
+    source_entries = translations.get(source)
+    if not isinstance(source_entries, dict):
+        return None
+    if subject in source_entries:
+        entry = source_entries[subject]
+        return entry if isinstance(entry, dict) else None
+    # Longest-prefix: strip trailing ':'-segments and retry.
+    parts = subject.split(':')
+    for trim in range(1, len(parts)):
+        candidate = ':'.join(parts[:-trim])
+        if candidate in source_entries:
+            entry = source_entries[candidate]
+            return entry if isinstance(entry, dict) else None
+    return None
+
+
+def _render_translated_alert(record: dict, translation: dict) -> str:
+    """Render a matched alert with the new layered shape:
+
+        <SEVERITY_WORD>                       (plain text, no emoji prefix)
+        <plain-language summary>
+
+        <recommended action>
+
+        ---technical detail---
+        <original raw header + body verbatim>
+
+    The technical-detail block preserves the pre-translation render so the
+    operator can still see source, subject, original message, and any
+    suggested_action that the producer wrote."""
+    severity_label = translation.get('severity', 'WARNING')
+    summary = translation.get('plain_language_summary', '').strip()
+    action = translation.get('recommended_action', '').strip()
+    raw_body = _render_raw_alert_body(record)
+    lines: list[str] = [severity_label]
+    if summary:
+        lines.append('')
+        lines.append(summary)
+    if action:
+        lines.append('')
+        lines.append(action)
+    lines.append('')
+    lines.append('---technical detail---')
+    lines.append(raw_body)
+    return '\n'.join(lines)
+
+
+def _render_raw_alert_body(record: dict) -> str:
+    """The original pre-translation render shape (severity emoji + source +
+    subject + message + suggested_action). Kept verbatim for the technical-
+    detail footer of matched alerts AND for the fallback render of unmatched
+    alerts."""
+    severity = record.get('severity', 'warning')
+    emoji = '🚨' if severity == 'critical' else '⚠'
+    source = record.get('source', '?')
+    subject = record.get('subject')
+    header = f'{emoji} {source}'
+    if subject:
+        header += f' [{subject}]'
+    lines = [header, record.get('message', '')]
+    sa = record.get('suggested_action')
+    if sa:
+        lines.append(f'Run: {sa}')
+    return '\n'.join(line for line in lines if line)
+
+
+_NO_TRANSLATION_FOOTER = (
+    '[no translation; needs entry in config/alert-translations.json '
+    'or Pulse triage scope]'
+)
+
+
 _NOTIFICATION_INTENT_EMOJI = {
     'review-pass': '✓',
     'review-revision': '⚠',
@@ -329,16 +447,16 @@ def format_dm(record: dict) -> str:
     # the degraded-fallback path (entry vanished between append and read).
     if record.get('kind') == 'approval_request':
         return record.get('body', '🪔 (approval request — entry not found)')
-    # Alert rendering (existing — D3.5-prep).
-    severity = record.get('severity', 'warning')
-    emoji = '🚨' if severity == 'critical' else '⚠'
+    # Alert rendering. First try the translation layer (stopgap; see
+    # operating-manual.md #68): if (source, subject) matches an entry in
+    # config/alert-translations.json, render the layered form with severity
+    # word + plain-language summary + recommended action + technical-detail
+    # footer. On miss, fall back to the original render shape with a
+    # `[no translation]` footer so silence-on-unmatched is impossible.
     source = record.get('source', '?')
     subject = record.get('subject')
-    header = f'{emoji} {source}'
-    if subject:
-        header += f' [{subject}]'
-    lines = [header, record.get('message', '')]
-    sa = record.get('suggested_action')
-    if sa:
-        lines.append(f'Run: {sa}')
-    return '\n'.join(line for line in lines if line)
+    translation = translate_alert(source, subject) if source != '?' else None
+    if translation is not None:
+        return _render_translated_alert(record, translation)
+    raw = _render_raw_alert_body(record)
+    return f'{raw}\n\n{_NO_TRANSLATION_FOOTER}'
