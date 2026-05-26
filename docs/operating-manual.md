@@ -2640,6 +2640,29 @@ The drift healer (`scripts/heal_credential_registry_drift.py`, 6h cadence) had b
 56. **Supabase CLI 2.x requires BOTH `supabase` AND `supabase-go` in the same directory.** The 2.x install dropped the single-binary release shape that 1.x used. The user-facing `supabase` is a Go shim that exec's `supabase-go` from the same directory; if `supabase-go` is missing, most subcommands fail silently (exit 0, no stderr). When installing on a new host, download both binaries from the same release tag into the same directory and `chmod +x` both. Verify with `ls -la ~/.local/share/supabase/` showing both names before assuming the install succeeded.
 57. **Single-quote `.env` values that may contain shell-special chars; source them with `set -a && source <file> && set +a`, not via `ssh ... 'KEY=val cmd'` inline exports.** Supabase-issued DB passwords frequently contain `$`, `!`, `&`, and quote chars. Without single-quotes on disk, `source /home/larry/credentials/.env.larry` mis-parses the value (everything after the special char becomes shell expansion or a new command). The inline-export ssh pattern (`ssh host 'SUPABASE_DB_PASSWORD=$pw supabase db push'`) is even worse — the local shell expands `$pw` before send, and ssh's arg-splitting drops chars again on the remote side. The reliable idiom is: store as `KEY='value-here'` in `.env.larry`, then `ssh host 'set -a && source /home/larry/credentials/.env.larry && set +a && cmd'`. Apply this pattern to any new credential being added to `.env.larry` — quote on write, source on read.
 
+## AUTO_MERGE serializer (D3.5 5d-prime, 2026-05-26)
+
+On 2026-05-26, PR #112 (PR-B, ingestion daemon) and PR #109 (PR-C, droplet API) both Mirror-passed within minutes of each other. Both appended to `docs/operating-manual.md`. PR #112's auto-merge fired at 13:53Z and failed with `not mergeable: merge commit cannot be cleanly created`; PR #109's auto-merge fired at 13:59Z and failed identically. Larry got two "Merge manually" DMs for what was fundamentally a serializable problem (one PR could have merged cleanly; the other needed to wait, then either merge automatically or be flagged for rebase). He manually merged PR #112 at 14:15Z, then PR #109. This section codifies the upstream catch.
+
+### What changed
+
+D3.5 5d's `_auto_merge_pr` in `scripts/outbox_notifier.py` now runs behind two gates inserted at the REVIEW_PASS handler call site:
+
+- **Gate 1 — serializer queue.** When Mirror PASSes a PR, the notifier fetches its `changed_files` (via `gh pr view --json files`) and compares against every other OPEN PR in the same repo. If any other open PR (lower `createdAt`) touches an overlapping file, the merge is HELD: an entry is written to `~/agents/state/auto-merge-queue.json` with the blocker PR number. The DM Larry receives reads "Auto-merge HELD behind PR #N (file overlap). Will retry automatically when the blocker resolves."
+- **Gate 2 — mergeable check.** When no blocker is found, the notifier asks `gh pr view --json mergeable` BEFORE shelling out to `gh pr merge`. CONFLICTING → skip the merge attempt entirely and DM Larry the canonical rebase command. UNKNOWN (GitHub still computing) → defer one sweep tick; on the second attempt with UNKNOWN, proceed and let git be the authority.
+
+A 5-second sweep added to the notifier's main loop detects when a blocker PR has merged or closed (`gh pr view --json state`) and re-attempts queued entries via a post-merge release pass; it also re-attempts UNKNOWN-deferred entries and fires a one-shot watchdog DM when a queue entry has been waiting more than `auto_merge_queue.watchdog_dm_hours` (default 24h, tunable via `config/agent-models.json`).
+
+The E1.3 healer (`scripts/heal_pr_auto_merge.py`) remains in place as the post-hoc safety net for anything that slips past both gates.
+
+### State file
+
+`~/agents/state/auto-merge-queue.json` is atomically written (temp file + rename). On parse failure, the daemon fails CLOSED: refuses all subsequent auto-merges, DMs Larry once (broadcast critical alert), and requires daemon restart to recover. Safer than fail-open: never merge unverified PRs. Runbook: `runbooks/auto-merge-queue.md` covers inspect, manual-release, and corrupt-file recovery.
+
+### Codified additions worth recalling next session
+
+58. **Pre-merge gates are strictly safer than post-hoc healers when the failure mode is predictable.** D3.5 5d shipped with a post-hoc healer (E1.3 `heal_pr_auto_merge.py`) that scanned for AUTO_MERGE_FAILED log lines and retried. The healer is bounded (MAX_RETRIES_PER_PR=3, 24h-lookback, dry-run by default) and works fine for transient API errors, but it CANNOT fix the overlap-conflict case — by the time the log line exists, the failed merge has already DMed Larry. The 2026-05-26 incident drove this lesson: when the failure mode is "two PRs both touch the same file and git can't auto-resolve," the right place to catch it is BEFORE `gh pr merge`, not after. Pattern for future similar surfaces: if you can detect the failure precondition cheaply (one extra gh API call), gate at the call site; reserve the healer for genuinely-unpredictable failures.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

@@ -237,6 +237,15 @@ _AUTO_MERGE_TIMEOUT_S = 30
 # path, never wedging the daemon.
 _AUTO_MERGE_FN_OVERRIDE: Optional[Any] = None
 
+# D3.5 5d-prime — test-mode bypass for the serializer gates. When True,
+# `_attempt_auto_merge_with_gates` skips both gates and invokes the merge
+# function directly (preserving the D3.5 5d test-fixture contract that
+# existing tests rely on — they exercise the merge-outcome rendering
+# pipeline without mocking the new `gh pr view --json mergeable` /
+# `gh pr list` calls the gates depend on). Production keeps it False;
+# tests that want to exercise the gates explicitly do NOT set it.
+_AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST: bool = False
+
 # D3.5 commit 5d — daemon-lifetime dedup of cost-budget-cap-fired DMs per
 # task_id. First cap-fire for a task queues a closing DM to Larry; later
 # fires for the same task within the same daemon process just log a
@@ -246,6 +255,47 @@ _AUTO_MERGE_FN_OVERRIDE: Optional[Any] = None
 # (avoids DM flooding when multiple dispatch sites refuse in rapid
 # succession on the same task).
 _COST_BUDGET_DMED_TASKS: set[str] = set()
+
+# D3.5 5d-prime — AUTO_MERGE serializer state. The 2026-05-26 incident
+# (PR #112 + PR #109 both appending to docs/operating-manual.md; PR #112's
+# auto-merge fired at 13:53Z and failed with "not mergeable: merge commit
+# cannot be cleanly created") demonstrated that two Mirror-passed PRs with
+# overlapping changed_files can't both auto-merge — the second loses to
+# git, and Larry gets a "Merge manually" DM that's fundamentally a
+# serializable problem. The serializer catches this upstream: when an
+# overlap exists, the second PR's merge is queued behind the first.
+#
+# Queue file is per-process-restart-safe (atomic temp + rename, parsed at
+# every read). Fail-closed on parse error: a corrupt queue refuses all
+# subsequent AUTO_MERGE attempts (safer than fail-open — never merge
+# unverified PRs) and DMs Larry once with the parse error.
+AUTO_MERGE_QUEUE_FILE = AGENTS_ROOT / 'state' / 'auto-merge-queue.json'
+AUTO_MERGE_QUEUE_VERSION = 1
+
+# Fallback when config/agent-models.json doesn't specify
+# auto_merge_queue.watchdog_dm_hours. 24h is Larry's default; raise via
+# config if he's away for a known-long stretch.
+DEFAULT_AUTO_MERGE_WATCHDOG_HOURS = 24
+
+# `gh pr view --json mergeable` returns one of MERGEABLE / CONFLICTING /
+# UNKNOWN (UNKNOWN = GitHub still computing). Map to the gate's tri-state.
+_GH_MERGEABLE_TO_GATE_STATUS = {
+    'MERGEABLE': 'mergeable',
+    'CONFLICTING': 'conflicting',
+    'UNKNOWN': 'unknown',
+}
+
+# Module-level fail-closed sentinel. Flipped True by _load_auto_merge_queue
+# when the on-disk JSON is corrupt; once set, every gate-check refuses
+# AUTO_MERGE until daemon restart (operator clears the file, restarts).
+# The DM to Larry is one-shot per daemon process via this same flag.
+_AUTO_MERGE_QUEUE_FAIL_CLOSED = False
+
+# Daemon-lifetime dedup of watchdog-DMs across queue entries. Distinct from
+# the per-entry `watchdog_dm_sent` flag on disk: this set guards against
+# double-DM within a single sweep iteration (defense-in-depth — the on-disk
+# flag is the authoritative dedup).
+_WATCHDOG_DMED_PRS: set[tuple[str, int]] = set()
 
 
 def _reset_cost_budget_dmed_tasks() -> None:
@@ -308,6 +358,32 @@ def _load_max_replans_from_config() -> int:
     raw = loop_bounds.get('max_replans')
     if not isinstance(raw, int) or raw < 0:
         return approval.DEFAULT_MAX_REPLANS
+    return raw
+
+
+def _load_auto_merge_watchdog_hours_from_config() -> int:
+    """Return `auto_merge_queue.watchdog_dm_hours` from config/agent-models.json.
+
+    D3.5 5d-prime. Same shape as the `loop_bounds` loaders — reads the
+    cached config and falls back to `DEFAULT_AUTO_MERGE_WATCHDOG_HOURS`
+    (=24) when the config file is missing, malformed, or doesn't define
+    the field. Tunable via `auto_merge_queue.watchdog_dm_hours`; raise
+    when Larry's away for a known-long stretch so the queue doesn't spam
+    him during planned absences.
+    """
+    if 'config' not in _LOOP_BOUNDS_CACHE:
+        try:
+            cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+        _LOOP_BOUNDS_CACHE['config'] = cfg
+    cfg = _LOOP_BOUNDS_CACHE['config']
+    block = cfg.get('auto_merge_queue') if isinstance(cfg, dict) else None
+    if not isinstance(block, dict):
+        return DEFAULT_AUTO_MERGE_WATCHDOG_HOURS
+    raw = block.get('watchdog_dm_hours')
+    if not isinstance(raw, int) or raw <= 0:
+        return DEFAULT_AUTO_MERGE_WATCHDOG_HOURS
     return raw
 
 
@@ -705,6 +781,28 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
         'Merge manually: gh pr merge {pr_number} --repo {repo_coords} '
         '--squash --delete-branch'
     ),
+    # D3.5 5d-prime — serializer gate 1 held the merge behind an
+    # overlapping in-flight PR. The retry fires automatically when the
+    # blocker resolves (post-merge release pass OR the 5-min queue sweep
+    # if the blocker was closed externally).
+    'held_for_blocker': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merge HELD behind PR #{blocker_pr_number} (file overlap). '
+        'Will retry automatically when the blocker resolves.'
+    ),
+    # D3.5 5d-prime — serializer gate 2 saw `gh pr view --json mergeable`
+    # = CONFLICTING. We did NOT fire `gh pr merge` (that's guaranteed to
+    # fail); instead surface the canonical rebase command so Larry can
+    # resolve in one shot. The healer (heal_pr_auto_merge.py) won't fire
+    # either because there's no AUTO_MERGE_FAILED log line to scan.
+    'held_conflict': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merge BLOCKED: PR has merge conflicts with main.\n'
+        'Rebase manually: gh pr checkout {pr_number} && git fetch origin '
+        '&& git rebase origin/main && git push --force-with-lease'
+    ),
 }
 
 # Subset of intents that produce a closing DM to the originating chat. Other
@@ -768,6 +866,8 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
         'current_usd': '?',
         'cap_usd': '?',
         'dispatch_label': '?',
+        # D3.5 5d-prime — serializer hold-for-blocker DM field.
+        'blocker_pr_number': '?',
     }
     findings = payload.get('findings')
     if isinstance(findings, list):
@@ -777,7 +877,10 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
     # win over payload defaults.
     merge_result = decision.get('merge_result')
     if isinstance(merge_result, dict):
-        for k in ('merge_outcome', 'merge_reason', 'pr_number', 'repo_coords'):
+        for k in (
+            'merge_outcome', 'merge_reason', 'pr_number', 'repo_coords',
+            'blocker_pr_number',
+        ):
             v = merge_result.get(k)
             if v is not None:
                 fields[k] = v
@@ -2958,6 +3061,764 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     }
 
 
+# ============================================================================
+# D3.5 5d-prime — AUTO_MERGE serializer (overlap-aware merge gating)
+# ============================================================================
+#
+# Two gates inserted BEFORE `_auto_merge_pr`'s shell-out in the review-pass
+# handler:
+#
+#   Gate 1 (serializer queue): If another open PR in the same repo touches
+#   any of the same files, queue this PR's merge behind it. FIFO release
+#   when the blocker resolves (merged OR closed without merge).
+#
+#   Gate 2 (mergeable status): If `gh pr view --json mergeable` returns
+#   CONFLICTING, do NOT fire `gh pr merge` (guaranteed-to-fail); DM Larry
+#   the rebase command. UNKNOWN defers one sweep tick then proceeds (let
+#   git be the authority on the second attempt).
+#
+# Eliminates the 2026-05-26 incident class. The E1.3 healer
+# (heal_pr_auto_merge.py) remains in place as the post-hoc safety net.
+
+
+def _reset_auto_merge_queue_state() -> None:
+    """Test helper — wipe the in-process serializer state between cases."""
+    global _AUTO_MERGE_QUEUE_FAIL_CLOSED
+    _AUTO_MERGE_QUEUE_FAIL_CLOSED = False
+    _WATCHDOG_DMED_PRS.clear()
+
+
+def _atomic_write_json(path: Path, payload: Any) -> None:
+    """Write JSON to `path` atomically (temp file in same dir + rename).
+
+    Same-directory tempfile guarantees the rename is atomic on POSIX
+    filesystems. Caller ensures parent dir exists.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    tmp.replace(path)
+
+
+def _load_auto_merge_queue() -> list[dict[str, Any]]:
+    """Read the serializer queue. Returns [] on missing file (cold start).
+
+    Fail-closed on parse error: sets module-level
+    `_AUTO_MERGE_QUEUE_FAIL_CLOSED = True`, DMs Larry once (broadcast
+    `kind: alert` via larry_alerts.append_alert with severity='critical'
+    so it reaches every authorized chat; the queue is daemon-state and
+    Larry-direct review-pass DMs aren't reliable when the queue is
+    corrupt). Once tripped, every subsequent AUTO_MERGE attempt refuses
+    until daemon restart (operator fixes the file).
+    """
+    global _AUTO_MERGE_QUEUE_FAIL_CLOSED
+    if _AUTO_MERGE_QUEUE_FAIL_CLOSED:
+        return []
+    if not AUTO_MERGE_QUEUE_FILE.exists():
+        return []
+    try:
+        raw = AUTO_MERGE_QUEUE_FILE.read_text(encoding='utf-8')
+        data = json.loads(raw)
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        _AUTO_MERGE_QUEUE_FAIL_CLOSED = True
+        log(
+            f'AUTO_MERGE_QUEUE_CORRUPT at {AUTO_MERGE_QUEUE_FILE}: '
+            f'{type(e).__name__}: {e}; refusing all subsequent '
+            f'AUTO_MERGE attempts until daemon restart',
+            'ERROR',
+        )
+        try:
+            larry_alerts.append_alert(
+                source='outbox-notifier',
+                severity='critical',
+                message=(
+                    f'AUTO_MERGE queue file is corrupt at '
+                    f'{AUTO_MERGE_QUEUE_FILE}: {type(e).__name__}: {e}. '
+                    f'All subsequent auto-merges are HELD until you '
+                    f'inspect/repair the file and restart the notifier. '
+                    f'Recovery: see runbooks/auto-merge-queue.md.'
+                ),
+                subject='auto-merge-queue-corrupt',
+                suggested_action=(
+                    f'cat {AUTO_MERGE_QUEUE_FILE} ; '
+                    f'mv {AUTO_MERGE_QUEUE_FILE} {AUTO_MERGE_QUEUE_FILE}.broken'
+                ),
+            )
+        except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+            pass
+        return []
+    if not isinstance(data, dict):
+        # Treat structural surprises the same as a parse error — fail closed.
+        _AUTO_MERGE_QUEUE_FAIL_CLOSED = True
+        log(
+            f'AUTO_MERGE_QUEUE_MALFORMED at {AUTO_MERGE_QUEUE_FILE}: '
+            f'top-level is {type(data).__name__}, expected object',
+            'ERROR',
+        )
+        return []
+    queue = data.get('queue')
+    if not isinstance(queue, list):
+        return []
+    return [entry for entry in queue if isinstance(entry, dict)]
+
+
+def _save_auto_merge_queue(entries: list[dict[str, Any]]) -> None:
+    """Atomically persist the queue. Caller passes the full list."""
+    payload = {
+        'version': AUTO_MERGE_QUEUE_VERSION,
+        'queue': entries,
+    }
+    _atomic_write_json(AUTO_MERGE_QUEUE_FILE, payload)
+
+
+def _queue_push(entry: dict[str, Any]) -> None:
+    """Append `entry` to the queue (FIFO). Caller fills required fields."""
+    entries = _load_auto_merge_queue()
+    entries.append(entry)
+    _save_auto_merge_queue(entries)
+
+
+def _queue_remove_pr(pr_number: int, repo_coords: str) -> Optional[dict[str, Any]]:
+    """Remove the queue entry matching (pr_number, repo). Returns the
+    removed entry or None if not present.
+    """
+    entries = _load_auto_merge_queue()
+    kept = []
+    removed = None
+    for e in entries:
+        if (
+            removed is None
+            and e.get('pr_number') == pr_number
+            and e.get('repo') == repo_coords
+        ):
+            removed = e
+            continue
+        kept.append(e)
+    if removed is not None:
+        _save_auto_merge_queue(kept)
+    return removed
+
+
+def _queue_update_entry(pr_number: int, repo_coords: str, updates: dict[str, Any]) -> None:
+    """In-place merge `updates` onto the matching queue entry. No-op if
+    the entry is absent (caller may have already removed it).
+    """
+    entries = _load_auto_merge_queue()
+    changed = False
+    for e in entries:
+        if e.get('pr_number') == pr_number and e.get('repo') == repo_coords:
+            e.update(updates)
+            changed = True
+            break
+    if changed:
+        _save_auto_merge_queue(entries)
+
+
+def _gh_pr_changed_files(repo_coords: str, pr_number: int) -> Optional[list[str]]:
+    """Fetch the file paths the PR changed via `gh pr view --json files`.
+
+    Returns the path list on success, None on any error (gh missing,
+    timeout, non-zero exit, parse fail). Callers treat None as
+    "couldn't determine overlap — fail safe by NOT holding" since the
+    spec's failure mode here is "miss an overlap" (the healer is the
+    safety net), not "block forever on a gh outage".
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords, '--json', 'files'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json files failed: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json files exit='
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    files = data.get('files')
+    if not isinstance(files, list):
+        return None
+    out = []
+    for f in files:
+        if isinstance(f, dict):
+            path = f.get('path')
+            if isinstance(path, str):
+                out.append(path)
+    return out
+
+
+def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
+    """Return 'mergeable' / 'conflicting' / 'unknown'.
+
+    Wraps `gh pr view --json mergeable,mergeStateStatus`. Maps GitHub's
+    `mergeable` field (MERGEABLE / CONFLICTING / UNKNOWN). Returns
+    'unknown' on timeout / parse error / unrecognized value — callers
+    treat 'unknown' with defer-then-proceed semantics so transient API
+    quirks don't stall the queue forever.
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords,
+             '--json', 'mergeable,mergeStateStatus'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json mergeable '
+            f'failed: {type(e).__name__}: {e}; treating as unknown',
+            'WARN',
+        )
+        return 'unknown'
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json mergeable exit='
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}; '
+            f'treating as unknown',
+            'WARN',
+        )
+        return 'unknown'
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return 'unknown'
+    raw = data.get('mergeable')
+    if not isinstance(raw, str):
+        return 'unknown'
+    return _GH_MERGEABLE_TO_GATE_STATUS.get(raw.upper(), 'unknown')
+
+
+def _gh_open_prs_for_repo(repo_coords: str) -> list[dict[str, Any]]:
+    """Return open PRs for `repo_coords` with number/createdAt/headRefName.
+
+    Empty list on error. Used by `_find_overlap_blocker` to catch PRs
+    that have already opened but haven't reached Mirror PASS yet — those
+    can still merge before this one and create overlap conflicts.
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'list', '--repo', repo_coords, '--state', 'open',
+             '--json', 'number,createdAt,headRefName'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr list {repo_coords} --state open failed: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return []
+    if proc.returncode != 0:
+        log(
+            f'gh pr list {repo_coords} --state open exit={proc.returncode}: '
+            f'{(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return []
+    try:
+        data = json.loads(proc.stdout or '[]')
+    except (ValueError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def _gh_pr_is_open(repo_coords: str, pr_number: int) -> Optional[bool]:
+    """True/False for OPEN-ness, or None on any error (treat as unknown,
+    leave queue entry in place; sweep will retry next tick).
+
+    Wraps `_gh_pr_state` (already exists for the auto-merge resume-safety
+    recheck). 'OPEN' → True; 'MERGED'/'CLOSED' → False; anything else → None.
+    """
+    state = _gh_pr_state(repo_coords, pr_number)
+    if state == 'OPEN':
+        return True
+    if state in ('MERGED', 'CLOSED'):
+        return False
+    return None
+
+
+def _find_overlap_blocker(
+    self_pr_number: int,
+    repo_coords: str,
+    changed_files: list[str],
+) -> Optional[int]:
+    """Return the PR number that should block `self_pr_number`'s merge,
+    or None if no overlap is in flight.
+
+    Scans live open PRs via `gh pr list` and returns the
+    LOWEST-createdAt PR whose changed_files intersect ours. Queued PRs
+    are intentionally NOT considered as blockers — they're already
+    waiting for THEIR blocker to resolve, so they cannot precede us in
+    the merge order. Including them would create a cycle (PR-A and PR-B
+    blocking each other) when A's gates run after B was queued behind A.
+
+    Cross-repo isolation: a PR in repo A never blocks a PR in repo B —
+    `repo` field comparison is strict.
+
+    Empty/None changed_files means we can't detect overlap; return None
+    to let the merge fire (the E1.3 healer is the post-hoc safety net).
+
+    File changed_files lookup: prefers the queue entry's cached list
+    (avoids redundant `gh pr view` calls on retries), falls back to
+    `gh pr view --json files` for PRs we haven't seen yet.
+    """
+    if not changed_files:
+        return None
+    self_files = set(changed_files)
+
+    queue_entries = _load_auto_merge_queue()
+    queued_prs = {
+        e.get('pr_number') for e in queue_entries
+        if e.get('repo') == repo_coords
+    }
+    queued_files_cache: dict[int, list[str]] = {
+        e['pr_number']: list(e.get('changed_files') or [])
+        for e in queue_entries
+        if e.get('repo') == repo_coords and isinstance(e.get('pr_number'), int)
+    }
+
+    candidates: list[tuple[str, int]] = []  # (createdAt, pr_number)
+    for pr_info in _gh_open_prs_for_repo(repo_coords):
+        pr = pr_info.get('number')
+        if not isinstance(pr, int) or pr == self_pr_number:
+            continue
+        if pr in queued_prs:
+            # Already waiting — won't merge ahead of us. Skip to avoid
+            # the A↔B cycle when A's gates run after B was queued.
+            continue
+        files = queued_files_cache.get(pr)
+        if files is None:
+            files = _gh_pr_changed_files(repo_coords, pr)
+        if not files:
+            continue
+        if self_files & set(files):
+            candidates.append((str(pr_info.get('createdAt') or ''), pr))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (x[0], x[1]))
+    return candidates[0][1]
+
+
+def _dm_larry_rebase_needed(
+    pr_url: str,
+    pr_number: int,
+    repo_coords: str,
+    task_id: str,
+    chat_id: Optional[int],
+) -> None:
+    """Queue the merge_conflict_manual_rebase DM. Uses append_notification
+    when we have a reply_chat_id (closes the chain in the originating
+    thread), append_alert as a fallback broadcast.
+    """
+    rebase_cmd = (
+        f'gh pr checkout {pr_number} --repo {repo_coords} && '
+        f'git fetch origin && git rebase origin/main && '
+        f'git push --force-with-lease'
+    )
+    body = (
+        f'AUTO_MERGE BLOCKED on {pr_url} (task `{task_id}`): PR has merge '
+        f'conflicts with main.\nRebase manually: {rebase_cmd}'
+    )
+    if isinstance(chat_id, int):
+        try:
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='merge_conflict_manual_rebase',
+                message=body,
+                chat_id=chat_id,
+                task_id=task_id,
+            )
+            return
+        except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+            pass
+    # No targeted chat available (queued-retry path from the sweep often
+    # has no envelope context) — broadcast via append_alert.
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=body,
+            subject=f'auto-merge-conflict:{repo_coords}:{pr_number}',
+        )
+    except Exception:  # noqa: BLE001 — daemon-never-wedge
+        pass
+
+
+def _dm_larry_queue_stale(entry: dict[str, Any]) -> None:
+    """Watchdog DM: queue entry older than watchdog_dm_hours. One-shot
+    per entry (gated on the on-disk `watchdog_dm_sent` flag).
+    """
+    pr_number = entry.get('pr_number')
+    blocker = entry.get('blocker_pr_number')
+    pr_url = entry.get('pr_url') or '?'
+    task_id = entry.get('task_id') or '?'
+    queued_at = entry.get('queued_at') or '?'
+    chat_id = entry.get('reply_chat_id')
+    hours = _load_auto_merge_watchdog_hours_from_config()
+    body = (
+        f'AUTO_MERGE queue entry stale: PR {pr_url} (task `{task_id}`) has '
+        f'been HELD behind PR #{blocker} since {queued_at} '
+        f'(>{hours}h). Manual review needed — either merge PR #{blocker} '
+        f'or close the queued PR.'
+    )
+    if isinstance(chat_id, int):
+        try:
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='auto_merge_queue_stale',
+                message=body,
+                chat_id=chat_id,
+                task_id=task_id,
+            )
+            return
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=body,
+            subject=f'auto-merge-queue-stale:{entry.get("repo")}:{pr_number}',
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _attempt_auto_merge_with_gates(
+    pr_url: str,
+    repo_coords: str,
+    pr_number: int,
+    task_id: str,
+    summary: str,
+    chat_id: Optional[int],
+    changed_files: Optional[list[str]],
+    *,
+    second_attempt_on_unknown: bool = False,
+) -> dict[str, Any]:
+    """Run both serializer gates then (if both pass) fire `_auto_merge_pr`.
+
+    Returns a merge_result dict with one of these outcome values:
+      - 'merged' / 'already_merged' / 'failed'  (from _auto_merge_pr)
+      - 'held_for_blocker'  (gate 1 hit, entry pushed to queue)
+      - 'held_conflict'     (gate 2 hit, DM fired, NOT queued)
+      - 'deferred_unknown'  (gate 2 = UNKNOWN, first attempt; queued for retry)
+      - 'held_fail_closed'  (queue file corrupt; never call _auto_merge_pr)
+
+    `second_attempt_on_unknown=True` makes UNKNOWN proceed to the merge
+    shell-out (per spec: "let git be the authority on the second attempt").
+    """
+    # Test-bypass: existing D3.5 5d tests assert merge-outcome rendering
+    # via _AUTO_MERGE_FN_OVERRIDE without mocking the gate's gh calls.
+    # When the bypass is set, fire the merge directly (preserve old
+    # contract). The bypass is OFF in production and OFF in serializer
+    # tests (which mock subprocess.run end-to-end).
+    if _AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST:
+        merge_fn = _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr
+        try:
+            return merge_fn(pr_url, task_id)
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            return {
+                'merge_outcome': 'failed',
+                'merge_reason': f'override raised: {type(e).__name__}: {e}',
+                'pr_number': pr_number,
+                'repo_coords': repo_coords,
+            }
+
+    # Fail-closed gate (highest priority — never merge when queue is corrupt).
+    if _AUTO_MERGE_QUEUE_FAIL_CLOSED:
+        log(
+            f'AUTO_MERGE_HELD_FAIL_CLOSED task={task_id} pr={pr_url} '
+            f'(queue corrupt; refusing all auto-merges until daemon restart)',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_fail_closed',
+            'merge_reason': 'auto-merge queue file corrupt; daemon restart required',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    # Resolve changed_files (caller may have it from the envelope; else fetch).
+    if not changed_files:
+        changed_files = _gh_pr_changed_files(repo_coords, pr_number) or []
+
+    # Gate 1 — serializer queue.
+    blocker = _find_overlap_blocker(pr_number, repo_coords, changed_files)
+    if blocker is not None:
+        # Push (or update) the queue entry. Idempotent on (pr_number, repo).
+        existing = _queue_remove_pr(pr_number, repo_coords)
+        entry = {
+            'pr_number': pr_number,
+            'task_id': task_id,
+            'repo': repo_coords,
+            'pr_url': pr_url,
+            'changed_files': changed_files,
+            'queued_at': (existing or {}).get(
+                'queued_at',
+                datetime.now(timezone.utc).isoformat(),
+            ),
+            'blocker_pr_number': blocker,
+            'watchdog_dm_sent': (existing or {}).get('watchdog_dm_sent', False),
+            'unknown_attempts': (existing or {}).get('unknown_attempts', 0),
+            'reply_chat_id': chat_id,
+            'summary': summary,
+        }
+        _queue_push(entry)
+        log(
+            f'AUTO_MERGE_HELD task={task_id} pr={pr_url} '
+            f'blocker=#{blocker} (overlap on {sorted(set(changed_files))[:5]}'
+            f'{"..." if len(changed_files) > 5 else ""})',
+        )
+        return {
+            'merge_outcome': 'held_for_blocker',
+            'merge_reason': f'queued behind PR #{blocker}',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+            'blocker_pr_number': blocker,
+        }
+
+    # Gate 2 — mergeable status.
+    status = _gh_pr_mergeable_status(repo_coords, pr_number)
+    if status == 'conflicting':
+        _queue_remove_pr(pr_number, repo_coords)  # clear if it was queued
+        _dm_larry_rebase_needed(pr_url, pr_number, repo_coords, task_id, chat_id)
+        log(
+            f'AUTO_MERGE_SKIPPED_CONFLICTING task={task_id} pr={pr_url} '
+            f'(mergeable=CONFLICTING; DMed Larry rebase command)',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_conflict',
+            'merge_reason': 'mergeable=CONFLICTING; manual rebase required',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    if status == 'unknown' and not second_attempt_on_unknown:
+        # First UNKNOWN — queue with no blocker, increment attempts counter.
+        existing = _queue_remove_pr(pr_number, repo_coords)
+        entry = {
+            'pr_number': pr_number,
+            'task_id': task_id,
+            'repo': repo_coords,
+            'pr_url': pr_url,
+            'changed_files': changed_files,
+            'queued_at': (existing or {}).get(
+                'queued_at',
+                datetime.now(timezone.utc).isoformat(),
+            ),
+            # blocker_pr_number=None signals "deferred for UNKNOWN" to the
+            # sweep; on next sweep, this entry retries with
+            # second_attempt_on_unknown=True.
+            'blocker_pr_number': None,
+            'watchdog_dm_sent': (existing or {}).get('watchdog_dm_sent', False),
+            'unknown_attempts': (existing or {}).get('unknown_attempts', 0) + 1,
+            'reply_chat_id': chat_id,
+            'summary': summary,
+        }
+        _queue_push(entry)
+        log(
+            f'AUTO_MERGE_DEFERRED_UNKNOWN task={task_id} pr={pr_url} '
+            f'(mergeable=UNKNOWN; retry on next sweep)',
+        )
+        return {
+            'merge_outcome': 'deferred_unknown',
+            'merge_reason': 'mergeable=UNKNOWN; deferred one tick',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    # Both gates pass (or second UNKNOWN attempt) — fire the merge.
+    _queue_remove_pr(pr_number, repo_coords)  # clear queue if retrying
+    merge_fn = _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr
+    try:
+        result = merge_fn(pr_url, task_id)
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'AUTO_MERGE override raised on task {task_id}: '
+            f'{type(e).__name__}: {e}; synthesizing failed outcome',
+            'WARN',
+        )
+        result = {
+            'merge_outcome': 'failed',
+            'merge_reason': f'override raised: {type(e).__name__}: {e}',
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    # Post-merge release: if this PR merged successfully, re-attempt every
+    # queue entry that was blocked behind it.
+    if result.get('merge_outcome') in ('merged', 'already_merged'):
+        _queue_release(pr_number, repo_coords)
+    return result
+
+
+def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
+    """Re-attempt queue entries blocked behind `merged_pr_number`.
+
+    Called immediately after a successful `_auto_merge_pr` (post-merge
+    release pass) AND from the periodic sweep (catches external closes /
+    manual merges). Each released entry re-runs both gates from scratch
+    — if gate 2 fires on the retry, Larry sees the rebase DM.
+
+    Entries are released one at a time in FIFO order. If a released
+    entry hits gate 1 again (chained blocker A < B < C scenario), the
+    re-queue is idempotent; the next release pass handles it.
+    """
+    entries = _load_auto_merge_queue()
+    released_entries = [
+        e for e in entries
+        if e.get('blocker_pr_number') == merged_pr_number
+        and e.get('repo') == repo_coords
+    ]
+    if not released_entries:
+        return
+    log(
+        f'AUTO_MERGE_QUEUE_RELEASE blocker=#{merged_pr_number} '
+        f'releasing {len(released_entries)} entr'
+        f'{"y" if len(released_entries) == 1 else "ies"}',
+    )
+    for entry in released_entries:
+        pr_number = entry.get('pr_number')
+        repo = entry.get('repo')
+        if not isinstance(pr_number, int) or not isinstance(repo, str):
+            continue
+        # Remove first so the gate re-check sees a clean queue.
+        _queue_remove_pr(pr_number, repo)
+        result = _attempt_auto_merge_with_gates(
+            pr_url=entry.get('pr_url') or '',
+            repo_coords=repo,
+            pr_number=pr_number,
+            task_id=entry.get('task_id') or 'unknown',
+            summary=entry.get('summary') or '',
+            chat_id=entry.get('reply_chat_id'),
+            changed_files=entry.get('changed_files') or [],
+            second_attempt_on_unknown=False,
+        )
+        outcome = result.get('merge_outcome')
+        log(
+            f'AUTO_MERGE_QUEUE_RELEASED pr={entry.get("pr_url")} '
+            f'task={entry.get("task_id")} outcome={outcome}',
+        )
+
+
+def _auto_merge_queue_sweep() -> None:
+    """Periodic sweep: handle UNKNOWN-defer retries, blocker-resolution
+    detection, and watchdog DMs.
+
+    Cheap when queue is empty (one stat call). When the queue has
+    entries, makes O(N) `gh pr view` calls for blocker-state and
+    UNKNOWN-retry mergeable checks. Called from the notifier main loop
+    after the outbox + dead-letter scans.
+
+    Three classes of action per entry:
+      1. entry.blocker_pr_number is None AND unknown_attempts >= 1 →
+         retry merge with second_attempt_on_unknown=True (one defer,
+         then proceed per spec).
+      2. entry.blocker_pr_number is set → check `gh pr view` state for
+         that PR; if MERGED/CLOSED, re-attempt via _queue_release.
+      3. entry.queued_at older than watchdog_dm_hours AND not yet
+         DMed → DM Larry once, set watchdog_dm_sent=True.
+
+    Fail-closed entries skip all retries (queue corrupt; nothing to do
+    until restart).
+    """
+    if _AUTO_MERGE_QUEUE_FAIL_CLOSED:
+        return
+    entries = _load_auto_merge_queue()
+    if not entries:
+        return
+    now = datetime.now(timezone.utc)
+    watchdog_hours = _load_auto_merge_watchdog_hours_from_config()
+    watchdog_threshold_sec = watchdog_hours * 3600
+
+    # Pass 1: UNKNOWN-defer retries.
+    for entry in list(entries):
+        if (
+            entry.get('blocker_pr_number') is None
+            and (entry.get('unknown_attempts') or 0) >= 1
+        ):
+            pr_number = entry.get('pr_number')
+            repo = entry.get('repo')
+            if not isinstance(pr_number, int) or not isinstance(repo, str):
+                continue
+            _queue_remove_pr(pr_number, repo)
+            result = _attempt_auto_merge_with_gates(
+                pr_url=entry.get('pr_url') or '',
+                repo_coords=repo,
+                pr_number=pr_number,
+                task_id=entry.get('task_id') or 'unknown',
+                summary=entry.get('summary') or '',
+                chat_id=entry.get('reply_chat_id'),
+                changed_files=entry.get('changed_files') or [],
+                second_attempt_on_unknown=True,
+            )
+            log(
+                f'AUTO_MERGE_QUEUE_UNKNOWN_RETRY pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} '
+                f'outcome={result.get("merge_outcome")}',
+            )
+
+    # Pass 2 + 3 re-read because Pass 1 mutated the queue.
+    entries = _load_auto_merge_queue()
+    for entry in list(entries):
+        blocker = entry.get('blocker_pr_number')
+        repo = entry.get('repo')
+        if not isinstance(blocker, int) or not isinstance(repo, str):
+            continue
+        is_open = _gh_pr_is_open(repo, blocker)
+        if is_open is False:
+            # Blocker resolved (merged or closed) — release this entry.
+            _queue_release(blocker, repo)
+            # Don't break; other entries may share this blocker.
+
+    # Pass 3: watchdog DMs (re-read again — releases above may have
+    # cleared entries).
+    entries = _load_auto_merge_queue()
+    changed = False
+    for entry in entries:
+        if entry.get('watchdog_dm_sent'):
+            continue
+        queued_at = entry.get('queued_at')
+        if not isinstance(queued_at, str):
+            continue
+        try:
+            queued_dt = datetime.fromisoformat(queued_at.replace('Z', '+00:00'))
+        except ValueError:
+            continue
+        if queued_dt.tzinfo is None:
+            queued_dt = queued_dt.replace(tzinfo=timezone.utc)
+        age = (now - queued_dt).total_seconds()
+        if age < watchdog_threshold_sec:
+            continue
+        dedup_key = (entry.get('repo') or '', entry.get('pr_number') or 0)
+        if dedup_key in _WATCHDOG_DMED_PRS:
+            continue
+        _WATCHDOG_DMED_PRS.add(dedup_key)
+        _dm_larry_queue_stale(entry)
+        entry['watchdog_dm_sent'] = True
+        changed = True
+    if changed:
+        _save_auto_merge_queue(entries)
+
+
 def _trip_emergency_halt(
     data: dict[str, Any],
     payload: dict[str, Any],
@@ -4361,29 +5222,61 @@ def process_outbox(outbox_file: Path) -> str:
             payload = marker_decision.get('payload') or {}
             pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
             if pr_url:
-                # Test-mode override: when tests set
-                # _AUTO_MERGE_FN_OVERRIDE, route through that instead of
-                # shelling out to the real `gh pr merge`. Defensive: any
-                # exception in the override falls through to a synthetic
-                # `failed` outcome so the daemon never wedges.
-                merge_fn = _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr
-                try:
-                    merge_result = merge_fn(
-                        pr_url, data.get('task_id') or 'unknown',
-                    )
-                except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+                # D3.5 5d-prime — route through the serializer gates
+                # before any `gh pr merge` shell-out. Two gates:
+                #   1) FIFO queue: if another open PR in the same repo
+                #      touches overlapping files, hold this merge behind
+                #      it (auto-release when the blocker resolves).
+                #   2) Mergeable check: skip-with-rebase-DM on
+                #      CONFLICTING; defer-one-tick on UNKNOWN.
+                # When both gates pass, the gate helper itself fires the
+                # merge (via _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr)
+                # and runs the post-merge release pass.
+                parsed = _parse_pr_url(pr_url)
+                if parsed is None:
                     log(
-                        f'AUTO_MERGE override raised on task '
-                        f'{data.get("task_id", "?")}: {type(e).__name__}: {e}; '
-                        f'rendering failed outcome',
+                        f'AUTO_MERGE task={data.get("task_id", "?")} '
+                        f'pr={pr_url!r} outcome=failed reason=malformed-pr-url '
+                        f'(no serializer gate attempted)',
                         'WARN',
                     )
                     merge_result = {
                         'merge_outcome': 'failed',
-                        'merge_reason': f'override raised: {type(e).__name__}: {e}',
+                        'merge_reason': f'malformed PR URL: {pr_url!r}',
                         'pr_number': '?',
                         'repo_coords': '?',
                     }
+                else:
+                    repo_coords, pr_number = parsed
+                    envelope_changed_files = data.get('changed_files')
+                    if not isinstance(envelope_changed_files, list):
+                        envelope_changed_files = None
+                    try:
+                        merge_result = _attempt_auto_merge_with_gates(
+                            pr_url=pr_url,
+                            repo_coords=repo_coords,
+                            pr_number=pr_number,
+                            task_id=data.get('task_id') or 'unknown',
+                            summary=(payload.get('summary') if isinstance(payload, dict) else '') or '',
+                            chat_id=data.get('reply_chat_id'),
+                            changed_files=envelope_changed_files,
+                        )
+                    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+                        log(
+                            f'AUTO_MERGE serializer raised on task '
+                            f'{data.get("task_id", "?")}: '
+                            f'{type(e).__name__}: {e}; rendering failed '
+                            f'outcome',
+                            'WARN',
+                        )
+                        merge_result = {
+                            'merge_outcome': 'failed',
+                            'merge_reason': (
+                                f'serializer raised: {type(e).__name__}: {e}'
+                            ),
+                            'pr_number': pr_number,
+                            'repo_coords': repo_coords,
+                        }
                 marker_decision['merge_result'] = merge_result
                 marker_decision['merge_outcome'] = merge_result['merge_outcome']
             else:
@@ -4778,6 +5671,20 @@ def main_loop() -> int:
             scan_dead_letters()
         except Exception as e:
             log(f'dead-letter scan error: {type(e).__name__}: {e}', 'ERROR')
+
+        # D3.5 5d-prime — AUTO_MERGE queue sweep. Cheap when queue empty
+        # (one Path.exists() call). When entries are present, makes O(N)
+        # `gh pr view` calls per poll to detect blocker resolution +
+        # retry UNKNOWN-deferred entries + watchdog-DM stale entries.
+        # Daemon-never-wedge: any exception in the sweep is logged and
+        # the loop continues.
+        try:
+            _auto_merge_queue_sweep()
+        except Exception as e:  # noqa: BLE001
+            log(
+                f'auto-merge queue sweep error: {type(e).__name__}: {e}',
+                'ERROR',
+            )
 
         # Sleep in short slices so SIGTERM is responsive.
         slept = 0.0
