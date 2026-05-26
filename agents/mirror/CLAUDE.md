@@ -91,11 +91,19 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
 === END_REVIEW_EMERGENCY_HALT ===
 ```
 
-### How to emit a marker safely (Phase E1.1 — required for REVIEW_PASS)
+### How to emit a marker safely (Phase E1.1 — required for ALL Mirror verdicts)
 
-**ALWAYS use the `marker.py` CLI for REVIEW_PASS.** Hand-typing the delimiters is the most common silent failure in the whole chain. Use the CLI — no exceptions, no matter how short the diff feels.
+**EVERY review marker MUST be emitted via:**
 
-**Why this is non-negotiable:** Hand-typed `REVIEW_PASS` markers caused PR #16 to sit unmerged for 7+ hours, and the same first-pass marker-error pattern recurred on PRs #63, #64, #65, #66, #68, and #70 — every single short-diff PR in the 2026-05-20/21 ship cycle. The slip is always the same: a small payload feels too trivial to bother piping through Bash, so you type `REVIEW_PASS` bare (or with one set of delimiters and a `;` typo, or with prose between them), the parser bails, the notifier dead-letters, retry attempts burn ~$0.30 each, and the PR sits until second-pass recovery. The CLI produces canonical output that's guaranteed parseable. Short PRs are NOT an exception — they're where the slip happens.
+```
+python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>
+```
+
+**and the stdout PASTED VERBATIM into your response. No exceptions.** Do NOT type marker blocks by hand. Do NOT invent wrapper shapes like `REVIEW_RESULT`. Do NOT inline JSON with `REVIEW_PASS:` prefix. The outbox-notifier parser recognizes only the canonical shape produced by `marker.py`; non-canonical markers are silently dropped from the chain and your review will require manual recovery.
+
+This applies to all four verdicts: `review_pass`, `review_revision`, `review_escalate`, `review_emergency_halt`. No "the payload is too simple to bother with the CLI" exception. No "this is a structured finding that's awkward in a heredoc" exception. The CLI accepts heredoc stdin (`<<'JSON' ... JSON`) for structured payloads; if the JSON gets unwieldy, build it in a file and `cat file | marker.py render mirror <verdict>`. The output is the canonical block — paste it verbatim, narrative ABOVE.
+
+**Why this is non-negotiable:** Hand-typed `REVIEW_PASS` markers caused PR #16 to sit unmerged for 7+ hours, and the same first-pass marker-error pattern recurred on PRs #63, #64, #65, #66, #68, and #70 — every single short-diff PR in the 2026-05-20/21 ship cycle. Then 2026-05-25 added a *new* failure mode: Mirror reviews on PR #101 + PR #104 r1/r2/r3 emitted **non-canonical wrapper/inline shapes** (`=== REVIEW_RESULT === {verdict: ...}` and inline ``` REVIEW_PASS:\n```json\n{...}\n``` ```) that the outbox-notifier's strict parser silently dropped — 3 of 4 reviews on PR #104 required manual session-JSONL forensics + manual PR merge. The slip is always the same: a small payload feels too trivial to bother piping through Bash, or a wrapper shape feels more readable, so you skip the CLI, the parser bails, the notifier dead-letters or silently drops, and the PR sits until manual recovery. The CLI produces canonical output that's guaranteed parseable. Short PRs and "obvious" verdicts are NOT exceptions — they're exactly where the slip happens.
 
 Construct your payload dict, pipe it to `marker.py render mirror <type>`, and paste the EXACT stdout into your response. Bash is in your allowlist:
 
@@ -122,7 +130,7 @@ Subcommands:
 - `python3 ~/agent-core/scripts/marker.py types mirror` — list all four review markers + required fields. Run if you're unsure.
 - `python3 ~/agent-core/scripts/marker.py validate mirror <type>` — pre-check a payload before rendering. Exits 0 if valid, 1 with a diagnostic if not.
 
-Hand-typing is allowed ONLY for `REVIEW_REVISION`, `REVIEW_ESCALATE`, and `REVIEW_EMERGENCY_HALT` when the structured payload genuinely makes a heredoc awkward — and even then, the CLI's `validate` subcommand is strongly preferred over eyeballing the JSON. `REVIEW_PASS` is CLI-only. If you find yourself reaching for a hand-typed `REVIEW_PASS` because "it's just a one-line diff," that's exactly the pattern that has dead-lettered seven PRs in a row. Use the CLI.
+Hand-typing is forbidden for ALL four verdicts (per the non-negotiable mandate above). If a structured payload feels awkward in a heredoc, build the JSON in a scratch file and pipe it through `cat scratch.json | python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>`. If you find yourself reaching for a hand-typed marker because "it's just a one-line diff" or "the wrapper shape looks cleaner," that's exactly the pattern that has dead-lettered seven PRs in a row AND silently dropped 3 reviews on PR #104. Use the CLI.
 
 ### Marker discipline (strict — mirrors Forge's preflight grammar)
 

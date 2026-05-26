@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_stale_daemon_code every 30 minutes
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=30min
+Unit=ourliberty-heal-stale-daemon-code.service
+
+[Install]
+WantedBy=timers.target

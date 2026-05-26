@@ -2375,6 +2375,67 @@ $1.62 burned on the hung Mirror session; PR #101 manually merged via `f4dee2b` a
 39. **Marker classification is always-scan-latest-wins across all assistant turns** (chain-discipline-marker-parser-and-regression-check-001, 2026-05-25). The outbox `result` field is only the final `claude -p` turn; the session JSONL is the authoritative source. Mirror and Forge classifiers both use the session-log scan as the primary path now, with `result_text` as a fallback for when the log is unavailable. Earlier `parse_*_marker` returning None on a final-turn text no longer suppresses a valid earlier marker.
 40. **`pgrep -f <pat>` self-matches its caller's argv.** The bash command line that runs `pgrep -f foo` contains the literal string `foo`, so `pgrep` returns the caller's own PID, `kill -0` succeeds forever, and any "wait until the child exits" poll loop hangs. Workaround when you genuinely need to poll a sibling process: `pgrep -f '[f]oo'` — the brackets are a one-char character class; the literal pattern in the caller's argv contains the brackets and won't match the bracketless regex. Default: don't poll; run subprocesses in the foreground.
 
+## Phase E4 followup — chain-discipline-v2: Mirror marker-shape discipline + stale-daemon-code healer (2026-05-25)
+
+Closes two failure modes that recurred across the 2026-05-25 incident sequence (PR #101, PR #103 stale-code-until-manual-restart, PR #104 r0/r1/r2/r3 reviews). Both refer to repo `Larry-Yatch/ourliberty-agent-core`.
+
+### Symptom 1 — Mirror emitted non-canonical marker shapes
+
+Mirror reviews on PR #101 + PR #104 r1, r2, r3 emitted **non-canonical wrapper / inline-prefix** marker shapes that the outbox-notifier's strict parser silently dropped:
+
+- **Wrapper shape (PR #101 + PR #104 r1+r2):**
+  ```
+  === REVIEW_RESULT ===
+  {"verdict": "...", ...}
+  === END_REVIEW_RESULT ===
+  ```
+- **Inline-prefix shape (PR #104 r3):** a literal `REVIEW_PASS:` line followed by a fenced ` ```json ... ``` ` block (no `=== ... ===` delimiters at all).
+
+Outbox-notifier post-PR-#103 recognizes only the canonical `=== REVIEW_PASS === / === END_REVIEW_PASS ===` shape produced by `scripts/marker.py`. Non-canonical shapes silently dropped — 3 of 4 Mirror reviews on PR #104 required manual session-JSONL forensics + manual PR merge.
+
+### Symptom 2 — PR #103's marker-parser fix landed but ran stale
+
+PR #103 (`chain-discipline-marker-parser-and-regression-check-001`) merged at 19:16:56Z 2026-05-25. The fix updated `scripts/outbox_notifier.py`'s classification to always scan the session JSONL first, recovering Mirror's earlier valid markers even when the final turn was a meta-message ("Acknowledged — moot now"). The fix landed on disk and was sync'd into `~/agent-core/` — but `ourliberty-outbox-notifier.service` had been running since 17:37:48 MDT (2026-05-25), so it continued executing the pre-merge Python module until Larry manually restarted at 17:37 MDT, which finally picked up the fix. Between 19:16Z merge and 23:37Z manual restart, every Mirror review that landed continued to run against the broken classifier.
+
+### Root cause 1 — Mirror typed markers by hand
+
+Mirror emitted markers using prose patterns rather than the canonical `marker.py` CLI output. The previous `agents/mirror/CLAUDE.md` mandate required CLI for `REVIEW_PASS` only — `REVIEW_REVISION` / `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT` were explicitly allowed to be hand-typed "when the structured payload genuinely makes a heredoc awkward." That exception was the gap; hand-typed structured verdicts evaded the parser via wrapper/inline shapes the agent invented as more readable alternatives.
+
+### Root cause 2 — no automated detection of stale daemon code
+
+systemd-managed daemons run a single Python process across multiple script revisions on disk. Without a restart, a merged code fix is invisible to the running daemon. The agent-OS had no surfacing of this drift — Larry only discovered the stale-code state by reading the outbox-notifier log after PR #104's reviews kept failing, then noticed PR #103's fix had landed hours earlier and inferred the daemon hadn't been restarted.
+
+### Fixes shipped this PR
+
+- **`agents/mirror/CLAUDE.md`:** rewrote the "How to emit a marker safely" section with a non-negotiable mandate — every Mirror verdict (all four types) MUST be emitted via `python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>` with stdout pasted verbatim. No hand-typed exception for structured payloads — use a scratch JSON file + `cat | marker.py render` when heredocs feel awkward.
+- **`scripts/tests/test_mirror_marker_discipline.py`:** forward-looking scanner over `~/.claude/projects/*/<session>.jsonl` for the last 7 days. Flags wrapper (`=== REVIEW_RESULT === ...`) and inline-prefix (`REVIEW_PASS:` + code fence) shapes in Mirror's session text. Prints findings, does not hard-fail — at PR-merge time the historical PR #101 + PR #104 violations from today are still in-window, so a hard-fail would self-trip. Once they roll out of the 7-day window a follow-up PR can flip the watcher to enforcing.
+- **`scripts/heal_stale_daemon_code.py` + `scripts/tests/test_heal_stale_daemon_code.py`:** healer that walks `ourliberty-*.service` units, compares `ActiveEnterTimestamp` to the `ExecStart=` script's mtime, and DMs Larry via `larry_alerts.append_alert` when the script is newer than the service start by more than 5 minutes (race-avoidance for legitimate restarts). Per-service 6 h cooldown in `~/agents/state/heal-stale-daemon-code-cooldowns.json`.
+- **`systemd/ourliberty-heal-stale-daemon-code.service` + `.timer`:** oneshot unit firing every 30 min, modeled on the existing heal-* lineup. systemd-analyze verifies clean.
+- **`runbooks/heal-stale-daemon-code.md`:** documents what it checks, what it does on detection (DM-only — no auto-restart), how to suppress alerts (touch cooldown forward), how to run manually, where to investigate root cause.
+
+### Why we did NOT extend the parser to accept wrapper/inline shapes
+
+Parser tolerance broadens the failure surface — every accepted shape becomes a future drift risk. Tightening Mirror's discipline (marker.py CLI for all verdicts, no exceptions) keeps a single source of truth for the canonical block, and the 2026-05-25 incident catalog shows the slip happens when humans invent "more readable" forms. Single source of truth wins.
+
+### Why DM-only (no auto-restart) on stale daemons
+
+Same posture as the stuck-detector: surface, don't act. Restart bypasses Mirror's review for behavior changes (the daemon picks up new code immediately) and risks restarting during in-flight work. Larry decides when to apply.
+
+### References
+
+- **PR #101** (this repo, merged via `f4dee2b` 2026-05-25): Mirror hung on chain-discipline review; first surfaced both root causes.
+- **PR #103** (this repo, `chain-discipline-marker-parser-and-regression-check-001`, merged 19:16:56Z 2026-05-25): the marker-parser fix that landed but ran stale until manual restart.
+- **PR #104** (this repo, `e4-4d-operations-tab-and-system-view`, 2026-05-25): 3 manual-recovery review rounds via non-canonical marker shapes; canonical case for "Mirror evades the parser by hand-typing."
+
+### Self-test of this PR
+
+This PR's own Mirror review must emit the canonical marker shape (produced by `scripts/marker.py render mirror review_pass`). If Mirror reverts to wrapper or inline-prefix, the discipline tightening hasn't actually changed her behavior — surface to Larry for further work. Self-verifying PR pattern, same as PR #103.
+
+### Codified additions worth recalling next session
+
+41. **Mirror marker discipline: marker.py CLI for ALL verdicts, no exceptions** (chain-discipline-v2, 2026-05-25). The previous mandate carved out hand-typing for `REVIEW_REVISION` / `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT` when structured payloads felt awkward; that gap is the failure surface — wrapper shapes (`=== REVIEW_RESULT ===`) and inline-prefix shapes (`REVIEW_PASS:` + code fence) silently drop. Per `agents/mirror/CLAUDE.md` § "How to emit a marker safely": every verdict via `python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>`, stdout pasted verbatim. If a structured payload is unwieldy, build the JSON in a scratch file + `cat file | marker.py render`.
+42. **systemd daemons running stale code is a real failure mode** (chain-discipline-v2, 2026-05-25). PR #103's fix landed at 19:16Z but `ourliberty-outbox-notifier.service` ran pre-merge code until manual restart at 23:37Z. `scripts/heal_stale_daemon_code.py` now walks `ourliberty-*.service` every 30 min, compares `ActiveEnterTimestamp` to ExecStart script mtime, and DMs Larry on drift (5-min race-avoidance, 6h per-service cooldown). DM-only — no auto-restart; restart bypasses Mirror's review.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
