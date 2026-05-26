@@ -158,8 +158,8 @@ class TestParseJournalRecord(unittest.TestCase):
         rec = {
             '__REALTIME_TIMESTAMP': '1748189328000000',
             'MESSAGE': (
-                'session_start agent=mirror task_id=pr-101-review '
-                'model=claude-opus-4-7 task_type=feature-development'
+                'inbox_watcher: [mirror] start task=pr-101-review '
+                'model=claude-opus-4-7 timeout=14400s'
             ),
         }
         ev = ces.parse_journal_record(rec)
@@ -172,8 +172,8 @@ class TestParseJournalRecord(unittest.TestCase):
         rec = {
             '__REALTIME_TIMESTAMP': '1748189328000000',
             'MESSAGE': (
-                'session_done agent=forge task_id=abc '
-                'success=true duration_sec=120.5 cost_usd=0.42'
+                'inbox_watcher: [forge] done task=abc '
+                'success=True duration=120.5s attempts=1 cost=$0.42'
             ),
         }
         ev = ces.parse_journal_record(rec)
