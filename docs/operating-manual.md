@@ -2375,66 +2375,118 @@ $1.62 burned on the hung Mirror session; PR #101 manually merged via `f4dee2b` a
 39. **Marker classification is always-scan-latest-wins across all assistant turns** (chain-discipline-marker-parser-and-regression-check-001, 2026-05-25). The outbox `result` field is only the final `claude -p` turn; the session JSONL is the authoritative source. Mirror and Forge classifiers both use the session-log scan as the primary path now, with `result_text` as a fallback for when the log is unavailable. Earlier `parse_*_marker` returning None on a final-turn text no longer suppresses a valid earlier marker.
 40. **`pgrep -f <pat>` self-matches its caller's argv.** The bash command line that runs `pgrep -f foo` contains the literal string `foo`, so `pgrep` returns the caller's own PID, `kill -0` succeeds forever, and any "wait until the child exits" poll loop hangs. Workaround when you genuinely need to poll a sibling process: `pgrep -f '[f]oo'` — the brackets are a one-char character class; the literal pattern in the caller's argv contains the brackets and won't match the bracketless regex. Default: don't poll; run subprocesses in the foreground.
 
-## Phase E4 followup — chain-discipline-v2: Mirror marker-shape discipline + stale-daemon-code healer (2026-05-25)
+## Phase E4 followup — page-cache investigation (Pulse off-cycle dispatch, 2026-05-25)
 
-Closes two failure modes that recurred across the 2026-05-25 incident sequence (PR #101, PR #103 stale-code-until-manual-restart, PR #104 r0/r1/r2/r3 reviews). Both refer to repo `Larry-Yatch/ourliberty-agent-core`.
+A misdiagnosed "memory leak" that turned out to be reclaimable page cache. Resolved via one code change (PR #102) plus one manual systemctl tweak. Worth recording because the bump-the-cap reflex would have masked the actual cause indefinitely.
 
-### Symptom 1 — Mirror emitted non-canonical marker shapes
+### Symptom
 
-Mirror reviews on PR #101 + PR #104 r1, r2, r3 emitted **non-canonical wrapper / inline-prefix** marker shapes that the outbox-notifier's strict parser silently dropped:
+The `ourliberty-inbox-watcher.service` MemoryMax setting was bumped twice on 2026-05-24: 2G → 4G in the morning (PR #71), 4G → 8G in the evening (PR #99). Both triggered by watchdog DMs as the cgroup approached the cap. Parent watcher process RSS was healthy (~17 MB); children consumed up to ~4.3 GB while only one Claude subprocess was actively running. The remaining was "accumulated dead-process memory" — or so the symptom suggested.
 
-- **Wrapper shape (PR #101 + PR #104 r1+r2):**
-  ```
-  === REVIEW_RESULT ===
-  {"verdict": "...", ...}
-  === END_REVIEW_RESULT ===
-  ```
-- **Inline-prefix shape (PR #104 r3):** a literal `REVIEW_PASS:` line followed by a fenced ` ```json ... ``` ` block (no `=== ... ===` delimiters at all).
+### Root cause
 
-Outbox-notifier post-PR-#103 recognizes only the canonical `=== REVIEW_PASS === / === END_REVIEW_PASS ===` shape produced by `scripts/marker.py`. Non-canonical shapes silently dropped — 3 of 4 Mirror reviews on PR #104 required manual session-JSONL forensics + manual PR merge.
+Pulse off-cycle investigation (Sonnet 4.6, $1.68) traced 82% of cgroup memory (3.26 GB of 3.97 GB) to **kernel page cache from large `node_modules` directories** in three dashboard worktrees (~720 MB each, 12-19 h old at sample time). Linux cgroup v2 attributes page cache to the cgroup that brought the page in. When Forge/Mirror ran `pnpm typecheck/build` in those worktrees, the kernel cached the read pages and accounted them to the watcher's cgroup. `memory.events.max=868` confirmed the kernel was reclaiming but new file reads refilled faster than the soft pressure could keep up.
 
-### Symptom 2 — PR #103's marker-parser fix landed but ran stale
+Ruled out with evidence:
+- Anonymous RSS leak: `memory_stat.anon=354MB` (healthy for 2 active Claude processes)
+- Zombie processes: `zombie_processes=0`
+- Orphan-process retention: KillMode=control-group already set; PrivateTmp=true already set
+- Pipe-buffer growth: no swap, no kernel-side spillover
 
-PR #103 (`chain-discipline-marker-parser-and-regression-check-001`) merged at 19:16:56Z 2026-05-25. The fix updated `scripts/outbox_notifier.py`'s classification to always scan the session JSONL first, recovering Mirror's earlier valid markers even when the final turn was a meta-message ("Acknowledged — moot now"). The fix landed on disk and was sync'd into `~/agent-core/` — but `ourliberty-outbox-notifier.service` had been running since 17:37:48 MDT (2026-05-25), so it continued executing the pre-merge Python module until Larry manually restarted at 17:37 MDT, which finally picked up the fix. Between 19:16Z merge and 23:37Z manual restart, every Mirror review that landed continued to run against the broken classifier.
+### What shipped
 
-### Root cause 1 — Mirror typed markers by hand
-
-Mirror emitted markers using prose patterns rather than the canonical `marker.py` CLI output. The previous `agents/mirror/CLAUDE.md` mandate required CLI for `REVIEW_PASS` only — `REVIEW_REVISION` / `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT` were explicitly allowed to be hand-typed "when the structured payload genuinely makes a heredoc awkward." That exception was the gap; hand-typed structured verdicts evaded the parser via wrapper/inline shapes the agent invented as more readable alternatives.
-
-### Root cause 2 — no automated detection of stale daemon code
-
-systemd-managed daemons run a single Python process across multiple script revisions on disk. Without a restart, a merged code fix is invisible to the running daemon. The agent-OS had no surfacing of this drift — Larry only discovered the stale-code state by reading the outbox-notifier log after PR #104's reviews kept failing, then noticed PR #103's fix had landed hours earlier and inferred the daemon hadn't been restarted.
-
-### Fixes shipped this PR
-
-- **`agents/mirror/CLAUDE.md`:** rewrote the "How to emit a marker safely" section with a non-negotiable mandate — every Mirror verdict (all four types) MUST be emitted via `python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>` with stdout pasted verbatim. No hand-typed exception for structured payloads — use a scratch JSON file + `cat | marker.py render` when heredocs feel awkward.
-- **`scripts/tests/test_mirror_marker_discipline.py`:** forward-looking scanner over `~/.claude/projects/*/<session>.jsonl` for the last 7 days. Flags wrapper (`=== REVIEW_RESULT === ...`) and inline-prefix (`REVIEW_PASS:` + code fence) shapes in Mirror's session text. Prints findings, does not hard-fail — at PR-merge time the historical PR #101 + PR #104 violations from today are still in-window, so a hard-fail would self-trip. Once they roll out of the 7-day window a follow-up PR can flip the watcher to enforcing.
-- **`scripts/heal_stale_daemon_code.py` + `scripts/tests/test_heal_stale_daemon_code.py`:** healer that walks `ourliberty-*.service` units, compares `ActiveEnterTimestamp` to the `ExecStart=` script's mtime, and DMs Larry via `larry_alerts.append_alert` when the script is newer than the service start by more than 5 minutes (race-avoidance for legitimate restarts). Per-service 6 h cooldown in `~/agents/state/heal-stale-daemon-code-cooldowns.json`.
-- **`systemd/ourliberty-heal-stale-daemon-code.service` + `.timer`:** oneshot unit firing every 30 min, modeled on the existing heal-* lineup. systemd-analyze verifies clean.
-- **`runbooks/heal-stale-daemon-code.md`:** documents what it checks, what it does on detection (DM-only — no auto-restart), how to suppress alerts (touch cooldown forward), how to run manually, where to investigate root cause.
-
-### Why we did NOT extend the parser to accept wrapper/inline shapes
-
-Parser tolerance broadens the failure surface — every accepted shape becomes a future drift risk. Tightening Mirror's discipline (marker.py CLI for all verdicts, no exceptions) keeps a single source of truth for the canonical block, and the 2026-05-25 incident catalog shows the slip happens when humans invent "more readable" forms. Single source of truth wins.
-
-### Why DM-only (no auto-restart) on stale daemons
-
-Same posture as the stuck-detector: surface, don't act. Restart bypasses Mirror's review for behavior changes (the daemon picks up new code immediately) and risks restarting during in-flight work. Larry decides when to apply.
-
-### References
-
-- **PR #101** (this repo, merged via `f4dee2b` 2026-05-25): Mirror hung on chain-discipline review; first surfaced both root causes.
-- **PR #103** (this repo, `chain-discipline-marker-parser-and-regression-check-001`, merged 19:16:56Z 2026-05-25): the marker-parser fix that landed but ran stale until manual restart.
-- **PR #104** (this repo, `e4-4d-operations-tab-and-system-view`, 2026-05-25): 3 manual-recovery review rounds via non-canonical marker shapes; canonical case for "Mirror evades the parser by hand-typing."
-
-### Self-test of this PR
-
-This PR's own Mirror review must emit the canonical marker shape (produced by `scripts/marker.py render mirror review_pass`). If Mirror reverts to wrapper or inline-prefix, the discipline tightening hasn't actually changed her behavior — surface to Larry for further work. Self-verifying PR pattern, same as PR #103.
+- **Fix A (PR #102):** `scripts/cleanup_stale_worktrees.py:83` — `MAX_AGE_SECONDS = 86400 → 14400` (24h → 4h). Tighter retention removes idle dashboard worktrees within 4h, releasing the page cache they were caching. In-flight detection (`load_active_task_stems`) already guards active worktrees, so the tighter mtime gate cannot collateral-remove anything in use.
+- **Fix B (manual systemctl, deployed 2026-05-25 by Larry):** `sudo systemctl set-property ourliberty-inbox-watcher.service MemoryHigh=3221225472` (3 GB). Creates a new persistent drop-in at `/etc/systemd/system.control/ourliberty-inbox-watcher.service.d/50-MemoryHigh.conf`. The `MemoryHigh` setting triggers async background reclaim under soft pressure rather than waiting for synchronous direct-reclaim at the `MemoryMax` hard cap. `memory.current` dropped 3.67 GB → 3.12 GB within seconds of the property taking effect.
+- `MemoryMax=8G` stayed unchanged pending ≥1 day of metrics under the new MemoryHigh-bounded regime.
 
 ### Codified additions worth recalling next session
 
-41. **Mirror marker discipline: marker.py CLI for ALL verdicts, no exceptions** (chain-discipline-v2, 2026-05-25). The previous mandate carved out hand-typing for `REVIEW_REVISION` / `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT` when structured payloads felt awkward; that gap is the failure surface — wrapper shapes (`=== REVIEW_RESULT ===`) and inline-prefix shapes (`REVIEW_PASS:` + code fence) silently drop. Per `agents/mirror/CLAUDE.md` § "How to emit a marker safely": every verdict via `python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>`, stdout pasted verbatim. If a structured payload is unwieldy, build the JSON in a scratch file + `cat file | marker.py render`.
-42. **systemd daemons running stale code is a real failure mode** (chain-discipline-v2, 2026-05-25). PR #103's fix landed at 19:16Z but `ourliberty-outbox-notifier.service` ran pre-merge code until manual restart at 23:37Z. `scripts/heal_stale_daemon_code.py` now walks `ourliberty-*.service` every 30 min, compares `ActiveEnterTimestamp` to ExecStart script mtime, and DMs Larry on drift (5-min race-avoidance, 6h per-service cooldown). DM-only — no auto-restart; restart bypasses Mirror's review.
+41. **Memory pressure is not always a leak.** Before reaching for `systemctl set-property MemoryMax=<higher>`, decompose `memory.stat`: `anon` is application heap (real leak signal); `file` is page cache (reclaimable, usually not the problem); `slab_reclaimable` + `slab_unreclaimable` are kernel structures. If `file >> anon`, the cgroup is caching reads, not leaking. Look at WHAT'S being read (large node_modules trees, big data files), not at the parent process.
+42. **`MemoryHigh` is the right escalation step before `MemoryMax`.** `MemoryMax` is a hard kill ceiling. `MemoryHigh` is a soft-pressure threshold that triggers async background reclaim. When the cgroup is mostly page cache (per #41), MemoryHigh forces the kernel to keep reclaiming proactively instead of waiting for a hard miss. `systemctl set-property <unit> MemoryHigh=<bytes>` is the live-tuning path; it creates a `50-MemoryHigh.conf` drop-in automatically.
+43. **`systemctl set-property` for live cgroup quota changes** persists across reboots via the auto-generated drop-in file. Larry's pattern: bump live, verify with `systemctl show <unit> | grep -E 'Memory(High|Max)='`, never edit `/etc/systemd/system.control/<unit>.d/` directly (the file is regenerated). The pattern works for `TasksMax`, `CPUWeight`, and other cgroup-backed properties too.
+
+## Phase E4.4d — System tab spec lands (2026-05-25)
+
+A new E4 sub-phase. Captures the Operations tab + System view (chain telemetry MVP-2) — the dashboard surface Larry has been needing all session to make today's debugging self-service. Spec doc only; implementation queued as 4 PRs.
+
+### What triggered it
+
+Today's debugging burned ~3 hours of Larry's day on issues that the dashboard would have surfaced as a single glance: a 71-min Mirror review hang invisible to the chain (PR #101); a "memory leak" that was page cache (PR #102 above); an approved-but-unmerged PR (#101 again, due to the marker-parser bug PR #103 fixed). Every status answer required SSH forensics. Larry's framing: *"I have no clue if they're stuck, if they're working... Currently the live system dashboard seems to be useless."*
+
+### What shipped
+
+- **agents/beacon/specs/e4-4d-system-tab.md** (615 lines, PR #104). Full sub-spec with six locked decisions A–F, schema/API/UI architecture, threshold table, graceful-degradation matrix, 4-PR implementation staging, Pulse Check III self-optimizing loop, post-brief-additions provenance section.
+- **agents/beacon/specs/e4-overview.md** (+18 lines) — decision-log row + new sub-phase entry under § 6 Phasing.
+
+The six locked decisions (Beacon Telegram spec round 14:29–15:12 MDT):
+
+| # | Decision |
+|---|---|
+| A | Hybrid ingestion (poll initial, push-compatible schema day 1) |
+| B | Schema: `chain_events` table + `agent_sessions` Postgres VIEW + on-read PR pipeline route |
+| C | Three new droplet API endpoints (`/api/system/{active-sessions,cgroup-stats,worktrees}`); stuck-detection lives dashboard-side, not droplet |
+| D | Tighter task_type-gated thresholds in editable config file (D1=15min global, D2=10min, D3=2min, D4 Mirror task_type override) |
+| E | Nested `Operations` parent tab with System as first child (future siblings: Cost, Memory, Worktrees) |
+| F | Public for V1; "build then protect in separate project" later |
+
+Four scope additions made mid-session with explicit Larry approval, documented in spec § 5.11 with verbatim quotes:
+
+1. 5th view — Escalations + Alerts panel (`pulse-escalations.json` + `larry-alerts.jsonl` + `sentinel-alerts.jsonl`) added as a unified surface with `needs_response=true` pinning + per-event "Mark as read"
+2. Pulse Check III — 14-day self-optimizing threshold loop with proposal artifact + Beacon Telegram approval shortcut + Claude-as-Forge PR delivery
+3. Operating-manual doctrine entry for the self-optimizing-config pattern (this addition lands in the future PR-B build dispatch)
+4. Migration 0005 + mark-as-read route handler (derived from #1)
+
+### Authorship: Claude-as-Forge applied to a large doc
+
+The spec was authored entirely in Larry's interactive Claude Code session, not through a Forge dispatch. Justified by the Claude-as-Forge pattern's core test: doc-only, no code execution change, low blast radius, full context already loaded. Mirror review applied at the merge gate, which is where the discipline matters.
+
+### Mirror review marker-shape drift
+
+Mirror's first two reviews of PR #104 emitted REVIEW_REVISION markers in a non-canonical `=== REVIEW_RESULT === { verdict: ... }` wrapper shape. Her third review (the eventual PASS) used yet a third shape: `REVIEW_PASS:` followed by fenced JSON. The always-scan parser shipped in PR #103 recognizes only the canonical `=== REVIEW_VERDICT === ... === END_REVIEW_VERDICT ===` shape, so all three reviews looked invisible to the chain (no `marker-notified beacon <- mirror (mirror-result, intent=review-X)` log line). Larry confirmed each verdict from the session JSONL directly and manually merged PR #104 at 22:22 MDT via `gh pr merge 104 --squash --delete-branch`.
+
+This drift was the trigger for PR #105 (below).
+
+### Recovery cost
+
+~$5.50 LLM across three Mirror reviews + three Beacon notify cycles. Wall time ~5.5 hours, mostly the human + Claude-Code-side forensics between reviews; the chain compute itself was ~8 min combined.
+
+### Codified additions worth recalling next session
+
+44. **Claude-as-Forge scales to large doc artifacts.** The pattern's discipline boundary is "Mirror reviews at the merge gate," not "trivial change size." PR #104 was 615 lines of spec authored entirely in Larry's interactive Claude Code session; the same Mirror-at-merge-gate discipline kept the doc honest. The key extension to capture: a "Post-brief additions" provenance section with verbatim Larry quotes lets Mirror verify which scope expansions were explicitly approved during the Claude-as-Forge session vs. silent scope creep.
+45. **The unified PM dashboard now has direct-write surfaces via Supabase REST.** Adding a Project row to a Program ahead of E4.4c (UI CRUD) is a one-line `curl -X POST` against the Supabase REST API using the service-role key from `.env.larry`. Pattern: source `.env.larry`, `curl -X POST "${SUPABASE_URL}/rest/v1/projects" -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" -d @<json>`. Beware bash heredoc `$N` positional-arg expansion — use `USD` or escape if a literal dollar sign appears.
+
+## Chain discipline v2 — marker.py mandate + stale-daemon healer (2026-05-25)
+
+Closes two structural failure modes surfaced repeatedly across the day's PR cycle. Self-verifying: Mirror reviewed her own discipline fix in this PR, used the canonical marker shape, AUTO_MERGE fired cleanly.
+
+### Symptom #1 — Mirror marker-shape drift
+
+Three Mirror reviews of PR #104 emitted markers in three different shapes (canonical block, wrapper variant, inline JSON-fenced). The always-scan parser from PR #103 recognizes only the canonical shape. Every non-canonical emission produced silent chain failure (no `marker-notified` log line, no auto-merge, manual session-JSONL recovery required).
+
+The marker.py CLI already exists and produces the canonical shape deterministically. Mirror used it correctly on PR #103's review (which auto-merged); she stopped using it on subsequent reviews. The fix: mandate marker.py in `agents/mirror/CLAUDE.md` so the canonical shape is non-negotiable.
+
+### Symptom #2 — Stale daemon code
+
+PR #103's marker-parser fix landed at 19:16 UTC. The fix didn't take effect because `ourliberty-outbox-notifier.service` had been running since 2026-05-20 (5 days before PR #103 existed); the new code sat on disk while the live process kept running the old version in memory. Larry manually restarted at 17:37 MDT once the regression was diagnosed. There was no automated detection that a daemon was running stale code.
+
+### What shipped (PR #105)
+
+- **agents/mirror/CLAUDE.md** — new non-negotiable section: *"EVERY review marker MUST be emitted via `python3 /home/larry/agent-core/scripts/marker.py render mirror <verdict>` and the stdout PASTED VERBATIM into your response. Do NOT type marker blocks by hand. Do NOT invent wrapper shapes like REVIEW_RESULT. Do NOT inline JSON with REVIEW_PASS: prefix."* Plus matching language in marker.py docstring confirming the CLI is the canonical render.
+- **scripts/tests/test_mirror_marker_discipline.py** (new) — scans recent Mirror session JSONLs for non-canonical marker shapes. Reports historical violations (expected: PR #101 + PR #104 r1/r2/r3 sessions) as informational; fails forward if any session post-PR-#105-merge emits a non-canonical shape.
+- **scripts/heal_stale_daemon_code.py** (new) — for each `ourliberty-*.service` unit, reads `ActiveEnterTimestamp`, parses `ExecStart` from the unit file, stats the script's mtime, DMs Larry via `larry_alerts.append_alert` if `script_mtime > service_start_time` with delta > 5 min. Cooldown 6h per service. Runs every 30 min via `ourliberty-heal-stale-daemon-code.timer`.
+- **agents/forge/CLAUDE.md** + **agents/pulse/CLAUDE.md** — both now mandate marker.py for their respective markers (Forge: PROCEED / CLARIFY_REQUEST / REJECT; Pulse: any structured marker output). Aligns all four agents on canonical shape.
+- **docs/operating-manual.md Part II** — this section.
+- **runbooks/heal-stale-daemon-code.md** (new) — operational runbook covering when the alert fires + how to verify + how to restart the affected daemon.
+
+### Self-verification
+
+PR #105's own Mirror review (review #3 of this PR-chain, the eventual PASS) used the canonical marker shape. Notifier logged `classified mirror review_pass marker from session log scan` + `marker-notified beacon <- mirror (mirror-result, intent=review-pass)` + `AUTO_MERGE task=chain-discipline-v2-marker-shape-and-stale-daemon-001 ... outcome=merged`. Zero manual recovery needed. This is the test passing.
+
+### Codified additions worth recalling next session
+
+46. **`scripts/marker.py` is the ONLY canonical path for emitting structured markers.** All four agents (Beacon / Forge / Mirror / Pulse) now mandate it in their CLAUDE.md. The CLI produces the `=== REVIEW_VERDICT === ... === END_REVIEW_VERDICT ===` (or PROCEED / etc.) shape that the outbox-notifier parser recognizes. Hand-typed markers, wrapper shapes, and inline-JSON variants are silently dropped from the chain — no error, no DM, just invisible. If you're emitting a marker, you ARE calling marker.py.
+47. **A daemon's running code is not its source file.** When a PR merges that modifies a daemon's Python source (`outbox_notifier.py`, `inbox_watcher.py`, healer scripts), the live process keeps the old code in memory until restarted. `heal_stale_daemon_code.py` catches this drift every 30 min by comparing `systemctl show <unit> --property=ActiveEnterTimestamp` against the script's mtime. If you see the alert, `sudo systemctl restart <unit>` is the fix; verify with `systemctl show <unit> --property=ActiveEnterTimestamp` to confirm the timestamp is post-merge.
+48. **Self-optimizing-config-via-Pulse-Check is now a documented pattern.** Whenever an operational config surface is a hand-tuned constant (thresholds, retry budgets, cadences, caps, memory limits), the canonical mechanism is: Pulse periodic Check → proposal artifact at `~/agents/blackboard/pulse-<name>-proposals.json` → Telegram DM to Larry → Beacon `approve <name>-update-<date>` shortcut → Claude-as-Forge config-only PR → Mirror auto-merges. Guardrails: no auto-apply, bounded delta (>50% flagged as regime-change-suspected), sample-size floor (≥10 data points per bucket). First instance ships with E4.4d as Pulse Check III for stuck-detection thresholds. Backlog of 10 candidate surfaces in the project list at `dashboard.ourliberty.dev/projects/1b36f0d2-5f2c-4d45-9f13-6806a4c5fa42` (Operational Config Self-Optimization).
 
 ---
 
