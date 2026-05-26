@@ -142,7 +142,7 @@ The orchestrator is working when ALL of the following are true:
 
 **Resilience to droplet reboot.** All state lives in the sequence files; the advancer is stateless across reboots. First tick post-reboot re-reads all active sequences, queries chain_events from each step's `dispatched_at` forward, and rebuilds the live state.
 
-**Concurrency.** Per decision A (one active sequence at a time), the advancer enforces this at sequence-creation time, not at tick time: when Beacon writes a new sequence file, the advancer checks for any existing `status: active` sequence and rejects the new one with a DM to Larry if found. Existing PR-S1 implementation: hand validation to a `validate_no_concurrent_active()` helper in `scripts/build_sequence_validator.py`.
+**Concurrency.** Per decision A (one active sequence at a time), the advancer enforces this at sequence-creation time, not at tick time: when Beacon writes a new sequence file, the advancer checks for any existing `status: active` sequence and rejects the new one with a DM to Larry if found. PR-S2 ships the `validate_no_concurrent_active()` helper in `scripts/build_sequence_validator.py` (alongside the advancer itself, since both gate on the same state files).
 
 ### 5.3 Belt-and-suspenders gate check
 
