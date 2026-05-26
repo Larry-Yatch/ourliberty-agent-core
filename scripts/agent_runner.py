@@ -13,7 +13,7 @@ import sys
 import json
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).parent))
 # Removed: was importing GM-specific token_manager (multi-account OAuth pool).
@@ -128,7 +128,7 @@ def _mark_paused_on_tier1(task_stem, failure_type):
             data = {}
         data['paused_on_tier1'] = {
             'failure_type': failure_type,
-            'at': datetime.now().isoformat(),
+            'at': datetime.now(timezone.utc).isoformat(),
         }
         target.write_text(json.dumps(data, indent=2))
     except OSError:
@@ -535,7 +535,7 @@ def _register_in_flight(task_stem, agent_id, pid):
         'task_stem': task_stem,
         'agent_id': agent_id,
         'pid': pid,
-        'started_at': datetime.now().isoformat(),
+        'started_at': datetime.now(timezone.utc).isoformat(),
     }
     try:
         with open(IN_FLIGHT_DIR / f'{task_stem}.json', 'w') as f:
@@ -630,7 +630,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
     Returns: (success: bool, output_text: str, new_session_id: str | None)
     """
-    _meta_started_at = datetime.now().isoformat()
+    _meta_started_at = datetime.now(timezone.utc).isoformat()
     _meta_t0 = time.time()
     tm = get_manager()
     guard = get_guard()
@@ -935,7 +935,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             out_meta['account_id'] = account_id
                             out_meta['attempts'] = attempt + 1
                             out_meta['started_at'] = _meta_started_at
-                            out_meta['completed_at'] = datetime.now().isoformat()
+                            out_meta['completed_at'] = datetime.now(timezone.utc).isoformat()
                             out_meta['duration_sec'] = round(time.time() - _meta_t0, 2)
                         return True, output_text, new_session_id
 
@@ -1401,7 +1401,7 @@ def process_inbox(agent_id):
                 'source': source,
                 'success': success,
                 'output': output,
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
                 'agent_id': agent_id,
                 'worktree': worktree_path,
             }

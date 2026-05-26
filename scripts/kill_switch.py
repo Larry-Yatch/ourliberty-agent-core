@@ -22,7 +22,7 @@ Telegram commands (any agent bot):
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 AGENTS_ROOT = Path.home() / 'agents'
@@ -47,7 +47,7 @@ def halt():
     """Activate emergency halt."""
     BLACKBOARD.mkdir(parents=True, exist_ok=True)
     halt_data = {
-        'activated_at': datetime.now().isoformat(),
+        'activated_at': datetime.now(timezone.utc).isoformat(),
         'activated_by': 'manual' if len(sys.argv) <= 2 else sys.argv[2],
         'reason': sys.argv[3] if len(sys.argv) > 3 else 'Emergency halt activated',
     }
