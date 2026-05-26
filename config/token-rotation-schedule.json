@@ -46,12 +46,29 @@
       "created_at": "2026-05-18",
       "last_rotated_at": "2026-05-18",
       "next_rotation_due": "2027-05-18",
-      "calendar_event_url": null,
+      "calendar_event_url": "https://www.google.com/calendar/event?eid=bDBtajZncDUwNDBpdGIza2syYXU4dDFmMXMgYWdlbnQuYmVhY29uLm91cmxpYmVydHlAbQ",
       "runbook_path": "docs/runbooks/audit-claude-max-oauth.md",
       "severity_if_lapsed": "critical",
       "owner_role": "larry",
       "scopes": ["claude-max-subscription"],
-      "notes": "Access token auto-refreshes via refreshToken; subscription billing is the load-bearing rotation signal. Annual entry is for billing + tier audit (have we accumulated unused capacity? do we need to increase?)."
+      "notes": "Access token auto-refreshes via refreshToken; subscription billing is the load-bearing rotation signal. Annual audit verifies the account is still agent.beacon.ourliberty@gmail.com (not silently rotated) AND the Max tier still matches usage. calendar_event_url added 2026-05-26 to close the E1.5 4-artifact gap exposed by the 2026-05-26 OAuth-expiry incident (silent expiry was misdiagnosed as rate-limit because the registry entry had no calendar reminder)."
+    },
+    {
+      "name": "LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2",
+      "storage_location": "claude_cli:/home/larry/.claude-larry-personal/.claude/.credentials.json",
+      "credential_type": "oauth_token",
+      "purpose": "Tier 2 fallback for CLAUDE_MAX_OAUTH. Used by scripts/beacon_telegram_bot.py and scripts/agent_runner.py when the primary agent account hits rate-limit OR auth-401, via HOME-swap to /home/larry/.claude-larry-personal. Separate account = separate quota + auth buckets.",
+      "rotation_type": "scope_audit",
+      "cadence_days": 365,
+      "created_at": "2026-05-26",
+      "last_rotated_at": "2026-05-26",
+      "next_rotation_due": "2027-05-26",
+      "calendar_event_url": "https://www.google.com/calendar/event?eid=bjI4NDZzNzVoa2w1czA3dWgzdDdlbWRzbnMgYWdlbnQuYmVhY29uLm91cmxpYmVydHlAbQ",
+      "runbook_path": "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md",
+      "severity_if_lapsed": "medium",
+      "owner_role": "larry",
+      "scopes": ["claude-max-personal"],
+      "notes": "Tier 2 fallback for agent.beacon.ourliberty Claude Max. Annual audit verifies still-personal-not-agent (browser auth can silently land in wrong account; calendar event covers re-verify). Separate account from Tier 1 = separate quota + auth buckets."
     },
     {
       "name": "GOOGLE_OAUTH_REFRESH_TOKEN",
@@ -285,7 +302,11 @@
       "scanner_strategy": "run `gh auth status` and parse the 'Token scopes' line"
     },
     "claude_cli:/home/larry/.claude/.credentials.json": {
-      "description": "Claude Code OAuth keychain (Max subscription)",
+      "description": "Claude Code OAuth keychain (Max subscription, Tier 1 — agent.beacon.ourliberty@gmail.com)",
+      "scanner_strategy": "JSON parse; claudeAiOauth key present and accessToken non-empty = active"
+    },
+    "claude_cli:/home/larry/.claude-larry-personal/.claude/.credentials.json": {
+      "description": "Claude Code OAuth keychain (Max subscription, Tier 2 fallback — Larry's personal account; HOME-isolated dir consumed via HOME=/home/larry/.claude-larry-personal swap in beacon_telegram_bot.py + agent_runner.py)",
       "scanner_strategy": "JSON parse; claudeAiOauth key present and accessToken non-empty = active"
     },
     "workspace_mcp:/home/larry/.google_workspace_mcp/credentials/": {

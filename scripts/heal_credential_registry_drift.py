@@ -419,8 +419,21 @@ def scan_gh_cli(host_path: Path) -> set[str]:
 
 
 def scan_claude_cli(creds_path: Path) -> set[str]:
-    """Return {'CLAUDE_MAX_OAUTH'} iff the Claude credentials JSON has a
-    non-empty access token; else empty set."""
+    """Return the set of registered credential names whose Claude OAuth file
+    at `creds_path` has a non-empty access token; else empty set.
+
+    Two paths are recognized today (Tier 1 + Tier 2 — see
+    `claude-quota-tier2-fallback-wrapper`, 2026-05-26):
+      - `/home/larry/.claude/.credentials.json` → CLAUDE_MAX_OAUTH
+      - `/home/larry/.claude-larry-personal/.claude/.credentials.json` →
+        LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2
+
+    The path → name mapping is structural — the registry's known_storage_locations
+    block determines the location strings, and `detect_drift` matches each
+    credential entry to the right scanner via `_scanner_for`. Returning the
+    correct generic name here is what lets `MISSING_REGISTRY_ENTRY` /
+    `MISSING_CREDENTIAL` classification fire on Tier 2 just like Tier 1.
+    """
     if not creds_path.exists():
         return set()
     try:
@@ -429,6 +442,12 @@ def scan_claude_cli(creds_path: Path) -> set[str]:
         if isinstance(oauth, dict):
             token = oauth.get('accessToken')
             if isinstance(token, str) and token:
+                # Disambiguate Tier 1 vs Tier 2 by path. Both have the same
+                # JSON shape; the credential name is determined by the
+                # filesystem location.
+                normalized = str(creds_path)
+                if 'claude-larry-personal' in normalized:
+                    return {'LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2'}
                 return {'CLAUDE_MAX_OAUTH'}
     except (json.JSONDecodeError, OSError) as e:
         log(f'scan_claude_cli read error on {creds_path}: {e}', 'WARN')

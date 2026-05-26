@@ -189,6 +189,29 @@ ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 ROUTING_EVENTS_LOOKBACK_HOURS = 24 * 7  # PRs aren't routed faster than this
 PR_UNROUTED_MIN_AGE_MIN = 60            # don't race with in-flight auto-dispatch
 
+# Check 8 (claude-quota-tier2-fallback-wrapper, 2026-05-26). Scan per-agent
+# logs for TIER2_FALLBACK_UNAVAILABLE / TIER2_FALLBACK_FAILED /
+# TIER2_FALLBACK_SKIPPED markers within the last 24h. The in-flight
+# healer-read-discipline PR introduces `SCAN_WINDOW_SECONDS`; this check
+# uses that constant when it lands and falls back to a local equivalent
+# until then. Either way, the value is 24h.
+TIER2_LOG_LOOKBACK_HOURS = 24
+# Match: '[<ts>] [agent] [LEVEL] TIER2_FALLBACK_<UNAVAILABLE|FAILED|SKIPPED>
+#         reason=<rate_limit|auth_401> ...' OR the same line shape without
+# the agent prefix (beacon_telegram_bot.log uses a slightly different
+# format). The reason= is non-greedy and bounded to keep the regex safe.
+_TIER2_FALLBACK_RE = re.compile(
+    r'\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?)\]'
+    r'.*?TIER2_FALLBACK_(?P<outcome>UNAVAILABLE|FAILED|SKIPPED)\s+'
+    r'reason=(?P<reason>rate_limit|auth_401)'
+)
+# Per-agent log files that the wrappers write to. agent_runner.py logs
+# to ~/agents/logs/<agent>.log; the bot logs to beacon_telegram_bot.log.
+_TIER2_LOG_NAMES = (
+    'forge.log', 'mirror.log', 'pulse.log', 'beacon.log',
+    'beacon_telegram_bot.log',
+)
+
 
 def log(msg: str, level: str = 'INFO') -> None:
     ts = datetime.now(timezone.utc).isoformat()
@@ -777,6 +800,93 @@ def check_unrouted_open_prs(open_prs: list[dict],
     return alerts
 
 
+# ---------- Check 8: Tier 1 quota+auth + Tier 2 missing/failed/skipped ----------
+
+def check_tier2_fallback_failures(state: dict) -> list[dict]:
+    """Scan per-agent logs for TIER2_FALLBACK_UNAVAILABLE / FAILED / SKIPPED
+    markers within the lookback window. Each unique (agent, outcome,
+    reason) combo produces one alert per cooldown window.
+
+    Composes with the in-flight healer-read-discipline PR's
+    `SCAN_WINDOW_SECONDS` when present — if that PR has merged by the
+    time this code runs, the module-level constant will already be in
+    `globals()`; we prefer it. Otherwise we fall back to
+    `TIER2_LOG_LOOKBACK_HOURS` (same 24h default).
+    """
+    # Compose with healer-read-discipline if it's landed
+    scan_window_secs = globals().get('SCAN_WINDOW_SECONDS')
+    if isinstance(scan_window_secs, int) and scan_window_secs > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=scan_window_secs)
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=TIER2_LOG_LOOKBACK_HOURS)
+
+    alerts: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    logs_dir = AGENTS_ROOT / 'logs'
+    for log_name in _TIER2_LOG_NAMES:
+        log_path = logs_dir / log_name
+        if not log_path.exists():
+            continue
+        try:
+            with open(log_path, errors='replace') as f:
+                for line in f:
+                    m = _TIER2_FALLBACK_RE.search(line)
+                    if not m:
+                        continue
+                    ts = _parse_ts(m.group('ts'))
+                    if not ts or ts < cutoff:
+                        continue
+                    outcome = m.group('outcome')
+                    reason = m.group('reason')
+                    agent = log_name.replace('.log', '').replace(
+                        'beacon_telegram_bot', 'beacon-bot',
+                    )
+                    sig = (agent, outcome, reason)
+                    if sig in seen:
+                        continue
+                    seen.add(sig)
+                    if outcome == 'UNAVAILABLE':
+                        cause = (
+                            f'Tier 1 hit {reason} and Tier 2 OAuth was not '
+                            f'provisioned at /home/larry/.claude-larry-personal/.'
+                        )
+                    elif outcome == 'FAILED':
+                        cause = (
+                            f'Tier 1 hit {reason} and the Tier 2 retry also '
+                            f'failed (Tier 2 credentials likely lapsed or '
+                            f'silently landed in the wrong account).'
+                        )
+                    else:  # SKIPPED
+                        cause = (
+                            f'Tier 1 hit {reason} on a --resume session; '
+                            f'Tier 2 retry skipped because session IDs are '
+                            f'account-bound. Task marked paused_on_tier1.'
+                        )
+                    key = f'tier2_fallback:{agent}:{outcome}:{reason}'
+                    alerts.append({
+                        'key': key,
+                        'message': (
+                            f'Agent `{agent}` Tier 2 fallback issue: '
+                            f'{outcome.lower()} ({reason}). {cause}'
+                        ),
+                        'subject': (
+                            f'pipeline-stall:tier2-fallback-'
+                            f'{outcome.lower()}-{reason}:{agent}'
+                        ),
+                        'suggested_action': (
+                            'Provision or re-provision Tier 2 OAuth per '
+                            '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. '
+                            'For resume-session SKIPPED, re-dispatch the work '
+                            'as a fresh task once Tier 1 is recovered (the '
+                            'old session ID can\'t be carried across accounts).'
+                        ),
+                    })
+        except OSError as e:
+            log(f'read {log_path} failed: {e}', 'WARN')
+    return alerts
+
+
 # ---------- Main ----------
 
 def run() -> int:
@@ -828,6 +938,11 @@ def run() -> int:
         all_alerts += check_unrouted_open_prs(open_prs, routing_events, state)
     except Exception as e:
         log(f'check_unrouted_open_prs failed: {type(e).__name__}: {e}', 'ERROR')
+    try:
+        all_alerts += check_tier2_fallback_failures(state)
+    except Exception as e:
+        log(f'check_tier2_fallback_failures failed: {type(e).__name__}: {e}',
+            'ERROR')
 
     if not all_alerts:
         log('no stalls detected', 'INFO')

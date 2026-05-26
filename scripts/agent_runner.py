@@ -7,6 +7,7 @@ Uses --system-prompt-file, stdin pipe, bypassPermissions.
 
 import subprocess
 import os
+import re
 import shutil
 import sys
 import json
@@ -67,6 +68,130 @@ RETRY_BASE_DELAY = 10
 RETRY_DELAY_MAX = 160
 # Back-compat alias for any external code reading the old constant.
 RETRY_DELAY = RETRY_BASE_DELAY
+
+# Tier 2 fallback (claude-quota-tier2-fallback-wrapper, 2026-05-26).
+# When Tier 1 (the agent's primary Claude Max account) hits rate-limit OR
+# auth-401, retry once with HOME swapped to Larry's personal Claude Max
+# OAuth dir. Separate accounts = separate quota + auth buckets.
+# Resume-discipline rule: --resume session IDs are NOT portable between
+# accounts. If session_id is set, we DM Larry instead of attempting a
+# silent Tier 2 retry that would fail with 'session not found'.
+TIER2_HOME = '/home/larry/.claude-larry-personal'
+
+RATE_LIMIT_RE = re.compile(
+    r'(hit your limit|5-hour|resets \d+)', re.IGNORECASE,
+)
+AUTH_401_RE = re.compile(
+    r'(401|Invalid authentication credentials|Failed to authenticate)',
+    re.IGNORECASE,
+)
+
+
+def classify_tier1_failure(stdout, stderr):
+    """Return 'rate_limit', 'auth_401', or None.
+
+    Detection runs against the combined stdout+stderr (the Claude CLI emits
+    rate-limit AND auth-401 messages on stdout — that's the 2026-05-26 gap).
+    Rate-limit takes precedence when both regexes match; the recovery is the
+    same either way (Tier 2 retry).
+    """
+    combined = (stdout or '') + '\n' + (stderr or '')
+    if RATE_LIMIT_RE.search(combined):
+        return 'rate_limit'
+    if AUTH_401_RE.search(combined):
+        return 'auth_401'
+    return None
+
+
+def tier2_available():
+    """True iff /home/larry/.claude-larry-personal/.claude/.credentials.json
+    exists. Checked BEFORE swapping HOME so a missing Tier 2 setup DMs Larry
+    rather than producing a confusing claude-no-credentials failure."""
+    return Path(TIER2_HOME, '.claude', '.credentials.json').exists()
+
+
+def _mark_paused_on_tier1(task_stem, failure_type):
+    """Write a sentinel in the in-flight state file so heal_pipeline_stall's
+    Check 8 can detect resume-tasks paused on Tier 1 quota/auth failure.
+
+    Failure is non-fatal; the DM via larry_alerts is the primary signal
+    (this is defense-in-depth state for the healer to surface if Larry
+    misses the DM)."""
+    if not task_stem:
+        return
+    try:
+        IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
+        target = IN_FLIGHT_DIR / f'{task_stem}.json'
+        try:
+            data = json.loads(target.read_text()) if target.exists() else {}
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        data['paused_on_tier1'] = {
+            'failure_type': failure_type,
+            'at': datetime.now().isoformat(),
+        }
+        target.write_text(json.dumps(data, indent=2))
+    except OSError:
+        pass
+
+
+def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id):
+    """DM Larry that Tier 1 failed and Tier 2 was unavailable / also failed
+    OR the session was a --resume that can't fall back. Uses larry_alerts
+    with the existing 'warning' severity; subject buckets on intent +
+    failure_type so different failure types get distinct cooldown windows.
+    """
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+    except Exception:
+        return
+    if failure_type == 'rate_limit':
+        recovery = (
+            'Rate-limit: wait for reset (~5h) OR provision Tier 2 per '
+            'docs/runbooks/restore-larry-personal-claude-oauth-tier2.md.'
+        )
+    elif failure_type == 'auth_401':
+        recovery = (
+            'Auth-401: run /tmp/auth_orchestrator.py from chat to '
+            'headless-re-auth Tier 1. Runbook: '
+            'docs/runbooks/restore-larry-personal-claude-oauth-tier2.md.'
+        )
+    else:
+        recovery = (
+            'Investigate the agent_runner log for the task and recover '
+            'manually.'
+        )
+    task_label = task_stem or 'unknown-task'
+    resume_note = ''
+    if session_id:
+        resume_note = (
+            ' Resume-mode task — cannot fall back to Tier 2 mid-session '
+            '(session IDs are account-bound). Marked paused_on_tier1 in '
+            'the in-flight state file.'
+        )
+    try:
+        la.append_alert(
+            source=f'agent-runner-{agent_id}',
+            severity='warning',
+            message=(
+                f'Task `{task_label}` ({agent_id}) hit Tier 1 {failure_type} '
+                f'and Tier 2 fallback was unavailable, failed, or skipped.'
+                f'{resume_note}'
+            ),
+            subject=f'claude_tier1_failed_tier2_unavailable:{failure_type}',
+            suggested_action=recovery,
+        )
+    except Exception:
+        pass
+
+
+def _build_cmd_for_tier(base_cmd, model, fallback, session_id):
+    """Return a fresh command list for a Tier 2 retry. Keeps everything
+    identical to the Tier 1 invocation EXCEPT we never thread --resume on
+    a Tier 2 retry — the caller has already vetted that no session_id was
+    set before reaching this helper, so the absence is structural."""
+    return list(base_cmd)
 
 
 def _retry_delay(attempt):
@@ -663,6 +788,105 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 result = _Result(proc.returncode, stdout_text, stderr_text)
                 output = result.stdout + result.stderr
 
+                # === Tier 2 fallback (2026-05-26) =========================
+                # Both rate-limit AND auth-401 messages from the Claude CLI
+                # go to stdout. The legacy stderr-only log line dropped them
+                # silently — today's OAuth expiry was misdiagnosed as rate
+                # limit because of this. Log BOTH streams on non-zero exit
+                # and detect from the combined output.
+                if result.returncode != 0:
+                    failure_type = classify_tier1_failure(
+                        result.stdout, result.stderr,
+                    )
+                    if failure_type:
+                        log(agent_id,
+                            'TIER1_FAILURE_DETECTED type=' + failure_type +
+                            ' stdout=' + repr((result.stdout or '')[:300]) +
+                            ' stderr=' + repr((result.stderr or '')[:300]),
+                            'WARN')
+                        # Resume-discipline rule: --resume session IDs are
+                        # NOT portable between accounts. A Tier 2 retry on a
+                        # resume task would fail with 'session not found'
+                        # AND would orphan the original session's context.
+                        # DM Larry + mark paused; the next retry would hit
+                        # the same wall, so exit the loop terminally.
+                        if session_id:
+                            log(agent_id,
+                                'TIER2_FALLBACK_SKIPPED reason=' + failure_type +
+                                ' cause=resume_session_account_bound',
+                                'WARN')
+                            _mark_paused_on_tier1(task_stem, failure_type)
+                            _dm_tier2_unavailable(
+                                failure_type, task_stem, agent_id, session_id,
+                            )
+                            return (False,
+                                    'Tier 1 ' + failure_type +
+                                    ' on --resume session; cannot fall back '
+                                    'to Tier 2 (session is account-bound). '
+                                    'DM sent.',
+                                    None)
+                        if not tier2_available():
+                            log(agent_id,
+                                'TIER2_FALLBACK_UNAVAILABLE reason=' +
+                                failure_type + ' home=' + TIER2_HOME +
+                                ' (missing credentials file)',
+                                'WARN')
+                            _dm_tier2_unavailable(
+                                failure_type, task_stem, agent_id, None,
+                            )
+                            # Fall through to existing retry behavior — a
+                            # transient rate-limit might clear on its own,
+                            # though auth-401 will keep failing the same way.
+                        else:
+                            log(agent_id,
+                                'TIER2_FALLBACK_ATTEMPT reason=' +
+                                failure_type + ' home=' + TIER2_HOME,
+                                'INFO')
+                            t2_env = dict(env)
+                            t2_env['HOME'] = TIER2_HOME
+                            t2_cmd = _build_cmd_for_tier(
+                                cmd, model, fallback, session_id,
+                            )
+                            try:
+                                t2 = subprocess.run(
+                                    t2_cmd,
+                                    input=prompt,
+                                    capture_output=True,
+                                    text=True,
+                                    env=t2_env,
+                                    cwd=cwd,
+                                    timeout=min(timeout if timeout > 0 else 14400, 1800),
+                                )
+                                if t2.returncode == 0:
+                                    log(agent_id,
+                                        'TIER2_FALLBACK_USED reason=' +
+                                        failure_type, 'INFO')
+                                    # Replace the result for downstream JSON
+                                    # parsing — the happy path takes over
+                                    # from here.
+                                    result = _Result(
+                                        t2.returncode, t2.stdout, t2.stderr,
+                                    )
+                                    output = result.stdout + result.stderr
+                                else:
+                                    log(agent_id,
+                                        'TIER2_FALLBACK_FAILED reason=' +
+                                        failure_type + ' exit=' +
+                                        str(t2.returncode), 'WARN')
+                                    _dm_tier2_unavailable(
+                                        failure_type, task_stem, agent_id, None,
+                                    )
+                            except (subprocess.TimeoutExpired,
+                                    FileNotFoundError, OSError) as t2_exc:
+                                log(agent_id,
+                                    'TIER2_FALLBACK_FAILED reason=' +
+                                    failure_type + ' exc=' +
+                                    type(t2_exc).__name__ + ': ' +
+                                    str(t2_exc), 'WARN')
+                                _dm_tier2_unavailable(
+                                    failure_type, task_stem, agent_id, None,
+                                )
+
                 if tm.check_for_rate_limit(output):
                     # Distinguish usage-cap (hours until reset) from transient
                     # 429 (seconds-to-minutes until reset). Usage caps get a
@@ -727,7 +951,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                         tm.report_success(account_id)
                         return True, output_text, None
 
-                log(agent_id, 'Non-zero exit (' + str(result.returncode) + '): ' + result.stderr[:500], 'WARN')
+                log(agent_id,
+                    'Non-zero exit (' + str(result.returncode) +
+                    '): stdout=' + repr((result.stdout or '')[:500]) +
+                    ' stderr=' + repr((result.stderr or '')[:500]),
+                    'WARN')
                 if attempt < MAX_RETRIES - 1:
                     time.sleep(_retry_delay(attempt))
                 continue
