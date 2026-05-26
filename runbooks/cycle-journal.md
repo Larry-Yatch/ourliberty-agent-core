@@ -4,6 +4,32 @@
 
 ---
 
+## Iteration 91 — 2026-05-26 16:50 UTC (interactive)
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Source repo: nominal.** Branch=main, clean tree, HEAD=acefffb=origin/main. Repo returned to main after PR #108 merge (per 0 open PRs + current gitStatus). ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-26T16:26:47Z (~24m ago), status=no-change at acefffb. Within 2h threshold. ✅
+- **(C) Agent liveness: 6/6 units active.** All systemctl active. Beacon: 2026-05-26T16:39Z (approved chain-discipline-gap forge dispatches — very fresh). Forge: 2026-05-24T14:40Z (~50h — calibrated timeout/ENETUNREACH). Mirror: 2026-05-23T19:11Z (~69h — calibrated HTTP 502/timeout). Pulse: 2026-05-24T18:59Z (~46h — /optimize, calibrated). ✅
+- **(D) Inboxes: nominal.** Forge: 2 tasks in active processing. `chain-discipline-gap-four-failure-modes` in-flight since 16:33Z (~17m, in-flight/ file confirmed); `chain-discipline-gap-beacon-plan-synthesis-stale-state` queued 16:39Z (~11m). Both well under 1h stale threshold. No new .invalid files (5 old closed entries in dead-letter). ✅
+- **(E) PRs: nominal.** 0 open PRs. PRs #107 (heal_pipeline_stall.py) + #108 (pulse-cycle-upgrade-spec) from iter 90 Mirror review → resolved. PRs #109, #112, #113, #114 merged 14:15Z–15:52Z (see Check H). ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest.** 4 merged since iter 90 (last 4h): #114 feat(d3.5+) AUTO_MERGE serializer + overlap queue 15:52Z; #113 docs(E1.5) SUPABASE cred discipline 15:03Z; #112 feat(e4-4d-b) chain-event daemon + Check III analyzer 14:15Z; #109 feat(e4.4d) PR-C droplet API + thresholds 14:17Z. 0 open forge/ PRs. 2 forge tasks in-flight (chain-discipline-v3 build). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~88d out). ✅
+- **Check I: skipped.** Tuesday (off day — fires Mon/Wed/Fri/Sun). Next firing: Wednesday 2026-05-27. ✅
+- **Check III: new capability available.** PR #112 shipped `scripts/pulse_check_iii.py`. Not eligible this cycle (Tuesday; fires Sunday; no prior artifact = first Sunday will auto-trigger). ✅
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43 [yellow]. ⚠️
+- **(Monitor) inbox-watcher MemoryMax Fix A+B (PR #102):** 5 cycles since PR #102 merged (iters 87–91). Cannot verify memory.events from session scope; no escalations or anomalies in C-check across all 5 cycles. Conditionally closing watch item — will reopen if memory anomaly surfaces.
+
+**Did:** Nothing. No always-fix conditions triggered.
+**Escalated:** Nothing. No new ask-then-do / never-auto findings.
+**Forge:** 4 shipped since iter 90 — #114 feat(d3.5+) AUTO_MERGE (15:52Z); #113 docs(E1.5) creds (15:03Z); #112 feat(e4-4d-b) chain-events+CheckIII (14:15Z); #109 feat(e4.4d) droplet API (14:17Z). 0 open. 2 forge tasks in active build (chain-discipline-v3).
+**Patterns:** Wrong-branch VM clone: 2/10 (iter 87 + 90) — not at G-rule threshold. Check I idempotency pending Larry authorization. Stuck-cycle timeout guard pending Larry authorization (iter 43). Telegram ENETUNREACH/502/timeout ongoing (G-rule dispatched iter 57, Beacon response not visible in Pulse outbox).
+**Learned:** PR #112 ships Check III. E4.4d major milestone: chain-event daemon + PR-C droplet API + thresholds config now all merged. AUTO_MERGE serializer (#114) closes D3.5+ gap. inbox-watcher MemoryMax watch item conditionally closed (5 cycles clean).
+
+---
+
 ## Iteration 90 — 2026-05-26 12:50 UTC (interactive)
 
 **Health:** ⚠️ Drift
