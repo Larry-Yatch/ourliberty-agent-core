@@ -63,6 +63,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import chain_event_shipper as _ces  # noqa: E402  # imported read-only for compute_event_id
 import safe_write_inbox  # noqa: E402
 import trust_policy      # noqa: E402
 
@@ -627,6 +628,92 @@ def format_resume_confirmation(backlog_count: int) -> str:
         f'▶ Approvals resumed. {backlog_count} plan(s) queued during pause '
         f'are about to be DMed individually.'
     )
+
+
+# -------------------- chain_event payload builder (E4.4e PR-A) --------------------
+
+# Concrete envelope shapes per spec § 7.1, with placeholders resolved at
+# emit time. PR-B's dashboard POST endpoint reads suggested_envelope_for_*
+# from the approval_request chain_event row and writes verbatim, only
+# adding `actor` (the authed user's email). For reject, PR-B also appends
+# the optional `Optional comment: <text>` line to the prompt when the
+# user supplies one — that's why the reject prompt below ends with no
+# comment placeholder.
+_APPROVE_PROMPT_TEMPLATE = (
+    'Larry approved the pending proposal via dashboard. '
+    'Source event: {event_id}. '
+    'Proceed per the approve-path that beacon_approval_handler.py describes '
+    'for this approval_request type. '
+    'Use the suggested_envelope_for_approve payload from the source event.'
+)
+
+_REJECT_PROMPT_TEMPLATE = (
+    'Larry rejected the pending proposal via dashboard. '
+    'Source event: {event_id}. '
+    'Soft reject — archive the pending item, do not abort any in-flight work, '
+    'route per the suggested_envelope_for_reject payload from the source event.'
+)
+
+
+def build_approval_request_chain_event(
+    payload: dict[str, Any],
+    *,
+    ts: Optional[str] = None,
+) -> dict[str, Any]:
+    """Build kwargs for `chain_event_emit.emit_event` for an approval_request.
+
+    Per spec § 4, the payload carries six fields:
+      - proposing_agent: 'beacon' (this module's owner)
+      - target_agent: who would receive the dispatched task on approve
+      - prompt: the full marker prompt body
+      - dedup_identity: the dispatch task_id (per PR-A dispatch task —
+        NOT a timestamp/UUID that would defeat dedup on re-emit)
+      - suggested_envelope_for_approve: concrete envelope for the dashboard
+        POST endpoint to write when Larry clicks Approve
+      - suggested_envelope_for_reject: concrete envelope for Reject
+
+    Per spec § 11 open question 1 (resolved via PR-A preflight CLARIFY 2026-05-26):
+    interpretation (A) — the suggested envelopes are CONCRETE dicts with
+    placeholders already resolved against the chain_event's own event_id.
+    `actor` is OMITTED; the dashboard fills it from the authed user.
+
+    Returns kwargs ready to splat into `chain_event_emit.emit_event(**...)`.
+    The caller (the bot, after add_pending) is responsible for the actual
+    Supabase write; this builder is pure so test fixtures can assert payload
+    shape without mocking supabase-py.
+    """
+    use_ts = ts or _now_utc()
+    task_id = payload['task_id']
+    event_id = _ces.compute_event_id(task_id, 'approval_request', use_ts)
+    suggested_envelope_for_approve = {
+        'task_id': f'larry-approval-{event_id}',
+        'source': 'dashboard',
+        'dedup_identity': f'larry-approval:{event_id}',
+        'timeout': 600,
+        'prompt': _APPROVE_PROMPT_TEMPLATE.format(event_id=event_id),
+    }
+    suggested_envelope_for_reject = {
+        'task_id': f'larry-reject-{event_id}',
+        'source': 'dashboard',
+        'dedup_identity': f'larry-reject:{event_id}',
+        'timeout': 600,
+        'prompt': _REJECT_PROMPT_TEMPLATE.format(event_id=event_id),
+    }
+    chain_payload = {
+        'proposing_agent': 'beacon',
+        'target_agent': payload.get('target_agent', 'forge'),
+        'prompt': payload.get('prompt', ''),
+        'dedup_identity': task_id,
+        'suggested_envelope_for_approve': suggested_envelope_for_approve,
+        'suggested_envelope_for_reject': suggested_envelope_for_reject,
+    }
+    return {
+        'event_type': 'approval_request',
+        'agent': 'beacon',
+        'task_id': task_id,
+        'ts': use_ts,
+        'payload': chain_payload,
+    }
 
 
 # -------------------- dispatch step --------------------

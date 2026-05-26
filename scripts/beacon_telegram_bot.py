@@ -54,6 +54,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 import beacon_approval_handler as approval  # noqa: E402
+import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
 from telegram_text_utils import strip_leading_slash  # noqa: E402
@@ -521,6 +522,9 @@ def _send_beacon_response(
             replan_count=inherited_replan_count,
             max_replans=inherited_max_replans,
         )
+        chain_event_emit.emit_event(
+            **approval.build_approval_request_chain_event(payload),
+        )
         try:
             approval.dispatch_approved(entry)
             approval.resolve(entry['id'], 'approved',
@@ -545,6 +549,9 @@ def _send_beacon_response(
         queued_during_pause=queued,
         replan_count=inherited_replan_count,
         max_replans=inherited_max_replans,
+    )
+    chain_event_emit.emit_event(
+        **approval.build_approval_request_chain_event(payload),
     )
     if queued:
         telegram_send(

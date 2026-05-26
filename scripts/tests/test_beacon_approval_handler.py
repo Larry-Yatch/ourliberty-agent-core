@@ -832,5 +832,117 @@ class RenderMarkerTest(unittest.TestCase):
                 self.assertIn(mtype, ah.REQUIRED_FIELDS)
 
 
+# -------------------- chain_event payload builder (E4.4e PR-A) --------------------
+
+
+class BuildApprovalRequestChainEventTest(unittest.TestCase):
+    """Spec § 4 contract: 6-field payload + dual concrete envelopes."""
+
+    def _payload(self, **overrides):
+        p = {
+            'task_id': 'task-emit-001',
+            'summary': 'Plan summary',
+            'target_agent': 'forge',
+            'prompt': 'A complete plan prompt for Forge to act on.',
+            'target_repo': 'ourliberty-agent-core',
+        }
+        p.update(overrides)
+        return p
+
+    def test_returns_emit_event_kwargs(self):
+        row = ah.build_approval_request_chain_event(self._payload())
+        # Caller does chain_event_emit.emit_event(**row) — confirm kwargs.
+        self.assertEqual(row['event_type'], 'approval_request')
+        self.assertEqual(row['agent'], 'beacon')
+        self.assertEqual(row['task_id'], 'task-emit-001')
+        self.assertIn('ts', row)
+        self.assertIn('payload', row)
+
+    def test_payload_has_all_six_spec_fields(self):
+        row = ah.build_approval_request_chain_event(self._payload())
+        payload = row['payload']
+        for field in (
+            'proposing_agent', 'target_agent', 'prompt', 'dedup_identity',
+            'suggested_envelope_for_approve', 'suggested_envelope_for_reject',
+        ):
+            self.assertIn(field, payload, f'missing field {field!r}')
+        self.assertEqual(payload['proposing_agent'], 'beacon')
+        self.assertEqual(payload['target_agent'], 'forge')
+        # dedup_identity is the dispatch task_id — NOT a timestamp/UUID
+        # (per PR-A dispatch task discipline).
+        self.assertEqual(payload['dedup_identity'], 'task-emit-001')
+
+    def test_both_envelopes_present(self):
+        row = ah.build_approval_request_chain_event(self._payload())
+        approve_env = row['payload']['suggested_envelope_for_approve']
+        reject_env = row['payload']['suggested_envelope_for_reject']
+        self.assertIsInstance(approve_env, dict)
+        self.assertIsInstance(reject_env, dict)
+        for env in (approve_env, reject_env):
+            for required in ('task_id', 'source', 'dedup_identity',
+                              'timeout', 'prompt'):
+                self.assertIn(required, env)
+            self.assertEqual(env['source'], 'dashboard')
+            self.assertEqual(env['timeout'], 600)
+
+    def test_event_id_substituted_into_envelopes(self):
+        # Compute expected event_id via the same path the builder uses.
+        ts = '2026-05-26T18:00:00+00:00'
+        row = ah.build_approval_request_chain_event(self._payload(), ts=ts)
+        import chain_event_shipper as ces  # local import; module-level loaded
+        expected_event_id = ces.compute_event_id(
+            'task-emit-001', 'approval_request', ts,
+        )
+        approve_env = row['payload']['suggested_envelope_for_approve']
+        reject_env = row['payload']['suggested_envelope_for_reject']
+        # task_id placeholder
+        self.assertEqual(approve_env['task_id'], f'larry-approval-{expected_event_id}')
+        self.assertEqual(reject_env['task_id'], f'larry-reject-{expected_event_id}')
+        # dedup_identity placeholder
+        self.assertEqual(approve_env['dedup_identity'],
+                          f'larry-approval:{expected_event_id}')
+        self.assertEqual(reject_env['dedup_identity'],
+                          f'larry-reject:{expected_event_id}')
+        # prompt references the event_id
+        self.assertIn(expected_event_id, approve_env['prompt'])
+        self.assertIn(expected_event_id, reject_env['prompt'])
+
+    def test_actor_omitted_from_envelopes(self):
+        # Per spec § 11 OQ1 resolution: dashboard fills `actor` at write
+        # time from the authed user. Builder must NOT stub it.
+        row = ah.build_approval_request_chain_event(self._payload())
+        approve_env = row['payload']['suggested_envelope_for_approve']
+        reject_env = row['payload']['suggested_envelope_for_reject']
+        self.assertNotIn('actor', approve_env)
+        self.assertNotIn('actor', reject_env)
+
+    def test_reject_prompt_has_no_comment_placeholder(self):
+        # Dashboard appends `Optional comment: <text>` at POST-time iff
+        # the user supplies one. Builder must NOT carry a literal placeholder.
+        row = ah.build_approval_request_chain_event(self._payload())
+        reject_prompt = row['payload']['suggested_envelope_for_reject']['prompt']
+        self.assertNotIn('<comment', reject_prompt)
+        self.assertNotIn('{comment', reject_prompt)
+        self.assertNotIn('Optional comment', reject_prompt)
+
+    def test_ts_default_is_iso_utc(self):
+        row = ah.build_approval_request_chain_event(self._payload())
+        ts = row['ts']
+        # Must round-trip through datetime.fromisoformat without error
+        # and end up UTC-aware.
+        parsed = datetime.fromisoformat(ts.replace('Z', '+00:00')
+                                          if ts.endswith('Z') else ts)
+        self.assertIsNotNone(parsed.tzinfo)
+        self.assertEqual(parsed.utcoffset(), timedelta(0))
+
+    def test_target_agent_defaults_to_forge(self):
+        # Some marker payloads may omit target_agent (rare; usually present)
+        # — default per existing add_pending behavior.
+        p = self._payload()
+        p.pop('target_agent')
+        row = ah.build_approval_request_chain_event(p)
+        self.assertEqual(row['payload']['target_agent'], 'forge')
+
+
 if __name__ == '__main__':
     unittest.main()
