@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""heal_stale_daemon_code.py — detect systemd daemons running pre-merge code.
+"""heal_stale_daemon_code.py — detect + auto-restart stale daemons.
 
-Chain-discipline-v2 (2026-05-25). Surfaces the failure mode where a fix
-to a long-running daemon's script is merged to main + synced to disk but
-the systemd-managed process is still running the pre-merge code, because
-nothing restarted the unit. The canonical case: PR #103's marker-parser
-fix landed on disk at 19:16Z but `ourliberty-outbox-notifier.service` had
-been running since 17:37 MDT (~23:37Z prior day) and continued executing
-the stale Python module until Larry manually restarted at 17:37 MDT on
-2026-05-25.
+Chain-discipline-v2 (2026-05-25); auto-restart added 2026-05-26. Surfaces
+and fixes the failure mode where a long-running daemon's script is merged
+to main + synced to disk but the systemd-managed process is still running
+pre-merge code. Canonical case: PR #103's marker-parser fix landed on disk
+at 19:16Z but `ourliberty-outbox-notifier.service` had been running since
+17:37 MDT prior day and continued executing the stale module until manual
+restart at 17:37 MDT 2026-05-25. Today (2026-05-26) the same shape
+appeared twice within hours after PR #114 and PR #118 merges, and Larry
+had to manually restart both times — this revision absorbs that loop.
 
 What this DOES NOT do:
-  - Auto-restart anything (same posture as the stuck-detector — surface
-    only, DM Larry, let him decide). Restart bypasses Mirror's review for
-    behavior changes and risks restarting during in-flight work.
+  - Restart units it hasn't detected as stale via the mtime predicate.
+  - Retry a `systemctl restart` that returned non-zero (broken units
+    don't get hammered; one attempt per 30-min cycle, DM Larry instead).
   - Catch stale Python imports inside a long-running daemon that runs as
     a single process across multiple script revisions (different failure
     mode; out of scope).
@@ -25,18 +26,26 @@ What this DOES:
        .service file to identify the script path.
     3. Stat the script's mtime.
     4. If script_mtime > service_start AND (script_mtime - service_start)
-       > RACE_AVOIDANCE_SEC: emit a DM via larry_alerts.
+       > RACE_AVOIDANCE_SEC: invoke `sudo -n systemctl restart <unit>`
+       and DM Larry the outcome (success body includes unit, mtime,
+       pre-restart timestamp, best-effort PR list inferred from git log;
+       failure body includes stderr + manual recovery command — no retry).
+    5. Per-unit 30-min restart cooldown prevents loops; post-cooldown
+       still-stale state escalates to a manual-investigation DM (6h
+       cooldown on that DM via larry_alerts subject discipline).
 
-  Per-service 6h cooldown is tracked in
-  ~/agents/state/heal-stale-daemon-code-cooldowns.json so a chronically
-  stale service doesn't spam Larry every 30 min.
+  Restart + DM cooldowns share `~/agents/state/heal-stale-daemon-code-cooldowns.json`
+  (`last_restart_ts` and the existing `last_alert_ts` field).
 
 Safe-by-construction:
-  - Read-only on systemctl + filesystem; no restart calls.
-  - Kill-switch aware (exits immediately on ~/agents/healers.disabled).
-  - Per-service cooldown (6h) on top of larry_alerts' own 1h cooldown.
-  - Idempotent (re-running with no changes is a no-op).
-  - Bounded blast radius (one DM per stale service per 6h).
+  - `sudo -n` (non-interactive): errors fast if sudoers ever revokes
+    passwordless access, surfaces as `auto-restart-failed:<unit>` DM
+    rather than wedging the systemd one-shot.
+  - Kill-switch aware: ~/agents/healers.disabled disables BOTH detection
+    AND restart for free (`main()` short-circuits before the per-unit loop).
+  - Per-unit 30-min restart cooldown bounds blast radius to one restart
+    per unit per cycle. Failure path is no-retry.
+  - Idempotent: re-running with no new staleness is a no-op.
 """
 from __future__ import annotations
 
@@ -67,12 +76,29 @@ SYSTEMCTL_TIMEOUT_S = 10
 # we'd alert during legitimate restart sequences.
 RACE_AVOIDANCE_SEC = 5 * 60
 
-# Per-service cooldown — don't re-alert about the same stale service
-# within this window. 6h matches Larry's stated cadence for this healer
-# (every 30 min the timer fires; we don't want 12 DMs/hour about the
-# same drift). Larger than larry_alerts' built-in 60-min warning cooldown
-# so it's the binding constraint when multiple subjects might collide.
+# Per-service DM cooldown — don't DM about a chronically still-stale unit
+# (post-auto-restart escalation case) more than once per window. 6h
+# matches the original DM-only behavior pre-2026-05-26 and is larger than
+# larry_alerts' built-in 60-min cooldown so this is the binding constraint
+# for the `still-stale-after-restart:<unit>` subject. Successful-restart
+# and restart-failure DMs use larry_alerts' own subject-keyed 60-min
+# cooldown (one DM per outcome shape per hour is the right rate when the
+# event itself is rare and informational).
 PER_SERVICE_COOLDOWN_SEC = 6 * 60 * 60
+
+# Per-unit restart cooldown — don't auto-restart the same unit twice
+# within this window. 30 min matches the healer timer cadence (one tick =
+# one restart attempt, max). If a restart fails OR the unit is still
+# stale at the next tick (script regressing, deploy looping, broken
+# unit), we suppress the second attempt and escalate to a manual-
+# investigation DM instead of hammering the unit.
+RESTART_COOLDOWN_SEC = 30 * 60
+
+# Subprocess timeout for `sudo -n systemctl restart`. systemctl restart
+# can legitimately take a few seconds on heavier units (TimeoutStartSec
+# default is 90s in systemd); we cap at 30s to bound healer tick time
+# but stay above realistic restart duration.
+RESTART_TIMEOUT_S = 30
 
 # Unit glob. `ourliberty-*.service` (NOT .timer; timers don't have
 # ExecStart pointing at code — they activate the underlying .service).
@@ -157,9 +183,29 @@ def in_cooldown(state: dict, unit: str, now: Optional[float] = None) -> bool:
 
 
 def mark_alerted(state: dict, unit: str, now: Optional[float] = None) -> None:
-    state['services'][unit] = {
-        'last_alert_ts': now if now is not None else time.time(),
-    }
+    # Merge into existing entry so we don't clobber last_restart_ts.
+    entry = state['services'].setdefault(unit, {})
+    entry['last_alert_ts'] = now if now is not None else time.time()
+
+
+def in_restart_cooldown(
+    state: dict, unit: str, now: Optional[float] = None,
+) -> bool:
+    entry = state['services'].get(unit)
+    if not entry:
+        return False
+    last = entry.get('last_restart_ts')
+    if not isinstance(last, (int, float)):
+        return False
+    now = now if now is not None else time.time()
+    return (now - last) < RESTART_COOLDOWN_SEC
+
+
+def mark_restarted(
+    state: dict, unit: str, now: Optional[float] = None,
+) -> None:
+    entry = state['services'].setdefault(unit, {})
+    entry['last_restart_ts'] = now if now is not None else time.time()
 
 
 # -------------------- systemctl shellouts --------------------
@@ -321,42 +367,153 @@ def is_stale(
     return (script_mtime - service_start) > race_avoidance_sec
 
 
+# -------------------- auto-restart + PR-inference helpers --------------------
+
+def auto_restart_unit(unit: str) -> tuple[int, str]:
+    """Run `sudo -n systemctl restart <unit>`. Return (returncode, stderr).
+
+    Returns (-1, descriptive) on FileNotFoundError / TimeoutExpired so the
+    caller can route to the failure DM uniformly. Sudoers contract on the
+    droplet is `(ALL) NOPASSWD: ALL`; -n errors immediately if that ever
+    changes rather than blocking the healer tick on a password prompt.
+    """
+    try:
+        result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'restart', unit],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+        return result.returncode, (result.stderr or '').strip()
+    except subprocess.TimeoutExpired:
+        return -1, f'systemctl restart timed out after {RESTART_TIMEOUT_S}s'
+    except FileNotFoundError:
+        return -1, 'sudo or systemctl not found in PATH'
+
+
+def infer_recent_prs(script_path: Path, since_iso: str) -> list[str]:
+    """Best-effort: return PR-shaped lines from `git log --since=<iso>`.
+
+    Returns [] on any error or no commits — caller treats empty as
+    "omit PR list from the DM body cleanly." Format per line:
+    `<short-sha> <subject>`. We pass the script path, not the repo, so the
+    log is naturally scoped to commits that touched THIS script (which is
+    what Larry wants to see when a stale-daemon DM fires).
+    """
+    try:
+        script_path = Path(script_path)
+        if not script_path.is_file():
+            return []
+        result = subprocess.run(
+            ['git', 'log', f'--since={since_iso}',
+             '--format=%h %s', '--', str(script_path)],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(script_path.parent),
+        )
+        if result.returncode != 0:
+            return []
+        lines = [
+            line.strip() for line in result.stdout.splitlines() if line.strip()
+        ]
+        return lines
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return []
+
+
 # -------------------- DM to Larry --------------------
 
-def dm_larry_about_stale(
+def _import_larry_alerts():
+    """Import larry_alerts module lazily (the module is in scripts/ next to us)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import larry_alerts as la  # noqa: E402
+    return la
+
+
+def dm_larry_auto_restarted(
     unit: str, script_path: Path, service_start: float, script_mtime: float,
+    pr_lines: list[str],
 ) -> bool:
-    """Append a warning-level alert via larry_alerts. Returns True on append."""
+    """Append a warning-level closure alert after a successful auto-restart."""
     try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import larry_alerts as la  # noqa: E402
-        # Format both times as human-readable UTC for the DM body.
+        la = _import_larry_alerts()
         svc_iso = datetime.fromtimestamp(service_start, tz=timezone.utc).isoformat()
         scr_iso = datetime.fromtimestamp(script_mtime, tz=timezone.utc).isoformat()
         gap_min = (script_mtime - service_start) / 60.0
+        body = (
+            f'Auto-restarted {unit} (script mtime newer than active-since by '
+            f'{gap_min:.1f} min; new code now live).\n\n'
+            f'Service start (pre-restart): {svc_iso}\n'
+            f'Script mtime:                {scr_iso}\n'
+            f'Script path:                 {script_path}'
+        )
+        if pr_lines:
+            body += '\n\nCommits since pre-restart active-start:\n' + '\n'.join(
+                f'  {line}' for line in pr_lines
+            )
         return la.append_alert(
             source='heal-stale-daemon-code',
             severity='warning',
-            subject=f'stale-daemon-code:{unit}',
-            message=(
-                f'Daemon {unit} appears to be running stale code.\n\n'
-                f'Service started: {svc_iso}\n'
-                f'Script mtime:    {scr_iso}\n'
-                f'Script path:     {script_path}\n'
-                f'Gap:             {gap_min:.1f} min (script newer than '
-                f'running process by this much).'
-            ),
+            subject=f'auto-restarted:{unit}',
+            message=body,
+        )
+    except Exception as e:
+        log(f'dm_larry_auto_restarted failed: {type(e).__name__}: {e}', 'WARN')
+        return False
+
+
+def dm_larry_auto_restart_failed(
+    unit: str, rc: int, stderr: str,
+) -> bool:
+    """Append a warning-level alert when `sudo -n systemctl restart` fails."""
+    try:
+        la = _import_larry_alerts()
+        body = (
+            f'Auto-restart of {unit} FAILED (rc={rc}).\n\n'
+            f'systemctl stderr:\n{stderr or "(empty)"}\n\n'
+            f'No automatic retry. Manual recovery:\n'
+            f'  sudo systemctl restart {unit}'
+        )
+        return la.append_alert(
+            source='heal-stale-daemon-code',
+            severity='warning',
+            subject=f'auto-restart-failed:{unit}',
+            message=body,
+            suggested_action=f'sudo systemctl restart {unit}',
+        )
+    except Exception as e:
+        log(f'dm_larry_auto_restart_failed failed: {type(e).__name__}: {e}',
+            'WARN')
+        return False
+
+
+def dm_larry_still_stale_after_restart(
+    unit: str, last_restart_ts: float,
+) -> bool:
+    """Append a warning alert when a unit is still stale after the cooldown."""
+    try:
+        la = _import_larry_alerts()
+        restart_iso = datetime.fromtimestamp(
+            last_restart_ts, tz=timezone.utc,
+        ).isoformat()
+        body = (
+            f'{unit} still stale after auto-restart at {restart_iso}; '
+            f'manual investigation needed.\n\n'
+            f'The healer attempted a restart at the timestamp above but the '
+            f'script is still newer than the unit\'s ActiveEnterTimestamp. '
+            f'No further auto-restart attempts will be made.'
+        )
+        return la.append_alert(
+            source='heal-stale-daemon-code',
+            severity='warning',
+            subject=f'still-stale-after-restart:{unit}',
+            message=body,
             suggested_action=(
-                f'Restart the unit to pick up the latest script: '
-                f'`sudo systemctl restart {unit}`. If the staleness is '
-                f'intentional (e.g. holding off a behavior change until a '
-                f'maintenance window), suppress further alerts by touching '
-                f'the cooldown file: `touch {STATE_FILE}` then edit the JSON '
-                f'to bump `services.{unit}.last_alert_ts` forward.'
+                f'Investigate why {unit} did not pick up the new code: '
+                f'`journalctl -u {unit} -n 200` and '
+                f'`systemctl status {unit}`.'
             ),
         )
     except Exception as e:
-        log(f'dm_larry_about_stale failed: {type(e).__name__}: {e}', 'WARN')
+        log(f'dm_larry_still_stale_after_restart failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
         return False
 
 
@@ -366,11 +523,14 @@ def check_unit(
     unit: str, state: dict, now: Optional[float] = None,
 ) -> str:
     """Inspect one unit. Return one of:
-       'alerted'         — DM sent.
-       'cooldown'        — stale but in 6h cooldown; suppressed.
-       'race-window'     — modified recently but inside race-avoidance.
-       'fresh'           — script older than (or equal to) service start.
-       'unparseable'     — couldn't extract service-start or script path.
+       'auto-restarted'           — restart returned rc=0; closure DM sent.
+       'auto-restart-failed'      — restart returned non-zero; failure DM sent.
+       'restart-cooldown'         — stale but inside 30-min restart cooldown.
+       'still-stale-after-restart' — stale, past cooldown, prior restart did
+                                    not help; escalation DM sent (6h-gated).
+       'race-window'              — modified recently but inside race-avoidance.
+       'fresh'                    — script older than (or equal to) service start.
+       'unparseable'              — couldn't extract service-start or script path.
     """
     raw_ts = systemctl_show(unit, 'ActiveEnterTimestamp')
     service_start = parse_systemd_timestamp(raw_ts) if raw_ts is not None else None
@@ -400,27 +560,54 @@ def check_unit(
             return 'race-window'
         return 'fresh'
 
-    if in_cooldown(state, unit, now=now):
-        log(f'{unit}: stale (script newer by '
-            f'{(script_mtime - service_start) / 60:.1f}min) — '
-            f'in 6h cooldown; suppressing DM')
-        return 'cooldown'
-
-    sent = dm_larry_about_stale(unit, script_path, service_start, script_mtime)
-    if sent:
+    # Stale. Decide between (a) inside restart cooldown → escalation-or-suppress
+    # vs (b) outside cooldown → attempt restart.
+    if in_restart_cooldown(state, unit, now=now):
+        last_restart_ts = state['services'].get(unit, {}).get('last_restart_ts')
+        # Unit was restarted recently AND is still stale — escalate to a
+        # manual-investigation DM (gated by the existing 6h subject cooldown
+        # so a chronically broken unit doesn't DM every tick).
+        if in_cooldown(state, unit, now=now):
+            log(f'{unit}: still stale after restart at '
+                f'{last_restart_ts}; in 6h DM cooldown — suppressing '
+                f'escalation DM', 'INFO')
+            return 'restart-cooldown'
+        sent = dm_larry_still_stale_after_restart(unit, last_restart_ts or 0.0)
+        # Mark the alert regardless of larry_alerts internal-cooldown outcome
+        # so the healer's own 6h gate is the binding constraint.
         mark_alerted(state, unit, now=now)
         save_state(state)
-        log(f'{unit}: ALERTED — script {script_path} newer than service '
-            f'start by {(script_mtime - service_start) / 60:.1f}min')
-        return 'alerted'
-    # Append failed (larry_alerts internal cooldown collision or write
-    # error). Still record locally so we don't hammer larry_alerts on the
-    # next tick — its own cooldown would suppress anyway.
-    mark_alerted(state, unit, now=now)
+        if sent:
+            log(f'{unit}: STILL STALE AFTER RESTART — escalation DM sent', 'WARN')
+        else:
+            log(f'{unit}: still-stale escalation DM suppressed by '
+                f'larry_alerts internal cooldown or write error', 'WARN')
+        return 'still-stale-after-restart'
+
+    # Outside restart cooldown — attempt restart now.
+    pre_restart_iso = datetime.fromtimestamp(
+        service_start, tz=timezone.utc,
+    ).isoformat()
+    rc, stderr = auto_restart_unit(unit)
+    # Record the attempt under the cooldown clock regardless of outcome.
+    # A failed restart STILL gets the 30-min cooldown — we don't hammer
+    # broken units between healer ticks.
+    mark_restarted(state, unit, now=now)
     save_state(state)
-    log(f'{unit}: stale but larry_alerts.append_alert returned False '
-        f'(internal cooldown or write error)', 'WARN')
-    return 'alerted'
+
+    if rc == 0:
+        pr_lines = infer_recent_prs(script_path, pre_restart_iso)
+        dm_larry_auto_restarted(
+            unit, script_path, service_start, script_mtime, pr_lines,
+        )
+        log(f'{unit}: AUTO-RESTARTED — script {script_path} newer than '
+            f'service start by {(script_mtime - service_start) / 60:.1f}min; '
+            f'PRs since pre-restart: {len(pr_lines)}')
+        return 'auto-restarted'
+
+    dm_larry_auto_restart_failed(unit, rc, stderr)
+    log(f'{unit}: AUTO-RESTART FAILED rc={rc} stderr={stderr[:200]!r}', 'WARN')
+    return 'auto-restart-failed'
 
 
 # -------------------- main --------------------
@@ -438,8 +625,9 @@ def main() -> int:
 
     state = load_state()
     counts = {
-        'alerted': 0, 'cooldown': 0, 'race-window': 0,
-        'fresh': 0, 'unparseable': 0,
+        'auto-restarted': 0, 'auto-restart-failed': 0,
+        'restart-cooldown': 0, 'still-stale-after-restart': 0,
+        'race-window': 0, 'fresh': 0, 'unparseable': 0,
     }
     for unit in units:
         outcome = check_unit(unit, state)
