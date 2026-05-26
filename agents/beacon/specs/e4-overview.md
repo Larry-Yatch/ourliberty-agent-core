@@ -54,6 +54,7 @@ This is the largest single phase in the E plan by scope. It's also the highest-l
 | First-of-day digest format | **5-7 bullets ~7am MDT**: yesterday's merges, today's in-flight tasks, blockers needing decision, costs vs. budget | Default; configurable later. Locked 2026-05-24 round 3. |
 | Mission Control parallel-run length | **≥1 week; Larry calls cutover** | Decommission once Larry confirms he hasn't gone back to MC. No fixed deadline. Locked 2026-05-24 round 3. |
 | Direct UI CRUD in dashboard | **REQUIRED in E4.4 scope**: + New Program/Project/Task buttons, inline-edit on all fields, delete-via-overflow with confirm. Also `+ New Decision` in Project sidebar. | Without UI CRUD, daily PM work would require opening Telegram for routine adds/edits — that's the comms-channel-overload pattern E4 was built to fix. Locked 2026-05-24 round 4 after gap surfaced during E4.2 dispatch planning. |
+| E4.4d scope (System tab / chain telemetry MVP-2) | **Six decisions A–F locked**: A hybrid ingestion (poll initial, push-compatible schema); B `chain_events` table + `agent_sessions` VIEW + on-read PR pipeline route; C three new droplet API endpoints (active-sessions, cgroup-stats, worktrees) extending existing service; D tighter task_type-gated thresholds in editable config file; E `Operations` parent tab with System as first child; F public for V1 (V2 auth in separate project). | Triggered by the 2026-05-25 Mirror 71-min hang on PR #101 — Larry had no visibility into stuck-state until asking. Existing dashboard surfaces zero of the agent runtime; this sub-phase closes the gap. Full sub-spec at `agents/beacon/specs/e4-4d-system-tab.md`. Locked 2026-05-25 via Telegram spec round (Beacon ↔ Larry). |
 
 ---
 
@@ -340,6 +341,23 @@ Full sub-spec: [agents/beacon/specs/e4-4-dashboard-ui-rebuild.md](specs/e4-4-das
 - **E4.4c — CRUD + forms** (~1 day, ~800 LOC, ~$10 LLM): + New buttons, inline edit, delete via overflow. Full CRUD per overview § 5.4 "Direct UI CRUD" subsection.
 
 Each sub-sub-phase ships as an independent Forge dispatch with Larry review between. Total estimate: ~$25-35 LLM, ~2-2.5h wall clock, ~50-60 min Larry-time spread across the 3 dispatches.
+
+### E4.4d — Operations tab + System view (chain telemetry MVP-2, NEW 2026-05-25; ~3 days, ~$19 LLM across 4 PRs)
+
+Added 2026-05-25 in response to the Mirror 71-min hang on PR #101 — Larry had no signal that anything was stuck and had to ask. The existing dashboard surfaces zero of the agent runtime. E4.4d closes the visibility gap.
+
+Full sub-spec: [agents/beacon/specs/e4-4d-system-tab.md](specs/e4-4d-system-tab.md).
+
+Five views inside a new `Operations` parent tab (System is the first child):
+- **Active Sessions** — what's running NOW per agent (task_id, model, duration, cost, stuck indicator + copy-paste unstick recipes).
+- **Escalations + Alerts** — pulse-escalations.json + larry-alerts.jsonl + sentinel-alerts.jsonl surfaced as a unified panel with `needs_response=true` entries pinned at top + per-event mark-as-read.
+- **System Health** — cgroup memory, worktree count + size, last-good-update timestamp.
+- **Chain Event Feed** — last 50 events from `chain_events` Supabase table (dispatches, completions, marker emits, AUTO_MERGEs, marker-errors).
+- **PR Pipeline** — open PRs across both repos with chain-state cross-referenced (dispatched / building / opened / reviewing / pending-merge / in-revision / escalated / merged).
+
+Implementation staging (4 PRs): PR-A migration (`0004_chain_events.sql`) → PR-B ingestion daemon (`chain_event_shipper.py` + healer) → PR-C droplet API endpoints → PR-D Operations tab UI + System view. PR-A first; B + C in parallel; D last. MVP-2 surface-only (NO auto-remediation, NO action paths).
+
+Ships independent of E4.4b/c (different surface, different concern); sequencing TBD when Larry dispatches.
 
 ### E4.3 — Backend extension: droplet `pm_writer.py` + Beacon CLAUDE.md updates (Forge dispatch ~1 day; FOLLOWS E4.4 per round 5)
 

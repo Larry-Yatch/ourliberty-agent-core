@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-25 (Iteration 86)
+## Status snapshot — updated 2026-05-26 (Iteration 87)
 
-Eighty-six cycles/responses run. **System: ⚠️ Drift (dirty tree only — recurring interactive-cycle pattern).** Iter 86 findings (20:47Z May 25) — A (dirty tree: MEMORY.md staged + cycle-journal.md unstaged from iter 85), B (sync error — same root cause), C (6/6 units active; Beacon live in Larry architecture session at 20:46Z), D (all inboxes empty), E (0 open PRs), H (3 merged since iter 85: #101 check-i heuristic, #102 worktree cleanup + MemoryHigh, #103 chain-discipline). Check I skipped (4 blocks already today, idempotency fix pending). Fix APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry authorization. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
+Eighty-seven cycles/responses run. **System: ⚠️ Drift (wrong branch — VM clone on `larry/e4-4d-system-tab-spec` for PR #104 spec work).** Iter 87 findings (00:35Z May 26) — A (wrong branch: sync blocked "Wrong branch" error at 00:23Z, clean tree), B (sync error — root cause is A), C (6/6 units active; Beacon fresh 23:09Z dispatching Mirror review for PR #104), D (all inboxes empty), E (1 open PR #104 — larry/e4-4d-system-tab-spec, Mirror review in flight), H (0 open forge/ PRs). Check I skipped (Tuesday off day). APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` still pending Larry authorization. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]). Journal append made to spec branch (not committed — deferred to when repo returns to main).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
