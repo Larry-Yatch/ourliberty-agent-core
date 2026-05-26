@@ -54,9 +54,9 @@ The Claude CLI follows `$HOME` for its credentials path. By isolating HOME to `/
 
 ## STEP 2 — Run the headless OAuth orchestrator
 
-The headless OAuth pattern (recovered today via `/tmp/auth_orchestrator.py`) spawns `claude login` under the Tier 2 HOME, scrapes the device-code URL from stdout, presents it to Larry via Telegram DM, waits for browser-side completion, then verifies with `claude auth status`.
+The headless OAuth pattern (recovered today via `scripts/auth_orchestrator_tier2.py`) spawns `claude login` under the Tier 2 HOME, scrapes the device-code URL from stdout, presents it to Larry via Telegram DM, waits for browser-side completion, then verifies with `claude auth status`.
 
-**Recreate the orchestrator script if it's no longer at `/tmp/auth_orchestrator.py`:**
+**Recreate the orchestrator script if it's no longer at `scripts/auth_orchestrator_tier2.py`:**
 
 ```python
 #!/usr/bin/env python3
@@ -78,7 +78,7 @@ Then run:
 
 ```bash
 source ~/credentials/.env.larry
-HOME=/home/larry/.claude-larry-personal python3 /tmp/auth_orchestrator.py
+HOME=/home/larry/.claude-larry-personal python3 scripts/auth_orchestrator_tier2.py
 ```
 
 The orchestrator will DM Larry a one-time device-code URL.
