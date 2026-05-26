@@ -21,10 +21,29 @@ Adapted from heal_pr_auto_merge.py (E1.3) for kill-switches, dry-run
 defaults, activation-on-first-real-drift, state-file dedup, and DM body
 shape.
 
+Canonical-source reads
+----------------------
+The registry comes from `origin/main` (`git fetch origin main` + `git show
+origin/main:config/token-rotation-schedule.json`) — NOT from the working
+tree of whatever branch is checked out locally. Two false positives on
+2026-05-26 traced to a stale local checkout: a registry entry merged via
+PR #113 looked like drift because the droplet's local checkout was on a
+feature branch.
+
+Behaviors:
+  - `--source origin` (default): fetch + read canonical. If fetch or show
+    fails (network down, GitHub auth lapse, transient git error), WARN-log
+    + DM Larry once per 6h cooldown ("can't reach origin/main; falling
+    back to local — may produce false positives"), then read local.
+  - `--source local`: skip fetch entirely; read working tree. Useful for
+    debugging registry shape against a local edit, or pre-merge sanity
+    checks.
+
 Stdlib only.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -41,16 +60,24 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-credential-registry-drift.he
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-credential-registry-drift.json'
 
 REGISTRY_PATH = Path(__file__).resolve().parent.parent / 'config' / 'token-rotation-schedule.json'
+REPO_ROOT = REGISTRY_PATH.parent.parent  # /home/larry/agent-core in prod
+REGISTRY_REL_PATH = 'config/token-rotation-schedule.json'
 
 ENV_HEALER_ENABLED = 'OURLIBERTY_CREDENTIALS_HEALER_ENABLED'
 
 # 6h cadence per E1.5 design. Re-DM the same drift only once per 6h.
 RE_DM_WINDOW = timedelta(hours=6)
 
+# Same 6h window for the fetch-fallback DM — drift-healer ticks every 6h,
+# so this caps the fallback DM at one per outage window. Stored as ISO
+# timestamp in `state['_meta']['fetch_fallback_last_dm']`.
+FETCH_FALLBACK_DM_WINDOW = timedelta(hours=6)
+
 # gh CLI scope-line shape.
 _GH_SCOPES_RE = re.compile(r"Token scopes:\s*(.+)$", re.MULTILINE)
 
 GH_TIMEOUT_S = 15
+GIT_TIMEOUT_S = 30
 
 
 # -------------------- logging + heartbeat --------------------
@@ -183,13 +210,155 @@ def dm_larry(
 
 # -------------------- registry loader --------------------
 
-def load_registry(path: Path = REGISTRY_PATH) -> Optional[dict[str, Any]]:
-    """Return parsed registry dict or None on read/parse error."""
+def load_registry(path: Optional[Path] = None) -> Optional[dict[str, Any]]:
+    """Return parsed registry dict from a local file or None on read/parse
+    error. Used as the `--source local` path and as the fallback when
+    `--source origin` fails.
+
+    `path` is resolved against the module-level REGISTRY_PATH at call
+    time (NOT a function default) so tests can mock REGISTRY_PATH.
+    """
+    if path is None:
+        path = REGISTRY_PATH
     try:
         return json.loads(path.read_text())
     except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
         log(f'load_registry failed for {path}: {type(e).__name__}: {e}', 'WARN')
         return None
+
+
+def load_registry_from_origin(
+    repo_root: Path = REPO_ROOT,
+    rel_path: str = REGISTRY_REL_PATH,
+    timeout_s: int = GIT_TIMEOUT_S,
+) -> Optional[dict[str, Any]]:
+    """Fetch origin/main and read `rel_path` from it. Returns parsed dict
+    or None on any subprocess / parse failure.
+
+    No shell-out interpolation: all arguments are constants or pre-bound
+    paths. `repo_root` is the working-tree root (must contain `.git`).
+
+    The two-step fetch + show is intentional: `git fetch origin main`
+    updates the remote-tracking ref FETCH_HEAD / origin/main without
+    touching the working tree, and `git show origin/main:<path>` reads
+    the canonical blob from that ref. Neither step modifies the local
+    branch or checkout state.
+    """
+    try:
+        fetch = subprocess.run(
+            ['git', '-C', str(repo_root), 'fetch', 'origin', 'main', '--quiet'],
+            capture_output=True, text=True, timeout=timeout_s,
+        )
+        if fetch.returncode != 0:
+            log(f'load_registry_from_origin: git fetch returned {fetch.returncode}: '
+                f'{(fetch.stderr or "")[:200]}', 'WARN')
+            return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'load_registry_from_origin: git fetch failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+
+    try:
+        show = subprocess.run(
+            ['git', '-C', str(repo_root), 'show', f'origin/main:{rel_path}'],
+            capture_output=True, text=True, timeout=timeout_s,
+        )
+        if show.returncode != 0:
+            log(f'load_registry_from_origin: git show returned {show.returncode}: '
+                f'{(show.stderr or "")[:200]}', 'WARN')
+            return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'load_registry_from_origin: git show failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+
+    try:
+        return json.loads(show.stdout)
+    except json.JSONDecodeError as e:
+        log(f'load_registry_from_origin: JSON parse failed: {e}', 'WARN')
+        return None
+
+
+def _should_dm_fetch_fallback(
+    state: dict[str, Any], now: Optional[datetime] = None,
+    window: timedelta = FETCH_FALLBACK_DM_WINDOW,
+) -> bool:
+    """True iff the fetch-fallback DM hasn't fired in the last `window`."""
+    now = now or datetime.now(timezone.utc)
+    meta = state.get('_meta') or {}
+    last_iso = meta.get('fetch_fallback_last_dm')
+    if not last_iso:
+        return True
+    try:
+        last = datetime.fromisoformat(last_iso)
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return True
+    return (now - last) >= window
+
+
+def _record_fetch_fallback_dm(
+    state: dict[str, Any], now: Optional[datetime] = None,
+) -> None:
+    now = now or datetime.now(timezone.utc)
+    state.setdefault('_meta', {})['fetch_fallback_last_dm'] = now.isoformat()
+
+
+def _fetch_fallback_message() -> tuple[str, str, str]:
+    message = (
+        f'drift-healer can\'t reach origin/main; falling back to local '
+        f'checkout — may produce false positives if local is stale. '
+        f'Cause is typically transient (network blip, GitHub outage, '
+        f'`gh auth` token lapse); next 6h tick will retry origin/main.'
+    )
+    subject = (
+        'credential-drift-healer: origin/main unreachable, fell back to '
+        'local checkout'
+    )
+    suggested = (
+        f'On the droplet (ssh larry@134.209.44.80): '
+        f'`cd /home/larry/agent-core && git fetch origin main --quiet`. '
+        f'If it errors, the error explains the root cause (auth, network, '
+        f'remote down). The healer continues every 6h; once `git fetch '
+        f'origin main` works there, the next tick reads origin/main again '
+        f'and this DM stops.'
+    )
+    return message, subject, suggested
+
+
+def resolve_registry(
+    source: str,
+    state: dict[str, Any],
+    now: Optional[datetime] = None,
+) -> Optional[dict[str, Any]]:
+    """Return the registry to compare against. Honors --source semantics:
+
+      - 'origin' (default): try `load_registry_from_origin`; on failure,
+        log WARN, fire a 6h-cooldown fallback DM (single per outage
+        window), then read local file.
+      - 'local': read local file directly. No fetch attempt, no fallback
+        DM (intentional debugging mode).
+
+    Returns None only when BOTH origin and local reads fail (catastrophic;
+    caller already handles).
+    """
+    if source == 'local':
+        return load_registry()
+
+    reg = load_registry_from_origin()
+    if reg is not None:
+        return reg
+
+    # Origin failed — fall back to local with WARN + cooldowned DM.
+    log('falling back to local checkout because origin/main read failed',
+        'WARN')
+    if _should_dm_fetch_fallback(state, now=now):
+        msg, subj, sug = _fetch_fallback_message()
+        if dm_larry(message=msg, subject=subj, suggested_action=sug,
+                    severity='warning'):
+            _record_fetch_fallback_dm(state, now=now)
+    return load_registry()
 
 
 # -------------------- scanners --------------------
@@ -464,16 +633,19 @@ def run_once(
     scan_overrides: Optional[dict[str, set[str]]] = None,
     now: Optional[datetime] = None,
     dry_run_override: Optional[bool] = None,
+    source: str = 'origin',
 ) -> dict[str, int]:
     """Single-tick orchestration. Returns counts dict (also for tests).
 
     Args:
-        registry: pre-loaded registry; None to load from disk.
+        registry: pre-loaded registry; None to resolve via `source`.
         state: pre-loaded state; None to load from disk (with save on exit).
         scan_overrides: test hook — bypass live scanners for specific
             storage_locations.
         now: anchor for re-DM window dedup.
         dry_run_override: when set, overrides env-var detection.
+        source: 'origin' (default — canonical-source read with fetch +
+            fallback) or 'local' (working-tree read, no fetch).
     """
     counts = {
         'missing_registry_entry': 0,
@@ -487,9 +659,15 @@ def run_once(
         return counts
     heartbeat()
 
+    state_was_none = state is None
+    if state is None:
+        state = load_state()
+
     if registry is None:
-        registry = load_registry()
+        registry = resolve_registry(source, state, now=now)
         if registry is None:
+            if state_was_none:
+                save_state(state)
             return counts
 
     dry_run = (
@@ -497,10 +675,6 @@ def run_once(
         if dry_run_override is not None
         else not healer_enabled()
     )
-
-    state_was_none = state is None
-    if state is None:
-        state = load_state()
 
     drifts, live_keys = detect_drift(registry, scan_overrides=scan_overrides)
 
@@ -553,9 +727,37 @@ def run_once(
     return counts
 
 
-def main() -> int:
+def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog='heal_credential_registry_drift',
+        description=(
+            'Credential registry drift healer. By default reads the registry '
+            'from origin/main (canonical source — what is actually merged), '
+            'with a WARN + 6h-cooldown DM fallback to the local working tree '
+            'if origin is unreachable. Use --source local to bypass the '
+            'fetch and read the local file directly (debugging or pre-merge '
+            'sanity checks).'
+        ),
+    )
+    parser.add_argument(
+        '--source',
+        choices=['origin', 'local'],
+        default='origin',
+        help=(
+            'Where to read `config/token-rotation-schedule.json` from. '
+            "'origin' (default) runs `git fetch origin main` + "
+            "`git show origin/main:<path>` and falls back to local on "
+            "failure (DMing Larry once per 6h). 'local' reads the working "
+            'tree directly, no fetch, no fallback DM.'
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = _parse_args(argv)
     try:
-        run_once()
+        run_once(source=args.source)
         return 0
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge
         log(f'FATAL: {type(e).__name__}: {e}', 'ERROR')

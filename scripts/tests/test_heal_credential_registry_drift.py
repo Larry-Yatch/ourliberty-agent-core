@@ -444,5 +444,178 @@ class RenderingTest(_IsolatedAgentsRoot):
         self.assertIn('docs/x.md', sug)
 
 
+class ResolveRegistryOriginTest(_IsolatedAgentsRoot):
+    """origin/main canonical reads + fetch-fallback behavior."""
+
+    def test_origin_success_reads_from_git_show_stdout(self):
+        """Happy path: git fetch + git show succeed, stdout is parsed."""
+        registry_json = json.dumps(_registry([_cred('CANON_TOKEN')]))
+        with mock.patch('subprocess.run') as mock_sub:
+            # First call: git fetch (rc=0). Second call: git show (stdout=json).
+            mock_sub.side_effect = [
+                mock.Mock(returncode=0, stdout='', stderr=''),
+                mock.Mock(returncode=0, stdout=registry_json, stderr=''),
+            ]
+            reg = h.resolve_registry(
+                source='origin', state={'drifts': {}, '_meta': {}},
+            )
+        self.assertIsNotNone(reg)
+        self.assertEqual(reg['credentials'][0]['name'], 'CANON_TOKEN')
+        # Verify the two subprocess calls have the expected arg shape.
+        self.assertEqual(mock_sub.call_count, 2)
+        fetch_args = mock_sub.call_args_list[0].args[0]
+        show_args = mock_sub.call_args_list[1].args[0]
+        self.assertEqual(fetch_args[0:3], ['git', '-C', str(h.REPO_ROOT)])
+        self.assertIn('fetch', fetch_args)
+        self.assertIn('main', fetch_args)
+        self.assertIn('show', show_args)
+        self.assertTrue(
+            any('origin/main:' in a for a in show_args),
+            f'no origin/main:<path> arg in {show_args!r}',
+        )
+
+    def test_origin_fetch_fail_falls_back_to_local_with_dm(self):
+        """git fetch returns non-zero: log WARN, fire fallback DM once,
+        read local file as fallback. State records the DM."""
+        # Write a registry to the local REGISTRY_PATH (the fallback source).
+        local_reg = _registry([_cred('LOCAL_TOKEN')])
+        # Patch REGISTRY_PATH to a temp file so the fallback succeeds.
+        with tempfile.TemporaryDirectory() as td:
+            local_path = Path(td) / 'token-rotation-schedule.json'
+            local_path.write_text(json.dumps(local_reg))
+            dm_calls = []
+
+            def fake_dm(message, subject, suggested_action, severity='warning'):
+                dm_calls.append({
+                    'message': message, 'subject': subject,
+                    'suggested_action': suggested_action, 'severity': severity,
+                })
+                return True
+
+            state = {'drifts': {}, '_meta': {}}
+            with mock.patch.object(h, 'REGISTRY_PATH', local_path), \
+                 mock.patch.object(h, 'dm_larry', fake_dm), \
+                 mock.patch('subprocess.run') as mock_sub:
+                mock_sub.return_value = mock.Mock(
+                    returncode=128, stdout='', stderr='fatal: could not read',
+                )
+                reg = h.resolve_registry(source='origin', state=state)
+
+            self.assertIsNotNone(reg)
+            self.assertEqual(reg['credentials'][0]['name'], 'LOCAL_TOKEN')
+            self.assertEqual(len(dm_calls), 1)
+            self.assertIn('origin/main', dm_calls[0]['subject'])
+            self.assertIn('falling back', dm_calls[0]['message'].lower())
+            self.assertIn(
+                'fetch_fallback_last_dm', state.get('_meta', {}),
+            )
+
+    def test_fetch_fallback_dm_suppressed_within_cooldown(self):
+        """Second origin failure inside the 6h window must not re-DM."""
+        local_reg = _registry([_cred('LOCAL_TOKEN')])
+        with tempfile.TemporaryDirectory() as td:
+            local_path = Path(td) / 'token-rotation-schedule.json'
+            local_path.write_text(json.dumps(local_reg))
+            dm_calls = []
+
+            def fake_dm(message, subject, suggested_action, severity='warning'):
+                dm_calls.append({'subject': subject})
+                return True
+
+            now1 = datetime(2026, 5, 26, 10, 0, tzinfo=timezone.utc)
+            now2 = now1 + timedelta(hours=1)  # 1h later — well inside 6h
+            state = {'drifts': {}, '_meta': {}}
+            with mock.patch.object(h, 'REGISTRY_PATH', local_path), \
+                 mock.patch.object(h, 'dm_larry', fake_dm), \
+                 mock.patch('subprocess.run') as mock_sub:
+                mock_sub.return_value = mock.Mock(
+                    returncode=128, stdout='', stderr='fatal',
+                )
+                h.resolve_registry(source='origin', state=state, now=now1)
+                h.resolve_registry(source='origin', state=state, now=now2)
+            self.assertEqual(len(dm_calls), 1)  # only first tick DMs
+
+    def test_source_local_bypasses_fetch(self):
+        """`--source local` must not call subprocess.run at all (no fetch,
+        no fallback DM). Reads the local file directly."""
+        local_reg = _registry([_cred('LOCAL_ONLY')])
+        with tempfile.TemporaryDirectory() as td:
+            local_path = Path(td) / 'token-rotation-schedule.json'
+            local_path.write_text(json.dumps(local_reg))
+            dm_calls = []
+
+            def fake_dm(message, subject, suggested_action, severity='warning'):
+                dm_calls.append({'subject': subject})
+                return True
+
+            state = {'drifts': {}, '_meta': {}}
+            with mock.patch.object(h, 'REGISTRY_PATH', local_path), \
+                 mock.patch.object(h, 'dm_larry', fake_dm), \
+                 mock.patch('subprocess.run') as mock_sub:
+                reg = h.resolve_registry(source='local', state=state)
+            self.assertIsNotNone(reg)
+            self.assertEqual(reg['credentials'][0]['name'], 'LOCAL_ONLY')
+            mock_sub.assert_not_called()
+            self.assertEqual(dm_calls, [])
+
+    def test_origin_classification_uses_canonical_not_local(self):
+        """The PR #113 incident: origin/main contains an entry that local
+        doesn't (or vice versa). The healer must classify based on
+        origin/main contents. Here: local says one cred is missing-in-
+        registry; origin says it's already registered → no drift."""
+        # origin has BOTH FOO and BAR registered.
+        origin_reg = _registry([_cred('FOO'), _cred('BAR')])
+        # local would have only FOO registered (stale checkout).
+        local_reg = _registry([_cred('FOO')])
+        scans = {
+            'env_file:/home/larry/credentials/.env.larry': {'FOO', 'BAR'},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            local_path = Path(td) / 'token-rotation-schedule.json'
+            local_path.write_text(json.dumps(local_reg))
+            with mock.patch.object(h, 'REGISTRY_PATH', local_path), \
+                 mock.patch('subprocess.run') as mock_sub:
+                # origin fetch + show succeed and return the canonical
+                # registry. Local would be the stale fallback if origin
+                # failed, but origin succeeds here.
+                mock_sub.side_effect = [
+                    mock.Mock(returncode=0, stdout='', stderr=''),
+                    mock.Mock(returncode=0, stdout=json.dumps(origin_reg),
+                              stderr=''),
+                ]
+                reg = h.resolve_registry(
+                    source='origin', state={'drifts': {}, '_meta': {}},
+                )
+            # detect_drift against the canonical registry → no drift.
+            drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+            self.assertEqual(drifts, [])
+            # Sanity: against the stale local registry, BAR WOULD have
+            # looked like MISSING_REGISTRY_ENTRY. This documents the
+            # exact failure mode the canonical-source fix prevents.
+            stale_drifts, _ = h.detect_drift(local_reg, scan_overrides=scans)
+            stale_kinds = [(n, k) for n, k, _ in stale_drifts]
+            self.assertIn(('BAR', 'MISSING_REGISTRY_ENTRY'), stale_kinds)
+
+
+class CliArgsTest(unittest.TestCase):
+    """--source local|origin CLI flag plumbing."""
+
+    def test_default_is_origin(self):
+        args = h._parse_args([])
+        self.assertEqual(args.source, 'origin')
+
+    def test_explicit_origin(self):
+        args = h._parse_args(['--source', 'origin'])
+        self.assertEqual(args.source, 'origin')
+
+    def test_explicit_local(self):
+        args = h._parse_args(['--source', 'local'])
+        self.assertEqual(args.source, 'local')
+
+    def test_invalid_source_rejected(self):
+        with self.assertRaises(SystemExit):
+            h._parse_args(['--source', 'bogus'])
+
+
 if __name__ == '__main__':
     unittest.main()

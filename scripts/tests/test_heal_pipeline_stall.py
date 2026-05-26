@@ -638,5 +638,114 @@ class TestReadRecentRoutingEvents(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(events, [])
 
 
+class TestScanWindow(_TempAgentsRootMixin, unittest.TestCase):
+    """SCAN_WINDOW_SECONDS gates every Check's stall-trigger event
+    timestamp. Events older than the window are skipped silently —
+    historical record, not stalls. Verified per-Check + at the boundary."""
+
+    def test_constant_is_24h(self) -> None:
+        """Default is 24h = 86400s. Documented in the module docstring as
+        the rationale for retiring resolved incidents."""
+        self.assertEqual(self.hps.SCAN_WINDOW_SECONDS, 86400)
+
+    def test_within_helper_inclusive_boundary(self) -> None:
+        """Event exactly at `now - SCAN_WINDOW_SECONDS` is in-window
+        (inclusive boundary, per spec)."""
+        now = datetime.now(timezone.utc)
+        at_boundary = now - timedelta(seconds=self.hps.SCAN_WINDOW_SECONDS)
+        self.assertTrue(self.hps._within_scan_window(at_boundary, now=now))
+        # Just outside is out.
+        outside = now - timedelta(seconds=self.hps.SCAN_WINDOW_SECONDS + 1)
+        self.assertFalse(self.hps._within_scan_window(outside, now=now))
+        # None is out (un-parseable timestamps are not stall triggers).
+        self.assertFalse(self.hps._within_scan_window(None, now=now))
+
+    def test_check1_skips_event_older_than_window(self) -> None:
+        """Inbox-watcher [forge] done line >24h ago must not alert.
+        Mirrors the original 'three false positives from yesterday's
+        already-resolved incidents' scenario."""
+        # 25h ago — past the 24h SCAN_WINDOW_SECONDS.
+        lines = [_watcher_forge_done_line('historical-task-001', minutes_ago=25 * 60)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_check1_alerts_event_inside_window(self) -> None:
+        """Same shape as the historical event, but 6h ago — well inside
+        the window. Existing Check 1 logic still classifies it."""
+        lines = [_watcher_forge_done_line('fresh-task-001', minutes_ago=6 * 60)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'], 'forge_built_no_pr:fresh-task-001')
+
+    def test_check1_boundary_event_included(self) -> None:
+        """Event exactly at `now - SCAN_WINDOW_SECONDS` is included.
+        Spec: inclusive boundary."""
+        # 24h ago to the second is the boundary — must include.
+        # Use 24h minus 1s to avoid clock-drift flakiness on the boundary
+        # arithmetic between this test's _watcher_ts and the production
+        # _within_scan_window check.
+        lines = [_watcher_forge_done_line(
+            'boundary-task-001', minutes_ago=24 * 60 - 1,
+        )]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'], 'forge_built_no_pr:boundary-task-001')
+
+    def test_check3_skips_mirror_pass_older_than_window(self) -> None:
+        """Mirror PASS marker line >24h ago. The PR could still be OPEN
+        but at that age it's a long-standing situation, not a fresh
+        stall — Check 3 must not re-DM."""
+        lines = [f'[{_ts(25 * 60)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-historical-pass-001.json)']
+        pr = {
+            'number': 700, 'headRefName': 'forge/historical-pass-001', 'title': 'fix: x',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_mirror_pass_unmerged(lines, [pr], {})
+        self.assertEqual(alerts, [])
+
+    def test_check4_skips_generic_notify_older_than_window(self) -> None:
+        """Generic mirror-result depth=1 line >24h ago: historical
+        marker-shape drift, presumed-resolved. Skip."""
+        lines = [f'[{_ts(25 * 60)}] [notifier] [INFO] notified beacon <- mirror (mirror-result, depth=1, file=notify-historical-drift-001.json)']
+        alerts = self.hps.check_mirror_marker_invisible(lines, {})
+        self.assertEqual(alerts, [])
+
+    def test_check6_skips_no_session_warn_older_than_window(self) -> None:
+        """REVIEW_REVISION no-session WARN line >24h ago: the direct-fix
+        DM fired when the WARN was fresh. Re-alerting now is noise."""
+        lines = [
+            f'[{_ts(25 * 60)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'historical-rev-001 has no forge_build_session_id'
+        ]
+        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
+        self.assertEqual(alerts, [])
+
+    def test_check2_skips_pr_older_than_window(self) -> None:
+        """PR opened >24h ago without Mirror dispatch: long-standing
+        situation, not a fresh stall."""
+        pr = {
+            'number': 720, 'headRefName': 'forge/old-pr-001', 'title': 'docs: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(hours=25)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_pr_no_mirror_dispatch([], [pr], {})
+        self.assertEqual(alerts, [])
+
+    def test_check7_skips_pr_older_than_window(self) -> None:
+        """OPEN un-routed PR > 24h old: same logic. Long-standing, not
+        a fresh stall trigger."""
+        pr = {
+            'number': 730, 'headRefName': 'larry/old-unrouted-001', 'title': 'feat: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(hours=25)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(alerts, [])
+
+
 if __name__ == '__main__':
     unittest.main()

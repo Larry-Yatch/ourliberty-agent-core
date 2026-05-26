@@ -96,6 +96,25 @@
 
 `python3 /home/larry/agent-core/scripts/heal_pipeline_stall.py` — same code path as the systemd-driven invocation. Useful for debugging or pre-deployment validation.
 
+## Scan window
+
+Every Check gates its stall-trigger event timestamp against `SCAN_WINDOW_SECONDS` (default `86400`, 24h). Events whose anchor timestamp is older than the window are treated as historical record, not stalls, and produce no alert. This retires already-resolved incidents instead of re-firing on log lines from yesterday.
+
+**Default rationale.** 24h is long enough to cover overnight quiet periods (a real stall that begins at 11pm and goes uninvestigated until 9am is still fully in-window) and short enough that a stall older than a day is past the point where another DM helps — at that age the action is human investigation, not another notification. Three false positives on 2026-05-26 (Mirror PASS markers from PRs Larry had already merged manually the prior day; the cooldown had expired but `LOG_LOOKBACK_HOURS=24` was still serving the events) drove the explicit constant.
+
+**When to tune.** Two operational shapes legitimately argue for a different default:
+  - **Long-running deployments / weekend-only operation.** If the chain is intentionally idle for >24h (e.g., a long migration weekend), a real stall that begins on Friday and persists past Monday morning might fall outside the window before anyone notices. Bump to 48h or 72h for the window of concern.
+  - **Holiday gaps.** A multi-day holiday where the chain is paused (kill-switch on) followed by a resumed scan: events from before the pause might trigger if they're inside the window. Either keep kill-switch on through the boundary, or shrink the window temporarily to retire pre-pause events faster.
+
+**How to tune.** Edit `SCAN_WINDOW_SECONDS` near the top of `scripts/heal_pipeline_stall.py`, then `sudo systemctl restart ourliberty-heal-pipeline-stall.timer`. The change takes effect on the next tick. Per the doctrine in [Self-optimizing-config-via-Pulse-Check](https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/operating-manual.md), this constant is a candidate for Pulse-driven auto-tuning once that pattern's threshold-config layer ships — for now, it's hand-tuned.
+
+**Recovery for a real >SCAN_WINDOW_SECONDS stall.** If a real stall persists past the window (e.g., a PR that's been stuck Mirror-PASS-unmerged for 30h because the AUTO_MERGE queue jammed and no one noticed), the healer falls silent — the event is past-window. Manual recovery path:
+  1. Identify the stalled task via `git log`, `gh pr list --state open`, or by direct grep of `~/agents/logs/outbox-notifier.log` (the log still has the event; the healer just doesn't alert on it).
+  2. Apply the recovery action from the appropriate Check's section above (manually merge, manually dispatch Mirror, investigate the worktree, etc.).
+  3. If the >24h-old class of stall is recurring, that's the signal to bump `SCAN_WINDOW_SECONDS` upward — the assumption "24h is enough to catch every real stall while it's still actionable" no longer holds.
+
+The healer's heartbeat still updates even when every Check skips its events (the heartbeat fires on the run, not the alerts). `heal_stale_daemon_code` will not false-positive a window-skip-only run.
+
 ## Tuning thresholds
 
 The threshold constants live near the top of `scripts/heal_pipeline_stall.py`:
@@ -112,6 +131,7 @@ The threshold constants live near the top of `scripts/heal_pipeline_stall.py`:
 | `ROUTING_EVENTS_LOOKBACK_HOURS` | 168 | Check 7 — how far back into routing-events.jsonl to scan |
 | `ALERT_DEDUP_HOURS` | 1 | Suppress same alert key within window |
 | `LOG_LOOKBACK_HOURS` | 24 | How far back into outbox-notifier.log to read |
+| `SCAN_WINDOW_SECONDS` | 86400 | Per-Check stall-trigger event age cap. See [Scan window](#scan-window) above. |
 
 These should eventually migrate to `config/system_tab_thresholds.json` once E4.4d's threshold config layer ships (per the [self-optimizing-config-via-Pulse-Check pattern](https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/operating-manual.md) backlog item #1).
 
