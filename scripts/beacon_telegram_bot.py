@@ -88,6 +88,87 @@ CLAUDE_TIMEOUT_SEC = 600  # 10 min — long enough for Beacon to think hard
 # which is more than fine for 6h/24h/72h schedule granularity.
 REMINDER_INTERVAL_SEC = 300
 
+# Tier 2 fallback (claude-quota-tier2-fallback-wrapper, 2026-05-26).
+# When the Tier 1 (agent) Claude Max account hits rate-limit OR auth-401,
+# retry once with HOME swapped to Larry's personal Claude Max OAuth dir.
+# Separate accounts = separate quota + auth buckets.
+TIER2_HOME = "/home/larry/.claude-larry-personal"
+
+# Detection regexes run against STDOUT (not stderr — the Claude CLI emits
+# both rate-limit and auth-401 messages to stdout). Keep these intentionally
+# loose enough to survive minor CLI phrasing changes but tight enough to
+# avoid false positives on normal output.
+RATE_LIMIT_RE = re.compile(
+    r"(hit your limit|5-hour|resets \d+)", re.IGNORECASE
+)
+AUTH_401_RE = re.compile(
+    r"(401|Invalid authentication credentials|Failed to authenticate)",
+    re.IGNORECASE,
+)
+
+
+def classify_tier1_failure(stdout: str, stderr: str) -> Optional[str]:
+    """Return 'rate_limit', 'auth_401', or None.
+
+    Detection runs against the combined stdout+stderr so the AUTH_401 'Invalid
+    authentication credentials' phrasing is caught regardless of which stream
+    the CLI used. Rate-limit takes precedence when both match (today's
+    incident: rate-limit phrasing masked the underlying 401 — we err on the
+    side of treating the more-recoverable signal first, but EITHER detection
+    triggers the same Tier 2 retry).
+    """
+    combined = (stdout or "") + "\n" + (stderr or "")
+    if RATE_LIMIT_RE.search(combined):
+        return "rate_limit"
+    if AUTH_401_RE.search(combined):
+        return "auth_401"
+    return None
+
+
+def tier2_available() -> bool:
+    """True iff the Tier 2 OAuth credentials file exists.
+
+    Checked BEFORE the HOME-swap so a missing Tier 2 dir DMs Larry instead
+    of producing a confusing 'claude: command not found' or empty-credentials
+    error inside the subprocess.
+    """
+    return Path(TIER2_HOME, ".claude", ".credentials.json").exists()
+
+
+def _tier2_failure_dm(failure_type: str) -> None:
+    """DM Larry that Tier 1 failed and Tier 2 was unavailable / also failed.
+
+    Uses larry_alerts.append_alert with the existing 'warning' severity; the
+    intent ('claude_tier1_failed_tier2_unavailable') is in the subject for
+    cooldown bucketing.
+    """
+    if failure_type == "rate_limit":
+        recovery = (
+            "Tier 1 rate-limit: wait for reset (~5h) OR provision Tier 2 "
+            "per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+        )
+    else:
+        recovery = (
+            "Tier 1 auth-401: run /tmp/auth_orchestrator.py from chat to "
+            "headless-re-auth Tier 1; runbook "
+            "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md "
+            "for Tier 2 provisioning."
+        )
+    try:
+        larry_alerts.append_alert(
+            source="beacon-telegram-bot",
+            severity="warning",
+            message=(
+                f"Beacon bot subprocess hit Tier 1 {failure_type} and Tier 2 "
+                f"fallback was unavailable or also failed. Beacon will not "
+                f"reply to chat until manual recovery."
+            ),
+            subject=f"claude_tier1_failed_tier2_unavailable:{failure_type}",
+            suggested_action=recovery,
+        )
+    except Exception:
+        pass
+
 
 # ---------- logging ----------
 
@@ -159,35 +240,112 @@ def telegram_send_action(chat_id: int, action: str = "typing") -> None:
 
 # ---------- Claude Code bridge ----------
 
-def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
-    """Run claude in Beacon's directory; return (reply_text, new_session_id)."""
-    cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
-    if session_id:
-        cmd += ["--resume", session_id]
-    cmd += [prompt]
+def _run_claude_once(
+    cmd: list, home_override: Optional[str] = None,
+) -> Optional[subprocess.CompletedProcess]:
+    """Single subprocess.run for `claude`. Returns the CompletedProcess
+    or None on TimeoutExpired / FileNotFoundError / unexpected exception.
 
+    `home_override`, when set, builds a copy of os.environ with HOME
+    swapped to the override path — used for the Tier 2 fallback. We never
+    mutate the parent process env; the override lives only on the child.
+    """
+    env = None
+    if home_override:
+        env = {**os.environ, "HOME": home_override}
     try:
-        result = subprocess.run(
+        return subprocess.run(
             cmd,
             cwd=str(BEACON_DIR),
             capture_output=True,
             text=True,
             timeout=CLAUDE_TIMEOUT_SEC,
+            env=env,
         )
-    except subprocess.TimeoutExpired:
-        return ("[Beacon timed out after 10 min — please retry, ideally with a tighter scope]", session_id)
-    except FileNotFoundError:
-        return (f"[claude binary not found at {CLAUDE_BIN}]", session_id)
-    except Exception as e:
-        return (f"[exception: {e}]", session_id)
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+        return None
+
+
+def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
+    """Run claude in Beacon's directory; return (reply_text, new_session_id).
+
+    On non-zero exit: log BOTH stdout and stderr (today's incident — 2026-05-26
+    — surfaced because only stderr was logged and the rate-limit/auth-401
+    message lives on stdout). Detect rate-limit or auth-401 from the combined
+    output and, if detected, retry once with HOME=TIER2_HOME (Larry's personal
+    Claude Max) before falling back to the error response.
+
+    Note: the bot does NOT thread `--resume` between accounts (it does for
+    same-account session continuity, and resume-on-Tier-1-error already
+    retries without `--resume` for stale sessions). The Tier 2 retry
+    preserves the same args including `--resume` when set — the bot's chat
+    sessions per chat_id are typically a fresh-or-recent enough conversation
+    that a Tier 2 cold-start is acceptable. The stricter resume-account
+    binding rule lives in agent_runner.py where multi-phase build sessions
+    are at stake.
+    """
+    cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
+    if session_id:
+        cmd += ["--resume", session_id]
+    cmd += [prompt]
+
+    result = _run_claude_once(cmd)
+    if result is None:
+        return ("[Beacon timed out or claude binary missing — please retry]", session_id)
 
     if result.returncode != 0:
-        log(f"claude exit {result.returncode}: {result.stderr[:500]}")
+        # Log BOTH streams — stderr-only logging was the gap that masked
+        # today's auth-401 (CLI puts both rate-limit and 401 phrasing on stdout).
+        log(
+            f"claude exit {result.returncode}: "
+            f"stdout={(result.stdout or '')[:500]!r} "
+            f"stderr={(result.stderr or '')[:500]!r}"
+        )
+
+        # Tier 2 detection: classify from the combined output.
+        failure_type = classify_tier1_failure(result.stdout, result.stderr)
+        if failure_type:
+            if not tier2_available():
+                log(
+                    f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
+                    f"home={TIER2_HOME} (missing credentials file)"
+                )
+                _tier2_failure_dm(failure_type)
+                return (
+                    f"[claude {failure_type} — Tier 2 unavailable; DM sent]\n"
+                    f"{(result.stdout or '')[:1500]}",
+                    session_id,
+                )
+            log(f"TIER2_FALLBACK_ATTEMPT reason={failure_type} home={TIER2_HOME}")
+            t2 = _run_claude_once(cmd, home_override=TIER2_HOME)
+            if t2 is not None and t2.returncode == 0:
+                log(f"TIER2_FALLBACK_USED reason={failure_type}")
+                try:
+                    data = json.loads(t2.stdout)
+                    reply = data.get("result") or data.get("text") or t2.stdout
+                    new_session = data.get("session_id") or session_id
+                    return (reply.strip(), new_session)
+                except json.JSONDecodeError:
+                    return (t2.stdout.strip() or "[empty response]", session_id)
+            log(
+                f"TIER2_FALLBACK_FAILED reason={failure_type} "
+                f"exit={t2.returncode if t2 else 'none'}"
+            )
+            _tier2_failure_dm(failure_type)
+            return (
+                f"[claude {failure_type} — Tier 2 retry also failed; DM sent]\n"
+                f"{(result.stdout or '')[:1500]}",
+                session_id,
+            )
+
         # If --resume failed (stale session), retry once without it
-        if session_id and "session" in result.stderr.lower():
+        if session_id and "session" in (result.stderr or "").lower():
             log("retrying without --resume after session error")
             return call_beacon(prompt, None)
-        return (f"[claude exit {result.returncode}]\n{result.stderr[:1500]}", session_id)
+        return (
+            f"[claude exit {result.returncode}]\n{(result.stderr or '')[:1500]}",
+            session_id,
+        )
 
     # Try to parse JSON output
     try:

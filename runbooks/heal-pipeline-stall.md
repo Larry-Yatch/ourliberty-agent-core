@@ -10,7 +10,7 @@
 
 ---
 
-## Seven checks (in order)
+## Eight checks (in order)
 
 ### 1. Forge built but no PR opened
 
@@ -74,6 +74,20 @@
 
 **False-positive silencing:** If a PR is intentionally not getting auto-routed (e.g. a draft, an experimental branch Larry wants to keep manual), the per-PR cooldown lives at `~/agents/state/alert-cooldown/warning/heal-pipeline-stall_pipeline-stall_unrouted-pr_PR#<N>`. Touching the cooldown file extends suppression by another 60 min; the 1h cadence repeats the DM if the PR is still open + still unrouted by the next tick. The longer-term silencer is to close the PR or route it manually.
 
+### 8. Tier 1 hit rate-limit OR auth-401 but Tier 2 not provisioned / also failed (claude-quota-tier2-fallback-wrapper)
+
+**Detects:** Any agent's `~/agents/logs/<agent>.log` contains one of these patterns within the last `SCAN_WINDOW_SECONDS` (24h default — `heal_pipeline_stall.SCAN_WINDOW_SECONDS` introduced by the in-flight healer-read-discipline PR; this Check 8 composes with it when available, falls back to a local 24h constant otherwise):
+
+- `TIER2_FALLBACK_UNAVAILABLE` — Tier 1 failed AND `/home/larry/.claude-larry-personal/.claude/.credentials.json` was missing.
+- `TIER2_FALLBACK_FAILED` — Tier 1 failed AND the Tier 2 retry also returned non-zero.
+- `TIER2_FALLBACK_SKIPPED` — Tier 1 failed on a `--resume` session, so the Tier 2 retry was skipped (resume sessions are account-bound).
+
+**Cause:** Either Tier 2 has never been provisioned on this droplet (run the runbook below), or the Tier 2 OAuth credentials have lapsed / been silently rotated into the wrong account, or a multi-phase build session can't be migrated mid-`--resume`. In all three cases, Larry needs to act — the chain can't self-heal.
+
+**Action recipe in DM:** Provision (or re-provision) Tier 2 per `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. The runbook covers the headless OAuth orchestrator pattern + the wrong-account-in-browser gotcha (Google's default-account behavior can land Tier 2 credentials in the agent account, silently making Tier 2 a duplicate of Tier 1).
+
+**False-positive silencing:** Per-failure-type cooldown lives at `~/agents/state/alert-cooldown/warning/heal-pipeline-stall_pipeline-stall_tier2-fallback-<failure_type>_<agent>`. The per-tick cadence is 15 min; the per-subject cooldown is 1h; the healer state file's 6h-keyed dedup ensures the same agent's same failure type doesn't re-DM within 6h. If you've intentionally left Tier 2 unprovisioned (cost reasons, account-management transition), `touch ~/agents/healers.disabled` is the kill switch — but that disables ALL healers, so prefer the per-Check cooldown file.
+
 ---
 
 ## State + observability
@@ -129,6 +143,7 @@ The threshold constants live near the top of `scripts/heal_pipeline_stall.py`:
 | `RETRY_EXHAUST_WINDOW_MIN` | 30 | Check 5 — retry-cap exhausted recency window |
 | `PR_UNROUTED_MIN_AGE_MIN` | 60 | Check 7 — minimum PR age before flagging as unrouted |
 | `ROUTING_EVENTS_LOOKBACK_HOURS` | 168 | Check 7 — how far back into routing-events.jsonl to scan |
+| `TIER2_LOG_LOOKBACK_HOURS` | 24 | Check 8 — how far back into per-agent logs to scan for TIER2_FALLBACK_* lines (composes with `SCAN_WINDOW_SECONDS` from the in-flight healer-read-discipline PR when present) |
 | `ALERT_DEDUP_HOURS` | 1 | Suppress same alert key within window |
 | `LOG_LOOKBACK_HOURS` | 24 | How far back into outbox-notifier.log to read |
 | `SCAN_WINDOW_SECONDS` | 86400 | Per-Check stall-trigger event age cap. See [Scan window](#scan-window) above. |

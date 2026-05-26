@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""Tests for the Claude Max Tier 2 quota+auth fallback wrapper
+(claude-quota-tier2-fallback-wrapper, 2026-05-26).
+
+Covers the detection + dispatch shape added to:
+
+  - scripts/beacon_telegram_bot.py — classify_tier1_failure, tier2_available
+  - scripts/agent_runner.py — classify_tier1_failure, tier2_available,
+    _mark_paused_on_tier1, _dm_tier2_unavailable
+
+We deliberately do NOT exercise the full Popen flow in run_claude — the
+cancel-marker + concurrency-guard scaffolding is integration-heavy and
+already covered by existing test files. Instead we test the pure
+classification + state-marker helpers, and assert the regex shapes match
+the strings observed in the 2026-05-26 incident.
+
+Run:
+    cd ~/agent-core && python3 -m unittest \\
+        scripts.tests.test_tier2_fallback_wrapper
+"""
+from __future__ import annotations
+
+import importlib
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+
+# ---- agent_runner classification + state tests --------------------------
+
+class AgentRunnerClassifyTest(unittest.TestCase):
+    """Detection lives in agent_runner; test both regexes against the
+    strings the Claude CLI actually emitted on 2026-05-26."""
+
+    def setUp(self):
+        # Defer import so we don't blow up at module-load time if the file
+        # is being edited.
+        self.ar = importlib.import_module('agent_runner')
+
+    def test_rate_limit_phrase_hit_your_limit(self):
+        # Today's incident phrasing — verbatim from beacon_telegram_bot.log
+        out = "You've hit your limit · resets 11:30am"
+        self.assertEqual(self.ar.classify_tier1_failure(out, ''), 'rate_limit')
+
+    def test_rate_limit_phrase_5_hour(self):
+        self.assertEqual(
+            self.ar.classify_tier1_failure(
+                'You have used your 5-hour quota.', ''),
+            'rate_limit',
+        )
+
+    def test_rate_limit_phrase_resets_with_time(self):
+        self.assertEqual(
+            self.ar.classify_tier1_failure('Quota resets 12 hours from now.', ''),
+            'rate_limit',
+        )
+
+    def test_auth_401_invalid_credentials(self):
+        out = 'Invalid authentication credentials'
+        self.assertEqual(self.ar.classify_tier1_failure(out, ''), 'auth_401')
+
+    def test_auth_401_bare_status_code(self):
+        # The CLI prints '401' as part of the error body in some shapes
+        self.assertEqual(
+            self.ar.classify_tier1_failure('HTTP 401 Unauthorized', ''),
+            'auth_401',
+        )
+
+    def test_auth_401_failed_to_authenticate(self):
+        self.assertEqual(
+            self.ar.classify_tier1_failure('Failed to authenticate', ''),
+            'auth_401',
+        )
+
+    def test_clean_output_returns_none(self):
+        # No false positives on success-shaped output
+        ok = json.dumps({'result': 'ok', 'session_id': 'abc'})
+        self.assertIsNone(self.ar.classify_tier1_failure(ok, ''))
+
+    def test_stderr_input_combined_with_stdout(self):
+        # The fix's whole point: detection must read BOTH streams. If the
+        # message landed on stderr only (or vice versa), still classify.
+        self.assertEqual(
+            self.ar.classify_tier1_failure('', 'You have hit your limit.'),
+            'rate_limit',
+        )
+        self.assertEqual(
+            self.ar.classify_tier1_failure('', 'HTTP 401'),
+            'auth_401',
+        )
+
+    def test_rate_limit_takes_precedence_over_auth(self):
+        # When both match, rate-limit wins — the recovery shape is the
+        # same (Tier 2 retry), but the DM body diverges.
+        mixed = "hit your limit AND 401 from upstream"
+        self.assertEqual(
+            self.ar.classify_tier1_failure(mixed, ''), 'rate_limit',
+        )
+
+
+class Tier2AvailableTest(unittest.TestCase):
+    """tier2_available() is a filesystem probe. Mock TIER2_HOME to a
+    temp directory and toggle the credentials file."""
+
+    def setUp(self):
+        self.ar = importlib.import_module('agent_runner')
+
+    def test_returns_false_when_credentials_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(self.ar, 'TIER2_HOME', tmp):
+                self.assertFalse(self.ar.tier2_available())
+
+    def test_returns_true_when_credentials_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            creds_dir = Path(tmp, '.claude')
+            creds_dir.mkdir(parents=True)
+            (creds_dir / '.credentials.json').write_text('{}')
+            with mock.patch.object(self.ar, 'TIER2_HOME', tmp):
+                self.assertTrue(self.ar.tier2_available())
+
+
+class MarkPausedOnTier1Test(unittest.TestCase):
+    """The in-flight state-file marker that heal_pipeline_stall's Check 8
+    will key on. Test that the helper:
+      - is a no-op when task_stem is None
+      - writes paused_on_tier1 with failure_type + at
+      - preserves existing keys in the in-flight file
+    """
+
+    def setUp(self):
+        self.ar = importlib.import_module('agent_runner')
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_noop_when_task_stem_none(self):
+        with mock.patch.object(self.ar, 'IN_FLIGHT_DIR', self.tmp_path):
+            self.ar._mark_paused_on_tier1(None, 'rate_limit')
+        self.assertEqual(list(self.tmp_path.iterdir()), [])
+
+    def test_writes_marker_on_fresh_task(self):
+        with mock.patch.object(self.ar, 'IN_FLIGHT_DIR', self.tmp_path):
+            self.ar._mark_paused_on_tier1('task-abc', 'auth_401')
+        target = self.tmp_path / 'task-abc.json'
+        self.assertTrue(target.exists())
+        data = json.loads(target.read_text())
+        self.assertEqual(data['paused_on_tier1']['failure_type'], 'auth_401')
+        self.assertIn('at', data['paused_on_tier1'])
+
+    def test_preserves_existing_keys(self):
+        # The in-flight file pre-exists with pid/started_at; our marker
+        # must not clobber those.
+        target = self.tmp_path / 'task-xyz.json'
+        target.write_text(json.dumps({
+            'task_stem': 'task-xyz', 'agent_id': 'forge',
+            'pid': 1234, 'started_at': '2026-05-26T18:00:00',
+        }))
+        with mock.patch.object(self.ar, 'IN_FLIGHT_DIR', self.tmp_path):
+            self.ar._mark_paused_on_tier1('task-xyz', 'rate_limit')
+        data = json.loads(target.read_text())
+        self.assertEqual(data['pid'], 1234)
+        self.assertEqual(data['agent_id'], 'forge')
+        self.assertEqual(data['paused_on_tier1']['failure_type'], 'rate_limit')
+
+
+# ---- beacon_telegram_bot classification + Tier 2 ------------------------
+
+class _BotImporter:
+    """beacon_telegram_bot has env-required imports at module load
+    (TELEGRAM_BOT_TOKEN_BEACON + TELEGRAM_ALLOWED_CHAT_IDS). We can't
+    import it directly under unittest without those env vars."""
+
+    @staticmethod
+    def load_with_env():
+        os.environ.setdefault('TELEGRAM_BOT_TOKEN_BEACON', 'TEST_TOKEN')
+        os.environ.setdefault('TELEGRAM_ALLOWED_CHAT_IDS', '12345')
+        # Force a clean import each test so module-level state doesn't leak
+        if 'beacon_telegram_bot' in sys.modules:
+            del sys.modules['beacon_telegram_bot']
+        return importlib.import_module('beacon_telegram_bot')
+
+
+class BotClassifyTest(unittest.TestCase):
+    """Bot's classify_tier1_failure mirrors agent_runner's. We test the
+    same shapes here so the two modules can't drift independently."""
+
+    def setUp(self):
+        self.bot = _BotImporter.load_with_env()
+
+    def test_rate_limit_phrase(self):
+        out = "You've hit your limit · resets 11:30am"
+        self.assertEqual(
+            self.bot.classify_tier1_failure(out, ''), 'rate_limit',
+        )
+
+    def test_auth_401_phrase(self):
+        out = 'Invalid authentication credentials'
+        self.assertEqual(
+            self.bot.classify_tier1_failure(out, ''), 'auth_401',
+        )
+
+    def test_clean_output_returns_none(self):
+        self.assertIsNone(
+            self.bot.classify_tier1_failure('hello world', ''),
+        )
+
+    def test_tier2_available_filesystem_probe(self):
+        # tier2_available() should be False when the path doesn't exist
+        with mock.patch.object(self.bot, 'TIER2_HOME', '/nonexistent/path'):
+            self.assertFalse(self.bot.tier2_available())
+
+
+# ---- call_beacon flow tests --------------------------------------------
+
+class CallBeaconTier2Test(unittest.TestCase):
+    """End-to-end-ish: mock _run_claude_once to exercise the Tier 2
+    branch in call_beacon. Verifies that:
+      - rate-limit-classified Tier 1 failure → Tier 2 retry attempted
+      - successful Tier 2 → reply returned, log shape correct
+      - Tier 2 unavailable → DM fired, error returned
+      - --resume on bot is allowed (bot does not enforce resume-discipline)
+    """
+
+    def setUp(self):
+        self.bot = _BotImporter.load_with_env()
+
+    def test_tier1_success_no_tier2_attempted(self):
+        ok = mock.Mock(returncode=0, stdout=json.dumps({
+            'result': 'hi', 'session_id': 'new-sid',
+        }), stderr='')
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                return_value=ok) as run_mock:
+            reply, sid = self.bot.call_beacon('hello', None)
+        self.assertEqual(reply, 'hi')
+        self.assertEqual(sid, 'new-sid')
+        # Only one invocation (Tier 1) — no Tier 2 retry
+        self.assertEqual(run_mock.call_count, 1)
+
+    def test_tier1_rate_limit_triggers_tier2_success(self):
+        tier1 = mock.Mock(
+            returncode=1,
+            stdout="You've hit your limit · resets 11:30am",
+            stderr='',
+        )
+        tier2 = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'recovered', 'session_id': 'sid2'}),
+            stderr='',
+        )
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]) as run_mock, \
+             mock.patch.object(self.bot, 'tier2_available',
+                                return_value=True):
+            reply, sid = self.bot.call_beacon('hello', None)
+        self.assertEqual(reply, 'recovered')
+        self.assertEqual(sid, 'sid2')
+        # Two invocations: Tier 1 then Tier 2
+        self.assertEqual(run_mock.call_count, 2)
+        # The Tier 2 call must have had HOME swapped
+        tier2_kwargs = run_mock.call_args_list[1].kwargs
+        self.assertEqual(tier2_kwargs.get('home_override'),
+                         self.bot.TIER2_HOME)
+
+    def test_tier1_auth_401_triggers_tier2_attempt(self):
+        tier1 = mock.Mock(
+            returncode=1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        tier2 = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'ok', 'session_id': 's'}),
+            stderr='',
+        )
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]), \
+             mock.patch.object(self.bot, 'tier2_available',
+                                return_value=True):
+            reply, _ = self.bot.call_beacon('hello', None)
+        self.assertEqual(reply, 'ok')
+
+    def test_tier1_failure_tier2_unavailable_dms_larry(self):
+        tier1 = mock.Mock(
+            returncode=1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                return_value=tier1), \
+             mock.patch.object(self.bot, 'tier2_available',
+                                return_value=False), \
+             mock.patch.object(self.bot.larry_alerts,
+                                'append_alert') as dm_mock:
+            reply, _ = self.bot.call_beacon('hello', None)
+        self.assertIn('Tier 2 unavailable', reply)
+        dm_mock.assert_called_once()
+        # The subject must include the failure-type bucket
+        kwargs = dm_mock.call_args.kwargs
+        self.assertIn('claude_tier1_failed_tier2_unavailable',
+                      kwargs.get('subject', ''))
+        self.assertIn('auth_401', kwargs.get('subject', ''))
+
+    def test_tier1_failure_tier2_also_fails_dms_larry(self):
+        tier1 = mock.Mock(
+            returncode=1,
+            stdout="You've hit your limit",
+            stderr='',
+        )
+        tier2 = mock.Mock(returncode=1, stdout='also broken', stderr='')
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]), \
+             mock.patch.object(self.bot, 'tier2_available',
+                                return_value=True), \
+             mock.patch.object(self.bot.larry_alerts,
+                                'append_alert') as dm_mock:
+            reply, _ = self.bot.call_beacon('hello', None)
+        self.assertIn('Tier 2 retry also failed', reply)
+        dm_mock.assert_called_once()
+
+
+# ---- credential-drift healer Tier 2 scan -------------------------------
+
+class HealCredentialRegistryDriftTier2Test(unittest.TestCase):
+    """scan_claude_cli now disambiguates Tier 1 vs Tier 2 by path."""
+
+    def setUp(self):
+        self.healer = importlib.import_module('heal_credential_registry_drift')
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write_creds(self, path: Path, token: str = 'sk-deadbeef'):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            'claudeAiOauth': {'accessToken': token},
+        }))
+
+    def test_tier1_path_returns_claude_max_oauth(self):
+        creds = self.tmp_path / '.claude' / '.credentials.json'
+        self._write_creds(creds)
+        self.assertEqual(
+            self.healer.scan_claude_cli(creds), {'CLAUDE_MAX_OAUTH'},
+        )
+
+    def test_tier2_path_returns_tier2_name(self):
+        creds = self.tmp_path / 'claude-larry-personal' / '.claude' / '.credentials.json'
+        self._write_creds(creds)
+        self.assertEqual(
+            self.healer.scan_claude_cli(creds),
+            {'LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2'},
+        )
+
+    def test_missing_file_returns_empty_set(self):
+        creds = self.tmp_path / 'claude-larry-personal' / '.claude' / '.credentials.json'
+        self.assertEqual(self.healer.scan_claude_cli(creds), set())
+
+    def test_malformed_file_returns_empty_set(self):
+        # A malformed Tier 2 file is conflated with 'missing' — same DM action.
+        creds = self.tmp_path / 'claude-larry-personal' / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        creds.write_text('not json')
+        self.assertEqual(self.healer.scan_claude_cli(creds), set())
+
+    def test_empty_access_token_returns_empty_set(self):
+        creds = self.tmp_path / 'claude-larry-personal' / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        creds.write_text(json.dumps({'claudeAiOauth': {'accessToken': ''}}))
+        self.assertEqual(self.healer.scan_claude_cli(creds), set())
+
+
+# ---- heal_pipeline_stall Check 8 -----------------------------------------
+
+class HealPipelineStallCheck8Test(unittest.TestCase):
+    """Check 8 scans per-agent logs for TIER2_FALLBACK_* markers and
+    produces one alert per (agent, outcome, reason) signature in the
+    window."""
+
+    def setUp(self):
+        self.healer = importlib.import_module('heal_pipeline_stall')
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.tmp.name)
+        self.logs_dir = self.tmp_path / 'logs'
+        self.logs_dir.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _patch_root(self):
+        return mock.patch.object(self.healer, 'AGENTS_ROOT', self.tmp_path)
+
+    def _make_log(self, name: str, body: str):
+        (self.logs_dir / name).write_text(body)
+
+    def test_no_logs_no_alerts(self):
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(alerts, [])
+
+    def test_unavailable_marker_in_window_alerts(self):
+        # Use a current-day timestamp so it's inside the lookback window
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        self._make_log('forge.log',
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_UNAVAILABLE '
+            f'reason=auth_401 home=/home/larry/.claude-larry-personal '
+            f'(missing credentials file)\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('unavailable', alerts[0]['message'].lower())
+        self.assertIn('auth_401', alerts[0]['subject'])
+        self.assertIn('forge', alerts[0]['subject'])
+
+    def test_failed_marker_alerts(self):
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        self._make_log('mirror.log',
+            f'[{ts}] [mirror] [WARN] TIER2_FALLBACK_FAILED '
+            f'reason=rate_limit exit=1\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('rate_limit', alerts[0]['subject'])
+
+    def test_skipped_marker_alerts(self):
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        self._make_log('forge.log',
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_SKIPPED '
+            f'reason=auth_401 cause=resume_session_account_bound\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('--resume', alerts[0]['message'].lower()
+                      .replace('—', '-'))  # tolerate em-dash vs --
+
+    def test_old_marker_outside_window_no_alert(self):
+        # 2 days ago — well outside the 24h lookback
+        from datetime import datetime, timedelta, timezone
+        old_ts = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        self._make_log('forge.log',
+            f'[{old_ts}] [forge] [WARN] TIER2_FALLBACK_FAILED '
+            f'reason=rate_limit exit=1\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(alerts, [])
+
+    def test_dedup_within_agent_outcome_reason(self):
+        # Two markers in the same log with identical (outcome, reason)
+        # → one alert
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        self._make_log('forge.log',
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_FAILED reason=rate_limit\n'
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_FAILED reason=rate_limit\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+
+    def test_different_reasons_different_alerts(self):
+        # Same agent + outcome, different reason → two alerts
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
+        self._make_log('forge.log',
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_FAILED reason=rate_limit\n'
+            f'[{ts}] [forge] [WARN] TIER2_FALLBACK_FAILED reason=auth_401\n')
+        with self._patch_root():
+            alerts = self.healer.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 2)
+
+
+if __name__ == '__main__':
+    unittest.main()
