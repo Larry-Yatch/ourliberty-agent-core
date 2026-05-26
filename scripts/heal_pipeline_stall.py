@@ -109,6 +109,11 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-pipeline-stall.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall-state.json'
 OUTBOX_NOTIFIER_LOG = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
+# Archived Forge outboxes carry the first-attempt result string with the
+# preflight marker (PROCEED / CLARIFY_REQUEST / REJECT_REQUEST). Check 1
+# reads this to distinguish 'Forge done but no PR by design' from a real
+# stall. See `_forge_preflight_non_proceed` for the read shape.
+FORGE_OUTBOX_ARCHIVE = AGENTS_ROOT / 'outboxes' / 'forge' / '.archive'
 # `[forge] done task=X success=True` lines are emitted by inbox_watcher.py to
 # THIS file, NOT by outbox_notifier.py to OUTBOX_NOTIFIER_LOG. Check 1 reads
 # inbox_watcher.log; all other checks (review-request dispatched,
@@ -380,6 +385,87 @@ def _task_id_from_branch(branch: str) -> Optional[str]:
 
 # ---------- Check 1: Forge built but no PR opened ----------
 
+# Branch-truncation tolerance. Forge writes feature branches as
+# `forge/<task_id>` but the branch name has a soft cap (verified
+# empirically 2026-05-26: PR #116's full task_id was 54 chars; the
+# branch was truncated to `forge/chain-discipline-gap-beacon-plan-
+# synthesis-stale-s`, 49 chars after the prefix). When a PR's branch
+# suffix is a strict prefix of the task_id AND long enough to make a
+# coincidental shared prefix implausible, treat it as a match. 30 char
+# floor avoids matching short common prefixes like `fix-`, `build-`.
+_BRANCH_TRUNCATION_MIN_LEN = 30
+
+# Preflight non-PROCEED markers in archived Forge outbox `result`
+# strings. A task that completed Forge build but emitted one of these
+# markers DID NOT intend to produce a PR — it asked a question
+# (CLARIFY_REQUEST) or refused (REJECT_REQUEST). The lack of a PR is by
+# design, not a stall. Verified 2026-05-26: oauth-orchestrator-
+# promotion-plus-auto-restart's archived outbox carries
+# `result='=== CLARIFY_REQUEST ===\n{...}\n=== END_CLARIFY_REQUEST ==='`
+# — exactly the false-fire pattern this check guards against.
+_PREFLIGHT_NON_PROCEED_MARKERS = (
+    '=== CLARIFY_REQUEST ===',
+    '=== REJECT_REQUEST ===',
+)
+
+
+def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
+    """If `pr` corresponds to `task_id`, return a short reason string
+    (`'branch'` / `'branch_truncated'` / `'title'`); else None.
+
+    Match order:
+      1. Exact: headRefName == `forge/<task_id>` (or `larry/<task_id>`).
+      2. Branch-truncation tolerant: branch suffix is a strict prefix of
+         task_id and >= `_BRANCH_TRUNCATION_MIN_LEN` chars long.
+      3. Title fallback: task_id appears (case-insensitive) in the PR
+         title — covers re-keyed dispatches and human-titled PRs that
+         carry the original task verbatim in the subject line.
+    """
+    branch = pr.get('headRefName') or ''
+    branch_task = _task_id_from_branch(branch)
+    if branch_task:
+        if branch_task == task_id:
+            return 'branch'
+        if (
+            len(branch_task) >= _BRANCH_TRUNCATION_MIN_LEN
+            and task_id.startswith(branch_task)
+        ):
+            return 'branch_truncated'
+    title = pr.get('title') or ''
+    if task_id and task_id.lower() in title.lower():
+        return 'title'
+    return None
+
+
+def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
+    """Return the marker string if the archived Forge outbox for `task_id`
+    carries a preflight non-PROCEED outcome (CLARIFY_REQUEST or
+    REJECT_REQUEST), else None.
+
+    Reads only `<task_id>.json` — the first-attempt outbox, which is the
+    canonical preflight decision. Retry variants (`<task_id>.N.json`)
+    inherit the original PROCEED/non-PROCEED outcome and are not
+    consulted. Tolerates missing file / unreadable JSON by returning
+    None (the caller will treat a missing archive as 'no preflight
+    skip-signal' and proceed with the normal PR-existence reconciliation
+    + alert decision)."""
+    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
+    if not archive.exists():
+        return None
+    try:
+        with open(archive, errors='replace') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    result = data.get('result')
+    if not isinstance(result, str):
+        return None
+    for marker in _PREFLIGHT_NON_PROCEED_MARKERS:
+        if marker in result:
+            return marker
+    return None
+
+
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
@@ -389,7 +475,23 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
     `[forge] done task=X success=True` shape is emitted by
     `inbox_watcher.py` to its own log. Verified against production logs
     (Mirror PR #107 review): outbox-notifier.log has zero matches for
-    this pattern; inbox_watcher.log has hundreds."""
+    this pattern; inbox_watcher.log has hundreds.
+
+    Reconciliation before alerting (2026-05-26, fixes false-fire on
+    truncated-branch PRs + preflight CLARIFY/REJECT tasks):
+      a) `_pr_matches_task` against open + merged PRs across both
+         tracked repos. Matches exact branch, truncated branch, or
+         title substring.
+      b) `_forge_preflight_non_proceed` against the archived outbox.
+         CLARIFY_REQUEST / REJECT_REQUEST mean Forge intentionally did
+         not produce a PR.
+    Both reconciliation paths emit an INFO log on skip for forensic
+    visibility. Only if BOTH paths miss does this check DM Larry.
+
+    The dispatch that introduced this reconciliation refers to it as
+    'Check 6' in its narration; in the module's own numbering it is
+    Check 1. The log tag uses the descriptive form `FORGE_NO_PR_SKIP`
+    to avoid the off-by-five ambiguity."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=FORGE_BUILT_NO_PR_MIN)
     all_prs = open_prs + merged_prs
     alerts: list[dict] = []
@@ -409,8 +511,35 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             # window discipline (see module docstring).
             seen_tasks.add(task)
             continue
-        # PR with matching branch on any repo?
-        if any(_task_id_from_branch(pr.get('headRefName', '')) == task for pr in all_prs):
+        # Reconciliation step 1: ANY PR (open or merged, across all
+        # tracked repos) corresponds to this task?
+        matched_pr = None
+        match_reason = None
+        for pr in all_prs:
+            reason = _pr_matches_task(pr, task)
+            if reason:
+                matched_pr = pr
+                match_reason = reason
+                break
+        if matched_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=pr_exists '
+                f'match={match_reason} pr=#{matched_pr.get("number")} '
+                f'repo={matched_pr.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 2: archived outbox carries a preflight
+        # non-PROCEED marker?
+        preflight_marker = _forge_preflight_non_proceed(task)
+        if preflight_marker is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=preflight_non_proceed '
+                f'marker={preflight_marker!r} '
+                f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
+                'INFO',
+            )
             seen_tasks.add(task)
             continue
         # No matching PR — stall

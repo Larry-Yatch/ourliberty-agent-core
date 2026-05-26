@@ -180,6 +180,185 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
         self.assertEqual(alerts, [])
 
+    # ----- Reconciliation cases (2026-05-26 false-fire fix) -----
+
+    def test_skips_when_branch_truncated_prefix_matches(self) -> None:
+        """Forge truncates long branch names. PR #116 in production had
+        head `forge/chain-discipline-gap-beacon-plan-synthesis-stale-s`
+        (49-char suffix) for task_id `...stale-state` (54-char full).
+        Exact-equal match misses; truncated-prefix match catches it."""
+        full_task = 'chain-discipline-gap-beacon-plan-synthesis-stale-state'
+        truncated_branch = (
+            'forge/chain-discipline-gap-beacon-plan-synthesis-stale-s'
+        )
+        lines = [_watcher_forge_done_line(full_task, minutes_ago=180)]
+        merged_prs = [{
+            'headRefName': truncated_branch,
+            'number': 116,
+            'title': 'feat(chain-discipline): something',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_skips_when_pr_title_contains_task_id(self) -> None:
+        """Title-substring fallback: branch differs entirely but the
+        task_id appears verbatim in the PR title (case-insensitive)."""
+        task = 'some-rekeyed-task-001'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        open_prs = [{
+            'headRefName': 'forge/unrelated-branch-name',
+            'number': 42,
+            'title': f'fix(thing): handle Some-Rekeyed-Task-001 edge case',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
+        self.assertEqual(alerts, [])
+
+    def test_branch_truncation_min_length_floor(self) -> None:
+        """A 5-char shared prefix must NOT match — only branch suffixes
+        >= _BRANCH_TRUNCATION_MIN_LEN (30) chars long are trusted as
+        truncated."""
+        lines = [_watcher_forge_done_line(
+            'build-something-very-specific-001', minutes_ago=180,
+        )]
+        # Short prefix `build` would coincidentally match many tasks —
+        # the floor blocks it.
+        open_prs = [{
+            'headRefName': 'forge/build',
+            'number': 11, 'title': 'wat',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
+        self.assertEqual(len(alerts), 1)
+
+    def test_skips_when_preflight_clarify_request_archived(self) -> None:
+        """oauth-orchestrator-promotion-plus-auto-restart shape: Forge
+        done success=True, but archived outbox carries CLARIFY_REQUEST
+        in `result`. No PR was intended."""
+        task = 'oauth-orchestrator-promotion-plus-auto-restart'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'result': (
+                '=== CLARIFY_REQUEST ===\n'
+                '{"task_id": "' + task + '", "question": "..."}\n'
+                '=== END_CLARIFY_REQUEST ==='
+            ),
+        }))
+        # FORGE_OUTBOX_ARCHIVE was set at module import time; the
+        # _TempAgentsRootMixin re-imports the module each test so the
+        # constant has already been recomputed against the temp root.
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_skips_when_preflight_reject_request_archived(self) -> None:
+        """Defense-in-depth: REJECT_REQUEST marker also signals
+        no-PR-by-design. No instances exist in production today but the
+        marker shape is part of the Forge agent's vocabulary."""
+        task = 'task-that-forge-explicitly-rejected-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'result': (
+                '=== REJECT_REQUEST ===\n'
+                '{"reason": "tier violation"}\n'
+                '=== END_REJECT_REQUEST ==='
+            ),
+        }))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_fires_when_archive_contains_proceed_marker(self) -> None:
+        """A PROCEED marker means Forge committed to building. If there
+        is still no PR after FORGE_BUILT_NO_PR_MIN, that IS the stall
+        Check 1 is meant to surface."""
+        task = 'real-stall-after-proceed-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'result': '=== PROCEED ===\n{"preflight_summary": "..."}\n=== END_PROCEED ===',
+        }))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn(task, alerts[0]['message'])
+
+    def test_skips_when_pr_merged_on_other_tracked_repo(self) -> None:
+        """A merged PR in the dashboard repo (not agent-core) still
+        means Forge's work shipped — both tracked repos must be checked."""
+        task = 'cross-repo-task-001'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        merged_prs = [{
+            'headRefName': f'forge/{task}',
+            'number': 77,
+            'title': 'feat: x',
+            '_repo': 'Larry-Yatch/ourliberty-dashboard',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_falls_back_to_alert_when_pr_list_empty_due_to_gh_failure(self) -> None:
+        """When `gh pr list` fails, `_all_open_prs` + `_all_merged_prs_recent`
+        return []. Check 1 must still alert on real stalls — better a
+        false-alert than a false-skip during gh outages. Verified by
+        passing empty PR lists (the shape the wrappers produce on failure)
+        and no archive entry (so the preflight reconciliation also misses)."""
+        task = 'task-during-gh-outage-001'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        # Empty open + merged PR lists (gh outage shape).
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn(task, alerts[0]['message'])
+
+    def test_pr_matches_task_helper_branch_exact(self) -> None:
+        pr = {'headRefName': 'forge/exact-001', 'title': 'x'}
+        self.assertEqual(self.hps._pr_matches_task(pr, 'exact-001'), 'branch')
+
+    def test_pr_matches_task_helper_branch_truncated(self) -> None:
+        # 30 chars in the suffix → just at the floor.
+        long_task = 'a' * 30 + '-extra-suffix-here-001'
+        truncated = 'forge/' + 'a' * 30
+        pr = {'headRefName': truncated, 'title': 'x'}
+        self.assertEqual(
+            self.hps._pr_matches_task(pr, long_task),
+            'branch_truncated',
+        )
+
+    def test_pr_matches_task_helper_title_fallback(self) -> None:
+        pr = {
+            'headRefName': 'forge/something-else',
+            'title': 'fix: handle MY-TASK-001 case',
+        }
+        self.assertEqual(
+            self.hps._pr_matches_task(pr, 'my-task-001'),
+            'title',
+        )
+
+    def test_pr_matches_task_helper_returns_none(self) -> None:
+        pr = {'headRefName': 'forge/unrelated', 'title': 'no match'}
+        self.assertIsNone(self.hps._pr_matches_task(pr, 'lonely-task-001'))
+
+    def test_forge_preflight_non_proceed_returns_none_for_missing_archive(self) -> None:
+        self.assertIsNone(
+            self.hps._forge_preflight_non_proceed('never-existed-task'),
+        )
+
+    def test_forge_preflight_non_proceed_returns_none_for_malformed_json(self) -> None:
+        task = 'malformed-archive-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text('{not valid json')
+        self.assertIsNone(self.hps._forge_preflight_non_proceed(task))
+
 
 class TestCheckPrNoMirrorDispatch(_TempAgentsRootMixin, unittest.TestCase):
 
