@@ -2579,6 +2579,39 @@ Dedup correctness (deterministic `event_id`; no double-INSERTs). Cursor resume a
 54. **Pulse Check III is the first concrete instance of doctrine #48.** Entry #48 named the self-optimizing-config-via-Pulse-Check pattern; this PR codifies it as agent-OS doctrine with discipline boundaries (no auto-apply, bounded delta, sample-size floor, idempotent shortcut) and ships the first instance against stuck-detection thresholds. The 10-surface backlog in PM project `1b36f0d2-5f2c-4d45-9f13-6806a4c5fa42` is the canonical list of where to apply the pattern next.
 55. **Application-side event-type validation, not DB-level.** Spec § 5.1 chose plain TEXT for `chain_events.event_type` over a Postgres ENUM. The trade-off: adding a new event_type is a single-line Python PR (Mirror catches typos at code review) instead of a migration; the cost is a belt-and-suspenders weekly audit healer to catch any drift. The audit healer is itself a reusable pattern: any allowlist gated in code (not schema) earns a weekly auditor that re-checks the data layer for drift.
 
+## E4.4d PR-C — Droplet API endpoints + thresholds config
+
+Third of four sequenced PRs implementing the Operations → System view (sub-spec at `agents/beacon/specs/e4-4d-system-tab.md`). PR-A landed the `chain_events` migration in `ourliberty-dashboard`; PR-B (parallel to this one) lands the ingestion daemon + Pulse Check III; PR-D wires the dashboard UI. This PR extends the existing droplet-side `dashboard-api.service` with three uncached read endpoints and ships the tunable thresholds config.
+
+### What shipped (PR-C)
+
+- **scripts/dashboard_api.py** — extended with three new `GET` endpoints under `/api/system/*`. All three are token-gated via the existing `_require_token` dependency, return JSON, and read filesystem state fresh on every request (no in-process caching).
+  - `/api/system/active-sessions` — reads `cgroup.procs` for the `ourliberty-inbox-watcher.service` slice, cross-references each PID against the `~/agents/state/in-flight/*.json` registry. Returns raw per-session signals only: pid, agent, task_id, task_type, model (best-effort from `/proc/<pid>/cmdline`), started_at, duration_sec. **No `stuck` / `stuck_reason` booleans** — locked decision-C puts stuck-detection on the dashboard side. PIDs that die mid-read are silently omitted, not 500-ed.
+  - `/api/system/cgroup-stats` — reads `memory.{current,peak,max,high,events}` and `cpu.stat` from the inbox-watcher slice. `memory.max` / `memory.high` literal-`max` sentinel surfaces as JSON `null` rather than a coercion error.
+  - `/api/system/worktrees` — filesystem-only walk of `/home/larry/agent-worktrees/`, parses `wt-<agent>-<task_id>` dirnames into (agent, task_id, branch), stats mtime, cross-references in-flight registry. **Never shells out** to `git worktree list` — closes the no-user-input-near-subprocess reviewer concern.
+- **scripts/tests/test_dashboard_api_system.py** (new) — 15 tests covering success paths, 401-on-missing/wrong-token paths, 503-with-structured-body degraded path (slice stopped → `{"error": "service-unavailable", "message": ...}`), PID-race tolerance, the literal-`max` sentinel, and an uncached-behavior assertion (mutating the underlying file between requests must change the response).
+- **config/system_tab_thresholds.json** (new) — locked decision-D values verbatim: `session_duration_seconds_default=900`, `no_journal_output_seconds=600`, `envelope_not_picked_up_seconds=120`, plus Mirror `task_type` overrides (`doc-only=900`, `bug-investigation=1500`, `feature-development=2100`, `_default=1500`). Read by the dashboard's `/api/operations/stuck-sessions` Route Handler in PR-D.
+- **runbooks/system-tab-thresholds.md** (new) — operator doc explaining each threshold's semantics, when to tune, and the edit-then-reload procedure (PR review path, no service restart required — the file is re-read on every request).
+- **docs/operating-manual.md Part II** — this section.
+
+### Design constraints honored
+
+- **Uncached server-side.** No in-process cache, no TTL, no memoization. Every request re-reads the filesystem / `/proc` / cgroup files. The dashboard owns caching client-side. Test `UncachedTest` asserts mutating a file mid-flight changes the next response.
+- **Raw signals only.** Per locked decision-C, stuck-detection lives in the dashboard's `/api/operations/stuck-sessions` Route Handler (PR-D). The droplet exposes duration_sec, started_at, memory bytes, etc.; the dashboard joins with thresholds + `chain_events` to compute booleans.
+- **Structured error bodies.** Cgroup ENOENT (slice stopped) returns `503` with `{"error": "service-unavailable", "message": "<path>"}` via FastAPI's `HTTPException(detail=dict)`. No bare 500s.
+- **No shell injection surface.** Worktree listing is filesystem walk, not `git worktree list --porcelain`. The three endpoints take zero user input regardless.
+- **Test isolation.** Three new env overrides for tests: `OURLIBERTY_CGROUP_BASE`, `OURLIBERTY_WORKTREES_ROOT` (the existing `OURLIBERTY_AGENTS_ROOT` covers the in-flight registry). Same pattern as the existing E3.1 test suite.
+
+### Coordination with PR-B
+
+PR-B (ingestion daemon, parallel dispatch in `ourliberty-agent-core`) also appends a Part II section but uses a distinct title; merging order between PR-B and PR-C is reversible — each will rebase cleanly across the other.
+
+### Followups deferred to PR-D
+
+- The dashboard's stuck-detection Route Handler at `app/api/operations/stuck-sessions/route.ts`.
+- Delivery of `config/system_tab_thresholds.json` into the dashboard repo (CI sync vs. a new `/api/system/thresholds` droplet endpoint — PR-D picks one).
+- Migration 0005 `chain_events_read_flag.sql` for the "Mark as read" affordance.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*

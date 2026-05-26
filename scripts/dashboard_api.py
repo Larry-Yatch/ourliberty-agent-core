@@ -59,6 +59,25 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _cgroup_base() -> Path:
+    """Cgroup v2 directory for the inbox-watcher slice.
+
+    Env-overridable so tests can point at a synthetic tree without
+    touching /sys/fs/cgroup.
+    """
+    return Path(os.environ.get(
+        'OURLIBERTY_CGROUP_BASE',
+        '/sys/fs/cgroup/system.slice/ourliberty-inbox-watcher.service',
+    ))
+
+
+def _worktrees_root() -> Path:
+    """Where Forge / Mirror checkout worktrees live. Env-overridable for tests."""
+    return Path(os.environ.get(
+        'OURLIBERTY_WORKTREES_ROOT', '/home/larry/agent-worktrees',
+    ))
+
+
 # ---- agent + healer registries ----
 
 AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
@@ -225,6 +244,49 @@ class HealerStatus(BaseModel):
 class HealersStatusResponse(BaseModel):
     healers: list[HealerStatus]
     as_of: str
+
+
+# ---- /api/system/* response models (E4.4d PR-C) ----
+
+class SystemActiveSession(BaseModel):
+    pid: int
+    agent: Optional[str]
+    task_id: Optional[str]
+    task_type: Optional[str]
+    model: Optional[str]
+    started_at: Optional[str]
+    duration_sec: Optional[float]
+
+
+class SystemActiveSessionsResponse(BaseModel):
+    captured_at: str
+    sessions: list[SystemActiveSession]
+
+
+class SystemCgroupStatsResponse(BaseModel):
+    captured_at: str
+    memory_current_bytes: int
+    memory_peak_bytes: int
+    memory_max_bytes: Optional[int]
+    memory_high_bytes: Optional[int]
+    memory_events_max: int
+    memory_events_high: int
+    cpu_user_usec: int
+    cpu_system_usec: int
+
+
+class SystemWorktree(BaseModel):
+    name: str
+    agent: Optional[str]
+    task_id: Optional[str]
+    branch: Optional[str]
+    age_seconds: Optional[float]
+    is_in_flight: bool
+
+
+class SystemWorktreesResponse(BaseModel):
+    captured_at: str
+    worktrees: list[SystemWorktree]
 
 
 # ---- helpers ----
@@ -934,6 +996,274 @@ def _reader_healers_status(
     return {'healers': healers, 'as_of': _now_utc_iso(now)}
 
 
+# ---- /api/system/* readers (E4.4d PR-C) ----
+#
+# Locked decision-C: droplet API returns RAW signals only. No `stuck` /
+# `stuck_reason` booleans; the dashboard route handler at
+# /api/operations/stuck-sessions joins this output with chain_events and
+# thresholds (config/system_tab_thresholds.json) to compute stuck-state.
+# All three readers are uncached: each request re-reads the filesystem.
+
+# Cgroup files map directly to documented systemd cgroup v2 attributes.
+# `memory.max` and `memory.high` can be the literal string "max" when no
+# limit is configured — we surface that as None rather than coercing.
+
+
+def _parse_kv_file(text: str) -> dict[str, str]:
+    """Parse a key-value file (one `<key> <value>` pair per line)."""
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            out[parts[0]] = parts[1]
+    return out
+
+
+def _read_cgroup_int(base: Path, name: str) -> int:
+    """Read a single-int cgroup file. FileNotFoundError surfaces to caller."""
+    return int((base / name).read_text().strip())
+
+
+def _read_cgroup_int_or_none(base: Path, name: str) -> Optional[int]:
+    """Like `_read_cgroup_int` but tolerates the literal `max` sentinel
+    used for unlimited memory.max / memory.high."""
+    raw = (base / name).read_text().strip()
+    if raw == 'max':
+        return None
+    return int(raw)
+
+
+def _read_proc_cmdline(pid: int) -> Optional[str]:
+    """Read /proc/<pid>/cmdline as a space-joined string. Returns None if
+    the process has died mid-read or the file is unreadable."""
+    try:
+        raw = Path(f'/proc/{pid}/cmdline').read_bytes()
+    except (FileNotFoundError, ProcessLookupError, PermissionError, OSError):
+        return None
+    if not raw:
+        return None
+    # cmdline is NUL-separated; the last byte is typically also NUL.
+    parts = raw.split(b'\x00')
+    return ' '.join(p.decode('utf-8', errors='replace') for p in parts if p)
+
+
+# Worktree dir names follow the pattern `wt-<agent>-<task_id>`. Strict regex
+# so we don't mis-parse a stray directory.
+_WORKTREE_RE = re.compile(r'^wt-(?P<agent>[a-z]+)-(?P<task_id>[a-z0-9][a-z0-9-]*)$')
+
+
+def _parse_worktree_name(name: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Return (agent, task_id, branch) from a worktree dirname.
+
+    Branch follows the existing convention `<agent>/<task_id>`. Returns
+    (None, None, None) for directories that don't match the pattern.
+    """
+    m = _WORKTREE_RE.match(name)
+    if not m:
+        return None, None, None
+    agent = m.group('agent')
+    task_id = m.group('task_id')
+    return agent, task_id, f'{agent}/{task_id}'
+
+
+def _load_in_flight_index(agents_root: Path) -> dict[str, dict[str, Any]]:
+    """Index `~/agents/state/in-flight/*.json` by task_stem.
+
+    Each file is the dispatch-sentinel envelope: `{task_stem, agent_id,
+    pid, started_at}`. Tolerates missing dir, bad JSON, and races where a
+    file vanishes mid-iteration.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    in_flight_dir = agents_root / 'state' / 'in-flight'
+    if not in_flight_dir.is_dir():
+        return out
+    try:
+        entries = list(in_flight_dir.iterdir())
+    except OSError:
+        return out
+    for f in entries:
+        if not f.is_file() or not f.name.endswith('.json'):
+            continue
+        try:
+            payload = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        stem = payload.get('task_stem')
+        if isinstance(stem, str) and stem:
+            out[stem] = payload
+    return out
+
+
+def _detect_model_from_cmdline(cmdline: Optional[str]) -> Optional[str]:
+    """Best-effort: pull `--model <name>` or `claude-<family>` token out
+    of cmdline. Returns None if no clean match. Pure read, no shell."""
+    if not cmdline:
+        return None
+    m = re.search(r'--model[= ]([\w.-]+)', cmdline)
+    if m:
+        return m.group(1)
+    m = re.search(r'\b(claude-(?:opus|sonnet|haiku)-[\w.-]+)\b', cmdline)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _reader_system_active_sessions(
+    agents_root: Path,
+    cgroup_base: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Read cgroup.procs for the inbox-watcher slice, cross-reference
+    each PID against the in-flight registry, return one row per session.
+
+    Raw signals only — no stuck/stuck_reason (computed dashboard-side per
+    locked decision-C / spec § 5.5).
+
+    Tolerates:
+      - Slice not running → raises FileNotFoundError so the route
+        returns 503 with a structured body.
+      - PID dying between cgroup.procs read and /proc/<pid>/cmdline open
+        → that PID is omitted from the response (not a fatal error).
+    """
+    captured_at = now or datetime.now(timezone.utc)
+    procs_text = (cgroup_base / 'cgroup.procs').read_text()
+    pids: list[int] = []
+    for raw in procs_text.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            pids.append(int(raw))
+        except ValueError:
+            continue
+    in_flight = _load_in_flight_index(agents_root)
+    # Build pid → in-flight entry index for fast lookup.
+    in_flight_by_pid: dict[int, dict[str, Any]] = {}
+    for stem, entry in in_flight.items():
+        pid_v = entry.get('pid')
+        if isinstance(pid_v, int):
+            in_flight_by_pid[pid_v] = entry
+    sessions: list[dict[str, Any]] = []
+    for pid in pids:
+        cmdline = _read_proc_cmdline(pid)
+        entry = in_flight_by_pid.get(pid)
+        if entry is None and cmdline is None:
+            # Process vanished mid-read AND we have no registry entry —
+            # skip it entirely rather than emitting a half-row.
+            continue
+        agent = entry.get('agent_id') if entry else None
+        task_id = entry.get('task_stem') if entry else None
+        task_type = entry.get('task_type') if entry else None
+        started_at_raw = entry.get('started_at') if entry else None
+        started_dt = _ts_to_dt(started_at_raw) if isinstance(started_at_raw, str) else None
+        duration_sec: Optional[float] = None
+        if started_dt is not None:
+            duration_sec = (captured_at - started_dt).total_seconds()
+        sessions.append({
+            'pid': pid,
+            'agent': agent if isinstance(agent, str) else None,
+            'task_id': task_id if isinstance(task_id, str) else None,
+            'task_type': task_type if isinstance(task_type, str) else None,
+            'model': _detect_model_from_cmdline(cmdline),
+            'started_at': started_at_raw if isinstance(started_at_raw, str) else None,
+            'duration_sec': duration_sec,
+        })
+    return {
+        'captured_at': _now_utc_iso(captured_at),
+        'sessions': sessions,
+    }
+
+
+def _reader_system_cgroup_stats(
+    cgroup_base: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Read live cgroup memory + cpu numbers. FileNotFoundError surfaces
+    to the route for a 503 structured body.
+
+    `memory.events` is a kv file; `cpu.stat` likewise. memory.max /
+    memory.high may be the literal `max` sentinel when uncapped — that
+    becomes JSON null.
+    """
+    captured_at = now or datetime.now(timezone.utc)
+    memory_current = _read_cgroup_int(cgroup_base, 'memory.current')
+    memory_peak = _read_cgroup_int(cgroup_base, 'memory.peak')
+    memory_max = _read_cgroup_int_or_none(cgroup_base, 'memory.max')
+    memory_high = _read_cgroup_int_or_none(cgroup_base, 'memory.high')
+    events_kv = _parse_kv_file((cgroup_base / 'memory.events').read_text())
+    cpu_kv = _parse_kv_file((cgroup_base / 'cpu.stat').read_text())
+    return {
+        'captured_at': _now_utc_iso(captured_at),
+        'memory_current_bytes': memory_current,
+        'memory_peak_bytes': memory_peak,
+        'memory_max_bytes': memory_max,
+        'memory_high_bytes': memory_high,
+        'memory_events_max': int(events_kv.get('max', '0')),
+        'memory_events_high': int(events_kv.get('high', '0')),
+        'cpu_user_usec': int(cpu_kv.get('user_usec', '0')),
+        'cpu_system_usec': int(cpu_kv.get('system_usec', '0')),
+    }
+
+
+def _reader_system_worktrees(
+    agents_root: Path,
+    worktrees_root: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """List directories under `worktrees_root`, parse `wt-<agent>-<task_id>`,
+    cross-reference in-flight registry.
+
+    Filesystem-only — never shells out to `git worktree list`. Worktree
+    names come from filesystem listing, not request input, so there's no
+    user-controlled string anywhere near a subprocess.
+    """
+    captured_at = now or datetime.now(timezone.utc)
+    in_flight = _load_in_flight_index(agents_root)
+    in_flight_stems = set(in_flight.keys())
+    worktrees: list[dict[str, Any]] = []
+    if not worktrees_root.is_dir():
+        return {
+            'captured_at': _now_utc_iso(captured_at),
+            'worktrees': worktrees,
+        }
+    try:
+        entries = sorted(worktrees_root.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return {
+            'captured_at': _now_utc_iso(captured_at),
+            'worktrees': worktrees,
+        }
+    for entry in entries:
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        if not name.startswith('wt-'):
+            continue
+        agent, task_id, branch = _parse_worktree_name(name)
+        mt = _safe_mtime(entry)
+        age_seconds: Optional[float] = None
+        if mt is not None:
+            age_seconds = (captured_at - datetime.fromtimestamp(mt, tz=timezone.utc)).total_seconds()
+        is_in_flight = task_id in in_flight_stems if task_id else False
+        worktrees.append({
+            'name': name,
+            'agent': agent,
+            'task_id': task_id,
+            'branch': branch,
+            'age_seconds': age_seconds,
+            'is_in_flight': is_in_flight,
+        })
+    return {
+        'captured_at': _now_utc_iso(captured_at),
+        'worktrees': worktrees,
+    }
+
+
 # ---- FastAPI app ----
 
 app = FastAPI(
@@ -996,6 +1326,64 @@ def get_cycle_journal_recent(
 @app.get('/healers/status', response_model=HealersStatusResponse, dependencies=[Depends(_require_token)])
 def get_healers_status() -> dict[str, Any]:
     return _reader_healers_status(_agents_root())
+
+
+# ---- /api/system/* routes (E4.4d PR-C) ----
+#
+# All three are token-gated via the existing _require_token dependency.
+# None are server-side cached: each request re-reads filesystem + /proc.
+# Per locked decision-C, the droplet returns raw signals only; the
+# dashboard route handler combines these with thresholds + chain_events
+# to compute stuck-state.
+
+
+@app.get(
+    '/api/system/active-sessions',
+    response_model=SystemActiveSessionsResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_active_sessions() -> dict[str, Any]:
+    try:
+        return _reader_system_active_sessions(_agents_root(), _cgroup_base())
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                'error': 'service-unavailable',
+                'message': (
+                    f'inbox-watcher cgroup unavailable: {e.filename or e}'
+                ),
+            },
+        )
+
+
+@app.get(
+    '/api/system/cgroup-stats',
+    response_model=SystemCgroupStatsResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_cgroup_stats() -> dict[str, Any]:
+    try:
+        return _reader_system_cgroup_stats(_cgroup_base())
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                'error': 'service-unavailable',
+                'message': (
+                    f'inbox-watcher cgroup unavailable: {e.filename or e}'
+                ),
+            },
+        )
+
+
+@app.get(
+    '/api/system/worktrees',
+    response_model=SystemWorktreesResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_worktrees() -> dict[str, Any]:
+    return _reader_system_worktrees(_agents_root(), _worktrees_root())
 
 
 # Auth-gate the FastAPI auto-docs surfaces too. We override the routes

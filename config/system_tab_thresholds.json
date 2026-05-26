@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "owner": "stuck-detector",
+    "tweak_via": "edit this file + commit; dashboard reads on next poll (no service reload needed)",
+    "rationale": "Locked 2026-05-25 round D: D1=15min tighter start, D2=10min, D3=2min, D4 Mirror task_type override. See agents/beacon/specs/e4-4d-system-tab.md § 5.4 and runbooks/system-tab-thresholds.md."
+  },
+  "session_duration_seconds_default": 900,
+  "no_journal_output_seconds": 600,
+  "envelope_not_picked_up_seconds": 120,
+  "mirror_review_overrides_seconds": {
+    "doc-only": 900,
+    "bug-investigation": 1500,
+    "feature-development": 2100,
+    "_default": 1500
+  }
+}
