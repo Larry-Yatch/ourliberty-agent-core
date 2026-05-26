@@ -2612,6 +2612,34 @@ PR-B (ingestion daemon, parallel dispatch in `ourliberty-agent-core`) also appen
 - Delivery of `config/system_tab_thresholds.json` into the dashboard repo (CI sync vs. a new `/api/system/thresholds` droplet endpoint — PR-D picks one).
 - Migration 0005 `chain_events_read_flag.sql` for the "Mark as read" affordance.
 
+## Supabase CLI moved to droplet (2026-05-26)
+
+E4.4d follow-up. Until 2026-05-26 morning, applying a Supabase migration meant Larry's Mac had to be online with `~/.zshrc` sourced for `SUPABASE_ACCESS_TOKEN` and the DB password handy in 1Password. Larry asked if the apply step could move to the droplet terminal alongside everything else; we set up the CLI there the same morning. Migration `0004` (12:58 UTC) was the first one deployed via the new droplet path.
+
+### What changed
+
+- **Supabase CLI installed at `~/.local/share/supabase/`** on the droplet, version 2.101.0. The 2.x line is shipped as TWO binaries that MUST sit in the same directory: the user-facing shim `supabase` and the actual implementation `supabase-go`. A single-binary install ships `supabase` only and fails silently on most subcommands (`db push` returns no output and exit 0; `link` hangs). Discovered when the first install attempt downloaded only the shim and `supabase projects list` returned nothing. Codified below as item #56.
+- **Two new credentials added to `/home/larry/credentials/.env.larry`** — `SUPABASE_ACCESS_TOKEN` (`sbp_`-prefixed personal access token from https://supabase.com/dashboard/account/tokens) and `SUPABASE_DB_PASSWORD` (Postgres password for the linked project). Both are single-quoted on disk; the DB password regularly contains shell-special chars (`$`, `!`, `&`) that the `source` step mangles without quoting. The DB password is ALSO stored in 1Password and the two copies are kept in sync manually. Codified below as item #57.
+- **Project linked at `~/ourliberty-dashboard/.supabase/`** via `supabase link --project-ref ezldtkbhexyrgujqmxpd` with both credentials in env.
+- **Canonical one-shot apply command** is now `ssh larry@134.209.44.80 'set -a && source /home/larry/credentials/.env.larry && set +a && cd ~/ourliberty-dashboard && git pull --rebase origin main && PATH="$HOME/.local/share/supabase:$PATH" supabase db push'`. The `set -a && source` pattern is the working idiom — inline `-e KEY=val` exports through `ssh` lose `SUPABASE_DB_PASSWORD` to arg-splitting when the password contains shell-special chars.
+- **Mac CLI still works as a fallback.** The Mac's `SUPABASE_ACCESS_TOKEN` + 1Password DB password remain valid; if the droplet is in a bad state, `cd ~/ourliberty-dashboard && supabase db push` from the Mac still applies migrations.
+
+### Credential discipline (this PR)
+
+Closes the 4-artifact gap from the credentials discipline (`shared/credentials-discipline.md`) for both new credentials:
+
+- `config/token-rotation-schedule.json` gains two entries — `SUPABASE_ACCESS_TOKEN` (scheduled, 365d cadence, calendar event registered) and `SUPABASE_DB_PASSWORD` (`revocation_only`, no scheduled rotation — rotation is destructive and only happens on suspected compromise).
+- `docs/runbooks/rotate-supabase-access-token.md` (NEW) — 5-section rotate runbook.
+- `docs/runbooks/rotate-supabase-db-password.md` (NEW) — 6-section rotate runbook (the extra section is the post-rotation `supabase link` re-link + 1Password sync, because resetting the DB password invalidates every existing link state atomically).
+- `docs/runbooks/apply-supabase-migrations-from-droplet.md` (NEW) — canonical droplet apply path (this section's contents in operational form): prereqs, one-shot command, REST round-trip verify, full troubleshooting tree.
+
+The drift healer (`scripts/heal_credential_registry_drift.py`, 6h cadence) had been DMing Larry every six hours about the missing entries from 2026-05-26 morning until this PR; merging silences it.
+
+### Codified additions worth recalling next session
+
+56. **Supabase CLI 2.x requires BOTH `supabase` AND `supabase-go` in the same directory.** The 2.x install dropped the single-binary release shape that 1.x used. The user-facing `supabase` is a Go shim that exec's `supabase-go` from the same directory; if `supabase-go` is missing, most subcommands fail silently (exit 0, no stderr). When installing on a new host, download both binaries from the same release tag into the same directory and `chmod +x` both. Verify with `ls -la ~/.local/share/supabase/` showing both names before assuming the install succeeded.
+57. **Single-quote `.env` values that may contain shell-special chars; source them with `set -a && source <file> && set +a`, not via `ssh ... 'KEY=val cmd'` inline exports.** Supabase-issued DB passwords frequently contain `$`, `!`, `&`, and quote chars. Without single-quotes on disk, `source /home/larry/credentials/.env.larry` mis-parses the value (everything after the special char becomes shell expansion or a new command). The inline-export ssh pattern (`ssh host 'SUPABASE_DB_PASSWORD=$pw supabase db push'`) is even worse — the local shell expands `$pw` before send, and ssh's arg-splitting drops chars again on the remote side. The reliable idiom is: store as `KEY='value-here'` in `.env.larry`, then `ssh host 'set -a && source /home/larry/credentials/.env.larry && set +a && cmd'`. Apply this pattern to any new credential being added to `.env.larry` — quote on write, source on read.
+
 ---
 
 *This doc lives at `docs/operating-manual.md` in `Larry-Yatch/ourliberty-agent-core`. Edit Part I in place when something changes about how the system behaves. Append a new section to Part II when a phase ships — don't edit earlier phase entries; capture the change in the new entry instead.*
