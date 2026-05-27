@@ -359,6 +359,114 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         (archive_dir / f'{task}.json').write_text('{not valid json')
         self.assertIsNone(self.hps._forge_preflight_non_proceed(task))
 
+    # ----- Clean-preflight-exit fallback (2026-05-26 build-sequence-
+    # orchestrator-pr-s1 false-fire) -----
+
+    def test_skips_when_preflight_clean_exit_no_marker_delimiter(self) -> None:
+        """build-sequence-orchestrator-pr-s1 shape: phase='preflight',
+        exit_code=0, attempts=1, and `result` is prose describing the
+        CLARIFY marker without literal `=== CLARIFY_REQUEST ===`
+        delimiters. The 2026-05-26 185-min false-fire case."""
+        task = 'build-sequence-orchestrator-pr-s1-spec-adoption'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': 0,
+            'attempts': 1,
+            'result': (
+                'Preflight surfaced two scope-blocking ambiguities. '
+                'Marker emitted verbatim above. No files modified. '
+                'Awaiting Beacon resolution before PROCEED.'
+            ),
+        }))
+        # _forge_preflight_non_proceed returns the generic signal.
+        self.assertEqual(
+            self.hps._forge_preflight_non_proceed(task),
+            'PREFLIGHT_EXIT',
+        )
+        # Check 1 captures the skip with reason=preflight_exit in the log.
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'FORGE_NO_PR_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=preflight_exit', skip_lines[0])
+        self.assertIn(task, skip_lines[0])
+
+    def test_skips_when_preflight_marker_delimiter_present_preserves_label(self) -> None:
+        """Same outbox shape with phase=preflight + exit_code=0 + attempts=1,
+        but `result` ALSO carries the literal `=== CLARIFY_REQUEST ===`
+        delimiter. Marker scan wins; the specific marker label is
+        preserved in the skip log (`reason=preflight_non_proceed
+        marker='CLARIFY_REQUEST'`) for precise reporting."""
+        task = 'precise-clarify-marker-archived-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': 0,
+            'attempts': 1,
+            'result': (
+                '=== CLARIFY_REQUEST ===\n'
+                '{"task_id": "' + task + '", "question": "..."}\n'
+                '=== END_CLARIFY_REQUEST ==='
+            ),
+        }))
+        self.assertEqual(
+            self.hps._forge_preflight_non_proceed(task),
+            'CLARIFY_REQUEST',
+        )
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'FORGE_NO_PR_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=preflight_non_proceed', skip_lines[0])
+        self.assertIn("marker='CLARIFY_REQUEST'", skip_lines[0])
+
+    def test_alerts_on_build_phase_crash_no_preflight_skip(self) -> None:
+        """Regression guard for legitimate stalls: a real build-phase
+        crash (phase='build', exit_code != 0) must not be silenced by
+        the new PREFLIGHT_EXIT fallback. The three-conditions guard
+        (phase=preflight AND exit_code=0 AND attempts>=1) prevents it."""
+        task = 'real-build-phase-crash-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'build',
+            'exit_code': 1,
+            'attempts': 3,
+            'result': 'Forge crashed during gh pr create; no output.',
+        }))
+        # Helper returns None — three-conditions guard fails on phase.
+        self.assertIsNone(self.hps._forge_preflight_non_proceed(task))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn(task, alerts[0]['message'])
+
+    def test_alerts_when_no_preflight_archive_at_all(self) -> None:
+        """Regression guard: Forge completed build per inbox_watcher.log
+        (the `[forge] done success=True` line is present) but neither a
+        matching PR nor a preflight archive exists. Check 1 must alert
+        — neither reconciliation path applies."""
+        task = 'no-archive-no-pr-stall-001'
+        # Deliberately do NOT write any archive file.
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn(task, alerts[0]['message'])
+
 
 class TestCheckPrNoMirrorDispatch(_TempAgentsRootMixin, unittest.TestCase):
 
