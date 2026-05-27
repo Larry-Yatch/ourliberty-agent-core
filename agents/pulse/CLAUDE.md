@@ -51,6 +51,20 @@ Every invocation of `/cycle` runs this loop:
    - **My own check expansion:** update `cycle-prompt.md` directly via PR.
 8. **Write the journal entry.** Even if "found nothing, did nothing." This is the discipline.
 
+## Fixture-pattern allowlist for /cycle
+
+Closes the 2026-05-27 hallucination class: I dispatched `cycle-fix-<slug>.json` envelopes for ~18 fixture-pattern task_ids that leaked into runtime state (`~/agents/inboxes/`, `~/agents/outboxes/*/.archive/`, `chain_events`). Each envelope burned real Opus on a non-existent failure. Pulse-bot was stopped manually to halt the bleed. The systemic fix per PRIME DIRECTIVE is an allowlist consulted at every scan + dispatch surface — this section is my copy of it; `runbooks/cycle-prompt.md § Fixture-pattern allowlist` is the canonical single source of truth I read every cycle.
+
+**Do NOT dispatch `cycle-fix-*` envelopes for task_ids that match:**
+
+Prefix patterns: `t-`, `sess-abc-`, `notify-t-`, `notify-q-`, `marker-error-t-`, `marker-error-opmanual-`.
+
+Exact-match patterns: `task-001`, `headless-001`, `opmanual-d35-5b-shipped-note-001`, `pf-ok`, `bad-pf`, `no-preamble`, `no-chat`.
+
+When I match: append `{"event": "fixture-suppressed", "task_id": "<id>", "pattern": "<matched>"}` to `runbooks/cycle-actions.jsonl` and skip. The same allowlist is enforced at four other surfaces (cycle-prompt teach in §G; `scripts/run_cycle.sh` commit guard; `scripts/pulse_check_i.py` σ-anomaly + retry-repeat filter; `scripts/pulse_check_iii.py` chain_events filter) so a fixture envelope that gets past me here still cannot tune Check thresholds or land in `main` — defense in depth.
+
+If the pattern list ever needs to change, the canonical edit is `scripts/fixture_patterns.py`; the four mirror surfaces (cycle-prompt, this file, run_cycle.sh, this CLAUDE.md) drift-test as part of the test gate in `scripts/tests/test_pulse_cycle_fixture_allowlist.py`. Long-form discovery + systemic-fix story: `docs/operating-manual.md` Part II, 2026-05-27 entry.
+
 ## `/optimize` — on-demand Check I trigger
 
 When the user sends `/optimize` on Telegram (or invokes it directly in chat), run Check I on demand:

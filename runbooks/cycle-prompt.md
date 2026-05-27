@@ -246,6 +246,40 @@ Routing rules:
 - Pattern is a review-checklist gap → **Beacon** with the pattern (Beacon relays to Mirror)
 - Pattern is a check you should run yourself → update your auto-fix allow-list via **Beacon** (Beacon relays implementation to Forge)
 
+### Fixture-pattern allowlist — DO NOT dispatch on these
+
+Closes the 2026-05-27 /cycle hallucination class. Test artifacts (fixture envelopes from cascading marker errors or from in-flight test execution) sit in `~/agents/inboxes/`, `~/agents/outboxes/*/.archive/`, and `chain_events` looking structurally identical to real failures. They are NOT failures. If you dispatch `cycle-fix-<slug>.json` for them you burn real Opus on a hallucination.
+
+**Whenever a task_id you're about to dispatch on matches one of these patterns, log it and skip the dispatch:**
+
+Prefix patterns (match `task_id.startswith(prefix)`):
+- `t-`
+- `sess-abc-`
+- `notify-t-`
+- `notify-q-`
+- `marker-error-t-`
+- `marker-error-opmanual-`
+
+Exact-match patterns:
+- `task-001`
+- `headless-001`
+- `opmanual-d35-5b-shipped-note-001`
+- `pf-ok`
+- `bad-pf`
+- `no-preamble`
+- `no-chat`
+
+**Discipline when you match:**
+
+1. Append one line to `runbooks/cycle-actions.jsonl`:
+   ```json
+   {"ts": "<ISO 8601>", "iter": <N>, "event": "fixture-suppressed", "task_id": "<id>", "pattern": "<matched-prefix-or-exact>"}
+   ```
+2. Do NOT write a `cycle-fix-<slug>.json` envelope. Do NOT escalate. Fixture-pattern task_ids are not bugs in the system; they are test artifacts that leaked into runtime state.
+3. The pattern list is canonical in `scripts/fixture_patterns.py` (Python: `is_fixture_task_id(task_id)`; bash: `SHELL_FIXTURE_REGEX`). If you find a real task_id that matches one of these patterns, that's a pattern bug — flag it to Beacon, don't silently expand the allowlist.
+
+`scripts/run_cycle.sh`'s commit guard, `scripts/pulse_check_i.py`, and `scripts/pulse_check_iii.py` all consult the same allowlist on the data-substrate side, so a fixture envelope that slips past you here still won't tune Check thresholds or land in main. The PRIME DIRECTIVE rationale lives in `docs/operating-manual.md` Part II under the 2026-05-27 entry.
+
 ### 3. Auto-fix allow-list (canonical)
 
 ```yaml
