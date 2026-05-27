@@ -150,7 +150,7 @@ What each one does:
 | `deploy-notifier` (E2.2) | 2 min | Vercel preview-URL READY + build-ERROR events for configured deploy targets |
 | `chain-event-shipper-heartbeat` (E4.4d PR-B) | 5 min | `chain_event_shipper.heartbeat` file mtime > 10 min stale (daemon hung or crashed) |
 | `chain-event-type-audit` (E4.4d PR-B) | weekly Sun 06:00 | `chain_events` rows whose `event_type` is not in the application-side `KNOWN_EVENT_TYPES` allowlist |
-| `build-sequence-advancer-heartbeat` (E-orchestrator PR-S2) | 5 min | `build-sequence-advancer.heartbeat` file mtime > 15 min stale (3 missed ticks at the 5-min advancer cadence) |
+| `build-sequence-advancer-heartbeat` (E-orchestrator PR-S2) | 5 min | `build-sequence-advancer.heartbeat` file mtime > 10 min stale (2 missed ticks at the 5-min advancer cadence — per spec § 5.4 failure mode 3) |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
 
@@ -243,7 +243,7 @@ No systemd unit yet — `supabase-py` is a library, not a service. The first lon
 
 ### Build-sequence advancer (E-orchestrator PR-S2)
 
-`scripts/build_sequence_advancer.py` is a timer-driven oneshot (Type=oneshot) that polls `~/agents/blackboard/build-sequences/*.json` every 5 min and advances any active multi-step build sequence. Companion: the `heal-build-sequence-advancer-heartbeat` healer (above) DMs Larry when the per-tick heartbeat is >15 min stale.
+`scripts/build_sequence_advancer.py` is a timer-driven oneshot (Type=oneshot) that polls `~/agents/blackboard/build-sequences/*.json` every 5 min and advances any active multi-step build sequence. Companion: the `heal-build-sequence-advancer-heartbeat` healer (above) DMs Larry when the per-tick heartbeat is >10 min stale (per spec § 5.4 failure mode 3).
 
 The advancer ships **inactive by default** behind `OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=false` (mirrors the chain-event-shipper activation pattern). Enable only after PR-S3 (dashboard ladder UI) + PR-S4 (Beacon's 6 sequence shortcuts + Mirror's preflight DAG verification) have shipped and the kickoff round-trip is verified end-to-end. The blackboard directory is runtime-only — the daemon creates `~/agents/blackboard/build-sequences/` on its first tick; nothing in the repo tracks it.
 

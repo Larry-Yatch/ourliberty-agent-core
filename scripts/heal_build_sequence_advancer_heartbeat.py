@@ -9,9 +9,11 @@ The build_sequence_advancer daemon writes a heartbeat to
 ~/agents/blackboard/build-sequence-advancer.heartbeat every 5 min via its
 systemd timer. This healer runs every 5 min via its own systemd timer and
 DMs Larry (warning severity) when the heartbeat is older than
-STALE_THRESHOLD_SEC (15 min == 3 missed ticks — long enough that a slow
-tick won't fire false alarms, short enough that a real crash is visible
-within ~half an hour).
+STALE_THRESHOLD_SEC (10 min per spec § 5.4 failure mode 3: "if heartbeat
+timestamp is more than 10 min stale, DM Larry"). At the 5-min advancer
+cadence that's 2 missed ticks; tight but spec-verbatim. The
+chain-event-shipper analogue uses the same 10-min floor over a 30-second
+heartbeat cadence.
 
 Mirrors heal_chain_event_shipper_heartbeat.py exactly in shape — the
 codebase has ten such healers and uniformity beats per-healer cleverness.
@@ -38,10 +40,11 @@ HEALER_HEARTBEAT = (
 )
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-build-sequence-advancer-heartbeat.log'
 
-# 15 min == 3 missed ticks at the 5-min cadence. Tighter would alert on
-# a single slow tick (false positive); looser would delay detection past
-# the half-hour ceiling Larry expects for healer DMs.
-STALE_THRESHOLD_SEC = 15 * 60
+# Spec § 5.4 failure mode 3: 10 min. At the 5-min advancer cadence that's
+# 2 missed ticks — tight but spec-verbatim. The pre-revision value (15
+# min == 3 missed ticks) was looser; Mirror's revision 1 caught the
+# drift and we tightened to match the spec.
+STALE_THRESHOLD_SEC = 10 * 60
 
 PER_HEALER_KILL_ENV = 'OURLIBERTY_HEAL_BUILD_SEQUENCE_ADVANCER_DISABLE'
 
@@ -129,7 +132,7 @@ def main() -> int:
     log(f'STALE advancer heartbeat — {reason}', 'WARN')
     delivered = _dm_larry(
         message=(
-            'build_sequence_advancer heartbeat is stale (>15 min). The '
+            'build_sequence_advancer heartbeat is stale (>10 min). The '
             'daemon is most likely crashed, paused at its activation '
             'gate (OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED), or its '
             'systemd timer is disabled.\n\n'

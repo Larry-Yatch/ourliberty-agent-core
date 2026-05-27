@@ -72,7 +72,7 @@ The reason file edits use `tmp + os.replace`: per spec § 5.1 atomic-writes are 
 
 ## Diagnosing a stalled advancer
 
-The healer DMs Larry when the heartbeat file is >15 min stale (3 missed ticks at the 5-min cadence). When that DM fires, work through this in order:
+The healer DMs Larry when the heartbeat file is >10 min stale (2 missed ticks at the 5-min cadence — spec § 5.4 failure mode 3). When that DM fires, work through this in order:
 
 1. **Is the timer enabled and active?**
    ```bash

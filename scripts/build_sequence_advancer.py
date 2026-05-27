@@ -773,12 +773,18 @@ def _process_active_sequence(
                     'step-dispatched', step_id=step_id,
                 ))
             else:
-                # Dispatch failure — log + DM, leave in dispatchable so next
-                # tick retries. (Per spec § 5.4: never crash; pause + DM
-                # for unrecoverable; here we treat as transient.)
+                # Dispatch failure — log + DM + RESET step to 'pending' so
+                # the next tick's pending-only filter re-enters this branch
+                # and retries. Leaving the step in 'dispatchable' would
+                # silently strand it (the dispatch loop at line 756 only
+                # iterates pending steps; the gate-check loop above only
+                # iterates current_steps; nothing else picks 'dispatchable'
+                # back up). Per spec § 5.4: never crash; pause + DM for
+                # unrecoverable; here we treat as transient and retry.
                 logger.error(
                     f'dispatch failed for {seq_id}/{step_id}: {err}'
                 )
+                step['status'] = 'pending'
                 audit_log.append(_audit_entry(
                     'step-dispatch-failed', step_id=step_id, error=err,
                 ))

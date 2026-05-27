@@ -640,5 +640,88 @@ class TestSupabaseUnavailable(_AdvancerHarness):
         self.assertEqual(alpha['status'], 'dispatched')
 
 
+class TestDispatchFailureRecovery(_AdvancerHarness):
+    """Mirror revision 1: dispatch-failure must reset the step to
+    'pending' so the next tick re-enters the dispatch loop (which only
+    iterates pending steps). Leaving the step in 'dispatchable' would
+    strand it forever — the gate-check loop only iterates current_steps;
+    the dispatch loop only iterates pending; nothing picks 'dispatchable'
+    back up."""
+
+    def test_dispatch_failure_resets_and_recovers_on_next_tick(self):
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'alpha', status='merged',
+                    pr_url='https://github.com/x/y/pull/1',
+                    dispatched_at='2026-05-27T00:00:00+00:00',
+                ),
+                _make_step('beta', deps=['alpha'], status='pending'),
+            ],
+            current_steps=[],
+        )
+        seq['steps'][0]['merged_at'] = '2026-05-27T00:10:00+00:00'
+        self._write_sequence(seq)
+        self._patch_gates()
+
+        # Fail dispatch on the first call, succeed on the second.
+        attempts = {'n': 0}
+        original_dispatch = self.bsa._dispatch_step
+
+        def _fail_once_then_succeed(seq_arg, step_arg):
+            attempts['n'] += 1
+            if attempts['n'] == 1:
+                # Don't call the original (no envelope written on failure).
+                self.dispatched_envelopes.append(
+                    self.bsa._build_step_envelope(seq_arg, step_arg)
+                )
+                return 'simulated transient dispatch failure'
+            return original_dispatch(seq_arg, step_arg)
+
+        self.bsa._dispatch_step = _fail_once_then_succeed
+
+        # First tick: dispatch fails, step must be reset to 'pending'.
+        self.bsa.tick()
+        seq_after_t1 = self._read_sequence('seq-001')
+        beta_t1 = next(
+            s for s in seq_after_t1['steps'] if s['step_id'] == 'beta'
+        )
+        self.assertEqual(
+            beta_t1['status'], 'pending',
+            msg=(
+                'After dispatch failure, step must be reset to pending so '
+                'the next tick re-enters the dispatch loop (which filters '
+                'on status==pending). Mirror revision 1.'
+            ),
+        )
+        # Sequence still active (not paused — transient failure).
+        self.assertEqual(seq_after_t1['status'], 'active')
+        # Larry got a dispatch-failed DM.
+        fail_dms = [
+            d for d in self.dms if 'dispatch-failed' in d['subject']
+        ]
+        self.assertEqual(len(fail_dms), 1)
+        # The audit_log records the failure.
+        events_t1 = [e['event'] for e in seq_after_t1['audit_log']]
+        self.assertIn('step-dispatch-failed', events_t1)
+
+        # Second tick: dispatch succeeds; step transitions to dispatched.
+        self.bsa.tick()
+        seq_after_t2 = self._read_sequence('seq-001')
+        beta_t2 = next(
+            s for s in seq_after_t2['steps'] if s['step_id'] == 'beta'
+        )
+        self.assertEqual(
+            beta_t2['status'], 'dispatched',
+            msg=(
+                'After a successful retry on tick 2, step must transition '
+                'to dispatched. The reset-to-pending in tick 1 is what '
+                'allows this re-entry; the test would fail with the pre-'
+                'revision code that left the step at dispatchable.'
+            ),
+        )
+        self.assertIn('beta', seq_after_t2['current_steps'])
+
+
 if __name__ == '__main__':
     unittest.main()
