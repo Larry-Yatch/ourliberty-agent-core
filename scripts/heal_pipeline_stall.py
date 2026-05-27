@@ -391,6 +391,131 @@ def _task_id_from_branch(branch: str) -> Optional[str]:
     return None
 
 
+# ---------- Shared resolution-signal reconciliation (2026-05-27) ----------
+#
+# Checks 1, 2, 4, 5, 6, 7 share the same false-positive class: they fire on
+# tasks Larry already resolved via the Approvals tab (emitting a
+# `larry_action` chain_event), OR that the producing agent already re-ran
+# (a subsequent `session_start` chain_event supersedes the original stuck
+# pointer), OR — when a PR exists — that the PR was already closed/merged
+# out-of-band. The shared helper below queries chain_events for those
+# signals and returns (True, reason) when any are present. Each call site
+# logs a `<CHECK_NAME>_SKIP reason=<reason>` line mirroring PR #133's
+# FORGE_NO_PR_SKIP shape and bypasses the alert.
+#
+# Failsafe: on infrastructure failure (missing env, import error, query
+# exception) the helper returns (False, None) so the legitimate alert path
+# is preserved. The 6h per-subject cooldown is unchanged — SKIP bypasses
+# it entirely; alerts that do fire still cooldown-gate DM spam.
+#
+# Check 3 (mirror-pass-unmerged) already handles PR.state inline via a
+# different code path. Check 8 (tier2-fallback) is a different signal
+# type — resolution signals don't apply. Both untouched.
+
+def _get_chain_events_for_task(task_id: str,
+                               since_ts: datetime) -> Optional[list[dict]]:
+    """Query Supabase chain_events for rows matching `task_id` with
+    `ts > since_ts`. Returns a list of dicts (possibly empty) on success,
+    or None on infrastructure failure (missing env, import error, query
+    exception). Callers treat None as 'no signal present' so the existing
+    alert behavior is preserved as the failsafe.
+
+    Lazy `from supabase import create_client` per the
+    `heal_chain_event_type_audit.py` canonical pattern — keeps tests
+    mock-friendly and avoids importing the supabase SDK at module load."""
+    url = os.environ.get('SUPABASE_URL')
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        # Quiet on missing env — tests don't set these, and the failsafe
+        # path is the correct behavior in that case (legitimate alerts
+        # still fire). WARN noise here would pollute every healer cycle
+        # that runs in an environment without Supabase configured.
+        return None
+    try:
+        from supabase import create_client  # type: ignore
+        client = create_client(url, key)
+        since_iso = since_ts.astimezone(timezone.utc).isoformat()
+        res = (
+            client.table('chain_events')
+                  .select('event_type,ts,actor,task_id')
+                  .eq('task_id', task_id)
+                  .gt('ts', since_iso)
+                  .execute()
+        )
+        rows = getattr(res, 'data', None) or []
+        return rows
+    except Exception as e:
+        log(
+            f'chain_events query failed for task={task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+
+
+def _check_pr_closed_via_gh(pr_url: str) -> Optional[str]:
+    """Return the PR state string if MERGED or CLOSED, else None. Returns
+    None on subprocess / JSON error too (treated as 'unknown' so the
+    legitimate alert behavior is preserved)."""
+    try:
+        result = subprocess.run(
+            ['gh', 'pr', 'view', pr_url, '--json', 'state'],
+            capture_output=True, text=True, timeout=GH_TIMEOUT_S,
+            env={**os.environ,
+                 'PATH': '/usr/bin:/usr/local/bin:' + os.environ.get('PATH', '')},
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout or '{}')
+        state = data.get('state')
+        if state in ('MERGED', 'CLOSED'):
+            return state
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+        return None
+    return None
+
+
+def _resolution_signal_present(
+    task_id: str,
+    since_ts: datetime,
+    *,
+    check_pr_state: bool = False,
+    pr_url: Optional[str] = None,
+) -> tuple[bool, Optional[str]]:
+    """Return (True, reason) if the task has been resolved out-of-band
+    since `since_ts`. Reasons checked, in cheap-to-expensive order:
+
+      1. `larry_action` chain_event — Larry approved/rejected the
+         queued item via the Approvals tab. Reason: `'larry_action'`.
+      2. `session_start` chain_event — the producing agent already
+         started a fresh attempt; the older stuck pointer is moot.
+         Reason: `'superseded_session'`.
+      3. PR.state in {MERGED, CLOSED} via `gh pr view` (only when
+         `check_pr_state=True` AND `pr_url` provided). Reason:
+         `'pr_closed'`.
+
+    Returns (False, None) when no signal is present OR when the
+    chain_events query failed (failsafe — current alert behavior is
+    preserved on infrastructure errors). Task_ids of `'unknown'` or
+    empty short-circuit to (False, None) since no row could match."""
+    if not task_id or task_id == 'unknown':
+        return (False, None)
+    rows = _get_chain_events_for_task(task_id, since_ts)
+    if rows is None:
+        return (False, None)
+    for row in rows:
+        if row.get('event_type') == 'larry_action':
+            return (True, 'larry_action')
+    for row in rows:
+        if row.get('event_type') == 'session_start':
+            return (True, 'superseded_session')
+    if check_pr_state and pr_url:
+        state = _check_pr_closed_via_gh(pr_url)
+        if state is not None:
+            return (True, 'pr_closed')
+    return (False, None)
+
+
 # ---------- Check 1: Forge built but no PR opened ----------
 
 # Branch-truncation tolerance. Forge writes feature branches as
@@ -583,6 +708,14 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             )
             seen_tasks.add(task)
             continue
+        # Reconciliation step 3: chain_events shows an out-of-band
+        # resolution (Larry approved via Approvals tab, or the producer
+        # already started a fresh session that supersedes this pointer)?
+        hit, reason = _resolution_signal_present(task_id=task, since_ts=ts)
+        if hit:
+            log(f'FORGE_NO_PR_SKIP task={task} reason={reason}', 'INFO')
+            seen_tasks.add(task)
+            continue
         # No matching PR — stall
         elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'forge_built_no_pr:{task}'
@@ -636,6 +769,18 @@ def check_pr_no_mirror_dispatch(notifier_lines: list[str], open_prs: list[dict],
         if elapsed_min < threshold:
             continue
         if task in dispatched:
+            continue
+        pr_url = (pr.get('html_url')
+                  or f'https://github.com/{pr["_repo"]}/pull/{pr["number"]}')
+        hit, reason = _resolution_signal_present(
+            task_id=task, since_ts=created,
+            check_pr_state=True, pr_url=pr_url,
+        )
+        if hit:
+            log(
+                f'PR_NO_MIRROR_DISPATCH_SKIP task={task} reason={reason}',
+                'INFO',
+            )
             continue
         key = f'pr_no_mirror_dispatch:{task}'
         alerts.append({
@@ -742,6 +887,13 @@ def check_mirror_marker_invisible(notifier_lines: list[str], state: dict) -> lis
             continue
         if ts > cutoff:
             continue
+        hit, reason = _resolution_signal_present(task_id=task, since_ts=ts)
+        if hit:
+            log(
+                f'MIRROR_MARKER_INVISIBLE_SKIP task={task} reason={reason}',
+                'INFO',
+            )
+            continue
         elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'mirror_marker_invisible:{task}'
         alerts.append({
@@ -764,7 +916,8 @@ def check_mirror_marker_invisible(notifier_lines: list[str], state: dict) -> lis
 
 def check_retry_exhausted(state: dict) -> list[dict]:
     """Scan inbox-watcher journal for 'All retries exhausted' in the recent window."""
-    cutoff_iso = (datetime.now(timezone.utc) - timedelta(minutes=RETRY_EXHAUST_WINDOW_MIN)).strftime('%Y-%m-%d %H:%M:%S UTC')
+    cutoff_dt = datetime.now(timezone.utc) - timedelta(minutes=RETRY_EXHAUST_WINDOW_MIN)
+    cutoff_iso = cutoff_dt.strftime('%Y-%m-%d %H:%M:%S UTC')
     try:
         result = subprocess.run(
             ['journalctl', '-u', 'ourliberty-inbox-watcher.service',
@@ -789,6 +942,12 @@ def check_retry_exhausted(state: dict) -> list[dict]:
         if task in seen_tasks:
             continue
         seen_tasks.add(task)
+        hit, reason = _resolution_signal_present(
+            task_id=task, since_ts=cutoff_dt,
+        )
+        if hit:
+            log(f'RETRY_EXHAUSTED_SKIP task={task} reason={reason}', 'INFO')
+            continue
         key = f'retry_exhausted:{task}'
         alerts.append({
             'key': key,
@@ -834,6 +993,13 @@ def check_revision_dispatched_with_no_session(notifier_lines: list[str],
             seen_tasks.add(task)
             continue
         seen_tasks.add(task)
+        hit, reason = _resolution_signal_present(task_id=task, since_ts=ts)
+        if hit:
+            log(
+                f'NO_SESSION_REVISION_SKIP task={task} reason={reason}',
+                'INFO',
+            )
+            continue
         elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'no_session_revision:{task}'
         alerts.append({
@@ -949,6 +1115,18 @@ def check_unrouted_open_prs(open_prs: list[dict],
         pr_html_url = pr.get('html_url') or (
             f'https://github.com/{pr["_repo"]}/pull/{pr["number"]}'
         )
+        if branch_task:
+            hit, reason = _resolution_signal_present(
+                task_id=branch_task, since_ts=created,
+                check_pr_state=True, pr_url=pr_html_url,
+            )
+            if hit:
+                log(
+                    f'UNROUTED_OPEN_PR_SKIP task={branch_task} '
+                    f'reason={reason}',
+                    'INFO',
+                )
+                continue
         key = f'unrouted_open_pr:{pr["_repo"]}:{pr["number"]}'
         alerts.append({
             'key': key,
