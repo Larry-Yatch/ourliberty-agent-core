@@ -460,3 +460,44 @@ def format_dm(record: dict) -> str:
         return _render_translated_alert(record, translation)
     raw = _render_raw_alert_body(record)
     return f'{raw}\n\n{_NO_TRANSLATION_FOOTER}'
+
+
+# ---------- CLI (shell-callable from sync_agent_core.sh, run_cycle.sh, etc.) ----------
+
+
+def _cli_append_alert(args) -> int:
+    ok = append_alert(
+        source=args.source,
+        severity=args.severity,
+        message=args.message,
+        subject=args.subject,
+        suggested_action=args.suggested_action,
+    )
+    return 0 if ok else 1
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog='larry_alerts.py',
+        description='Shell-callable CLI for the larry-alerts queue.',
+    )
+    sub = parser.add_subparsers(dest='cmd', required=True)
+    aa = sub.add_parser(
+        'append_alert',
+        help='Append one alert (subject to per-source:subject cooldown).',
+    )
+    aa.add_argument('--source', required=True)
+    aa.add_argument('--severity', required=True, choices=list(VALID_SEVERITIES))
+    aa.add_argument('--message', required=True)
+    aa.add_argument('--subject', default=None)
+    aa.add_argument('--suggested-action', dest='suggested_action', default=None)
+    args = parser.parse_args(argv)
+    if args.cmd == 'append_alert':
+        return _cli_append_alert(args)
+    return 2
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
