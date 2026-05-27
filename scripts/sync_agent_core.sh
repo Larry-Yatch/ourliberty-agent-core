@@ -10,10 +10,14 @@
 
 set -euo pipefail
 
-REPO_DIR="/home/larry/agent-core"
-LIVE_ROOT="/home/larry/agents"
-STAGING_ROOT="/home/larry/agents/.sync-staging"
-BACKUP_ROOT="/home/larry/agents/.sync-backup"
+# REPO_DIR / LIVE_ROOT default to the production paths but accept env-var
+# overrides so the test harness can point them at a tmpdir-rooted fake tree.
+# Production callers (ourliberty-sync.service) don't set these vars; the
+# defaults apply unchanged.
+REPO_DIR="${REPO_DIR:-/home/larry/agent-core}"
+LIVE_ROOT="${LIVE_ROOT:-/home/larry/agents}"
+STAGING_ROOT="${STAGING_ROOT:-/home/larry/agents/.sync-staging}"
+BACKUP_ROOT="${BACKUP_ROOT:-/home/larry/agents/.sync-backup}"
 BLACKBOARD_DIR="/home/larry/agents/blackboard"
 SYNC_STATUS_FILE="${BLACKBOARD_DIR}/agent-core-sync.json"
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -59,6 +63,28 @@ alert_larry() {
         --message "$message" >/dev/null 2>&1 || true
 }
 
+# emit_larry_alert_envelope — append a record to the larry-alerts queue via
+# the larry_alerts.py CLI. Subject is the cooldown dedup key (subject-specific
+# 60min window for severity=warning). Added 2026-05-27 after the 'merged but
+# not deployed' incident: alert_larry()->notify_larry.py never reached Larry
+# (the notify wiring is still a TODO), so silent sync failures sat unobserved
+# for hours. This is the belt-and-suspenders second channel that Beacon's
+# Telegram bot polls. Best-effort: failure to enqueue never blocks the sync
+# flow's existing exit semantics.
+emit_larry_alert_envelope() {
+    local subject="$1"
+    local message="$2"
+    local cli="${SCRIPTS_DIR}/larry_alerts.py"
+    if [ ! -f "$cli" ]; then
+        return 0
+    fi
+    timeout 10 python3 "$cli" append_alert \
+        --source sync.service \
+        --severity warning \
+        --subject "$subject" \
+        --message "$message" >/dev/null 2>&1 || true
+}
+
 write_status() {
     local status="$1"
     local message="$2"
@@ -100,7 +126,8 @@ CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')
 if [ "$CURRENT_BRANCH" != "main" ]; then
     log "ERROR: Repo is on '$CURRENT_BRANCH', expected 'main'. Sync refuses to operate."
     write_status "error" "Wrong branch: $CURRENT_BRANCH"
-    alert_larry "wrong branch ($CURRENT_BRANCH)" "sync_agent_core.sh refused to run because /home/larry/agent-core is checked out on '$CURRENT_BRANCH', not 'main'. Per ourliberty-agent-core operating model, all work commits direct to main. Action: ssh ourliberty-vm, cd /home/larry/agent-core, switch to main and merge or discard the feature branch."
+    alert_larry "wrong branch ($CURRENT_BRANCH)" "sync_agent_core.sh refused to run because ${REPO_DIR} is checked out on '$CURRENT_BRANCH', not 'main'. Per ourliberty-agent-core operating model, all work commits direct to main. Action: ssh ourliberty-vm, cd ${REPO_DIR}, switch to main and merge or discard the feature branch."
+    emit_larry_alert_envelope "sync-blocked:wrong-branch:${CURRENT_BRANCH}" "ourliberty-sync.service refusing to pull on branch ${CURRENT_BRANCH} (expected main). Working tree will not receive PR merges from origin/main until restored. Recovery: cd ${REPO_DIR} && git checkout main && git pull --ff-only (if tree is clean; else commit/stash work first)."
     exit 1
 fi
 
@@ -109,7 +136,8 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
     write_status "error" "Uncommitted changes in working tree"
     DIRTY_FILES=$(git status --short | head -10)
-    alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because /home/larry/agent-core has uncommitted modifications. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
+    alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because ${REPO_DIR} has uncommitted modifications. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
+    emit_larry_alert_envelope "sync-blocked:uncommitted-changes" "ourliberty-sync.service refusing to pull: ${REPO_DIR} has uncommitted modifications. Working tree will not receive PR merges from origin/main until cleaned. Recovery: cd ${REPO_DIR} && git status; commit or stash the changes."
     exit 1
 fi
 
@@ -138,7 +166,8 @@ if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
     git merge --ff-only origin/main --quiet 2>/dev/null || {
         log "ERROR: Cannot fast-forward to origin/main. Manual intervention required."
         write_status "error" "Fast-forward merge failed"
-        alert_larry "fast-forward failed" "sync_agent_core.sh tried to fast-forward main from $OLD_HEAD to $NEW_HEAD but failed. The repo and origin have diverged. Action: ssh ourliberty-vm, cd /home/larry/agent-core, run 'git status' and 'git log --oneline origin/main..HEAD' to see what's local-only, then rebase or merge as appropriate."
+        alert_larry "fast-forward failed" "sync_agent_core.sh tried to fast-forward main from $OLD_HEAD to $NEW_HEAD but failed. The repo and origin have diverged. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git status' and 'git log --oneline origin/main..HEAD' to see what's local-only, then rebase or merge as appropriate."
+        emit_larry_alert_envelope "sync-blocked:fast-forward-failed" "ourliberty-sync.service: cannot fast-forward main from ${OLD_HEAD:0:8} to ${NEW_HEAD:0:8}; repo and origin diverged. Recovery: cd ${REPO_DIR}; investigate divergence; rebase or hard-reset to origin/main once safe."
         exit 1
     }
 fi
@@ -151,7 +180,8 @@ if [ -f "${SCRIPTS_DIR}/validate_agent_core.py" ]; then
     if [ $VALIDATE_RC -ne 0 ]; then
         log "ERROR: Validation failed (exit code $VALIDATE_RC). Aborting sync."
         write_status "error" "Validation failed for commit $NEW_HEAD"
-        alert_larry "validation failed" "sync_agent_core.sh halted at validate_agent_core.py for commit $NEW_HEAD (exit code $VALIDATE_RC). Repo rolled back to $OLD_HEAD. Action: ssh ourliberty-vm, cd /home/larry/agent-core, git checkout $NEW_HEAD, run 'python3 scripts/validate_agent_core.py' to see what failed."
+        alert_larry "validation failed" "sync_agent_core.sh halted at validate_agent_core.py for commit $NEW_HEAD (exit code $VALIDATE_RC). Repo rolled back to $OLD_HEAD. Action: ssh ourliberty-vm, cd ${REPO_DIR}, git checkout $NEW_HEAD, run 'python3 scripts/validate_agent_core.py' to see what failed."
+        emit_larry_alert_envelope "sync-blocked:validation-failed:${NEW_HEAD:0:8}" "ourliberty-sync.service: validate_agent_core.py rejected commit ${NEW_HEAD:0:8} (exit ${VALIDATE_RC}); rolled back to ${OLD_HEAD:0:8}. Recovery: cd ${REPO_DIR}; git checkout ${NEW_HEAD}; python3 scripts/validate_agent_core.py to see what failed; fix on origin/main."
         # Roll back to old HEAD
         git reset --hard "$OLD_HEAD" --quiet 2>/dev/null
         exit 1
@@ -180,6 +210,8 @@ if [ -f "${SCRIPTS_DIR}/await_quiescence.py" ]; then
         if [ $QUIESCENCE_RC -ne 0 ]; then
             log "ERROR: Strict quiescence timeout. Aborting sync."
             write_status "error" "Quiescence timeout for commit $NEW_HEAD"
+            alert_larry "quiescence timeout" "sync_agent_core.sh strict-quiescence wait exceeded ${QUIESCENCE_TIMEOUT}s for commit ${NEW_HEAD}; rolled back to ${OLD_HEAD}. Action: ssh ourliberty-vm, investigate which agents are non-quiescent (await_quiescence.py output)."
+            emit_larry_alert_envelope "sync-blocked:quiescence-timeout" "ourliberty-sync.service: strict-quiescence wait exceeded ${QUIESCENCE_TIMEOUT}s for commit ${NEW_HEAD:0:8}; rolled back to ${OLD_HEAD:0:8}. Recovery: cd ${REPO_DIR}; python3 scripts/await_quiescence.py to identify the non-quiescent agent(s); resolve before next sync tick."
             git reset --hard "$OLD_HEAD" --quiet 2>/dev/null
             exit 1
         fi

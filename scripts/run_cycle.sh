@@ -39,6 +39,54 @@ fi
 echo "$$" > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"; log "lock released"' EXIT
 
+# --- wrong-branch guard ---
+# Added 2026-05-27 (closes 2026-05-26 'merged but not deployed' outage class):
+# run_cycle.sh auto-commits cycle-journal / cycle-actions / Pulse MEMORY on
+# every successful cycle (see auto-commit block below). If the working tree
+# is on a non-main branch when this fires, those commits land on the wrong
+# branch — silent corruption of feature-branch history. Three-way decision:
+#   - on main           → pass through (existing behavior)
+#   - non-main + clean  → auto-restore (checkout main + ff-pull) + audit-log
+#   - non-main + dirty  → larry_alert + exit 1; never touch the working tree
+# This runs BEFORE the claude --print invocation so a dirty non-main tree
+# doesn't even start a cycle (which would also error out at the auto-commit).
+REPO_DIR="${REPO_DIR:-${HOME}/agent-core}"
+CYCLE_ACTIONS_LOG="${REPO_DIR}/runbooks/cycle-actions.jsonl"
+if [ -d "${REPO_DIR}/.git" ]; then
+    CURRENT_BRANCH=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+    if [ "$CURRENT_BRANCH" != "main" ]; then
+        if git -C "$REPO_DIR" diff --quiet 2>/dev/null && git -C "$REPO_DIR" diff --cached --quiet 2>/dev/null; then
+            log "branch-guard: tree on '${CURRENT_BRANCH}' but clean; auto-restoring to main"
+            if git -C "$REPO_DIR" checkout main --quiet 2>>"$LOG_FILE" \
+               && git -C "$REPO_DIR" pull --ff-only --quiet 2>>"$LOG_FILE"; then
+                AUTO_RESTORE_TS=$(date -u +%FT%TZ)
+                mkdir -p "$(dirname "$CYCLE_ACTIONS_LOG")"
+                printf '{"ts": "%s", "event": "auto-restored-main-from-%s", "actor": "run_cycle"}\n' \
+                    "$AUTO_RESTORE_TS" "$CURRENT_BRANCH" >> "$CYCLE_ACTIONS_LOG"
+                log "branch-guard: auto-restore succeeded; logged to ${CYCLE_ACTIONS_LOG}"
+            else
+                log "branch-guard: auto-restore FAILED (checkout or pull); aborting cycle"
+                timeout 10 python3 "${HOME}/agent-core/scripts/larry_alerts.py" append_alert \
+                    --source pulse-cycle \
+                    --severity warning \
+                    --subject "cycle-blocked:auto-restore-failed-from-${CURRENT_BRANCH}" \
+                    --message "Pulse cycle tried to auto-restore from branch ${CURRENT_BRANCH} to main but the checkout or fast-forward pull failed. Recovery: cd ${REPO_DIR}; resolve manually (origin may have diverged); then return to main." \
+                    >/dev/null 2>&1 || true
+                exit 1
+            fi
+        else
+            log "branch-guard: tree on '${CURRENT_BRANCH}' with uncommitted changes; refusing to auto-commit cycle journal"
+            timeout 10 python3 "${HOME}/agent-core/scripts/larry_alerts.py" append_alert \
+                --source pulse-cycle \
+                --severity warning \
+                --subject "cycle-blocked:dirty-tree-on-${CURRENT_BRANCH}" \
+                --message "Pulse cycle on branch ${CURRENT_BRANCH} with uncommitted changes; refusing to auto-commit cycle journal (would land on wrong branch). Recovery: cd ${REPO_DIR}; resolve work on ${CURRENT_BRANCH}, then return to main." \
+                >/dev/null 2>&1 || true
+            exit 1
+        fi
+    fi
+fi
+
 # --- run cycle via Claude Code ---
 log "Starting /cycle iteration; PULSE_DIR=$PULSE_DIR"
 
