@@ -297,18 +297,30 @@ Each PR ships independently; later PRs gate on earlier ones.
 
 ### PR-S3 — Dashboard ladder panel + droplet API endpoint
 
-- **Files added/modified:**
+**Split annotation (2026-05-27):** PR-S3 spans two repos (droplet `ourliberty-agent-core` for the API + `ourliberty-dashboard` for the UI). Per § 4's V1 single-repo discipline ("Cross-repo sequences. V1 assumes all steps in a sequence target the same `target_repo`"), this entry splits into two single-repo PRs that must both merge for the ladder feature to be operationally complete:
+
+- **PR-S3a** (`ourliberty-agent-core`, this PR-S2 successor): droplet endpoint + tests + dashboard runbook + this annotation.
+- **PR-S3b** (`ourliberty-dashboard`, follow-on): the Next.js ladder UI that consumes PR-S3a's endpoint.
+
+Either repo's PR can land first in principle; PR-S3a is sequenced first because its endpoint locks the JSON contract PR-S3b consumes. Mirror's PR-S3a review covers the endpoint side; Mirror's PR-S3b review covers the UI side.
+
+- **PR-S3a files added/modified (this PR):**
   - `scripts/dashboard_api.py` — new endpoint `GET /api/system/build-sequences` per § 5.6.
   - `scripts/tests/test_dashboard_api_build_sequences.py` (NEW).
+  - `runbooks/build-sequence-dashboard.md` (NEW).
+  - `agents/beacon/specs/build-sequence-orchestrator.md` — this split annotation + footer note.
+- **PR-S3b files added/modified (follow-on, `ourliberty-dashboard`):**
   - `dashboard/app/operations/build-sequences/page.tsx` (NEW) — landing list page.
   - `dashboard/app/operations/build-sequences/[seq_id]/page.tsx` (NEW) — detail page with ladder.
   - `dashboard/components/build-sequence-ladder.tsx` (NEW) — the ladder component.
   - `dashboard/components/build-sequence-row.tsx` (NEW) — list-page row.
   - `dashboard/__tests__/build-sequence-ladder.test.tsx` (NEW).
-  - `runbooks/build-sequence-dashboard.md` (NEW).
-- **task_type:** `feature-development`.
-- **Estimated cost:** ~$7 LLM. ~1.5 days wall clock.
-- **Mirror reviews for:** ladder rendering correctness across (a) all-sequential, (b) all-parallel, (c) mixed DAGs; color-coding matches spec § 5.6; polling cadence does not over-fetch (10s interval, no thundering-herd); accessibility tags on color-only-status nodes.
+- **task_type:** `feature-development` (both halves).
+- **Estimated cost:** ~$7 LLM combined across PR-S3a + PR-S3b. ~1.5 days wall clock.
+- **Mirror reviews PR-S3a for:** endpoint matches the § 5.6 contract; token-gating via existing `_require_token`; uncached re-read per request (no `lru_cache`); empty-state/missing-dir/corrupt-file graceful degradation (200, not 500); archive-layout discipline (only `YYYY-MM` subdirs recursed); path-safety + no env-var leak.
+- **Mirror reviews PR-S3b for:** ladder rendering correctness across (a) all-sequential, (b) all-parallel, (c) mixed DAGs; color-coding matches spec § 5.6; polling cadence does not over-fetch (10s interval, no thundering-herd); accessibility tags on color-only-status nodes.
+
+**Endpoint contract locked by PR-S3a's preflight CLARIFY (2026-05-27):** response shape is `{active: [...], archived: [...], parse_warnings: [...], as_of: <iso>}` with raw sequence-file dicts (no field projection). `active` = files with `status ∈ {pending, active, paused}` or unknown/missing status; `archived` = files with `status ∈ {complete, failed, archived}` plus anything under `.archive/YYYY-MM/*.json`. No pagination + no time-cutoff filter in V1 (the spec-§ 5.1 30-day archiver doesn't exist yet — `.archive/YYYY-MM/` is forward-compat scaffolding; `TODO(PR-S3c): pagination` breadcrumb lives in `_reader_build_sequences`).
 
 ### PR-S4 — Beacon shortcuts + Mirror preflight integration
 
@@ -407,3 +419,7 @@ These are values calls in the spec that Larry can override in approval-review:
 4. **5-min tick cadence (§ 5.2).** Locked at 5 min. Tighter (1 min) reduces advance latency but burns more chain_events queries; looser (15 min) saves load but adds latency. Tunable via Pulse Check VIII later.
 
 If any need amendment, paste the change as a Beacon `modify:` reply to the PR-S1 approval card.
+
+---
+
+*Amended 2026-05-27: § 6 PR-S3 split into PR-S3a (droplet API endpoint, this repo) + PR-S3b (dashboard UI, `ourliberty-dashboard`) per the § 4 single-repo discipline. Git history of this file is the canonical change log.*

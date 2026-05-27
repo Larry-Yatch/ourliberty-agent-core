@@ -78,6 +78,13 @@ def _worktrees_root() -> Path:
     ))
 
 
+def _sequence_blackboard_root() -> Path:
+    """Multi-step build orchestrator blackboard dir (PR-S2 created it via
+    .gitkeep; PR-S3a reads it). Derived from `_agents_root()` so test
+    isolation via OURLIBERTY_AGENTS_ROOT covers this endpoint too."""
+    return _agents_root() / 'blackboard' / 'build-sequences'
+
+
 # ---- agent + healer registries ----
 
 AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
@@ -130,6 +137,19 @@ JOURNAL_HEADER_RE = re.compile(
 # In the real journal, the "Found:" / "Did:" sections under each entry
 # tend to be bold-labeled bullets; we surface the iteration tag as
 # headline for now and let the UI render body_markdown.
+
+# /api/system/build-sequences classification (PR-S3a). Spec § 5.1 lists
+# six sequence-level status values: pending, active, paused, complete,
+# failed, archived. Beacon's 2026-05-27 CLARIFY locked: {active, paused}
+# → active panel and {complete, failed} → archived panel. We extend
+# faithfully to cover the other two values (pending → active panel;
+# archived → archived panel) so no data is dropped on the floor.
+SEQUENCE_STATUS_ARCHIVED_VALUES: frozenset[str] = frozenset({
+    'complete', 'failed', 'archived',
+})
+# Archive subdirs are named `YYYY-MM` per spec § 5.1. Anything else under
+# .archive/ is ignored so stray scratch dirs can't pollute the response.
+SEQUENCE_ARCHIVE_YYYY_MM_RE = re.compile(r'^\d{4}-(?:0[1-9]|1[0-2])$')
 
 # Auth.
 HEADER_NAME = 'X-Dashboard-Token'
@@ -305,6 +325,22 @@ class SystemWorktree(BaseModel):
 class SystemWorktreesResponse(BaseModel):
     captured_at: str
     worktrees: list[SystemWorktree]
+
+
+# ---- /api/system/build-sequences response model (PR-S3a) ----
+#
+# Spec § 5.6 commits only to "a JSON list of all sequence files + their
+# current state." The 2026-05-27 PR-S3a CLARIFY locked the contract as
+# {active, archived} with raw sequence-file dicts (no field projection):
+# active = files with status in {active, paused, pending} or unknown;
+# archived = files with status in {complete, failed, archived} or
+# anything under `.archive/YYYY-MM/`. PR-S3b consumes this verbatim.
+
+class BuildSequencesResponse(BaseModel):
+    active: list[dict[str, Any]]
+    archived: list[dict[str, Any]]
+    parse_warnings: list[str] = Field(default_factory=list)
+    as_of: str
 
 
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
@@ -1318,6 +1354,156 @@ def _reader_system_worktrees(
     }
 
 
+# ---- /api/system/build-sequences reader (PR-S3a) ----
+#
+# Spec: agents/beacon/specs/build-sequence-orchestrator.md § 5.6 (panel +
+# API endpoint) + § 5.8 (data sources). The reader returns the raw
+# sequence-file dicts under {active, archived} keys, partitioned
+# server-side by status per the 2026-05-27 CLARIFY contract. Uncached:
+# every request re-reads the blackboard dir. The dashboard owns any
+# client-side caching.
+#
+# Failure modes (all graceful, never 500):
+#   - blackboard dir missing → {active: [], archived: [], parse_warnings: []}
+#   - individual sequence file fails JSON parse → omitted, surfaced in
+#     `parse_warnings` (matches the cycle-journal reader convention)
+#   - non-`YYYY-MM` subdirs under `.archive/` → ignored
+#   - symlinks under either dir → skipped (defense against path traversal
+#     even though the dir is hardcoded)
+#
+# No pagination + no 90d archive-mtime filter in V1 per the 2026-05-27
+# CLARIFY (`.archive/` is empty today since the spec-§ 5.1 30-day archiver
+# isn't built yet). TODO(PR-S3c): pagination + ?archived_since= once
+# archived volume grows.
+
+
+def _load_sequence_file(path: Path) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+    """Return (parsed_dict, error_message). On any failure: (None, msg)."""
+    try:
+        text = path.read_text(encoding='utf-8')
+    except OSError as e:
+        return None, f'read failed: {e}'
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError as e:
+        return None, f'invalid JSON: {e}'
+    if not isinstance(obj, dict):
+        return None, 'top-level JSON is not an object'
+    return obj, None
+
+
+def _iter_active_dir_sequence_files(blackboard_root: Path) -> list[Path]:
+    """Yield top-level *.json files under the blackboard dir. Skips
+    hidden files / dirs (including `.archive/`), symlinks, and
+    non-`.json` entries."""
+    out: list[Path] = []
+    try:
+        entries = sorted(blackboard_root.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return out
+    for entry in entries:
+        if entry.is_symlink():
+            continue
+        if entry.name.startswith('.'):
+            continue
+        if not entry.is_file():
+            continue
+        if entry.suffix != '.json':
+            continue
+        out.append(entry)
+    return out
+
+
+def _iter_archive_sequence_files(archive_root: Path) -> list[Path]:
+    """Yield *.json files exactly one level deep under archive_root, only
+    inside subdirs named `YYYY-MM`. Skips symlinks at both levels."""
+    out: list[Path] = []
+    try:
+        ym_dirs = sorted(archive_root.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return out
+    for ym in ym_dirs:
+        if ym.is_symlink() or not ym.is_dir():
+            continue
+        if not SEQUENCE_ARCHIVE_YYYY_MM_RE.match(ym.name):
+            continue
+        try:
+            files = sorted(ym.iterdir(), key=lambda p: p.name)
+        except OSError:
+            continue
+        for entry in files:
+            if entry.is_symlink():
+                continue
+            if entry.name.startswith('.'):
+                continue
+            if not entry.is_file():
+                continue
+            if entry.suffix != '.json':
+                continue
+            out.append(entry)
+    return out
+
+
+def _reader_build_sequences(
+    blackboard_root: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Return the {active, archived, parse_warnings, as_of} response.
+
+    Active = main-dir files with status in {pending, active, paused} or
+             missing/unknown status (conservative fallback: surface in
+             the operator panel rather than dropping).
+    Archived = main-dir files with status in {complete, failed, archived}
+               OR any well-formed file under `.archive/YYYY-MM/`.
+
+    See module-level comment above for failure-mode contract.
+    """
+    active: list[dict[str, Any]] = []
+    archived: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    captured_at = now or datetime.now(timezone.utc)
+
+    if not blackboard_root.is_dir():
+        return {
+            'active': active,
+            'archived': archived,
+            'parse_warnings': warnings,
+            'as_of': _now_utc_iso(captured_at),
+        }
+
+    for path in _iter_active_dir_sequence_files(blackboard_root):
+        seq, err = _load_sequence_file(path)
+        if err is not None or seq is None:
+            warnings.append(f'{path.name}: {err}')
+            continue
+        status = seq.get('status') if isinstance(seq, dict) else None
+        if isinstance(status, str) and status in SEQUENCE_STATUS_ARCHIVED_VALUES:
+            archived.append(seq)
+        else:
+            active.append(seq)
+
+    archive_root = blackboard_root / '.archive'
+    if archive_root.is_dir():
+        for path in _iter_archive_sequence_files(archive_root):
+            seq, err = _load_sequence_file(path)
+            if err is not None or seq is None:
+                # Path includes the YYYY-MM dir so warnings disambiguate
+                # same-named files across months.
+                warnings.append(f'.archive/{path.parent.name}/{path.name}: {err}')
+                continue
+            archived.append(seq)
+
+    # TODO(PR-S3c): add `?limit=` + `?offset=` + optional `?archived_since=`
+    # once archived volume grows past what the dashboard can render in
+    # one poll cycle.
+    return {
+        'active': active,
+        'archived': archived,
+        'parse_warnings': warnings,
+        'as_of': _now_utc_iso(captured_at),
+    }
+
+
 # ---- /api/larry/* handler (E4.4e PR-B2) ----
 #
 # Spec § 5.2, § 6.3, § 6.4, § 7.1, § 7.2, § 7.3 — Larry-action endpoint
@@ -1736,6 +1922,15 @@ def get_system_cgroup_stats() -> dict[str, Any]:
 )
 def get_system_worktrees() -> dict[str, Any]:
     return _reader_system_worktrees(_agents_root(), _worktrees_root())
+
+
+@app.get(
+    '/api/system/build-sequences',
+    response_model=BuildSequencesResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_build_sequences() -> dict[str, Any]:
+    return _reader_build_sequences(_sequence_blackboard_root())
 
 
 # ---- /api/larry/* routes (E4.4e PR-B2) ----
