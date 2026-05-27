@@ -52,6 +52,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -112,6 +113,13 @@ UNIT_GLOB = 'ourliberty-*.service'
 # (with `\`) is not used in this codebase's units; if it appears, the
 # heuristic will fall back to whatever path is on the first line.
 _EXEC_START_RE = re.compile(r'^\s*ExecStart\s*=\s*(.+?)\s*$', re.MULTILINE)
+
+# WorkingDirectory= line. Needed for the `-m uvicorn <dotted.module>:<attr>`
+# ExecStart shape, where the script path is not on the ExecStart line — it
+# has to be reconstructed from the dotted module + the unit's working dir.
+_WORKING_DIR_RE = re.compile(
+    r'^\s*WorkingDirectory\s*=\s*(.+?)\s*$', re.MULTILINE,
+)
 
 # Interpreters we should NOT treat as the script (we want the script
 # itself, not the runtime). Match by basename.
@@ -310,6 +318,9 @@ def parse_script_path_from_service_file(fragment_path: str) -> Optional[Path]:
         ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/foo.py
         ExecStart=/home/larry/agent-core/scripts/foo.py
         ExecStart=/usr/bin/env python3 /home/larry/agent-core/scripts/foo.py
+    Also handles the uvicorn module-mode shape:
+        ExecStart=/usr/bin/env python3 -m uvicorn scripts.dashboard_api:app ...
+    by resolving <dotted.module> against the unit's WorkingDirectory.
     Returns None when no ExecStart line is found or no candidate path
     exists on disk.
     """
@@ -340,11 +351,58 @@ def parse_script_path_from_service_file(fragment_path: str) -> Optional[Path]:
     for p in reversed(candidates):
         if Path(p).is_file():
             return Path(p)
+
+    # Uvicorn module-mode: `python3 -m uvicorn <pkg>.<mod>:<attr> ...`. The
+    # script path lives in WorkingDirectory + dotted module → file. Scope:
+    # `-m uvicorn` only (other launchers like gunicorn/flask are deferred);
+    # two-segment `<pkg>.<mod>:<attr>` only (three-segment leaf-attribute
+    # forms are out of scope until a real daemon needs them).
+    uvicorn_path = _resolve_uvicorn_script_path(line, text)
+    if uvicorn_path is not None:
+        return uvicorn_path
+
     # Nothing exists — return the last non-interpreter path so callers
     # can log it; staleness check on a non-existent file will fall back
     # to "no alert" naturally.
     if candidates:
         return Path(candidates[-1])
+    return None
+
+
+def _resolve_uvicorn_script_path(
+    exec_start_line: str, fragment_text: str,
+) -> Optional[Path]:
+    """Resolve `python3 -m uvicorn <pkg>.<mod>:<attr>` to an on-disk path.
+
+    Returns the resolved Path only if it exists on disk; otherwise None so
+    the caller falls through to the existing `could not resolve` branch
+    rather than returning a phantom path.
+    """
+    try:
+        argv = shlex.split(exec_start_line)
+    except ValueError:
+        return None
+    if '-m' not in argv:
+        return None
+    m_idx = argv.index('-m')
+    if m_idx + 1 >= len(argv) or argv[m_idx + 1] != 'uvicorn':
+        return None
+    if m_idx + 2 >= len(argv):
+        return None
+    app_target = argv[m_idx + 2]
+    module_part = app_target.split(':', 1)[0]
+    if not module_part:
+        return None
+    rel_path = Path(*module_part.split('.')).with_suffix('.py')
+    wd_match = _WORKING_DIR_RE.search(fragment_text)
+    if not wd_match:
+        return None
+    working_dir = wd_match.group(1).strip()
+    if not working_dir:
+        return None
+    resolved = Path(working_dir) / rel_path
+    if resolved.is_file():
+        return resolved
     return None
 
 
