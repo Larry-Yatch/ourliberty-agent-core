@@ -74,7 +74,7 @@
   "loop_bounds": {
     "max_revisions": 3,
     "max_replans": 2,
-    "cost_per_task_usd": 15.0,
+    "cost_per_task_usd": 50.0,
     "_note": "D3.5 loop budgets. max_revisions caps Forge↔Mirror revision cycles (5b). max_replans caps Beacon↔Larry replan cycles after Mirror ESCALATE (5c). cost_per_task_usd is the per-task_id spend cap across all dispatches (preflight + clarifications + build + revisions + reviews + replans). Read by outbox_notifier when classifying Mirror markers. See docs/tunables.md for retune triggers."
   },
   "auto_merge_queue": {
@@ -124,6 +124,11 @@
     {
       "date": "2026-05-26",
       "change": "D3.5 5d-prime: add top-level 'auto_merge_queue' block with watchdog_dm_hours=24. Tunable for the AUTO_MERGE serializer's watchdog DM (fires once when a queued PR sits behind a blocker for >24h). Outbox_notifier reads via _load_auto_merge_watchdog_hours_from_config; default 24 is Larry's pick — raise during planned absences. Ships alongside the serializer gates in scripts/outbox_notifier.py that eliminate the 2026-05-26 PR-B + PR-C overlap-conflict incident class.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-26",
+      "change": "loop_bounds.cost_per_task_usd raised from $15 to $50. Trigger: PR-S2 (build-sequence-orchestrator advancer + validator + healer + tests + systemd) tripped at $16.61 mid-Mirror-review-rerun. Larry's direct instruction: set baseline to $50 going forward to accommodate real-code PRs that span multi-file daemon work + healer + tests + multiple Mirror revision cycles. Single-PR cap remains in place as a backstop against runaway loops; raising rather than removing preserves the gate. Self-tuning candidate for Pulse Check VII (cost-ceiling thresholds) once enough at-cap incidents accumulate to inform a data-driven threshold.",
       "author": "Claude (via Larry's session)"
     }
   ]
