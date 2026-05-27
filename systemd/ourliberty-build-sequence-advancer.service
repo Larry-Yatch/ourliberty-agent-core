@@ -1,0 +1,46 @@
+[Unit]
+Description=Build-sequence advancer — polls sequence files and advances multi-step builds (E-orchestrator PR-S2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/build_sequence_advancer.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/build-sequence-advancer.md
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/build-sequence-orchestrator.md
+After=network.target ourliberty-inbox-watcher.service
+Wants=ourliberty-inbox-watcher.service
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Activation gate. Default OFF until PR-S3 (dashboard) + PR-S4 (Beacon
+# wiring + 6 shortcuts) have shipped and Larry has verified the kickoff
+# round-trip end-to-end. To activate:
+#   sudo systemctl edit ourliberty-build-sequence-advancer.service
+# then add an [Service] override line:
+#   Environment="OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=true"
+# then `sudo systemctl daemon-reload`. The next timer tick will pick it up.
+Environment="OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/build_sequence_advancer.py --once
+TimeoutStartSec=120
+Nice=10
+# Hardening (matches existing ourliberty-chain-event-shipper.service pattern).
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs /home/larry/agents/state /home/larry/agents/inboxes /home/larry/credentials
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# Bounded memory — a runaway tick must not starve the droplet's bot
+# processes. 256M is generous for a stdlib + supabase-py tick that
+# touches a few JSON files and runs a few gh subprocesses.
+MemoryMax=256M
+MemoryHigh=128M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-build-sequence-advancer
+
+[Install]
+WantedBy=multi-user.target

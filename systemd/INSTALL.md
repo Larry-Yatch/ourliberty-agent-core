@@ -120,9 +120,13 @@ sudo systemctl enable --now ourliberty-sync-deploy-targets.timer  # E2.1 — DRY
 sudo systemctl enable --now ourliberty-deploy-notifier.timer  # E2.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-heal-chain-event-shipper-heartbeat.timer  # E4.4d PR-B
 sudo systemctl enable --now ourliberty-heal-chain-event-type-audit.timer  # E4.4d PR-B (weekly Sundays)
+sudo systemctl enable --now ourliberty-heal-build-sequence-advancer-heartbeat.timer  # E-orchestrator PR-S2 (every 5 min)
 
 # Long-running ingestion daemon (not a timer; default disabled at activation gate)
 sudo systemctl enable ourliberty-chain-event-shipper.service  # E4.4d PR-B — service is OFF until OURLIBERTY_CHAIN_SHIPPER_ENABLED=true (see service file)
+
+# Build-sequence advancer (timer-driven oneshot; default disabled at activation gate)
+sudo systemctl enable --now ourliberty-build-sequence-advancer.timer  # E-orchestrator PR-S2 — enables the timer; the per-tick service is OFF until OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=true (see service file)
 
 # Confirm
 systemctl list-timers 'ourliberty-heal-*' 'ourliberty-sync-*' 'ourliberty-deploy-*' --all
@@ -146,6 +150,7 @@ What each one does:
 | `deploy-notifier` (E2.2) | 2 min | Vercel preview-URL READY + build-ERROR events for configured deploy targets |
 | `chain-event-shipper-heartbeat` (E4.4d PR-B) | 5 min | `chain_event_shipper.heartbeat` file mtime > 10 min stale (daemon hung or crashed) |
 | `chain-event-type-audit` (E4.4d PR-B) | weekly Sun 06:00 | `chain_events` rows whose `event_type` is not in the application-side `KNOWN_EVENT_TYPES` allowlist |
+| `build-sequence-advancer-heartbeat` (E-orchestrator PR-S2) | 5 min | `build-sequence-advancer.heartbeat` file mtime > 15 min stale (3 missed ticks at the 5-min advancer cadence) |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
 
@@ -235,6 +240,49 @@ python3 -c "from supabase import create_client; print('ok')"
 No systemd unit yet — `supabase-py` is a library, not a service. The first long-running consumer will be `pm_writer` (E4.3); its service file will land at that time.
 
 **Credential discipline.** Three credentials are wired in `config/token-rotation-schedule.json` (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`), all sharing the rotation runbook at `docs/runbooks/rotate-supabase-keys.md`. The service-role key is on a 90-day scheduled cadence (RLS-bypassing → short cadence → bounded blast radius); the URL + anon key are revocation-only (rotate on suspected leak). First-time project setup is documented at `docs/runbooks/setup-supabase-pm-project.md`.
+
+### Build-sequence advancer (E-orchestrator PR-S2)
+
+`scripts/build_sequence_advancer.py` is a timer-driven oneshot (Type=oneshot) that polls `~/agents/blackboard/build-sequences/*.json` every 5 min and advances any active multi-step build sequence. Companion: the `heal-build-sequence-advancer-heartbeat` healer (above) DMs Larry when the per-tick heartbeat is >15 min stale.
+
+The advancer ships **inactive by default** behind `OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=false` (mirrors the chain-event-shipper activation pattern). Enable only after PR-S3 (dashboard ladder UI) + PR-S4 (Beacon's 6 sequence shortcuts + Mirror's preflight DAG verification) have shipped and the kickoff round-trip is verified end-to-end. The blackboard directory is runtime-only — the daemon creates `~/agents/blackboard/build-sequences/` on its first tick; nothing in the repo tracks it.
+
+```bash
+# Install (service + timer for the advancer; service + timer for the healer).
+sudo cp ~/agent-core/systemd/ourliberty-build-sequence-advancer.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-build-sequence-advancer.timer /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-heal-build-sequence-advancer-heartbeat.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-heal-build-sequence-advancer-heartbeat.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable both timers immediately. The advancer service itself is gated by
+# the env var below; the healer fires on its own cadence regardless of
+# the gate (it will DM Larry until activation, which is intentional — the
+# DM is the operator's reminder that activation is still pending).
+sudo systemctl enable --now ourliberty-build-sequence-advancer.timer
+sudo systemctl enable --now ourliberty-heal-build-sequence-advancer-heartbeat.timer
+
+# Activate (once Larry has verified PR-S3 + PR-S4 are in place):
+sudo systemctl edit ourliberty-build-sequence-advancer.service
+# In the editor, add:
+#   [Service]
+#   Environment="OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED=true"
+sudo systemctl daemon-reload
+
+# Confirm.
+systemctl list-timers ourliberty-build-sequence-advancer.timer ourliberty-heal-build-sequence-advancer-heartbeat.timer
+
+# Smoke (after activation): trigger a tick by hand, watch the journal.
+sudo systemctl start ourliberty-build-sequence-advancer.service
+journalctl -u ourliberty-build-sequence-advancer.service -n 50 --no-pager
+# Expect to see: `tick: files=N processed=M` near the bottom.
+
+# Kill switches (in priority order):
+# 1. Touch ~/agents/healers.disabled — blanket switch for all healers + daemons.
+# 2. Per-healer: set OURLIBERTY_HEAL_BUILD_SEQUENCE_ADVANCER_DISABLE=true.
+```
+
+Full operating detail (ad-hoc pause/resume/cancel by direct file edit; corrupted-sequence handling; gate-mismatch diagnosis; spec-drift note on `auto_merge` event type) is at `runbooks/build-sequence-advancer.md`.
 
 ## Checking state
 
