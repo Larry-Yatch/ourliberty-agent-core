@@ -6,7 +6,7 @@
 **Phase:** Phase E follow-on. Not part of the Pulse cycle upgrade per se; it is the **prerequisite capability** that makes the Pulse upgrade (PR-α₁/α₂/β/γ) and all future multi-PR builds hands-free.
 **Predecessor:** PR #114 (AUTO_MERGE serializer + mergeable gate), E4.4d PR-A/B (chain_events table + ingestion daemon).
 **Successor:** The Pulse cycle upgrade dispatches are the first real-use test of this orchestrator.
-**Companion docs:** `agents/beacon/specs/pulse-cycle-upgrade.md` (first real consumer); `agents/beacon/CLAUDE.md` § "How you dispatch work to Forge" (extends with new multi-step authoring discipline).
+**Companion docs:** `agents/beacon/specs/pulse-cycle-upgrade.md` § 12.5 (the reciprocal cross-reference — that spec's PR-0 amendment hands the multi-step build orchestration scope off to this spec); `agents/beacon/CLAUDE.md` § "How you dispatch work to Forge" (extends with new multi-step authoring discipline, see also § "How you author multi-step build sequences" added by PR-S1).
 
 ---
 
@@ -21,6 +21,8 @@ Larry's 2026-05-26 framing:
 > We should have something or someone assess what can be run in parallel versus what can be run individually or in sequence that's dependent... We should think about putting something in the operations tab that shows the multi-step process, almost like a ladder: what's running in parallel, what's running sequentially, and then a simple, visible tag on what state it's in and who's touching it.
 
 The orchestrator turns a "kick off this 5-step build" intent into a hands-free sequence with visible state, automatic gate-watching, parallel-where-safe, sequential-where-required, and Larry-DM only at key transitions.
+
+The Pulse cycle upgrade spec hands the multi-step orchestration scope off to this spec in its § 12.5 (post-2026-05-26 design pass) — both specs co-evolved during the same conversational design pass and reference each other deliberately. See `agents/beacon/specs/pulse-cycle-upgrade.md` § 12.5 for the reciprocal scope-handoff statement.
 
 Joe's `gm-agent-core` does not have this capability; this is our innovation on top of his pattern. The Pulse cycle upgrade (which adapts Joe's `/cycle` doctrine) becomes natural successor consumer — post-Pulse-merge, Pulse layers LLM-judgment on top of the orchestrator's deterministic gate-watching.
 

@@ -291,6 +291,61 @@ D3.5 will likely add a runtime check (notifier rejects preflight outboxes that d
 
 **Headless-dispatch path (Task #17, 2026-05-19).** When you receive an inbox envelope with `source: "larry"` and a pre-drafted spec (Claude in a Larry-session dropped the dispatch into your inbox directly, rather than Larry chatting you on Telegram), formalize it via the standard APPROVAL_REQUEST marker. The outbox notifier auto-translates the marker into a Forge preflight task — you do NOT need to wait for Larry's approval-via-Telegram in this case because the upstream Larry-session already had it. Trust policy is not consulted on this path; the implicit approval is carried by the `source: "larry"` envelope. Emit the marker exactly as you would in chat-mode; the headless handler in `outbox_notifier._handle_beacon_headless_approval_request` does the rest.
 
+## How you author multi-step build sequences
+
+When Larry brings a build that spans multiple PRs (a "5-step rollout," "4-PR sequence," "implement spec X across N stages"), the single-PR APPROVAL_REQUEST shape above is not enough. The multi-step build orchestrator (spec at `agents/beacon/specs/build-sequence-orchestrator.md`, adopted 2026-05-26 via direct commit `e097de9` + § 5.2 fix `84d149b`) defines three authoring disciplines that compose with — they do not replace — PLAN_SYNTHESIS_DISCIPLINE, the APPROVAL_REQUEST marker discipline, and the inline-vs-Docs drafting discipline. **Read spec § 5.5 in full before authoring your first multi-step sequence.** Verbatim summary of the three disciplines below.
+
+**Discipline 1 — Spec-doc-first authoring.** When Larry says "build X across multiple PRs" or "implement the Y spec," do NOT include the build detail in the Telegram dispatch text. Instead:
+
+1. Determine whether a canonical spec doc already exists at `agents/beacon/specs/<topic>.md`. If yes, amend it. If no, draft it.
+2. The spec doc must be self-contained: someone who has not seen this Telegram conversation must be able to read the spec and understand what to build, why, and what success looks like.
+3. Per the new authoring discipline, the spec doc is committed to `main` BEFORE the sequence kicks off (typically as a doc-only PR that Mirror reviews quickly via Claude-as-Forge). The sequence file references spec sections by anchor.
+
+This discipline is **live now** — it composes with the existing Spec Template in `TOOLS.md` and with the inline-vs-Docs drafting discipline; nothing about it gates on a future PR.
+
+**Discipline 2 — Sequence file synthesis.** When Larry approves a multi-step build:
+
+1. Write the sequence file to `~/agents/blackboard/build-sequences/<seq-id>.json` per spec § 5.1 schema.
+2. Each step's `dispatch_text` must be ≤500 characters and consist of (a) a one-sentence statement of what to build, (b) a pointer to the spec section, (c) a brief Mirror-review-focus line. NO design detail inline; that lives in the spec.
+3. Run `python3 scripts/build_sequence_validator.py validate <seq-id>` to verify DAG correctness before emitting the kickoff marker. *(Live once PR-S2 ships the validator; this CLAUDE.md entry documents the discipline in advance for forward consistency. Until PR-S2 merges, hand-authored sequence files are unvalidated — author with extra care and ask Larry to sanity-check the DAG before kickoff.)*
+4. Emit a single APPROVAL_REQUEST with `task_id: kickoff-<seq-id>`, `target_agent: build_sequence_advancer`, `prompt: kickoff <seq-id>`. The bot routes this to the advancer rather than Forge. *(The `build_sequence_advancer` target-agent routing also lands in PR-S2 alongside the daemon itself; until then, multi-step sequences are still dispatched the old way — one APPROVAL_REQUEST per step, sequentially, with Larry watching merge DMs to time the next dispatch.)*
+
+The **authoring** sub-disciplines (sequence-file synthesis, dispatch_text ≤500 chars, schema conformance to spec § 5.1) are live now — when Beacon hand-writes a sequence file for a future-PR-S2-onward consumer, it should already match the eventual contract so PR-S2 doesn't have to retroactively rewrite anything.
+
+**Discipline 3 — Mirror preflight DAG verification.** Per spec decision F (author declares, Mirror preflight verifies), before the kickoff APPROVAL_REQUEST is emitted, Beacon dispatches a small Mirror review of the sequence file's DAG (a separate APPROVAL_REQUEST with `task_type: code-review`, `prompt: review-sequence-dag <seq-id>`). Mirror checks:
+
+- No cycles in the DAG.
+- All `depends_on` references resolve to valid step_ids.
+- Steps declared parallel (i.e., no `depends_on` between them but both share an upstream parent) do not touch overlapping files based on a static analysis of their dispatch_texts and spec sections.
+- All referenced spec sections exist in the spec_doc.
+
+Mirror returns PASS or REVISION-with-reasons. On REVISION, Beacon amends the sequence file and re-dispatches the review. On PASS, Beacon emits the kickoff APPROVAL_REQUEST.
+
+*(Live once PR-S4 ships Mirror's DAG-verify capability — specifically, the `agents/mirror/CLAUDE.md` addition teaching Mirror to recognize `prompt: review-sequence-dag <seq-id>` and execute the four-check verification above. Until PR-S4 merges, Mirror does NOT know how to interpret a `review-sequence-dag` prompt; documented now so PR-S2/PR-S3 authoring matches the eventual contract. Until then, the DAG-correctness burden falls on Beacon's own pre-emission self-check + Larry's approval review.)*
+
+**New Beacon shortcuts (added in PR-S4, documented here for forward consistency):**
+
+- `approve sequence <seq-id>` — confirms kickoff after Mirror preflight PASSes.
+- `pause sequence <seq-id>` — Larry's manual pause.
+- `resume sequence <seq-id>` — unpause.
+- `cancel sequence <seq-id>` — terminate.
+- `retry sequence <seq-id> step <step-id>` — re-dispatch a failed step.
+- `skip sequence <seq-id> step <step-id>` — mark a step as merged without PR.
+
+These shortcuts land in `agents/beacon/CLAUDE.md` as a dedicated section in PR-S4. Until then, multi-step sequence-related operations route through ad-hoc APPROVAL_REQUEST markers or direct Larry conversation.
+
+**Composition with existing disciplines:**
+
+- **PLAN_SYNTHESIS_DISCIPLINE** still applies — before asserting "sequence X is in-flight" or "step Y merged," refetch ground truth (read the sequence file directly, query `chain_events`, run `gh pr view`).
+- **APPROVAL_REQUEST marker discipline** still applies — multi-step authoring emits APPROVAL_REQUESTs (one for the spec adoption PR, one per step in the old single-dispatch path, or one kickoff in the PR-S2-onward sequence path). Use `marker.py render beacon approval_request` for every emission.
+- **Inline-vs-Docs drafting discipline** still applies — long multi-PR specs typically warrant a Google Doc surface (`Shared with Larry/specs/`); the eventual canonical spec lands in `agents/beacon/specs/<topic>.md` after Larry's edit pass.
+
+**Self-check before authoring a sequence:**
+
+- Is the spec doc on `main` BEFORE the sequence file is synthesized? If no, draft + PR the spec first.
+- Does each step's `dispatch_text` fit ≤500 chars and reference a spec section by anchor? If no, trim and re-anchor.
+- For each step's `depends_on`: is the dependency real (the step truly cannot start until the dep merges), or is it an over-conservative ordering Beacon added "just in case"? Over-conservative deps serialize work that could parallelize — prefer empty `depends_on` for steps that genuinely share no upstream state.
+
 ## How you handle Forge's preflight markers (Phase D3 commit 4a)
 
 After a dispatch, Forge runs a **preflight** before any code is written. She ends her run with EXACTLY one of: PROCEED, CLARIFY_REQUEST, or REJECT. These flow back to you via the outbox notifier in four different shapes — each one tells you what to do. **Read the `intent=` tag in the inbox notify header to pick the right shape.**
