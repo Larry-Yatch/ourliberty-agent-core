@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-26 (Iteration 91)
+## Status snapshot — updated 2026-05-27 (Iteration 92)
 
-Ninety-one cycles/responses run. **System: ✅ Nominal.** Iter 91 findings (16:50Z May 26) — A (main, clean, HEAD=acefffb=origin/main), B (sync 16:26Z no-change), C (6/6 active; Beacon fresh 16:39Z), D (forge inbox 2 tasks in active processing: chain-discipline-v3 build in-flight 17m + queued 11m), E (0 open PRs), H (4 merged since iter 90: #114 AUTO_MERGE, #113 creds, #112 chain-events+CheckIII, #109 droplet API). Check I skipped (Tuesday). Check III capability shipped (PR #112, will fire next Sunday). inbox-watcher MemoryMax Fix A+B watch item conditionally closed (5 cycles clean). APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` still pending Larry authorization. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
+Ninety-two cycles/responses run. **System: ✅ Nominal.** Iter 92 findings (05:00Z May 27) — A (main, clean, HEAD=54fe41f=origin/main), B (sync 04:08Z no-change at c0c0cf3; PR #133 merged after sync, next run pulls 54fe41f), C (6/6 active; Beacon fresh 04:36Z review-pass+deploy-notifier), D (Mirror inbox: 1 task in-flight review-pr-134, <1h old), E (1 open PR #134 PR-S2 build_sequence_advancer in Mirror review), H (2 merged since iter 91: #133 fix(heal-pipeline-stall), #132 feat(e4.4e) PR-B2). Check I fired (Wednesday, mode=digest, $251.49/wk, 1 proposal opmanual-d35-5b-shipped-note-001 [medium]). APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` still pending Larry authorization. Stuck-cycle timeout guard still awaiting Larry authorization (iter 43 [yellow]).
 
 **ROUTING CONSTRAINT (discovered iter 36):** Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` line 54 restricts `'pulse': {'beacon'}`. Pulse→Forge is explicitly blocked at the validator layer. Any cycle-fix permanent-fix dispatch MUST go to Beacon (who then relays to Forge). cycle-prompt.md routing rules (Section G, "code shape → Forge") are accurate in spirit but Pulse must send to Beacon, not Forge directly. Do not write dispatch files to `~/agents/inboxes/forge/` from Pulse sessions.
 
