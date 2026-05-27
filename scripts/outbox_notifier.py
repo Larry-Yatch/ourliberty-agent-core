@@ -64,6 +64,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import beacon_approval_handler as approval  # noqa: E402
+import chain_event_emit             # noqa: E402  # E4.4e PR-A: push writer
 import dispatch_validator         # noqa: E402
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
@@ -1271,6 +1272,51 @@ def _archive_outbox(outbox_file: Path) -> None:
         target = archive_dir / f'{outbox_file.stem}.{counter}{outbox_file.suffix}'
         counter += 1
     shutil.move(str(outbox_file), str(target))
+
+
+def _emit_clarify_request_chain_event(
+    data: dict[str, Any],
+    marker_decision: dict[str, Any],
+    *,
+    agent: str,
+) -> None:
+    """Push a `clarify_request` chain_event for spec § 4 source #5.
+
+    Payload per spec § 4:
+      - asking_agent: 'forge' or (future) 'mirror'
+      - task_id: the dispatch task being clarified
+      - question: the marker payload's question text
+      - resume_session_id: the session_id the clarification answer must
+        --resume against (Forge resumes her preflight with the answer)
+
+    Best-effort: chain_event_emit.emit_event logs WARN and returns False
+    on Supabase outage; the daemon's marker-routing path does NOT depend
+    on the row landing, so failure here doesn't affect Forge's resume
+    cascade. The clarify question itself still reaches Beacon through the
+    inter-agent notify path immediately below.
+    """
+    payload = marker_decision.get('payload') or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    chain_payload = {
+        'asking_agent': agent,
+        'task_id': data.get('task_id', ''),
+        'question': payload.get('question', ''),
+        'resume_session_id': data.get('claude_session_id', '') or '',
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type='clarify_request',
+            agent=agent,
+            task_id=data.get('task_id'),
+            payload=chain_payload,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'clarify_request chain_event emit raised unexpectedly for '
+            f'task {data.get("task_id")!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
 
 
 def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -4475,6 +4521,9 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
         max_replans=max_count,
         queued_during_pause=is_paused,
     )
+    chain_event_emit.emit_event(
+        **approval.build_approval_request_chain_event(payload),
+    )
     if is_paused:
         log(
             f'beacon replan APPROVAL_REQUEST queued during /pause for task '
@@ -4701,6 +4750,9 @@ def _route_beacon_pulse_auto_dispatch_approval(data: dict[str, Any]) -> bool:
         payload,
         chat_id=reply_chat_id,
         queued_during_pause=is_paused,
+    )
+    chain_event_emit.emit_event(
+        **approval.build_approval_request_chain_event(payload),
     )
     if is_paused:
         log(
@@ -5281,6 +5333,17 @@ def process_outbox(outbox_file: Path) -> str:
             _notify_forge_marker_error(data, str(e))
             _archive_outbox(outbox_file)
             return 'marker-error'
+        # E4.4e PR-A — emit a `clarify_request` chain_event when Forge's
+        # marker classified as an in-budget clarify. Gate is `intent ==
+        # 'clarify'` (NOT marker_type == 'clarify_request') so the over-
+        # budget `clarification-exhausted` case — which is structurally a
+        # reject — doesn't generate a clarify_request row. Emission lives
+        # past the classifier so partial/unparseable markers (caught
+        # above as MalformedForgeMarker) never reach here, satisfying the
+        # spec § 4 source #5 contract that clarify_request fires only on
+        # classified markers.
+        if marker_decision and marker_decision.get('intent') == 'clarify':
+            _emit_clarify_request_chain_event(data, marker_decision, agent='forge')
 
     # D3.5 commit 5a — Mirror review marker check. Parallel to the Forge
     # branch above; same return shape from the classifier so the marker-

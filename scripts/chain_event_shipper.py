@@ -105,6 +105,16 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     'larry_alert',
     'sentinel_alert',
     'healer_fire',
+    # E4.4e PR-A: push-instrumented writers emit these directly to Supabase
+    # via scripts/chain_event_emit.py. Listing them here keeps the audit
+    # healer (heal_chain_event_type_audit.py) from flagging them as unknown
+    # types when they land. The shipper itself never produces these rows.
+    # `larry_action` is added now for PR-B forward-compat: PR-B's dashboard
+    # POST endpoint writes those rows, but the audit gate needs to admit
+    # them the moment PR-B ships.
+    'approval_request',
+    'clarify_request',
+    'larry_action',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

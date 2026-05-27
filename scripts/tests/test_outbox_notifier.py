@@ -1659,6 +1659,104 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
         self.assertIsNotNone(decision)
 
 
+class EmitClarifyRequestChainEventTest(unittest.TestCase):
+    """E4.4e PR-A: clarify_request chain_event emission at classification.
+
+    Spec § 4 source #5 payload contract:
+      asking_agent, task_id, question, resume_session_id (4 fields).
+    """
+
+    def test_emit_helper_carries_all_four_spec_fields_for_forge(self):
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_clarify_request_chain_event(
+                data={
+                    'task_id': 'task-clarify-001',
+                    'claude_session_id': 'sess-abc-xyz',
+                },
+                marker_decision={
+                    'marker_type': 'clarify_request',
+                    'intent': 'clarify',
+                    'payload': {
+                        'task_id': 'task-clarify-001',
+                        'question': 'Which interpretation of envelope X is right?',
+                    },
+                },
+                agent='forge',
+            )
+        self.assertEqual(captured.get('event_type'), 'clarify_request')
+        self.assertEqual(captured.get('agent'), 'forge')
+        self.assertEqual(captured.get('task_id'), 'task-clarify-001')
+        payload = captured.get('payload') or {}
+        # All four spec § 4 fields.
+        self.assertEqual(payload.get('asking_agent'), 'forge')
+        self.assertEqual(payload.get('task_id'), 'task-clarify-001')
+        self.assertEqual(payload.get('question'),
+                          'Which interpretation of envelope X is right?')
+        self.assertEqual(payload.get('resume_session_id'), 'sess-abc-xyz')
+
+    def test_emit_helper_differentiates_asking_agent_for_mirror(self):
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_clarify_request_chain_event(
+                data={'task_id': 't-2', 'claude_session_id': 's-2'},
+                marker_decision={
+                    'intent': 'clarify',
+                    'payload': {'question': 'Mirror question?'},
+                },
+                agent='mirror',
+            )
+        self.assertEqual(captured.get('agent'), 'mirror')
+        self.assertEqual(captured['payload']['asking_agent'], 'mirror')
+
+    def test_emit_helper_does_not_raise_on_emit_failure(self):
+        # Daemon-never-wedge: if emit_event raises, the helper swallows
+        # and logs. This is the invariant the BLE001 noqa in the helper
+        # is justifying.
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            # Should NOT propagate.
+            on._emit_clarify_request_chain_event(
+                data={'task_id': 't-3'},
+                marker_decision={
+                    'intent': 'clarify',
+                    'payload': {'question': 'Q?'},
+                },
+                agent='forge',
+            )
+
+    def test_emit_helper_handles_missing_payload_fields_gracefully(self):
+        # Payload may be empty (defensive) — helper substitutes empty
+        # strings rather than raising KeyError.
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_clarify_request_chain_event(
+                data={'task_id': 't-4'},
+                marker_decision={'intent': 'clarify', 'payload': {}},
+                agent='forge',
+            )
+        payload = captured.get('payload') or {}
+        self.assertEqual(payload.get('question'), '')
+        self.assertEqual(payload.get('resume_session_id'), '')
+
+
 class BuildPhaseDispatchTest(unittest.TestCase):
     """Phase D3 commit 4b: PROCEED marker → build-phase task to Forge."""
 

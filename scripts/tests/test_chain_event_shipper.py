@@ -700,13 +700,17 @@ class TestDrainOnce(_IsolatedAgentsRoot):
 class TestKnownEventTypesContract(unittest.TestCase):
 
     def test_known_set_matches_spec(self):
-        # Spec § 5.1 enumeration — keep this in sync if the set changes.
+        # Spec § 5.1 (E4.4d) enumeration plus the three push-instrumented
+        # writer types added by E4.4e PR-A (spec § 5.1). `larry_action` is
+        # forward-compat for PR-B's dashboard endpoint; no code in PR-A
+        # produces it. Keep this in sync if the set changes.
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
             'build_dispatched', 'preflight_proceed', 'preflight_clarify',
             'preflight_reject', 'escalation', 'larry_alert', 'sentinel_alert',
             'healer_fire',
+            'approval_request', 'clarify_request', 'larry_action',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
