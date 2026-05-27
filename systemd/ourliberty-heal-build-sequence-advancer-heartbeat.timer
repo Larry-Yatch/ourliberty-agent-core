@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_build_sequence_advancer_heartbeat every 5 minutes (E-orchestrator PR-S2)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-build-sequence-advancer-heartbeat.service
+
+[Install]
+WantedBy=timers.target
