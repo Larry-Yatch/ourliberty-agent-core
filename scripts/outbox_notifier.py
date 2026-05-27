@@ -814,11 +814,26 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
     # D3.5 5d-prime — serializer gate 1 held the merge behind an
     # overlapping in-flight PR. The retry fires automatically when the
     # blocker resolves (post-merge release pass OR the 5-min queue sweep
-    # if the blocker was closed externally).
+    # if the blocker was closed externally). fix-review-pass-dm-await-
+    # merge-outcome (2026-05-26): body now names the overlap files so
+    # Larry can see WHY the hold fired, and a second DM fires on the
+    # release with the final outcome (merged/failed) so the chain isn't
+    # silent after the queue clears.
     'held_for_blocker': (
         'Mirror approved PR {pr_url} on task `{task_id}`.\n'
         'Summary: {summary}\n'
-        'Auto-merge HELD behind PR #{blocker_pr_number} (file overlap). '
+        'Auto-merge HELD behind PR #{blocker_pr_number} on overlap files: '
+        '{overlap_files}.\n'
+        'Will retry automatically when the blocker resolves.'
+    ),
+    # Spec alias for `held_for_blocker` — same body. Kept so the variant
+    # map matches the spec vocabulary even though the gates fn always
+    # emits `held_for_blocker` as the outcome value.
+    'queued_behind_serializer': (
+        'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        'Summary: {summary}\n'
+        'Auto-merge HELD behind PR #{blocker_pr_number} on overlap files: '
+        '{overlap_files}.\n'
         'Will retry automatically when the blocker resolves.'
     ),
     # D3.5 5d-prime — serializer gate 2 saw `gh pr view --json mergeable`
@@ -898,6 +913,9 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
         'dispatch_label': '?',
         # D3.5 5d-prime — serializer hold-for-blocker DM field.
         'blocker_pr_number': '?',
+        # fix-review-pass-dm-await-merge-outcome — overlap files for the
+        # serializer-hold DM body so Larry sees WHICH files collided.
+        'overlap_files': '?',
     }
     findings = payload.get('findings')
     if isinstance(findings, list):
@@ -909,7 +927,7 @@ def _render_dm_message(intent: str, decision: dict[str, Any]) -> Optional[str]:
     if isinstance(merge_result, dict):
         for k in (
             'merge_outcome', 'merge_reason', 'pr_number', 'repo_coords',
-            'blocker_pr_number',
+            'blocker_pr_number', 'overlap_files',
         ):
             v = merge_result.get(k)
             if v is not None:
@@ -944,6 +962,26 @@ def _maybe_dm_larry(
     intent = decision.get('intent')
     if intent not in TERMINAL_DM_INTENTS:
         return
+    # fix-review-pass-dm-await-merge-outcome (2026-05-26):
+    # Suppress the closing review-pass DM when the merge step hasn't
+    # produced a final outcome yet, OR when the conflict path already
+    # fired the canonical rebase DM. The eventual final outcome reaches
+    # Larry from the queue-sweep retry / release path via
+    # `_fire_review_pass_outcome_dm`.
+    #   * deferred_unknown — mergeable=UNKNOWN on first attempt; sweep
+    #     retries with second_attempt_on_unknown and DMs on resolution.
+    #   * held_conflict — `_dm_larry_rebase_needed` already queued the
+    #     rebase recipe (includes Mirror summary); a second DM here
+    #     would be a duplicate.
+    if intent == 'review-pass':
+        merge_outcome = decision.get('merge_outcome')
+        if merge_outcome in ('deferred_unknown', 'held_conflict'):
+            log(
+                f'review-pass closing DM suppressed (outcome='
+                f'{merge_outcome}); final DM fires on retry/conflict '
+                f'path (task={data.get("task_id", "?")})',
+            )
+            return
     chat_id = data.get('reply_chat_id')
     if chat_id is None:
         # No originating chat thread (autonomous Pulse-initiated runs, or
@@ -3629,25 +3667,99 @@ def _find_overlap_blocker(
     return candidates[0][1]
 
 
+def _format_overlap_files(files: Optional[list[str]], limit: int = 3) -> str:
+    """Render an overlap-files list for the held_for_blocker DM body.
+
+    Sorted + de-duped; truncated with a `+N more` tail when over `limit`
+    so the body stays phone-readable.
+    """
+    if not files:
+        return '(unknown)'
+    uniq = sorted({f for f in files if isinstance(f, str)})
+    if not uniq:
+        return '(unknown)'
+    if len(uniq) <= limit:
+        return ', '.join(uniq)
+    return ', '.join(uniq[:limit]) + f' +{len(uniq) - limit} more'
+
+
+def _fire_review_pass_outcome_dm(
+    entry: dict[str, Any],
+    merge_result: dict[str, Any],
+) -> None:
+    """Queue-sweep-side closing DM for a review-pass.
+
+    fix-review-pass-dm-await-merge-outcome (2026-05-26). Called from
+    `_queue_release` and `_auto_merge_queue_sweep` Pass-1 (UNKNOWN
+    retry) after `_attempt_auto_merge_with_gates` returns a final
+    outcome for a queued PR — `process_outbox` is long gone for those
+    paths, so the closing DM has to fire from the sweep side.
+
+    Synthesizes a (data, decision) shape and routes through
+    `_maybe_dm_larry` so the outcome-aware variant selection +
+    suppression rules match the process_outbox path. The suppression
+    in `_maybe_dm_larry` (deferred_unknown / held_conflict) still
+    applies — the conflict path's canonical DM is
+    `_dm_larry_rebase_needed`, and deferred_unknown waits for the next
+    sweep tick.
+    """
+    data = {
+        'task_id': entry.get('task_id') or 'unknown',
+        'reply_chat_id': entry.get('reply_chat_id'),
+    }
+    decision = {
+        'marker_type': 'review_pass',
+        'intent': 'review-pass',
+        'payload': {
+            'task_id': entry.get('task_id') or 'unknown',
+            'pr_url': entry.get('pr_url') or '?',
+            'summary': entry.get('summary') or '(no summary)',
+        },
+        'merge_result': merge_result,
+        'merge_outcome': merge_result.get('merge_outcome'),
+        'intent_kwargs': {},
+    }
+    try:
+        _maybe_dm_larry(data, decision)
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge on DM failure
+        log(
+            f'queue-sweep closing DM raised for pr={entry.get("pr_url")} '
+            f'task={entry.get("task_id")}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _dm_larry_rebase_needed(
     pr_url: str,
     pr_number: int,
     repo_coords: str,
     task_id: str,
     chat_id: Optional[int],
+    summary: str = '',
 ) -> None:
     """Queue the merge_conflict_manual_rebase DM. Uses append_notification
     when we have a reply_chat_id (closes the chain in the originating
     thread), append_alert as a fallback broadcast.
+
+    fix-review-pass-dm-await-merge-outcome (2026-05-26): now carries the
+    Mirror review summary in the body so Larry has context for the
+    rebase ask without paging back to the PR. This is the canonical
+    closing DM for the held_conflict outcome; `_maybe_dm_larry` is
+    suppressed for held_conflict to avoid a duplicate.
     """
     rebase_cmd = (
         f'gh pr checkout {pr_number} --repo {repo_coords} && '
         f'git fetch origin && git rebase origin/main && '
         f'git push --force-with-lease'
     )
+    summary_line = (
+        f'Summary: {summary}\n' if summary else ''
+    )
     body = (
-        f'AUTO_MERGE BLOCKED on {pr_url} (task `{task_id}`): PR has merge '
-        f'conflicts with main.\nRebase manually: {rebase_cmd}'
+        f'Mirror approved PR {pr_url} on task `{task_id}`.\n'
+        f'{summary_line}'
+        f'Auto-merge BLOCKED: PR has merge conflicts with main.\n'
+        f'Rebase manually: {rebase_cmd}'
     )
     if isinstance(chat_id, int):
         try:
@@ -3805,13 +3917,16 @@ def _attempt_auto_merge_with_gates(
             'pr_number': pr_number,
             'repo_coords': repo_coords,
             'blocker_pr_number': blocker,
+            'overlap_files': _format_overlap_files(changed_files),
         }
 
     # Gate 2 — mergeable status.
     status = _gh_pr_mergeable_status(repo_coords, pr_number)
     if status == 'conflicting':
         _queue_remove_pr(pr_number, repo_coords)  # clear if it was queued
-        _dm_larry_rebase_needed(pr_url, pr_number, repo_coords, task_id, chat_id)
+        _dm_larry_rebase_needed(
+            pr_url, pr_number, repo_coords, task_id, chat_id, summary,
+        )
         log(
             f'AUTO_MERGE_SKIPPED_CONFLICTING task={task_id} pr={pr_url} '
             f'(mergeable=CONFLICTING; DMed Larry rebase command)',
@@ -3929,6 +4044,13 @@ def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
             f'AUTO_MERGE_QUEUE_RELEASED pr={entry.get("pr_url")} '
             f'task={entry.get("task_id")} outcome={outcome}',
         )
+        # fix-review-pass-dm-await-merge-outcome (2026-05-26):
+        # `process_outbox` is long gone for this entry — it produced the
+        # first DM ("queued behind PR #Y") and archived its outbox. The
+        # release-side DM is the final outcome (merged / already_merged /
+        # failed / held_for_blocker on chained blocker). Skips for
+        # deferred_unknown / held_conflict are handled in _maybe_dm_larry.
+        _fire_review_pass_outcome_dm(entry, result)
 
 
 def _auto_merge_queue_sweep() -> None:
@@ -3987,6 +4109,12 @@ def _auto_merge_queue_sweep() -> None:
                 f'task={entry.get("task_id")} '
                 f'outcome={result.get("merge_outcome")}',
             )
+            # fix-review-pass-dm-await-merge-outcome (2026-05-26):
+            # the deferred path's process_outbox call suppressed the
+            # closing DM (deferred_unknown is in the skip set); fire it
+            # now with the real outcome. Skips inside _maybe_dm_larry
+            # still apply for held_conflict (rebase DM handles it).
+            _fire_review_pass_outcome_dm(entry, result)
 
     # Pass 2 + 3 re-read because Pass 1 mutated the queue.
     entries = _load_auto_merge_queue()

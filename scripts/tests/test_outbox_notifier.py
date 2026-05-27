@@ -6839,6 +6839,383 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
         self.assertEqual(self._auto_merge_calls, [])
 
 
+class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
+    """fix-review-pass-dm-await-merge-outcome (2026-05-26) — Larry's
+    closing DM must reflect the ACTUAL AUTO_MERGE outcome, not the
+    optimistic 'fired automatically' state from before merge resolution.
+
+    Key invariants:
+      * One DM per resolution moment. (Two for serializer-queued: queued
+        + final outcome — that's intentional.)
+      * deferred_unknown → no DM until the queue sweep retries and
+        resolves.
+      * held_conflict → exactly ONE DM (the rebase recipe from
+        _dm_larry_rebase_needed). The held_conflict variant from
+        _maybe_dm_larry is suppressed.
+      * Mirror review summary appears in every closing DM body.
+
+    Mocks the gh-shell-out helpers individually so the gate flow runs
+    end-to-end. Does NOT set _AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST (which
+    short-circuits gates) — the gates' DM-timing is what we're testing.
+    """
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+    REPO_COORDS = 'Larry-Yatch/ourliberty-agent-core'
+    SUMMARY = 'AC coverage clean.'
+    TASK_ID = 't-rev'
+    CHAT_ID = 98765
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG', 'AUTO_MERGE_QUEUE_FILE',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on.AUTO_MERGE_QUEUE_FILE = self._root / 'state' / 'auto-merge-queue.json'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+
+        # Per-test mutable state for the merge fn override + call log.
+        self._auto_merge_calls: list[tuple[str, str]] = []
+        self._merge_outcome_override = {
+            'merge_outcome': 'merged',
+            'merge_reason': 'squash-merged + branch deleted',
+            'pr_number': 42,
+            'repo_coords': self.REPO_COORDS,
+        }
+        # Capture the order of all relevant interleavings so the
+        # one-DM-after-merge invariant can be asserted explicitly.
+        self._call_order: list[str] = []
+
+        def _override(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            self._call_order.append('auto_merge_pr')
+            return dict(self._merge_outcome_override)
+        self._orig_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = _override
+        # DO NOT bypass the serializer — these tests exercise the gate
+        # flow. (Compare: MirrorMarkerRoutingAutoMergeTest bypasses it.)
+        self._orig_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = False
+        # Reset module-level serializer state between tests.
+        on._reset_auto_merge_queue_state()
+
+        # Default mergeable status — overridden per test.
+        self._mergeable_status_responses: list[str] = ['mergeable']
+        # Default overlap blocker — None unless test sets it.
+        self._overlap_blocker: object = None
+        # Default open-state recheck for blockers — True (still open).
+        self._is_open_responses: dict[int, bool | None] = {}
+        # Default changed-files response — empty.
+        self._changed_files_responses: dict[int, list[str]] = {}
+
+        def _mergeable_stub(repo, pr):
+            self._call_order.append(f'mergeable_check(pr={pr})')
+            if not self._mergeable_status_responses:
+                return 'mergeable'
+            if len(self._mergeable_status_responses) == 1:
+                return self._mergeable_status_responses[0]
+            return self._mergeable_status_responses.pop(0)
+
+        def _overlap_stub(pr_number, repo_coords, changed_files):
+            self._call_order.append(f'overlap_check(pr={pr_number})')
+            return self._overlap_blocker
+
+        def _is_open_stub(repo, pr):
+            return self._is_open_responses.get(pr, True)
+
+        def _changed_files_stub(repo, pr):
+            return self._changed_files_responses.get(pr, [])
+
+        self._patches = [
+            mock.patch.object(on, '_gh_pr_mergeable_status', _mergeable_stub),
+            mock.patch.object(on, '_find_overlap_blocker', _overlap_stub),
+            mock.patch.object(on, '_gh_pr_is_open', _is_open_stub),
+            mock.patch.object(on, '_gh_pr_changed_files', _changed_files_stub),
+        ]
+        for p in self._patches:
+            p.start()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._orig_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._orig_skip_serializer
+        on._reset_auto_merge_queue_state()
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    # ---------------- helpers ----------------
+
+    def _write_mirror_outbox(self, name, body):
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def _pass_body(self, chat_id=None, changed_files=None):
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id=self.TASK_ID, summary=self.SUMMARY)
+        )
+        body['reply_chat_id'] = chat_id if chat_id is not None else self.CHAT_ID
+        if changed_files is not None:
+            body['changed_files'] = changed_files
+        return body
+
+    def _review_pass_dms(self):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()
+            if 'review-pass' in line or 'merge_conflict' in line
+        ]
+
+    def _notifications_with_intent(self, intent):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return []
+        return [
+            r for r in (
+                json.loads(line)
+                for line in la.ALERTS_FILE.read_text().splitlines()
+                if line.strip()
+            )
+            if r.get('kind') == 'notification' and r.get('intent') == intent
+        ]
+
+    # ---------------- cases ----------------
+
+    def test_clean_mergeable_one_dm_after_merge(self):
+        """MERGEABLE on first check → merge fires → ONE DM with `merged` body.
+
+        Call-order assertion: no DM is queued before _auto_merge_pr is
+        called. The DM contains the Mirror summary + 'Auto-merged' marker.
+        """
+        self._mergeable_status_responses = ['mergeable']
+        f = self._write_mirror_outbox(
+            'clean-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 1)
+        body = dms[0]['message']
+        self.assertIn('Auto-merged', body)
+        self.assertIn(self.SUMMARY, body)
+        self.assertIn(self.PR_URL, body)
+        # _auto_merge_pr fires before any DM queue write — verify via
+        # the captured call_order (mergeable_check → auto_merge_pr).
+        self.assertIn('auto_merge_pr', self._call_order)
+        merge_idx = self._call_order.index('auto_merge_pr')
+        mergeable_idx = self._call_order.index('mergeable_check(pr=42)')
+        self.assertLess(mergeable_idx, merge_idx)
+        self.assertEqual(len(self._auto_merge_calls), 1)
+
+    def test_deferred_unknown_first_then_merged_one_dm_total(self):
+        """UNKNOWN on first attempt → NO DM yet → sweep retries with
+        second_attempt_on_unknown=True → mergeable → merge → ONE DM.
+
+        This is the 2026-05-26 bug class: the deferred path produced an
+        immediate DM with the placeholder 'fired automatically' phrasing
+        and the eventual outcome never reached Larry. After the fix, the
+        deferred path is silent and the retry fires the real DM.
+        """
+        self._mergeable_status_responses = ['unknown', 'mergeable']
+        f = self._write_mirror_outbox(
+            'deferred-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+        # No DM after the deferred attempt.
+        self.assertEqual(self._notifications_with_intent('review-pass'), [])
+        # Queue entry exists for the deferred PR.
+        entries = on._load_auto_merge_queue()
+        self.assertEqual(len(entries), 1)
+        self.assertIsNone(entries[0].get('blocker_pr_number'))
+        self.assertEqual(entries[0].get('unknown_attempts'), 1)
+        # Sweep — retry path.
+        on._auto_merge_queue_sweep()
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 1)
+        self.assertIn('Auto-merged', dms[0]['message'])
+        self.assertIn(self.SUMMARY, dms[0]['message'])
+        self.assertEqual(len(self._auto_merge_calls), 1)
+
+    def test_conflicting_one_dm_with_rebase_recipe(self):
+        """CONFLICTING on first check → _auto_merge_pr NOT called → ONE
+        DM (rebase recipe) with the Mirror summary inline."""
+        self._mergeable_status_responses = ['conflicting']
+        f = self._write_mirror_outbox(
+            'conflict-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+
+        rebase_dms = self._notifications_with_intent('merge_conflict_manual_rebase')
+        pass_dms = self._notifications_with_intent('review-pass')
+        # ONE rebase DM, zero review-pass DMs (the held_conflict variant
+        # is suppressed — _dm_larry_rebase_needed is canonical).
+        self.assertEqual(len(rebase_dms), 1)
+        self.assertEqual(len(pass_dms), 0)
+        body = rebase_dms[0]['message']
+        self.assertIn('Auto-merge BLOCKED', body)
+        self.assertIn('Rebase manually', body)
+        self.assertIn(self.SUMMARY, body)
+        # _auto_merge_pr NOT called for CONFLICTING.
+        self.assertEqual(self._auto_merge_calls, [])
+
+    def test_serializer_queued_one_dm_at_queue_time(self):
+        """Serializer gate 1 returns blocker → ONE DM with 'HELD behind
+        PR #Y' + overlap files; _auto_merge_pr NOT called yet."""
+        self._overlap_blocker = 99
+        f = self._write_mirror_outbox(
+            'queued-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py', 'scripts/bar.py']),
+        )
+        on.process_outbox(f)
+
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 1)
+        body = dms[0]['message']
+        self.assertIn('HELD behind PR #99', body)
+        self.assertIn('scripts/foo.py', body)
+        self.assertIn('scripts/bar.py', body)
+        self.assertIn(self.SUMMARY, body)
+        # _auto_merge_pr NOT fired yet — gate 1 short-circuited.
+        self.assertEqual(self._auto_merge_calls, [])
+        # Queue entry exists with blocker recorded.
+        entries = on._load_auto_merge_queue()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].get('blocker_pr_number'), 99)
+
+    def test_serializer_release_two_dms_total(self):
+        """Held → blocker resolves → release path runs gates again →
+        merges → SECOND DM with `merged` body. Two DMs total for the
+        held PR (queued + outcome) — the intentional two-event story.
+        """
+        # Step 1: PR-42 held behind PR-99.
+        self._overlap_blocker = 99
+        f = self._write_mirror_outbox(
+            'queued-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+
+        first_dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(first_dms), 1)
+        self.assertIn('HELD behind PR #99', first_dms[0]['message'])
+
+        # Step 2: blocker resolves. Set up next gate-pass to be clean.
+        self._overlap_blocker = None
+        self._mergeable_status_responses = ['mergeable']
+
+        on._queue_release(99, self.REPO_COORDS)
+
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 2)
+        # First DM = queued-behind; second DM = merged outcome.
+        self.assertIn('HELD behind PR #99', dms[0]['message'])
+        self.assertIn('Auto-merged', dms[1]['message'])
+        self.assertEqual(len(self._auto_merge_calls), 1)
+
+    def test_auto_merge_failed_one_dm_with_manual_recipe(self):
+        """MERGEABLE → merge fires but fails (e.g. conflict with main on
+        actual merge attempt) → ONE DM with `failed` body + manual
+        fallback command."""
+        self._mergeable_status_responses = ['mergeable']
+        self._merge_outcome_override = {
+            'merge_outcome': 'failed',
+            'merge_reason': 'not mergeable: merge commit cannot be cleanly created',
+            'pr_number': 42,
+            'repo_coords': self.REPO_COORDS,
+        }
+        f = self._write_mirror_outbox(
+            'failed-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 1)
+        body = dms[0]['message']
+        self.assertIn('Auto-merge FAILED', body)
+        self.assertIn('not mergeable', body)
+        # Manual-fallback command rendered with concrete PR + repo.
+        self.assertIn(
+            'gh pr merge 42 --repo Larry-Yatch/ourliberty-agent-core '
+            '--squash --delete-branch',
+            body,
+        )
+        self.assertIn(self.SUMMARY, body)
+
+    def test_already_merged_one_dm_with_success_body(self):
+        """already_merged (resume-after-crash) → ONE DM with success body
+        (identical to `merged` per the variant map)."""
+        self._mergeable_status_responses = ['mergeable']
+        self._merge_outcome_override = {
+            'merge_outcome': 'already_merged',
+            'merge_reason': 'PR was already merged (resume from prior dispatch)',
+            'pr_number': 42,
+            'repo_coords': self.REPO_COORDS,
+        }
+        f = self._write_mirror_outbox(
+            'resumed-pass.json',
+            self._pass_body(changed_files=['scripts/foo.py']),
+        )
+        on.process_outbox(f)
+
+        dms = self._notifications_with_intent('review-pass')
+        self.assertEqual(len(dms), 1)
+        body = dms[0]['message']
+        self.assertIn('Auto-merged', body)
+        self.assertNotIn('FAILED', body)
+        self.assertIn(self.SUMMARY, body)
+
+
 class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
     """D3.5 5d — verify the cost gate refuses dispatch at each of the
     four dispatch sites when the per-task spend is at-cap."""
