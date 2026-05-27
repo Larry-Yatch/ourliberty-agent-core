@@ -156,5 +156,48 @@ class ClarificationBudgetTest(unittest.TestCase):
         self.assertTrue(ok)
 
 
+class RoutingSignalPromptPrefixExemptionTest(unittest.TestCase):
+    """bootstrap-002 gap V3 (2026-05-27): Beacon's marker template for
+    APPROVAL_REQUEST has no slot for the phase field, so DAG-preflight
+    dispatches cannot get phase=routing-signal set. Defense-in-depth:
+    accept exemption by canonical prompt prefix as well."""
+
+    def test_review_sequence_dag_prompt_exempt_even_without_phase(self):
+        # Beacon's actual emission on 2026-05-27: target_agent=mirror,
+        # task_type=code-review (NOT phase=routing-signal — phase field
+        # absent because marker.py render template has no slot for it),
+        # prompt=`review-sequence-dag orchestrator-bootstrap-002` (~45 chars).
+        # Old behavior: MIN_PROMPT_LEN rejection. New behavior: exempt by prefix.
+        ok, reason = dv.validate_task(_make_task(
+            prompt='review-sequence-dag orchestrator-bootstrap-002',
+            target_agent='mirror',
+            task_type='code-review',
+            # phase deliberately omitted to match Beacon's marker emission
+        ))
+        self.assertTrue(ok, reason)
+
+    def test_kickoff_prompt_exempt_even_without_phase_or_target_agent(self):
+        # Defense-in-depth — kickoff dispatches normally have
+        # target_agent=build_sequence_advancer (already exempt) but if a
+        # caller forgets that field, the prefix still saves them.
+        ok, reason = dv.validate_task(_make_task(
+            prompt='kickoff orchestrator-bootstrap-002',
+            target_agent='beacon',  # NOT the expected build_sequence_advancer
+            phase=None,
+        ))
+        self.assertTrue(ok, reason)
+
+    def test_short_non_routing_prompt_still_rejected(self):
+        # Regression guard: only canonical routing-signal prefixes get the
+        # exemption. A random short prompt to mirror should still fail.
+        ok, reason = dv.validate_task(_make_task(
+            prompt='short non-canonical prompt',
+            target_agent='mirror',
+            phase='code-review',
+        ))
+        self.assertFalse(ok)
+        self.assertIn('prompt too short', reason)
+
+
 if __name__ == '__main__':
     unittest.main()

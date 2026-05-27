@@ -101,6 +101,19 @@ ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision', 'routing-signal'}
 # orchestrator-bootstrap dispatch chain.
 ROUTING_SIGNAL_TARGET_AGENTS = {'build_sequence_advancer'}
 
+# bootstrap-002 gap V3 (2026-05-27): Beacon's marker.py render template
+# for APPROVAL_REQUEST has no slot for the phase field, so DAG-preflight
+# dispatches (target_agent=mirror, prompt=`review-sequence-dag <seq-id>`)
+# cannot get phase=routing-signal set via the standard emission path —
+# even when Beacon's CLAUDE.md mandates it. Defense-in-depth: also accept
+# routing-signal exemption by canonical prompt prefix. Keeps the H2
+# semantic safety net intact (these prefixes ARE routing signals by
+# definition) without requiring Beacon-LLM adherence to the phase field.
+ROUTING_SIGNAL_PROMPT_PREFIXES = (
+    'kickoff ',
+    'review-sequence-dag ',
+)
+
 MIN_PROMPT_LEN = 100  # chars
 MAX_PROMPT_LEN = 50000
 MIN_TIMEOUT = 60      # seconds
@@ -125,6 +138,7 @@ def validate_task(task):
     is_routing_signal = (
         target_agent in ROUTING_SIGNAL_TARGET_AGENTS
         or phase == 'routing-signal'
+        or any(prompt.startswith(p) for p in ROUTING_SIGNAL_PROMPT_PREFIXES)
     )
     if not is_routing_signal and len(prompt) < MIN_PROMPT_LEN:
         return False, f'prompt too short ({len(prompt)} chars, min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug'
