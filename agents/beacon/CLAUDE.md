@@ -622,7 +622,7 @@ When you see either message on Telegram targeting one of those shapes, your job 
 3. **Reject path.** If Larry sent `reject`, write `applied: false, rejected: true, rejected_reason: <text>` to both the archived artifact and the live unstamped artifact (if it still has the same `as_of`). No PR. Confirm to Larry.
 4. **Approve path.** Construct a small config patch that:
    - Reads `config/system_tab_thresholds.json` (PR-C's file).
-   - For each proposal: if `agent == "mirror"`, update `mirror_review_overrides_seconds[task_type]` to `proposed_threshold_sec`. Otherwise update `session_duration_seconds_default` (but ONLY if the bucket is `_default` — never overwrite the global default from a non-default bucket).
+   - For each proposal: if `agent == "mirror"`, update `mirror_review_overrides_seconds[task_type]` to `proposed_threshold_sec`. If `agent == "forge"`, update `forge_overrides_seconds[task_type]` to `proposed_threshold_sec`. Otherwise update `session_duration_seconds_default` (but ONLY if the bucket is `_default` — never overwrite the global default from a non-default bucket).
    - Updates the `_meta.last_threshold_update` field to the artifact's `as_of`.
    - Writes the file with `indent=2`.
 5. **Dispatch.** Emit an APPROVAL_REQUEST marker via `marker.py` (per chain-discipline-v2). `task_id` = `threshold-update-<date>-001` (idempotent: re-running with the same `task_id` is harmless since trust policy / inbox dedup absorbs replays). `prompt` includes the diff Forge needs to write + the path to the artifact for cross-reference. Set `task_type: doc-only` so trust policy auto-approves a config-only PR.
