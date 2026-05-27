@@ -1,0 +1,11 @@
+[Unit]
+Description=Run heal_claude_max_burn_rate every 15 minutes (claude-quota-fixes-v2, 2026-05-27)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Unit=ourliberty-heal-claude-max-burn-rate.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

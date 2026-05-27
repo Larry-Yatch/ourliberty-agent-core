@@ -81,6 +81,16 @@
     "watchdog_dm_hours": 24,
     "_note": "D3.5 5d-prime serializer watchdog. When a PR sits in the auto-merge queue (held behind an overlapping in-flight PR) for longer than this, the notifier sweep DMs Larry once. Raise during planned multi-day absences so the queue doesn't spam him; lower during high-throughput periods. Read by outbox_notifier._load_auto_merge_watchdog_hours_from_config; cache invalidates on daemon restart."
   },
+  "tier1_quota": {
+    "max_5h_spend_threshold_usd": 60.0,
+    "_note": "Rolling 5h account-wide ceiling for Tier 1 Claude Pro/Max account. heal_claude_max_burn_rate.py DMs Larry once when the summed costs.jsonl spend in the trailing 5h window crosses 80% of this. Read at every healer tick (15 min). $60 default is a reasonable starting point for a Max account; tune against the Anthropic usage page (https://console.anthropic.com/settings/usage) post-merge. V1 limitation: costs.jsonl has no per-account field so the sum includes Tier 2 fallback spend — in steady state Tier 2 is rare and the inflation is conservative (alerts slightly early, not late)."
+  },
+  "models": {
+    "haiku": {
+      "model_id": "claude-haiku-4-5-20251001",
+      "_note": "Used by heal_tier2_weekly_health_probe.py for cheap liveness probes against the Tier 2 OAuth account. Cheapest viable model — probe is intentionally minimal (~$0.001 per run). Pin the latest Haiku id here; the healer falls back to claude-haiku-4-5-20251001 if this block is missing."
+    }
+  },
   "repo_paths": {
     "ourliberty-agent-core": "/home/larry/agent-core",
     "ourliberty-dashboard": "/home/larry/ourliberty-dashboard"
@@ -129,6 +139,11 @@
     {
       "date": "2026-05-26",
       "change": "loop_bounds.cost_per_task_usd raised from $15 to $50. Trigger: PR-S2 (build-sequence-orchestrator advancer + validator + healer + tests + systemd) tripped at $16.61 mid-Mirror-review-rerun. Larry's direct instruction: set baseline to $50 going forward to accommodate real-code PRs that span multi-file daemon work + healer + tests + multiple Mirror revision cycles. Single-PR cap remains in place as a backstop against runaway loops; raising rather than removing preserves the gate. Self-tuning candidate for Pulse Check VII (cost-ceiling thresholds) once enough at-cap incidents accumulate to inform a data-driven threshold.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-27",
+      "change": "claude-quota-fixes-v2 bundle: add top-level 'tier1_quota' block (max_5h_spend_threshold_usd=60.0) consumed by new heal_claude_max_burn_rate.py — DMs Larry at 80% of the rolling 5h Tier 1 spend ceiling so quota walls don't hit unannounced (would have given 1-2h warning before the 2026-05-26/27 incident). Add top-level 'models' block with models.haiku.model_id=claude-haiku-4-5-20251001 consumed by new heal_tier2_weekly_health_probe.py — cheap Sunday probe of Tier 2 OAuth health catches silent credential rot before the next Tier 1 quota event. Field placements per CLARIFY response (top-level, not nested under loop_bounds — different semantics: per-window/per-account vs per-task).",
       "author": "Claude (via Larry's session)"
     }
   ]

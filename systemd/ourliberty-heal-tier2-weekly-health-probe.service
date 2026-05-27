@@ -1,0 +1,45 @@
+[Unit]
+Description=Ourliberty Tier 2 Weekly Health Probe — cheap Haiku probe of Tier 2 OAuth, DMs on failure (claude-quota-fixes-v2, 2026-05-27)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_tier2_weekly_health_probe.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_tier2_weekly_health_probe.py
+
+# Probe timeout is 60s inside the script; give systemd 120s headroom.
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-tier2-weekly-probe
+
+# Memory cap: small subprocess + JSON parse, never needs more than 256M.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches heal-pipeline-stall pattern, BUT ReadWritePaths
+# adds /home/larry/.claude-larry-personal so the subprocess can read
+# Tier 2 OAuth credentials. The script itself sets HOME=TIER2_HOME on
+# the subprocess env (not on this service); ProtectHome=read-only still
+# applies to the parent process state.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/.claude /home/larry/.claude-larry-personal /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

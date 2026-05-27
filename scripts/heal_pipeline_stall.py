@@ -108,6 +108,14 @@ KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-pipeline-stall.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'heal-pipeline-stall-state.json'
+# Check 8 per-(agent, outcome, reason) cursor. Records the latest log-line
+# timestamp already processed per signature so subsequent runs don't re-emit
+# alerts on the same log lines. Lives in state/ (not blackboard/) per the
+# healer-state convention — heal_pipeline_stall-state.json is the only
+# blackboard/ resident for legacy reasons; new persistent state lives in
+# state/. Atomic tmp+rename writes; safe-resume on JSON-decode corruption
+# (logs WARN, treats all cursors as empty, writes a fresh empty file).
+CHECK8_CURSOR_FILE = AGENTS_ROOT / 'state' / 'heal-pipeline-stall-check-8-cursor.json'
 OUTBOX_NOTIFIER_LOG = AGENTS_ROOT / 'logs' / 'outbox-notifier.log'
 # Archived Forge outboxes carry the first-attempt result string with the
 # preflight marker (PROCEED / CLARIFY_REQUEST / REJECT_REQUEST). Check 1
@@ -964,6 +972,68 @@ def check_unrouted_open_prs(open_prs: list[dict],
 
 # ---------- Check 8: Tier 1 quota+auth + Tier 2 missing/failed/skipped ----------
 
+def _check8_cursor_key(agent: str, outcome: str, reason: str) -> str:
+    """Compose the per-signature cursor key. Stable string form so cursor
+    file is human-inspectable / grep-friendly."""
+    return f'{agent}:{outcome}:{reason}'
+
+
+def load_check8_cursor() -> dict[str, datetime]:
+    """Load the Check 8 cursor map: signature → last-processed-timestamp.
+
+    Safe-resume discipline: on JSON-parse failure (corrupted file from a
+    partial write or disk error), log WARN, treat all cursors as empty,
+    and write a fresh empty file. Callers then re-process everything in
+    the scan window — same behavior as the very first run. Crashing
+    instead would mean the healer fails silently per the systemd Type=
+    oneshot pattern, which would defeat the purpose of having a cursor."""
+    if not CHECK8_CURSOR_FILE.exists():
+        return {}
+    try:
+        with open(CHECK8_CURSOR_FILE) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'check 8 cursor corrupted ({type(e).__name__}: {e}) — '
+            f'treating all cursors as empty + writing fresh', 'WARN')
+        save_check8_cursor({})
+        return {}
+    if not isinstance(data, dict):
+        log(f'check 8 cursor not a dict ({type(data).__name__}) — '
+            f'treating all cursors as empty + writing fresh', 'WARN')
+        save_check8_cursor({})
+        return {}
+    raw_cursors = data.get('cursors')
+    if not isinstance(raw_cursors, dict):
+        return {}
+    out: dict[str, datetime] = {}
+    for key, ts_str in raw_cursors.items():
+        if not isinstance(key, str) or not isinstance(ts_str, str):
+            continue
+        ts = _parse_ts(ts_str)
+        if ts is not None:
+            out[key] = ts
+    return out
+
+
+def save_check8_cursor(cursors: dict[str, datetime]) -> None:
+    """Atomically persist the Check 8 cursor map (tmp+rename, per the
+    test-isolation PR #137 + PR-S2 atomic-write discipline)."""
+    try:
+        CHECK8_CURSOR_FILE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            'version': 1,
+            'cursors': {
+                key: ts.isoformat() for key, ts in sorted(cursors.items())
+            },
+        }
+        tmp = CHECK8_CURSOR_FILE.with_suffix('.json.tmp')
+        with open(tmp, 'w') as f:
+            json.dump(payload, f, indent=2)
+        tmp.rename(CHECK8_CURSOR_FILE)
+    except OSError as e:
+        log(f'save check 8 cursor failed: {e}', 'WARN')
+
+
 def check_tier2_fallback_failures(state: dict) -> list[dict]:
     """Scan per-agent logs for TIER2_FALLBACK_UNAVAILABLE / FAILED / SKIPPED
     markers within the lookback window. Each unique (agent, outcome,
@@ -974,6 +1044,17 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
     time this code runs, the module-level constant will already be in
     `globals()`; we prefer it. Otherwise we fall back to
     `TIER2_LOG_LOOKBACK_HOURS` (same 24h default).
+
+    Cursor (2026-05-27): per-(agent, outcome, reason) cursor in
+    `CHECK8_CURSOR_FILE` records the latest log-line timestamp already
+    processed per signature. On entry, skip log lines whose ts is <=
+    the cursor for their signature. On exit, advance the cursor to the
+    max-ts seen per signature (NEVER backward — defensive against log
+    reordering). The cursor composes WITH the scan window (events
+    outside the window are filtered upstream) AND with the
+    larry_alerts per-subject cooldown (cooldown suppresses DM emission;
+    the cursor suppresses re-detection at the log-scan layer). Different
+    layers, complementary.
     """
     # Compose with healer-read-discipline if it's landed
     scan_window_secs = globals().get('SCAN_WINDOW_SECONDS')
@@ -981,6 +1062,11 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=scan_window_secs)
     else:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=TIER2_LOG_LOOKBACK_HOURS)
+
+    cursor = load_check8_cursor()
+    # Working copy — only persist if a value strictly advances. Never-backward
+    # invariant is enforced by the `> existing` comparison at advance time.
+    new_cursor: dict[str, datetime] = dict(cursor)
 
     alerts: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
@@ -1004,6 +1090,19 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                     agent = log_name.replace('.log', '').replace(
                         'beacon_telegram_bot', 'beacon-bot',
                     )
+                    cursor_key = _check8_cursor_key(agent, outcome, reason)
+                    # Cursor gate — skip log lines already processed in a
+                    # prior run. Cursor is inclusive at the boundary (a
+                    # line exactly AT the cursor was processed last run).
+                    prior_cursor_ts = cursor.get(cursor_key)
+                    if prior_cursor_ts is not None and ts <= prior_cursor_ts:
+                        continue
+                    # Always advance the working cursor — even if within-run
+                    # dedup (the `seen` set) suppresses the alert, the line
+                    # was processed and the next run shouldn't see it again.
+                    existing = new_cursor.get(cursor_key)
+                    if existing is None or ts > existing:
+                        new_cursor[cursor_key] = ts
                     sig = (agent, outcome, reason)
                     if sig in seen:
                         continue
@@ -1046,6 +1145,11 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                     })
         except OSError as e:
             log(f'read {log_path} failed: {e}', 'WARN')
+
+    # Persist only if anything advanced. Avoids touching the file on
+    # idle ticks (no Tier 2 log activity).
+    if new_cursor != cursor:
+        save_check8_cursor(new_cursor)
     return alerts
 
 

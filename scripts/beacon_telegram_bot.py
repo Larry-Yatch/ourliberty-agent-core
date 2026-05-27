@@ -136,12 +136,21 @@ def tier2_available() -> bool:
     return Path(TIER2_HOME, ".claude", ".credentials.json").exists()
 
 
-def _tier2_failure_dm(failure_type: str) -> None:
+def _tier2_failure_dm(
+    failure_type: str,
+    tier2_stdout: Optional[str] = None,
+    tier2_stderr: Optional[str] = None,
+) -> None:
     """DM Larry that Tier 1 failed and Tier 2 was unavailable / also failed.
 
     Uses larry_alerts.append_alert with the existing 'warning' severity; the
     intent ('claude_tier1_failed_tier2_unavailable') is in the subject for
     cooldown bucketing.
+
+    When the Tier 2 subprocess actually ran, the caller passes its stdout/
+    stderr — both are surfaced in the DM body so Larry can distinguish
+    'Tier 2 missing' vs 'Tier 2 auth-401' vs 'Tier 2 also rate-limited' from
+    a single DM. Without this, both failure modes looked identical.
     """
     if failure_type == "rate_limit":
         recovery = (
@@ -155,17 +164,58 @@ def _tier2_failure_dm(failure_type: str) -> None:
             "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md "
             "for Tier 2 provisioning."
         )
+    body = (
+        f"Beacon bot subprocess hit Tier 1 {failure_type} and Tier 2 "
+        f"fallback was unavailable or also failed. Beacon will not "
+        f"reply to chat until manual recovery."
+    )
+    if tier2_stdout or tier2_stderr:
+        body += (
+            f"\nTier 2 stdout: {(tier2_stdout or '')[:300]!r}"
+            f"\nTier 2 stderr: {(tier2_stderr or '')[:300]!r}"
+        )
+    try:
+        larry_alerts.append_alert(
+            source="beacon-telegram-bot",
+            severity="warning",
+            message=body,
+            subject=f"claude_tier1_failed_tier2_unavailable:{failure_type}",
+            suggested_action=recovery,
+        )
+    except Exception:
+        pass
+
+
+def _tier2_refuse_on_resume_dm(failure_type: str) -> None:
+    """DM Larry that Tier 1 failed mid-resume and Tier 2 retry was REFUSED.
+
+    Mirrors the refuse-on-resume discipline in agent_runner.py:822-828 — a
+    session_id from Tier 1 is account-bound and CANNOT be replayed against
+    Tier 2's account (HOME=TIER2_HOME points at a different ~/.claude
+    credentials and a different Anthropic identity). Retrying with --resume
+    would fail with 'session not found' AND would orphan the original
+    session's context. Skipping is the correct outcome; we surface it to
+    Larry so the manual-recovery path (wait for Tier 1 reset OR drop
+    --resume and retry on Tier 2 fresh) is visible.
+    """
     try:
         larry_alerts.append_alert(
             source="beacon-telegram-bot",
             severity="warning",
             message=(
-                f"Beacon bot subprocess hit Tier 1 {failure_type} and Tier 2 "
-                f"fallback was unavailable or also failed. Beacon will not "
-                f"reply to chat until manual recovery."
+                f"beacon-bot Tier 1 failed mid-resume (session-bound); "
+                f"manual recovery: wait for Tier 1 reset OR clear --resume "
+                f"and retry on Tier 2 fresh."
             ),
-            subject=f"claude_tier1_failed_tier2_unavailable:{failure_type}",
-            suggested_action=recovery,
+            subject=f"claude_tier1_failed_on_resume_session_bound:{failure_type}",
+            suggested_action=(
+                "Tier 1 hit "
+                f"{failure_type} on a --resume session. Session IDs are "
+                "account-bound — Tier 2 retry would fail with 'session not "
+                "found'. Wait for the Tier 1 5h window to clear, or start a "
+                "fresh Beacon chat (no --resume) which will route through "
+                "Tier 2."
+            ),
         )
     except Exception:
         pass
@@ -276,14 +326,17 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
     output and, if detected, retry once with HOME=TIER2_HOME (Larry's personal
     Claude Max) before falling back to the error response.
 
-    Note: the bot does NOT thread `--resume` between accounts (it does for
-    same-account session continuity, and resume-on-Tier-1-error already
-    retries without `--resume` for stale sessions). The Tier 2 retry
-    preserves the same args including `--resume` when set — the bot's chat
-    sessions per chat_id are typically a fresh-or-recent enough conversation
-    that a Tier 2 cold-start is acceptable. The stricter resume-account
-    binding rule lives in agent_runner.py where multi-phase build sessions
-    are at stake.
+    Resume-discipline rule (mirrors agent_runner.py:822-828): `--resume`
+    session IDs are NOT portable between accounts. A Tier 2 retry on a
+    --resume session would fail with 'session not found' AND would orphan
+    the original session's context. When Tier 1 fails (rate-limit or
+    auth-401) on a request that carries `--resume`, we DM Larry with the
+    session-bound recovery instructions and return early — no Tier 2
+    subprocess invocation. When the request has NO `--resume` (fresh
+    session), the Tier 2 fallback proceeds as normal. The earlier design
+    here (Tier 2 cold-start acceptable for chat sessions) was retired
+    after the 2026-05-26/27 incident — the cross-account session failure
+    mode is real and identical to the agent_runner.py case.
     """
     cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
     if session_id:
@@ -306,6 +359,23 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         # Tier 2 detection: classify from the combined output.
         failure_type = classify_tier1_failure(result.stdout, result.stderr)
         if failure_type:
+            # Refuse-on-resume (mirrors agent_runner.py:822-828). A Tier 2
+            # retry on a --resume session would fail with 'session not found'
+            # AND orphan the original session's context — session IDs are
+            # account-bound. DM Larry the recovery hint and return early; no
+            # Tier 2 subprocess invocation.
+            if session_id:
+                log(
+                    f"TIER2_FALLBACK_SKIPPED reason={failure_type} "
+                    f"cause=resume_session_account_bound"
+                )
+                _tier2_refuse_on_resume_dm(failure_type)
+                return (
+                    f"[claude {failure_type} on --resume session — "
+                    f"Tier 2 retry refused (session-bound); DM sent]\n"
+                    f"{(result.stdout or '')[:1500]}",
+                    session_id,
+                )
             if not tier2_available():
                 log(
                     f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
@@ -328,14 +398,22 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     return (reply.strip(), new_session)
                 except json.JSONDecodeError:
                     return (t2.stdout.strip() or "[empty response]", session_id)
+            t2_stdout = t2.stdout if t2 is not None else None
+            t2_stderr = t2.stderr if t2 is not None else None
             log(
                 f"TIER2_FALLBACK_FAILED reason={failure_type} "
-                f"exit={t2.returncode if t2 else 'none'}"
+                f"exit={t2.returncode if t2 else 'none'} "
+                f"stdout={(t2_stdout or '')[:300]!r} "
+                f"stderr={(t2_stderr or '')[:300]!r}"
             )
-            _tier2_failure_dm(failure_type)
+            _tier2_failure_dm(failure_type, t2_stdout, t2_stderr)
+            # Echo Tier 2's stdout (not Tier 1's) in the chat reply so the
+            # error body distinguishes 'Tier 2 missing' vs 'Tier 2 auth-401'
+            # vs 'Tier 2 also rate-limited'. Before this fix the body was
+            # result.stdout (Tier 1's), masking the real Tier 2 failure mode.
             return (
                 f"[claude {failure_type} — Tier 2 retry also failed; DM sent]\n"
-                f"{(result.stdout or '')[:1500]}",
+                f"{(t2_stdout or '')[:1500]}",
                 session_id,
             )
 

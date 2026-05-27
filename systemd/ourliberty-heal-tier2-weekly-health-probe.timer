@@ -1,0 +1,12 @@
+[Unit]
+Description=Run heal_tier2_weekly_health_probe every Sunday at 06:00 MDT / 12:00 UTC (claude-quota-fixes-v2, 2026-05-27)
+
+[Timer]
+# Sunday 06:00 MDT = 12:00 UTC. If the system was off when the timer
+# would have fired, Persistent=true catches up on next boot.
+OnCalendar=Sun *-*-* 12:00:00 UTC
+Unit=ourliberty-heal-tier2-weekly-health-probe.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
