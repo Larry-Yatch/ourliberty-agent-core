@@ -58,7 +58,16 @@ def _watcher_forge_done_line(task: str, minutes_ago: int,
 
 class _TempAgentsRootMixin:
     """Sets OURLIBERTY_AGENTS_ROOT to a temp dir + re-imports the module so
-    its module-level constants pick up the env var."""
+    its module-level constants pick up the env var.
+
+    Also unsets SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY for the duration
+    of each test so the shared `_resolution_signal_present` helper takes
+    its failsafe path (returns (False, None)) instead of hitting the real
+    Supabase instance from the test process. Tests that want to exercise
+    the helper itself set the env vars + mock `_get_chain_events_for_task`
+    explicitly via `_PatchSupabaseMixin` below."""
+
+    _SUPABASE_ENV_KEYS = ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
 
     def setUp(self) -> None:
         self._tmpdir = tempfile.TemporaryDirectory()
@@ -67,6 +76,10 @@ class _TempAgentsRootMixin:
         (self.agents_root / 'logs').mkdir()
         (self.agents_root / 'blackboard').mkdir()
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.agents_root)
+        # Snapshot + clear Supabase env so tests don't make network calls.
+        self._supabase_env_snapshot = {
+            k: os.environ.pop(k, None) for k in self._SUPABASE_ENV_KEYS
+        }
         # Force re-import.
         if 'heal_pipeline_stall' in sys.modules:
             del sys.modules['heal_pipeline_stall']
@@ -76,6 +89,10 @@ class _TempAgentsRootMixin:
     def tearDown(self) -> None:
         self._tmpdir.cleanup()
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        # Restore Supabase env (only re-set if previously present).
+        for k, v in self._supabase_env_snapshot.items():
+            if v is not None:
+                os.environ[k] = v
 
 
 class TestRegexPatterns(_TempAgentsRootMixin, unittest.TestCase):
@@ -1032,6 +1049,430 @@ class TestScanWindow(_TempAgentsRootMixin, unittest.TestCase):
         }
         alerts = self.hps.check_unrouted_open_prs([pr], [], {})
         self.assertEqual(alerts, [])
+
+
+# ---------- Shared resolution-signal reconciliation (2026-05-27) ----------
+#
+# Family A — helper unit tests
+# Family B — per-check skip-path fixtures for Checks 1, 2, 4, 5, 6, 7
+# Family C — replay of the 2026-05-27 review-sequence-dag-orchestrator-
+#            bootstrap-001 false-fire case
+# Family D — regression guards: legitimate alerts still fire when no
+#            resolution signal is present
+
+def _row(event_type: str, minutes_ago: int = 1, **extra) -> dict:
+    """Construct a fake chain_events row matching the helper's expected shape.
+    The helper only reads `event_type` from each row; `ts` is included for
+    readability + future-proofing."""
+    ts = (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).isoformat()
+    out = {'event_type': event_type, 'ts': ts, 'actor': 'test'}
+    out.update(extra)
+    return out
+
+
+class TestResolutionSignalHelper(_TempAgentsRootMixin, unittest.TestCase):
+    """Family A — `_resolution_signal_present` unit tests.
+
+    The helper short-circuits on missing env (failsafe path used by the
+    test mixin's default setup). Each test here mocks
+    `_get_chain_events_for_task` to inject specific row sets, exercising
+    the precedence order and failsafe behavior."""
+
+    def test_larry_action_returns_true(self) -> None:
+        rows = [_row('larry_action', minutes_ago=5)]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-001',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertTrue(hit)
+        self.assertEqual(reason, 'larry_action')
+
+    def test_session_start_returns_superseded_session(self) -> None:
+        rows = [_row('session_start', minutes_ago=5)]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-002',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertTrue(hit)
+        self.assertEqual(reason, 'superseded_session')
+
+    def test_larry_action_wins_over_session_start(self) -> None:
+        """Order matters — larry_action is cheaper to detect and is the
+        more decisive signal (Larry already handled it)."""
+        rows = [
+            _row('session_start', minutes_ago=5),
+            _row('larry_action', minutes_ago=3),
+        ]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-003',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertTrue(hit)
+        self.assertEqual(reason, 'larry_action')
+
+    def test_pr_state_merged_returns_pr_closed(self) -> None:
+        """When chain_events has nothing AND check_pr_state=True AND
+        gh reports MERGED, helper returns 'pr_closed'."""
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=[]), \
+             patch.object(self.hps, '_check_pr_closed_via_gh',
+                          return_value='MERGED'):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-004',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+                check_pr_state=True,
+                pr_url='https://example/pr/1',
+            )
+        self.assertTrue(hit)
+        self.assertEqual(reason, 'pr_closed')
+
+    def test_pr_state_open_falls_through_to_false(self) -> None:
+        """check_pr_state=True + PR.state=OPEN (gh helper returns None)
+        + no chain_events signals → (False, None)."""
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=[]), \
+             patch.object(self.hps, '_check_pr_closed_via_gh',
+                          return_value=None):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-005',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+                check_pr_state=True,
+                pr_url='https://example/pr/1',
+            )
+        self.assertFalse(hit)
+        self.assertIsNone(reason)
+
+    def test_no_signals_returns_false(self) -> None:
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=[]):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-006',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertFalse(hit)
+        self.assertIsNone(reason)
+
+    def test_chain_events_query_error_returns_false_failsafe(self) -> None:
+        """Infrastructure failure (query returns None) → helper returns
+        (False, None). Existing alert behavior is preserved as the
+        failsafe. PR-state is NOT consulted when chain_events failed,
+        because we want the alert to fire unmodified in that case."""
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=None):
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='t-007',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+                check_pr_state=True,
+                pr_url='https://example/pr/1',
+            )
+        self.assertFalse(hit)
+        self.assertIsNone(reason)
+
+    def test_unknown_task_short_circuits(self) -> None:
+        """Check 5 (retry_exhausted) can emit `task='unknown'` when the
+        journalctl line lacks `task=`. No chain_events row could possibly
+        match — short-circuit to False without querying."""
+        with patch.object(self.hps, '_get_chain_events_for_task') as mock_q:
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='unknown',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertFalse(hit)
+        self.assertIsNone(reason)
+        mock_q.assert_not_called()
+
+    def test_empty_task_short_circuits(self) -> None:
+        with patch.object(self.hps, '_get_chain_events_for_task') as mock_q:
+            hit, reason = self.hps._resolution_signal_present(
+                task_id='',
+                since_ts=datetime.now(timezone.utc) - timedelta(minutes=30),
+            )
+        self.assertFalse(hit)
+        self.assertIsNone(reason)
+        mock_q.assert_not_called()
+
+    def test_get_chain_events_returns_none_when_env_missing(self) -> None:
+        """The mixin clears SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY;
+        verify the underlying helper returns None silently (no WARN
+        spam on every healer cycle in test environments)."""
+        rows = self.hps._get_chain_events_for_task(
+            'any-task',
+            datetime.now(timezone.utc) - timedelta(minutes=30),
+        )
+        self.assertIsNone(rows)
+
+
+class TestPerCheckSkipPaths(_TempAgentsRootMixin, unittest.TestCase):
+    """Family B — each of Checks 1, 2, 4, 5, 6, 7 must emit a
+    `<CHECK_NAME>_SKIP reason=larry_action` log line and NOT add to its
+    alerts list when a larry_action chain_event is present after the
+    stall trigger ts."""
+
+    def _patch_resolution(self, reason: str = 'larry_action'):
+        """Patch `_resolution_signal_present` to return (True, reason).
+        Returns the context manager so callers can wrap their check."""
+        return patch.object(
+            self.hps, '_resolution_signal_present',
+            return_value=(True, reason),
+        )
+
+    def _capture_logs(self):
+        """Patch the module-level `log` so we can assert specific
+        SKIP-shape lines without coupling to other INFO output."""
+        captured: list[str] = []
+        cm = patch.object(
+            self.hps, 'log',
+            side_effect=lambda msg, level='INFO': captured.append(msg),
+        )
+        return cm, captured
+
+    def test_check1_skips_on_larry_action(self) -> None:
+        lines = [_watcher_forge_done_line('check1-resolved-001', minutes_ago=180)]
+        cm, captured = self._capture_logs()
+        with cm, self._patch_resolution('larry_action'):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'FORGE_NO_PR_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check1-resolved-001', skip_lines[0])
+
+    def test_check2_skips_on_larry_action(self) -> None:
+        pr = {
+            'number': 600,
+            'headRefName': 'forge/check2-resolved-001',
+            'title': 'docs(x): something',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=45)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        cm, captured = self._capture_logs()
+        with cm, self._patch_resolution('larry_action'):
+            alerts = self.hps.check_pr_no_mirror_dispatch([], [pr], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'PR_NO_MIRROR_DISPATCH_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check2-resolved-001', skip_lines[0])
+
+    def test_check4_skips_on_larry_action(self) -> None:
+        lines = [
+            f'[{_ts(45)}] [notifier] [INFO] notified beacon <- mirror '
+            f'(mirror-result, depth=1, '
+            f'file=notify-check4-resolved-001.json)'
+        ]
+        cm, captured = self._capture_logs()
+        with cm, self._patch_resolution('larry_action'):
+            alerts = self.hps.check_mirror_marker_invisible(lines, {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'MIRROR_MARKER_INVISIBLE_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check4-resolved-001', skip_lines[0])
+
+    def test_check5_skips_on_larry_action(self) -> None:
+        fake_journal = (
+            'May 27 09:01:00 host inbox-watcher: All retries exhausted '
+            'for task=check5-resolved-001\n'
+        )
+        cm, captured = self._capture_logs()
+        with patch('subprocess.run') as mock_sub, \
+             cm, self._patch_resolution('larry_action'):
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'RETRY_EXHAUSTED_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check5-resolved-001', skip_lines[0])
+
+    def test_check6_skips_on_larry_action(self) -> None:
+        lines = [
+            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'check6-resolved-001 has no forge_build_session_id '
+            f"(routing_source='beacon', chat_id=None); skipping."
+        ]
+        cm, captured = self._capture_logs()
+        with cm, self._patch_resolution('larry_action'):
+            alerts = self.hps.check_revision_dispatched_with_no_session(
+                lines, {},
+            )
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'NO_SESSION_REVISION_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check6-resolved-001', skip_lines[0])
+
+    def test_check7_skips_on_larry_action(self) -> None:
+        pr = {
+            'number': 700,
+            'headRefName': 'forge/check7-resolved-001',
+            'title': 'feat: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=180)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        cm, captured = self._capture_logs()
+        with cm, self._patch_resolution('larry_action'):
+            alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'UNROUTED_OPEN_PR_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn('check7-resolved-001', skip_lines[0])
+
+
+class TestReviewSequenceDagOrchestratorReplay(_TempAgentsRootMixin,
+                                              unittest.TestCase):
+    """Family C — replay of the concrete 2026-05-27 false-fire case.
+    `review-sequence-dag-orchestrator-bootstrap-001` was reviewed by
+    Mirror at 16:24Z (DAG sessions emit `result:` not `REVIEW_*`
+    markers; the classifier missed). Check 4 would have fired at
+    23:39Z. But: Larry approved via Approvals tab at 16:38Z
+    (larry_action chain_event); Mirror also re-ran the review at
+    16:21-24Z (session_start). With this PR's helper, Check 4 emits
+    MIRROR_MARKER_INVISIBLE_SKIP reason=larry_action."""
+
+    TASK = 'review-sequence-dag-orchestrator-bootstrap-001'
+
+    def test_check4_skips_with_larry_action_winning(self) -> None:
+        # Generic mirror-result notify at "16:24Z" (45 min ago from now).
+        notify_line = (
+            f'[{_ts(45)}] [notifier] [INFO] notified beacon <- mirror '
+            f'(mirror-result, depth=1, file=notify-{self.TASK}.json)'
+        )
+        # Chain_events fixture: larry_action 31 min after notify, plus
+        # an even-earlier session_start (Mirror re-ran). larry_action
+        # wins per cheap-to-expensive precedence.
+        rows = [
+            _row('session_start', minutes_ago=48),
+            _row('larry_action', minutes_ago=31),
+        ]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda m, level='INFO': captured.append(m)), \
+             patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            alerts = self.hps.check_mirror_marker_invisible([notify_line], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'MIRROR_MARKER_INVISIBLE_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=larry_action', skip_lines[0])
+        self.assertIn(self.TASK, skip_lines[0])
+
+    def test_check4_skips_with_only_session_start_when_larry_absent(self) -> None:
+        """Defense in depth: same task, but only the session_start is
+        present (no larry_action). Helper falls through to
+        'superseded_session'."""
+        notify_line = (
+            f'[{_ts(45)}] [notifier] [INFO] notified beacon <- mirror '
+            f'(mirror-result, depth=1, file=notify-{self.TASK}.json)'
+        )
+        rows = [_row('session_start', minutes_ago=42)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda m, level='INFO': captured.append(m)), \
+             patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            alerts = self.hps.check_mirror_marker_invisible([notify_line], {})
+        self.assertEqual(alerts, [])
+        skip_lines = [m for m in captured if 'MIRROR_MARKER_INVISIBLE_SKIP' in m]
+        self.assertEqual(len(skip_lines), 1)
+        self.assertIn('reason=superseded_session', skip_lines[0])
+
+
+class TestResolutionSignalRegressionGuards(_TempAgentsRootMixin,
+                                           unittest.TestCase):
+    """Family D — when NO resolution signal is present, every wired check
+    must still emit its legitimate alert. Verifies the helper doesn't
+    suppress real stalls. Mixin's SUPABASE env-clear means
+    `_get_chain_events_for_task` returns None (failsafe → no skip)."""
+
+    def test_check1_fires_when_no_resolution_signal(self) -> None:
+        lines = [_watcher_forge_done_line('legit-stall-1', minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('legit-stall-1', alerts[0]['message'])
+
+    def test_check2_fires_when_no_resolution_signal(self) -> None:
+        pr = {
+            'number': 800, 'headRefName': 'forge/legit-stall-2',
+            'title': 'docs: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=45)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_pr_no_mirror_dispatch([], [pr], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #800', alerts[0]['message'])
+
+    def test_check4_fires_when_no_resolution_signal(self) -> None:
+        lines = [
+            f'[{_ts(45)}] [notifier] [INFO] notified beacon <- mirror '
+            f'(mirror-result, depth=1, file=notify-legit-stall-4.json)'
+        ]
+        alerts = self.hps.check_mirror_marker_invisible(lines, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('legit-stall-4', alerts[0]['message'])
+
+    def test_check5_fires_when_no_resolution_signal(self) -> None:
+        fake_journal = (
+            'May 27 09:01:00 host inbox-watcher: All retries exhausted '
+            'for task=legit-stall-5\n'
+        )
+        with patch('subprocess.run') as mock_sub:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('legit-stall-5', alerts[0]['message'])
+
+    def test_check6_fires_when_no_resolution_signal(self) -> None:
+        lines = [
+            f'[{_ts(45)}] [notifier] [WARN] REVIEW_REVISION on task '
+            f'legit-stall-6 has no forge_build_session_id'
+        ]
+        alerts = self.hps.check_revision_dispatched_with_no_session(lines, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('legit-stall-6', alerts[0]['message'])
+
+    def test_check7_fires_when_no_resolution_signal(self) -> None:
+        pr = {
+            'number': 900, 'headRefName': 'larry/legit-stall-7',
+            'title': 'feat: x',
+            'createdAt': (
+                datetime.now(timezone.utc) - timedelta(minutes=180)
+            ).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('PR #900', alerts[0]['message'])
+
+    def test_skip_path_does_not_trip_cooldown(self) -> None:
+        """The SKIP path emits a log line + continues; it does NOT call
+        `record_alert` (which is what tripping the cooldown counter
+        means). Verify by inspecting state dict before/after: stays
+        empty when every check skips."""
+        lines = [_watcher_forge_done_line('cooldown-untouched-1', minutes_ago=180)]
+        state: dict = {}
+        with patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(True, 'larry_action')):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], state)
+        self.assertEqual(alerts, [])
+        self.assertEqual(state, {})
 
 
 if __name__ == '__main__':
