@@ -161,6 +161,66 @@ class ExecStartParserTests(unittest.TestCase):
             h.parse_script_path_from_service_file('/nonexistent.service'),
         )
 
+    def test_shell_pipe_execstart_returns_none(self):
+        # `/bin/sh -c '...'` shapes are not parseable: /bin/sh is filtered as
+        # an interpreter and the quoted pipeline has no absolute paths. The
+        # parser returns None so check_unit logs the could-not-resolve skip.
+        with tempfile.TemporaryDirectory() as td:
+            svc = Path(td) / 'sh.service'
+            svc.write_text(
+                "[Service]\nExecStart=/bin/sh -c 'curl localhost | jq'\n",
+            )
+            self.assertIsNone(h.parse_script_path_from_service_file(str(svc)))
+
+    def test_uvicorn_module_mode_resolves_via_workingdirectory(self):
+        # Production case (ourliberty-dashboard-api.service): the script path
+        # is not on the ExecStart line; it must be reconstructed from the
+        # dotted module + WorkingDirectory.
+        with tempfile.TemporaryDirectory() as td:
+            scripts_dir = Path(td) / 'scripts'
+            scripts_dir.mkdir()
+            script = scripts_dir / 'dashboard_api.py'
+            script.write_text('app = None\n')
+            svc = Path(td) / 'dashboard.service'
+            svc.write_text(
+                '[Service]\n'
+                f'WorkingDirectory={td}\n'
+                'ExecStart=/usr/bin/env python3 -m uvicorn '
+                'scripts.dashboard_api:app --host 127.0.0.1 --port 8000\n'
+            )
+            got = h.parse_script_path_from_service_file(str(svc))
+            self.assertEqual(got, script)
+
+    def test_uvicorn_module_missing_on_disk_returns_none(self):
+        # If the dotted module resolves to a non-existent file (typo in unit
+        # file, file deleted), the parser must NOT return a phantom path —
+        # check_unit relies on None here to log the skip.
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / 'scripts').mkdir()
+            svc = Path(td) / 'dashboard.service'
+            svc.write_text(
+                '[Service]\n'
+                f'WorkingDirectory={td}\n'
+                'ExecStart=/usr/bin/env python3 -m uvicorn '
+                'scripts.nonexistent_module:app\n'
+            )
+            self.assertIsNone(h.parse_script_path_from_service_file(str(svc)))
+
+    def test_non_uvicorn_m_invocation_returns_none(self):
+        # `-m gunicorn`, `-m flask`, and other module-mode launchers are out
+        # of scope for the V1 uvicorn fix; the parser falls through to the
+        # existing could-not-resolve branch. Deferred to a follow-up.
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / 'scripts').mkdir()
+            (Path(td) / 'scripts' / 'foo.py').write_text('app = None\n')
+            svc = Path(td) / 'gunicorn.service'
+            svc.write_text(
+                '[Service]\n'
+                f'WorkingDirectory={td}\n'
+                'ExecStart=/usr/bin/env python3 -m gunicorn scripts.foo:app\n'
+            )
+            self.assertIsNone(h.parse_script_path_from_service_file(str(svc)))
+
 
 # -------------------- cooldown tests --------------------
 
