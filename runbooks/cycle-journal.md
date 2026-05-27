@@ -4,6 +4,15 @@
 
 ---
 
+## Notification — 2026-05-27 (inter-agent delivery)
+
+**Type:** Beacon result notification batch — `sess-abc-123`
+**Finding:** 3 test inbox messages delivered to pulse inbox (`notify-t-1`, `notify-t-short`, `notify-t-fail`). All share synthetic `session_id=sess-abc-123`. Task IDs (`t-1`, `t-short`, `t-fail`) are test scenario names, not real production tasks. `t-fail` carried "Error: claude timed out after 3 attempts" — the failure scenario in the test set.
+**Assessment:** Notification routing smoke test. No real task failure. No action required. Test messages archived from inbox.
+**Did:** Archived 3 test messages from `~/agents/inboxes/pulse/`.
+
+---
+
 ## Iteration 92 — 2026-05-27 05:00 UTC (interactive)
 
 **Health:** ✅ Nominal
