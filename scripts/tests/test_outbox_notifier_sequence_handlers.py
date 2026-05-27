@@ -236,7 +236,10 @@ class KickoffPendingToActive(_KickoffHandlerHarness):
         self.assertEqual(len(on_disk['audit_log']), initial_log_len + 1)
         last = on_disk['audit_log'][-1]
         self.assertEqual(last['event'], 'kickoff-acknowledged')
-        self.assertEqual(last['actor'], 'advancer')
+        # PR-S4 rectification (L4): actor is `outbox-notifier`, not
+        # `advancer`. The notifier wrote the entry; calling it
+        # `advancer` was misleading for ops debugging.
+        self.assertEqual(last['actor'], 'outbox-notifier')
         self.assertIn('ts', last)
         self.assertIn('task_id', last)
 
@@ -289,7 +292,10 @@ class KickoffIdempotency(_KickoffHandlerHarness):
     def _assert_warn_noop(self, status):
         seq = _make_sequence(seq_id=f'seq-{status}', status=status)
         original_log_len = len(seq['audit_log'])
-        original_dict = json.loads(json.dumps(seq))  # deep copy
+        original_kickoff_acks = [
+            e for e in seq['audit_log']
+            if isinstance(e, dict) and e.get('event') == 'kickoff-acknowledged'
+        ]
         self._write_sequence(seq)
         result = on._handle_build_sequence_advancer_kickoff(
             self._make_envelope(
@@ -313,15 +319,35 @@ class KickoffIdempotency(_KickoffHandlerHarness):
         )
         self.assertIsNotNone(result, 'handler claims the marker on no-op too')
         on_disk = self._read_sequence(f'seq-{status}')
-        # Audit_log NOT extended; sequence dict is byte-identical.
+        # PR-S4 rectification (M3): idempotent no-op now appends a
+        # `kickoff-duplicate-suppressed` audit entry so the trail is
+        # honest. The load-bearing invariant — no DUPLICATE
+        # `kickoff-acknowledged` events, no status mutation, no DM — is
+        # preserved.
         self.assertEqual(
-            len(on_disk['audit_log']), original_log_len,
-            f'idempotent no-op for status={status} must NOT append audit_log',
+            on_disk['status'], status,
+            f'idempotent no-op for status={status} must NOT mutate status',
         )
+        on_disk_kickoff_acks = [
+            e for e in on_disk['audit_log']
+            if isinstance(e, dict) and e.get('event') == 'kickoff-acknowledged'
+        ]
         self.assertEqual(
-            on_disk, original_dict,
-            f'idempotent no-op for status={status} must NOT mutate the file',
+            len(on_disk_kickoff_acks), len(original_kickoff_acks),
+            f'idempotent no-op for status={status} must NOT append a '
+            f'second kickoff-acknowledged event',
         )
+        # The dedup-suppressed event WAS appended (one new entry).
+        self.assertEqual(
+            len(on_disk['audit_log']), original_log_len + 1,
+            f'idempotent no-op for status={status} appends exactly one '
+            f'kickoff-duplicate-suppressed audit entry',
+        )
+        last = on_disk['audit_log'][-1]
+        self.assertEqual(last['event'], 'kickoff-duplicate-suppressed')
+        self.assertEqual(last['actor'], 'outbox-notifier')
+        self.assertEqual(last['duplicate_task_id'], 'dispatch-larry-001')
+        self.assertEqual(last['status_at_suppression'], status)
         # No alert/DM either.
         self.assertEqual(
             self._read_alerts(), [],
@@ -650,204 +676,14 @@ class KickoffFailureModes(_KickoffHandlerHarness):
 # AFTER-AFTER state is identical (no duplicate audit_log entries).
 
 
-class ShortcutMutationShapes(_KickoffHandlerHarness):
-    """Lock the expected sequence-file mutation shape for each of the 6
-    shortcuts. These are the contracts Beacon's CLAUDE.md commits to."""
-
-    # ---------- pause / resume ----------
-
-    def test_pause_sets_status_paused_and_validates(self):
-        seq = _make_sequence(seq_id='pause-seq', status='active')
-        seq['status'] = 'paused'
-        seq['audit_log'].append({
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'paused', 'actor': 'larry',
-        })
-        result = bsv.validate_dag(seq)
-        self.assertTrue(result.valid, result.errors)
-        self.assertEqual(seq['status'], 'paused')
-        # 'paused' is a member of VALID_SEQUENCE_STATUS — no new field.
-        self.assertNotIn('paused', set(seq.keys()) - {'audit_log', 'status',
-                                                       'steps', 'current_steps',
-                                                       'created_at', 'created_by',
-                                                       'spec_doc', 'label',
-                                                       'seq_id'})
-
-    def test_pause_idempotency_on_already_paused(self):
-        """Re-running `pause sequence X` when already paused must NOT
-        append a second audit_log entry."""
-        seq = _make_sequence(seq_id='pause-idem', status='paused')
-        before = json.loads(json.dumps(seq))
-        # WARN no-op: leave the dict identical.
-        if seq['status'] == 'paused':
-            pass  # no-op
-        self.assertEqual(seq, before)
-
-    def test_resume_sets_status_active(self):
-        seq = _make_sequence(seq_id='resume-seq', status='paused')
-        seq['status'] = 'active'
-        seq['audit_log'].append({
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'resumed', 'actor': 'larry',
-        })
-        result = bsv.validate_dag(seq)
-        self.assertTrue(result.valid, result.errors)
-
-    # ---------- cancel ----------
-
-    def test_cancel_sets_status_failed_no_archive_move(self):
-        seq = _make_sequence(seq_id='cancel-seq', status='active')
-        seq['status'] = 'failed'
-        seq['audit_log'].append({
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'cancelled', 'actor': 'larry',
-            'reason': 'Larry decided we are going a different direction',
-        })
-        result = bsv.validate_dag(seq)
-        self.assertTrue(result.valid, result.errors)
-        # No `outcome` field, no `cancelled_at` field — schema unchanged.
-        self.assertNotIn('outcome', seq)
-        self.assertNotIn('cancelled_at', seq)
-
-    def test_cancel_without_reason_omits_reason_field(self):
-        seq = _make_sequence(seq_id='cancel-no-reason', status='active')
-        entry = {
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'cancelled', 'actor': 'larry',
-        }
-        seq['status'] = 'failed'
-        seq['audit_log'].append(entry)
-        self.assertNotIn('reason', entry)
-
-    def test_cancel_idempotency_on_already_failed(self):
-        seq = _make_sequence(seq_id='cancel-idem', status='failed')
-        before = json.loads(json.dumps(seq))
-        # WARN no-op: leave the dict identical.
-        self.assertEqual(seq, before)
-
-    # ---------- retry ----------
-
-    def test_retry_resets_step_fields_and_removes_from_current_steps(self):
-        seq = _make_sequence(
-            seq_id='retry-seq',
-            status='paused',
-            steps=[
-                _make_step('a', deps=[], status='merged',
-                           merged_at='2026-05-27T01:00:00Z',
-                           pr_url='https://example.com/pr/1'),
-                _make_step('b', deps=['a'], status='failed',
-                           pr_url='https://example.com/pr/2'),
-            ],
-            current_steps=['b'],
-        )
-        # Mutation per the spec/Beacon CLAUDE.md.
-        for step in seq['steps']:
-            if step['step_id'] == 'b':
-                step['status'] = 'pending'
-                step['dispatched_at'] = None
-                step['pr_url'] = None
-                step['current_actor'] = None
-                step['failure_reason'] = None
-                step['merged_at'] = None
-        seq['current_steps'] = [s for s in seq['current_steps'] if s != 'b']
-        seq['audit_log'].append({
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'step-retried', 'step_id': 'b', 'actor': 'larry',
-        })
-        # Sequence must still pass the validator.
-        result = bsv.validate_dag(seq)
-        self.assertTrue(result.valid, result.errors)
-        # Step 'b' is back to pending.
-        b = next(s for s in seq['steps'] if s['step_id'] == 'b')
-        self.assertEqual(b['status'], 'pending')
-        self.assertIsNone(b['pr_url'])
-        # Removed from current_steps.
-        self.assertNotIn('b', seq['current_steps'])
-
-    def test_retry_idempotency_on_already_pending_step(self):
-        """Step already pending → WARN no-op, no duplicate audit_log."""
-        seq = _make_sequence(
-            seq_id='retry-idem',
-            status='paused',
-            steps=[_make_step('a', status='pending')],
-        )
-        before = json.loads(json.dumps(seq))
-        # WARN no-op.
-        self.assertEqual(seq, before)
-
-    # ---------- skip ----------
-
-    def test_skip_sets_step_status_merged_not_skipped(self):
-        """Per spec § 5.4 + preflight Q4: skip marks step as `merged`,
-        NOT `skipped`. `'skipped'` is not in VALID_STEP_STATUS."""
-        seq = _make_sequence(
-            seq_id='skip-seq',
-            status='active',
-            steps=[
-                _make_step('a', deps=[], status='merged'),
-                _make_step('b', deps=['a'], status='failed'),
-            ],
-            current_steps=['b'],
-        )
-        # Apply skip(b, reason="Work done out-of-band via hotfix").
-        now = datetime.now(timezone.utc).isoformat()
-        for step in seq['steps']:
-            if step['step_id'] == 'b':
-                step['status'] = 'merged'
-                step['merged_at'] = now
-        seq['audit_log'].append({
-            'ts': now, 'event': 'step-skipped', 'step_id': 'b',
-            'reason': 'Work done out-of-band via hotfix',
-            'actor': 'larry',
-        })
-        # Validator passes — `merged` is a valid step status.
-        result = bsv.validate_dag(seq)
-        self.assertTrue(result.valid, result.errors)
-        # `skipped` is NOT a valid step status per the schema enum.
-        self.assertNotIn('skipped', bsv.VALID_STEP_STATUS)
-
-    def test_skip_without_reason_omits_reason_field(self):
-        """If Larry doesn't provide reason text after the comma, the
-        audit_log entry omits the `reason` key entirely (no empty string)."""
-        entry = {
-            'ts': datetime.now(timezone.utc).isoformat(),
-            'event': 'step-skipped', 'step_id': 'b', 'actor': 'larry',
-        }
-        # No `reason` key when Larry didn't provide one.
-        self.assertNotIn('reason', entry)
-
-    def test_skip_idempotency_on_already_merged_step(self):
-        """Step already merged → WARN no-op, no duplicate audit_log."""
-        seq = _make_sequence(
-            seq_id='skip-idem',
-            status='active',
-            steps=[
-                _make_step('a', status='merged',
-                           merged_at='2026-05-27T01:00:00Z'),
-            ],
-        )
-        before = json.loads(json.dumps(seq))
-        # WARN no-op.
-        self.assertEqual(seq, before)
-
-    # ---------- schema invariant ----------
-
-    def test_no_invented_fields_after_any_shortcut(self):
-        """Across every shortcut mutation, the locked PR-S2 schema must
-        hold: top-level fields stay within REQUIRED_SEQ_FIELDS, status
-        within VALID_SEQUENCE_STATUS, step status within VALID_STEP_STATUS.
-        This is the load-bearing guarantee — zero schema drift in PR-S4."""
-        for status in ('pending', 'active', 'paused', 'complete',
-                       'failed', 'archived'):
-            seq = _make_sequence(seq_id=f'invariant-{status}', status=status)
-            self.assertIn(seq['status'], bsv.VALID_SEQUENCE_STATUS)
-            top_level_extra = set(seq.keys()) - set(bsv.REQUIRED_SEQ_FIELDS)
-            self.assertEqual(
-                top_level_extra, set(),
-                f'no invented top-level fields for status={status}',
-            )
-            for step in seq['steps']:
-                self.assertIn(step['status'], bsv.VALID_STEP_STATUS)
+# PR-S4 rectification (L3): the aspirational ShortcutMutationShapes
+# class that USED to live here was removed. It documented expected
+# sequence-file mutation shapes for the 5 non-kickoff shortcuts but
+# never executed the mutations (no helper functions existed). With
+# `scripts/sequence_shortcut_helpers.py` shipped, real behavior tests
+# live in `scripts/tests/test_sequence_shortcut_helpers.py` —
+# happy-path + idempotency + atomic-write + audit_log shape for each
+# of the 5 helpers, against the same PR-S2 validator. See that file.
 
 
 if __name__ == '__main__':

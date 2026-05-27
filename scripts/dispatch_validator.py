@@ -90,7 +90,16 @@ ALLOWED_INTENTS = {
 # phase (review-request task lands in her inbox after Forge opens a PR).
 # `revision` is the Forge revision phase wired in 5b (Mirror's REVIEW_REVISION
 # routes a fresh task back to Forge under --resume).
-ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision'}
+ALLOWED_PHASES = {'preflight', 'build', 'review', 'revision', 'routing-signal'}
+
+# PR-S4 rectification (H2): target_agents whose envelopes are routing
+# signals — short prompts like `kickoff <seq-id>` or
+# `review-sequence-dag <seq-id>` — bypass MIN_PROMPT_LEN because the
+# semantic surface is the seq-id, not the prose. The kickoff handler in
+# outbox_notifier parses the prompt directly; min-length validation
+# blanket-rejected these envelopes (~25-30 char prompts) and broke the
+# orchestrator-bootstrap dispatch chain.
+ROUTING_SIGNAL_TARGET_AGENTS = {'build_sequence_advancer'}
 
 MIN_PROMPT_LEN = 100  # chars
 MAX_PROMPT_LEN = 50000
@@ -108,7 +117,16 @@ def validate_task(task):
     if not isinstance(prompt, str):
         return False, 'prompt field missing or not a string'
     prompt = prompt.strip()
-    if len(prompt) < MIN_PROMPT_LEN:
+    # Routing-signal exemption (H2): short canonical prompts addressed to
+    # routing-signal target agents OR carrying phase='routing-signal' skip
+    # the min-length check. Either condition is sufficient.
+    target_agent = task.get('target_agent')
+    phase = task.get('phase')
+    is_routing_signal = (
+        target_agent in ROUTING_SIGNAL_TARGET_AGENTS
+        or phase == 'routing-signal'
+    )
+    if not is_routing_signal and len(prompt) < MIN_PROMPT_LEN:
         return False, f'prompt too short ({len(prompt)} chars, min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug'
     if len(prompt) > MAX_PROMPT_LEN:
         return False, f'prompt too long ({len(prompt)} chars, max {MAX_PROMPT_LEN})'

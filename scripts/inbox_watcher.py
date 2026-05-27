@@ -357,6 +357,15 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
                            'previous_findings',
                            'replan_count', 'max_replans',
                            'mirror_escalate_reason',
+                           # PR-S4 rectification (H1+M4): propagate the
+                           # inbound task `prompt` so outbox_notifier can
+                           # discriminate Mirror DAG-preflight sessions
+                           # (prompt starts with `review-sequence-dag`)
+                           # from regular PR reviews. Without this, the
+                           # M4 short-circuit on `_classify_mirror_marker`
+                           # and the H1 DAG-result handler have no signal
+                           # to gate on.
+                           'prompt',
                            # task-25 (2026-05-20) — Forge's preflight session
                            # ID, threaded through Beacon's clarification
                            # round-trip so the clarification-response leg

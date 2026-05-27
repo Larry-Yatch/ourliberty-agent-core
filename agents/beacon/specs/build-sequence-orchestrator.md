@@ -165,10 +165,10 @@ Three failure modes are recognized:
 
 **Larry's recovery options (via Beacon shortcuts):**
 
-- `resume <seq-id>` — unpause; advancer re-evaluates current step state. Used when the failure was transient (e.g., a retry succeeded out-of-band).
-- `cancel <seq-id>` — set sequence status to `failed`, log reason, stop advancing. Any in-flight PRs continue but new steps will not dispatch.
-- `retry <seq-id> <step-id>` — re-dispatch a specific failed step (creates a new PR). Used when the failure was a fixable spec issue that Larry has already addressed.
-- `skip <seq-id> <step-id>` — mark a step as `merged` without an actual PR (use sparingly; used when the step's work was done out-of-band). Logs a `skip` event in audit_log.
+- `resume sequence <seq-id>` — unpause; advancer re-evaluates current step state. Used when the failure was transient (e.g., a retry succeeded out-of-band).
+- `cancel sequence <seq-id>` — set sequence status to `failed`, log reason, stop advancing. Any in-flight PRs continue but new steps will not dispatch.
+- `retry sequence <seq-id> step <step-id>` — re-dispatch a specific failed step (creates a new PR). Used when the failure was a fixable spec issue that Larry has already addressed.
+- `skip sequence <seq-id> step <step-id>` — mark a step as `merged` without an actual PR (use sparingly; used when the step's work was done out-of-band). Logs a `step-skipped` event in audit_log.
 
 ### 5.5 Beacon CLAUDE.md additions
 

@@ -354,6 +354,39 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(proc.returncode, 1)
         self.assertIn('not a file', proc.stderr)
 
+    def test_cli_validate_subcommand_resolves_blackboard_path(self):
+        """PR-S4 rectification (H5): `validate <seq-id>` expands to
+        `<blackboard>/<seq-id>.json` automatically. The blackboard root
+        is controlled by OURLIBERTY_AGENTS_ROOT so the subprocess writes
+        only to tmpdir."""
+        agents_root = self.tmpdir / 'agents'
+        bdir = agents_root / 'blackboard' / 'build-sequences'
+        bdir.mkdir(parents=True)
+        (bdir / 'sub-test-001.json').write_text(
+            json.dumps(_valid_sequence(seq_id='sub-test-001')),
+        )
+        env = {**os.environ, 'OURLIBERTY_AGENTS_ROOT': str(agents_root)}
+        proc = subprocess.run(
+            [sys.executable, str(self.script), 'validate', 'sub-test-001'],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK', proc.stdout)
+
+    def test_cli_validate_subcommand_unknown_seq_id_exits_one(self):
+        """`validate <seq-id>` on a seq-id with no corresponding file
+        exits 1 with `not a file` on stderr."""
+        agents_root = self.tmpdir / 'agents'
+        bdir = agents_root / 'blackboard' / 'build-sequences'
+        bdir.mkdir(parents=True)
+        env = {**os.environ, 'OURLIBERTY_AGENTS_ROOT': str(agents_root)}
+        proc = subprocess.run(
+            [sys.executable, str(self.script), 'validate', 'nope'],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn('not a file', proc.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()
