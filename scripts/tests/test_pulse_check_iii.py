@@ -91,6 +91,10 @@ class TestCurrentThresholdLookup(unittest.TestCase):
             'feature-development': 2100,
             '_default': 1500,
         },
+        'forge_overrides_seconds': {
+            '_default': 900,
+            'feature-development': 1800,
+        },
     }
 
     def test_mirror_specific(self):
@@ -107,10 +111,32 @@ class TestCurrentThresholdLookup(unittest.TestCase):
             1500,
         )
 
-    def test_non_mirror_falls_back_to_default(self):
+    def test_forge_specific(self):
         self.assertEqual(
             p3.current_threshold_for_bucket(
                 self.CONFIG, 'forge', 'feature-development'),
+            1800,
+        )
+
+    def test_forge_default_override(self):
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                self.CONFIG, 'forge', 'unknown-task-type'),
+            900,
+        )
+
+    def test_non_mirror_non_forge_falls_back_to_default(self):
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                self.CONFIG, 'pulse', 'feature-development'),
+            900,
+        )
+
+    def test_forge_without_override_block_falls_back_to_default(self):
+        config = {'session_duration_seconds_default': 900}
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                config, 'forge', 'feature-development'),
             900,
         )
 
@@ -304,6 +330,93 @@ class TestRunCheckSyntheticFixture(unittest.TestCase):
             self.assertIn('proposed_threshold_sec', prop)
             self.assertIn('sample_size', prop)
             self.assertIn('rationale', prop)
+
+
+class TestForgeBranch(unittest.TestCase):
+    """End-to-end Forge-bucket Check III behavior (Round E 2026-05-27).
+
+    Mirrors the Mirror-branch formula exactly: raw p90, no margin, no
+    rounding, sample-size floor of 10. The only Forge-specific surface
+    is the `forge_overrides_seconds[task_type]` lookup added to
+    current_threshold_for_bucket.
+    """
+
+    FORGE_CONFIG = {
+        'session_duration_seconds_default': 900,
+        'mirror_review_overrides_seconds': {
+            'feature-development': 2100,
+            'doc-only': 900,
+            '_default': 1500,
+        },
+        'forge_overrides_seconds': {
+            '_default': 900,
+            'feature-development': 1800,
+        },
+    }
+
+    def _mk(self, agent, task_type, dur):
+        return p3.SessionDuration(
+            agent=agent, task_type=task_type, duration_sec=dur,
+            ts='2026-05-15T00:00:00+00:00',
+        )
+
+    def _buckets(self, artifact):
+        return {p['bucket']: p for p in artifact['proposals']}
+
+    def test_a_forge_within_headroom_no_proposal(self):
+        # 30 Forge feature-development events at 1800s — p90 == current.
+        durations = [self._mk('forge', 'feature-development', 1800)
+                     for _ in range(30)]
+        artifact = p3.run_check(
+            durations=durations, config=self.FORGE_CONFIG)
+        buckets = self._buckets(artifact)
+        # No-change skip per run_check: proposed == current → not emitted.
+        self.assertNotIn('(forge, feature-development)', buckets)
+
+    def test_b_forge_p90_exceeds_threshold_proposal_emitted(self):
+        # 30 Forge feature-development events at 2400s — p90 = 2400 > 1800.
+        durations = [self._mk('forge', 'feature-development', 2400)
+                     for _ in range(30)]
+        artifact = p3.run_check(
+            durations=durations, config=self.FORGE_CONFIG)
+        buckets = self._buckets(artifact)
+        self.assertIn('(forge, feature-development)', buckets)
+        prop = buckets['(forge, feature-development)']
+        self.assertEqual(prop['agent'], 'forge')
+        self.assertEqual(prop['task_type'], 'feature-development')
+        self.assertEqual(prop['current_threshold_sec'], 1800)
+        self.assertEqual(prop['proposed_threshold_sec'], 2400)
+        self.assertEqual(prop['sample_size'], 30)
+        # delta_ratio ≈ 0.33 → below 50% bound → not high-attention.
+        self.assertFalse(prop['high_attention'])
+        self.assertIn('loosen', prop['rationale'])
+
+    def test_c_forge_insufficient_samples_skipped(self):
+        # 3 events — below SAMPLE_SIZE_FLOOR (10) → propose_threshold None.
+        durations = [self._mk('forge', 'bug-investigation', 3000)
+                     for _ in range(3)]
+        artifact = p3.run_check(
+            durations=durations, config=self.FORGE_CONFIG)
+        buckets = self._buckets(artifact)
+        self.assertNotIn('(forge, bug-investigation)', buckets)
+
+    def test_d_mixed_mirror_forge_independence(self):
+        # 30 Forge feature-development at 2400s (current=1800 → propose 2400).
+        # 30 Mirror feature-development at 2100s (current=2100 → no-change skip).
+        durations = (
+            [self._mk('forge', 'feature-development', 2400) for _ in range(30)]
+            + [self._mk('mirror', 'feature-development', 2100)
+               for _ in range(30)]
+        )
+        artifact = p3.run_check(
+            durations=durations, config=self.FORGE_CONFIG)
+        buckets = self._buckets(artifact)
+        self.assertIn('(forge, feature-development)', buckets)
+        self.assertNotIn('(mirror, feature-development)', buckets)
+        # Sanity: Forge proposal stays tagged forge, doesn't drift to mirror.
+        forge_prop = buckets['(forge, feature-development)']
+        self.assertEqual(forge_prop['agent'], 'forge')
+        self.assertEqual(forge_prop['current_threshold_sec'], 1800)
 
 
 class TestFormatDigest(unittest.TestCase):
