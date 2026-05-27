@@ -54,6 +54,7 @@ from task_type_inference import infer_task_type
 from typing import Any, Optional
 
 import safe_write_inbox  # noqa: E402 — sys.path adjusted above
+from fixture_patterns import is_fixture_task_id  # noqa: E402
 
 # --- constants ---
 
@@ -284,6 +285,11 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
             # Inherited exclusion: notify-* underlying base is workflow noise.
             if infer_task_type(base) == "notification":
                 continue
+            # Fixture-pattern allowlist (2026-05-27): test artifacts must not
+            # contaminate self-optimizing Check signal. See
+            # scripts/fixture_patterns.py for rationale.
+            if is_fixture_task_id(base):
+                continue
             key = (agent_dir.name, base)
             counts[key] = counts.get(key, 0) + 1
     repeats = [
@@ -329,10 +335,13 @@ def synthesize_proposals(
         })
 
     # σ anomalies above the escalate threshold get their own proposal slot.
+    # Fixture-pattern allowlist (2026-05-27): drop test-artifact task_ids so a
+    # leaked fixture σ outlier can't trigger a hallucinated proposal.
     sigma_hits = [
         a for a in (sidecar.get("anomalies") or [])
         if isinstance(a, dict)
         and a.get("task_id") != "_ramp_up_notice"
+        and not is_fixture_task_id(a.get("task_id"))
         and float(a.get("sigma_above", 0.0) or 0.0)
         >= SIGMA_ANOMALY_ESCALATE_THRESHOLD
     ]
@@ -729,9 +738,14 @@ def assemble_check_i(
     total_usd = float(sidecar.get("total_usd", 0.0) or 0.0)
     delta = sidecar.get("delta_vs_prior_week")
     raw_anoms = sidecar.get("anomalies") or []
+    # Fixture-pattern allowlist (2026-05-27): the headline count + the
+    # sigma_anomalies list both feed has_signal and the journal block; a
+    # fixture leak in either would falsely flag the cycle as actionable.
     real_anoms = [
         a for a in raw_anoms
-        if isinstance(a, dict) and a.get("task_id") != "_ramp_up_notice"
+        if isinstance(a, dict)
+        and a.get("task_id") != "_ramp_up_notice"
+        and not is_fixture_task_id(a.get("task_id"))
     ]
     retry_overhead = sidecar.get("retry_overhead", {}) or {}
     overhead_pct = float(retry_overhead.get("percent_of_total", 0.0) or 0.0)

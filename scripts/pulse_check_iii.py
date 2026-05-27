@@ -61,6 +61,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from fixture_patterns import is_fixture_task_id  # noqa: E402
+
 
 def log(msg: str, level: str = 'INFO') -> None:
     ts = datetime.now(timezone.utc).isoformat()
@@ -79,11 +81,17 @@ def log(msg: str, level: str = 'INFO') -> None:
 
 @dataclass
 class SessionDuration:
-    """One observed session duration tied to an (agent, task_type) bucket."""
+    """One observed session duration tied to an (agent, task_type) bucket.
+
+    `task_id` is optional for back-compat with existing fixture files but
+    is populated by the Supabase fetch path so the fixture-pattern filter
+    in run_check can drop test artifacts before bucketing.
+    """
     agent: str
     task_type: str
     duration_sec: float
     ts: str
+    task_id: str = ''
 
 
 @dataclass
@@ -446,6 +454,7 @@ def fetch_durations_from_supabase(
         out.append(SessionDuration(
             agent=agent, task_type=task_type,
             duration_sec=duration, ts=start_row['ts'],
+            task_id=tid,
         ))
     return out
 
@@ -517,6 +526,13 @@ def run_check(
     durations = durations or []
     apply_history = apply_history or {}
     false_positive_counts = false_positive_counts or {}
+
+    # Fixture-pattern allowlist (2026-05-27): drop test-artifact task_ids
+    # from the data substrate before bucketing so synthetic-noise durations
+    # cannot pull a real (agent, task_type) bucket's p90 around. Durations
+    # whose task_id is empty (legacy fixtures, --fixture CLI files without
+    # the field) pass through — only positive matches are filtered.
+    durations = [d for d in durations if not is_fixture_task_id(d.task_id)]
 
     stats = compute_bucket_stats(durations)
     proposals: list[Proposal] = []

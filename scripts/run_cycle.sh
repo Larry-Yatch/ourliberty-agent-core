@@ -151,6 +151,35 @@ if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
        || ! git diff --quiet --cached -- runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null \
        || git ls-files --others --exclude-standard -- agents/pulse/memory/ runbooks/ | grep -q .; then
         git add runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null || true
+
+        # --- fixture-pattern commit guard (2026-05-27) ---
+        # Defense-in-depth for the /cycle hallucination class: if Pulse's
+        # journal / actions log mentions a fixture-pattern task_id (from
+        # leaked test artifacts she misread as real failures), refuse the
+        # commit and alert. The canonical pattern list lives in
+        # scripts/fixture_patterns.py — the regex below mirrors
+        # SHELL_FIXTURE_REGEX. The token boundary requires a ", `, or = on
+        # the left so we match JSONL ("task_id":"t-fail"), markdown prose
+        # (`t-fail`), and KV-style log lines (task_id=t-fail) without
+        # tripping on incidental prose.
+        FIXTURE_TOKEN_REGEX='["`=](t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|marker-error-opmanual-|task-001([^A-Za-z0-9_-]|$)|headless-001([^A-Za-z0-9_-]|$)|opmanual-d35-5b-shipped-note-001([^A-Za-z0-9_-]|$)|pf-ok([^A-Za-z0-9_-]|$)|bad-pf([^A-Za-z0-9_-]|$)|no-preamble([^A-Za-z0-9_-]|$)|no-chat([^A-Za-z0-9_-]|$))'
+        # NB: every grep here must be -E (or -F) — BRE treats `\+` as the
+        # GNU "one-or-more" operator, so `grep -v "^\+\+\+"` would strip
+        # every `+`-prefixed diff line and silently disable the guard.
+        FIXTURE_DIFF=$(git diff --cached -U0 | grep -E "^\+" | grep -Ev "^\+\+\+" | grep -E "$FIXTURE_TOKEN_REGEX" | head -5 || true)
+        if [ -n "$FIXTURE_DIFF" ]; then
+            log "fixture-guard: staged journal/actions contain fixture-pattern task_id(s); refusing commit"
+            FIXTURE_TAIL=$(echo "$FIXTURE_DIFF" | head -3 | tr '\n' ' | ')
+            git reset -q HEAD -- runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null || true
+            timeout 10 python3 "${HOME}/agent-core/scripts/larry_alerts.py" append_alert \
+                --source pulse-cycle \
+                --severity warning \
+                --subject "cycle-blocked:fixture-pattern-detected" \
+                --message "Pulse cycle attempted to commit journal entries referencing fixture-pattern task_ids (likely fixture-leak hallucination). Excerpts: ${FIXTURE_TAIL}. The allowlist in scripts/fixture_patterns.py + runbooks/cycle-prompt.md should have caught this earlier; investigate Pulse's cycle for the leak source. Recovery: inspect ~/agent-core, remove fixture entries from working tree, re-run cycle." \
+                >/dev/null 2>&1 || true
+            exit 1
+        fi
+
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "Pulse cycle ${TS}" -m "Auto-committed by run_cycle.sh after successful /cycle." 2>>"$LOG_FILE"; then
             log "auto-commit: created commit for cycle ${TS}"
