@@ -395,18 +395,16 @@ def _task_id_from_branch(branch: str) -> Optional[str]:
 # floor avoids matching short common prefixes like `fix-`, `build-`.
 _BRANCH_TRUNCATION_MIN_LEN = 30
 
-# Preflight non-PROCEED markers in archived Forge outbox `result`
-# strings. A task that completed Forge build but emitted one of these
-# markers DID NOT intend to produce a PR — it asked a question
-# (CLARIFY_REQUEST) or refused (REJECT_REQUEST). The lack of a PR is by
-# design, not a stall. Verified 2026-05-26: oauth-orchestrator-
-# promotion-plus-auto-restart's archived outbox carries
-# `result='=== CLARIFY_REQUEST ===\n{...}\n=== END_CLARIFY_REQUEST ==='`
-# — exactly the false-fire pattern this check guards against.
-_PREFLIGHT_NON_PROCEED_MARKERS = (
-    '=== CLARIFY_REQUEST ===',
-    '=== REJECT_REQUEST ===',
-)
+# Preflight non-PROCEED detection lives in `_forge_preflight_non_proceed`.
+# Two-tier read: (1) scan `result` for `=== CLARIFY_REQUEST ===` /
+# `=== REJECT_REQUEST ===` delimiters and return the specific label
+# when present (preserves precise reporting for the oauth-orchestrator-
+# promotion-plus-auto-restart shape); (2) fall back to a generic
+# `PREFLIGHT_EXIT` label when phase=='preflight' AND exit_code==0 AND
+# attempts>=1, which catches the build-sequence-orchestrator-pr-s1
+# shape (2026-05-26) where Forge emits the marker block to its session
+# log but the outbox `result` field is prose narration without the
+# literal delimiter — that was the 185-min false-fire driver.
 
 
 def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
@@ -438,17 +436,33 @@ def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
 
 
 def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
-    """Return the marker string if the archived Forge outbox for `task_id`
-    carries a preflight non-PROCEED outcome (CLARIFY_REQUEST or
-    REJECT_REQUEST), else None.
+    """Classify the archived Forge outbox as a clean preflight non-PROCEED.
+    Returns a short label string if so, else None.
 
     Reads only `<task_id>.json` — the first-attempt outbox, which is the
     canonical preflight decision. Retry variants (`<task_id>.N.json`)
     inherit the original PROCEED/non-PROCEED outcome and are not
-    consulted. Tolerates missing file / unreadable JSON by returning
-    None (the caller will treat a missing archive as 'no preflight
-    skip-signal' and proceed with the normal PR-existence reconciliation
-    + alert decision)."""
+    consulted.
+
+    Return values:
+      * `'CLARIFY_REQUEST'` / `'REJECT_REQUEST'` — the `result` field
+        contains the corresponding marker delimiter (e.g.
+        `=== CLARIFY_REQUEST ===`). Preserves the original precise
+        reporting path.
+      * `'PREFLIGHT_EXIT'` — fallback for a clean preflight exit when
+        the `result` field carries prose narration of the marker
+        outcome rather than the literal delimiters. Triggered iff
+        `phase == 'preflight'`, `exit_code == 0`, and `attempts >= 1`.
+        Production shape: Forge emits the marker block to its session
+        log, but the outbox-archive `result` field is the model's
+        prose summary — so the delimiter scan misses. Verified
+        2026-05-26 against the build-sequence-orchestrator-pr-s1
+        archive, which was the 185-min false-fire case that drove
+        this fallback.
+      * `None` — archive missing, unreadable JSON, or not a
+        recognized clean preflight outcome. Caller treats this as
+        'no preflight skip-signal' and proceeds with the normal
+        PR-existence reconciliation + alert decision."""
     archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
     if not archive.exists():
         return None
@@ -458,11 +472,18 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
     except (OSError, json.JSONDecodeError):
         return None
     result = data.get('result')
-    if not isinstance(result, str):
-        return None
-    for marker in _PREFLIGHT_NON_PROCEED_MARKERS:
-        if marker in result:
-            return marker
+    if isinstance(result, str):
+        if '=== CLARIFY_REQUEST ===' in result:
+            return 'CLARIFY_REQUEST'
+        if '=== REJECT_REQUEST ===' in result:
+            return 'REJECT_REQUEST'
+    if (
+        data.get('phase') == 'preflight'
+        and data.get('exit_code') == 0
+        and isinstance(data.get('attempts'), int)
+        and data.get('attempts') >= 1
+    ):
+        return 'PREFLIGHT_EXIT'
     return None
 
 
@@ -478,20 +499,27 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
     this pattern; inbox_watcher.log has hundreds.
 
     Reconciliation before alerting (2026-05-26, fixes false-fire on
-    truncated-branch PRs + preflight CLARIFY/REJECT tasks):
+    truncated-branch PRs + clean-preflight-exit tasks):
       a) `_pr_matches_task` against open + merged PRs across both
          tracked repos. Matches exact branch, truncated branch, or
          title substring.
       b) `_forge_preflight_non_proceed` against the archived outbox.
-         CLARIFY_REQUEST / REJECT_REQUEST mean Forge intentionally did
-         not produce a PR.
+         Returns `'CLARIFY_REQUEST'` / `'REJECT_REQUEST'` when the
+         `result` field carries the marker delimiter, OR
+         `'PREFLIGHT_EXIT'` when the outbox shape is
+         phase=='preflight' AND exit_code==0 AND attempts>=1 but the
+         `result` field is prose narration only (the 2026-05-26
+         build-sequence-orchestrator-pr-s1 false-fire shape — Forge
+         emits the marker to its session log; `result` summarizes it
+         in prose). All three labels mean Forge intentionally did not
+         produce a PR.
     Both reconciliation paths emit an INFO log on skip for forensic
     visibility. Only if BOTH paths miss does this check DM Larry.
 
-    The dispatch that introduced this reconciliation refers to it as
-    'Check 6' in its narration; in the module's own numbering it is
-    Check 1. The log tag uses the descriptive form `FORGE_NO_PR_SKIP`
-    to avoid the off-by-five ambiguity."""
+    Module-internal numbering: this is Check 1 (forge-no-pr). Some
+    earlier dispatch narration referred to the same reconciliation as
+    'Check 6'; that off-by-five is retired. The log tag
+    `FORGE_NO_PR_SKIP` is the canonical forensic identifier."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=FORGE_BUILT_NO_PR_MIN)
     all_prs = open_prs + merged_prs
     alerts: list[dict] = []
@@ -530,12 +558,17 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             )
             seen_tasks.add(task)
             continue
-        # Reconciliation step 2: archived outbox carries a preflight
-        # non-PROCEED marker?
+        # Reconciliation step 2: archived outbox carries a clean
+        # preflight non-PROCEED signal (marker delimiter in result, or
+        # phase=preflight + exit_code=0 + attempts>=1 fallback)?
         preflight_marker = _forge_preflight_non_proceed(task)
         if preflight_marker is not None:
+            if preflight_marker == 'PREFLIGHT_EXIT':
+                reason = 'preflight_exit'
+            else:
+                reason = 'preflight_non_proceed'
             log(
-                f'FORGE_NO_PR_SKIP task={task} reason=preflight_non_proceed '
+                f'FORGE_NO_PR_SKIP task={task} reason={reason} '
                 f'marker={preflight_marker!r} '
                 f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
                 'INFO',
