@@ -265,7 +265,7 @@ The system runs as a collection of systemd-managed services. They survive drople
 | `ourliberty-cycle.timer` → `.service` | `/cycle` Health Check Suite (Pulse on Sonnet) | every 4h |
 | `ourliberty-sync.timer` → `.service` | Pull `origin/main` into `~/agent-core/` | every 1h |
 | `ourliberty-agent-core-health.timer` → `.service` | Working-copy discipline check | every 30m |
-| `ourliberty-watchdog.timer` → `.service` | Broad system health monitor with auto-recovery *(disabled; D2.5 criterion met but the underlying `watchdog.py` still has GM-era service-name hard-coding — pending adapter rewrite, separate from D3 commit 5 per the B option Larry signed off 2026-05-12)* | every 5m |
+| `ourliberty-watchdog.timer` → `.service` | Broad system health monitor with auto-recovery *(disabled; D2.5 criterion met but the underlying `watchdog.py` still has GM-era service-name hard-coding — pending adapter rewrite, separate from D3 commit 5 per the B option Larry signed off 2026-05-12)* | every 5m *(when enabled)* |
 | `ourliberty-heal-*.timer` → `.service` (×7) | Self-healing healers (D2.5) — abandoned-inbox-tasks, blocked-inbox-age, empty-inbox-files, recovery-already-merged, restart-dedup-obsolete, silent-loop-death, zombie-main-workers. | every 5–15 min each |
 | `ourliberty-cleanup-stale-worktrees.timer` → `.service` (D3-4b) | Daily sweep of `~/agent-worktrees/wt-*` (24h grace; skips in-flight). | every 24h |
 | `ourliberty-dispatch-sentinel.timer` → `.service` (D3 commit 5) | Stall detection — flags inbox tasks > 3h old, in-flight tasks past per-model threshold, leases with stale heartbeats. Disk-only alerts to `~/agents/blackboard/sentinel-alerts.jsonl`. Does NOT kill stalled tasks. | every 10m |
