@@ -30,14 +30,18 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
-_ORIGINAL_TOKEN = os.environ.get('DASHBOARD_API_TOKEN')
-os.environ['DASHBOARD_API_TOKEN'] = 'test-token-value'
+# Set DASHBOARD_API_TOKEN at import time via setdefault so the dashboard_api
+# auth dependency resolves it at request time. Sibling test modules
+# (e.g. test_dashboard_api.py) may pop this env var in their own
+# tearDownModule(); _TokenSetMixin re-sets it in setUp() so the fix
+# survives any cross-module teardown ordering under `unittest discover`.
+TOKEN = 'test-token-value'
+os.environ.setdefault('DASHBOARD_API_TOKEN', TOKEN)
 
 import dashboard_api as da  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
-TOKEN = 'test-token-value'
 ALLOWED_ACTOR = 'larry@sealteamleaders.com'
 AUTH = {
     'X-Dashboard-Token': TOKEN,
@@ -46,11 +50,20 @@ AUTH = {
 }
 
 
-def tearDownModule():  # noqa: N802 — unittest API
-    if _ORIGINAL_TOKEN is None:
-        os.environ.pop('DASHBOARD_API_TOKEN', None)
-    else:
-        os.environ['DASHBOARD_API_TOKEN'] = _ORIGINAL_TOKEN
+class _TokenSetMixin:
+    """Re-set DASHBOARD_API_TOKEN in every setUp.
+
+    test_dashboard_api.py's tearDownModule pops the env var unconditionally
+    if its own _ORIGINAL_TOKEN snapshot was None at its import time —
+    which it is under `unittest discover` since this module isn't loaded
+    yet at that point. Re-setting in setUp is the most robust shape: it
+    survives any teardown ordering and any other test module's env
+    mutations. Mirrors test_dashboard_api_system.py's fix verbatim.
+    """
+
+    def setUp(self):  # noqa: D401 — unittest hook
+        os.environ['DASHBOARD_API_TOKEN'] = TOKEN
+        super().setUp()
 
 
 # ---------- supabase stub ----------
@@ -137,10 +150,11 @@ class _Resp:
 
 # ---------- shared test base ----------
 
-class _LarryActionBase(unittest.TestCase):
+class _LarryActionBase(_TokenSetMixin, unittest.TestCase):
     """Sets up an isolated agents-root + injected supabase stub per test."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-larry-'))
         for sub in (
             'inboxes/beacon', 'inboxes/forge',
