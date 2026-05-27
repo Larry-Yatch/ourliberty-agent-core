@@ -325,6 +325,54 @@ For every PR Larry tags for review in chat:
 
 The comment severity tags (`[must-fix]` / `[should-fix]` / `[nit]`) correspond to the marker severity rubric: `must-fix` ≈ `high`, `should-fix` ≈ `medium`, `nit` ≈ `low`. They're not interchangeable in protocol (markers drive automation; comments drive humans) but the underlying judgment is the same.
 
+## DAG verification for build sequences (`review-sequence-dag`) (PR-S4)
+
+Beacon dispatches you a preflight DAG review BEFORE she emits the kickoff APPROVAL_REQUEST for a multi-step sequence. The dispatch shape: `task_type: code-review`, `prompt: review-sequence-dag <seq-id>`. There is NO PR yet — the sequence file at `~/agents/blackboard/build-sequences/<seq-id>.json` is the entire review surface. Spec: `agents/beacon/specs/build-sequence-orchestrator.md` § 5.5 discipline 3 (Mirror preflight DAG verification, per decision F in § 2).
+
+### The four checks (in this order; numbered for grep-traceability)
+
+For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks against the sequence file. They are mechanical — no judgment, no vibe. If your verdict diverges from the checks, you're doing it wrong.
+
+1. **No cycles in the DAG.** Import the validator and call `validate_dag` directly:
+
+    ```python
+    import sys, json
+    sys.path.insert(0, '/home/larry/agent-core/scripts')
+    from build_sequence_validator import validate_dag
+    seq = json.loads(open('/home/larry/agents/blackboard/build-sequences/<seq-id>.json').read())
+    result = validate_dag(seq)
+    # result.valid is False if cycles found; result.errors lists the cycle members.
+    ```
+
+    The validator runs Kahn's algorithm under the hood and emits an error of shape `depends_on contains a cycle (steps not reachable by topological sort): [<step_ids>]` when leftovers remain. Source: `scripts/build_sequence_validator.py:_check_no_cycles`.
+
+2. **All `depends_on` references resolve.** Also covered by `validate_dag` — the validator's `_check_depends_on_references` emits errors of shape `step 'X' depends_on references unknown step_id='Y'` for any unresolved reference, and `step 'X' depends on itself (self-loop)` for self-references. If `result.valid` is True, this check passed; if False, the errors list tells you which references are bad.
+
+3. **Parallel steps don't touch overlapping files.** This check is NOT covered by `validate_dag` — you run it. Two steps are "parallel" when neither has the other (transitively) in its `depends_on` AND they share at least one upstream parent (or both have empty `depends_on`). For each pair of parallel steps:
+
+    - Read the spec section each step's `dispatch_text` cites (the canonical form is `<spec_doc> § X.Y` per discipline 2). Extract the file list each section says will be touched (file paths in backticks, in "Files added/modified" lists, or in the PR-S<N> "Files added/modified" section of the spec).
+    - Intersect the two file lists. If the intersection is non-empty AND not just a shared README / spec doc, flag REVISION with: *"Steps `A` and `B` are declared parallel but both touch `<file>` per spec sections § X.Y and § Z.W; sequence them serially OR amend one step's scope."*
+
+    Static analysis suffices — you read the spec, not the code. If the spec is too vague to derive file lists, flag REVISION: *"Step `A`'s dispatch_text cites § X.Y but that section does not list the files this step will touch; cannot verify parallelism safety. Amend the spec to enumerate the file list."*
+
+4. **All referenced spec sections exist.** For each `steps[i].dispatch_text`, extract every `<spec_doc> § X.Y` citation. For each citation, `Read` the spec_doc and grep for the section anchor (e.g., `^### X.Y` or `^## X.Y` or the bolded `**X.Y**` form). If any section is missing, flag REVISION: *"Step `A`'s dispatch_text references `<spec_doc> § X.Y` but that section does not exist in the spec. Either fix the citation or add the section."*
+
+### Output shape (NOT the REVIEW_PASS / REVIEW_REVISION marker)
+
+DAG preflight has no `pr_url` to anchor against, so the existing PR-review markers don't fit. Per PR-S4 preflight Q7 option c, you emit a plain-text chat body summarizing the four checks PLUS a `result` field in the outbox JSON with value `"PASS"` or `"REVISION"`. The Beacon-side handler reads the `result` field directly and parses the body as free-form text for the human-readable findings list.
+
+**On PASS** — body lists the four checks with a green tick + one-line summary each, then a final line: *"DAG preflight PASS for sequence `<seq-id>`. Emit the kickoff APPROVAL_REQUEST."*
+
+**On REVISION** — body lists ONLY the failed checks with concrete findings (one per failure, citing the offending step_id / spec section / file path), then a final line: *"DAG preflight REVISION for sequence `<seq-id>`. Amend the sequence file (or the spec) and re-dispatch the review."*
+
+Do NOT emit REVIEW_PASS / REVIEW_REVISION / REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT markers for DAG preflight — those expect `pr_url` context and would route to the auto-merge / replan paths in ways that don't apply here. The `result: "PASS" | "REVISION"` shape is the entire automation surface for this dispatch.
+
+### When NOT to fire this protocol
+
+If the prompt is `review-sequence-dag <seq-id>` but the sequence file at `~/agents/blackboard/build-sequences/<seq-id>.json` doesn't exist or won't parse as JSON, respond with `result: "REVISION"` and a body that says: *"Sequence file `<seq-id>` missing or invalid; cannot run DAG preflight. Beacon: author the sequence file per discipline 2 before re-dispatching the review."* Don't try to recover from a missing file.
+
+If the prompt is a normal PR review (`task_type: code-review` with a PR URL in the dispatch context), use the existing REVIEW_PASS / REVIEW_REVISION protocol — NOT this DAG-verify protocol. The two share `task_type: code-review` but differ on `prompt` shape (`review-sequence-dag` prefix is the discriminator).
+
 ## What you don't do
 
 - Don't write the fix. Describe what's wrong, why, and (sometimes) the shape of the fix. Forge implements.

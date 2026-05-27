@@ -4974,6 +4974,271 @@ def _handle_beacon_headless_approval_request(
     return str(dest)
 
 
+_SEQUENCE_KICKOFF_TARGET_AGENT = 'build_sequence_advancer'
+
+
+def _handle_build_sequence_advancer_kickoff(
+    data: dict[str, Any], result_text: str,
+) -> Optional[str]:
+    """Handle a Beacon kickoff APPROVAL_REQUEST for the build sequence advancer.
+
+    PR-S4 (orchestrator workstream finale). Spec:
+    agents/beacon/specs/build-sequence-orchestrator.md § 5.5 discipline 2
+    ("Emit a single APPROVAL_REQUEST with task_id: kickoff-<seq-id>,
+    target_agent: build_sequence_advancer, prompt: kickoff <seq-id>. The
+    bot routes this to the advancer rather than Forge.").
+
+    Routing collision discipline: this handler fires ONLY when the marker
+    payload's `target_agent == 'build_sequence_advancer'`. Markers with
+    target_agent in {forge, mirror, beacon, pulse, None} fall through to
+    `_handle_beacon_headless_approval_request` unchanged. Existing dispatch
+    paths are untouched — the new handler is purely additive and gates on
+    a single string-equality check.
+
+    Scope (per preflight Q6 option a — route-only, NOT inline first-step
+    dispatch): the handler transitions the sequence from `status=pending`
+    to `status=active` and appends a `kickoff-acknowledged` audit_log
+    entry. The next `build_sequence_advancer.tick()` (within 5 min per the
+    systemd timer) discovers the dispatchable step(s) via the existing
+    pending→deps-resolved logic and dispatches them. This keeps step
+    dispatch single-sourced in the advancer per spec § 5.2.
+
+    Idempotency (per preflight Q2 option b — uses existing `status` field,
+    no `applied_kickoff` invention): re-emitting the kickoff marker on a
+    sequence with `status != 'pending'` (i.e., in {active, paused,
+    complete, failed, archived}) is a WARN no-op — no audit_log entry, no
+    sequence-file write, no Larry DM.
+
+    Failure modes:
+      - prompt missing / not `kickoff <seq-id>` → log WARN, return None
+        (fall through; this isn't a sequence kickoff marker even though
+        target_agent matches).
+      - sequence file missing → DM Larry, log WARN, return sentinel so the
+        outbox is archived (we handled it; just unsuccessfully).
+      - sequence file malformed JSON → DM Larry, return sentinel.
+      - schema/DAG validation fails → DM Larry with the validator's first
+        error, return sentinel. (PR-S2's validator is the single source of
+        truth for what's a structurally-valid sequence file.)
+
+    Args:
+        data: the Beacon outbox envelope.
+        result_text: Beacon's result string (carries the APPROVAL_REQUEST
+            marker block).
+
+    Returns:
+        - str(sequence-file path) when the handler took action OR
+          intentionally no-op'd (idempotent re-apply, missing/malformed
+          file with DM fired). Caller archives the outbox and skips
+          default routing.
+        - None when the marker is absent, unparseable, or its target_agent
+          isn't `build_sequence_advancer` — caller falls through to the
+          existing headless-approval handler (which routes to Forge).
+    """
+    if data.get('agent') != 'beacon' or data.get('source') != 'larry':
+        return None
+    if not isinstance(result_text, str) or not result_text:
+        return None
+
+    try:
+        payload, _narrative = approval.extract_approval_request(result_text)
+    except approval.MalformedApprovalMarker:
+        # Headless-approval handler will log its own diagnostic on the
+        # same marker; we silently fall through.
+        return None
+    if payload is None:
+        return None
+    if payload.get('target_agent') != _SEQUENCE_KICKOFF_TARGET_AGENT:
+        return None
+
+    task_id = data.get('task_id') or payload.get('task_id') or 'unknown'
+
+    # Extract seq_id from the marker's prompt field. Per spec § 5.5
+    # discipline 2 the canonical wording is `kickoff <seq-id>`. We also
+    # accept the marker's `task_id` of shape `kickoff-<seq-id>` as a
+    # fallback so a Beacon session that puts the seq_id in either place
+    # still routes correctly.
+    seq_id: Optional[str] = None
+    prompt_text = payload.get('prompt')
+    if isinstance(prompt_text, str):
+        m = re.match(r'^\s*kickoff\s+([A-Za-z0-9._-]+)\s*$', prompt_text)
+        if m:
+            seq_id = m.group(1)
+    if not seq_id:
+        marker_task_id = payload.get('task_id')
+        if isinstance(marker_task_id, str) and marker_task_id.startswith('kickoff-'):
+            seq_id = marker_task_id[len('kickoff-'):].strip() or None
+    if not seq_id:
+        log(
+            f'sequence-kickoff marker on task {task_id} has no parseable '
+            f'seq_id (prompt={prompt_text!r}); skipping',
+            'WARN',
+        )
+        # Treat as handled — the marker explicitly addressed the advancer,
+        # so falling through to Forge would be wrong. Archive without
+        # writing.
+        return f'sequence-kickoff:no-seq-id:{task_id}'
+
+    seq_path = AGENTS_ROOT / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+    if not seq_path.is_file():
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: sequence file missing at '
+            f'{seq_path}. Author the sequence file (Beacon discipline 2) '
+            f'before re-dispatching the kickoff.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED file-missing '
+            f'task={task_id}',
+            'WARN',
+        )
+        return f'sequence-kickoff:missing:{seq_id}'
+
+    try:
+        raw_text = seq_path.read_text()
+    except OSError as e:
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: cannot read sequence file '
+            f'at {seq_path} ({e}). Investigate filesystem/permissions.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED read-error '
+            f'task={task_id}: {e}',
+            'WARN',
+        )
+        return f'sequence-kickoff:read-error:{seq_id}'
+
+    try:
+        seq = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: sequence file is not valid '
+            f'JSON ({e}). Fix the file before re-dispatching the kickoff.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED invalid-json '
+            f'task={task_id}: {e}',
+            'WARN',
+        )
+        return f'sequence-kickoff:invalid-json:{seq_id}'
+
+    # Lazy import: keeps build_sequence_validator out of the notifier's
+    # import-time graph for environments that don't have it on sys.path
+    # (e.g., minimal test fixtures that exercise unrelated handlers).
+    try:
+        from scripts import build_sequence_validator as bsv  # type: ignore  # noqa: E402
+    except ImportError:
+        try:
+            import build_sequence_validator as bsv  # type: ignore  # noqa: E402
+        except ImportError as e:
+            log(
+                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED validator-import '
+                f'task={task_id}: {e}',
+                'WARN',
+            )
+            return f'sequence-kickoff:no-validator:{seq_id}'
+
+    result = bsv.validate_dag(seq)
+    if not result.valid:
+        first_err = result.errors[0] if result.errors else 'unspecified validator error'
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: schema/DAG validation '
+            f'failed ({first_err}). Run '
+            f'`python3 scripts/build_sequence_validator.py '
+            f'~/agents/blackboard/build-sequences/{seq_id}.json` to see all '
+            f'errors, then re-dispatch the kickoff.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED validation '
+            f'task={task_id}: {first_err}',
+            'WARN',
+        )
+        return f'sequence-kickoff:invalid:{seq_id}'
+
+    current_status = seq.get('status')
+    if current_status != 'pending':
+        # Idempotent no-op per preflight Q2 option b. Re-emitting kickoff
+        # on a sequence that's already past pending must NOT duplicate
+        # audit_log entries or trigger a second daemon-side dispatch.
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} WARN already-kicked-off '
+            f'status={current_status} task={task_id}; no-op',
+            'WARN',
+        )
+        return f'sequence-kickoff:already-active:{seq_id}'
+
+    # Transition pending → active and append audit_log entry. Use the
+    # advancer's atomic-write convention (tmp + os.replace via stdlib).
+    audit_entry = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'event': 'kickoff-acknowledged',
+        'actor': 'advancer',
+        'task_id': task_id,
+    }
+    seq['status'] = 'active'
+    if not isinstance(seq.get('audit_log'), list):
+        # Validator guarantees this is a list, but defend against schema
+        # drift in case a future validator change relaxes the rule.
+        seq['audit_log'] = []
+    seq['audit_log'].append(audit_entry)
+
+    tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
+    try:
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(seq, f, indent=2)
+            f.write('\n')
+        os.replace(tmp_path, seq_path)
+    except OSError as e:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: cannot write sequence file '
+            f'at {seq_path} ({e}). Investigate filesystem/permissions.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED write-error '
+            f'task={task_id}: {e}',
+            'WARN',
+        )
+        return f'sequence-kickoff:write-error:{seq_id}'
+
+    log(
+        f'BUILD_SEQUENCE_KICKOFF seq={seq_id} status=pending->active '
+        f'task={task_id} (next advancer tick will dispatch the first step)'
+    )
+    return str(seq_path)
+
+
 def _handle_beacon_clarification_response(
     data: dict[str, Any],
 ) -> Optional[str]:
@@ -5310,6 +5575,20 @@ def process_outbox(outbox_file: Path) -> str:
     # BEFORE marker classification so Beacon's non-Forge-marker result text
     # doesn't fall through to default notify-to-self routing.
     if agent == 'beacon' and source == 'larry':
+        # PR-S4 (orchestrator workstream) — multi-step build sequence
+        # kickoff. Fires BEFORE the headless-approval-request handler
+        # because the kickoff marker targets the build_sequence_advancer
+        # daemon (status transition only), not Forge. Routing is keyed on
+        # `payload.target_agent == 'build_sequence_advancer'`; markers with
+        # any other target_agent (including the default `forge`) return
+        # None here and fall through unchanged.
+        kickoff_dispatched = _handle_build_sequence_advancer_kickoff(
+            data, data.get('result', '') or '',
+        )
+        if kickoff_dispatched is not None:
+            _archive_outbox(outbox_file)
+            return 'sequence-kickoff-handled'
+
         dispatched = _handle_beacon_headless_approval_request(
             data, data.get('result', '') or '',
         )

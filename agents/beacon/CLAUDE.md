@@ -346,6 +346,79 @@ These shortcuts land in `agents/beacon/CLAUDE.md` as a dedicated section in PR-S
 - Does each step's `dispatch_text` fit ≤500 chars and reference a spec section by anchor? If no, trim and re-anchor.
 - For each step's `depends_on`: is the dependency real (the step truly cannot start until the dep merges), or is it an over-conservative ordering Beacon added "just in case"? Over-conservative deps serialize work that could parallelize — prefer empty `depends_on` for steps that genuinely share no upstream state.
 
+## Multi-step build sequence shortcuts (PR-S4)
+
+Six Telegram shortcuts let Larry steer an in-flight or completed sequence without writing the sequence file by hand. You recognize the canonical wording (case-insensitive on the verb; exact match on `<seq-id>` and `<step-id>`), apply the change to the sequence file at `~/agents/blackboard/build-sequences/<seq-id>.json`, and confirm to Larry in chat. All sequence-file writes use the tmp-then-rename atomicity discipline from PR-S2. The shortcuts compose with — they do not replace — the `## How you author multi-step build sequences` discipline above; that section covers AUTHORING, this one covers RUNTIME control.
+
+**Schema discipline (non-negotiable).** Every shortcut mutates the existing PR-S2 schema fields (`status` enum, `current_steps`, `steps[].status`, `audit_log`) — NEVER invents new fields. PR-S4 was authored against PR-S2's locked `build_sequence_validator.py` (REQUIRED_SEQ_FIELDS + VALID_SEQUENCE_STATUS + VALID_STEP_STATUS) and ZERO new fields are introduced. If a future shortcut needs new state, amend the spec + validator FIRST in a separate PR, then add the shortcut.
+
+**Cross-reference:** spec `agents/beacon/specs/build-sequence-orchestrator.md` § 5.4 (failure handling + recovery shortcuts) and § 5.5 (the six shortcuts as designed). Runbook: `runbooks/build-sequence-shortcuts.md`. Ladder UI: `dashboard.ourliberty.dev/operations/build-sequences` (PR-S3b).
+
+### 1. `approve sequence <seq-id>`
+
+Confirms kickoff after Mirror's DAG preflight returns PASS. The sequence file has already been authored by you (per discipline 2 above) with `status: "pending"`. On `approve sequence X`:
+
+1. Read `~/agents/blackboard/build-sequences/X.json`. If the file doesn't exist, WARN to Larry: *"No such sequence `X` — list active sequences via the ladder UI at `dashboard.ourliberty.dev/operations/build-sequences`."* Stop.
+2. Idempotency check (per PR-S4 preflight Q2 option b — uses existing `status` field, no `applied_kickoff` invention): if `status != "pending"` (i.e., already in `{active, paused, complete, failed, archived}`), WARN to Larry: *"Sequence `X` is already past kickoff (status=`<status>`); no-op."* Stop. NO audit_log entry, NO marker emit.
+3. Otherwise: emit the kickoff APPROVAL_REQUEST exactly as discipline 2 says — `task_id: "kickoff-X"`, `target_agent: "build_sequence_advancer"`, `prompt: "kickoff X"`. The outbox notifier's `_handle_build_sequence_advancer_kickoff` handler picks it up, transitions `status: pending → active`, appends `{event: "kickoff-acknowledged", actor: "advancer", ts: ...}` to `audit_log`, and the next advancer tick (≤5 min) dispatches the first step.
+
+### 2. `pause sequence <seq-id>`
+
+Larry's manual pause (decision I in spec § 2 — pauses the whole sequence). On `pause sequence X`:
+
+1. Read the sequence file. If missing → WARN as above and stop.
+2. Idempotency check: if `status == "paused"`, WARN: *"Sequence `X` is already paused; no-op."* Stop. NO audit_log entry.
+3. Otherwise: set `status: "paused"`, append `{event: "paused", actor: "larry", ts: ...}` to `audit_log`, atomic write. The advancer's next tick sees `status=paused` and skips the sequence per spec § 5.2.
+
+### 3. `resume sequence <seq-id>`
+
+Inverse of pause. On `resume sequence X`:
+
+1. Read the sequence file. If missing → WARN and stop.
+2. Idempotency check: if `status == "active"`, WARN: *"Sequence `X` is already active; no-op."* Stop.
+3. Otherwise: set `status: "active"`, append `{event: "resumed", actor: "larry", ts: ...}` to `audit_log`, atomic write. The advancer's next tick resumes processing.
+
+### 4. `cancel sequence <seq-id>[: <reason>]`
+
+Terminate the sequence. Per spec § 5.4 verbatim ("set sequence status to `failed`, log reason, stop advancing"). On `cancel sequence X` or `cancel sequence X: <Larry's reason>`:
+
+1. Read the sequence file. If missing → WARN and stop.
+2. Idempotency check: if `status` is already in `{failed, complete, archived}`, WARN: *"Sequence `X` is already terminal (status=`<status>`); no-op."* Stop.
+3. Otherwise: set `status: "failed"`, append `{event: "cancelled", actor: "larry", reason: <Larry's text if present, else omitted>, ts: ...}` to `audit_log`, atomic write.
+
+**NO synchronous move to `.archive/YYYY-MM/`** — the 30-day rotation handles archiving per spec § 5.1. **NO new fields** like `outcome` or `cancelled_at` — the verb + audit_log entry carry the intent.
+
+### 5. `retry sequence <seq-id> step <step-id>`
+
+Re-dispatch a specific failed (or completed-with-issues) step. On `retry sequence X step Y`:
+
+1. Read the sequence file. If missing → WARN and stop. If `step Y` doesn't exist in `steps[]` → WARN: *"Sequence `X` has no step `Y`. Valid step_ids: <list>."* Stop.
+2. Idempotency check: if `step.status == "pending"` already, WARN: *"Step `Y` is already pending in sequence `X`; no-op."* Stop. NO audit_log entry.
+3. Otherwise: reset the step — set `step.status: "pending"`, `step.dispatched_at: null`, `step.pr_url: null`, `step.current_actor: null`, `step.failure_reason: null`, `step.merged_at: null`. If `Y` is in the sequence-level `current_steps` list, remove it. Append `{event: "step-retried", step_id: "Y", actor: "larry", ts: ...}` to `audit_log`. Atomic write.
+4. The advancer's next tick sees the step's deps are still resolved (they merged earlier) and re-dispatches via the existing pending→dispatchable→dispatched path. No special-case logic required in the daemon.
+
+### 6. `skip sequence <seq-id> step <step-id>[, <reason>]`
+
+Mark a step as "done" without an actual PR — use sparingly; typically when the work was done out-of-band (e.g., a hotfix that obsoleted the step). Per spec § 5.4 verbatim ("mark a step as `merged` without an actual PR"). On `skip sequence X step Y` or `skip sequence X step Y, <Larry's reason>`:
+
+1. Read the sequence file. If missing → WARN. If `step Y` doesn't exist → WARN with valid step_ids.
+2. Idempotency check: if `step.status == "merged"` already, WARN: *"Step `Y` in sequence `X` is already merged; no-op."* Stop.
+3. Otherwise: set `step.status: "merged"`, `step.merged_at: <utc>` (so the audit trail has a timestamp). Append `{event: "step-skipped", step_id: "Y", reason: <Larry's text after the comma if present, else omitted>, actor: "larry", ts: ...}` to `audit_log`. Atomic write.
+
+**Step status stays in `VALID_STEP_STATUS`** — `"skipped"` is NOT in the validator's enum and would be rejected. The advancer's dependency resolution treats `"merged"` as the green-light for downstream steps, so resumption works without enum changes.
+
+### Discipline notes
+
+- **Parsing:** case-insensitive matching on the verb (`approve`, `pause`, `resume`, `cancel`, `retry`, `skip`); exact match on `<seq-id>` and `<step-id>` (kebab-case identifiers, no fuzzy match). For shortcuts with optional reason text (`cancel sequence X: <reason>`, `skip sequence X step Y, <reason>`), preserve the reason verbatim in the audit_log entry — don't paraphrase, don't truncate (audit_log entries are intentionally append-only and operator-readable).
+- **Unknown IDs:** non-existent `seq-id` or `step-id` → WARN with a corrective hint pointing Larry at the ladder UI. NEVER guess.
+- **Audit_log invariants:** every state-changing shortcut appends exactly ONE entry. Idempotent no-ops append ZERO entries. Re-running a shortcut after the first apply must NEVER produce a duplicate audit_log entry.
+- **No DM cascade:** the shortcuts mutate the sequence file directly; the advancer's normal transition DMs (per spec § 2 decision B — key-transitions-only) handle the downstream user notifications. Don't fire an extra DM from the shortcut handler itself beyond confirming to Larry in the chat that you've applied his shortcut.
+- **PLAN_SYNTHESIS_DISCIPLINE still applies:** before asserting "sequence X is now paused" in a follow-up status update, refetch the sequence file (the advancer's next tick can race with your write).
+
+### Composition with the existing shortcut family
+
+These six sequence shortcuts compose with the existing Pulse Check III approval shortcuts (`approve threshold-update-<date>` / `reject threshold-update-<date>`). Both follow the same idempotency-via-existing-field pattern: Check III uses the artifact's `applied: true` flag; sequence shortcuts use the sequence's `status` enum value. The shapes are intentionally distinct (sequence shortcuts ALWAYS take a `<seq-id>` arg; threshold-update shortcuts take a date) so parsing is unambiguous. If a future Larry message matches BOTH patterns, the shortcut shape with a `<seq-id>` arg wins (sequence shortcuts are more specific).
+
 ## How you handle Forge's preflight markers (Phase D3 commit 4a)
 
 After a dispatch, Forge runs a **preflight** before any code is written. She ends her run with EXACTLY one of: PROCEED, CLARIFY_REQUEST, or REJECT. These flow back to you via the outbox notifier in four different shapes — each one tells you what to do. **Read the `intent=` tag in the inbox notify header to pick the right shape.**
