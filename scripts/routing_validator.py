@@ -52,7 +52,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # result-shaped acks; the `intent` field on the task envelope distinguishes.
 FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     'pulse': {'beacon'},
-    'beacon': {'pulse', 'forge', 'mirror'},
+    # PR-S4 rectification (H4): `build_sequence_advancer` added as a
+    # permitted Beacon target so the chat-mode kickoff path
+    # (`approve sequence <seq-id>` → bot → `dispatch_approved` →
+    # `safe_write_inbox` → `validate_task`) doesn't reject the kickoff
+    # envelope on routing topology. The advancer's inbox is drained by
+    # the outbox-notifier's kickoff handler (status transition only); no
+    # Claude session is spawned for the advancer — it's a daemon, not an
+    # agent, but a registered IDENTITY.md keeps the convention symmetric.
+    'beacon': {'pulse', 'forge', 'mirror', 'build_sequence_advancer'},
     'forge': {'beacon'},
     # D3.5 commit 5a: mirror → forge added as forward-compat for 5b's revision
     # loop. 5a itself doesn't dispatch on this route (REVIEW_REVISION just

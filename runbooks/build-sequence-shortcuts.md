@@ -32,14 +32,15 @@ What is **not** in the schema (and must not be invented): `paused: bool`, `appli
 
 **Wording:** `approve sequence pulse-upgrade-001` (case-insensitive on the verb, exact match on the seq-id).
 
-**What it writes:** Beacon emits an `APPROVAL_REQUEST` marker with `target_agent: build_sequence_advancer`, `task_id: kickoff-<seq-id>`, `prompt: kickoff <seq-id>`. The outbox notifier's `_handle_build_sequence_advancer_kickoff` handler picks it up, sets `status: pending → active`, and appends `{event: "kickoff-acknowledged", actor: "advancer", ts: <utc>, task_id: <id>}` to `audit_log`. The next advancer tick (≤5 min) discovers the dispatchable step(s) and dispatches them per spec § 5.2.
+**What it writes:** Beacon emits an `APPROVAL_REQUEST` marker with `target_agent: build_sequence_advancer`, `task_id: kickoff-<seq-id>`, `prompt: kickoff <seq-id>`. The outbox notifier's `_handle_build_sequence_advancer_kickoff` handler picks it up, sets `status: pending → active`, and appends `{event: "kickoff-acknowledged", actor: "outbox-notifier", ts: <utc>, task_id: <id>}` to `audit_log`. The next advancer tick (≤5 min) discovers the dispatchable step(s) and dispatches them per spec § 5.2.
 
-**Idempotency:** if `status != "pending"` (sequence already in `{active, paused, complete, failed, archived}`), the kickoff handler logs WARN and exits early — no audit_log entry, no file write, no DM. Re-running `approve sequence X` on an active sequence is safe.
+**Idempotency:** if `status != "pending"` (sequence already in `{active, paused, complete, failed, archived}`), the kickoff handler logs WARN and exits without mutating status, without writing a second `kickoff-acknowledged` event, and without firing a DM. To keep the audit trail honest in the double-tap case, the handler DOES append a `{event: "kickoff-duplicate-suppressed", actor: "outbox-notifier", original_task_id, duplicate_task_id, status_at_suppression, ts}` entry — a different event type from `kickoff-acknowledged`, so the "no duplicate kickoff" invariant still holds. Re-running `approve sequence X` on an active sequence is safe.
 
 **Failure modes:**
 - Sequence file missing at the time of kickoff → handler DMs Larry: *"Sequence `X` kickoff failed: sequence file missing at `<path>`. Author the sequence file (Beacon discipline 2) before re-dispatching the kickoff."* No state change.
 - Sequence file malformed JSON → DM Larry with the JSON error; no state change.
-- Sequence file fails `validate_dag` (cycle, missing depends_on reference, etc.) → DM Larry with the first validator error + a runnable command to see all errors; no state change.
+- Sequence file fails `validate_dag` (cycle, missing depends_on reference, etc.) → DM Larry with marker `task_id`, sequence file path, and the first 3 validator errors + a runnable `python3 scripts/build_sequence_validator.py validate <seq-id>` to see all errors. Also appends one JSON line to `~/agents/blackboard/build-sequences/.kickoff-failures.jsonl` for ops audit trail. No state change.
+- Kickoff marker emitted with no parseable seq_id (e.g., wrong prompt verb) → handler DMs Larry with subject `kickoff-malformed-prompt:<task_id>` so the bad dispatch surfaces immediately. No state change.
 
 ### 2. `pause sequence <seq-id>`
 

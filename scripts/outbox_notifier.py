@@ -1959,6 +1959,24 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     Returns None if the outbox has no marker (Mirror's chat-mode outputs
     take the default routing path).
     """
+    # PR-S4 rectification (M4): defensive gate for Mirror DAG-preflight
+    # sessions. Per `agents/mirror/CLAUDE.md:362-368`, DAG preflight
+    # responses MUST emit only `result: PASS/REVISION` — not the
+    # PR-review REVIEW_* markers — because they have no `pr_url` to
+    # anchor against and would route through auto-merge / replan paths
+    # that don't apply. If Mirror accidentally emits a stray REVIEW_PASS
+    # / REVIEW_REVISION marker in her DAG-preflight session log (habit
+    # carryover from regular review work), this classifier picks it up
+    # and the auto-merge path fires against a fictional PR. Defense in
+    # depth: short-circuit on the envelope's prompt prefix and let
+    # `_handle_mirror_dag_preflight_result` own the routing decision.
+    envelope_prompt = data.get('prompt', '')
+    if (
+        isinstance(envelope_prompt, str)
+        and envelope_prompt.lstrip().startswith('review-sequence-dag')
+    ):
+        return None
+
     result_text = data.get('result', '')
     if not isinstance(result_text, str):
         result_text = ''
@@ -2121,6 +2139,238 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         # Parallel field to Forge's clarification_count for cascade plumbing.
         'next_clarification_count': None,
     }
+
+
+_DAG_RESULT_VERDICT_RE = re.compile(
+    r'(?im)^\s*[\*\-]?\s*"?result"?\s*[:=]\s*"?(PASS|REVISION)"?',
+)
+_DAG_PROMPT_RE = re.compile(r'^\s*review-sequence-dag\s+(\S+)')
+
+
+def _parse_dag_preflight_verdict(result_text: str) -> Optional[str]:
+    """Scan a Mirror DAG-preflight outbox result body for the verdict.
+
+    Mirror's DAG-preflight protocol (agents/mirror/CLAUDE.md:362-368)
+    requires emitting `result: PASS` or `result: REVISION` in the final
+    chat body — that's the entire automation surface for this dispatch
+    (no REVIEW_* marker, no pr_url). Liberal in what we accept: any
+    line, anywhere in the body, of the shape `result: PASS|REVISION`
+    (case-insensitive, with optional leading bullet/dash/quote). The
+    first match wins.
+
+    Returns 'PASS' or 'REVISION' on match, None on no match (caller
+    treats no-match as malformed → DMs Larry per the H1 contract).
+    """
+    if not isinstance(result_text, str) or not result_text:
+        return None
+    m = _DAG_RESULT_VERDICT_RE.search(result_text)
+    if m is None:
+        return None
+    return m.group(1).upper()
+
+
+def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
+    """PR-S4 rectification (H1) — handle Mirror's DAG-preflight session result.
+
+    The DAG-preflight dispatch is keyed on the envelope prompt
+    `review-sequence-dag <seq-id>`. Mirror's response carries a
+    `result: PASS|REVISION` verdict in the chat body (NOT a REVIEW_*
+    marker, per `agents/mirror/CLAUDE.md:362-368` — those expect
+    pr_url context that doesn't apply to a sequence-file review).
+
+    Routing decision per verdict:
+      * PASS — the sequence's DAG is sound. Transition the sequence
+        file from `status: pending` to `status: active` (same shape as
+        the kickoff handler, atomic write + audit_log entry). The next
+        advancer tick dispatches the first step. No Larry approval gate
+        here: Larry already implicitly approved by chatting Beacon to
+        author the sequence; the DAG-preflight gate IS the approval.
+      * REVISION — DM Larry with the verdict + the human-readable
+        review body (which carries Mirror's reasons) + the sequence
+        file path. Larry reads the reasons, amends the sequence file,
+        and re-dispatches the review.
+      * malformed (no PASS/REVISION verdict parsed) — DM Larry with a
+        `mirror-dag-malformed-result:<seq-id>` alert so the failure is
+        loud, not silent.
+
+    Returns:
+      * str sentinel when the handler claimed the outbox (PASS / REVISION
+        / malformed paths). Caller archives without falling through.
+      * None when the envelope doesn't look like a DAG-preflight
+        response (wrong prompt prefix, missing prompt field). Caller
+        falls through to the existing marker classifier path.
+    """
+    if data.get('agent') != 'mirror':
+        return None
+    envelope_prompt = data.get('prompt', '')
+    if not isinstance(envelope_prompt, str):
+        return None
+    m = _DAG_PROMPT_RE.match(envelope_prompt)
+    if not m:
+        return None
+    seq_id = m.group(1)
+    task_id = data.get('task_id') or f'review-sequence-dag-{seq_id}'
+    result_text = data.get('result', '') or ''
+    verdict = _parse_dag_preflight_verdict(result_text)
+
+    seq_path = AGENTS_ROOT / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+
+    if verdict is None:
+        # Malformed Mirror DAG-preflight response — loud failure.
+        msg = (
+            f'Mirror DAG-preflight result for sequence `{seq_id}` is '
+            f'malformed: no `result: PASS` or `result: REVISION` verdict '
+            f'found in the chat body. Re-dispatch the review (Mirror '
+            f'CLAUDE.md § DAG preflight `result:` shape) or inspect '
+            f'`{seq_path}` directly. Mirror task_id: `{task_id}`.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'mirror-dag-malformed-result:{seq_id}',
+        )
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=MALFORMED '
+            f'task={task_id}; DMed Larry',
+            'WARN',
+        )
+        return f'mirror-dag-preflight:malformed:{seq_id}'
+
+    if verdict == 'REVISION':
+        body_snippet = result_text.strip()
+        if len(body_snippet) > 1500:
+            body_snippet = body_snippet[:1500] + '\n…(truncated)'
+        msg = (
+            f'Mirror DAG-preflight REVISION for sequence `{seq_id}`. '
+            f'Amend the sequence file at `{seq_path}` (or the spec it '
+            f'references) per Mirror\'s findings below, then '
+            f're-dispatch the review.\n\n--- Mirror\'s verdict ---\n'
+            f'{body_snippet}'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'mirror-dag-revision:{seq_id}',
+        )
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
+            f'task={task_id}; DMed Larry',
+        )
+        return f'mirror-dag-preflight:revision:{seq_id}'
+
+    # verdict == 'PASS' — transition the sequence file pending → active.
+    # Shape parallels `_handle_build_sequence_advancer_kickoff`: read,
+    # validate JSON+DAG, idempotency-gate on status, atomic-write, audit.
+    if not seq_path.is_file():
+        msg = (
+            f'Mirror DAG-preflight PASS for sequence `{seq_id}` but the '
+            f'sequence file is missing at `{seq_path}`. Investigate — '
+            f'this should not happen mid-protocol.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'mirror-dag-pass-file-missing:{seq_id}',
+        )
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
+            f'file-missing task={task_id}',
+            'WARN',
+        )
+        return f'mirror-dag-preflight:file-missing:{seq_id}'
+
+    try:
+        raw_text = seq_path.read_text()
+        seq = json.loads(raw_text)
+    except (OSError, json.JSONDecodeError) as e:
+        msg = (
+            f'Mirror DAG-preflight PASS for sequence `{seq_id}` but the '
+            f'sequence file cannot be read/parsed at `{seq_path}` ({e}).'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'mirror-dag-pass-unreadable:{seq_id}',
+        )
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
+            f'read/parse task={task_id}: {e}',
+            'WARN',
+        )
+        return f'mirror-dag-preflight:unreadable:{seq_id}'
+
+    current_status = seq.get('status')
+    if current_status != 'pending':
+        # Idempotent no-op — sequence already moved on. Mirror's PASS
+        # arriving late on a sequence that's already active/complete/
+        # etc. is not an error; just log + archive.
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS WARN '
+            f'already-kicked-off status={current_status} task={task_id}; '
+            f'no-op',
+            'WARN',
+        )
+        return f'mirror-dag-preflight:already-active:{seq_id}'
+
+    seq['status'] = 'active'
+    audit_entry = {
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'event': 'dag-preflight-pass-kickoff',
+        'actor': 'outbox-notifier',
+        'mirror_task_id': task_id,
+    }
+    if not isinstance(seq.get('audit_log'), list):
+        seq['audit_log'] = []
+    seq['audit_log'].append(audit_entry)
+
+    tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
+    try:
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(seq, f, indent=2)
+            f.write('\n')
+        os.replace(tmp_path, seq_path)
+    except OSError as e:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        msg = (
+            f'Mirror DAG-preflight PASS for sequence `{seq_id}` but '
+            f'cannot write the sequence file at `{seq_path}` ({e}).'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'mirror-dag-pass-write-error:{seq_id}',
+        )
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
+            f'write-error task={task_id}: {e}',
+            'WARN',
+        )
+        return f'mirror-dag-preflight:write-error:{seq_id}'
+
+    larry_alerts.append_alert(
+        source='outbox-notifier',
+        severity='warning',
+        message=(
+            f'Mirror DAG-preflight PASS for sequence `{seq_id}`. '
+            f'Sequence transitioned `pending` → `active`; the build '
+            f'sequence advancer will dispatch the first step on its next '
+            f'tick (≤5 min).'
+        ),
+        subject=f'mirror-dag-pass:{seq_id}',
+    )
+    log(
+        f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS status=pending'
+        f'->active task={task_id}',
+    )
+    return f'mirror-dag-preflight:active:{seq_id}'
 
 
 def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
@@ -4876,7 +5126,10 @@ def _handle_beacon_headless_approval_request(
         marker, write failure) so the caller falls through to default
         routing and Beacon's narrative still reaches downstream consumers.
     """
-    if data.get('agent') != 'beacon' or data.get('source') != 'larry':
+    if (
+        data.get('agent') != 'beacon'
+        or data.get('source') not in _BEACON_TRUSTED_DISPATCH_SOURCES
+    ):
         return None
     task_id = data.get('task_id') or 'unknown'
     if not isinstance(result_text, str) or not result_text:
@@ -4976,6 +5229,20 @@ def _handle_beacon_headless_approval_request(
 
 _SEQUENCE_KICKOFF_TARGET_AGENT = 'build_sequence_advancer'
 
+# PR-S4 rectification (H3): sources whose Beacon outboxes are eligible
+# for the headless-approval / kickoff handlers. `larry` covers the
+# original Claude-in-Larry-session dispatch (task #17 from 2026-05-19).
+# `orchestrator` covers the build_sequence_advancer daemon's step
+# envelopes — when the advancer dispatches step N to Beacon's inbox, the
+# envelope carries `source: 'orchestrator'` (see
+# `scripts/build_sequence_advancer.py:468,490`), and Beacon's response
+# must route through the same headless-approval translation to reach
+# Forge. Without `orchestrator` in this set, advancer-dispatched steps
+# silently archive as dead-end notifies and the orchestrator chain
+# stalls — the empirical failure observed running
+# `orchestrator-bootstrap-001` on 2026-05-27.
+_BEACON_TRUSTED_DISPATCH_SOURCES = frozenset({'larry', 'orchestrator'})
+
 
 def _handle_build_sequence_advancer_kickoff(
     data: dict[str, Any], result_text: str,
@@ -5034,7 +5301,10 @@ def _handle_build_sequence_advancer_kickoff(
           isn't `build_sequence_advancer` — caller falls through to the
           existing headless-approval handler (which routes to Forge).
     """
-    if data.get('agent') != 'beacon' or data.get('source') != 'larry':
+    if (
+        data.get('agent') != 'beacon'
+        or data.get('source') not in _BEACON_TRUSTED_DISPATCH_SOURCES
+    ):
         return None
     if not isinstance(result_text, str) or not result_text:
         return None
@@ -5072,6 +5342,24 @@ def _handle_build_sequence_advancer_kickoff(
             f'sequence-kickoff marker on task {task_id} has no parseable '
             f'seq_id (prompt={prompt_text!r}); skipping',
             'WARN',
+        )
+        # PR-S4 rectification (L5): loud failure beats silent. If Beacon
+        # mis-emits the kickoff marker (e.g., `prompt: "approve <id>"`
+        # instead of `kickoff <id>`), the handler used to archive
+        # silently and the sequence stayed `pending` forever. DM Larry
+        # so the malformed dispatch surfaces immediately.
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=(
+                f'Build-sequence kickoff marker on task `{task_id}` has '
+                f'no parseable seq_id (prompt={prompt_text!r}). Beacon '
+                f'likely emitted the marker with the wrong prompt shape; '
+                f'expected `kickoff <seq-id>`. Sequence remains in its '
+                f'prior status; re-dispatch the kickoff with the correct '
+                f'prompt.'
+            ),
+            subject=f'kickoff-malformed-prompt:{task_id}',
         )
         # Treat as handled — the marker explicitly addressed the advancer,
         # so falling through to Forge would be wrong. Archive without
@@ -5156,13 +5444,24 @@ def _handle_build_sequence_advancer_kickoff(
 
     result = bsv.validate_dag(seq)
     if not result.valid:
-        first_err = result.errors[0] if result.errors else 'unspecified validator error'
+        # PR-S4 rectification (M2): enrich the alert and append a
+        # side-channel ops audit trail so the failure mode is fully
+        # reconstructable. The original alert dropped only the first
+        # error — that's load-bearing detail when validation rejected
+        # for multiple reasons.
+        errs = list(result.errors or [])
+        marker_task_id = payload.get('task_id')
+        first_three = errs[:3]
+        more = max(0, len(errs) - 3)
+        more_suffix = f' (+{more} more)' if more else ''
+        formatted = '\n'.join(f'  - {e}' for e in first_three) if first_three else '  - unspecified validator error'
         msg = (
             f'Sequence `{seq_id}` kickoff failed: schema/DAG validation '
-            f'failed ({first_err}). Run '
-            f'`python3 scripts/build_sequence_validator.py '
-            f'~/agents/blackboard/build-sequences/{seq_id}.json` to see all '
-            f'errors, then re-dispatch the kickoff.'
+            f'failed. Marker task_id: `{marker_task_id}`. Sequence file: '
+            f'`{seq_path}`.\n\nFirst validator errors{more_suffix}:\n'
+            f'{formatted}\n\nRun `python3 scripts/build_sequence_validator.py '
+            f'validate {seq_id}` to see all errors, then re-dispatch the '
+            f'kickoff.'
         )
         larry_alerts.append_alert(
             source='outbox-notifier',
@@ -5170,31 +5469,109 @@ def _handle_build_sequence_advancer_kickoff(
             message=msg,
             subject=f'sequence-kickoff-{seq_id}',
         )
+        # Side-channel ops audit trail. Append-only; one JSON line per
+        # rejected kickoff. Survives Larry-DM history rotation.
+        try:
+            failures_path = (
+                AGENTS_ROOT / 'blackboard' / 'build-sequences'
+                / '.kickoff-failures.jsonl'
+            )
+            failures_path.parent.mkdir(parents=True, exist_ok=True)
+            with failures_path.open('a', encoding='utf-8') as fail_f:
+                fail_f.write(json.dumps({
+                    'ts': datetime.now(timezone.utc).isoformat(),
+                    'seq_id': seq_id,
+                    'task_id': task_id,
+                    'marker_task_id': marker_task_id,
+                    'sequence_path': str(seq_path),
+                    'errors': errs,
+                }) + '\n')
+        except OSError as e:
+            log(
+                f'kickoff-failures.jsonl append failed for seq={seq_id} '
+                f'task={task_id}: {e}',
+                'WARN',
+            )
         log(
             f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED validation '
-            f'task={task_id}: {first_err}',
+            f'task={task_id}: {errs[:3]}',
             'WARN',
         )
         return f'sequence-kickoff:invalid:{seq_id}'
 
     current_status = seq.get('status')
     if current_status != 'pending':
-        # Idempotent no-op per preflight Q2 option b. Re-emitting kickoff
-        # on a sequence that's already past pending must NOT duplicate
-        # audit_log entries or trigger a second daemon-side dispatch.
+        # Idempotent no-op per preflight Q2 option b: re-emitting kickoff
+        # on a sequence past `pending` must NOT duplicate the
+        # `kickoff-acknowledged` event or trigger a second daemon-side
+        # dispatch.
+        #
+        # PR-S4 rectification (M3): the prior implementation archived
+        # silently — if a duplicate ever appeared (Larry double-tapping
+        # `approve sequence X` plus a crash mid-archive), the trail
+        # vanished. Append a `kickoff-duplicate-suppressed` entry to
+        # keep the audit log honest. This is a DIFFERENT event from
+        # `kickoff-acknowledged`, so the existing "no duplicate
+        # kickoff-acknowledged" invariant still holds.
+        original_kickoff = next(
+            (
+                e for e in (seq.get('audit_log') or [])
+                if isinstance(e, dict) and e.get('event') == 'kickoff-acknowledged'
+            ),
+            None,
+        )
+        original_task_id = (
+            original_kickoff.get('task_id') if isinstance(original_kickoff, dict)
+            else None
+        )
+        dedup_entry = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'event': 'kickoff-duplicate-suppressed',
+            'actor': 'outbox-notifier',
+            'original_task_id': original_task_id,
+            'duplicate_task_id': task_id,
+            'status_at_suppression': current_status,
+        }
+        if not isinstance(seq.get('audit_log'), list):
+            seq['audit_log'] = []
+        seq['audit_log'].append(dedup_entry)
+        # Atomic-write the dedup entry. Errors are logged but not
+        # fatal — the duplicate-suppression itself is the safety
+        # property; the audit trail is a nice-to-have on top.
+        dedup_tmp = seq_path.with_suffix(seq_path.suffix + '.tmp')
+        try:
+            with open(dedup_tmp, 'w', encoding='utf-8') as f:
+                json.dump(seq, f, indent=2)
+                f.write('\n')
+            os.replace(dedup_tmp, seq_path)
+        except OSError as e:
+            try:
+                dedup_tmp.unlink()
+            except OSError:
+                pass
+            log(
+                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} dedup audit append '
+                f'failed task={task_id}: {e}',
+                'WARN',
+            )
         log(
             f'BUILD_SEQUENCE_KICKOFF seq={seq_id} WARN already-kicked-off '
-            f'status={current_status} task={task_id}; no-op',
+            f'status={current_status} task={task_id}; no-op (dedup audit '
+            f'entry appended)',
             'WARN',
         )
         return f'sequence-kickoff:already-active:{seq_id}'
 
     # Transition pending → active and append audit_log entry. Use the
     # advancer's atomic-write convention (tmp + os.replace via stdlib).
+    #
+    # PR-S4 rectification (L4): actor is `outbox-notifier`, not
+    # `advancer` — the notifier wrote the entry; calling it `advancer`
+    # was misleading for ops debugging.
     audit_entry = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'event': 'kickoff-acknowledged',
-        'actor': 'advancer',
+        'actor': 'outbox-notifier',
         'task_id': task_id,
     }
     seq['status'] = 'active'
@@ -5574,7 +5951,7 @@ def process_outbox(outbox_file: Path) -> str:
     # implicit Larry-session approval covers the headless case. Fires
     # BEFORE marker classification so Beacon's non-Forge-marker result text
     # doesn't fall through to default notify-to-self routing.
-    if agent == 'beacon' and source == 'larry':
+    if agent == 'beacon' and source in _BEACON_TRUSTED_DISPATCH_SOURCES:
         # PR-S4 (orchestrator workstream) — multi-step build sequence
         # kickoff. Fires BEFORE the headless-approval-request handler
         # because the kickoff marker targets the build_sequence_advancer
@@ -5582,6 +5959,10 @@ def process_outbox(outbox_file: Path) -> str:
         # `payload.target_agent == 'build_sequence_advancer'`; markers with
         # any other target_agent (including the default `forge`) return
         # None here and fall through unchanged.
+        #
+        # PR-S4 rectification (H3): source gate widened from `larry`-only
+        # to `{larry, orchestrator}` so the advancer's step envelopes
+        # (source='orchestrator') reach the headless-approval translator.
         kickoff_dispatched = _handle_build_sequence_advancer_kickoff(
             data, data.get('result', '') or '',
         )
@@ -5623,6 +6004,19 @@ def process_outbox(outbox_file: Path) -> str:
         # classified markers.
         if marker_decision and marker_decision.get('intent') == 'clarify':
             _emit_clarify_request_chain_event(data, marker_decision, agent='forge')
+
+    # PR-S4 rectification (H1) — Mirror DAG-preflight result handler.
+    # Fires BEFORE the regular Mirror marker classifier because DAG
+    # preflight outputs `result: PASS|REVISION` in the chat body and
+    # never emit REVIEW_* markers (per agents/mirror/CLAUDE.md:362-368).
+    # The handler discriminates on the envelope's `prompt` field
+    # (`review-sequence-dag <seq-id>` prefix) and consumes the outbox
+    # on match — caller archives, no fall-through.
+    if agent == 'mirror':
+        dag_result = _handle_mirror_dag_preflight_result(data)
+        if dag_result is not None:
+            _archive_outbox(outbox_file)
+            return 'mirror-dag-preflight-handled'
 
     # D3.5 commit 5a — Mirror review marker check. Parallel to the Forge
     # branch above; same return shape from the classifier so the marker-

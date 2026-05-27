@@ -312,7 +312,7 @@ This discipline is **live now** — it composes with the existing Spec Template 
 
 The **authoring** sub-disciplines (sequence-file synthesis, dispatch_text ≤500 chars, schema conformance to spec § 5.1) are live now — when Beacon hand-writes a sequence file for a future-PR-S2-onward consumer, it should already match the eventual contract so PR-S2 doesn't have to retroactively rewrite anything.
 
-**Discipline 3 — Mirror preflight DAG verification.** Per spec decision F (author declares, Mirror preflight verifies), before the kickoff APPROVAL_REQUEST is emitted, Beacon dispatches a small Mirror review of the sequence file's DAG (a separate APPROVAL_REQUEST with `task_type: code-review`, `prompt: review-sequence-dag <seq-id>`). Mirror checks:
+**Discipline 3 — Mirror preflight DAG verification.** Per spec decision F (author declares, Mirror preflight verifies), before the kickoff APPROVAL_REQUEST is emitted, Beacon dispatches a small Mirror review of the sequence file's DAG (a separate APPROVAL_REQUEST with `task_type: code-review`, `phase: routing-signal`, `prompt: review-sequence-dag <seq-id>`). The `phase: routing-signal` field is required so the dispatch validator's MIN_PROMPT_LEN check is bypassed for the short canonical prompt (PR-S4 rectification H2 exemption). Mirror checks:
 
 - No cycles in the DAG.
 - All `depends_on` references resolve to valid step_ids.
@@ -323,14 +323,16 @@ Mirror returns PASS or REVISION-with-reasons. On REVISION, Beacon amends the seq
 
 *(Live once PR-S4 ships Mirror's DAG-verify capability — specifically, the `agents/mirror/CLAUDE.md` addition teaching Mirror to recognize `prompt: review-sequence-dag <seq-id>` and execute the four-check verification above. Until PR-S4 merges, Mirror does NOT know how to interpret a `review-sequence-dag` prompt; documented now so PR-S2/PR-S3 authoring matches the eventual contract. Until then, the DAG-correctness burden falls on Beacon's own pre-emission self-check + Larry's approval review.)*
 
-**New Beacon shortcuts (added in PR-S4, documented here for forward consistency):**
+**New Beacon shortcuts (added in PR-S4 and rectified in PR-S4-v1, with executable Python helpers for the 5 non-kickoff shortcuts):**
 
-- `approve sequence <seq-id>` — confirms kickoff after Mirror preflight PASSes.
-- `pause sequence <seq-id>` — Larry's manual pause.
-- `resume sequence <seq-id>` — unpause.
-- `cancel sequence <seq-id>` — terminate.
-- `retry sequence <seq-id> step <step-id>` — re-dispatch a failed step.
-- `skip sequence <seq-id> step <step-id>` — mark a step as merged without PR.
+- `approve sequence <seq-id>` — confirms kickoff after Mirror preflight PASSes. Beacon emits an APPROVAL_REQUEST with `target_agent: build_sequence_advancer`, `prompt: kickoff <seq-id>`; the outbox notifier's `_handle_build_sequence_advancer_kickoff` does the status transition.
+- `pause sequence <seq-id>` — Larry's manual pause. Invoke `python3 -c "from sequence_shortcut_helpers import apply_pause; print(apply_pause('<seq-id>', 'larry'))"` (or import the helper from a Python context). The helper is idempotent (no-op if already paused), atomic-writes the sequence file, and appends a `{event: paused, actor: larry, ts}` audit_log entry.
+- `resume sequence <seq-id>` — unpause. Invoke `apply_resume('<seq-id>', 'larry')`. Idempotent; refuses to resume terminal sequences.
+- `cancel sequence <seq-id>` — terminate (sets status to `failed` per spec § 5.4). Invoke `apply_cancel('<seq-id>', 'larry', reason='<text>')`. `reason` is optional; when omitted the audit entry omits the `reason` key.
+- `retry sequence <seq-id> step <step-id>` — re-dispatch a failed step. Invoke `apply_retry('<seq-id>', '<step-id>', 'larry')`. Resets step fields (status='pending', clears pr_url / dispatched_at / merged_at / current_actor / failure_reason) and removes it from `current_steps`.
+- `skip sequence <seq-id> step <step-id>` — mark a step as merged without PR. Invoke `apply_skip('<seq-id>', '<step-id>', 'larry', reason='<text>')`. Sets step status to `merged` (NOT `skipped` — that's not in the schema enum) and appends a `step-skipped` audit event.
+
+Always invoke via the helpers (`scripts/sequence_shortcut_helpers.py`) rather than hand-editing the sequence file. The helpers enforce idempotency, atomic-writes, and consistent audit_log shape — discipline that's only safe if it's executable.
 
 These shortcuts land in `agents/beacon/CLAUDE.md` as a dedicated section in PR-S4. Until then, multi-step sequence-related operations route through ad-hoc APPROVAL_REQUEST markers or direct Larry conversation.
 

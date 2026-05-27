@@ -359,13 +359,13 @@ For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks
 
 ### Output shape (NOT the REVIEW_PASS / REVIEW_REVISION marker)
 
-DAG preflight has no `pr_url` to anchor against, so the existing PR-review markers don't fit. Per PR-S4 preflight Q7 option c, you emit a plain-text chat body summarizing the four checks PLUS a `result` field in the outbox JSON with value `"PASS"` or `"REVISION"`. The Beacon-side handler reads the `result` field directly and parses the body as free-form text for the human-readable findings list.
+DAG preflight has no `pr_url` to anchor against, so the existing PR-review markers don't fit. Per PR-S4 preflight Q7 option c, you emit a plain-text chat body summarizing the four checks. The verdict is conveyed by including a line of the form `result: PASS` or `result: REVISION` somewhere in the body (case-insensitive; the outbox notifier's `_handle_mirror_dag_preflight_result` regex-scans the body for the first match). The Beacon-side handler parses the body as free-form text for the human-readable findings list.
 
-**On PASS** — body lists the four checks with a green tick + one-line summary each, then a final line: *"DAG preflight PASS for sequence `<seq-id>`. Emit the kickoff APPROVAL_REQUEST."*
+**On PASS** — body lists the four checks with a green tick + one-line summary each, INCLUDES a line `result: PASS` (the verdict marker the notifier parses), then a final line: *"DAG preflight PASS for sequence `<seq-id>`. The notifier will transition the sequence pending → active automatically; the next advancer tick dispatches the first step."*
 
-**On REVISION** — body lists ONLY the failed checks with concrete findings (one per failure, citing the offending step_id / spec section / file path), then a final line: *"DAG preflight REVISION for sequence `<seq-id>`. Amend the sequence file (or the spec) and re-dispatch the review."*
+**On REVISION** — body lists ONLY the failed checks with concrete findings (one per failure, citing the offending step_id / spec section / file path), INCLUDES a line `result: REVISION`, then a final line: *"DAG preflight REVISION for sequence `<seq-id>`. Amend the sequence file (or the spec) and re-dispatch the review."*
 
-Do NOT emit REVIEW_PASS / REVIEW_REVISION / REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT markers for DAG preflight — those expect `pr_url` context and would route to the auto-merge / replan paths in ways that don't apply here. The `result: "PASS" | "REVISION"` shape is the entire automation surface for this dispatch.
+**Do NOT emit any REVIEW_* marker block in a DAG-preflight session.** REVIEW_PASS / REVIEW_REVISION / REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT all expect `pr_url` context that doesn't apply to a sequence-file review, and the regular marker classifier would route them through auto-merge / replan paths against a fictional PR. The `result: PASS | REVISION` line in the body is the entire automation surface for this dispatch — those markers are reserved for PR reviews. As a defensive backstop, the outbox notifier explicitly short-circuits marker classification when the envelope's `prompt` starts with `review-sequence-dag` (any stray REVIEW_* marker is ignored). But the discipline is yours to hold first.
 
 ### When NOT to fire this protocol
 

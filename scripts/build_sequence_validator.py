@@ -416,15 +416,42 @@ def validate_no_concurrent_active(
 
 
 def _cli(argv: list[str]) -> int:
+    # PR-S4 rectification (H5): support both forms documented in
+    # `agents/beacon/CLAUDE.md` discipline 2 + spec § 5.5:
+    #   python3 scripts/build_sequence_validator.py validate <seq-id>
+    #   python3 scripts/build_sequence_validator.py <path-to-file>
+    # The `validate <seq-id>` form expands to the canonical blackboard
+    # path so Beacon doesn't have to remember the directory layout. The
+    # positional path form is preserved for direct file usage (Mirror's
+    # DAG preflight, ad-hoc validation, test fixtures).
     parser = argparse.ArgumentParser(
         description='Validate a build-sequence file against spec § 5.1 + DAG checks.',
     )
     parser.add_argument(
-        'path',
-        help='Path to the sequence file (JSON). Exits 0 if valid, 1 otherwise.',
+        'args',
+        nargs='+',
+        help=(
+            'Either `validate <seq-id>` (expands to '
+            '~/agents/blackboard/build-sequences/<seq-id>.json) OR a path to '
+            'a sequence file (JSON). Exits 0 if valid, 1 otherwise.'
+        ),
     )
-    args = parser.parse_args(argv)
-    path = Path(args.path)
+    parsed = parser.parse_args(argv)
+    raw_args = parsed.args
+
+    if len(raw_args) == 2 and raw_args[0] == 'validate':
+        seq_id = raw_args[1]
+        path = DEFAULT_BLACKBOARD_DIR / f'{seq_id}.json'
+    elif len(raw_args) == 1:
+        path = Path(raw_args[0])
+    else:
+        sys.stderr.write(
+            'ERROR: usage:\n'
+            '  build_sequence_validator.py validate <seq-id>\n'
+            '  build_sequence_validator.py <path-to-sequence-file.json>\n'
+        )
+        return 2
+
     if not path.is_file():
         sys.stderr.write(f'ERROR: not a file: {path}\n')
         return 1
