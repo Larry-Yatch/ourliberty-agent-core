@@ -135,6 +135,24 @@ JOURNAL_HEADER_RE = re.compile(
 HEADER_NAME = 'X-Dashboard-Token'
 TOKEN_ENV = 'DASHBOARD_API_TOKEN'
 
+# E4.4e PR-B2: Larry action endpoint auth. `X-Actor` carries the
+# dashboard-authenticated user's email (set by the Next.js Route Handler
+# AFTER Supabase Google OAuth). The droplet validates against this
+# hardcoded allowlist (option A per spec § 6.4 — single-Larry V1 scope).
+HEADER_ACTOR = 'X-Actor'
+LARRY_ACTION_ALLOWED_EMAILS: frozenset[str] = frozenset({
+    'larry@sealteamleaders.com',
+})
+
+# Per spec § 7.3 — path-injection guard for envelope writes. Both the
+# frozenset check AND the resolve-prefix check fire on every envelope.
+ALLOWED_TARGET_AGENTS: frozenset[str] = frozenset({
+    'beacon', 'forge', 'mirror', 'pulse',
+})
+LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
+    'approve', 'reject', 'comment', 'mark_done',
+})
+
 # CORS.
 CORS_ORIGIN = 'https://dashboard.ourliberty.dev'
 
@@ -289,6 +307,24 @@ class SystemWorktreesResponse(BaseModel):
     worktrees: list[SystemWorktree]
 
 
+# ---- /api/larry/* response + request models (E4.4e PR-B2) ----
+
+class LarryActionRequest(BaseModel):
+    source_event_id: str
+    action: str
+    comment: Optional[str] = None
+
+
+class LarryActionResponse(BaseModel):
+    action_event_id: str
+    envelope_written: Optional[str]
+    target_agent: Optional[str]
+
+
+class LarryAllowlistResponse(BaseModel):
+    allowed_emails: list[str]
+
+
 # ---- helpers ----
 
 def _now_utc_iso(now: Optional[datetime] = None) -> str:
@@ -410,6 +446,24 @@ def _require_token(request: Request) -> str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f'invalid {HEADER_NAME}',
+        )
+    return provided
+
+
+def _require_actor(request: Request) -> str:
+    """Validate `X-Actor` against the hardcoded allowlist.
+
+    Per spec § 6.3 + § 6.4 (option A): the dashboard sets `X-Actor` to the
+    Supabase-authenticated user's email; the droplet refuses anything not
+    on `LARRY_ACTION_ALLOWED_EMAILS`. Errors are deliberately generic ('
+    unauthorized') so we never echo the rejected actor value back to the
+    caller — a 401 body shouldn't be a confirmed-email oracle.
+    """
+    provided = request.headers.get(HEADER_ACTOR)
+    if not provided or provided not in LARRY_ACTION_ALLOWED_EMAILS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='unauthorized',
         )
     return provided
 
@@ -1264,6 +1318,304 @@ def _reader_system_worktrees(
     }
 
 
+# ---- /api/larry/* handler (E4.4e PR-B2) ----
+#
+# Spec § 5.2, § 6.3, § 6.4, § 7.1, § 7.2, § 7.3 — Larry-action endpoint
+# turns dashboard clicks into chain envelopes. The droplet is the
+# canonical audit point: every action writes a `larry_action` row to
+# chain_events keyed on (task_id, ts) via the shared `compute_event_id`
+# helper. The `actor` column (migration 0006, PR-B1) carries the authed
+# email — written as a top-level column, not buried in payload.
+#
+# We do NOT use `chain_event_emit.emit_event` here: that helper has no
+# `actor` kwarg and modifying it is out-of-scope for PR-B2 (see PR-A
+# #129). We import only the pure helpers (`compute_event_id`,
+# `sanitize_payload`) from chain_event_shipper and write the row
+# directly via the supabase client. Same dedup contract:
+# on_conflict='event_id', ignore_duplicates=True.
+
+
+def _import_chain_event_helpers():
+    """Import shipper-side helpers without taking a module-level dep.
+
+    Lazy import so the dashboard_api module loads cleanly even on a host
+    where supabase-py / shipper deps aren't installed (test environment).
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import chain_event_shipper as ces  # noqa: PLC0415
+    return ces.compute_event_id, ces.sanitize_payload
+
+
+# Test seam: tests monkeypatch this to inject a recording mock.
+def _get_larry_action_supabase_client():
+    """Build a service-role supabase client for the larry-action endpoint.
+
+    Returns None if env is unset OR supabase-py isn't installed; the
+    route raises 503 in that case. Tests override this function to
+    inject a recording stub.
+    """
+    url = os.environ.get('SUPABASE_URL')
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        return None
+    try:
+        from supabase import create_client  # type: ignore  # noqa: PLC0415
+    except ImportError:
+        return None
+    return create_client(url, key)
+
+
+def _atomic_write_envelope(path: Path, payload: dict[str, Any]) -> None:
+    """Write `payload` as JSON to `path` atomically.
+
+    Inbox watchers MUST NOT observe a partial file — write to a sibling
+    `.tmp` then `os.replace` to land the final name in one syscall.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + '.tmp')
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    os.replace(tmp, path)
+
+
+def _build_envelope_for_action(
+    *,
+    source: dict[str, Any],
+    action: str,
+    comment: Optional[str],
+    actor: str,
+) -> tuple[str, str, dict[str, Any]]:
+    """Return (target_agent, filename, envelope_body) per spec § 7.1.
+
+    Source-event-type → action validity matrix:
+      - approval_request → approve | reject (envelope to beacon)
+      - clarify_request  → comment           (envelope to asking_agent)
+      - larry_alert / escalation / sentinel_alert → mark_done ONLY
+        (handled before this function — never reaches here)
+
+    Raises HTTPException(400) for unsupported (event_type, action) pairs
+    so dashboard mis-routing surfaces as a 400 rather than a silent
+    envelope-to-the-wrong-agent.
+    """
+    event_type = source.get('event_type')
+    payload = source.get('payload') or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    task_id = source.get('task_id')
+    source_event_id = source.get('event_id') or ''
+
+    if event_type == 'approval_request':
+        target_agent = 'beacon'
+        if action == 'approve':
+            filename = f'larry-approval-{source_event_id}.json'
+            envelope = {
+                'task_id': f'larry-approval-{source_event_id}',
+                'source': 'dashboard',
+                'actor': actor,
+                'dedup_identity': f'larry-approval:{source_event_id}',
+                'timeout': 600,
+                'prompt': (
+                    'Larry approved the pending proposal via dashboard. '
+                    f'Source event: {source_event_id}. Proceed per the '
+                    'approve-path that beacon_approval_handler.py describes '
+                    'for this approval_request type. Use the '
+                    'suggested_envelope_for_approve payload from the source '
+                    'event.'
+                ),
+            }
+            if comment:
+                envelope['comment'] = comment
+            return target_agent, filename, envelope
+        if action == 'reject':
+            filename = f'larry-reject-{source_event_id}.json'
+            envelope = {
+                'task_id': f'larry-reject-{source_event_id}',
+                'source': 'dashboard',
+                'actor': actor,
+                'dedup_identity': f'larry-reject:{source_event_id}',
+                'timeout': 600,
+                'prompt': (
+                    'Larry rejected the pending proposal via dashboard. '
+                    f'Source event: {source_event_id}. Optional comment: '
+                    f'{comment or ""}. Soft reject — archive the pending '
+                    'item, do not abort any in-flight work, route per the '
+                    'suggested_envelope_for_reject payload from the source '
+                    'event.'
+                ),
+            }
+            if comment:
+                envelope['comment'] = comment
+            return target_agent, filename, envelope
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'action={action!r} not valid for approval_request',
+        )
+
+    if event_type == 'clarify_request':
+        if action != 'comment':
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='clarify_request only accepts action=comment',
+            )
+        asking_agent = payload.get('asking_agent')
+        if not isinstance(asking_agent, str) or not asking_agent:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='source clarify_request missing asking_agent',
+            )
+        # round=1 default for V1 dashboard-originated replies. The
+        # clarify_request payload schema (spec § 4) does not carry a
+        # round counter; future spec work can lift this.
+        round_n = 1
+        filename = f'resume-{task_id}-r{round_n}.json'
+        envelope = {
+            'task_id': task_id,
+            'source': 'dashboard',
+            'actor': actor,
+            'resume_session_id': payload.get('resume_session_id'),
+            'round': round_n,
+            'prompt': comment or '',
+        }
+        return asking_agent, filename, envelope
+
+    # larry_alert / escalation / sentinel_alert have only the Mark-done
+    # affordance (spec § 8.2). Reaching here means the dashboard tried to
+    # apply approve / reject / comment to one — surface as 400.
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f'event_type={event_type!r} only supports action=mark_done '
+            f'(got action={action!r})'
+        ),
+    )
+
+
+def _select_source_event(
+    supabase_client: Any, source_event_id: str,
+) -> Optional[dict[str, Any]]:
+    """Fetch the chain_events row for `source_event_id`. None if missing."""
+    resp = (
+        supabase_client.table('chain_events')
+        .select('*')
+        .eq('event_id', source_event_id)
+        .limit(1)
+        .execute()
+    )
+    rows = getattr(resp, 'data', None)
+    if not rows:
+        return None
+    row = rows[0]
+    return row if isinstance(row, dict) else None
+
+
+def _handle_larry_action(
+    *,
+    source_event_id: str,
+    action: str,
+    comment: Optional[str],
+    actor: str,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/larry/action; see spec § 7.2.
+
+    Raises HTTPException for 4xx; returns the response dict on success.
+    """
+    if action not in LARRY_ACTION_VALID_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid action={action!r}',
+        )
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+
+    source = _select_source_event(supabase_client, source_event_id)
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='source event not found',
+        )
+
+    # Already-acted-on lock: read_at IS NOT NULL blocks every action
+    # except mark_done (which is idempotent against the read state).
+    if source.get('read_at') is not None and action != 'mark_done':
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='source event already acted on',
+        )
+
+    envelope_written: Optional[str] = None
+    target_agent: Optional[str] = None
+
+    if action != 'mark_done':
+        target_agent, filename, envelope = _build_envelope_for_action(
+            source=source, action=action, comment=comment, actor=actor,
+        )
+        # Path-injection guard — both checks required.
+        if target_agent not in ALLOWED_TARGET_AGENTS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f'target_agent={target_agent!r} not allowed',
+            )
+        inbox_root = agents_root / 'inboxes'
+        agent_inbox = inbox_root / target_agent
+        # Resolve against the agent inbox dir (which we just established
+        # is a member of the frozenset). The envelope MUST be a leaf file
+        # whose immediate parent is the agent inbox — no subdirectories,
+        # no `..` traversal even if it lands back inside the inbox tree.
+        # This is the second half of the spec § 7.3 path-injection guard.
+        candidate = (agent_inbox / filename).resolve()
+        if candidate.parent != agent_inbox.resolve():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='invalid envelope filename',
+            )
+        _atomic_write_envelope(candidate, envelope)
+        envelope_written = str(candidate)
+
+    # Flip read_at on source event (mark_done flow + envelope flows both).
+    supabase_client.table('chain_events').update(
+        {'read_at': ts_iso}
+    ).eq('event_id', source_event_id).execute()
+
+    # Insert the larry_action audit row. Top-level `actor` column per
+    # migration 0006; payload mirrors spec § 5.2 verbatim.
+    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    source_task_id = source.get('task_id')
+    action_payload = {
+        'source_event_id': source_event_id,
+        'source_event_type': source.get('event_type'),
+        'action': action,
+        'comment': comment,
+        'envelope_written': envelope_written,
+        'target_agent': target_agent,
+    }
+    action_event_id = compute_event_id(
+        source_task_id, 'larry_action', ts_iso,
+    )
+    row: dict[str, Any] = {
+        'event_id': action_event_id,
+        'ts': ts_iso,
+        'agent': 'dashboard',
+        'event_type': 'larry_action',
+        'actor': actor,
+        'payload': sanitize_payload(action_payload),
+    }
+    if source_task_id:
+        row['task_id'] = source_task_id
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+    return {
+        'action_event_id': action_event_id,
+        'envelope_written': envelope_written,
+        'target_agent': target_agent,
+    }
+
+
 # ---- FastAPI app ----
 
 app = FastAPI(
@@ -1384,6 +1736,49 @@ def get_system_cgroup_stats() -> dict[str, Any]:
 )
 def get_system_worktrees() -> dict[str, Any]:
     return _reader_system_worktrees(_agents_root(), _worktrees_root())
+
+
+# ---- /api/larry/* routes (E4.4e PR-B2) ----
+#
+# POST /api/larry/action turns dashboard UI clicks into chain envelopes
+# and writes the audit row. GET /api/larry/allowlist returns the
+# email allowlist (option A per spec § 6.4 — hardcoded). Both require
+# the existing `X-Dashboard-Token` token gate; POST additionally
+# requires a valid `X-Actor` header.
+
+
+@app.post(
+    '/api/larry/action',
+    response_model=LarryActionResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_larry_action(
+    body: LarryActionRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    return _handle_larry_action(
+        source_event_id=body.source_event_id,
+        action=body.action,
+        comment=body.comment,
+        actor=actor,
+        agents_root=_agents_root(),
+        supabase_client=client,
+    )
+
+
+@app.get(
+    '/api/larry/allowlist',
+    response_model=LarryAllowlistResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_larry_allowlist() -> dict[str, Any]:
+    return {'allowed_emails': sorted(LARRY_ACTION_ALLOWED_EMAILS)}
 
 
 # Auth-gate the FastAPI auto-docs surfaces too. We override the routes
