@@ -26,7 +26,13 @@ SyslogIdentifier=ourliberty-watchdog
 # at the shell, but NoNewPrivileges blocks the kernel-level setuid path
 # sudo needs regardless of sudoers config. The remaining hardening below
 # preserves the rest of the protection envelope.
-PrivateTmp=true
+
+# PrivateTmp intentionally NOT set — watchdog uses scripts/bot_liveness_policy.py
+# to inspect /tmp/tmux-1000/default for bots launched in tmux mode (e.g., pulse-bot).
+# PrivateTmp=true gives the unit a private /tmp namespace that hides the user's
+# tmux socket, so tmux has-session always fails and emits false bots:pulse:tmux
+# alerts. The remaining hardening (ProtectSystem=strict, ReadWritePaths, kernel
+# protections) preserves the rest of the envelope.
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials
