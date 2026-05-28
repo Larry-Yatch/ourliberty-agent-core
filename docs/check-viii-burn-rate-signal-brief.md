@@ -11,14 +11,14 @@
 Current DM body claims "consider pausing dispatches to avoid hitting the quota wall" — overstating the correlation. The 2026-05-26/27 incident (Tier 1 wall hit overnight) did correlate with a sustained high burn, but in general $-trailing-5h is a noisy predictor of token-cap exhaustion.
 
 Two evidence gaps:
-- We don't capture *actual* rate-limit events (`classify_failure_type → 'rate_limit'` in `agent_runner.py` lines 105-163 exists but only feeds retry logic, not an observation ledger).
+- We don't capture *actual* rate-limit events (`classify_tier1_failure → 'rate_limit'` in `agent_runner.py` lines 105-163 exists but only feeds retry logic, not an observation ledger).
 - We can't measure the dollar-gate's accuracy without a ground-truth signal.
 
 ## 2. Approach — two-phase ship
 
 ### PR-2a — rate-limit event ledger + DM reframe (Forge, full chain, ~$4)
 
-1. **`scripts/agent_runner.py`** — when `classify_failure_type → 'rate_limit'`, before retrying, append a JSONL line to `~/agents/blackboard/anthropic-quota-events.jsonl`:
+1. **`scripts/agent_runner.py`** — when `classify_tier1_failure → 'rate_limit'`, before retrying, append a JSONL line to `~/agents/blackboard/anthropic-quota-events.jsonl`:
    ```json
    {"ts": "<ISO 8601>", "agent": "<agent>", "task_id": "<id>",
     "model": "<resolved-model>", "account": "tier1|tier2",
@@ -52,6 +52,7 @@ Two evidence gaps:
    - **Recall < 0.6 with ≥ 3 quota-events in window** → propose lowering threshold (to 75th-percentile spend at the *moment of FN events*, or -20% if no FNs).
    - **Both precision and recall above 0.6 for 4 consecutive weeks** → propose nothing; healer is well-calibrated.
    - **TP count == 0 across trailing 8w with ≥ 5 quota-events** → propose deprecating the dollar gate entirely (signal has no observable predictive value).
+   - **Priority + mutual exclusion:** when multiple rules fire in the same week, apply priority **deprecate > raise > lower**. If *raise* and *lower* both fire simultaneously (precision < 0.4 AND recall < 0.6, plausible when DMs miss true events and also alert on non-events), defer — emit no proposal artifact and instead DM Larry the metric tension (`precision=<x>, recall=<y>, TP=<n>, FP=<n>, FN=<n>`) for manual interpretation. Defer-on-tension prevents the analyzer from emitting contradictory raise/lower artifacts in the same window.
 
 3. **Standard 5-step pattern:**
    - Write artifact: `~/agents/blackboard/pulse-check-viii-proposals/check-viii-<week>.json` (current vs proposed value, sample sizes, rationale, `applied: false`, `as_of`).
@@ -68,7 +69,7 @@ Two evidence gaps:
 
 - **First-data-week limitation:** Check VIII's first proposal-firing is realistically ~4 weeks out (need data accumulation). PR-2b ships the analyzer but expect quiet output for the first month — that's expected, not a regression.
 - **Cooldown alignment:** existing 5h DM cooldown means at most 1 DM per 5h-burn period. With 4 weeks of data and Larry's typical workload pattern, expect ~5-15 DMs over the trailing 4w analysis window.
-- **Rate-limit event coverage:** `agent_runner.classify_failure_type` only fires on completed agent_runner-routed dispatches. Direct `claude -p` invocations outside agent_runner (e.g. `run_cycle.sh`'s wrapper) won't surface in the ledger. Acceptable for V1; broader coverage is follow-up.
+- **Rate-limit event coverage:** `agent_runner.classify_tier1_failure` only fires on completed agent_runner-routed dispatches. Direct `claude -p` invocations outside agent_runner (e.g. `run_cycle.sh`'s wrapper) won't surface in the ledger. Acceptable for V1; broader coverage is follow-up.
 - **Rollback:** PR-2a is purely additive (new file + DM body string). Reverting PR-2a leaves the existing healer behavior intact. PR-2b can be disabled by removing the Monday gate or stopping `/cycle` from invoking it.
 
 ## 4. Cross-references
@@ -76,7 +77,7 @@ Two evidence gaps:
 - Doctrine: `feedback_self_optimizing_config_via_pulse_check_pattern` (memory)
 - Spec context: `agents/beacon/specs/pulse-cycle-upgrade.md` § 12.3 (Check VII is cost-ceiling escalation; Check VIII is the burn-rate-signal cousin — separate concerns).
 - Existing healer: `scripts/heal_claude_max_burn_rate.py` (PR #139, claude-quota-fixes-v2 bundle).
-- Rate-limit detection: `scripts/agent_runner.py:105-163` (`classify_failure_type`).
+- Rate-limit detection: `scripts/agent_runner.py:105-163` (`classify_tier1_failure`).
 - PR-2a target_repo: `ourliberty-agent-core` (T0 sandbox).
 - Beacon shortcut path: parallel to `approve threshold-update-<date>` (Check III) per spec § 12.3.
 
