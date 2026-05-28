@@ -38,6 +38,7 @@ FIXTURE_PATTERN_PREFIXES: tuple[str, ...] = (
 
 FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     "task-001",
+    "task-legacy",
     "headless-001",
     "opmanual-d35-5b-shipped-note-001",
     "pf-ok",
@@ -45,6 +46,23 @@ FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     "no-preamble",
     "no-chat",
 })
+
+
+# Wrapper prefixes the routing layer prepends to envelope filenames as a
+# task moves through the notify/dead-letter cascade. They stack (e.g.,
+# `notify-dead-letter-notify-q-1.18.json` is a fixture base buried under
+# three wrappers). `is_fixture_envelope_name` peels these iteratively to
+# match wrapped fixtures the bare `is_fixture_task_id` would miss.
+_ENVELOPE_WRAPPER_PREFIXES: tuple[str, ...] = (
+    "notify-",
+    "dead-letter-",
+    "marker-error-",
+)
+
+# Cycle-guard cap for the peel loop. Real wrappers stack at most ~3 deep
+# (notify→dead-letter→notify on a doubled-prefix bug); 8 is generous and
+# bounds pathological inputs without risk of false negatives on real shapes.
+_ENVELOPE_PEEL_CAP: int = 8
 
 
 def is_fixture_task_id(task_id: object) -> bool:
@@ -84,12 +102,63 @@ def matched_fixture_pattern(task_id: object) -> str | None:
     return best
 
 
+def is_fixture_envelope_name(name: object) -> bool:
+    """True iff envelope filename resolves to a fixture under wrapper-peeling.
+
+    Self-replicating cascades bury the fixture task_id behind one or more
+    routing wrappers (`notify-`, `dead-letter-`, `marker-error-`) and a
+    trailing `.<seq>` suffix from filename collision-rename. A bare
+    `is_fixture_task_id` on `envelope_path.name` misses these. This helper
+    strips the `.json` extension and trailing numeric suffix once, then
+    iteratively peels known wrappers from the front and retests
+    `is_fixture_task_id` after each peel. Returns True at the first match.
+
+    Cycle-guarded: aborts after `_ENVELOPE_PEEL_CAP` iterations and returns
+    False (conservative — never false-positive a real task on pathological
+    input).
+
+    Accepts any object; non-string / empty returns False.
+    """
+    if not isinstance(name, str) or not name:
+        return False
+
+    # Strip .json envelope extension. Inbox filenames carry it; task_ids
+    # in FIXTURE_PATTERN_EXACT do not.
+    if name.endswith(".json"):
+        name = name[: -len(".json")]
+
+    # Strip trailing `.<seq>` collision-rename suffix (one layer only —
+    # `_unique_dest` only appends a single numeric tail).
+    dot_idx = name.rfind(".")
+    if dot_idx > 0 and name[dot_idx + 1:].isdigit():
+        name = name[:dot_idx]
+
+    # Test the bare form first — bypasses the loop for the common case.
+    if is_fixture_task_id(name):
+        return True
+
+    # Iteratively peel known wrappers and retest.
+    for _ in range(_ENVELOPE_PEEL_CAP):
+        peeled = False
+        for prefix in _ENVELOPE_WRAPPER_PREFIXES:
+            if name.startswith(prefix):
+                name = name[len(prefix):]
+                peeled = True
+                break
+        if not peeled:
+            return False
+        if is_fixture_task_id(name):
+            return True
+    # Cycle guard tripped — conservative False (don't false-positive).
+    return False
+
+
 # Shell-regex form, kept beside the Python list so run_cycle.sh and any
 # other bash consumer source from the same module. The `^` anchor matches
 # the start of the captured task_id literal; callers wrap as needed.
 SHELL_FIXTURE_REGEX = (
     "^(t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|"
-    "marker-error-opmanual-|task-001$|headless-001$|"
+    "marker-error-opmanual-|task-001$|task-legacy$|headless-001$|"
     "opmanual-d35-5b-shipped-note-001$|pf-ok$|bad-pf$|"
     "no-preamble$|no-chat$)"
 )
