@@ -39,7 +39,21 @@ def get_manager():
 from concurrency_guard import get_guard
 
 AGENTS_ROOT = Path.home() / 'agents'
-LOG_DIR = AGENTS_ROOT / 'logs'
+
+
+def resolve_log_dir():
+    """Return the directory this module writes per-agent log files to.
+
+    OURLIBERTY_LOG_DIR override exists so test runs do not leak sentinel
+    strings into the live agent logs (e.g., ~/agents/logs/forge.log) when
+    a test imports this module and triggers log() via mocked Popen flows.
+    Production keeps the env var unset, preserving the historical path.
+    """
+    override = os.environ.get('OURLIBERTY_LOG_DIR')
+    return Path(override) if override else AGENTS_ROOT / 'logs'
+
+
+LOG_DIR = resolve_log_dir()
 AGENT_MODELS_FILE = AGENTS_ROOT / 'config' / 'agent-models.json'
 
 def get_agent_model(agent_id, context='default'):
@@ -203,7 +217,11 @@ def log(agent_id, message, level='INFO'):
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     entry = '[' + ts + '] [' + agent_id + '] [' + level + '] ' + message
     print(entry)
-    log_file = LOG_DIR / (agent_id + '.log')
+    # Re-resolve at write time so OURLIBERTY_LOG_DIR set after import (e.g.,
+    # by the autouse test fixture in scripts/tests/conftest.py) still
+    # redirects writes. In production the env var is unset and the path
+    # collapses to LOG_DIR — no behavior change, no extra disk syscall.
+    log_file = resolve_log_dir() / (agent_id + '.log')
     with open(log_file, 'a') as f:
         f.write(entry + '\n')
 
