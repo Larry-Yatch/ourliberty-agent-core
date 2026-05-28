@@ -5,6 +5,10 @@
       "Bash(gh pr merge:*)",
       "Bash(git branch:*)",
       "Bash(python3:*)"
+    ],
+    "deny": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
