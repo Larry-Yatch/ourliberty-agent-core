@@ -85,6 +85,17 @@ def _sequence_blackboard_root() -> Path:
     return _agents_root() / 'blackboard' / 'build-sequences'
 
 
+def _missions_json_path() -> Path:
+    """Path to the mission registry. Env-overridable so tests redirect
+    reads to a tmpdir without touching the real `agents/beacon/missions.json`.
+    Defaults to the in-repo path so production reads from the deployed
+    checkout's working copy."""
+    override = os.environ.get('OURLIBERTY_MISSIONS_JSON')
+    if override:
+        return Path(override)
+    return _repo_root() / 'agents' / 'beacon' / 'missions.json'
+
+
 # ---- agent + healer registries ----
 
 AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
@@ -341,6 +352,40 @@ class BuildSequencesResponse(BaseModel):
     archived: list[dict[str, Any]]
     parse_warnings: list[str] = Field(default_factory=list)
     as_of: str
+
+
+# ---- /api/system/missions request + response models (E4.4f PR-A) ----
+#
+# Spec § 5.1 schema: missions.json carries `schema_version` + a `missions`
+# array of {id, name, phase, brief, spec_docs, task_ids, repo, created,
+# deferred_reason}. The GET response passes the array through verbatim
+# (no projection) and adds `last_synced_at` from the file's mtime so the
+# dashboard can render "as of N seconds ago" without a separate call.
+#
+# The POST route opens a GitHub PR via the REST API; per the PR-A
+# clarify-response (Beacon 2026-05-28), this avoids touching the shared
+# /home/larry/agent-core checkout. Race-safety: an in-process lock
+# serializes concurrent POSTs (uvicorn unit runs a single worker per
+# systemd/ourliberty-dashboard-api.service), and `POST /git/refs` at
+# GitHub is atomic — a duplicate branch returns 422, which we map to 409.
+
+class MissionsResponse(BaseModel):
+    missions: list[dict[str, Any]]
+    last_synced_at: Optional[str]
+    schema_version: Optional[int] = None
+
+
+class NewMissionRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    brief: str = Field(..., min_length=1)
+    repo: str = Field(..., min_length=1)
+    spec_docs: list[str] = Field(default_factory=list)
+
+
+class NewMissionResponse(BaseModel):
+    mission_id: str
+    pr_url: str
+    branch: str
 
 
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
@@ -1504,6 +1549,363 @@ def _reader_build_sequences(
     }
 
 
+# ---- /api/system/missions helpers + handler (E4.4f PR-A) ----
+#
+# GET serves the registry verbatim plus an mtime-derived `last_synced_at`.
+# POST opens a PR on the agent-core repo via the GitHub REST API; see the
+# request-model comment above for the race-safety contract.
+
+# Module-level lock serializes concurrent POSTs to /api/system/missions/new
+# within the single uvicorn worker. Cross-process safety comes from
+# GitHub's atomic `POST /git/refs` (duplicate branch → 422 → 409).
+_NEW_MISSION_LOCK = __import__('threading').Lock()
+
+_KEBAB_RE = re.compile(r'[^a-z0-9]+')
+
+
+def _kebab_case(name: str) -> str:
+    """Lowercase + collapse non-alphanumerics to single hyphens, strip ends."""
+    return _KEBAB_RE.sub('-', name.strip().lower()).strip('-')
+
+
+def _github_token() -> Optional[str]:
+    """Read the GitHub token at request time. Prefer GITHUB_TOKEN
+    (loaded from /home/larry/credentials/.env.larry by the systemd unit);
+    fall back to GH_TOKEN for parity with gh CLI conventions."""
+    tok = (
+        os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN') or ''
+    ).strip()
+    return tok or None
+
+
+def _missions_repo_full() -> str:
+    """`owner/repo` to open new-mission PRs against. Env-overridable so
+    tests don't need to touch the live API."""
+    return os.environ.get(
+        'OURLIBERTY_MISSIONS_REPO', 'Larry-Yatch/ourliberty-agent-core',
+    )
+
+
+# Test seam: tests monkeypatch this to a recording stub so no live HTTPS
+# is made. Real implementation lazy-imports httpx so the module loads on
+# hosts without it.
+def _github_api_request(
+    method: str,
+    url: str,
+    *,
+    headers: Optional[dict[str, str]] = None,
+    json_body: Optional[dict[str, Any]] = None,
+    timeout: float = 10.0,
+) -> Any:
+    """Perform a single GitHub REST API call. Returns an object with
+    `.status_code` and `.json()` (httpx.Response in production)."""
+    import httpx  # noqa: PLC0415  # local import keeps cold-start dep optional
+    return httpx.request(
+        method, url, headers=headers, json=json_body, timeout=timeout,
+    )
+
+
+def _reader_missions(missions_path: Path) -> dict[str, Any]:
+    """Return {missions, last_synced_at, schema_version}.
+
+    Missing file → 200 with empty list + null timestamp (defensive default;
+    spec acceptance criterion). Malformed JSON raises HTTPException(500)
+    with a structured body — never a Flask/FastAPI stack trace.
+    """
+    if not missions_path.exists():
+        return {
+            'missions': [],
+            'last_synced_at': None,
+            'schema_version': None,
+        }
+    try:
+        raw = missions_path.read_text()
+        data = json.loads(raw) if raw.strip() else {}
+    except (OSError, json.JSONDecodeError) as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'missions.json malformed', 'detail': first_line},
+        )
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'missions.json malformed',
+                'detail': 'top-level JSON is not an object',
+            },
+        )
+    missions = data.get('missions')
+    if not isinstance(missions, list):
+        missions = []
+    schema_version = data.get('schema_version')
+    if not isinstance(schema_version, int):
+        schema_version = None
+    return {
+        'missions': missions,
+        'last_synced_at': _iso(_safe_mtime(missions_path)),
+        'schema_version': schema_version,
+    }
+
+
+def _read_missions_registry(missions_path: Path) -> dict[str, Any]:
+    """Load the registry as a dict (raw schema), or return a fresh empty
+    registry shape if the file is missing. Raises HTTPException(500) on
+    malformed JSON — same contract as `_reader_missions` so the POST path
+    surfaces parse errors identically."""
+    if not missions_path.exists():
+        return {'schema_version': 1, 'missions': []}
+    try:
+        raw = missions_path.read_text()
+        data = json.loads(raw) if raw.strip() else {'schema_version': 1, 'missions': []}
+    except (OSError, json.JSONDecodeError) as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'missions.json malformed', 'detail': first_line},
+        )
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'missions.json malformed',
+                'detail': 'top-level JSON is not an object',
+            },
+        )
+    if not isinstance(data.get('missions'), list):
+        data['missions'] = []
+    data.setdefault('schema_version', 1)
+    return data
+
+
+def _handle_new_mission(
+    *,
+    body: NewMissionRequest,
+    missions_path: Path,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/system/missions/new.
+
+    Steps:
+      1. Derive kebab mission_id. Reject 400 if empty after kebab.
+      2. Acquire in-process lock (serializes concurrent POSTs).
+      3. Read local missions.json (read-only); 409 on dup id.
+      4. Call GitHub REST: GET main ref → POST refs (atomic, 422 → 409) →
+         PUT contents on branch → POST pulls.
+      5. Return {mission_id, pr_url, branch}.
+
+    Local missions.json is NOT mutated — it gets updated via `git pull`
+    once the PR merges. This avoids drift vs `origin/main` in the shared
+    `/home/larry/agent-core` checkout (heal-droplet-git-drift would alert
+    otherwise).
+    """
+    mission_id = _kebab_case(body.name)
+    if not mission_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                'error': 'invalid mission name',
+                'detail': 'name kebab-cases to empty string',
+            },
+        )
+
+    token = _github_token()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'github token missing',
+                'detail': 'GITHUB_TOKEN env not set on dashboard-api service',
+            },
+        )
+
+    repo_full = _missions_repo_full()
+    branch = f'feat/new-mission-{mission_id}'
+    now = now or datetime.now(timezone.utc)
+
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        for existing in registry['missions']:
+            if isinstance(existing, dict) and existing.get('id') == mission_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        'error': 'mission_id collision',
+                        'id': mission_id,
+                        'existing_entry_brief': existing.get('brief', ''),
+                    },
+                )
+
+        new_entry: dict[str, Any] = {
+            'id': mission_id,
+            'name': body.name,
+            'phase': 'drafting',
+            'brief': body.brief,
+            'spec_docs': list(body.spec_docs),
+            'task_ids': [],
+            'repo': body.repo,
+            'created': now.date().isoformat(),
+            'deferred_reason': None,
+        }
+        updated_registry = {
+            'schema_version': registry.get('schema_version', 1),
+            'missions': registry['missions'] + [new_entry],
+        }
+
+        api_base = f'https://api.github.com/repos/{repo_full}'
+        api_headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+        }
+
+        # 1. Resolve main's SHA.
+        ref_resp = _github_api_request(
+            'GET', f'{api_base}/git/refs/heads/main', headers=api_headers,
+        )
+        if ref_resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github get main ref failed',
+                    'detail': f'status={ref_resp.status_code}',
+                },
+            )
+        main_sha = ref_resp.json().get('object', {}).get('sha')
+        if not isinstance(main_sha, str) or not main_sha:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github main ref missing sha',
+                    'detail': '',
+                },
+            )
+
+        # 2. Create the new branch — atomic at GitHub. 422 → branch
+        #    already exists → return 409 to the caller.
+        branch_resp = _github_api_request(
+            'POST', f'{api_base}/git/refs', headers=api_headers,
+            json_body={'ref': f'refs/heads/{branch}', 'sha': main_sha},
+        )
+        if branch_resp.status_code == 422:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'branch_exists',
+                    'branch': branch,
+                    'hint': (
+                        'Mission name collides with an in-flight mission; '
+                        'pick a different name.'
+                    ),
+                },
+            )
+        if branch_resp.status_code not in (200, 201):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github create branch failed',
+                    'detail': f'status={branch_resp.status_code}',
+                },
+            )
+
+        # 3. Get current `agents/beacon/missions.json` blob sha on the
+        #    branch (which inherits main's content) so PUT can replace it.
+        contents_get = _github_api_request(
+            'GET',
+            f'{api_base}/contents/agents/beacon/missions.json?ref={branch}',
+            headers=api_headers,
+        )
+        file_sha: Optional[str] = None
+        if contents_get.status_code == 200:
+            sha_val = contents_get.json().get('sha')
+            if isinstance(sha_val, str):
+                file_sha = sha_val
+        elif contents_get.status_code != 404:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github get contents failed',
+                    'detail': f'status={contents_get.status_code}',
+                },
+            )
+
+        # 4. PUT the updated missions.json onto the branch.
+        new_text = json.dumps(updated_registry, indent=2) + '\n'
+        put_body: dict[str, Any] = {
+            'message': (
+                f'feat(missions): register {mission_id} per +New mission flow'
+            ),
+            'content': __import__('base64').b64encode(
+                new_text.encode('utf-8'),
+            ).decode('ascii'),
+            'branch': branch,
+        }
+        if file_sha:
+            put_body['sha'] = file_sha
+        put_resp = _github_api_request(
+            'PUT', f'{api_base}/contents/agents/beacon/missions.json',
+            headers=api_headers, json_body=put_body,
+        )
+        if put_resp.status_code not in (200, 201):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github put contents failed',
+                    'detail': f'status={put_resp.status_code}',
+                },
+            )
+
+        # 5. Open the PR.
+        pr_body_parts = [
+            f'Register mission `{mission_id}`.',
+            '',
+            f'**Brief:** {body.brief}',
+        ]
+        if body.spec_docs:
+            pr_body_parts.append('')
+            pr_body_parts.append('**Spec docs:**')
+            for doc in body.spec_docs:
+                pr_body_parts.append(f'- `{doc}`')
+        pr_body_parts.append('')
+        pr_body_parts.append(
+            'Opened by the dashboard +New mission flow '
+            '(E4.4f PR-A). Manual review and merge.',
+        )
+        pr_resp = _github_api_request(
+            'POST', f'{api_base}/pulls', headers=api_headers,
+            json_body={
+                'title': f'feat(missions): register {mission_id}',
+                'head': branch,
+                'base': 'main',
+                'body': '\n'.join(pr_body_parts),
+            },
+        )
+        if pr_resp.status_code not in (200, 201):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github create pr failed',
+                    'detail': f'status={pr_resp.status_code}',
+                },
+            )
+        pr_json = pr_resp.json()
+        pr_url = pr_json.get('html_url') if isinstance(pr_json, dict) else None
+        if not isinstance(pr_url, str) or not pr_url:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail={
+                    'error': 'github create pr returned no html_url',
+                    'detail': '',
+                },
+            )
+
+    return {
+        'mission_id': mission_id,
+        'pr_url': pr_url,
+        'branch': branch,
+    }
+
+
 # ---- /api/larry/* handler (E4.4e PR-B2) ----
 #
 # Spec § 5.2, § 6.3, § 6.4, § 7.1, § 7.2, § 7.3 — Larry-action endpoint
@@ -1931,6 +2333,27 @@ def get_system_worktrees() -> dict[str, Any]:
 )
 def get_system_build_sequences() -> dict[str, Any]:
     return _reader_build_sequences(_sequence_blackboard_root())
+
+
+# ---- /api/system/missions routes (E4.4f PR-A) ----
+
+
+@app.get(
+    '/api/system/missions',
+    response_model=MissionsResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_missions() -> dict[str, Any]:
+    return _reader_missions(_missions_json_path())
+
+
+@app.post(
+    '/api/system/missions/new',
+    response_model=NewMissionResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_system_missions_new(body: NewMissionRequest) -> dict[str, Any]:
+    return _handle_new_mission(body=body, missions_path=_missions_json_path())
 
 
 # ---- /api/larry/* routes (E4.4e PR-B2) ----

@@ -653,6 +653,24 @@ When you see either message on Telegram targeting one of those shapes, your job 
 
 **Cross-reference:** `agents/pulse/CLAUDE.md` Check III section documents the producer side; spec § 5.10 has the full architecture.
 
+## Mission registration discipline (E4.4f)
+
+The mission registry at `agents/beacon/missions.json` is the canonical record of every technical multi-PR initiative the chain is working on. The Missions tab on the dashboard reads this file (via `GET /api/system/missions`) and joins it with `chain_events` + open-PR state to render the kanban (spec `agents/beacon/specs/e4-4f-missions-tab-v1.md` § 5.1, § 5.2).
+
+**The discipline: no chain task gets dispatched without a corresponding mission entry first.**
+
+When you notice that a task you're about to dispatch (whether a fresh APPROVAL_REQUEST or a step in a build sequence) doesn't have a registered mission, do NOT silently dispatch. Register it first. Two paths:
+
+1. **+ New mission modal (preferred).** Larry opens the dashboard Missions tab, clicks "+ New mission," fills the modal. The dashboard POSTs to the droplet's `POST /api/system/missions/new`, which opens a PR on `ourliberty-agent-core` adding the entry. Larry merges. The entry appears in the registry on next poll. Use this path when Larry is at the dashboard and the new mission is the topic of conversation — it's the lowest-friction shape.
+
+2. **Direct commit (for chain-internal authoring).** When you're authoring a spec in Beacon-mode and the mission concept formalizes mid-spec, include the missions.json edit in the same PR as the spec (or as a small predecessor commit). Use this when the new mission isn't worth interrupting Larry over.
+
+The Missions tab's Orphans lane surfaces any `task_id` that appears in `chain_events` but doesn't belong to a registered mission. The lane exists so unregistered tasks don't stay invisible — but it's a remediation surface, not a parking lot. If a task lands in Orphans, the next action is to register a mission for it (or confirm it's truly a one-off hotfix that doesn't warrant one).
+
+**Invariant:** no orphan tasks for long. Either every in-flight task belongs to a mission, or it's an explicit one-off and the lane reflects that. The registry is the chain's coordination surface; let it work.
+
+**Cross-reference:** spec § 5.5 (the + New mission modal flow), § 5.3 (the Orphans lane), and `scripts/dashboard_api.py` (the GET/POST endpoints).
+
 ## Memory discipline
 
 - When something matters across sessions, write it down. Daily notes go in `memory/YYYY-MM-DD.md`. Distilled long-term memory goes in `MEMORY.md`.

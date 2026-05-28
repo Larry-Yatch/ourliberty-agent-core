@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "missions": [
+    {
+      "id": "missions-tab-v1",
+      "name": "Missions Tab v1",
+      "phase": "drafting",
+      "brief": "Kanban surface for technical multi-PR initiatives. Read-only v1; phase derived from chain_events + PR state.",
+      "spec_docs": [
+        "agents/beacon/specs/e4-4f-missions-tab-v1.md"
+      ],
+      "task_ids": [
+        "e4-4f-missions-tab-v1"
+      ],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "e4-4b-projects-kanban",
+      "name": "Programs Kanban (drag-drop projects)",
+      "phase": "deferred",
+      "brief": "Switch Programs view to kanban + drag-drop per E4.4b spec.",
+      "spec_docs": [
+        "agents/beacon/specs/e4-4-dashboard-ui-rebuild.md#e44b"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-24",
+      "deferred_reason": "Prioritized Missions tab first per 2026-05-28 design pass"
+    }
+  ]
+}
