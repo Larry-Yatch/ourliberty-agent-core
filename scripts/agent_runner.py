@@ -117,6 +117,84 @@ def classify_tier1_failure(stdout, stderr):
     return None
 
 
+# Check VIII (PR-2a) — rate-limit observation ledger. The Anthropic quota
+# wall is token-based; the existing 80% dollar-gate alert is a pace
+# indicator only. To measure how well the dollar gate actually predicts
+# the quota wall, we need ground-truth events. This ledger captures every
+# 'rate_limit' classification before retry/Tier-2 logic takes over. Pure
+# observation: no DM, no behavior change. Read by Check VIII analyzer
+# (PR-2b) and by the burn-rate healer's DM body.
+RATE_LIMIT_LEDGER_REL = 'blackboard/anthropic-quota-events.jsonl'
+
+
+def _rate_limit_ledger_path():
+    """Resolve the ledger path. Honors OURLIBERTY_AGENTS_ROOT so test runs
+    redirect to a tmpdir; production collapses to ~/agents/blackboard/.
+    Resolved at call time (not import) so env tweaks land."""
+    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+    base = Path(root) if root else AGENTS_ROOT
+    return base / RATE_LIMIT_LEDGER_REL
+
+
+def append_rate_limit_event(agent, task_id, model, account, stderr,
+                            retry_after_sec=None, ts=None, ledger_path=None):
+    """Append one rate-limit event to the JSONL ledger. Idempotent on the
+    (ts, agent, task_id) tuple — re-appending the same event is a no-op.
+
+    Best-effort: any I/O error is swallowed so a failed ledger write never
+    breaks the agent run. Returns the path on success, None when skipped
+    (duplicate) or on error.
+
+    Schema (Check VIII brief, verbatim):
+      {"ts", "agent", "task_id", "model", "account",
+       "retry_after_sec", "raw_excerpt"}
+    """
+    path = Path(ledger_path) if ledger_path else _rate_limit_ledger_path()
+    event_ts = ts or datetime.now(timezone.utc).isoformat()
+    excerpt = (stderr or '')[:300]
+    record = {
+        'ts': event_ts,
+        'agent': agent or '',
+        'task_id': task_id or '',
+        'model': model or '',
+        'account': account or '',
+        'retry_after_sec': retry_after_sec,
+        'raw_excerpt': excerpt,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Idempotency: scan existing lines for a (ts, agent, task_id) match.
+        # Rate-limit events are sparse (one per failure across all agents),
+        # so a full-file scan per write is fine at this volume.
+        if path.exists():
+            key = (record['ts'], record['agent'], record['task_id'])
+            try:
+                with open(path, errors='replace') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            existing = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if not isinstance(existing, dict):
+                            continue
+                        if (existing.get('ts'),
+                                existing.get('agent'),
+                                existing.get('task_id')) == key:
+                            return None
+            except OSError:
+                # Read failure → fall through to append; better to record a
+                # possible duplicate than silently lose the event.
+                pass
+        with open(path, 'a') as f:
+            f.write(json.dumps(record) + '\n')
+        return path
+    except OSError:
+        return None
+
+
 def tier2_available():
     """True iff /home/larry/.claude-larry-personal/.claude/.credentials.json
     exists. Checked BEFORE swapping HOME so a missing Tier 2 setup DMs Larry
@@ -822,6 +900,20 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             ' stdout=' + repr((result.stdout or '')[:300]) +
                             ' stderr=' + repr((result.stderr or '')[:300]),
                             'WARN')
+                        # Check VIII PR-2a: record rate-limit events to the
+                        # observation ledger before retry/Tier-2 takes over.
+                        # Pure observation; never blocks the recovery path.
+                        if failure_type == 'rate_limit':
+                            try:
+                                append_rate_limit_event(
+                                    agent=agent_id,
+                                    task_id=task_stem or '',
+                                    model=model,
+                                    account='tier1',
+                                    stderr=result.stderr,
+                                )
+                            except Exception:
+                                pass
                         # Resume-discipline rule: --resume session IDs are
                         # NOT portable between accounts. A Tier 2 retry on a
                         # resume task would fail with 'session not found'
