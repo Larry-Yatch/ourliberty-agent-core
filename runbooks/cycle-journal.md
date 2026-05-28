@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 97 — 2026-05-28 13:00 UTC (interactive)
+
+**Health:** ⚠️ Drift (pulse-bot inactive 4th cycle; dashboard-dispatch-source-blocked new finding)
+**Found:**
+- **(A) Source repo: nominal.** Session gitStatus: branch=main, clean. sync.json at 12:16Z: status=no-change at f93b051=HEAD. ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-28T12:16:20Z, status=no-change at f93b051. Within 2h threshold. ✅
+- **(C) Agent liveness: 5/6 active.** `ourliberty-pulse-bot` inactive (4th consecutive cycle: iters 94–97; ~24h total). Beacon: last log 2026-05-28T12:46Z (watchdog alert idx=557 bots:pulse — watchdog correctly alerting). Inbox-watcher: last log 05:30Z. Other 4 units active. G-rule already dispatched (iter 94 → Beacon APPROVAL_REQUEST for pulse_telegram_bot.sh pending Larry authorization). No new dispatch. ⚠️
+- **(D) Inboxes: nominal with new finding.** All 4 inboxes empty. .invalid counts: beacon=5, forge=94, mirror=48, pulse=3 (total=150, unchanged from iter 96). **New finding:** beacon/.invalid contains 4 dashboard-sourced rejections NOT on fixture allowlist: 2 larry-approval-*.json (oldest 2026-05-27T17:55Z) and 2 larry-reject-*.json (2026-05-28T05:29Z, 05:30Z). All rejected: source "dashboard" not in ALLOWED_SOURCES in dispatch_validator.py. These are Larry's real approval/rejection actions from the dashboard UI being silently dropped. Also found: cycle-fix-notify-dedup-20260527T000000Z.json rejected for source="pulse-g-rule" not in allowed list (historical automated cycle dispatch used non-canonical source value). ⚠️
+- **(E) PRs: nominal.** 0 open PRs. ✅
+- **(F) Cost/quota: nominal.** Fresh session. ✅
+- **(H) Forge digest.** 0 PRs merged since iter 96 auto-commit (f93b051, 08:53Z). 0 open. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (86d out). ✅
+- **Check I: off day.** UTC Thursday 2026-05-28 (fires Mon/Wed/Fri/Sun only). ✅
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. ⚠️
+
+**Did:** Dispatched to Beacon: cycle-finding-dashboard-dispatch-source-blocked-20260528T130000Z.json (G-rule met, 4 occurrences — add "dashboard" to dispatch_validator.py ALLOWED_SOURCES). Logged to cycle-actions.jsonl.
+**Escalated:** [yellow] dashboard-dispatch-source-blocked: 4 Larry dashboard approval/rejection actions silently dropped since 2026-05-27T17:55Z. Review any approvals/rejects made via dashboard since then — they did not reach Beacon. Beacon dispatched for fix. | Standing [yellow] pulse-bot inactive (4 cycles; Beacon APPROVAL_REQUEST pending Larry).
+**Forge:** 0 merged since iter 96; 0 open.
+**Patterns:** dashboard-dispatch-source-blocked: G-rule met (4 occurrences). Dispatch sent to Beacon. | pulse-bot inactive: 4th cycle (iters 94–97). Beacon APPROVAL_REQUEST pending Larry. | Check I idempotency fix: pending Larry authorization (iter 83+). | Stuck-cycle timeout guard: pending Larry (iter 43).
+**Learned:** 'dashboard' source not in dispatch_validator.py ALLOWED_SOURCES. Dashboard approval/rejection path silently broken since at least 2026-05-27T17:55Z. Also: automated cycle G-rule dispatches used source='pulse-g-rule' (cycle-fix-notify-dedup) — not in ALLOWED_SOURCES; future dispatches should use source='pulse'. Updating MEMORY.md.
+
+---
+
 ## Iteration 96 — 2026-05-28 08:45 UTC (interactive)
 
 **Health:** ⚠️ Drift (pulse-bot inactive; Beacon APPROVAL_REQUEST pending Larry authorization)
