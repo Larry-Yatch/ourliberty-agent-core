@@ -25,7 +25,7 @@ Every rule-introducing paragraph carries an adjacent `**Enforcement:**` line tha
 | `state-file path that is gitignored` | `~/agents/state/pulse-fixture-suppressions.jsonl` for fixture suppressions | When the rule is "don't put X in git" and X has a structural home outside git. |
 | `allowlist at <surfaces>` | `scripts/fixture_patterns.py` consulted at 5 surfaces | When the rule must hold across multiple call sites — defense in depth. |
 | `Mirror review checklist item` | "Review checks for unenforced rules" in `agents/mirror/CLAUDE.md` | When the rule is structural and Mirror can catch violations at PR time. |
-| `routing rule that physically prevents` | `HARD_TOPOLOGY` in `routing_validator.py` blocks Pulse → Forge | When the rule is "agent X cannot reach Y" and routing is centralized. |
+| `routing rule that physically prevents` | `check_hard_topology()` in `scripts/routing_validator.py` (function at line 294) blocks Pulse → Forge | When the rule is "agent X cannot reach Y" and routing is centralized. |
 | `idempotency flag in artifact` | `applied:true` on Check III proposal artifacts | When the rule is "don't re-apply X" and X produces a durable artifact. |
 
 If none of these fits, document the waiver explicitly:
@@ -48,7 +48,9 @@ The check is structural — Mirror does not adjudicate whether the chosen mechan
 
 ## How Pulse references this when proposing permanent fixes
 
-When Pulse's § G pattern detection surfaces a permanent fix that adds a rule, the dispatch envelope to Beacon/Mirror MUST include the proposed enforcement mechanism alongside the rule prose. Beacon's APPROVAL_REQUEST emit will refuse to forward dispatches whose rule has no mechanism named (and no waiver).
+When Pulse's § G pattern detection surfaces a permanent fix that adds a rule, the dispatch envelope to Beacon/Mirror MUST include the proposed enforcement mechanism alongside the rule prose. The downstream Beacon-side refuse-to-forward check (described in cycle-prompt § G) is not yet implemented as a hard gate — for now, Mirror's review checklist (this PR) and Pulse's own § G discipline catch unenforced rules at PR review time. The Beacon emit-time refuse mechanism is tracked as a follow-up enforcement layer.
+
+**Enforcement:** Mirror's checklist item flags the missing mechanism on PR review. Pulse's § G dispatches a permanent fix after ≥3 incidents of dispatches missing mechanism names. The Beacon emit-time refuse check is the next planned enforcement layer (tracked as follow-up).
 
 ---
 
