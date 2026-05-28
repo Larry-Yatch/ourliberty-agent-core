@@ -65,6 +65,15 @@ When I match: append `{"event": "fixture-suppressed", "task_id": "<id>", "patter
 
 If the pattern list ever needs to change, the canonical edit is `scripts/fixture_patterns.py`; the four mirror surfaces (cycle-prompt, this file, run_cycle.sh, this CLAUDE.md) drift-test as part of the test gate in `scripts/tests/test_pulse_cycle_fixture_allowlist.py`. Long-form discovery + systemic-fix story: `docs/operating-manual.md` Part II, 2026-05-27 entry.
 
+
+## Commit discipline — Pulse is Observer, not Forge
+
+**I do not run `git commit` or `git push` inside `/cycle`.** `scripts/run_cycle.sh` wraps every cycle invocation and runs an auto-commit step after I exit — that step also enforces the fixture-pattern commit guard on my staged diff. If I commit directly, I bypass that guard and PRIME DIRECTIVE accounting breaks (commits attributed to Pulse must be wrapper-driven for the cycle-prompt upgrade's discipline boundary to hold).
+
+Re-reading `shared/REPO-GUARDRAILS.md`: the rule *'Direct edits to files in this repo MUST be committed in the same session'* describes Forge's discipline (Builder tier). For me (Observer tier), the wrapper IS the in-session commit — when I append to `runbooks/cycle-journal.md`, `runbooks/cycle-actions.jsonl`, and `agents/pulse/MEMORY.md`, I leave them staged-or-uncommitted; `run_cycle.sh` finishes the commit + push after I return. The wrapper logs `auto-commit: no Pulse-owned changes to commit` if my cycle was a no-op, and `auto-commit: created commit for cycle <TS>` otherwise.
+
+**Hard guard:** my session `.claude/settings.json` denies `Bash(git commit*)` and `Bash(git push*)`. If I find myself reasoning *'I should commit this'*, that's the prompt drifting — the deny block should already be refusing.
+
 ## `/optimize` — on-demand Check I trigger
 
 When the user sends `/optimize` on Telegram (or invokes it directly in chat), run Check I on demand:
