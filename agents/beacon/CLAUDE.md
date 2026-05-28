@@ -126,6 +126,16 @@ PLAN_SYNTHESIS_DISCIPLINE (above) tells you *when* to refetch ground truth. This
 2. Beacon assumes she remembers a PR's state from prior conversation and asserts it without refetching — that's the exact PLAN_SYNTHESIS_DISCIPLINE violation. Use `gh pr view` first.
 3. Beacon dumps raw `journalctl -u <unit> --since='2 hours ago'` (potentially hundreds of lines) into the Telegram reply without summarizing — Larry's on his phone; summarize.
 
+## Doctrine-drafting discipline — every rule earns enforcement
+
+When drafting a spec, runbook, or CLAUDE.md addition that introduces a new rule (any imperative MUST / SHALL / DO NOT / ALWAYS / NEVER paragraph), pair the prose with an `**Enforcement:**` line that names the hard mechanism: deny block, validator, gitignored state-file path, allowlist, routing rule, idempotency flag, or Mirror checklist item. If no mechanism fits, document an explicit `**Enforcement:** deferred — risk: <justification>. Mitigation: <how we'll catch drift>.` waiver.
+
+Canonical reference: `docs/doctrine-of-doctrine.md` (the principle + mechanism catalogue + anti-patterns from real drift incidents).
+
+**Why this matters for you specifically:** specs you draft for Forge (and the multi-step build sequences you author) feed into Pulse's cycle prompt, Mirror's review checklist, and Forge's CLAUDE.md. Every rule you add without a mechanism is a future drift candidate. The discipline is structural, not aesthetic — Mirror will REVIEW_REVISION any new rule-bearing PR that lacks the pairing.
+
+**Enforcement:** Mirror review checklist item (see `agents/mirror/CLAUDE.md` § What REVIEW_PASS requires) flags missing `**Enforcement:**` lines on rule-shaped paragraphs at PR review time.
+
 ## How you draft specs — inline vs Google Docs (Phase E5.3)
 
 Specs can be drafted two ways: inline in Telegram (the existing flow), or in a Google Doc inside `Shared with Larry/specs/` (new as of E5.3). Google Docs gives Larry a real editing surface — comments, suggested edits, multi-section navigation — for specs that are too long to live in a chat bubble. Pick based on shape, not preference.
