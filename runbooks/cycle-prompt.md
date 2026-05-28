@@ -225,6 +225,42 @@ Behaviors you can rely on:
 
 When the analyzer surfaces proposals, you may add an interpretation paragraph after the deterministic block (engineering reading of *why* this week looked like it did). Keep it scoped — the analyzer's proposals are the contract; your interpretation is enrichment.
 
+#### VIII. Burn-rate-signal validity (Mondays)
+
+Check VIII fires on **Mondays only**, alongside Check I. It observes the `heal-claude-max-burn-rate` DM stream against the `anthropic-quota-events.jsonl` ground-truth ledger (shipped in PR-2a) and proposes adjustments to the dollar gate when the signal turns out to be miscalibrated. Spec: `docs/check-viii-burn-rate-signal-brief.md` § 2 PR-2b.
+
+```
+Trigger conditions:
+  • Today is Monday (UTC weekday == 0), AND
+  • EMERGENCY_HALT not present, AND
+  • Sentinel ~/agents/blackboard/pulse-check-viii-proposals/check-viii-<this-week-Monday>.json
+    is missing OR older than 7 days.
+
+If any condition fails on a Monday, journal a one-line skip note and proceed.
+On non-Monday cycles, skip silently.
+```
+
+**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. It reads `larry-alerts.jsonl` (trailing 4w of burn-rate DMs), `anthropic-quota-events.jsonl` (trailing 4w, plus 8w for the deprecate rule), and `costs.jsonl` (for rolling-5h spend at FN-event timestamps); classifies DMs as TP/FP and events as FN per the 2h proximity window; computes precision + recall; and applies the proposal-firing rules (priority: deprecate > defer > raise > lower).
+
+```bash
+python3 /home/larry/agent-core/scripts/pulse_check_viii.py
+```
+
+The analyzer writes the proposal artifact to `~/agents/blackboard/pulse-check-viii-proposals/check-viii-<week-Monday>.json` (the sentinel-cum-artifact) and DMs Larry via `larry_alerts.append_alert` with `source='pulse-check-viii'`. If a proposal fires (raise/lower/deprecate), the DM includes the `approve check-viii-update-<date>` shortcut. `defer` DMs the metric tension only. `insufficient_signal` and `none` write the artifact but emit no DM.
+
+Behaviors you can rely on:
+
+| Scenario | Analyzer behavior | Your action |
+|---|---|---|
+| Monday + sentinel missing, rule fires (raise/lower/deprecate) | Writes artifact + DMs proposal with approve shortcut | Note Check VIII fired + rule in journal |
+| Monday + sentinel missing, `defer` (precision + recall both below floor) | Writes artifact + DMs tension digest (no shortcut) | Note Check VIII defer in journal |
+| Monday + sentinel missing, `none` or `insufficient_signal` | Writes artifact, no DM | Note Check VIII quiet in journal |
+| Monday + sentinel exists for this week's Monday | Skips silently (idempotent — analyzer's own gate handles this) | No journal note needed |
+| EMERGENCY_HALT tripped | Exits 0 silently | Same as Checks A-H |
+| Tue–Sun (non-firing day) | Don't invoke | Journal nothing for Check VIII |
+
+**First-data-month limitation:** Check VIII needs ≥5 burn-rate DMs and ≥3 quota-events in the trailing 4w to fire a real proposal (otherwise `insufficient_signal`). For the first ~4 weeks after PR-2a + PR-2b ship, expect quiet output. That's expected, not a regression.
+
 #### G. Pattern detection
 
 For each finding type from A–F, count occurrences in the **last 10 cycles**:
