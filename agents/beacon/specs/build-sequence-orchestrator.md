@@ -194,7 +194,9 @@ Adds a new top-level section `## How you author multi-step build sequences` to `
 - Steps declared parallel (i.e., no `depends_on` between them but both share an upstream parent) do not touch overlapping files based on a static analysis of their dispatch_texts and spec sections.
 - All referenced spec sections exist in the spec_doc.
 
-Mirror returns PASS or REVISION-with-reasons. On REVISION, Beacon amends the sequence file and re-dispatches the review. On PASS, Beacon emits the kickoff APPROVAL_REQUEST.
+Mirror returns PASS or REVISION-with-reasons. On REVISION, Beacon amends the sequence file and re-dispatches the review. On PASS, the H1 handler (`_handle_mirror_dag_preflight_result` in `scripts/outbox_notifier.py`) auto-transitions the sequence file from `status: pending` → `status: active` and appends a `dag-preflight-passed` audit_log entry. The `build_sequence_advancer`'s next tick (≤5 min) dispatches the root step. No additional approval required — Larry already approved the sequence at author-time, and a second approval after the DAG-preflight PASS is friction without safety value.
+
+*(Decision D in `agents/beacon/specs/orchestrator-rectification-v2.md` locks "implementation wins" — PR #145 H1 shipped the auto-transition; this spec § 5.5 prose is being aligned in orchestrator-rectification-v2 V5 to match what already ships. The `approve sequence <seq-id>` shortcut still exists for the legacy case where the author wants to defer kickoff past the PASS — it's idempotent and a no-op on a sequence the H1 handler already advanced.)*
 
 **New shortcuts (added to Beacon CLAUDE.md):**
 

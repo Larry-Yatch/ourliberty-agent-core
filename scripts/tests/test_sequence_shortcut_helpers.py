@@ -505,6 +505,158 @@ class SchemaInvariantAfterMutation(_HelpersHarness):
         ssh.apply_skip('inv-skip', 'a')
         self._assert_schema(self._read_sequence('inv-skip'))
 
+    def test_step_merged_preserves_schema(self):
+        seq = _make_sequence(
+            seq_id='inv-step-merged',
+            status='active',
+            steps=[_make_step('a', status='dispatched',
+                              dispatched_at='2026-05-27T00:30:00Z')],
+            current_steps=['a'],
+        )
+        self._write_sequence(seq)
+        ssh.apply_step_merged(
+            seq_id='inv-step-merged',
+            step_id='a',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at='2026-05-27T01:00:00Z',
+        )
+        self._assert_schema(self._read_sequence('inv-step-merged'))
+
+
+# ============================================================================
+# V6 (orchestrator-rectification-v2) — apply_step_merged
+# ============================================================================
+
+
+class ApplyStepMergedTests(_HelpersHarness):
+    """V6: outbox-notifier-emitted signal when AUTO_MERGE merges a PR
+    whose task_id matches a step in an active sequence."""
+
+    def _dispatched_seq(self, seq_id='step-merged-001'):
+        return _make_sequence(
+            seq_id=seq_id,
+            status='active',
+            steps=[
+                _make_step(
+                    'step-1', status='dispatched',
+                    dispatched_at='2026-05-27T00:30:00Z',
+                ),
+                _make_step('step-2', deps=['step-1']),
+            ],
+            current_steps=['step-1'],
+        )
+
+    def test_happy_path_dispatched_to_merged(self):
+        seq = self._dispatched_seq()
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='step-merged-001',
+            step_id='step-1',
+            pr_url='https://github.com/x/y/pull/42',
+            merged_at='2026-05-27T01:00:00Z',
+        )
+        self.assertTrue(result.applied)
+        self.assertFalse(result.error)
+        on_disk = self._read_sequence('step-merged-001')
+        step1 = next(s for s in on_disk['steps'] if s['step_id'] == 'step-1')
+        self.assertEqual(step1['status'], 'merged')
+        self.assertEqual(step1['merged_at'], '2026-05-27T01:00:00Z')
+        self.assertEqual(step1['pr_url'], 'https://github.com/x/y/pull/42')
+        self.assertNotIn('step-1', on_disk['current_steps'])
+
+    def test_appends_step_merged_audit_event(self):
+        seq = self._dispatched_seq()
+        initial_log_len = len(seq['audit_log'])
+        self._write_sequence(seq)
+        ssh.apply_step_merged(
+            seq_id='step-merged-001',
+            step_id='step-1',
+            pr_url='https://github.com/x/y/pull/42',
+            merged_at='2026-05-27T01:00:00Z',
+            actor='notifier',
+        )
+        on_disk = self._read_sequence('step-merged-001')
+        self.assertEqual(len(on_disk['audit_log']), initial_log_len + 1)
+        last = on_disk['audit_log'][-1]
+        self.assertEqual(last['event'], 'step-merged')
+        self.assertEqual(last['step_id'], 'step-1')
+        self.assertEqual(last['pr_url'], 'https://github.com/x/y/pull/42')
+        self.assertEqual(last['actor'], 'notifier')
+        self.assertEqual(last['ts'], '2026-05-27T01:00:00Z')
+
+    def test_idempotent_on_already_merged(self):
+        """Notifier crash-then-resume re-processes the same outbox; the
+        second call must be a clean no-op rather than rewriting fields."""
+        seq = _make_sequence(
+            seq_id='step-merged-002',
+            status='active',
+            steps=[_make_step(
+                'step-1', status='merged',
+                merged_at='2026-05-27T00:00:00Z',
+                pr_url='https://github.com/x/y/pull/1',
+            )],
+            current_steps=[],
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='step-merged-002',
+            step_id='step-1',
+            pr_url='https://github.com/x/y/pull/999',  # different URL
+            merged_at='2026-05-28T00:00:00Z',
+        )
+        self.assertFalse(result.applied)
+        self.assertFalse(result.error)
+        # On-disk state UNCHANGED — original pr_url + merged_at preserved.
+        on_disk = self._read_sequence('step-merged-002')
+        step1 = next(s for s in on_disk['steps'] if s['step_id'] == 'step-1')
+        self.assertEqual(step1['pr_url'], 'https://github.com/x/y/pull/1')
+        self.assertEqual(step1['merged_at'], '2026-05-27T00:00:00Z')
+
+    def test_missing_step_returns_hard_error(self):
+        seq = self._dispatched_seq()
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='step-merged-001',
+            step_id='does-not-exist',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at='2026-05-27T01:00:00Z',
+        )
+        self.assertFalse(result.applied)
+        self.assertTrue(result.error)
+
+    def test_missing_sequence_file_returns_hard_error(self):
+        result = ssh.apply_step_merged(
+            seq_id='absent-sequence',
+            step_id='step-1',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at='2026-05-27T01:00:00Z',
+        )
+        self.assertFalse(result.applied)
+        self.assertTrue(result.error)
+
+    def test_pending_step_also_transitions_to_merged(self):
+        # The advancer's typical pre-dispatch state for a step is 'pending'
+        # before flipping to 'dispatched'. If the notifier signal fires
+        # while we're still in 'pending' (theoretical race; preserves the
+        # invariant), it should still flip cleanly.
+        seq = _make_sequence(
+            seq_id='step-merged-003',
+            status='active',
+            steps=[_make_step('step-1', status='pending')],
+            current_steps=['step-1'],
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='step-merged-003',
+            step_id='step-1',
+            pr_url='https://github.com/x/y/pull/7',
+            merged_at='2026-05-27T01:00:00Z',
+        )
+        self.assertTrue(result.applied)
+        on_disk = self._read_sequence('step-merged-003')
+        step1 = next(s for s in on_disk['steps'] if s['step_id'] == 'step-1')
+        self.assertEqual(step1['status'], 'merged')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -468,6 +468,104 @@ def apply_skip(
     )
 
 
+# -------------------- step-merged (V6, orchestrator-rectification-v2) --------------------
+
+
+def apply_step_merged(
+    seq_id: str,
+    step_id: str,
+    pr_url: str,
+    merged_at: str,
+    actor: str = 'notifier',
+) -> Result:
+    """Mark a step as `merged` from a real PR merge (NOT a skip).
+
+    Hook for the outbox-notifier's AUTO_MERGE path. Whenever AUTO_MERGE
+    successfully merges a PR for a task whose `task_id` matches a step
+    in an active sequence, the notifier calls this helper to flip the
+    step's status `dispatched → merged`, record `merged_at` + `pr_url`,
+    and remove the step from `current_steps`. Without this signal, the
+    build_sequence_advancer never observes the merge — bootstrap-002 V6
+    surfaced exactly that failure (step-verify-write merged at 17:36 MDT;
+    sequence file still showed status=dispatched, merged_at=null 9 hours
+    later until manual cancel).
+
+    Distinct from `apply_skip` (which uses `event: step-skipped` for
+    Larry's out-of-band completion shortcut). `apply_step_merged` uses
+    `event: step-merged` so audit-log readers can distinguish a real PR
+    merge from a manual skip-to-merged.
+
+    Idempotent: if `step.status` is already `merged`, returns
+    `Result(applied=False, reason='already merged')` so a notifier crash
+    between merge and archive (which re-processes the same outbox on
+    restart) doesn't double-fire. Hard error if file missing, JSON
+    invalid, or step_id not found in the sequence.
+
+    Args:
+        seq_id: target sequence id (file at
+            `<AGENTS_ROOT>/blackboard/build-sequences/<seq_id>.json`).
+        step_id: the step whose status flips to `merged`. Per § E (spec
+            decision), task_id matches step_id one-to-one across the
+            sequence's dispatch path.
+        pr_url: GitHub PR URL the AUTO_MERGE just merged.
+        merged_at: ISO-8601 timestamp the merge completed. Caller
+            supplies (typically `datetime.now(timezone.utc).isoformat()`)
+            so the helper stays free of clock dependencies for testing.
+        actor: who recorded the event. Defaults to `notifier` since the
+            AUTO_MERGE path is the canonical caller. The audit_log event
+            is still `step-merged` regardless of actor.
+    """
+    seq, err = _read_sequence(seq_id)
+    if err is not None:
+        return err
+    path = _seq_path(seq_id)
+    step = _find_step(seq, step_id)
+    if step is None:
+        return Result(
+            applied=False,
+            reason=f'Step `{step_id}` not found in sequence `{seq_id}`',
+            sequence_path=path,
+            error=True,
+        )
+
+    current = step.get('status')
+    if current == 'merged':
+        return Result(
+            applied=False,
+            reason=(
+                f'Step `{step_id}` in sequence `{seq_id}` is already '
+                f'`merged`; no-op (idempotent re-fire from notifier '
+                f'crash-resume is safe)'
+            ),
+            sequence_path=path,
+        )
+
+    step['status'] = 'merged'
+    step['merged_at'] = merged_at
+    step['pr_url'] = pr_url
+    seq['current_steps'] = [
+        s for s in (seq.get('current_steps') or []) if s != step_id
+    ]
+    _append_audit(seq, {
+        'ts': merged_at,
+        'event': 'step-merged',
+        'step_id': step_id,
+        'pr_url': pr_url,
+        'actor': actor,
+    })
+    write_err = _atomic_write(path, seq)
+    if write_err is not None:
+        return write_err
+    return Result(
+        applied=True,
+        reason=(
+            f'Step `{step_id}` in sequence `{seq_id}` transitioned '
+            f'`{current}` → `merged` (pr={pr_url})'
+        ),
+        sequence_path=path,
+    )
+
+
 __all__ = [
     'Result',
     'apply_pause',
@@ -475,5 +573,6 @@ __all__ = [
     'apply_cancel',
     'apply_retry',
     'apply_skip',
+    'apply_step_merged',
     'AGENTS_ROOT',
 ]

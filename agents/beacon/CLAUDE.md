@@ -321,11 +321,30 @@ The **authoring** sub-disciplines (sequence-file synthesis, dispatch_text ≤500
 
 Mirror returns PASS or REVISION-with-reasons. On REVISION, Beacon amends the sequence file and re-dispatches the review. On PASS, Beacon emits the kickoff APPROVAL_REQUEST.
 
+**Emission discipline (V1, orchestrator-rectification-v2):** the DAG-preflight marker MUST carry `phase: routing-signal`. Bootstrap-002 surfaced two consecutive Larry-`approve` rejections (F24 "prompt too short") because the field was absent — `marker.py render` had no slot for it. Always emit via the CLI with the explicit `--phase routing-signal` flag rather than hand-crafting JSON. The flag injects `"phase": "routing-signal"` into the rendered payload; without it the validator falls back to MIN_PROMPT_LEN and rejects the short canonical prompt.
+
+Worked example (the exact command Beacon should run):
+
+```bash
+echo '{
+  "task_id":"dag-preflight-<seq-id>",
+  "summary":"DAG preflight for sequence <seq-id>",
+  "target_agent":"mirror",
+  "target_repo":"ourliberty-agent-core",
+  "task_type":"code-review",
+  "prompt":"review-sequence-dag <seq-id>"
+}' \
+  | python3 ~/agent-core/scripts/marker.py render beacon approval_request \
+      --phase routing-signal
+```
+
+Paste the stdout verbatim into the response. PR #149's prompt-prefix exemption stays as defense-in-depth, but the canonical path is `--phase routing-signal`.
+
 *(Live once PR-S4 ships Mirror's DAG-verify capability — specifically, the `agents/mirror/CLAUDE.md` addition teaching Mirror to recognize `prompt: review-sequence-dag <seq-id>` and execute the four-check verification above. Until PR-S4 merges, Mirror does NOT know how to interpret a `review-sequence-dag` prompt; documented now so PR-S2/PR-S3 authoring matches the eventual contract. Until then, the DAG-correctness burden falls on Beacon's own pre-emission self-check + Larry's approval review.)*
 
 **New Beacon shortcuts (added in PR-S4 and rectified in PR-S4-v1, with executable Python helpers for the 5 non-kickoff shortcuts):**
 
-- `approve sequence <seq-id>` — confirms kickoff after Mirror preflight PASSes. Beacon emits an APPROVAL_REQUEST with `target_agent: build_sequence_advancer`, `prompt: kickoff <seq-id>`; the outbox notifier's `_handle_build_sequence_advancer_kickoff` does the status transition.
+- `approve sequence <seq-id>` — confirms kickoff. **Note (orchestrator-rectification-v2 V5):** when Mirror's DAG preflight returns PASS, `_handle_mirror_dag_preflight_result` auto-transitions the sequence from `pending` → `active` without waiting for `approve sequence <seq-id>`. The shortcut still exists for cases where the auto-transition is skipped (e.g., manual sequence creation that bypassed DAG preflight) — it's idempotent (no-op on an already-active sequence per the H1 dedup audit entry) and stays in the operator vocabulary. When invoked, Beacon emits an APPROVAL_REQUEST with `target_agent: build_sequence_advancer`, `prompt: kickoff <seq-id>`; the outbox notifier's `_handle_build_sequence_advancer_kickoff` does the status transition.
 - `pause sequence <seq-id>` — Larry's manual pause. Invoke `python3 -c "from sequence_shortcut_helpers import apply_pause; print(apply_pause('<seq-id>', 'larry'))"` (or import the helper from a Python context). The helper is idempotent (no-op if already paused), atomic-writes the sequence file, and appends a `{event: paused, actor: larry, ts}` audit_log entry.
 - `resume sequence <seq-id>` — unpause. Invoke `apply_resume('<seq-id>', 'larry')`. Idempotent; refuses to resume terminal sequences.
 - `cancel sequence <seq-id>` — terminate (sets status to `failed` per spec § 5.4). Invoke `apply_cancel('<seq-id>', 'larry', reason='<text>')`. `reason` is optional; when omitted the audit entry omits the `reason` key.
