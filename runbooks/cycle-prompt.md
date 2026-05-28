@@ -271,10 +271,11 @@ Exact-match patterns:
 
 **Discipline when you match:**
 
-1. Append one line to `runbooks/cycle-actions.jsonl`:
+1. Append one line to **`~/agents/state/pulse-fixture-suppressions.jsonl`** (state file, NOT git-tracked — the `state/` directory is gitignored):
    ```json
    {"ts": "<ISO 8601>", "iter": <N>, "event": "fixture-suppressed", "task_id": "<id>", "pattern": "<matched-prefix-or-exact>"}
    ```
+   **Do NOT** touch git-tracked `runbooks/cycle-actions.jsonl` or `runbooks/cycle-journal.md` for fixture suppressions — that path caused recurring sync churn (V7, 2026-05-28: out-of-cycle Pulse invocations append to git-tracked files but never commit, dirty tree blocks sync). The state-file path preserves audit value without churn. Real auto-fix actions (non-fixture) still log to `runbooks/cycle-actions.jsonl` per § Auto-fix allow-list below — that path is committed by `run_cycle.sh` at end of cycle.
 2. Do NOT write a `cycle-fix-<slug>.json` envelope. Do NOT escalate. Fixture-pattern task_ids are not bugs in the system; they are test artifacts that leaked into runtime state.
 3. The pattern list is canonical in `scripts/fixture_patterns.py` (Python: `is_fixture_task_id(task_id)`; bash: `SHELL_FIXTURE_REGEX`). If you find a real task_id that matches one of these patterns, that's a pattern bug — flag it to Beacon, don't silently expand the allowlist.
 
