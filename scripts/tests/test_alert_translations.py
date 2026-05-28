@@ -98,9 +98,15 @@ _OUT_OF_V1_SCOPE_SUBJECTS = {
     # failure alerts — out of stopgap's failure-translation scope).
     ('ledger', None),
     ('pulse', None),
-    # watchdog (infra-monitoring: disk, memory, cgroup, bots). Pre-dates
-    # the healer-alert framing and is out of V1; the existing emoji+source
-    # rendering remains adequate for these.
+    # watchdog (infra-monitoring: disk, memory, cgroup, bots). Bot-liveness
+    # subjects (bots:<agent>:down, bots:pulse:tmux) DO have translations as
+    # of the per-bot liveness-policy PR — see config/alert-translations.json
+    # under "watchdog". The wildcard skip stays because the producer's bot
+    # subject is dynamic (`bots:{short}:{mode}`) and would static-analyze to
+    # prefix 'bots', which the longest-prefix lookup can't resolve without
+    # exact-match enumeration. Runtime translation works via direct subject
+    # match. Infra subjects (disk, memory, cgroup) still rely on the raw
+    # emoji+source rendering.
     ('watchdog', None),
 }
 

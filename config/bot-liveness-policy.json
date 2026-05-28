@@ -1,0 +1,31 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Declare each bot's deployment mode so watchdog liveness checks match reality.",
+    "modes": {
+      "systemd": "Bot runs under a systemd unit. Liveness = `systemctl is-active <unit>`. Recovery = `sudo systemctl restart <unit>`.",
+      "tmux-or-systemd": "Bot may run in a tmux session OR a systemd unit. Liveness is satisfied if EITHER path is alive. Recovery defaults to the tmux launcher (the intended deployment) so two competing processes are not started."
+    },
+    "default_mode": "systemd",
+    "default_mode_note": "If a bot is missing from this file, watchdog assumes mode=systemd with unit `ourliberty-<agent>-bot.service` — preserves current behavior for beacon/forge/mirror should the file lose an entry.",
+    "doctrine": "docs/runbooks/watchdog-bot-policy.md (rule + enforcement pairing per doctrine-of-doctrine, PR #163)."
+  },
+  "beacon": {
+    "mode": "systemd",
+    "systemd_unit": "ourliberty-beacon-bot.service"
+  },
+  "forge": {
+    "mode": "systemd",
+    "systemd_unit": "ourliberty-forge-bot.service"
+  },
+  "mirror": {
+    "mode": "systemd",
+    "systemd_unit": "ourliberty-mirror-bot.service"
+  },
+  "pulse": {
+    "mode": "tmux-or-systemd",
+    "tmux_session": "pulse-bot",
+    "systemd_unit": "ourliberty-pulse-bot.service",
+    "launcher": "scripts/pulse_telegram_bot.sh"
+  }
+}
