@@ -70,6 +70,7 @@ import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
 import safe_write_inbox             # noqa: E402
+import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
 import trust_policy                 # noqa: E402
 
 HOME = Path.home()
@@ -3608,6 +3609,115 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
 
 
 # ============================================================================
+# V6 (orchestrator-rectification-v2) — step-merged signal for active sequences
+# ============================================================================
+
+def _signal_sequence_step_merged(
+    task_id: str, pr_url: str, merged_at_iso: str,
+) -> Optional[str]:
+    """If `task_id` matches a step_id in any active sequence file, call
+    `sequence_shortcut_helpers.apply_step_merged()` to flip the step's
+    status `dispatched → merged`, record `pr_url` + `merged_at`, and
+    remove the step from `current_steps`.
+
+    Fired AFTER `_attempt_auto_merge_with_gates` returns
+    `merge_outcome in {merged, already_merged}` from the marker-routing
+    block. Without this signal the build_sequence_advancer never observes
+    the merge — bootstrap-002 V6 surfaced exactly that wedge (step
+    merged at 17:36 MDT; sequence.current_steps still listed it 9 hours
+    later until manual cancel).
+
+    Returns the seq_id of the sequence whose step was updated, or None if
+    no active sequence claimed this task_id. Defensive: any read /
+    write / mutation error is logged as WARN and swallowed — the caller
+    (the marker-routing block) MUST NOT crash on a sequence-file
+    accident; the post-merge DM is the safety-critical surface, the
+    sequence-state propagation is best-effort.
+
+    Active-sequence definition: status ∈ {pending, active}. Terminal
+    sequences (complete / failed / archived / paused) are skipped — a
+    matching task_id there is either historical reconcilliation or a
+    re-fire after pause and would be wrong to mutate without operator
+    intent.
+
+    Idempotency: `apply_step_merged` itself returns `applied=False` when
+    the step is already merged, so a re-fire from outbox re-processing
+    is a clean no-op.
+    """
+    try:
+        seq_dir = AGENTS_ROOT / 'blackboard' / 'build-sequences'
+        if not seq_dir.is_dir():
+            return None
+        for seq_path in sorted(seq_dir.glob('*.json')):
+            # Skip jsonl side-channels (.kickoff-failures.jsonl etc).
+            if not seq_path.suffix == '.json':
+                continue
+            try:
+                seq = json.loads(seq_path.read_text())
+            except (OSError, json.JSONDecodeError) as e:
+                log(
+                    f'sequence-step-merged: skipping {seq_path.name} '
+                    f'(unreadable: {type(e).__name__}: {e})',
+                    'WARN',
+                )
+                continue
+            if not isinstance(seq, dict):
+                continue
+            if seq.get('status') not in ('pending', 'active'):
+                continue
+            steps = seq.get('steps') or []
+            if not any(
+                isinstance(s, dict) and s.get('step_id') == task_id
+                for s in steps
+            ):
+                continue
+            seq_id = seq.get('seq_id')
+            if not isinstance(seq_id, str) or not seq_id:
+                continue
+            try:
+                result = ssh.apply_step_merged(
+                    seq_id=seq_id,
+                    step_id=task_id,
+                    pr_url=pr_url,
+                    merged_at=merged_at_iso,
+                    actor='notifier',
+                )
+            except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+                log(
+                    f'SEQUENCE_STEP_MERGED seq={seq_id} step={task_id} '
+                    f'pr={pr_url} apply_step_merged raised '
+                    f'{type(e).__name__}: {e}',
+                    'WARN',
+                )
+                return seq_id
+            if result.error:
+                log(
+                    f'SEQUENCE_STEP_MERGED seq={seq_id} step={task_id} '
+                    f'pr={pr_url} hard-error: {result.reason}',
+                    'WARN',
+                )
+                return seq_id
+            if result.applied:
+                log(
+                    f'SEQUENCE_STEP_MERGED seq={seq_id} step={task_id} '
+                    f'pr={pr_url}',
+                )
+            else:
+                log(
+                    f'SEQUENCE_STEP_MERGED seq={seq_id} step={task_id} '
+                    f'pr={pr_url} no-op ({result.reason})',
+                )
+            return seq_id
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'sequence-step-merged scan raised {type(e).__name__}: {e}; '
+            f'swallowing — DM path still fires',
+            'WARN',
+        )
+    return None
+
+
+# ============================================================================
 # D3.5 5d-prime — AUTO_MERGE serializer (overlap-aware merge gating)
 # ============================================================================
 #
@@ -6406,6 +6516,16 @@ def process_outbox(outbox_file: Path) -> str:
                         }
                 marker_decision['merge_result'] = merge_result
                 marker_decision['merge_outcome'] = merge_result['merge_outcome']
+                # V6 (orchestrator-rectification-v2): when this PR merged
+                # successfully, propagate the signal to any active sequence
+                # whose step_id matches data['task_id']. Best-effort; the DM
+                # path below is unaffected by failure here.
+                if merge_result.get('merge_outcome') in ('merged', 'already_merged'):
+                    _signal_sequence_step_merged(
+                        task_id=str(data.get('task_id') or ''),
+                        pr_url=pr_url,
+                        merged_at_iso=datetime.now(timezone.utc).isoformat(),
+                    )
             else:
                 # Mirror PASS without a pr_url is malformed; the marker
                 # parser would normally catch this, but defensive — render

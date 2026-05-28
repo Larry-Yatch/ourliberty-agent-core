@@ -94,6 +94,21 @@ def cmd_render(args: argparse.Namespace) -> int:
     """render <agent> <type>: print canonical marker block to stdout."""
     handler = _resolve_handler(args.agent)
     payload = _read_stdin_json()
+    # V3 (orchestrator-rectification-v2): --phase merges into the payload so
+    # Beacon can mint approval_request markers with `"phase": "routing-signal"`
+    # for DAG-preflight emissions without hand-editing JSON. The flag is
+    # accepted on every (agent, type) — all three handlers preserve extra
+    # fields. Backward-compatible: omit the flag and no `phase` field is
+    # emitted. A `phase` already present in the stdin payload is rejected so
+    # the CLI doesn't silently overwrite caller intent.
+    if args.phase is not None:
+        if 'phase' in payload:
+            sys.stderr.write(
+                'marker.py render: --phase conflicts with `phase` already '
+                'present in the stdin payload. Provide it via exactly one path.\n'
+            )
+            return 1
+        payload['phase'] = args.phase
     try:
         sys.stdout.write(handler.render_marker(args.type, **payload))
     except ValueError as e:
@@ -137,6 +152,15 @@ def main(argv: list[str] | None = None) -> int:
     p_render = sub.add_parser('render', help='Read JSON from stdin, print marker.')
     p_render.add_argument('agent', choices=sorted(HANDLERS))
     p_render.add_argument('type', help='Marker type (see `types <agent>`).')
+    p_render.add_argument(
+        '--phase',
+        default=None,
+        help=(
+            'Optional `phase` field merged into the payload before rendering. '
+            'Used by Beacon for `--phase routing-signal` on DAG-preflight '
+            'APPROVAL_REQUEST markers. Omit to render without a phase field.'
+        ),
+    )
     p_render.set_defaults(func=cmd_render)
 
     p_validate = sub.add_parser('validate', help='Read JSON from stdin, check valid.')

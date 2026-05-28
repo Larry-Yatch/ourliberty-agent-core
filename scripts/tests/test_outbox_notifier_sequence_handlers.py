@@ -686,5 +686,201 @@ class KickoffFailureModes(_KickoffHandlerHarness):
 # of the 5 helpers, against the same PR-S2 validator. See that file.
 
 
+# ============================================================================
+# V6 (orchestrator-rectification-v2) — _signal_sequence_step_merged
+# ============================================================================
+
+
+import sequence_shortcut_helpers as ssh  # noqa: E402
+
+
+class SignalSequenceStepMergedHarness(_KickoffHandlerHarness):
+    """Shared setUp from _KickoffHandlerHarness — same per-test tmpdir
+    isolation. Extra rerouting for `sequence_shortcut_helpers.AGENTS_ROOT`
+    so the V6 helper writes into the same tmpdir as outbox_notifier."""
+
+    def setUp(self):
+        super().setUp()
+        self._ssh_original_root = ssh.AGENTS_ROOT
+        ssh.AGENTS_ROOT = self._root
+
+    def tearDown(self):
+        ssh.AGENTS_ROOT = self._ssh_original_root
+        super().tearDown()
+
+    def _make_active_sequence(
+        self, seq_id='live-seq-001', dispatched_step='step-a',
+    ):
+        return _make_sequence(
+            seq_id=seq_id,
+            status='active',
+            steps=[
+                _make_step(
+                    dispatched_step, deps=[], status='dispatched',
+                    dispatched_at='2026-05-27T00:30:00Z',
+                ),
+                _make_step(
+                    'step-b', deps=[dispatched_step], status='pending',
+                ),
+            ],
+            current_steps=[dispatched_step],
+        )
+
+
+class SignalSequenceStepMergedHappyPath(SignalSequenceStepMergedHarness):
+
+    def test_active_sequence_with_matching_step_id_flips_to_merged(self):
+        seq = self._make_active_sequence()
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_merged(
+            task_id='step-a',
+            pr_url='https://github.com/larry/r/pull/77',
+            merged_at_iso='2026-05-27T01:00:00Z',
+        )
+        self.assertEqual(result, 'live-seq-001')
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(
+            s for s in on_disk['steps'] if s['step_id'] == 'step-a'
+        )
+        self.assertEqual(step_a['status'], 'merged')
+        self.assertEqual(step_a['pr_url'],
+                         'https://github.com/larry/r/pull/77')
+        self.assertEqual(step_a['merged_at'], '2026-05-27T01:00:00Z')
+        self.assertNotIn('step-a', on_disk['current_steps'])
+        # An audit-log entry was appended.
+        last = on_disk['audit_log'][-1]
+        self.assertEqual(last['event'], 'step-merged')
+        self.assertEqual(last['actor'], 'notifier')
+
+    def test_no_matching_step_returns_none(self):
+        seq = self._make_active_sequence()
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_merged(
+            task_id='unrelated-task',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at_iso='2026-05-27T01:00:00Z',
+        )
+        self.assertIsNone(result)
+        # Sequence file unchanged.
+        on_disk = self._read_sequence('live-seq-001')
+        step_a = next(s for s in on_disk['steps'] if s['step_id'] == 'step-a')
+        self.assertEqual(step_a['status'], 'dispatched')
+
+    def test_terminal_sequence_is_not_mutated(self):
+        # A completed or paused sequence with a matching task_id is
+        # ignored — historical reconciliation isn't safe without operator
+        # intent (a re-fire could re-open a closed sequence).
+        for term_status in ('complete', 'failed', 'archived', 'paused'):
+            with self.subTest(status=term_status):
+                seq = _make_sequence(
+                    seq_id=f'term-{term_status}',
+                    status=term_status,
+                    steps=[_make_step(
+                        'x', status='merged',
+                        merged_at='2026-05-26T00:00:00Z',
+                        pr_url='https://github.com/x/y/pull/1',
+                    )],
+                )
+                self._write_sequence(seq)
+                result = on._signal_sequence_step_merged(
+                    task_id='x',
+                    pr_url='https://github.com/x/y/pull/99',
+                    merged_at_iso='2026-05-27T01:00:00Z',
+                )
+                self.assertIsNone(result)
+                # File unchanged — original pr_url preserved.
+                on_disk = self._read_sequence(f'term-{term_status}')
+                self.assertEqual(
+                    on_disk['steps'][0]['pr_url'],
+                    'https://github.com/x/y/pull/1',
+                )
+
+    def test_pending_sequence_with_matching_step_is_mutated(self):
+        # `pending` is also considered active for V6 purposes — a step
+        # somehow merging on a sequence that hasn't yet kicked off is an
+        # edge case but we want the signal to land cleanly rather than
+        # be silently dropped.
+        seq = _make_sequence(
+            seq_id='pending-seq',
+            status='pending',
+            steps=[_make_step('step-a', status='dispatched',
+                              dispatched_at='2026-05-27T00:00:00Z')],
+            current_steps=['step-a'],
+        )
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_merged(
+            task_id='step-a',
+            pr_url='https://github.com/x/y/pull/3',
+            merged_at_iso='2026-05-27T01:00:00Z',
+        )
+        self.assertEqual(result, 'pending-seq')
+        on_disk = self._read_sequence('pending-seq')
+        self.assertEqual(on_disk['steps'][0]['status'], 'merged')
+
+
+class SignalSequenceStepMergedRobustness(SignalSequenceStepMergedHarness):
+    """Defensive cases — the scan must NOT crash the daemon."""
+
+    def test_no_sequences_directory_returns_none(self):
+        # Wipe the build-sequences directory entirely; the scan should
+        # short-circuit cleanly.
+        import shutil
+        shutil.rmtree(on.AGENTS_ROOT / 'blackboard' / 'build-sequences')
+        result = on._signal_sequence_step_merged(
+            task_id='x',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at_iso='2026-05-27T01:00:00Z',
+        )
+        self.assertIsNone(result)
+
+    def test_malformed_sequence_file_is_skipped(self):
+        # A broken JSON file in the sequences dir must not crash the
+        # scan. We add a malformed file AND a valid matching one — the
+        # scan should still apply the signal to the valid one.
+        bad_path = (
+            on.AGENTS_ROOT / 'blackboard' / 'build-sequences'
+            / 'corrupt.json'
+        )
+        bad_path.write_text('{not valid json')
+        seq = self._make_active_sequence(seq_id='good-seq')
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_merged(
+            task_id='step-a',
+            pr_url='https://github.com/x/y/pull/4',
+            merged_at_iso='2026-05-27T01:00:00Z',
+        )
+        self.assertEqual(result, 'good-seq')
+
+    def test_idempotent_when_step_already_merged(self):
+        # Outbox re-processing after a notifier crash: the second call
+        # must not double-fire (apply_step_merged returns applied=False).
+        seq = _make_sequence(
+            seq_id='already-merged-seq',
+            status='active',
+            steps=[_make_step(
+                'step-a', status='merged',
+                merged_at='2026-05-27T00:00:00Z',
+                pr_url='https://github.com/x/y/pull/1',
+            )],
+        )
+        self._write_sequence(seq)
+        result = on._signal_sequence_step_merged(
+            task_id='step-a',
+            pr_url='https://github.com/x/y/pull/99',  # different URL
+            merged_at_iso='2026-05-28T00:00:00Z',
+        )
+        # Returns the matched seq_id (it WAS found) but no mutation.
+        self.assertEqual(result, 'already-merged-seq')
+        on_disk = self._read_sequence('already-merged-seq')
+        self.assertEqual(
+            on_disk['steps'][0]['pr_url'],
+            'https://github.com/x/y/pull/1',
+        )
+        self.assertEqual(
+            on_disk['steps'][0]['merged_at'],
+            '2026-05-27T00:00:00Z',
+        )
+
+
 if __name__ == '__main__':
     unittest.main()

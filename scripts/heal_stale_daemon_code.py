@@ -127,6 +127,55 @@ RESTART_TIMEOUT_S = 30
 # ExecStart pointing at code — they activate the underlying .service).
 UNIT_GLOB = 'ourliberty-*.service'
 
+# orchestrator-rectification-v2 V4 (2026-05-28). Multi-daemon-restart
+# shape: a shared library imported by N long-running daemons mutates on
+# merge, but the daemons keep running pre-merge module bytes until each
+# is individually restarted. Bootstrap-002 verified this empirically —
+# `scripts/dispatch_validator.py` changes from PR #145 didn't take effect
+# until beacon-bot, outbox-notifier, AND inbox-watcher all restarted.
+#
+# Each key is an absolute path to a script in this repo's `scripts/`.
+# Each value is the set of systemd units that import that script (directly
+# or transitively) and must be restarted when the script's mtime moves
+# forward on disk. The runbook
+# `runbooks/post-merge-daemon-restart-discipline.md` documents the
+# mapping in prose; this dict is the executable enforcement.
+#
+# Resolution rule per (lib, unit) pair on each tick: when
+# `script_mtime > service_start + RACE_AVOIDANCE_SEC`, treat the unit as
+# stale and route it through the same auto-restart path as a
+# direct-script staleness hit. The per-unit 30-min restart cooldown is
+# shared with the direct-script path — a unit won't be restarted twice
+# in the same window regardless of which path detected the staleness.
+#
+# Path resolution: `_SCRIPTS_DIR` is computed lazily so test fixtures can
+# point the watchlist at a tmp directory by monkey-patching this constant
+# before the first `check_shared_lib_watchlist` call.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+
+SHARED_LIB_WATCHLIST: dict[Path, set[str]] = {
+    _SCRIPTS_DIR / 'dispatch_validator.py': {
+        'ourliberty-beacon-bot.service',
+        'ourliberty-outbox-notifier.service',
+        'ourliberty-inbox-watcher.service',
+    },
+    _SCRIPTS_DIR / 'safe_write_inbox.py': {
+        'ourliberty-beacon-bot.service',
+        'ourliberty-outbox-notifier.service',
+        'ourliberty-inbox-watcher.service',
+    },
+    _SCRIPTS_DIR / 'routing_validator.py': {
+        'ourliberty-beacon-bot.service',
+        'ourliberty-outbox-notifier.service',
+        'ourliberty-inbox-watcher.service',
+    },
+    _SCRIPTS_DIR / 'marker.py': {
+        'ourliberty-beacon-bot.service',
+        'ourliberty-outbox-notifier.service',
+        'ourliberty-inbox-watcher.service',
+    },
+}
+
 # Conservative ExecStart parser. Match lines that look like:
 #   ExecStart=<interpreter> <args> <script-path>
 #   ExecStart=<script-path> <args>
@@ -823,6 +872,108 @@ def check_unit(
     return 'auto-restart-failed'
 
 
+# -------------------- shared-lib watchlist (V4) --------------------
+
+def check_shared_lib_watchlist(
+    state: dict, now: Optional[float] = None,
+) -> dict[str, int]:
+    """Scan SHARED_LIB_WATCHLIST. For each (lib, dependent-unit) pair, if
+    the lib's mtime is newer than the dependent unit's ActiveEnterTimestamp
+    by more than RACE_AVOIDANCE_SEC, route the unit through the same
+    auto-restart machinery as the direct-script path.
+
+    Reuses the existing per-unit primitives (`in_restart_cooldown`,
+    `auto_restart_unit`, `mark_restarted`, `dm_larry_auto_restarted`,
+    `dm_larry_auto_restart_failed`). Outcome counts share names with
+    `check_unit` so the main-loop summary log stays interpretable when
+    both paths fire on the same tick.
+
+    Returns a counts dict; the caller folds it into the main loop's
+    aggregate.
+
+    Important: when a dependent unit is restarted via this path, the
+    cooldown clock is shared with the direct-script path
+    (`mark_restarted`). The next tick's `check_unit` for that unit will
+    therefore observe `in_restart_cooldown=True` and not double-restart.
+    """
+    counts: dict[str, int] = {}
+    for lib_path, dependent_units in SHARED_LIB_WATCHLIST.items():
+        if not lib_path.is_file():
+            # Defensive: a watchlisted file may not exist in a sparse test
+            # fixture or during a reorganization. Skip silently — the
+            # runbook is the spec; missing-on-disk is operator action.
+            continue
+        try:
+            lib_mtime = lib_path.stat().st_mtime
+        except OSError as e:
+            log(f'watchlist: stat({lib_path}) failed: {e}', 'WARN')
+            continue
+        for unit in sorted(dependent_units):
+            outcome = _check_watchlist_pair(
+                lib_path, lib_mtime, unit, state, now=now,
+            )
+            counts[outcome] = counts.get(outcome, 0) + 1
+    return counts
+
+
+def _check_watchlist_pair(
+    lib_path: Path, lib_mtime: float, unit: str,
+    state: dict, now: Optional[float] = None,
+) -> str:
+    """Evaluate one (shared-lib, dependent-unit) pair. Outcomes mirror
+    `check_unit`'s vocabulary so the main-loop summary stays uniform:
+    'auto-restarted' / 'auto-restart-failed' / 'restart-cooldown' /
+    'race-window' / 'fresh' / 'unparseable'.
+    """
+    raw_ts = systemctl_show(unit, 'ActiveEnterTimestamp')
+    service_start = parse_systemd_timestamp(raw_ts) if raw_ts is not None else None
+    if service_start is None:
+        # Either the unit isn't installed on this host or systemd hasn't
+        # finished bringing it up. Either way: nothing to compare against.
+        return 'unparseable'
+
+    if not is_stale(service_start, lib_mtime):
+        if lib_mtime > service_start:
+            return 'race-window'
+        return 'fresh'
+
+    if in_restart_cooldown(state, unit, now=now):
+        log(
+            f'watchlist: {unit} stale vs {lib_path.name} but in 30-min '
+            f'restart cooldown — suppressing duplicate restart',
+            'INFO',
+        )
+        return 'restart-cooldown'
+
+    rc, stderr = auto_restart_unit(unit)
+    mark_restarted(state, unit, now=now)
+    save_state(state)
+
+    if rc == 0:
+        pre_restart_iso = datetime.fromtimestamp(
+            service_start, tz=timezone.utc,
+        ).isoformat()
+        pr_lines = infer_recent_prs(lib_path, pre_restart_iso)
+        dm_larry_auto_restarted(
+            unit, lib_path, service_start, lib_mtime, pr_lines,
+        )
+        log(
+            f'watchlist: AUTO-RESTARTED {unit} (shared lib '
+            f'{lib_path.name} newer than active-since by '
+            f'{(lib_mtime - service_start) / 60:.1f}min); PRs since: '
+            f'{len(pr_lines)}'
+        )
+        return 'auto-restarted'
+
+    dm_larry_auto_restart_failed(unit, rc, stderr)
+    log(
+        f'watchlist: AUTO-RESTART FAILED unit={unit} '
+        f'lib={lib_path.name} rc={rc} stderr={stderr[:200]!r}',
+        'WARN',
+    )
+    return 'auto-restart-failed'
+
+
 # -------------------- main --------------------
 
 def main() -> int:
@@ -847,6 +998,14 @@ def main() -> int:
     for unit in units:
         outcome = check_unit(unit, state, overrides=overrides)
         counts[outcome] = counts.get(outcome, 0) + 1
+
+    # V4: shared-lib watchlist scan after the direct-script pass. The
+    # cooldown clock is shared via `state`, so a direct-script restart on
+    # tick N suppresses a watchlist restart on the same tick for the same
+    # unit (and vice versa).
+    watchlist_counts = check_shared_lib_watchlist(state, now=None)
+    for k, v in watchlist_counts.items():
+        counts[k] = counts.get(k, 0) + v
 
     log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items() if v))
     return 0

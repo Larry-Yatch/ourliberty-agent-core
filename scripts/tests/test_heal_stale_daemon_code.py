@@ -1001,5 +1001,242 @@ class MainTests(_IsolatedAgentsRoot):
             self.assertEqual(h.main(), 0)
 
 
+# ============================================================================
+# V4 (orchestrator-rectification-v2) — SHARED_LIB_WATCHLIST
+# ============================================================================
+
+
+class SharedLibWatchlistTests(_IsolatedAgentsRoot):
+    """The shared-lib watchlist auto-restarts dependent daemons when a
+    library imported by multiple long-running units changes on disk."""
+
+    def _patch_watchlist(self, mapping):
+        """Replace `h.SHARED_LIB_WATCHLIST` with the given dict (Path → set)."""
+        return mock.patch.object(h, 'SHARED_LIB_WATCHLIST', mapping)
+
+    def _stub_systemctl(self, properties_per_unit):
+        """systemctl_show stub keyed by (unit, prop)."""
+        def fake_show(unit, prop):
+            return properties_per_unit.get(unit, {}).get(prop)
+        return mock.patch.object(h, 'systemctl_show', side_effect=fake_show)
+
+    def _stub_restart(self, rc=0, stderr=''):
+        return mock.patch.object(
+            h, 'auto_restart_unit', return_value=(rc, stderr),
+        )
+
+    def _stub_dms(self):
+        return {
+            'restarted': mock.patch.object(
+                h, 'dm_larry_auto_restarted', return_value=True,
+            ),
+            'failed': mock.patch.object(
+                h, 'dm_larry_auto_restart_failed', return_value=True,
+            ),
+        }
+
+    def _stub_prs(self, lines=None):
+        return mock.patch.object(
+            h, 'infer_recent_prs', return_value=(lines or []),
+        )
+
+    def test_lib_newer_than_dependent_unit_triggers_restart(self):
+        # The canonical bootstrap-002 V4 case: dispatch_validator.py merges
+        # to disk; outbox-notifier was started before the merge so it's now
+        # running stale module bytes. Healer should restart it.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'dispatch_validator.py'
+            lib.write_text('# fresh shared lib')
+            now = time.time()
+            service_start = now - (60 * 60)        # 1h ago
+            lib_mtime = now - (10 * 60)            # 10 min ago — > 5 min gap
+            os.utime(lib, (lib_mtime, lib_mtime))
+            dms = self._stub_dms()
+            watchlist = {lib: {'ourliberty-outbox-notifier.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-outbox-notifier.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart(rc=0) as m_restart, \
+                    self._stub_prs() as _m_prs, \
+                    dms['restarted'] as m_r, dms['failed'] as m_f:
+                counts = h.check_shared_lib_watchlist(
+                    {'services': {}}, now=now,
+                )
+            self.assertEqual(counts.get('auto-restarted'), 1)
+            self.assertEqual(m_restart.call_count, 1)
+            self.assertEqual(
+                m_restart.call_args.args[0],
+                'ourliberty-outbox-notifier.service',
+            )
+            self.assertEqual(m_r.call_count, 1)
+            self.assertEqual(m_f.call_count, 0)
+
+    def test_lib_within_race_window_no_action(self):
+        # mtime gap < RACE_AVOIDANCE_SEC → race-window suppression. The
+        # legitimate "sync + restart cycle just completed" case.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'lib.py'
+            lib.write_text('')
+            now = time.time()
+            service_start = now - (10 * 60)
+            lib_mtime = service_start + (3 * 60)   # 3 min gap
+            os.utime(lib, (lib_mtime, lib_mtime))
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            dms = self._stub_dms()
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-foo.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart() as m_restart, \
+                    dms['restarted'] as m_r, dms['failed'] as m_f:
+                counts = h.check_shared_lib_watchlist(
+                    {'services': {}}, now=now,
+                )
+            self.assertEqual(counts.get('race-window'), 1)
+            self.assertEqual(m_restart.call_count, 0)
+            self.assertEqual(m_r.call_count, 0)
+            self.assertEqual(m_f.call_count, 0)
+
+    def test_lib_older_than_service_no_action(self):
+        # Normal steady state: lib hasn't changed since the unit started.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'lib.py'
+            lib.write_text('')
+            now = time.time()
+            service_start = now - (10 * 60)
+            lib_mtime = now - (60 * 60)           # 1 hour ago
+            os.utime(lib, (lib_mtime, lib_mtime))
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            dms = self._stub_dms()
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-foo.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart() as m_restart, \
+                    dms['restarted'] as m_r:
+                counts = h.check_shared_lib_watchlist(
+                    {'services': {}}, now=now,
+                )
+            self.assertEqual(counts.get('fresh'), 1)
+            self.assertEqual(m_restart.call_count, 0)
+            self.assertEqual(m_r.call_count, 0)
+
+    def test_restart_cooldown_suppresses_second_restart(self):
+        # The cooldown clock is shared with the direct-script path —
+        # marking the unit restarted then asking the watchlist to check
+        # within 30 min should suppress (returns 'restart-cooldown').
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'lib.py'
+            lib.write_text('')
+            now = time.time()
+            service_start = now - (60 * 60)
+            lib_mtime = now - (10 * 60)
+            os.utime(lib, (lib_mtime, lib_mtime))
+            state = {
+                'services': {
+                    'ourliberty-foo.service': {
+                        'last_restart_ts': now - 60,  # 1 min ago
+                    },
+                },
+            }
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            ts_str = time.strftime(
+                '%Y-%m-%d %H:%M:%S', time.localtime(service_start),
+            )
+            dms = self._stub_dms()
+            with self._patch_watchlist(watchlist), \
+                    self._stub_systemctl({
+                        'ourliberty-foo.service': {
+                            'ActiveEnterTimestamp': ts_str,
+                        },
+                    }), self._stub_restart() as m_restart, \
+                    dms['restarted'] as m_r:
+                counts = h.check_shared_lib_watchlist(state, now=now)
+            self.assertEqual(counts.get('restart-cooldown'), 1)
+            self.assertEqual(m_restart.call_count, 0)
+            self.assertEqual(m_r.call_count, 0)
+
+    def test_lib_missing_from_disk_is_skipped(self):
+        # Defensive: a watchlisted path may not exist in a sparse fixture
+        # or during a reorganization. Should not crash.
+        with tempfile.TemporaryDirectory() as td:
+            lib = Path(td) / 'does-not-exist.py'
+            watchlist = {lib: {'ourliberty-foo.service'}}
+            dms = self._stub_dms()
+            # systemctl_show should never be called for a missing-on-disk lib.
+            with self._patch_watchlist(watchlist), \
+                    mock.patch.object(h, 'systemctl_show') as m_show, \
+                    self._stub_restart() as m_restart, \
+                    dms['restarted'] as m_r:
+                counts = h.check_shared_lib_watchlist(
+                    {'services': {}}, now=time.time(),
+                )
+            self.assertEqual(counts, {})
+            self.assertEqual(m_show.call_count, 0)
+            self.assertEqual(m_restart.call_count, 0)
+            self.assertEqual(m_r.call_count, 0)
+
+    def test_canonical_watchlist_targets_the_three_known_daemons(self):
+        # Lock in the spec's table: each shared lib in the watchlist points
+        # at the same three long-running daemons (beacon-bot, outbox-notifier,
+        # inbox-watcher). If a future PR mutates the set, the runbook
+        # mapping must be updated in lockstep.
+        expected_units = {
+            'ourliberty-beacon-bot.service',
+            'ourliberty-outbox-notifier.service',
+            'ourliberty-inbox-watcher.service',
+        }
+        # The watchlist must include at least one entry — sanity check
+        # the module didn't silently drop the constant.
+        self.assertGreater(len(h.SHARED_LIB_WATCHLIST), 0)
+        for lib_path, units in h.SHARED_LIB_WATCHLIST.items():
+            with self.subTest(lib=lib_path.name):
+                self.assertEqual(units, expected_units)
+
+    def test_main_invokes_watchlist_and_folds_counts(self):
+        # Sanity: main() calls check_shared_lib_watchlist after the unit
+        # pass and the counts are folded into the same summary log. We
+        # don't assert the log text here — just that the watchlist
+        # function gets called once per tick.
+        with mock.patch.object(
+            h, 'list_ourliberty_services', return_value=[],
+        ):
+            # No direct units to scan, so watchlist still runs.
+            with mock.patch.object(
+                h, 'check_shared_lib_watchlist', return_value={},
+            ) as m_watch:
+                rc = h.main()
+            self.assertEqual(rc, 0)
+            # With no units found, the unit loop short-circuits BEFORE
+            # the watchlist call. That's acceptable per V4 — there's
+            # nothing to restart anyway. The next assertion confirms the
+            # function isn't called in that branch.
+            self.assertEqual(m_watch.call_count, 0)
+
+        # Now exercise the path where the unit loop runs.
+        with mock.patch.object(
+            h, 'list_ourliberty_services', return_value=['ourliberty-x.service'],
+        ), mock.patch.object(h, 'check_unit', return_value='fresh'):
+            with mock.patch.object(
+                h, 'check_shared_lib_watchlist', return_value={'fresh': 0},
+            ) as m_watch:
+                rc = h.main()
+            self.assertEqual(rc, 0)
+            self.assertEqual(m_watch.call_count, 1)
+
+
 if __name__ == '__main__':
     unittest.main()
