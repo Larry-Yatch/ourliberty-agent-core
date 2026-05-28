@@ -4,6 +4,17 @@
 
 ---
 
+## [Notification] 2026-05-28 ~13:30 UTC — Beacon confirmed dashboard-dispatch-source-blocked + APPROVAL_REQUEST received
+
+**Source:** Inter-agent notify from Beacon (task=cycle-finding-dashboard-dispatch-source-blocked-20260528T130000Z, status=SUCCESS)
+**Finding confirmed:** 4 dropped Larry dashboard actions verified (2 `larry-approval-*`, 2 `larry-reject-*`, window 2026-05-27T16:38Z–2026-05-28T05:30Z). Root cause: `scripts/dispatch_validator.py` ALLOWED_SOURCES missing `'dashboard'`. Emitters (dashboard_api.py L1600/1620/1660, beacon_approval_handler.py L690/697) are correct — allowlist is the only gap.
+**APPROVAL_REQUEST received:** task_id=`validator-allow-dashboard-source-001` — add `'dashboard'` to ALLOWED_SOURCES in dispatch_validator.py + regression test in test_dispatch_validator.py confirming the accept path. Out-of-scope (correctly excluded by Beacon): replay of 4 stale .invalid envelopes (12–36h old, may be moot — Larry decides separately); `'pulse-g-rule'` source (no live emitter found by grep across scripts/agents/).
+**Pulse assessment:** Spec is sound. Minimal scope (one allowlist entry + one test), correct emitter audit, sensible exclusions. T0 sandbox file, reversible.
+**Action:** Escalated to Larry via pulse-escalations.json. Per MEMORY.md architectural constraint (confirmed iter 43): Pulse is not an approval authority — Larry must authorize via Telegram → Beacon → Forge.
+**Status:** Pending Larry authorization.
+
+---
+
 ## Iteration 97 — 2026-05-28 13:00 UTC (interactive)
 
 **Health:** ⚠️ Drift (pulse-bot inactive 4th cycle; dashboard-dispatch-source-blocked new finding)
