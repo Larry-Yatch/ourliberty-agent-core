@@ -123,6 +123,7 @@ sudo systemctl enable --now ourliberty-heal-chain-event-type-audit.timer  # E4.4
 sudo systemctl enable --now ourliberty-heal-build-sequence-advancer-heartbeat.timer  # E-orchestrator PR-S2 (every 5 min)
 sudo systemctl enable --now ourliberty-heal-claude-max-burn-rate.timer  # claude-quota-fixes-v2 (every 15 min)
 sudo systemctl enable --now ourliberty-heal-tier2-weekly-health-probe.timer  # claude-quota-fixes-v2 (weekly Sun 06:00 MDT)
+sudo systemctl enable --now ourliberty-heal-droplet-git-drift.timer  # droplet-drift-discipline-v2 (every 30 min; observe + alert, no mutation)
 
 # Long-running ingestion daemon (not a timer; default disabled at activation gate)
 sudo systemctl enable ourliberty-chain-event-shipper.service  # E4.4d PR-B — service is OFF until OURLIBERTY_CHAIN_SHIPPER_ENABLED=true (see service file)
@@ -155,6 +156,7 @@ What each one does:
 | `build-sequence-advancer-heartbeat` (E-orchestrator PR-S2) | 5 min | `build-sequence-advancer.heartbeat` file mtime > 10 min stale (2 missed ticks at the 5-min advancer cadence — per spec § 5.4 failure mode 3) |
 | `claude-max-burn-rate` (claude-quota-fixes-v2) | 15 min | Rolling 5h Tier 1 spend in `~/agents/blackboard/costs.jsonl` ≥ 80% of `config/agent-models.json:tier1_quota.max_5h_spend_threshold_usd` ($60 default). Pure file read + arithmetic — makes ZERO LLM calls so it self-protects from Tier 1 quota. Would have given Larry 1-2h warning before the 2026-05-26/27 incident. |
 | `tier2-weekly-health-probe` (claude-quota-fixes-v2) | weekly Sun 06:00 MDT | Cheap Haiku probe of Tier 2 OAuth (~$0.001/run); DMs if `claude -p 'say PROBE_OK'` against `HOME=/home/larry/.claude-larry-personal` fails (non-zero exit, `is_error: true`, or token missing from output). Catches silent credential rot BEFORE Tier 1 needs the fallback. |
+| `droplet-git-drift` (droplet-drift-discipline-v2) | 30 min | Droplet working tree drift vs `origin`: ahead with oldest unpushed > 2h, behind by > 2 commits, or uncommitted files older than 6h. Observation-only; no auto-pull / auto-push / auto-commit. Each tripped condition fires a `droplet-{ahead,behind,uncommitted}:<branch>` larry_alert with the manual recovery command in the body. |
 
 Each healer's logs land in `journalctl -u ourliberty-heal-<name>.service`. They `Nice=10` so they never starve real work.
 

@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "owner": "heal_stale_daemon_code",
+    "rationale": "Optional per-service overrides for the auto-discovered service list. Absent file or absent entry → default behavior (auto-restart at DEFAULT_STALE_THRESHOLD_SECONDS = 300s). Entries here tighten thresholds or change restart strategy for hot services. Keys MUST match the exact unit-name shape returned by list_ourliberty_services() in scripts/heal_stale_daemon_code.py (i.e. include the `.service` suffix). `restart_strategy` ∈ {auto, dm-only, never}; unrecognized values fall back to `auto`.",
+    "last_updated": "2026-05-27"
+  },
+  "services": {
+    "ourliberty-beacon-bot.service": {"stale_threshold_seconds": 600, "restart_strategy": "auto"},
+    "ourliberty-mirror-bot.service": {"stale_threshold_seconds": 600, "restart_strategy": "auto"},
+    "ourliberty-pulse-bot.service": {"stale_threshold_seconds": 600, "restart_strategy": "auto"},
+    "ourliberty-forge-bot.service": {"stale_threshold_seconds": 600, "restart_strategy": "auto"},
+    "ourliberty-dashboard-api.service": {"stale_threshold_seconds": 300, "restart_strategy": "auto"},
+    "ourliberty-inbox-watcher.service": {"stale_threshold_seconds": 600, "restart_strategy": "auto"},
+    "ourliberty-chain-event-shipper.service": {"stale_threshold_seconds": 1800, "restart_strategy": "auto"},
+    "ourliberty-build-sequence-advancer.service": {"stale_threshold_seconds": 1800, "restart_strategy": "auto"}
+  }
+}

@@ -66,6 +66,23 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-stale-daemon-code.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-stale-daemon-code.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-stale-daemon-code-cooldowns.json'
 
+# Optional per-service metadata overlay. Auto-discovery via
+# `list_ourliberty_services()` is the SOLE source of truth for which units
+# get scanned; this overlay only supplies per-service thresholds and the
+# `restart_strategy` enum for entries that appear. Absent file or absent
+# entry → defaults (= today's behavior identically). The path is
+# overridable for tests; the env var also lets a future ad-hoc test
+# substitute a fixture without monkey-patching the constant.
+OVERRIDE_CONFIG_PATH = Path(os.environ.get(
+    'OURLIBERTY_STALE_DAEMON_OVERRIDES',
+    '/home/larry/agent-core/config/tracked-services.json',
+))
+
+# Valid values for the `restart_strategy` enum in the override config.
+# Unrecognized values fall back to 'auto' (= today's behavior) so a typo
+# in the config cannot silently disable the auto-restart path.
+_VALID_RESTART_STRATEGIES = ('auto', 'dm-only', 'never')
+
 # Sub-shell timeout for systemctl calls. systemctl show is fast (<100 ms),
 # but we cap it so a hung dbus doesn't wedge the healer tick.
 SYSTEMCTL_TIMEOUT_S = 10
@@ -76,6 +93,11 @@ SYSTEMCTL_TIMEOUT_S = 10
 # systemd restart cycle plus typical apt/pip warmup; less than this and
 # we'd alert during legitimate restart sequences.
 RACE_AVOIDANCE_SEC = 5 * 60
+
+# Alias used by the per-service overrides mechanism so the config field
+# name (`stale_threshold_seconds`) reads cleanly. Identical value; pointing
+# at the same constant keeps the default behavior interpretable.
+DEFAULT_STALE_THRESHOLD_SECONDS = RACE_AVOIDANCE_SEC
 
 # Per-service DM cooldown — don't DM about a chronically still-stale unit
 # (post-auto-restart escalation case) more than once per window. 6h
@@ -214,6 +236,77 @@ def mark_restarted(
 ) -> None:
     entry = state['services'].setdefault(unit, {})
     entry['last_restart_ts'] = now if now is not None else time.time()
+
+
+# -------------------- per-service override loader --------------------
+
+def load_service_overrides() -> dict:
+    """Return the per-service overrides mapping, or {} on any failure.
+
+    Schema (read from `config/tracked-services.json`):
+        {
+          "_meta": {...},
+          "services": {
+            "ourliberty-foo.service": {
+              "stale_threshold_seconds": 600,
+              "restart_strategy": "auto"  # or "dm-only" / "never"
+            },
+            ...
+          }
+        }
+
+    Fail-open: FileNotFoundError, malformed JSON, wrong top-level shape, or
+    any other read error returns `{}` — every service falls back to the
+    DEFAULT_STALE_THRESHOLD_SECONDS + `auto` strategy (= behavior identical
+    to pre-extension). Tests R1 + R6 lock this invariant.
+    """
+    try:
+        data = json.loads(OVERRIDE_CONFIG_PATH.read_text())
+    except FileNotFoundError:
+        return {}
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        log(f'tracked-services.json unreadable ({type(e).__name__}: {e}); '
+            f'falling back to defaults', 'WARN')
+        return {}
+    if not isinstance(data, dict):
+        log(f'tracked-services.json top-level is not a dict; '
+            f'falling back to defaults', 'WARN')
+        return {}
+    services = data.get('services', {})
+    if not isinstance(services, dict):
+        log(f'tracked-services.json `services` is not a dict; '
+            f'falling back to defaults', 'WARN')
+        return {}
+    return services
+
+
+def _resolve_override(
+    overrides: dict, unit: str,
+) -> tuple[float, str]:
+    """Return (threshold_seconds, strategy) for `unit`.
+
+    Looks up the exact unit name (including the `.service` suffix that
+    list_ourliberty_services() returns). Unknown unit → defaults. Bad
+    threshold type → default threshold (with a WARN log). Bad strategy
+    value → 'auto' (preserves today's auto-restart behavior on typos).
+    """
+    entry = overrides.get(unit, {})
+    if not isinstance(entry, dict):
+        return DEFAULT_STALE_THRESHOLD_SECONDS, 'auto'
+    raw_threshold = entry.get('stale_threshold_seconds',
+                              DEFAULT_STALE_THRESHOLD_SECONDS)
+    if isinstance(raw_threshold, bool) or not isinstance(raw_threshold, (int, float)):
+        log(f'{unit}: stale_threshold_seconds is not a number; '
+            f'using default', 'WARN')
+        threshold = float(DEFAULT_STALE_THRESHOLD_SECONDS)
+    else:
+        threshold = float(raw_threshold)
+    strategy = entry.get('restart_strategy', 'auto')
+    if strategy not in _VALID_RESTART_STRATEGIES:
+        log(f'{unit}: restart_strategy={strategy!r} unrecognized; '
+            f'using `auto`', 'WARN')
+        strategy = 'auto'
+    return threshold, strategy
 
 
 # -------------------- systemctl shellouts --------------------
@@ -542,6 +635,44 @@ def dm_larry_auto_restart_failed(
         return False
 
 
+def dm_larry_dm_only_stale(
+    unit: str, script_path: Path, service_start: float, script_mtime: float,
+) -> bool:
+    """Alert when a unit is stale AND its override strategy is `dm-only`.
+
+    Unlike the `auto` path which alerts only after a successful restart,
+    this path alerts INSTEAD of restarting. Subject is `stale-code:<unit>`
+    (distinct namespace from `auto-restarted:<unit>` so the existing
+    translation layer + dedup buckets don't collide). Body carries the
+    manual recovery command.
+    """
+    try:
+        la = _import_larry_alerts()
+        svc_iso = datetime.fromtimestamp(service_start, tz=timezone.utc).isoformat()
+        scr_iso = datetime.fromtimestamp(script_mtime, tz=timezone.utc).isoformat()
+        gap_min = (script_mtime - service_start) / 60.0
+        body = (
+            f'Stale code detected for {unit} (script mtime newer than '
+            f'active-since by {gap_min:.1f} min).\n\n'
+            f'Auto-restart suppressed by config override '
+            f'(restart_strategy=dm-only).\n\n'
+            f'Service start: {svc_iso}\n'
+            f'Script mtime:  {scr_iso}\n'
+            f'Script path:   {script_path}\n\n'
+            f'Manual recovery: sudo systemctl restart {unit}'
+        )
+        return la.append_alert(
+            source='heal-stale-daemon-code',
+            severity='warning',
+            subject=f'stale-code:{unit}',
+            message=body,
+            suggested_action=f'sudo systemctl restart {unit}',
+        )
+    except Exception as e:
+        log(f'dm_larry_dm_only_stale failed: {type(e).__name__}: {e}', 'WARN')
+        return False
+
+
 def dm_larry_still_stale_after_restart(
     unit: str, last_restart_ts: float,
 ) -> bool:
@@ -579,6 +710,7 @@ def dm_larry_still_stale_after_restart(
 
 def check_unit(
     unit: str, state: dict, now: Optional[float] = None,
+    overrides: Optional[dict] = None,
 ) -> str:
     """Inspect one unit. Return one of:
        'auto-restarted'           — restart returned rc=0; closure DM sent.
@@ -589,7 +721,18 @@ def check_unit(
        'race-window'              — modified recently but inside race-avoidance.
        'fresh'                    — script older than (or equal to) service start.
        'unparseable'              — couldn't extract service-start or script path.
+       'strategy-never-skip'      — stale, but config override says `never`; no action.
+       'strategy-dm-only'         — stale, override says `dm-only`; alert fired,
+                                    no restart attempted.
+
+    `overrides` is the optional per-service metadata mapping from
+    `load_service_overrides()`. None / {} → every unit uses defaults
+    (= behavior identical to pre-overlay).
     """
+    if overrides is None:
+        overrides = {}
+    threshold, strategy = _resolve_override(overrides, unit)
+
     raw_ts = systemctl_show(unit, 'ActiveEnterTimestamp')
     service_start = parse_systemd_timestamp(raw_ts) if raw_ts is not None else None
     if service_start is None:
@@ -613,10 +756,22 @@ def check_unit(
         log(f'{unit}: stat({script_path}) failed: {e}', 'WARN')
         return 'unparseable'
 
-    if not is_stale(service_start, script_mtime):
+    if not is_stale(service_start, script_mtime, race_avoidance_sec=threshold):
         if script_mtime > service_start:
             return 'race-window'
         return 'fresh'
+
+    # Stale. Apply the per-service strategy gate BEFORE touching restart
+    # machinery — `never` and `dm-only` short-circuit the auto-restart path
+    # entirely while leaving the default `auto` path verbatim below.
+    if strategy == 'never':
+        log(f'{unit}: STALE_CODE_SKIP strategy=never reason=config-override',
+            'INFO')
+        return 'strategy-never-skip'
+    if strategy == 'dm-only':
+        dm_larry_dm_only_stale(unit, script_path, service_start, script_mtime)
+        log(f'{unit}: STALE_CODE_DM_ONLY strategy=dm-only', 'INFO')
+        return 'strategy-dm-only'
 
     # Stale. Decide between (a) inside restart cooldown → escalation-or-suppress
     # vs (b) outside cooldown → attempt restart.
@@ -682,13 +837,15 @@ def main() -> int:
         return 0
 
     state = load_state()
+    overrides = load_service_overrides()
     counts = {
         'auto-restarted': 0, 'auto-restart-failed': 0,
         'restart-cooldown': 0, 'still-stale-after-restart': 0,
         'race-window': 0, 'fresh': 0, 'unparseable': 0,
+        'strategy-never-skip': 0, 'strategy-dm-only': 0,
     }
     for unit in units:
-        outcome = check_unit(unit, state)
+        outcome = check_unit(unit, state, overrides=overrides)
         counts[outcome] = counts.get(outcome, 0) + 1
 
     log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items() if v))

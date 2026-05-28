@@ -660,6 +660,323 @@ class CheckUnitTests(_IsolatedAgentsRoot):
             self.assertEqual(m_r.call_count + m_f.call_count + m_s.call_count, 0)
 
 
+# -------------------- per-service overlay (droplet-drift-discipline-v2) --------------------
+
+class OverrideLoaderTests(_IsolatedAgentsRoot):
+    """Locks the fail-open contract of load_service_overrides()."""
+
+    def _point_overrides_at(self, path: Path):
+        return mock.patch.object(h, 'OVERRIDE_CONFIG_PATH', path)
+
+    def test_absent_config_returns_empty(self):
+        # Test R1's loader half: missing file → {}.
+        nonexistent = Path(self._isolated_tmp) / 'does-not-exist.json'
+        with self._point_overrides_at(nonexistent):
+            self.assertEqual(h.load_service_overrides(), {})
+
+    def test_malformed_json_returns_empty(self):
+        # Test R6's loader half: garbage on disk → {} (warning logged).
+        bad = Path(self._isolated_tmp) / 'malformed.json'
+        bad.write_text('{ this is not, valid json }')
+        with self._point_overrides_at(bad):
+            self.assertEqual(h.load_service_overrides(), {})
+
+    def test_non_dict_top_level_returns_empty(self):
+        wrong = Path(self._isolated_tmp) / 'wrong.json'
+        wrong.write_text('[1, 2, 3]')
+        with self._point_overrides_at(wrong):
+            self.assertEqual(h.load_service_overrides(), {})
+
+    def test_non_dict_services_returns_empty(self):
+        wrong = Path(self._isolated_tmp) / 'wrong2.json'
+        wrong.write_text('{"services": [1, 2]}')
+        with self._point_overrides_at(wrong):
+            self.assertEqual(h.load_service_overrides(), {})
+
+    def test_well_formed_config_loads(self):
+        good = Path(self._isolated_tmp) / 'good.json'
+        good.write_text(json.dumps({
+            'services': {
+                'ourliberty-beacon-bot.service': {
+                    'stale_threshold_seconds': 600,
+                    'restart_strategy': 'auto',
+                },
+            },
+        }))
+        with self._point_overrides_at(good):
+            overrides = h.load_service_overrides()
+        self.assertIn('ourliberty-beacon-bot.service', overrides)
+        self.assertEqual(
+            overrides['ourliberty-beacon-bot.service']['stale_threshold_seconds'],
+            600,
+        )
+
+
+class ResolveOverrideTests(_IsolatedAgentsRoot):
+    """Locks _resolve_override's defaulting + strategy-validation behavior."""
+
+    def test_unknown_unit_returns_defaults(self):
+        threshold, strategy = h._resolve_override({}, 'whatever.service')
+        self.assertEqual(threshold, h.DEFAULT_STALE_THRESHOLD_SECONDS)
+        self.assertEqual(strategy, 'auto')
+
+    def test_known_unit_returns_override(self):
+        overrides = {
+            'foo.service': {'stale_threshold_seconds': 90,
+                            'restart_strategy': 'dm-only'},
+        }
+        threshold, strategy = h._resolve_override(overrides, 'foo.service')
+        self.assertEqual(threshold, 90.0)
+        self.assertEqual(strategy, 'dm-only')
+
+    def test_unrecognized_strategy_falls_back_to_auto(self):
+        overrides = {'foo.service': {'restart_strategy': 'launch-missile'}}
+        _, strategy = h._resolve_override(overrides, 'foo.service')
+        self.assertEqual(strategy, 'auto')
+
+    def test_non_numeric_threshold_falls_back_to_default(self):
+        overrides = {'foo.service': {'stale_threshold_seconds': 'a-string'}}
+        threshold, _ = h._resolve_override(overrides, 'foo.service')
+        self.assertEqual(threshold, float(h.DEFAULT_STALE_THRESHOLD_SECONDS))
+
+    def test_bool_threshold_falls_back_to_default(self):
+        # bool is a subclass of int — make sure we reject `True`/`False`.
+        overrides = {'foo.service': {'stale_threshold_seconds': True}}
+        threshold, _ = h._resolve_override(overrides, 'foo.service')
+        self.assertEqual(threshold, float(h.DEFAULT_STALE_THRESHOLD_SECONDS))
+
+
+class StrategyGateTests(_IsolatedAgentsRoot):
+    """R1–R6 regression tests for the strategy gate in check_unit."""
+
+    def _stub_systemctl(self, properties):
+        def fake_show(unit, prop):
+            return properties.get(prop)
+        return mock.patch.object(h, 'systemctl_show', side_effect=fake_show)
+
+    def _stub_dms(self):
+        return {
+            'restarted': mock.patch.object(
+                h, 'dm_larry_auto_restarted', return_value=True),
+            'failed': mock.patch.object(
+                h, 'dm_larry_auto_restart_failed', return_value=True),
+            'still_stale': mock.patch.object(
+                h, 'dm_larry_still_stale_after_restart', return_value=True),
+            'dm_only': mock.patch.object(
+                h, 'dm_larry_dm_only_stale', return_value=True),
+        }
+
+    def _stub_restart(self, rc=0, stderr=''):
+        return mock.patch.object(
+            h, 'auto_restart_unit', return_value=(rc, stderr))
+
+    def _make_unit(self, td, script_mtime, service_start):
+        """Build a stale-by-construction unit fixture in `td`. Returns
+        (script_path, service_file_path, active_enter_timestamp_string)."""
+        script = Path(td) / 'foo.py'
+        script.write_text('# code')
+        os.utime(script, (script_mtime, script_mtime))
+        svc = Path(td) / 'unit.service'
+        svc.write_text(f'[Service]\nExecStart=/usr/bin/python3 {script}\n')
+        ts = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(service_start))
+        return script, svc, ts
+
+    def test_r1_absent_config_behavior_unchanged(self):
+        # R1: with no config file on disk + no overrides passed, a stale
+        # unit triggers the existing auto-restart path identically to
+        # pre-extension. Lock by directly observing the outcome string and
+        # auto_restart_unit getting called.
+        nonexistent = Path(self._isolated_tmp) / 'absent.json'
+        with mock.patch.object(h, 'OVERRIDE_CONFIG_PATH', nonexistent):
+            self.assertEqual(h.load_service_overrides(), {})
+
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now - 10 * 60, service_start=now - 60 * 60,
+            )
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    mock.patch.object(h, 'infer_recent_prs', return_value=[]), \
+                    dms['restarted'], dms['failed'], dms['still_stale'], \
+                    dms['dm_only']:
+                outcome = h.check_unit(
+                    'ourliberty-foo.service', {'services': {}}, now=now,
+                    overrides={},
+                )
+        self.assertEqual(outcome, 'auto-restarted')
+        self.assertEqual(m_restart.call_count, 1)
+
+    def test_r2_override_threshold_tightens(self):
+        # R2: override `stale_threshold_seconds=60` causes a 90s-stale
+        # unit to trip (would NOT trip under the default 300s threshold).
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            # 90s gap — under default 300s race-avoidance, NOT stale; under
+            # the 60s override, IS stale.
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now, service_start=now - 90,
+            )
+            overrides = {
+                'ourliberty-beacon-bot.service': {
+                    'stale_threshold_seconds': 60,
+                    'restart_strategy': 'auto',
+                },
+            }
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    mock.patch.object(h, 'infer_recent_prs', return_value=[]), \
+                    dms['restarted'], dms['failed'], dms['still_stale'], \
+                    dms['dm_only']:
+                outcome = h.check_unit(
+                    'ourliberty-beacon-bot.service', {'services': {}},
+                    now=now, overrides=overrides,
+                )
+        self.assertEqual(outcome, 'auto-restarted')
+        self.assertEqual(m_restart.call_count, 1)
+
+    def test_r2b_override_threshold_below_default_does_not_trip(self):
+        # R2 sibling: a 30s gap is under the 60s override → NOT stale.
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now, service_start=now - 30,
+            )
+            overrides = {
+                'ourliberty-beacon-bot.service': {
+                    'stale_threshold_seconds': 60,
+                    'restart_strategy': 'auto',
+                },
+            }
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    dms['restarted'], dms['failed'], dms['still_stale'], \
+                    dms['dm_only']:
+                outcome = h.check_unit(
+                    'ourliberty-beacon-bot.service', {'services': {}},
+                    now=now, overrides=overrides,
+                )
+        self.assertEqual(outcome, 'race-window')
+        self.assertEqual(m_restart.call_count, 0)
+
+    def test_r3_unlisted_service_uses_default(self):
+        # R3: config lists only beacon-bot; mirror-bot stale at the default
+        # threshold uses default behavior (auto-restart at 300s).
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now - 10 * 60, service_start=now - 60 * 60,
+            )
+            overrides = {
+                'ourliberty-beacon-bot.service': {
+                    'stale_threshold_seconds': 600,
+                    'restart_strategy': 'auto',
+                },
+            }
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    mock.patch.object(h, 'infer_recent_prs', return_value=[]), \
+                    dms['restarted'], dms['failed'], dms['still_stale'], \
+                    dms['dm_only']:
+                outcome = h.check_unit(
+                    'ourliberty-mirror-bot.service', {'services': {}},
+                    now=now, overrides=overrides,
+                )
+        self.assertEqual(outcome, 'auto-restarted')
+        self.assertEqual(m_restart.call_count, 1)
+
+    def test_r4_dm_only_alerts_no_restart(self):
+        # R4: restart_strategy=dm-only fires the alert AND does NOT call
+        # auto_restart_unit. Both halves are load-bearing.
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now - 10 * 60, service_start=now - 60 * 60,
+            )
+            overrides = {
+                'ourliberty-beacon-bot.service': {'restart_strategy': 'dm-only'},
+            }
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    dms['restarted'] as m_r, dms['failed'] as m_f, \
+                    dms['still_stale'] as m_s, dms['dm_only'] as m_dm:
+                outcome = h.check_unit(
+                    'ourliberty-beacon-bot.service', {'services': {}},
+                    now=now, overrides=overrides,
+                )
+        self.assertEqual(outcome, 'strategy-dm-only')
+        self.assertEqual(m_restart.call_count, 0)
+        self.assertEqual(m_dm.call_count, 1)
+        self.assertEqual(m_r.call_count, 0)
+        self.assertEqual(m_f.call_count, 0)
+        self.assertEqual(m_s.call_count, 0)
+
+    def test_r5_never_silent_skip(self):
+        # R5: restart_strategy=never → no alert, no restart, no DM calls.
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now - 10 * 60, service_start=now - 60 * 60,
+            )
+            overrides = {
+                'ourliberty-beacon-bot.service': {'restart_strategy': 'never'},
+            }
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    dms['restarted'] as m_r, dms['failed'] as m_f, \
+                    dms['still_stale'] as m_s, dms['dm_only'] as m_dm:
+                outcome = h.check_unit(
+                    'ourliberty-beacon-bot.service', {'services': {}},
+                    now=now, overrides=overrides,
+                )
+        self.assertEqual(outcome, 'strategy-never-skip')
+        self.assertEqual(m_restart.call_count, 0)
+        self.assertEqual(m_dm.call_count, 0)
+        self.assertEqual(m_r.call_count, 0)
+        self.assertEqual(m_f.call_count, 0)
+        self.assertEqual(m_s.call_count, 0)
+
+    def test_r6_malformed_config_fail_open(self):
+        # R6: malformed config → loader returns {} → check_unit with
+        # overrides={} behaves identically to R1.
+        bad = Path(self._isolated_tmp) / 'malformed.json'
+        bad.write_text('{ definitely not json }')
+        with mock.patch.object(h, 'OVERRIDE_CONFIG_PATH', bad):
+            overrides = h.load_service_overrides()
+        self.assertEqual(overrides, {})
+
+        with tempfile.TemporaryDirectory() as td:
+            now = time.time()
+            _, svc, ts = self._make_unit(
+                td, script_mtime=now - 10 * 60, service_start=now - 60 * 60,
+            )
+            dms = self._stub_dms()
+            with self._stub_systemctl({
+                'ActiveEnterTimestamp': ts, 'FragmentPath': str(svc),
+            }), self._stub_restart(rc=0) as m_restart, \
+                    mock.patch.object(h, 'infer_recent_prs', return_value=[]), \
+                    dms['restarted'], dms['failed'], dms['still_stale'], \
+                    dms['dm_only']:
+                outcome = h.check_unit(
+                    'ourliberty-foo.service', {'services': {}}, now=now,
+                    overrides=overrides,
+                )
+        self.assertEqual(outcome, 'auto-restarted')
+        self.assertEqual(m_restart.call_count, 1)
+
+
 class MainTests(_IsolatedAgentsRoot):
     def test_kill_switch_short_circuits(self):
         # The kill switch is the existing file `~/agents/healers.disabled`
