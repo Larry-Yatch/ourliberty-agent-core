@@ -60,6 +60,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import bot_liveness_policy  # noqa: E402
 import larry_alerts  # noqa: E402
 
 AGENTS_ROOT = Path.home() / 'agents'
@@ -80,7 +81,19 @@ AUTO_RESTART_SERVICES = (
 # units have Restart=always so crash recovery is already automatic;
 # watchdog surfaces the case where StartLimitBurst (10 starts / 300s) is
 # exhausted and systemd has given up.
-ALERT_ONLY_BOTS = ('forge', 'mirror', 'pulse')
+#
+# Derived from config/bot-liveness-policy.json minus {'beacon'} — beacon
+# is auto-restarted via _check_auto_restart (carve-out, see
+# check_beacon_bot below) rather than alert-only. The subtraction keeps
+# the carve-out visible in one place; new bots added to the policy file
+# join ALERT_ONLY_BOTS automatically.
+def _derive_alert_only_bots() -> tuple[str, ...]:
+    policy = bot_liveness_policy.load_policy()
+    agents = bot_liveness_policy.policy_agents(policy)
+    return tuple(a for a in agents if a != 'beacon')
+
+
+ALERT_ONLY_BOTS = _derive_alert_only_bots()
 
 # Service-active states treated as "alive enough — leave it alone".
 # Includes 'auto-restart' SubState (M1 fix): systemd has scheduled a
@@ -518,19 +531,27 @@ def check_log_growth() -> dict:
 
 
 def check_bots() -> dict:
-    """Alert-only sweep over forge/mirror/pulse bots.
+    """Alert-only sweep over bots declared in bot-liveness-policy.json
+    (minus beacon, which is auto-restarted via the carve-out).
 
-    M3 fix: subject-specific cooldown keys (`bots:mirror`, `bots:forge`,
-    `bots:pulse`) so each bot has its own dedup bucket — if mirror-bot
-    goes down at 11pm and forge-bot goes down at 11:30pm, the second
-    alert isn't suppressed by the first's cooldown.
+    Liveness and the recovery command come from bot_liveness_policy so
+    each bot's deployment mode (systemd vs tmux-or-systemd) is honored
+    — pulse-bot lives in a tmux session after PR #161, so suggesting
+    `sudo systemctl restart` would start a second instance fighting for
+    getUpdates. The alert subject embeds the observed mode
+    (`bots:<agent>:<mode>`, e.g. `bots:pulse:tmux`, `bots:pulse:down`)
+    so alert-translations can render mode-correct plain-language text.
+
+    M3 fix preserved: subject-specific cooldown keys so each bot has
+    its own dedup bucket.
     """
+    policy = bot_liveness_policy.load_policy()
     results: dict = {}
     down: list[str] = []
     for short in ALERT_ONLY_BOTS:
         service = f'ourliberty-{short}-bot'
-        alive = is_service_alive(service)
-        results[service] = 'active' if alive else 'inactive'
+        alive, mode_used = bot_liveness_policy.check_liveness(short, policy=policy)
+        results[service] = mode_used if alive else 'inactive'
         if alive:
             continue
         down.append(service)
@@ -542,15 +563,12 @@ def check_bots() -> dict:
         larry_alerts.append_alert(
             source='watchdog',
             severity='critical',
-            subject=f'bots:{short}',
+            subject=f'bots:{short}:{mode_used}',
             message=(
-                f'{service} is DOWN and systemd has not recovered it. '
-                'Likely StartLimitBurst exhausted.'
+                f'{service} is DOWN. All policy-declared liveness paths '
+                'failed to report alive.'
             ),
-            suggested_action=(
-                f'sudo systemctl status {service} && '
-                f'sudo systemctl restart {service}'
-            ),
+            suggested_action=bot_liveness_policy.recovery_command(short, policy=policy),
         )
     return {
         'status': 'critical' if down else 'ok',

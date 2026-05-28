@@ -66,5 +66,32 @@
       "plain_language_summary": "The auto-merge queue file at ~/agents/blackboard/auto-merge-queue.json failed to parse — JSON syntax error or structural surprise. The notifier has fail-closed: every subsequent auto-merge attempt is HELD until the file is repaired and the daemon restarts.",
       "recommended_action": "Inspect the file with `cat ~/agents/blackboard/auto-merge-queue.json` to find the corruption. Move it aside (`mv ... .broken`) to clear the queue, then `sudo systemctl restart outbox-notifier.service`. Recovery steps: runbooks/auto-merge-queue.md."
     }
+  },
+  "watchdog": {
+    "bots:pulse:tmux": {
+      "severity": "INFO",
+      "plain_language_summary": "Pulse-bot is running via tmux (the intended deployment after PR #161). No action needed unless the tmux session is also down.",
+      "recommended_action": "If you want to verify or relaunch: `tmux has-session -t pulse-bot` to check, `bash ~/agent-core/scripts/pulse_telegram_bot.sh` to (re)launch into the same tmux session. Do NOT run `sudo systemctl restart ourliberty-pulse-bot.service` — that would start a second pulse-bot instance competing with tmux for getUpdates."
+    },
+    "bots:pulse:down": {
+      "severity": "URGENT",
+      "plain_language_summary": "Pulse-bot is DOWN: both the tmux session and the systemd unit failed liveness checks. No Telegram pulse-side traffic is flowing.",
+      "recommended_action": "Relaunch the intended tmux deployment: `bash ~/agent-core/scripts/pulse_telegram_bot.sh`. Verify with `tmux has-session -t pulse-bot && tmux capture-pane -p -t pulse-bot | tail -20`. Runbook: runbooks/watchdog-bot-policy.md."
+    },
+    "bots:beacon:down": {
+      "severity": "URGENT",
+      "plain_language_summary": "Beacon-bot is DOWN and the auto-restart carve-out also failed. Telegram alert delivery itself is broken — DMs cannot reach you until beacon-bot is back.",
+      "recommended_action": "Run `sudo systemctl status ourliberty-beacon-bot.service && sudo journalctl -u ourliberty-beacon-bot.service -n 50` to find the failure mode, then `sudo systemctl restart ourliberty-beacon-bot.service`. Runbook: runbooks/watchdog-bot-policy.md."
+    },
+    "bots:forge:down": {
+      "severity": "URGENT",
+      "plain_language_summary": "Forge-bot is DOWN and systemd has not recovered it — StartLimitBurst (10 starts / 300s) likely exhausted. Forge tasks queued in the inbox will not be picked up.",
+      "recommended_action": "Run `sudo systemctl status ourliberty-forge-bot.service && sudo systemctl restart ourliberty-forge-bot.service`. Check `journalctl -u ourliberty-forge-bot.service -n 50` for the underlying crash cause. Runbook: runbooks/watchdog-bot-policy.md."
+    },
+    "bots:mirror:down": {
+      "severity": "URGENT",
+      "plain_language_summary": "Mirror-bot is DOWN and systemd has not recovered it — StartLimitBurst likely exhausted. PR reviews queued for mirror will not run.",
+      "recommended_action": "Run `sudo systemctl status ourliberty-mirror-bot.service && sudo systemctl restart ourliberty-mirror-bot.service`. Check `journalctl -u ourliberty-mirror-bot.service -n 50` for the underlying crash cause. Runbook: runbooks/watchdog-bot-policy.md."
+    }
   }
 }

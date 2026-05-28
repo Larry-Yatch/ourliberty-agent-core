@@ -369,34 +369,68 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
 
 
 class CheckBotsTest(_IsolatedRootsTest):
+    def _patch_liveness(self, liveness_fn):
+        return mock.patch.object(
+            watchdog.bot_liveness_policy, 'check_liveness', side_effect=liveness_fn,
+        )
+
     def test_all_bots_alive_returns_ok(self):
-        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+        # Mirror/forge → systemd; pulse → tmux (intended deployment).
+        def liveness(agent, policy=None):
+            return (True, 'tmux' if agent == 'pulse' else 'systemd')
+        with self._patch_liveness(liveness):
             result = watchdog.check_bots()
         self.assertEqual(result['status'], 'ok')
         self.assertEqual(result['down'], [])
+        # pulse is reported via its winning path.
+        self.assertEqual(result['services']['ourliberty-pulse-bot'], 'tmux')
 
     def test_one_bot_down_alerts_only_that_bot(self):
-        def alive(svc):
-            return 'forge' not in svc
-        with mock.patch.object(watchdog, 'is_service_alive', side_effect=alive):
+        def liveness(agent, policy=None):
+            if agent == 'forge':
+                return (False, 'down')
+            return (True, 'tmux' if agent == 'pulse' else 'systemd')
+        with self._patch_liveness(liveness):
             result = watchdog.check_bots()
         self.assertEqual(result['status'], 'critical')
         self.assertEqual(result['down'], ['ourliberty-forge-bot'])
         contents = larry_alerts.ALERTS_FILE.read_text()
         self.assertIn('ourliberty-forge-bot', contents)
-        # Subject should be subject-specific (M3 fix).
+        # Subject embeds the observed mode (M3 fix preserved; bot+mode-specific cooldown).
         record = json.loads(contents.strip().splitlines()[0])
-        self.assertEqual(record['subject'], 'bots:forge')
+        self.assertEqual(record['subject'], 'bots:forge:down')
+        # Recovery command is the policy-mode recovery shape.
+        self.assertEqual(
+            record['suggested_action'],
+            'sudo systemctl restart ourliberty-forge-bot.service',
+        )
 
     def test_two_bots_down_get_independent_subjects(self):
-        # M3 fix: cooldown keys are per-bot.
-        def alive(svc):
-            return 'forge' not in svc and 'mirror' not in svc
-        with mock.patch.object(watchdog, 'is_service_alive', side_effect=alive):
+        def liveness(agent, policy=None):
+            if agent in ('forge', 'mirror'):
+                return (False, 'down')
+            return (True, 'tmux' if agent == 'pulse' else 'systemd')
+        with self._patch_liveness(liveness):
             watchdog.check_bots()
         lines = larry_alerts.ALERTS_FILE.read_text().strip().splitlines()
         subjects = {json.loads(l)['subject'] for l in lines}
-        self.assertEqual(subjects, {'bots:forge', 'bots:mirror'})
+        self.assertEqual(subjects, {'bots:forge:down', 'bots:mirror:down'})
+
+    def test_pulse_down_uses_tmux_launcher_recovery(self):
+        # The destructive shape this policy exists to prevent: a `sudo
+        # systemctl restart` recovery for pulse would start a second
+        # process competing with tmux for getUpdates. Recovery must be
+        # the launcher.
+        def liveness(agent, policy=None):
+            if agent == 'pulse':
+                return (False, 'down')
+            return (True, 'systemd')
+        with self._patch_liveness(liveness):
+            watchdog.check_bots()
+        record = json.loads(larry_alerts.ALERTS_FILE.read_text().strip().splitlines()[0])
+        self.assertEqual(record['subject'], 'bots:pulse:down')
+        self.assertEqual(record['suggested_action'], 'bash scripts/pulse_telegram_bot.sh')
+        self.assertNotIn('systemctl restart', record['suggested_action'])
 
     def test_beacon_bot_not_in_alert_only_set(self):
         # beacon-bot is the carve-out — should NOT appear in check_bots.
