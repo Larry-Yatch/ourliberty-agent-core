@@ -4,6 +4,29 @@
 
 ---
 
+## Iteration 95 — 2026-05-28 04:30 UTC (interactive)
+
+**Health:** ⚠️ Drift (pulse-bot inactive; relaunch still blocked)
+**Found:**
+- **(A) Source repo: nominal.** On main, clean, HEAD=origin/main=1a0a9fc. ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-28T04:09:51Z (~20m before cycle), status=success at 1a0a9fc. Within 2h threshold. ✅
+- **(C) Agent liveness: 5/6 active.** `ourliberty-pulse-bot` still inactive (TERM kill 2026-05-27T12:16 MDT; 16h elapsed). PR #147 systemic fix in place. Relaunch still blocked: `pulse_telegram_bot.sh` not found; `systemctl restart` requires interactive auth. Iter 94 Beacon dispatch (cycle-finding-pulse-bot-launcher-missing-20260528T003200Z.json) not yet in Beacon archive — likely in-flight. Other 5 units active. ⚠️
+- **(D) Inboxes: nominal.** All 4 inboxes empty. .invalid counts: beacon=6, forge=153, mirror=96, pulse=6 (total=261; up from 128 at iter 94). ~133-file growth since 00:30Z — all smoke-test artifacts from orchestrator rectification runs (PRs #151, #152, #154 merged 02:16–03:54Z). Mirror's 96 are all `marker-error-t-chat-*` fixture pattern. No production rejections. ✅
+- **(E) PRs: 1 open, in review window.** #153 `forge/test-isolation-v3` "feat(test-isolation v2): close indirect-log-write class via OURLIBERTY_LOG_DIR override + AST gate" — created 03:15Z (~1h15m), MERGEABLE, reviewDecision="", no CI checks. Within 24h Mirror review window. Nominal. ✅
+- **(F) Cost/quota: nominal.** Fresh session. ✅
+- **(H) Forge digest.** 3 merged since iter 94: #151 feat(healers) droplet git-drift healer (02:16Z); #152 spec(orchestrator) rectification v2; #154 feat(orchestrator) rectification v2 — close 6 bootstrap-002 gaps (03:54Z). 1 open: #153 (see E). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~87d). ✅
+- **Check I: off day.** UTC date 2026-05-28 = Thursday. Firing days Mon/Wed/Fri/Sun. `check-i-2026-05-27.json` (Wednesday run, mode=digest, 1 proposal) is current. ✅
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. ⚠️
+
+**Did:** Nothing. No always-fix conditions met (pulse-bot relaunch blocked; sync current; no stale PRs; no duplicate inbox tasks).
+**Escalated:** Standing [yellow] pulse-bot inactive — iter 94 escalation still open; iter 94 Beacon dispatch in-flight; no new escalation written.
+**Forge:** 3 merged since iter 94 (#151 git-drift healer, #152 orchestrator spec, #154 orchestrator rectification v2); 1 open (#153, <2h, in review window).
+**Patterns:** pulse-bot inactive: 2/3 toward G-rule; iter 94 Beacon dispatch in-flight — watch one more cycle. | Check I idempotency fix: APPROVAL_REQUEST pending Larry. | Stuck-cycle timeout guard: pending Larry (iter 43). | .invalid 128→261: all fixture artifacts per allowlist, non-actionable.
+**Learned:** Nothing new. .invalid growth consistent with orchestrator test runs from PRs #151/#154. Iter 93 "diverged main" escalation now resolved — Larry rebased+pushed between iters 93 and 94.
+
+---
+
 ## Iteration 94 — 2026-05-28 00:30 UTC (interactive)
 
 **Health:** ⚠️ Drift (pulse-bot inactive; relaunch blocked by auth)
