@@ -4,6 +4,30 @@
 
 ---
 
+## Iteration 96 — 2026-05-28 08:45 UTC (interactive)
+
+**Health:** ⚠️ Drift (pulse-bot inactive; Beacon APPROVAL_REQUEST pending Larry authorization)
+**Found:**
+- **(A) Source repo: nominal.** On main, clean, HEAD=8543c48=origin/main (PR #156 merge commit). ✅
+- **(B) Sync health: nominal.** Last sync 2026-05-28T08:15:50Z, status=no-change at 8543c48. Within 2h threshold. ✅
+- **(C) Agent liveness: 5/6 active.** `ourliberty-pulse-bot` still inactive (TERM kill 2026-05-27T12:16 MDT; ~20h elapsed). Relaunch still blocked: `pulse_telegram_bot.sh` missing; `systemctl restart` requires interactive auth. **G-rule threshold reached: 3 consecutive cycles (iters 94, 95, 96).** Iter 94 Beacon dispatch (`cycle-finding-pulse-bot-launcher-missing-20260528T003200Z.json`) archived — Beacon processed and returned APPROVAL_REQUEST for `pulse_telegram_bot.sh` launcher (Option A). Pending Larry authorization. No new dispatch. Other 5 units active. ⚠️
+- **(D) Inboxes: nominal.** All 4 inboxes empty. .invalid counts: beacon=5, forge=94, mirror=48, pulse=3 (total=150; down from 261 at iter 95 — prior orchestrator smoke-test artifacts cleared/purged). All remaining per fixture allowlist. ✅
+- **(E) PRs: nominal.** 0 open PRs. PR #153 merged 05:01Z (was in Mirror review at iter 95). ✅
+- **(F) Cost/quota: nominal.** Fresh session. ✅
+- **(H) Forge digest.** 1 forge/ merged since iter 95: #153 feat(test-isolation v2) close indirect-log-write class via OURLIBERTY_LOG_DIR override + AST gate (05:01Z). 2 non-forge/ merged: #155 fix(pulse) V7 — redirect fixture-suppressed writes to gitignored state file (05:15Z); #156 spec(e4-4f) Missions Tab v1 — technical coordination surface (05:32Z). 0 open forge/ PRs. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~87d). ✅
+- **Check I: off day.** UTC Thursday 2026-05-28 (fires Mon/Wed/Fri/Sun). ✅
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. ⚠️
+
+**Did:** Nothing. No always-fix conditions met (pulse-bot relaunch blocked; sync current; 0 open PRs; 0 duplicate inbox tasks).
+**Escalated:** Standing [yellow] pulse-bot inactive — G-rule threshold reached (3/3 cycles). Beacon APPROVAL_REQUEST for `pulse_telegram_bot.sh` launcher pending Larry authorization via Telegram. No new escalation written (iter 94 escalation still open and still accurate).
+**Forge:** 1 forge/ merged since iter 95 — #153 feat(test-isolation v2) AST gate + LOG_DIR override (05:01Z). Non-forge/: #155 fix(pulse) V7 fixture-suppress state-file redirect (05:15Z), #156 spec(e4-4f) Missions Tab (05:32Z). 0 open.
+**Patterns:** pulse-bot inactive: G-rule reached (3/3 consecutive, iters 94–96). Beacon APPROVAL_REQUEST for launcher in-flight — awaiting Larry. | Check I idempotency fix: APPROVAL_REQUEST pending Larry (iter 83+). | Stuck-cycle timeout guard: pending Larry (iter 43).
+**Learned:** PR #155 (V7) merged — fixture-suppression writes now redirect to `~/agents/state/pulse-fixture-suppressions.jsonl` (gitignored); dirty-tree class from fixture suppression logs is closed. CLAUDE.md and cycle-prompt.md already reflected this change. .invalid total dropped 261→150 between iters 95–96 (smoke-test artifact purge — non-alarming).
+
+---
+
 ## Iteration 95 — 2026-05-28 04:30 UTC (interactive)
 
 **Health:** ⚠️ Drift (pulse-bot inactive; relaunch still blocked)
