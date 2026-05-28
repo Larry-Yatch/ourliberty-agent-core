@@ -71,7 +71,22 @@ if not ALLOWED:
     sys.exit("ERROR: TELEGRAM_ALLOWED_CHAT_IDS empty — refusing to run a bot anyone can talk to.")
 
 BEACON_DIR = Path.home() / "agent-core" / "agents" / "beacon"
-LOG_DIR = Path.home() / "agents" / "logs"
+
+
+def resolve_log_dir() -> Path:
+    """Return the directory this module writes its log file to.
+
+    OURLIBERTY_LOG_DIR override exists so test runs do not leak sentinel
+    strings (TIER_ONE_MARKER, '401 Unauthorized', etc.) into the live
+    beacon_telegram_bot.log when a test imports this module and triggers
+    log() via mocked subprocess flows. Production keeps the env var unset,
+    preserving the historical path.
+    """
+    override = os.environ.get("OURLIBERTY_LOG_DIR")
+    return Path(override) if override else Path.home() / "agents" / "logs"
+
+
+LOG_DIR = resolve_log_dir()
 STATE_DIR = Path.home() / "agents" / "state"
 SESSION_FILE = STATE_DIR / "beacon_telegram_sessions.json"
 
@@ -226,8 +241,12 @@ def _tier2_refuse_on_resume_dm(failure_type: str) -> None:
 def log(msg: str) -> None:
     line = f"[{time.strftime('%Y-%m-%dT%H:%M:%S%z')}] {msg}"
     print(line, flush=True)
+    # Re-resolve at write time so OURLIBERTY_LOG_DIR set after import (e.g.,
+    # by the autouse test fixture in scripts/tests/conftest.py) still
+    # redirects writes. In production the env var is unset and the path
+    # collapses to LOG_DIR — no behavior change, no extra disk syscall.
     try:
-        with open(LOG_DIR / "beacon_telegram_bot.log", "a") as f:
+        with open(resolve_log_dir() / "beacon_telegram_bot.log", "a") as f:
             f.write(line + "\n")
     except OSError:
         pass
