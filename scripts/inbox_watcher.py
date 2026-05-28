@@ -40,6 +40,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
+import fixture_patterns  # noqa: E402
 import routing_validator  # noqa: E402
 import worktree_manager  # noqa: E402
 
@@ -400,6 +401,36 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
     except (OSError, json.JSONDecodeError) as e:
         log(f"[{agent}] malformed task {task_file.name}: {e}")
         write_invalid(task_file, f"json: {e}")
+        return
+
+    # Fixture-pattern dispatch gate (2026-05-28 cost-loop fix). Test/fixture
+    # envelopes must NEVER reach an LLM dispatch. They leak into live inboxes
+    # via the notify/dead-letter/marker-error cascade — whose doubled-prefix
+    # routing artifacts self-replicate — and previously burned real Opus cost
+    # in a loop. matched_fixture_envelope peels those wrappers so wrapped
+    # fixtures still match; we also test the bare task_id field. Single source
+    # of truth: fixture_patterns.py. See docs/inbox-watcher-fixture-gate-brief.md.
+    fixture_hit = (
+        fixture_patterns.matched_fixture_envelope(task_file.stem)
+        or fixture_patterns.matched_fixture_pattern(task.get("task_id"))
+    )
+    if fixture_hit:
+        dest = move_to(task_file, INBOXES_ROOT / agent / ".archive")
+        log(f"[{agent}] fixture-suppressed task={task_file.stem} "
+            f"pattern={fixture_hit!r} dest={dest.name} cost=$0 (not dispatched)")
+        append_cost({
+            "ts": now_iso(),
+            "agent": agent,
+            "task_id": task.get("task_id") or task_file.stem,
+            "task_type": "fixture-suppressed",
+            "model": None,
+            "cost_usd": 0.0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "duration_sec": 0,
+            "attempts": 0,
+            "source": "inbox-watcher",
+        })
         return
 
     ok, reason = dispatch_validator.validate_task(task)

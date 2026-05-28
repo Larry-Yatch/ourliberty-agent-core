@@ -302,6 +302,7 @@ Prefix patterns (match `task_id.startswith(prefix)`):
 
 Exact-match patterns:
 - `task-001`
+- `task-legacy`
 - `headless-001`
 - `opmanual-d35-5b-shipped-note-001`
 - `pf-ok`
