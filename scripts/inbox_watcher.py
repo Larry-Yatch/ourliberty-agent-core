@@ -40,6 +40,7 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
+import fixture_patterns  # noqa: E402
 import routing_validator  # noqa: E402
 import worktree_manager  # noqa: E402
 
@@ -395,6 +396,28 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
 
 
 def process_task(agent: str, task_file: Path, models_config: dict) -> None:
+    # Dispatch-boundary fixture gate. Mirrors the Pulse /cycle suppression
+    # (PR #147): fixture envelopes leak into ~/agents/inboxes/ and, without a
+    # gate here, self-replicate through the notify/dead-letter cascade
+    # (2026-05-28: 104 dispatches, $33.44 burn in 3h). is_fixture_envelope_name
+    # peels routing wrappers (notify-, dead-letter-, marker-error-) before
+    # matching so the wrapped forms (notify-dead-letter-notify-q-1.18.json,
+    # marker-error-notify-t-pf-1.json) are caught. Placed BEFORE json.loads so
+    # well-formed fixture envelopes archive cleanly without routing through
+    # .invalid/, and malformed fixture envelopes are still suppressed without
+    # an alert. Suppressed envelopes incur $0 — no run_claude call, no
+    # append_cost row, just the log line + archive move.
+    if fixture_patterns.is_fixture_envelope_name(task_file.name):
+        log(
+            f"[{agent}] fixture-suppressed envelope={task_file.name} cost=$0 "
+            f"(dispatch-gate per docs/inbox-watcher-fixture-gate-brief.md)"
+        )
+        try:
+            move_to(task_file, INBOXES_ROOT / agent / ".archive")
+        except OSError as e:
+            log(f"[{agent}] fixture-suppressed archive failed for {task_file}: {e}")
+        return
+
     try:
         task = json.loads(task_file.read_text())
     except (OSError, json.JSONDecodeError) as e:
