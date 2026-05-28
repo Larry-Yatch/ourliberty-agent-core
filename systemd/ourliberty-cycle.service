@@ -17,7 +17,7 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_cycle.sh
 
 # Cycle should not run forever — 5 min hard cap (a single iteration shouldn't take this long)
-TimeoutStartSec=600
+# Bumped 2026-05-28 — 7-day trend showed cycles climbing 3m→10m as corpus grew\n# (chain-events + journal + archive); 5 timeouts in 7d (12%). α₁ will add\n# 5 new checks. 1200s gives ~50% headroom; per-check budget is a separate\n# design call in the α₁ brief.\nTimeoutStartSec=1200
 
 StandardOutput=journal
 StandardError=journal
