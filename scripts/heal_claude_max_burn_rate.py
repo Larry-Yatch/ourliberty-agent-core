@@ -63,6 +63,11 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-claude-max-burn-rate.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-claude-max-burn-rate.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-claude-max-burn-rate-state.json'
 COSTS_FILE = AGENTS_ROOT / 'blackboard' / 'costs.jsonl'
+# Check VIII PR-2a: ground-truth rate-limit ledger written by agent_runner.
+# The DM body's trailing-2h count is read from here. Missing file → 0
+# (first run after PR-2a merges, before any 429 has fired).
+RATE_LIMIT_LEDGER_FILE = AGENTS_ROOT / 'blackboard' / 'anthropic-quota-events.jsonl'
+RATE_LIMIT_RECENT_HOURS = 2
 
 # Config defaults — overridden by config/agent-models.json:tier1_quota.
 DEFAULT_MAX_5H_SPEND_THRESHOLD_USD = 60.0
@@ -181,6 +186,39 @@ def rolling_5h_spend(now: Optional[datetime] = None) -> float:
     return total
 
 
+def recent_rate_limit_event_count(now: Optional[datetime] = None) -> int:
+    """Count rate-limit events from the ledger within the trailing
+    RATE_LIMIT_RECENT_HOURS. Missing file or unreadable lines → 0 without
+    error; the ledger is purely observational and may not exist on first run.
+    """
+    if not RATE_LIMIT_LEDGER_FILE.exists():
+        return 0
+    if now is None:
+        now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=RATE_LIMIT_RECENT_HOURS)
+    count = 0
+    try:
+        with open(RATE_LIMIT_LEDGER_FILE, errors='replace') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                ts = _parse_ts(rec.get('ts', ''))
+                if ts is None or ts < cutoff:
+                    continue
+                count += 1
+    except OSError as e:
+        log(f'read {RATE_LIMIT_LEDGER_FILE} failed: {e}', 'WARN')
+        return 0
+    return count
+
+
 def load_state() -> dict:
     if not STATE_FILE.exists():
         return {}
@@ -238,10 +276,14 @@ def run() -> int:
         log(f'spend at {pct * 100:.1f}% but within DM cooldown '
             f'(last_dm_ts={state.get("last_dm_ts")}) — suppressing', 'INFO')
         return 0
+    recent_events = recent_rate_limit_event_count(now=now)
     body = (
-        f'Tier 1 Max {WINDOW_HOURS}h spend at {pct * 100:.0f}% of threshold '
-        f'(${spend:.2f} of ${threshold:.2f}). Anthropic page: {ANTHROPIC_USAGE_URL}. '
-        f'Consider pausing dispatches to avoid hitting the quota wall.'
+        f'Trailing {WINDOW_HOURS}h LLM pace at {pct * 100:.0f}% of dollar gate '
+        f'(${spend:.2f} of ${threshold:.2f}). '
+        f'Pace indicator only — for actual quota state, check '
+        f'{ANTHROPIC_USAGE_URL}. '
+        f'Recent rate-limit events (trailing {RATE_LIMIT_RECENT_HOURS}h): '
+        f'{recent_events}.'
     )
     ok = larry_alerts.append_alert(
         source='heal-claude-max-burn-rate',

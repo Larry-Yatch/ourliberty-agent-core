@@ -7,14 +7,14 @@ dashboard_api consumer (which correctly assumes UTC for naive values)
 rendered as wall-clock + 6h.
 
 Covers all five agent_runner.py callsites cited in the fix:
-  - line 131: `_mark_paused_on_tier1` 'at'
-  - line 538: `_register_in_flight` 'started_at'
-  - line 633: `_meta_started_at` (inside run_claude)
-  - line 938: `out_meta['completed_at']` (inside run_claude)
-  - line 1404: `process_task` result 'timestamp'
+  - `_mark_paused_on_tier1` 'at'
+  - `_register_in_flight` 'started_at'
+  - `_meta_started_at` (inside run_claude)
+  - `out_meta['completed_at']` (inside run_claude)
+  - `process_task` result 'timestamp'
 
-Lines 131 and 538 are exercised end-to-end (call the function, parse
-the JSON it writes, assert tz-aware UTC). Lines 633/938/1404 live deep
+The first two are exercised end-to-end (call the function, parse the
+JSON it writes, assert tz-aware UTC). The remaining three live deep
 inside `run_claude` / `process_task` and are covered via AST inspection
 of the source — equivalent regression strength without spinning up the
 full claude-subprocess harness.
@@ -60,7 +60,7 @@ def _assert_utc_aware(case: unittest.TestCase, iso_str: str) -> None:
 
 
 class RegisterInFlightTimezoneTest(unittest.TestCase):
-    """Line 538: `_register_in_flight` writes 'started_at' tz-aware UTC."""
+    """`_register_in_flight` writes 'started_at' tz-aware UTC."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='ar-tz-inflight-'))
@@ -77,7 +77,7 @@ class RegisterInFlightTimezoneTest(unittest.TestCase):
 
 
 class MarkPausedOnTier1TimezoneTest(unittest.TestCase):
-    """Line 131: `_mark_paused_on_tier1` writes 'at' tz-aware UTC."""
+    """`_mark_paused_on_tier1` writes 'at' tz-aware UTC."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='ar-tz-paused-'))
@@ -140,8 +140,9 @@ def _call_uses_utc_arg(call: ast.Call) -> bool:
 class AgentRunnerSourceTimezoneTest(unittest.TestCase):
     """Catches the original bug by static analysis: every
     `datetime.now(...).isoformat()` in agent_runner.py must pass
-    `timezone.utc`. Covers the buried callsites at lines 633, 938, 1404
-    (and re-covers 131, 538 — defense in depth)."""
+    `timezone.utc`. Covers the buried callsites inside run_claude /
+    process_task (and re-covers the helpers exercised end-to-end above —
+    defense in depth)."""
 
     def setUp(self):
         self.source = Path(ar.__file__)
@@ -149,7 +150,9 @@ class AgentRunnerSourceTimezoneTest(unittest.TestCase):
 
     def test_at_least_five_isoformat_callsites(self):
         # Sanity: if this drops, somebody removed a callsite without
-        # updating this test. Re-evaluate scope before lowering.
+        # updating this test. Re-evaluate scope before lowering. New
+        # callsites raise the floor — the rate-limit ledger writer added
+        # in Check VIII PR-2a brings the count to ≥ 6.
         self.assertGreaterEqual(
             len(self.calls), 5,
             f'expected at least 5 datetime.now(...).isoformat() callsites in '
@@ -165,17 +168,17 @@ class AgentRunnerSourceTimezoneTest(unittest.TestCase):
                 f'lines {lines} — must be datetime.now(timezone.utc).isoformat()'
             )
 
-    def test_line_633_meta_started_at_uses_utc(self):
+    def test_meta_started_at_uses_utc(self):
         # _meta_started_at assignment inside run_claude.
-        self._assert_callsite_uses_utc(target_line=633)
+        self._assert_callsite_uses_utc(target_line=729)
 
-    def test_line_938_completed_at_uses_utc(self):
+    def test_completed_at_uses_utc(self):
         # out_meta['completed_at'] inside run_claude's success branch.
-        self._assert_callsite_uses_utc(target_line=938)
+        self._assert_callsite_uses_utc(target_line=1048)
 
-    def test_line_1404_process_task_timestamp_uses_utc(self):
+    def test_process_task_timestamp_uses_utc(self):
         # result['timestamp'] inside process_task.
-        self._assert_callsite_uses_utc(target_line=1404)
+        self._assert_callsite_uses_utc(target_line=1514)
 
     def _assert_callsite_uses_utc(self, target_line: int) -> None:
         # Tolerate ±3 lines of drift from upstream edits before failing
