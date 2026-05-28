@@ -653,6 +653,39 @@ When you see either message on Telegram targeting one of those shapes, your job 
 
 **Cross-reference:** `agents/pulse/CLAUDE.md` Check III section documents the producer side; spec § 5.10 has the full architecture.
 
+## Pulse Check VIII approvals — `approve check-viii-update-<date>` / `reject check-viii-update-<date>` (Check VIII PR-2b)
+
+Pulse runs Check VIII weekly (Mondays, gated alongside Check I) and writes a burn-rate-signal proposal artifact to `~/agents/blackboard/pulse-check-viii-proposals/check-viii-<YYYY-MM-DD>.json` (the date is the ISO-week Monday). The analyzer observes the `heal-claude-max-burn-rate` DM stream against the `anthropic-quota-events.jsonl` ground-truth ledger over a trailing 4w (8w for the deprecate rule), classifies each DM as TP/FP and each quota-event as FN, and proposes one of `raise` / `lower` / `deprecate` / `defer` / `none` per spec `docs/check-viii-burn-rate-signal-brief.md` § 2 PR-2b.
+
+Larry approves via Telegram with:
+
+```
+approve check-viii-update-<YYYY-MM-DD>
+```
+
+…or rejects with:
+
+```
+reject check-viii-update-<YYYY-MM-DD>     (optional reason after the colon)
+```
+
+When you see either shape on Telegram, dispatch a Claude-as-Forge config-only PR that applies the proposal's `proposed_threshold` to `config/agent-models.json:tier1_quota.max_5h_spend_threshold_usd`. **Read the artifact for that date first; do not act on an artifact that doesn't exist.** Concretely:
+
+1. **Locate the artifact.** Read `~/agents/blackboard/pulse-check-viii-proposals/check-viii-<date>.json`. The path is the source of truth — `<date>` matches the artifact's `week_anchor` field, which is the ISO-week Monday of the cycle that produced it.
+2. **Idempotency check.** If the artifact already has `applied: true`, this approval is a no-op WARN. Reply: *"check-viii-update-`<date>` was already applied earlier; no action."* Do NOT emit another APPROVAL_REQUEST. The `applied: true` flag is the gate — same pattern as Check III's `threshold-update-<date>`.
+3. **Rule-aware handling.** The artifact's `rule_fired` field disambiguates the approval shape:
+   - `rule_fired: "raise"` or `"lower"` → standard approval path (step 4). The config patch sets `tier1_quota.max_5h_spend_threshold_usd` to the artifact's `proposed_threshold`.
+   - `rule_fired: "deprecate"` → Larry's approval means **remove the dollar gate entirely**. The config patch deletes (or zeroes out, per Larry's preference at approve-time) `tier1_quota.max_5h_spend_threshold_usd`; the healer's `load_threshold` fallback already handles a missing value. Confirm with Larry in the approval dialog before dispatching — deprecate is the biggest config change Check VIII can propose.
+   - `rule_fired: "defer"` → not approvable. The artifact carries no `proposed_threshold` and `defer` represents metric tension (precision AND recall both below floor) that needs manual interpretation. Reply: *"check-viii-update-`<date>` is a defer; no automatic config change. Inspect the artifact and decide whether to dispatch a raise, a lower, or hold."*
+   - `rule_fired: "insufficient_signal"` or `"none"` → no DM was emitted, so this approval shape shouldn't fire. If it does (Larry typing the shortcut speculatively), reply with the artifact's rationale and skip the dispatch.
+4. **Reject path.** If Larry sent `reject`, write `applied: false, rejected: true, rejected_reason: <text>` to the artifact. No PR. Confirm to Larry.
+5. **Approve dispatch.** Emit an APPROVAL_REQUEST marker via `marker.py`. `task_id` = `check-viii-update-<date>-001` (idempotent under inbox dedup). `prompt` includes the diff Forge needs to write + the path to the artifact for cross-reference. Set `task_type: doc-only` so trust policy auto-approves a config-only PR.
+6. **Flip applied flag after merge.** When Mirror's REVIEW_PASS notify arrives for that task, your handler edits the artifact's `applied: true` field. Future replays of `approve check-viii-update-<date>` become a no-op WARN.
+
+**Shortcut idempotency is non-negotiable.** Re-running `approve check-viii-update-<date>` for an already-applied date must NEVER produce a second PR. The `applied: true` flag is the gate. If the artifact is missing, abort and DM Larry — don't guess at thresholds.
+
+**Cross-reference:** `agents/pulse/CLAUDE.md` Check VIII section (producer side); `docs/check-viii-burn-rate-signal-brief.md` § 2 PR-2b (analyzer spec); `scripts/pulse_check_viii.py` (implementation). Same shortcut shape and idempotency rule as Check III above — pattern is identical, only the target config field differs.
+
 ## Mission registration discipline (E4.4f)
 
 The mission registry at `agents/beacon/missions.json` is the canonical record of every technical multi-PR initiative the chain is working on. The Missions tab on the dashboard reads this file (via `GET /api/system/missions`) and joins it with `chain_events` + open-PR state to render the kanban (spec `agents/beacon/specs/e4-4f-missions-tab-v1.md` § 5.1, § 5.2).
