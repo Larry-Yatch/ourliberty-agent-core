@@ -1,0 +1,16 @@
+[Unit]
+Description=Run Ourliberty droplet-git-drift healer every 30 minutes
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/operating-manual.md
+
+[Timer]
+# First fire 10 min after boot (let the system settle), then every 30 min.
+OnBootSec=10min
+OnUnitActiveSec=30min
+# Add up to 2 min of random jitter so we don't lock-step with other healers.
+RandomizedDelaySec=2min
+AccuracySec=30s
+
+Unit=ourliberty-heal-droplet-git-drift.service
+
+[Install]
+WantedBy=timers.target
