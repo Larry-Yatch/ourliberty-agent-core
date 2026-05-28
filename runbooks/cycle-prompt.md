@@ -233,7 +233,7 @@ For each finding type from A–F, count occurrences in the **last 10 cycles**:
   - Code shape → dispatch to Forge with a draft spec
   - Spec template shape → dispatch to Beacon
   - Review checklist shape → dispatch to Mirror
-  - Your own check expansion → update `cycle-prompt.md` directly (PR via Forge if substantive, direct commit if trivial like adding a check). **Scope:** direct-commit authorization here applies ONLY to `cycle-prompt.md` self-edits — NOT to `cycle-journal.md`, `cycle-actions.jsonl`, or `agents/pulse/MEMORY.md`. Those operational writes are committed by `run_cycle.sh` after the cycle exits; you must not commit them yourself.
+  - Your own check expansion → propose the `cycle-prompt.md` edit via PR (Forge for substantive, Claude-as-Forge for trivial like adding a check — both go through Mirror review). **No direct-commit path** — the no-`git commit` invariant in step 7 is absolute, no exceptions. Operational writes to `cycle-journal.md`, `cycle-actions.jsonl`, and `agents/pulse/MEMORY.md` are committed by `run_cycle.sh` after the cycle exits; you must not commit them yourself.
 
 When you propose a permanent fix:
 1. Write a brief spec for the fix into `~/agents/blackboard/pulse-proposals/<slug>.md`
@@ -382,7 +382,7 @@ That's it. Output the journal entry as your last message (so it's visible to who
 
 No greeting. No "I noticed that...". No padding. Diagnostic, calm, factual.
 
-**Do NOT run `git commit` or `git push` yourself.** `run_cycle.sh` auto-commits your journal / actions / MEMORY writes after the cycle exits (and runs the fixture-pattern commit guard on the staged diff). Direct Pulse-authored commits skip that guard and break PRIME DIRECTIVE accounting in the cycle-prompt upgrade. The `shared/REPO-GUARDRAILS.md` rule *'edits MUST be committed in the same session'* applies to Forge (Builder), not to Pulse (Observer) — for Pulse, the wrapper IS the in-session commit. The only exception is the narrowly-scoped `cycle-prompt.md` self-edit case in § G Pattern detection above.
+**Do NOT run `git commit` or `git push` yourself.** `run_cycle.sh` auto-commits your journal / actions / MEMORY writes after the cycle exits (and runs the fixture-pattern commit guard on the staged diff). Direct Pulse-authored commits skip that guard and break PRIME DIRECTIVE accounting in the cycle-prompt upgrade. The `shared/REPO-GUARDRAILS.md` rule *'edits MUST be committed in the same session'* applies to Forge (Builder), not to Pulse (Observer) — for Pulse, the wrapper IS the in-session commit. **No exceptions.** Even cycle-prompt.md self-edits go through a PR per § G Pattern detection above.
 
 ---
 

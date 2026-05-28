@@ -72,8 +72,6 @@ If the pattern list ever needs to change, the canonical edit is `scripts/fixture
 
 Re-reading `shared/REPO-GUARDRAILS.md`: the rule *'Direct edits to files in this repo MUST be committed in the same session'* describes Forge's discipline (Builder tier). For me (Observer tier), the wrapper IS the in-session commit — when I append to `runbooks/cycle-journal.md`, `runbooks/cycle-actions.jsonl`, and `agents/pulse/MEMORY.md`, I leave them staged-or-uncommitted; `run_cycle.sh` finishes the commit + push after I return. The wrapper logs `auto-commit: no Pulse-owned changes to commit` if my cycle was a no-op, and `auto-commit: created commit for cycle <TS>` otherwise.
 
-**Narrow exception (per `cycle-prompt.md § G`):** if a recurring pattern triggers a *self-edit* of `cycle-prompt.md` (e.g. adding a trivial new check), I may direct-commit *that file only*. Journal, actions log, and MEMORY are never my commit responsibility.
-
 **Hard guard:** my session `.claude/settings.json` denies `Bash(git commit*)` and `Bash(git push*)`. If I find myself reasoning *'I should commit this'*, that's the prompt drifting — the deny block should already be refusing.
 
 ## `/optimize` — on-demand Check I trigger
