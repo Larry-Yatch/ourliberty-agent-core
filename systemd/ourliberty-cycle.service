@@ -16,8 +16,11 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # Wrapper script handles concurrency lock + invokes claude with /cycle
 ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_cycle.sh
 
-# Cycle should not run forever — 5 min hard cap (a single iteration shouldn't take this long)
-TimeoutStartSec=600
+# Bumped 2026-05-28 — 7-day trend showed cycles climbing 3m→10m as corpus grew
+# (chain-events + journal + archive); 5 timeouts in 7d (12%). α₁ will add
+# 5 new checks. 1200s gives ~50% headroom; per-check budget is a separate
+# design call in the α₁ brief.
+TimeoutStartSec=1200
 
 StandardOutput=journal
 StandardError=journal
