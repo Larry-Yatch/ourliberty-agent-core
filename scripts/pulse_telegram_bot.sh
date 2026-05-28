@@ -42,11 +42,14 @@ if [ -z "$TELEGRAM_ALLOWED_CHAT_IDS" ]; then
 fi
 
 # Best-effort: stop the systemd unit if it's hanging on or in failed state.
-# || true keeps the script alive when systemctl-stop fails due to missing
-# auth (expected in agent sessions without sudo). Prevents double-polling
-# if systemd later recovers the unit while tmux is running.
-systemctl stop ourliberty-pulse-bot 2>/dev/null || true
-systemctl reset-failed ourliberty-pulse-bot 2>/dev/null || true
+# Redirect stdin from /dev/null so polkit's interactive password prompt
+# fails immediately when sudo isn't available — without </dev/null, polkit
+# blocks on stdin waiting for a password the agent session can't provide.
+# || true keeps the script alive when the stop fails (expected in agent
+# sessions). Prevents double-polling if systemd later recovers the unit
+# while tmux is running.
+systemctl stop ourliberty-pulse-bot </dev/null 2>/dev/null || true
+systemctl reset-failed ourliberty-pulse-bot </dev/null 2>/dev/null || true
 
 # Kill any existing tmux session
 tmux has-session -t "$SESSION" 2>/dev/null && tmux kill-session -t "$SESSION"
