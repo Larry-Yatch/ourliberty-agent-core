@@ -235,6 +235,8 @@ For each finding type from A–F, count occurrences in the **last 10 cycles**:
   - Review checklist shape → dispatch to Mirror
   - Your own check expansion → propose the `cycle-prompt.md` edit via PR (Forge for substantive, Claude-as-Forge for trivial like adding a check — both go through Mirror review). **No direct-commit path** — the no-`git commit` invariant in step 7 is absolute, no exceptions. Operational writes to `cycle-journal.md`, `cycle-actions.jsonl`, and `agents/pulse/MEMORY.md` are committed by `run_cycle.sh` after the cycle exits; you must not commit them yourself.
 
+When you propose a permanent fix that adds a new rule (cycle-prompt teach, CLAUDE.md addition, runbook discipline), the dispatch envelope MUST name the proposed enforcement mechanism alongside the rule prose. See `docs/doctrine-of-doctrine.md` for the mechanism catalogue. Beacon's APPROVAL_REQUEST emit refuses to forward dispatches whose rule has no mechanism named (and no explicit waiver).
+
 When you propose a permanent fix:
 1. Write a brief spec for the fix into `~/agents/blackboard/pulse-proposals/<slug>.md`
 2. Dispatch to the right agent via `~/agents/inboxes/<agent>/cycle-fix-<slug>.json` — use the format in **Section 8 (Dispatch task format)** below. The inbox watcher will pick it up within 5s.

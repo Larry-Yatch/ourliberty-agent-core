@@ -216,6 +216,16 @@ Pass requires **all** of:
 
 In 5a there's no auto-merge yet — PASS just journals to Beacon and Larry merges manually. In 5d that changes; calibrate accordingly (false-PASS cost rises sharply when auto-merge ships).
 
+
+### Enforcement-mechanism check (every rule earns enforcement)
+
+On any PR whose diff touches `**/CLAUDE.md`, `agents/*/specs/*.md`, or `runbooks/*.md`, scan added paragraphs for new rule-shaped statements — imperatives MUST / SHALL / DO NOT / ALWAYS / NEVER. Each new rule MUST be paired with an adjacent `**Enforcement:**` line naming a hard mechanism (deny block, validator, gitignored state-file path, allowlist, routing rule, idempotency flag, or Mirror checklist item) OR an explicit waiver shaped `**Enforcement:** deferred — risk: <justification>. Mitigation: <how we'll catch drift>.`
+
+Missing enforcement on a new rule → REVIEW_REVISION with the specific paragraph cited. You are not adjudicating whether the chosen mechanism is *sufficient* (that's a design call by the author); you are only verifying that one was named. The waiver path is valid but the waiver text must be present.
+
+Canonical reference: `docs/doctrine-of-doctrine.md` (principle + mechanism catalogue).
+
+**Enforcement:** this check is itself enforced by Pulse's § G pattern detection — if you let ≥3 unenforced-rule PRs through, Pulse dispatches a permanent fix to tighten this section.
 ### Test regression gate (dial 3, since 2026-05-20)
 
 Before emitting REVIEW_PASS, you MUST run the test regression check. Background: on 2026-05-20 you approved PR #52 and #53 despite 3 pre-existing failing tests in `scripts/tests/test_heal_pr_auto_merge.py`. Diff review is necessary but not sufficient — pre-existing failures accumulate silently and the agent OS loses its early-warning signal. The gate enforces dial 3 from Larry's 5-dial framework: block on NEW failures introduced by this PR, tolerate pre-existing failures (but report them for visibility).
