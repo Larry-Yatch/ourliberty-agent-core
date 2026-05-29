@@ -116,9 +116,22 @@ exceeded → defer (never force-kill). Wire the drain gate into `inbox_watcher.p
 (block new top-level, allow continuations). For PR-3, engage = always-true when enabled (so it is
 testable before load-gating lands in 6.4). Resolve "open build sequence" against the
 build-sequence-advancer state (the orchestrator already tracks active sequences) — pick the
-reliable existing source, do not invent a parallel tracker. Tests: window elapse → drain;
-in-flight present → no flip; clears → flip + reset; enabled=false → forced tier1; drain timeout →
-defer; watcher blocks fresh task during drain but passes a continuation.
+reliable existing source, do not invent a parallel tracker.
+
+Rate-limit cooldown (folds in the retry-storm fix). The 2026-05-28 incident was not just retries —
+the watcher kept throwing every queued task at Tier 1 after it was already rate-limited (~43
+failing dispatches in ~6 min). Fix, reusing the same dispatch gate as draining: when the active
+tier returns a `rate_limit` AND no tier switch happens (resume-session skip, other tier
+unavailable, or both tiers limited), set a per-account cooldown until the reset time parsed from
+the "resets <time>" message; when unparseable, fall back to a capped exponential backoff (cap
+30 min). The `inbox_watcher` dispatch path must skip dispatching to a cooled-down account until
+the cooldown expires. Cooldown state lives in `active-tier.json` (e.g. a `cooldowns: {<tier>:
+<until_iso>}` field). Keep this bounded — do NOT expand it into a general retry-policy rework.
+
+Tests: window elapse → drain; in-flight present → no flip; clears → flip + reset; enabled=false →
+forced tier1; drain timeout → defer; watcher blocks fresh task during drain but passes a
+continuation; rate_limit with no tier switch → account cooldown set until parsed reset and watcher
+skips that account until expiry; unparseable reset → capped backoff; cooldown clears at expiry.
 
 ### 6.4 Load-gating + observability (depends on 6.3)
 
