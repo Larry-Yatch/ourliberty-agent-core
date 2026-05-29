@@ -110,5 +110,29 @@
       "plain_language_summary": "Mirror-bot is DOWN and systemd has not recovered it — StartLimitBurst likely exhausted. PR reviews queued for mirror will not run.",
       "recommended_action": "Run `sudo systemctl status ourliberty-mirror-bot.service && sudo systemctl restart ourliberty-mirror-bot.service`. Check `journalctl -u ourliberty-mirror-bot.service -n 50` for the underlying crash cause. Runbook: runbooks/watchdog-bot-policy.md."
     }
+  },
+  "beacon-telegram-bot": {
+    "claude_tier1_failed_on_resume_session_bound": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A Beacon chat turn failed mid-session and could not auto-retry on the backup (Tier 2) account, because Claude session IDs are tied to one account. Beacon itself stays running — only that one turn failed. Most often the underlying cause is a brief Anthropic server-side throttle (HTTP 429, 'not your usage limit') that clears on its own, NOT a real quota or auth problem.",
+      "recommended_action": "First just send a fresh Beacon message — it starts a new (non-resumed) session and routes normally, which usually confirms recovery on its own. Only if the fresh message ALSO fails, probe `claude -p --output-format json 'say ok'` under each tier HOME (Tier 1: /home/larry; Tier 2: /home/larry/.claude-larry-personal) to tell apart a real auth-401 (re-login needed) from a usage-cap (wait for the rolling-5h window). NOTE: the raw alert's 'wait for the 5h window' advice is often wrong — the classifier currently mislabels transient 429s as auth_401 (fix queued)."
+    }
+  },
+  "heal-claude-max-burn-rate": {
+    "claude_max_5h_burn_threshold_breached": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The trailing-5h imputed-dollar 'pace' figure crossed its threshold. On our OAuth Max plan this is NOT money spent (there is no per-token billing) and only a rough proxy for the rolling-5h usage window. The real quota signal is the Anthropic usage page and the rate-limit-event ledger. A re-base of this healer onto the real quota signal (dropping the dollar framing) is already queued.",
+      "recommended_action": "No action required and no money is being spent — treat this as a soft heads-up only. For actual quota headroom, check https://console.anthropic.com/settings/usage or ~/agents/blackboard/anthropic-quota-events.jsonl (real rate-limit events). Do NOT hold or gate work on this dollar number — that gate is deprecated."
+    }
+  },
+  "heal-tier2-weekly-probe": {
+    "tier2_weekly_probe_failed": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The backup (Tier 2) OAuth account failed its weekly health probe — the automatic failover safety net may be down. The primary (Tier 1) account is unaffected, but if Tier 1 ever hits its limit there would be no working fallback.",
+      "recommended_action": "Re-auth Tier 2 per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. Manual re-probe: `HOME=/home/larry/.claude-larry-personal claude -p --model claude-opus-4-7 'say ok'` — a clean 'ok' means Tier 2 is healthy again."
+    }
   }
 }
