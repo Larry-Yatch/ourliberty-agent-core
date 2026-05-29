@@ -92,7 +92,7 @@ After applying the audit above, the α₁ file should read in this order:
    - 6.1 The directive verbatim from § 5.3
    - 6.2 Empirical-verification gating + dual-clock-anchor rule (§ 5.3 Mirror PR #108 amendment)
    - 6.3 Healer first-execution accounting
-   - 6.4 The cycle-actions ledger — `~/agents/blackboard/cycle-actions.jsonl` row shape, how to append, how to compute ratio over trailing 30d
+   - 6.4 The cycle-prime ledger — `~/agents/blackboard/cycle-prime-ledger.jsonl` row shape, how to append, how to compute ratio over trailing 30d
    - 6.5 Permanent-fix dispatch protocol (preserved from current Check G: routing rules + cycle-fix-<slug>.json shape + doctrine-of-doctrine enforcement-mechanism mandate + the no-direct-commit doctrine)
 8. § 7 Pipeline-driver — quiet-iter leverage proposals (NEW, ~80 lines from § 5.4)
    - 7.1 When it fires (all 5 mandatory clean + all additive clean + pipeline quiet)
