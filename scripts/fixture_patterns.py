@@ -98,6 +98,7 @@ def matched_fixture_pattern(task_id: object) -> str | None:
 # inbox-watcher kept dispatching it. See the 2026-05-28 cost-loop incident and
 # docs/inbox-watcher-fixture-gate-brief.md.
 ROUTING_WRAPPER_PREFIXES: tuple[str, ...] = (
+    "dead-letter-marker-",
     "notify-",
     "dead-letter-",
     "marker-error-",
