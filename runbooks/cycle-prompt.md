@@ -1460,6 +1460,10 @@ Exact-match patterns:
 - `bad-pf`
 - `no-preamble`
 - `no-chat`
+- `dead-letter-bad`
+- `dead-letter-gc`
+- `dead-letter-bad-task`
+- `envelope-id`
 
 **Discipline when you match:**
 

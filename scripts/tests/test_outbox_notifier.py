@@ -63,9 +63,9 @@ def tearDownModule():  # noqa: N802 — unittest hook name
 def _good_outbox(**overrides):
     """Default result outbox shape (matches inbox_watcher._build_outbox)."""
     outbox = {
-        'task_id': 'task-001',
+        'task_id': 'real-001',
         'agent': 'beacon',
-        'source_task_file': '/home/larry/agents/inboxes/beacon/task-001.json',
+        'source_task_file': '/home/larry/agents/inboxes/beacon/real-001.json',
         'reply_chat_id': None,
         'source': 'pulse',
         'started_at': '2026-05-11T20:00:00Z',
@@ -141,14 +141,14 @@ class HelperFunctionsTest(unittest.TestCase):
         # source_task_file starts with notify- → depth 1
         self.assertEqual(
             on._current_notify_depth({
-                'source_task_file': '/inboxes/beacon/notify-task-001.json',
+                'source_task_file': '/inboxes/beacon/notify-real-001.json',
             }),
             1,
         )
         # Plain task → depth 0
         self.assertEqual(
             on._current_notify_depth({
-                'source_task_file': '/inboxes/beacon/task-001.json',
+                'source_task_file': '/inboxes/beacon/real-001.json',
             }),
             0,
         )
@@ -215,15 +215,15 @@ class ProcessOutboxTest(unittest.TestCase):
         return f
 
     def test_pulse_to_beacon_result_notifies_back_to_pulse(self):
-        outbox = _good_outbox(agent='beacon', source='pulse', task_id='t-1')
-        f = self._write_outbox('beacon', 't-1.json', outbox)
+        outbox = _good_outbox(agent='beacon', source='pulse', task_id='real-1')
+        f = self._write_outbox('beacon', 'real-1.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
 
         # Outbox archived
         self.assertFalse(f.exists())
-        archive = on.OUTBOXES_ROOT / 'beacon' / '.archive' / 't-1.json'
+        archive = on.OUTBOXES_ROOT / 'beacon' / '.archive' / 'real-1.json'
         self.assertTrue(archive.exists())
 
         # Notify landed in pulse's inbox
@@ -239,11 +239,11 @@ class ProcessOutboxTest(unittest.TestCase):
 
     def test_failed_result_still_notifies_with_failed_framing(self):
         outbox = _good_outbox(
-            agent='beacon', source='pulse', task_id='t-fail',
+            agent='beacon', source='pulse', task_id='real-fail',
             exit_code=-1, error='claude timed out after 3 attempts',
             result='',
         )
-        f = self._write_outbox('beacon', 't-fail.json', outbox)
+        f = self._write_outbox('beacon', 'real-fail.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -256,10 +256,10 @@ class ProcessOutboxTest(unittest.TestCase):
 
     def test_forge_question_routes_back_as_clarification(self):
         outbox = _good_outbox(
-            agent='beacon', source='forge-question', task_id='q-1',
+            agent='beacon', source='forge-question', task_id='realq-1',
             result='Use camelCase for the new field; the existing convention in agent-models.json is camelCase.',
         )
-        f = self._write_outbox('beacon', 'q-1.json', outbox)
+        f = self._write_outbox('beacon', 'realq-1.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -275,8 +275,8 @@ class ProcessOutboxTest(unittest.TestCase):
         self.assertEqual(notify_data['intent'], 'clarification-response')
 
     def test_system_source_outbox_archived_no_notify(self):
-        outbox = _good_outbox(agent='beacon', source='telegram-webhook', task_id='t-tg')
-        f = self._write_outbox('beacon', 't-tg.json', outbox)
+        outbox = _good_outbox(agent='beacon', source='telegram-webhook', task_id='real-tg')
+        f = self._write_outbox('beacon', 'real-tg.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'archived-no-notify')
@@ -290,16 +290,16 @@ class ProcessOutboxTest(unittest.TestCase):
     def test_reply_leg_source_archived_no_notify(self):
         # beacon-clarification IS a reply leg — don't double-notify
         outbox = _good_outbox(
-            agent='forge', source='beacon-clarification', task_id='t-clar',
+            agent='forge', source='beacon-clarification', task_id='real-clar',
         )
-        f = self._write_outbox('forge', 't-clar.json', outbox)
+        f = self._write_outbox('forge', 'real-clar.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'archived-no-notify')
 
     def test_self_dispatch_skipped(self):
-        outbox = _good_outbox(agent='beacon', source='beacon', task_id='t-self')
-        f = self._write_outbox('beacon', 't-self.json', outbox)
+        outbox = _good_outbox(agent='beacon', source='beacon', task_id='real-self')
+        f = self._write_outbox('beacon', 'real-self.json', outbox)
 
         result = on.process_outbox(f)
         # Should be filtered by _should_notify_back (returns False for self-dispatch)
@@ -309,10 +309,10 @@ class ProcessOutboxTest(unittest.TestCase):
     def test_depth_cap_blocks_second_hop_notify(self):
         # source_task_file starts with notify- → already depth 1
         outbox = _good_outbox(
-            agent='beacon', source='pulse', task_id='t-deep',
+            agent='beacon', source='pulse', task_id='real-deep',
             source_task_file='/home/larry/agents/inboxes/beacon/notify-prior.json',
         )
-        f = self._write_outbox('beacon', 't-deep.json', outbox)
+        f = self._write_outbox('beacon', 'real-deep.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'depth-cap')
@@ -324,17 +324,17 @@ class ProcessOutboxTest(unittest.TestCase):
 
     def test_explicit_notify_depth_field_respected(self):
         outbox = _good_outbox(
-            agent='beacon', source='pulse', task_id='t-explicit-depth',
+            agent='beacon', source='pulse', task_id='real-explicit-depth',
             _notify_depth=1,
         )
-        f = self._write_outbox('beacon', 't-explicit-depth.json', outbox)
+        f = self._write_outbox('beacon', 'real-explicit-depth.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'depth-cap')
 
     def test_short_result_prompt_padded_to_validator_floor(self):
-        outbox = _good_outbox(agent='beacon', source='pulse', task_id='t-short', result='ok')
-        f = self._write_outbox('beacon', 't-short.json', outbox)
+        outbox = _good_outbox(agent='beacon', source='pulse', task_id='real-short', result='ok')
+        f = self._write_outbox('beacon', 'real-short.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -461,13 +461,13 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='result-notification',
             sender='beacon',
-            task_id='t-1',
+            task_id='real-1',
             success=True,
             output='cycle complete; 3 observations recorded',
         )
         # Header tag
         self.assertIn('[Inter-agent notify | intent=result-notification | from=beacon', prompt)
-        self.assertIn('task=t-1', prompt)
+        self.assertIn('task=real-1', prompt)
         self.assertIn('status=SUCCESS', prompt)
         # Framing
         self.assertIn('not a new task request', prompt)
@@ -481,7 +481,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='result-notification',
             sender='forge',
-            task_id='t-fail',
+            task_id='real-fail',
             success=False,
             output='',
             error='claude timed out after 3 attempts',
@@ -535,13 +535,13 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='reject',
             sender='forge',
-            task_id='t-bad-spec',
+            task_id='real-bad-spec',
             success=True,
             output='Spec references nonexistent file foo.md',
             intent_kwargs={'reason': 'Spec references nonexistent file foo.md'},
         )
         self.assertIn('reject', prompt)
-        self.assertIn('REJECTED task `t-bad-spec`', prompt)
+        self.assertIn('REJECTED task `real-bad-spec`', prompt)
         self.assertIn('nonexistent file', prompt)
         self.assertIn('Do not retry without addressing', prompt)
 
@@ -549,7 +549,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='dead-letter',
             sender='inbox-watcher',
-            task_id='t-rejected',
+            task_id='real-rejected',
             success=False,
             output='',
             intent_kwargs={'reason': 'F24 prompt too short'},
@@ -561,12 +561,12 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='marker-error',
             sender='outbox-notifier',
-            task_id='t-broken',
+            task_id='real-broken',
             success=False,
             output='=== PROCEED ===\n{bad json}',
             intent_kwargs={
                 'reason': 'invalid JSON: Expecting property name',
-                'task_id': 't-broken',
+                'task_id': 'real-broken',
             },
         )
         self.assertIn('marker-error', prompt)
@@ -577,7 +577,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='unknown-future-intent',
             sender='beacon',
-            task_id='t-x',
+            task_id='real-x',
             success=True,
             output='some output',
         )
@@ -589,7 +589,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='clarification-response',
             sender='beacon',
-            task_id='t-1',
+            task_id='real-1',
             success=True,
             output='answer text',
             # intent_kwargs intentionally missing 'remaining'
@@ -602,7 +602,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='result-notification',
             sender='beacon',
-            task_id='t-tiny',
+            task_id='real-tiny',
             success=True,
             output='ok',
         )
@@ -665,7 +665,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         outbox = _good_outbox(
             agent='forge',
             source='beacon',
-            task_id='t-pf',
+            task_id='real-pf',
             result=(
                 'Read the spec. Traced the line numbers. Ready to act.\n\n'
                 + marker_text
@@ -677,11 +677,11 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
     def test_proceed_marker_routes_to_beacon_as_forge_result(self):
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-pf", "preflight_summary": "Will edit X line 12."}\n'
+            '{"task_id": "real-pf", "preflight_summary": "Will edit X line 12."}\n'
             '=== END_PROCEED ==='
         )
         outbox = self._forge_outbox(marker)
-        f = self._write_outbox('forge', 't-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-pf.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -691,13 +691,13 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         data = json.loads(notifies[0].read_text())
         self.assertEqual(data['source'], 'forge-result')
         self.assertEqual(data['intent'], 'ack-proceed')
-        self.assertIn('PROCEED on task `t-pf`', data['prompt'])
+        self.assertIn('PROCEED on task `real-pf`', data['prompt'])
         self.assertIn('Will edit X line 12', data['prompt'])
 
     def test_clarify_request_routes_to_beacon_as_forge_question(self):
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-pf", "question": "Which line range exactly?"}\n'
+            '{"task_id": "real-pf", "question": "Which line range exactly?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = self._forge_outbox(
@@ -705,7 +705,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
             clarification_count=0,
             max_clarifications=3,
         )
-        f = self._write_outbox('forge', 't-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-pf.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -726,11 +726,11 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
     def test_reject_marker_routes_to_beacon_as_forge_result(self):
         marker = (
             '=== REJECT ===\n'
-            '{"task_id": "t-pf", "reason": "Spec references missing file."}\n'
+            '{"task_id": "real-pf", "reason": "Spec references missing file."}\n'
             '=== END_REJECT ==='
         )
         outbox = self._forge_outbox(marker)
-        f = self._write_outbox('forge', 't-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-pf.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -745,7 +745,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
     def test_clarify_at_budget_exhausted_converts_to_exhausted_intent(self):
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-pf", "question": "Final ambiguity?"}\n'
+            '{"task_id": "real-pf", "question": "Final ambiguity?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = self._forge_outbox(
@@ -753,7 +753,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
             clarification_count=3,
             max_clarifications=3,
         )
-        f = self._write_outbox('forge', 't-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-pf.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -773,7 +773,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         """The preflight protocol is multi-hop; depth cap must not block it."""
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-pf", "question": "Q?"}\n'
+            '{"task_id": "real-pf", "question": "Q?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = self._forge_outbox(
@@ -784,7 +784,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
             clarification_count=1,
             max_clarifications=3,
         )
-        f = self._write_outbox('forge', 't-pf-resume.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-resume.json', outbox)
 
         result = on.process_outbox(f)
         # Marker-driven path should bypass depth cap and notify regardless
@@ -797,7 +797,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         But a marker present means the protocol round is in progress — must notify."""
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-pf", "preflight_summary": "Got the clarification, building."}\n'
+            '{"task_id": "real-pf", "preflight_summary": "Got the clarification, building."}\n'
             '=== END_PROCEED ==='
         )
         outbox = self._forge_outbox(
@@ -806,7 +806,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
             clarification_count=1,
             max_clarifications=3,
         )
-        f = self._write_outbox('forge', 't-pf-resumed.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-resumed.json', outbox)
 
         result = on.process_outbox(f)
         # Without marker handling this would be 'archived-no-notify'
@@ -815,7 +815,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
     def test_malformed_marker_dead_letters_back_to_forge(self):
         marker = '=== PROCEED ===\n{bad json}\n=== END_PROCEED ==='
         outbox = self._forge_outbox(marker)
-        f = self._write_outbox('forge', 't-pf-bad.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-bad.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
@@ -840,26 +840,26 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         notify task, the answer leg dies at Forge's worktree gate."""
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-pf", "question": "Which line?"}\n'
+            '{"task_id": "real-pf", "question": "Which line?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = self._forge_outbox(
             marker,
             target_repo='ourliberty-agent-core',
-            branch='forge/t-pf',
+            branch='forge/real-pf',
             pr_title='docs: example title',
             pr_body='example body',
             clarification_count=0,
             max_clarifications=3,
         )
-        f = self._write_outbox('forge', 't-pf-clarify.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-clarify.json', outbox)
         on.process_outbox(f)
 
         notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
         self.assertEqual(len(notifies), 1)
         data = json.loads(notifies[0].read_text())
         self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(data['branch'], 'forge/t-pf')
+        self.assertEqual(data['branch'], 'forge/real-pf')
         self.assertEqual(data['pr_title'], 'docs: example title')
         self.assertEqual(data['pr_body'], 'example body')
 
@@ -870,23 +870,23 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         outbox = _good_outbox(
             agent='beacon',
             source='forge-question',
-            task_id='t-pf',
+            task_id='real-pf',
             target_repo='ourliberty-agent-core',
-            branch='forge/t-pf',
+            branch='forge/real-pf',
             pr_title='docs: example title',
             pr_body='example body',
             clarification_count=1,
             max_clarifications=3,
             result='Use line 258 — the systemd-units table row.',
         )
-        f = self._write_outbox('beacon', 't-pf-answer.json', outbox)
+        f = self._write_outbox('beacon', 'real-pf-answer.json', outbox)
         on.process_outbox(f)
 
         notifies = list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))
         self.assertEqual(len(notifies), 1)
         data = json.loads(notifies[0].read_text())
         self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(data['branch'], 'forge/t-pf')
+        self.assertEqual(data['branch'], 'forge/real-pf')
         self.assertEqual(data['pr_title'], 'docs: example title')
         self.assertEqual(data['pr_body'], 'example body')
 
@@ -899,7 +899,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
             target_repo='ourliberty-agent-core',
             branch='forge/watchdog-fix-001',
         )
-        f = self._write_outbox('forge', 't-pf-bad-fields.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-bad-fields.json', outbox)
         on.process_outbox(f)
 
         marker_errors = list(
@@ -918,18 +918,18 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         # re-emitted a clean PROCEED. The outbox carries propagated fields.
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-recovered", "preflight_summary": "Recovered cleanly."}\n'
+            '{"task_id": "real-recovered", "preflight_summary": "Recovered cleanly."}\n'
             '=== END_PROCEED ==='
         )
         outbox = _good_outbox(
             agent='forge',
             source='outbox-notifier',  # the previous marker-error notify
-            task_id='t-recovered',
+            task_id='real-recovered',
             result='Got the marker-error notify, here is my corrected marker.\n\n' + marker,
             original_source='beacon',  # propagated from the marker-error envelope
             marker_error_count=1,
         )
-        f = self._write_outbox('forge', 't-recovered.json', outbox)
+        f = self._write_outbox('forge', 'real-recovered.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -948,12 +948,12 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         outbox = _good_outbox(
             agent='forge',
             source='outbox-notifier',
-            task_id='t-loop',
+            task_id='real-loop',
             result=marker,
             original_source='beacon',
             marker_error_count=on.MAX_MARKER_ERROR_RETRIES,  # next retry exceeds cap
         )
-        f = self._write_outbox('forge', 't-loop.json', outbox)
+        f = self._write_outbox('forge', 'real-loop.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
@@ -977,15 +977,15 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
     def test_multiple_markers_dead_letters_back_to_forge(self):
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-1", "preflight_summary": "x"}\n'
+            '{"task_id": "real-1", "preflight_summary": "x"}\n'
             '=== END_PROCEED ===\n\n'
             'Wait, actually:\n\n'
             '=== REJECT ===\n'
-            '{"task_id": "t-1", "reason": "y"}\n'
+            '{"task_id": "real-1", "reason": "y"}\n'
             '=== END_REJECT ==='
         )
         outbox = self._forge_outbox(marker)
-        f = self._write_outbox('forge', 't-pf-dup.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-dup.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
@@ -1001,17 +1001,17 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         both marker-driven (forge) and default-path (beacon) legs."""
         # === Round 1: Forge clarifies (count 0 → 1) ===
         forge_outbox_1 = _good_outbox(
-            agent='forge', source='beacon', task_id='t-cascade',
+            agent='forge', source='beacon', task_id='real-cascade',
             result=(
                 'Need a quick clarification.\n\n'
                 '=== CLARIFY_REQUEST ===\n'
-                '{"task_id": "t-cascade", "question": "Which line range?"}\n'
+                '{"task_id": "real-cascade", "question": "Which line range?"}\n'
                 '=== END_CLARIFY_REQUEST ==='
             ),
             clarification_count=0,
             max_clarifications=3,
         )
-        f1 = self._write_outbox('forge', 't-cascade-r1.json', forge_outbox_1)
+        f1 = self._write_outbox('forge', 'real-cascade-r1.json', forge_outbox_1)
         r1 = on.process_outbox(f1)
         self.assertEqual(r1, 'notified-marker')
 
@@ -1028,7 +1028,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         beacon_outbox_1 = _good_outbox(
             agent='beacon', source='forge-question',
             source_task_file=str(beacon_inbox_1[0]),
-            task_id='notify-t-cascade-r1',
+            task_id='notify-real-cascade-r1',
             result='Line range is L730-L740. Use that.',
             clarification_count=1,
             max_clarifications=3,
@@ -1049,16 +1049,16 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
 
         # === Round 3: Forge clarifies again (count 1 → 2) ===
         forge_outbox_2 = _good_outbox(
-            agent='forge', source='beacon-clarification', task_id='t-cascade',
+            agent='forge', source='beacon-clarification', task_id='real-cascade',
             result=(
                 '=== CLARIFY_REQUEST ===\n'
-                '{"task_id": "t-cascade", "question": "And the file path?"}\n'
+                '{"task_id": "real-cascade", "question": "And the file path?"}\n'
                 '=== END_CLARIFY_REQUEST ==='
             ),
             clarification_count=1,
             max_clarifications=3,
         )
-        f3 = self._write_outbox('forge', 't-cascade-r3.json', forge_outbox_2)
+        f3 = self._write_outbox('forge', 'real-cascade-r3.json', forge_outbox_2)
         r3 = on.process_outbox(f3)
         # Note: source is beacon-clarification (reply leg) but marker handling
         # overrides the default archive-no-notify behavior
@@ -1077,7 +1077,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         beacon_outbox_2 = _good_outbox(
             agent='beacon', source='forge-question',
             source_task_file=str(newer),
-            task_id='notify-t-cascade-r3',
+            task_id='notify-real-cascade-r3',
             result='docs/operating-manual.md',
             clarification_count=2,
             max_clarifications=3,
@@ -1096,17 +1096,17 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
 
         # === Round 5: Forge PROCEEDs (terminal) ===
         forge_outbox_3 = _good_outbox(
-            agent='forge', source='beacon-clarification', task_id='t-cascade',
+            agent='forge', source='beacon-clarification', task_id='real-cascade',
             result=(
                 'Got it. Building.\n\n'
                 '=== PROCEED ===\n'
-                '{"task_id": "t-cascade", "preflight_summary": "Edit docs/operating-manual.md L730-L740."}\n'
+                '{"task_id": "real-cascade", "preflight_summary": "Edit docs/operating-manual.md L730-L740."}\n'
                 '=== END_PROCEED ==='
             ),
             clarification_count=2,
             max_clarifications=3,
         )
-        f5 = self._write_outbox('forge', 't-cascade-r5.json', forge_outbox_3)
+        f5 = self._write_outbox('forge', 'real-cascade-r5.json', forge_outbox_3)
         r5 = on.process_outbox(f5)
         self.assertEqual(r5, 'notified-marker')
 
@@ -1122,10 +1122,10 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         """Backward-compat: a Forge outbox with no marker (legacy or test
         scenario) follows the existing should_notify_back path."""
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-legacy',
+            agent='forge', source='beacon', task_id='real-legacy',
             result='Plain text result, no marker block here at all.',
         )
-        f = self._write_outbox('forge', 't-legacy.json', outbox)
+        f = self._write_outbox('forge', 'real-legacy.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -1142,7 +1142,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         """Only Forge outputs are marker-parsed. A marker-shaped string in
         another agent's output should NOT trigger marker handling."""
         outbox = _good_outbox(
-            agent='beacon', source='pulse', task_id='t-beacon',
+            agent='beacon', source='pulse', task_id='real-beacon',
             result=(
                 'Discussing the preflight protocol:\n\n'
                 '=== PROCEED ===\n'
@@ -1150,7 +1150,7 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
                 '=== END_PROCEED ==='
             ),
         )
-        f = self._write_outbox('beacon', 't-beacon.json', outbox)
+        f = self._write_outbox('beacon', 'real-beacon.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -1424,14 +1424,14 @@ class HeadlessClarificationRoutingTest(unittest.TestCase):
         beacon_outbox = _good_outbox(
             agent='beacon',
             source='forge-question',
-            task_id='notify-task-legacy',
+            task_id='notify-real-legacy',
             # No forge_session_id — simulates pre-task-25 cascade in flight
             # when the upgrade ships.
             result='Legacy answer; chain in flight at upgrade time.' * 4,
             clarification_count=1,
             max_clarifications=3,
         )
-        f = self._write_outbox('beacon', 'notify-task-legacy.json',
+        f = self._write_outbox('beacon', 'notify-real-legacy.json',
                                beacon_outbox)
         result = on.process_outbox(f)
         # Falls through to default routing (the pre-task-25 path).
@@ -1454,21 +1454,21 @@ class HeadlessClarificationRoutingTest(unittest.TestCase):
         downstream resume path silently degrades to legacy behavior."""
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-pf", "question": "Which line range?"}\n'
+            '{"task_id": "real-pf", "question": "Which line range?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         forge_outbox = _good_outbox(
             agent='forge',
             source='beacon',
-            task_id='t-pf',
+            task_id='real-pf',
             result=marker,
             clarification_count=0,
             max_clarifications=3,
             claude_session_id='forge-preflight-session-XYZ',
             target_repo='ourliberty-agent-core',
-            branch='forge/t-pf',
+            branch='forge/real-pf',
         )
-        f = self._write_outbox('forge', 't-pf.json', forge_outbox)
+        f = self._write_outbox('forge', 'real-pf.json', forge_outbox)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
 
@@ -1568,11 +1568,11 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
     def test_proceed_returns_decision(self):
         result = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-1", "preflight_summary": "ok"}\n'
+            '{"task_id": "real-1", "preflight_summary": "ok"}\n'
             '=== END_PROCEED ==='
         )
         decision = on._classify_forge_marker({
-            'agent': 'forge', 'result': result, 'task_id': 't-1',
+            'agent': 'forge', 'result': result, 'task_id': 'real-1',
         })
         self.assertEqual(decision['marker_type'], 'proceed')
         self.assertEqual(decision['intent'], 'ack-proceed')
@@ -1582,7 +1582,7 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
     def test_clarify_under_budget(self):
         result = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-1", "question": "Q?"}\n'
+            '{"task_id": "real-1", "question": "Q?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         decision = on._classify_forge_marker({
@@ -1599,7 +1599,7 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
     def test_clarify_at_budget_becomes_exhausted(self):
         result = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-1", "question": "Last Q?"}\n'
+            '{"task_id": "real-1", "question": "Last Q?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         decision = on._classify_forge_marker({
@@ -1626,10 +1626,10 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
         )
         with self.assertRaises(on.fph.MalformedForgeMarker) as cm:
             on._classify_forge_marker({
-                'agent': 'forge', 'result': result, 'task_id': 'envelope-id',
+                'agent': 'forge', 'result': result, 'task_id': 'real-mismatch',
             })
         self.assertIn('drifted-id', str(cm.exception))
-        self.assertIn('envelope-id', str(cm.exception))
+        self.assertIn('real-mismatch', str(cm.exception))
 
     def test_marker_task_id_match_succeeds(self):
         result = (
@@ -1709,7 +1709,7 @@ class EmitClarifyRequestChainEventTest(unittest.TestCase):
 
         with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
             on._emit_clarify_request_chain_event(
-                data={'task_id': 't-2', 'claude_session_id': 's-2'},
+                data={'task_id': 'real-2', 'claude_session_id': 's-2'},
                 marker_decision={
                     'intent': 'clarify',
                     'payload': {'question': 'Mirror question?'},
@@ -1729,7 +1729,7 @@ class EmitClarifyRequestChainEventTest(unittest.TestCase):
         with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
             # Should NOT propagate.
             on._emit_clarify_request_chain_event(
-                data={'task_id': 't-3'},
+                data={'task_id': 'real-3'},
                 marker_decision={
                     'intent': 'clarify',
                     'payload': {'question': 'Q?'},
@@ -1748,7 +1748,7 @@ class EmitClarifyRequestChainEventTest(unittest.TestCase):
 
         with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
             on._emit_clarify_request_chain_event(
-                data={'task_id': 't-4'},
+                data={'task_id': 'real-4'},
                 marker_decision={'intent': 'clarify', 'payload': {}},
                 agent='forge',
             )
@@ -1798,7 +1798,7 @@ class EmitClarifyResponseChainEventTest(unittest.TestCase):
 
         with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
             on._emit_clarify_response_chain_event(
-                task_id='t-r',
+                task_id='real-r',
                 question='Q',
                 answer='A',
                 clarification_round=2,
@@ -1896,7 +1896,7 @@ class EmitClarifyResponseChainEventTest(unittest.TestCase):
         legacy_outbox = _good_outbox(
             agent='beacon',
             source='forge-question',
-            task_id='notify-task-legacy',
+            task_id='notify-real-legacy',
             # No forge_session_id — handler returns None early.
             result='Legacy answer; chain in flight at upgrade time.',
             clarification_count=1,
@@ -1920,7 +1920,7 @@ class EmitClarifyResponseChainEventTest(unittest.TestCase):
         regular_outbox = _good_outbox(
             agent='beacon',
             source='telegram-webhook',  # Not *-question.
-            task_id='t-regular',
+            task_id='real-regular',
             result='Beacon doing some other work.',
         )
         with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
@@ -2002,11 +2002,11 @@ class BuildPhaseDispatchTest(unittest.TestCase):
     def _forge_proceed_outbox(self, **overrides):
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-pf", "preflight_summary": "Will edit watchdog doc."}\n'
+            '{"task_id": "real-pf", "preflight_summary": "Will edit watchdog doc."}\n'
             '=== END_PROCEED ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-pf',
+            agent='forge', source='beacon', task_id='real-pf',
             claude_session_id='sess-preflight-xyz',
             result=f'Read the spec. Ready to act.\n\n{marker}',
         )
@@ -2015,7 +2015,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
 
     def test_proceed_writes_build_phase_task_to_forge(self):
         outbox = self._forge_proceed_outbox(target_repo='ourliberty-agent-core')
-        f = self._write_outbox('forge', 't-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-pf.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
@@ -2034,7 +2034,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         self.assertEqual(build_data['source'], 'beacon')
         self.assertEqual(build_data['session_id'], 'sess-preflight-xyz')
         self.assertEqual(build_data['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(build_data['task_id'], 't-pf')
+        self.assertEqual(build_data['task_id'], 'real-pf')
         self.assertEqual(build_data['dispatched_by'], 'outbox-notifier')
         self.assertIn('Build phase', build_data['prompt'])
 
@@ -2043,7 +2043,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
             claude_session_id=None,
             target_repo='ourliberty-agent-core',
         )
-        f = self._write_outbox('forge', 't-pf-nosid.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-nosid.json', outbox)
 
         result = on.process_outbox(f)
         # Notify-to-Beacon still happens; build-phase dispatch skipped.
@@ -2061,7 +2061,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
             target_repo='ourliberty-agent-core',
             branch='forge/watchdog-fix-001',
         )
-        f = self._write_outbox('forge', 't-pf-branch.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-branch.json', outbox)
 
         on.process_outbox(f)
 
@@ -2075,7 +2075,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
             target_repo='ourliberty-agent-core',
             max_clarifications=5,
         )
-        f = self._write_outbox('forge', 't-pf-mc.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-mc.json', outbox)
         on.process_outbox(f)
 
         forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
@@ -2086,17 +2086,17 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         # Only PROCEED triggers build phase. CLARIFY/REJECT do not.
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-clr", "question": "Which file?"}\n'
+            '{"task_id": "real-clr", "question": "Which file?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-clr',
+            agent='forge', source='beacon', task_id='real-clr',
             claude_session_id='sess-clr',
             clarification_count=0, max_clarifications=3,
             target_repo='ourliberty-agent-core',
             result=f'Need more info.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 't-clr.json', outbox)
+        f = self._write_outbox('forge', 'real-clr.json', outbox)
 
         on.process_outbox(f)
 
@@ -2107,15 +2107,15 @@ class BuildPhaseDispatchTest(unittest.TestCase):
     def test_reject_does_not_trigger_build_phase(self):
         marker = (
             '=== REJECT ===\n'
-            '{"task_id": "t-rej", "reason": "Spec impossible."}\n'
+            '{"task_id": "real-rej", "reason": "Spec impossible."}\n'
             '=== END_REJECT ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-rej',
+            agent='forge', source='beacon', task_id='real-rej',
             target_repo='ourliberty-agent-core',
             result=f'Cannot proceed.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 't-rej.json', outbox)
+        f = self._write_outbox('forge', 'real-rej.json', outbox)
 
         on.process_outbox(f)
 
@@ -2131,12 +2131,12 @@ class BuildPhaseDispatchTest(unittest.TestCase):
             '=== END_PROCEED ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='envelope-id',
+            agent='forge', source='beacon', task_id='real-mismatch',
             claude_session_id='sess-1',
             target_repo='ourliberty-agent-core',
             result=f'Reasoning.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 'envelope-id.json', outbox)
+        f = self._write_outbox('forge', 'real-mismatch.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
@@ -2152,7 +2152,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         outbox = self._forge_proceed_outbox(
             target_repo='unauthorized-repo',
         )
-        f = self._write_outbox('forge', 't-pf-bad-repo.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-bad-repo.json', outbox)
 
         result = on.process_outbox(f)
         # Notify still succeeds (target_repo doesn't gate notify writes
@@ -2171,14 +2171,14 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         # is processed twice. The second pass should NOT write a duplicate
         # build task.
         outbox = self._forge_proceed_outbox(target_repo='ourliberty-agent-core')
-        f1 = self._write_outbox('forge', 't-pf-idem.json', outbox)
+        f1 = self._write_outbox('forge', 'real-pf-idem.json', outbox)
         on.process_outbox(f1)
 
         forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
         self.assertEqual(len(forge_builds), 1)
 
         # Second pass — write the same preflight outbox back and process.
-        f2 = self._write_outbox('forge', 't-pf-idem.json', outbox)
+        f2 = self._write_outbox('forge', 'real-pf-idem.json', outbox)
         on.process_outbox(f2)
         forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
         self.assertEqual(len(forge_builds), 1, 'duplicate build task written')
@@ -2189,7 +2189,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
             pr_title='fix(watchdog): clarify enabled flag in docs',
             pr_body='## Summary\nDocumentation fix.',
         )
-        f = self._write_outbox('forge', 't-pf-prfields.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-prfields.json', outbox)
         on.process_outbox(f)
 
         forge_builds = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
@@ -2211,7 +2211,7 @@ class BuildPhaseDispatchTest(unittest.TestCase):
 PR_URL_FIXTURE = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
 
 
-def _mirror_pass_marker(task_id='t-rev', summary='AC coverage clean.'):
+def _mirror_pass_marker(task_id='real-rev', summary='AC coverage clean.'):
     payload = json.dumps({
         'task_id': task_id, 'pr_url': PR_URL_FIXTURE, 'summary': summary,
     })
@@ -2219,7 +2219,7 @@ def _mirror_pass_marker(task_id='t-rev', summary='AC coverage clean.'):
 
 
 def _mirror_revision_marker(
-    task_id='t-rev', severity='medium', confidence='high', findings=None,
+    task_id='real-rev', severity='medium', confidence='high', findings=None,
 ):
     if findings is None:
         findings = [{
@@ -2234,7 +2234,7 @@ def _mirror_revision_marker(
 
 
 def _mirror_escalate_marker(
-    task_id='t-rev', severity='high', confidence='high',
+    task_id='real-rev', severity='high', confidence='high',
     reason='Spec mismatch; needs replan.',
 ):
     payload = json.dumps({
@@ -2245,7 +2245,7 @@ def _mirror_escalate_marker(
 
 
 def _mirror_emergency_marker(
-    task_id='t-rev',
+    task_id='real-rev',
     reason='Diff adds plaintext credentials.',
     evidence='+    "secret": "abc123"',
 ):
@@ -2263,12 +2263,12 @@ def _mirror_outbox_body(marker_text='', **overrides):
     """Synthetic Mirror outbox with optional marker embedded in result.
 
     `source` defaults to 'beacon' because the review-request was dispatched
-    BY beacon (logically). task_id defaults to 't-rev'. `phase: 'review'`
+    BY beacon (logically). task_id defaults to 'real-rev'. `phase: 'review'`
     is propagated so the envelope matches what `_dispatch_mirror_review`
     actually writes.
     """
     base = _good_outbox(
-        agent='mirror', source='beacon', task_id='t-rev', phase='review',
+        agent='mirror', source='beacon', task_id='real-rev', phase='review',
         result=(
             'Reviewed the PR diff. Coverage clean.\n\n' + marker_text
             if marker_text else 'Reviewed but emitted no marker.'
@@ -2335,16 +2335,16 @@ class ClassifyMirrorMarkerTest(unittest.TestCase):
         self.assertIsNone(on._classify_mirror_marker(data))
 
     def test_envelope_task_id_mismatch_raises(self):
-        # Marker says t-other but envelope says t-rev.
-        marker = _mirror_pass_marker(task_id='t-other')
-        data = _mirror_outbox_body(marker, task_id='t-rev')
+        # Marker says real-other but envelope says real-rev.
+        marker = _mirror_pass_marker(task_id='real-other')
+        data = _mirror_outbox_body(marker, task_id='real-rev')
         with self.assertRaises(on.mrh.MalformedMirrorMarker) as ctx:
             on._classify_mirror_marker(data)
         self.assertIn('task_id', str(ctx.exception))
 
     def test_malformed_marker_propagates(self):
         # Missing required field (no summary on PASS).
-        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        bad_payload = json.dumps({'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE})
         marker = (
             f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
         )
@@ -2656,7 +2656,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
 
     def test_review_pass_notifies_beacon(self):
         body = _mirror_outbox_body(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         data = self._get_beacon_notify()
@@ -2667,7 +2667,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
 
     def test_review_revision_notifies_beacon_with_finding_count(self):
         body = _mirror_outbox_body(_mirror_revision_marker(confidence='high'))
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         data = self._get_beacon_notify()
@@ -2676,7 +2676,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
 
     def test_review_revision_low_confidence_promotes_to_escalate(self):
         body = _mirror_outbox_body(_mirror_revision_marker(confidence='low'))
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         data = self._get_beacon_notify()
@@ -2686,7 +2686,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
 
     def test_review_escalate_notifies_beacon(self):
         body = _mirror_outbox_body(_mirror_escalate_marker())
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         data = self._get_beacon_notify()
@@ -2695,7 +2695,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
 
     def test_review_emergency_halt_notifies_beacon(self):
         body = _mirror_outbox_body(_mirror_emergency_marker())
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         data = self._get_beacon_notify()
@@ -2705,17 +2705,17 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
         envelope = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
         self.assertEqual(envelope['activated_by'], 'mirror-marker')
-        self.assertEqual(envelope['task_id'], 't-rev')
+        self.assertEqual(envelope['task_id'], 'real-rev')
         self.assertIn('credentials', envelope['reason'])
 
     def test_malformed_marker_dead_letters_to_mirror(self):
         # Missing required field — PASS without `summary`.
-        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        bad_payload = json.dumps({'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE})
         marker = (
             f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
         )
         body = _mirror_outbox_body(marker)
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
         # No notify to Beacon
@@ -2740,7 +2740,7 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
             result=('Reviewed but reporting back in chat mode without '
                     'a marker — Larry asked me a question, not a review.'),
         )
-        f = self._write_mirror_outbox('t-chat.json', body)
+        f = self._write_mirror_outbox('real-chat.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
         data = self._get_beacon_notify()
@@ -2802,14 +2802,14 @@ class PreflightDisciplineGateTest(unittest.TestCase):
         # phase=preflight, but Forge wrote a build-style response with no
         # marker block. This is the failure shape the gate exists to catch.
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-bad-pf',
+            agent='forge', source='beacon', task_id='real-bad-pf',
             phase='preflight',
             result=('I read the spec and started editing the file '
                     'directly — committed the change to a branch named '
                     'fix/typo. PR opened: https://github.com/Larry-Yatch/'
                     'ourliberty-agent-core/pull/99'),
         )
-        f = self._write_outbox('forge', 't-bad-pf.json', outbox)
+        f = self._write_outbox('forge', 'real-bad-pf.json', outbox)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
         # marker-error notify lands in Forge's inbox with the sharper prompt
@@ -2826,14 +2826,14 @@ class PreflightDisciplineGateTest(unittest.TestCase):
         # phase=build, no marker — this is EXPECTED (build responses don't
         # carry markers per Forge's CLAUDE.md). The gate must not fire here.
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-build-ok',
+            agent='forge', source='beacon', task_id='real-build-ok',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/t-build-ok',
+            branch='forge/real-build-ok',
             result=('PR opened: https://github.com/Larry-Yatch/'
                     'ourliberty-agent-core/pull/100\n\n'
                     'Fixed the typo per spec.'),
         )
-        f = self._write_outbox('forge', 't-build-ok.json', outbox)
+        f = self._write_outbox('forge', 'real-build-ok.json', outbox)
         result = on.process_outbox(f)
         # Default routing path (no marker, no preflight gate fire) →
         # notifies Beacon with the build result. ALSO dispatches a
@@ -2845,14 +2845,14 @@ class PreflightDisciplineGateTest(unittest.TestCase):
         # WITH a marker takes the normal marker-driven routing path.
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-pf-ok", "preflight_summary": "Will fix typo."}\n'
+            '{"task_id": "real-pf-ok", "preflight_summary": "Will fix typo."}\n'
             '=== END_PROCEED ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-pf-ok',
+            agent='forge', source='beacon', task_id='real-pf-ok',
             phase='preflight', result=marker,
         )
-        f = self._write_outbox('forge', 't-pf-ok.json', outbox)
+        f = self._write_outbox('forge', 'real-pf-ok.json', outbox)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
 
@@ -2861,11 +2861,11 @@ class PreflightDisciplineGateTest(unittest.TestCase):
         # have no phase field. The gate must not fire on those — only
         # explicit phase=preflight + no marker triggers it.
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='t-legacy',
+            agent='forge', source='beacon', task_id='real-legacy',
             result='Some plain text response from a legacy dispatch.',
         )
         outbox.pop('phase', None)
-        f = self._write_outbox('forge', 't-legacy.json', outbox)
+        f = self._write_outbox('forge', 'real-legacy.json', outbox)
         result = on.process_outbox(f)
         # No marker, no phase → default routing path (Beacon notify).
         self.assertEqual(result, 'notified')
@@ -2916,9 +2916,9 @@ class MirrorReviewDispatchTest(unittest.TestCase):
 
     def _build_outbox(self, **overrides):
         base = _good_outbox(
-            agent='forge', source='beacon', task_id='t-built',
+            agent='forge', source='beacon', task_id='real-built',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/t-built',
+            branch='forge/real-built',
             result=('PR opened: https://github.com/Larry-Yatch/'
                     'ourliberty-agent-core/pull/77\n\n'
                     'Implemented the fix; tests pass.'),
@@ -2935,17 +2935,17 @@ class MirrorReviewDispatchTest(unittest.TestCase):
 
     def test_pr_opened_dispatches_review_request_to_mirror(self):
         body = self._build_outbox()
-        f = self._write_outbox('forge', 't-built.json', body)
+        f = self._write_outbox('forge', 'real-built.json', body)
         on.process_outbox(f)
         # review-request task in Mirror's inbox
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         self.assertEqual(len(review_tasks), 1)
         data = json.loads(review_tasks[0].read_text())
-        self.assertEqual(data['task_id'], 't-built')
+        self.assertEqual(data['task_id'], 'real-built')
         self.assertEqual(data['source'], 'beacon')
         self.assertEqual(data['phase'], 'review')
         self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(data['branch'], 'forge/t-built')
+        self.assertEqual(data['branch'], 'forge/real-built')
         self.assertIn('pull/77', data['pr_url'])
         self.assertEqual(data['revision_count'], 0)
         # max_revisions sourced from mirror_review_handler default
@@ -2956,7 +2956,7 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # The review dispatch is ADDITIVE — Beacon still gets her notify
         # via the default routing path so she can journal "PR opened."
         body = self._build_outbox()
-        f = self._write_outbox('forge', 't-built.json', body)
+        f = self._write_outbox('forge', 'real-built.json', body)
         on.process_outbox(f)
         beacon_notifies = list(
             (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
@@ -2972,7 +2972,7 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         body = self._build_outbox(
             result='Tried to build but hit a compile error; need clarification.',
         )
-        f = self._write_outbox('forge', 't-failed-build.json', body)
+        f = self._write_outbox('forge', 'real-failed-build.json', body)
         on.process_outbox(f)
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         self.assertEqual(review_tasks, [])
@@ -2984,7 +2984,7 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # her — instead, log + skip and let Larry investigate.
         body = self._build_outbox()
         body.pop('target_repo', None)
-        f = self._write_outbox('forge', 't-no-repo.json', body)
+        f = self._write_outbox('forge', 'real-no-repo.json', body)
         on.process_outbox(f)
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         self.assertEqual(review_tasks, [])
@@ -2999,7 +2999,7 @@ class MirrorReviewDispatchTest(unittest.TestCase):
             result='PR opened: https://github.com/Larry-Yatch/'
                    'ourliberty-agent-core/pull/77\n\nI fast-pathed.',
         )
-        f = self._write_outbox('forge', 't-fastpath.json', body)
+        f = self._write_outbox('forge', 'real-fastpath.json', body)
         result = on.process_outbox(f)
         # Gate fires → marker-error, NOT review dispatch
         self.assertEqual(result, 'marker-error')
@@ -3011,12 +3011,12 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # outbox, re-processing the same outbox should NOT write a second
         # review-request (Mirror would otherwise spawn a duplicate review).
         body = self._build_outbox()
-        f = self._write_outbox('forge', 't-built.json', body)
+        f = self._write_outbox('forge', 'real-built.json', body)
         on.process_outbox(f)
         # Simulate re-processing: re-write the outbox + run again. (In
         # production this happens when the notifier crashes after the
         # dispatch write but before the archive move.)
-        f2 = self._write_outbox('forge', 't-built.json', body)
+        f2 = self._write_outbox('forge', 'real-built.json', body)
         on.process_outbox(f2)
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         # Still exactly one review-request, despite two process_outbox calls.
@@ -3095,7 +3095,7 @@ class MarkerOutputForPromptTest(unittest.TestCase):
 
     def test_review_pass_body_has_summary(self):
         payload = {
-            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE,
             'summary': 'AC coverage clean across the board.',
         }
         body = on._marker_output_for_prompt({}, self._decision(
@@ -3106,7 +3106,7 @@ class MarkerOutputForPromptTest(unittest.TestCase):
 
     def test_review_revision_body_has_finding_summary(self):
         payload = {
-            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE,
             'findings': [
                 {'file': 'a.py', 'line_range': 'L10',
                  'severity': 'medium',
@@ -3124,7 +3124,7 @@ class MarkerOutputForPromptTest(unittest.TestCase):
 
     def test_review_escalate_body_has_reason(self):
         payload = {
-            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE,
             'reason': 'Implemented X, spec said Y.',
             'severity': 'high', 'confidence': 'high',
         }
@@ -3135,7 +3135,7 @@ class MarkerOutputForPromptTest(unittest.TestCase):
 
     def test_review_emergency_halt_body_has_reason_and_evidence(self):
         payload = {
-            'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE,
+            'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE,
             'reason': 'Plaintext credentials in diff.',
             'evidence': '+    "aws_secret": "AKIA..."',
         }
@@ -3185,12 +3185,12 @@ class DispatchIdempotencyInvalidCheckTest(unittest.TestCase):
         # Plant a stale review-request in Mirror's .invalid/
         invalid_dir = on.INBOXES_ROOT / 'mirror' / '.invalid'
         invalid_dir.mkdir(parents=True, exist_ok=True)
-        (invalid_dir / 'review-t-stuck.json').write_text('{}')
+        (invalid_dir / 'review-real-stuck.json').write_text('{}')
 
         data = {
-            'task_id': 't-stuck',
+            'task_id': 'real-stuck',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-stuck',
+            'branch': 'forge/real-stuck',
         }
         on._dispatch_mirror_review(data, 'https://github.com/x/y/pull/1')
         # Should NOT have written a fresh review-request to the live inbox
@@ -3200,10 +3200,10 @@ class DispatchIdempotencyInvalidCheckTest(unittest.TestCase):
     def test_build_phase_skips_when_in_invalid(self):
         invalid_dir = on.INBOXES_ROOT / 'forge' / '.invalid'
         invalid_dir.mkdir(parents=True, exist_ok=True)
-        (invalid_dir / 'build-t-stuck.json').write_text('{}')
+        (invalid_dir / 'build-real-stuck.json').write_text('{}')
 
         data = {
-            'task_id': 't-stuck',
+            'task_id': 'real-stuck',
             'claude_session_id': 'sess-abc',
             'target_repo': 'ourliberty-agent-core',
         }
@@ -3249,9 +3249,9 @@ class MirrorReviewMetadataPropagationTest(unittest.TestCase):
 
     def test_pr_title_pr_body_max_clarifications_propagate(self):
         data = {
-            'task_id': 't-meta',
+            'task_id': 'real-meta',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-meta',
+            'branch': 'forge/real-meta',
             'pr_title': 'fix(watchdog): clarify enabled flag',
             'pr_body': '## Summary\nDoc fix.',
             'max_clarifications': 5,
@@ -3268,9 +3268,9 @@ class MirrorReviewMetadataPropagationTest(unittest.TestCase):
         # Forge envelopes that don't carry the metadata fields should still
         # dispatch successfully — the fields are optional.
         data = {
-            'task_id': 't-bare',
+            'task_id': 'real-bare',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-bare',
+            'branch': 'forge/real-bare',
         }
         on._dispatch_mirror_review(data, 'https://github.com/x/y/pull/1')
         reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
@@ -3319,7 +3319,7 @@ class MirrorMarkerErrorReplyChatIdTest(unittest.TestCase):
     def test_reply_chat_id_propagates_into_marker_error_notify(self):
         data = {
             'agent': 'mirror', 'source': 'beacon',
-            'task_id': 't-chat', 'reply_chat_id': 7998341473,
+            'task_id': 'real-chat', 'reply_chat_id': 7998341473,
         }
         on._notify_mirror_marker_error(data, 'some marker parse error')
         notifies = list(
@@ -3457,11 +3457,11 @@ class MaybeDmLarryTest(unittest.TestCase):
 
     def test_review_pass_with_chat_id_queues_notification(self):
         data = {
-            'task_id': 't-pass', 'reply_chat_id': 7998341473,
+            'task_id': 'real-pass', 'reply_chat_id': 7998341473,
             'agent': 'mirror',
         }
         decision = self._decision('review-pass', 'review_pass', payload={
-            'task_id': 't-pass',
+            'task_id': 'real-pass',
             'pr_url': 'https://github.com/x/y/pull/1',
             'summary': 'All clean.',
         })
@@ -3470,7 +3470,7 @@ class MaybeDmLarryTest(unittest.TestCase):
         self.assertEqual(len(notifs), 1)
         self.assertEqual(notifs[0]['intent'], 'review-pass')
         self.assertEqual(notifs[0]['chat_id'], 7998341473)
-        self.assertEqual(notifs[0]['task_id'], 't-pass')
+        self.assertEqual(notifs[0]['task_id'], 'real-pass')
         self.assertIn('Mirror approved', notifs[0]['message'])
         self.assertIn('pull/1', notifs[0]['message'])
         self.assertIn('All clean', notifs[0]['message'])
@@ -3480,9 +3480,9 @@ class MaybeDmLarryTest(unittest.TestCase):
         # Forge). Larry only gets DM on terminal intents — escalate (incl.
         # budget-exhausted downgrade), pass, emergency-halt, reject,
         # clarification-exhausted. Confirming the 5a behavior was changed.
-        data = {'task_id': 't-rev', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        data = {'task_id': 'real-rev', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
         decision = self._decision('review-revision', 'review_revision', payload={
-            'task_id': 't-rev',
+            'task_id': 'real-rev',
             'pr_url': 'https://github.com/x/y/pull/2',
             'findings': [{'file': 'a'}, {'file': 'b'}, {'file': 'c'}],
             'severity': 'medium', 'confidence': 'high',
@@ -3494,9 +3494,9 @@ class MaybeDmLarryTest(unittest.TestCase):
         self.assertEqual(self._read_notifications(), [])
 
     def test_review_escalate_renders_reason(self):
-        data = {'task_id': 't-esc', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        data = {'task_id': 'real-esc', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
         decision = self._decision('review-escalate', 'review_escalate', payload={
-            'task_id': 't-esc',
+            'task_id': 'real-esc',
             'pr_url': 'https://github.com/x/y/pull/3',
             'reason': 'Spec mismatch.',
             'severity': 'high', 'confidence': 'high',
@@ -3517,9 +3517,9 @@ class MaybeDmLarryTest(unittest.TestCase):
         # all authorized chats; a targeted closing DM on top would be a
         # duplicate notification with stale "decide whether to close
         # without merge" wording. Confirming the inversion vs 5a/5b/5c.
-        data = {'task_id': 't-halt', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
+        data = {'task_id': 'real-halt', 'reply_chat_id': 7998341473, 'agent': 'mirror'}
         decision = self._decision('review-emergency-halt', 'review_emergency_halt', payload={
-            'task_id': 't-halt',
+            'task_id': 'real-halt',
             'pr_url': 'https://github.com/x/y/pull/4',
             'reason': 'Plaintext credentials.',
             'evidence': '+    "aws_key": "AKIA..."',
@@ -3536,30 +3536,30 @@ class MaybeDmLarryTest(unittest.TestCase):
     def test_non_terminal_intent_does_not_dm(self):
         # ack-proceed is mid-chain — Forge proceeded, Beacon journals,
         # nothing for Larry to do yet. No DM.
-        data = {'task_id': 't-mid', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        data = {'task_id': 'real-mid', 'reply_chat_id': 7998341473, 'agent': 'forge'}
         decision = self._decision('ack-proceed', 'proceed')
         on._maybe_dm_larry(data, decision)
         self.assertEqual(self._read_notifications(), [])
 
     def test_clarify_intent_does_not_dm(self):
         # Clarifications are mid-chain (Beacon answers Forge); no Larry DM.
-        data = {'task_id': 't-clar', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        data = {'task_id': 'real-clar', 'reply_chat_id': 7998341473, 'agent': 'forge'}
         decision = self._decision('clarify', 'clarify_request')
         on._maybe_dm_larry(data, decision)
         self.assertEqual(self._read_notifications(), [])
 
     def test_result_notification_does_not_dm(self):
         # Generic result-notification is the mid-chain catch-all; no DM.
-        data = {'task_id': 't-result', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        data = {'task_id': 'real-result', 'reply_chat_id': 7998341473, 'agent': 'forge'}
         decision = self._decision('result-notification')
         on._maybe_dm_larry(data, decision)
         self.assertEqual(self._read_notifications(), [])
 
     def test_missing_reply_chat_id_does_not_dm(self):
         # Autonomous Pulse-initiated runs have no originating chat.
-        data = {'task_id': 't-auto', 'agent': 'mirror'}  # no reply_chat_id
+        data = {'task_id': 'real-auto', 'agent': 'mirror'}  # no reply_chat_id
         decision = self._decision('review-pass', 'review_pass', payload={
-            'task_id': 't-auto', 'pr_url': 'x', 'summary': 'y',
+            'task_id': 'real-auto', 'pr_url': 'x', 'summary': 'y',
         })
         on._maybe_dm_larry(data, decision)
         self.assertEqual(self._read_notifications(), [])
@@ -3568,20 +3568,20 @@ class MaybeDmLarryTest(unittest.TestCase):
         # Defensive: a corrupted reply_chat_id (string, list, whatever)
         # gets logged and skipped — not propagated to a DM.
         data = {
-            'task_id': 't-bad-chat', 'reply_chat_id': 'not-a-number',
+            'task_id': 'real-bad-chat', 'reply_chat_id': 'not-a-number',
             'agent': 'mirror',
         }
         decision = self._decision('review-pass', 'review_pass', payload={
-            'task_id': 't-bad-chat', 'pr_url': 'x', 'summary': 'y',
+            'task_id': 'real-bad-chat', 'pr_url': 'x', 'summary': 'y',
         })
         on._maybe_dm_larry(data, decision)
         self.assertEqual(self._read_notifications(), [])
 
     def test_reject_intent_dms(self):
         # Forge rejected the spec at preflight — terminal for Larry.
-        data = {'task_id': 't-rej', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        data = {'task_id': 'real-rej', 'reply_chat_id': 7998341473, 'agent': 'forge'}
         decision = self._decision('reject', 'reject', payload={
-            'task_id': 't-rej', 'reason': 'Required file missing.',
+            'task_id': 'real-rej', 'reason': 'Required file missing.',
         }, intent_kwargs={'reason': 'Required file missing.'})
         on._maybe_dm_larry(data, decision)
         notifs = self._read_notifications()
@@ -3591,10 +3591,10 @@ class MaybeDmLarryTest(unittest.TestCase):
 
     def test_clarification_exhausted_dms(self):
         # Forge ran out of clarifications — terminal for Larry.
-        data = {'task_id': 't-cx', 'reply_chat_id': 7998341473, 'agent': 'forge'}
+        data = {'task_id': 'real-cx', 'reply_chat_id': 7998341473, 'agent': 'forge'}
         decision = self._decision(
             'clarification-exhausted', 'clarify_request',
-            payload={'task_id': 't-cx', 'question': 'Final question?'},
+            payload={'task_id': 'real-cx', 'question': 'Final question?'},
             intent_kwargs={'reason': 'Final question?'},
         )
         on._maybe_dm_larry(data, decision)
@@ -3677,12 +3677,12 @@ class RevisionLoopTest(unittest.TestCase):
         """Mirror outbox with a REVIEW_REVISION marker — the trigger for
         the 5b revision-loop dispatch."""
         marker = _mirror_revision_marker(
-            task_id='t-loop', severity='medium', confidence='high',
+            task_id='real-loop', severity='medium', confidence='high',
         )
         body = _good_outbox(
-            agent='mirror', source='beacon', task_id='t-loop', phase='review',
+            agent='mirror', source='beacon', task_id='real-loop', phase='review',
             target_repo='ourliberty-agent-core',
-            branch='forge/t-loop',
+            branch='forge/real-loop',
             result=f'Found 1 medium finding.\n\n{marker}',
         )
         # 5b prerequisite: forge_build_session_id must be on the envelope.
@@ -3695,14 +3695,14 @@ class RevisionLoopTest(unittest.TestCase):
         """Forge outbox after a revision dispatch — must start with the
         Revision N applied: preamble per the 5b strict gate."""
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-loop',
+            agent='forge', source='beacon', task_id='real-loop',
             phase='revision', target_repo='ourliberty-agent-core',
-            branch='forge/t-loop',
+            branch='forge/real-loop',
             claude_session_id='forge-build-sess-abc',
             result=(
                 f'Revision {round_num} applied: added input validation on '
                 f'foo.py L12-L15 per Mirror finding.\n\n'
-                f'Tests pass; pushed to forge/t-loop.'
+                f'Tests pass; pushed to forge/real-loop.'
             ),
         )
         body['pr_url'] = 'https://github.com/x/y/pull/77'
@@ -3715,21 +3715,21 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_review_revision_dispatches_revision_to_forge(self):
         body = self._mirror_revision_outbox()
-        f = self._write_outbox('mirror', 't-loop.json', body)
+        f = self._write_outbox('mirror', 'real-loop.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         # Revision task lands in Forge's inbox keyed on round number
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
         )
         self.assertEqual(len(revisions), 1)
         revision = json.loads(revisions[0].read_text())
-        self.assertEqual(revision['task_id'], 't-loop')
+        self.assertEqual(revision['task_id'], 'real-loop')
         self.assertEqual(revision['source'], 'beacon')
         self.assertEqual(revision['phase'], 'revision')
         self.assertEqual(revision['session_id'], 'forge-build-sess-abc')
         self.assertEqual(revision['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(revision['branch'], 'forge/t-loop')
+        self.assertEqual(revision['branch'], 'forge/real-loop')
         self.assertEqual(revision['revision_count'], 1)
         self.assertEqual(revision['max_revisions'], 3)
         self.assertEqual(revision['dispatched_by'], 'outbox-notifier')
@@ -3740,16 +3740,16 @@ class RevisionLoopTest(unittest.TestCase):
     def test_review_revision_low_confidence_does_not_dispatch(self):
         # Auto-promote (5a behavior) blocks the revision dispatch — Mirror's
         # uncertainty means the auto-fix loop shouldn't run; escalate instead.
-        marker = _mirror_revision_marker(task_id='t-low', confidence='low')
+        marker = _mirror_revision_marker(task_id='real-low', confidence='low')
         body = _good_outbox(
-            agent='mirror', source='beacon', task_id='t-low',
+            agent='mirror', source='beacon', task_id='real-low',
             phase='review', target_repo='ourliberty-agent-core',
-            branch='forge/t-low',
+            branch='forge/real-low',
             result=f'Maybe?\n\n{marker}',
         )
         body['forge_build_session_id'] = 'forge-sess-xyz'
         body['pr_url'] = 'https://github.com/x/y/pull/78'
-        f = self._write_outbox('mirror', 't-low.json', body)
+        f = self._write_outbox('mirror', 'real-low.json', body)
         on.process_outbox(f)
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
@@ -3765,7 +3765,7 @@ class RevisionLoopTest(unittest.TestCase):
         body = self._mirror_revision_outbox(
             revision_count=3, max_revisions=3,
         )
-        f = self._write_outbox('mirror', 't-loop-exhausted.json', body)
+        f = self._write_outbox('mirror', 'real-loop-exhausted.json', body)
         on.process_outbox(f)
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
@@ -3783,7 +3783,7 @@ class RevisionLoopTest(unittest.TestCase):
         # upstream, the dispatch should skip rather than write a bogus task.
         body = self._mirror_revision_outbox()
         body.pop('forge_build_session_id', None)
-        f = self._write_outbox('mirror', 't-no-session.json', body)
+        f = self._write_outbox('mirror', 'real-no-session.json', body)
         on.process_outbox(f)
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
@@ -3792,14 +3792,14 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_revision_dispatch_idempotent_on_reprocess(self):
         body = self._mirror_revision_outbox()
-        f = self._write_outbox('mirror', 't-loop.json', body)
+        f = self._write_outbox('mirror', 'real-loop.json', body)
         on.process_outbox(f)
         # Re-write the same outbox + re-process (simulates notifier crash
         # between dispatch and archive)
-        f2 = self._write_outbox('mirror', 't-loop.json', body)
+        f2 = self._write_outbox('mirror', 'real-loop.json', body)
         on.process_outbox(f2)
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
         )
         # Still exactly one revision-task, despite two process_outbox calls
         self.assertEqual(len(revisions), 1)
@@ -3808,15 +3808,15 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_forge_revision_outbox_dispatches_rereview(self):
         body = self._forge_revision_outbox(round_num=1)
-        f = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        f = self._write_outbox('forge', 'revision-real-loop-1.json', body)
         on.process_outbox(f)
         # Mirror inbox gets a fresh review-request keyed on round number
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
-        self.assertEqual(review['task_id'], 't-loop')
+        self.assertEqual(review['task_id'], 'real-loop')
         self.assertEqual(review['source'], 'beacon')
         self.assertEqual(review['phase'], 'review')
         self.assertEqual(review['revision_count'], 1)
@@ -3829,13 +3829,13 @@ class RevisionLoopTest(unittest.TestCase):
         # start with "Revision N applied:" preamble. Missing → marker-error
         # cascade back to Forge.
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-bad-rev',
+            agent='forge', source='beacon', task_id='real-bad-rev',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='forge-sess',
             # NO preamble; Forge fast-pathed past the protocol
             result='I applied the fix but forgot to use the required format.',
         )
-        f = self._write_outbox('forge', 'revision-t-bad-rev-1.json', body)
+        f = self._write_outbox('forge', 'revision-real-bad-rev-1.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
         # Marker-error notify lands in Forge's inbox
@@ -3854,22 +3854,22 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_rereview_dispatch_idempotent_on_reprocess(self):
         body = self._forge_revision_outbox(round_num=1)
-        f = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        f = self._write_outbox('forge', 'revision-real-loop-1.json', body)
         on.process_outbox(f)
-        f2 = self._write_outbox('forge', 'revision-t-loop-1.json', body)
+        f2 = self._write_outbox('forge', 'revision-real-loop-1.json', body)
         on.process_outbox(f2)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
 
     def test_forge_revision_round_2_extracted_correctly(self):
         # Round 2 prefix should parse and feed Mirror's revision_count=2.
         body = self._forge_revision_outbox(round_num=2)
-        f = self._write_outbox('forge', 'revision-t-loop-2.json', body)
+        f = self._write_outbox('forge', 'revision-real-loop-2.json', body)
         on.process_outbox(f)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-t-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
@@ -3883,19 +3883,19 @@ class RevisionLoopTest(unittest.TestCase):
         # forge_build_session_id forward (so a downstream REVIEW_REVISION
         # can resume Forge's build session).
         build = _good_outbox(
-            agent='forge', source='beacon', task_id='t-thread',
+            agent='forge', source='beacon', task_id='real-thread',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/t-thread',
+            branch='forge/real-thread',
             claude_session_id='forge-build-thread-sess',
             result=(
                 'PR opened: https://github.com/x/y/pull/99\n\n'
                 'Done.'
             ),
         )
-        f = self._write_outbox('forge', 't-thread.json', build)
+        f = self._write_outbox('forge', 'real-thread.json', build)
         on.process_outbox(f)
         # Mirror's review-request envelope should now carry the field.
-        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-t-thread.json'))
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-real-thread.json'))
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
         self.assertEqual(
@@ -3910,9 +3910,9 @@ class RevisionLoopTest(unittest.TestCase):
         # paragraph) must still reach Beacon via default routing — NOT
         # marker-error cascade. Confirms 5a behavior preserved.
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-blocker',
+            agent='forge', source='beacon', task_id='real-blocker',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/t-blocker',
+            branch='forge/real-blocker',
             claude_session_id='forge-blocker-sess',
             result=(
                 'Compile error in foo.py — the spec asked me to import '
@@ -3920,7 +3920,7 @@ class RevisionLoopTest(unittest.TestCase):
                 'real module name before I can proceed.'
             ),
         )
-        f = self._write_outbox('forge', 't-blocker.json', body)
+        f = self._write_outbox('forge', 'real-blocker.json', body)
         result = on.process_outbox(f)
         # Default routing fires (not marker-error)
         self.assertEqual(result, 'notified')
@@ -3949,7 +3949,7 @@ class RevisionLoopTest(unittest.TestCase):
         body = self._mirror_revision_outbox(
             revision_count=3, max_revisions=3, reply_chat_id=7998341473,
         )
-        f = self._write_outbox('mirror', 't-loop-exhausted.json', body)
+        f = self._write_outbox('mirror', 'real-loop-exhausted.json', body)
         on.process_outbox(f)
         # Check larry-alerts.jsonl for the notification
         pending = self._la.read_pending(0)
@@ -4091,10 +4091,10 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # forge_build_session_id so _build_outbox propagates it to Forge's
         # revision outbox, so round 2's REVIEW_REVISION can find it.
         data = {
-            'task_id': 't-loop',
+            'task_id': 'real-loop',
             'forge_build_session_id': 'forge-sess-abc',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-loop',
+            'branch': 'forge/real-loop',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 0,
             'max_revisions': 3,
@@ -4103,7 +4103,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         decision = {
             'marker_type': 'review_revision',
             'payload': {
-                'task_id': 't-loop', 'pr_url': data['pr_url'],
+                'task_id': 'real-loop', 'pr_url': data['pr_url'],
                 'findings': [
                     {'file': 'a.py', 'line_range': 'L10', 'severity': 'medium',
                      'description': 'fix this'},
@@ -4113,7 +4113,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         }
         on._dispatch_revision_to_forge(data, decision)
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
         )
         self.assertEqual(len(revisions), 1)
         task = json.loads(revisions[0].read_text())
@@ -4130,9 +4130,9 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # revision_count, max_revisions, pr_url forward so Forge's retry
         # can re-emit cleanly with full revision context.
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-no-preamble',
+            agent='forge', source='beacon', task_id='real-no-preamble',
             phase='revision', target_repo='ourliberty-agent-core',
-            branch='forge/t-no-preamble',
+            branch='forge/real-no-preamble',
             claude_session_id='forge-build-sess',
             result='I forgot the required preamble format.',
         )
@@ -4141,7 +4141,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         body['max_revisions'] = 3
         body['pr_url'] = 'https://github.com/x/y/pull/1'
         body['reply_chat_id'] = 7998341473
-        f = self._write_outbox('forge', 'revision-t-no-preamble-2.json', body)
+        f = self._write_outbox('forge', 'revision-real-no-preamble-2.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
 
@@ -4163,12 +4163,12 @@ class RevisionFollowupFixesTest(unittest.TestCase):
 
     def test_m3_round_zero_rejected_as_marker_error(self):
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-zero',
+            agent='forge', source='beacon', task_id='real-zero',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='sess', result='Revision 0 applied: nope.',
         )
         body['revision_count'] = 1
-        f = self._write_outbox('forge', 'revision-t-zero-1.json', body)
+        f = self._write_outbox('forge', 'revision-real-zero-1.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
         marker_errors = list(
@@ -4182,13 +4182,13 @@ class RevisionFollowupFixesTest(unittest.TestCase):
     def test_m3_round_mismatch_rejected_as_marker_error(self):
         # Envelope says round 2, Forge wrote "Revision 1 applied:" (round drift).
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-drift',
+            agent='forge', source='beacon', task_id='real-drift',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='sess',
             result='Revision 1 applied: fixed the thing.',
         )
         body['revision_count'] = 2
-        f = self._write_outbox('forge', 'revision-t-drift-2.json', body)
+        f = self._write_outbox('forge', 'revision-real-drift-2.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
         notify = json.loads(
@@ -4202,30 +4202,30 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # Forge tries to skip ahead — envelope round 1, she writes "Revision 99
         # applied" (potentially trying to force-exhaust budget).
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-inflate',
+            agent='forge', source='beacon', task_id='real-inflate',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='sess',
             result='Revision 99 applied: skipping ahead.',
         )
         body['revision_count'] = 1
-        f = self._write_outbox('forge', 'revision-t-inflate-1.json', body)
+        f = self._write_outbox('forge', 'revision-real-inflate-1.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
 
     def test_m3_correct_round_passes(self):
         # Sanity: round matches envelope → dispatches the re-review normally.
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='t-ok',
+            agent='forge', source='beacon', task_id='real-ok',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='sess',
             result='Revision 2 applied: all findings addressed.',
         )
         body['revision_count'] = 2
         body['pr_url'] = 'https://github.com/x/y/pull/1'
-        f = self._write_outbox('forge', 'revision-t-ok-2.json', body)
+        f = self._write_outbox('forge', 'revision-real-ok-2.json', body)
         on.process_outbox(f)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-t-ok-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-ok-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
@@ -4285,9 +4285,9 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         })
         on._dispatch_mirror_review(
             {
-                'task_id': 't-cfg',
+                'task_id': 'real-cfg',
                 'target_repo': 'ourliberty-agent-core',
-                'branch': 'forge/t-cfg',
+                'branch': 'forge/real-cfg',
                 'claude_session_id': 'sess',
             },
             'https://github.com/x/y/pull/1',
@@ -4304,13 +4304,13 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # the budget cap (stronger termination signal), with audit-trail
         # note that auto-promote would also have routed escalate.
         data = {
-            'task_id': 't-both',
+            'task_id': 'real-both',
             'agent': 'mirror',
             'result': (
                 'Found something I am not sure about.\n\n'
                 '=== REVIEW_REVISION ===\n'
                 + json.dumps({
-                    'task_id': 't-both',
+                    'task_id': 'real-both',
                     'pr_url': 'https://github.com/x/y/pull/1',
                     'findings': [{'file': 'a', 'line_range': 'L1',
                                  'severity': 'low', 'description': 'maybe?'}],
@@ -4349,11 +4349,11 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # her clean retry's outbox has the field, _build_outbox propagates,
         # and _dispatch_revision_to_forge can find the session to --resume.
         data = {
-            'agent': 'mirror', 'source': 'beacon', 'task_id': 't-mirror-retry',
+            'agent': 'mirror', 'source': 'beacon', 'task_id': 'real-mirror-retry',
             'phase': 'review',
             'forge_build_session_id': 'forge-build-sess',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-mirror-retry',
+            'branch': 'forge/real-mirror-retry',
             'pr_url': 'https://github.com/x/y/pull/5',
             'revision_count': 0,
             'max_revisions': 3,
@@ -4382,10 +4382,10 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # threads them through the envelope as previous_findings so Mirror's
         # re-review prompt can include them on round 2+.
         data = {
-            'task_id': 't-findings',
+            'task_id': 'real-findings',
             'forge_build_session_id': 'forge-sess',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-findings',
+            'branch': 'forge/real-findings',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 0,
             'max_revisions': 3,
@@ -4399,14 +4399,14 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         decision = {
             'marker_type': 'review_revision',
             'payload': {
-                'task_id': 't-findings', 'pr_url': data['pr_url'],
+                'task_id': 'real-findings', 'pr_url': data['pr_url'],
                 'findings': findings,
                 'severity': 'medium', 'confidence': 'high',
             },
         }
         on._dispatch_revision_to_forge(data, decision)
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-findings-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-findings-*.json')
         )
         self.assertEqual(len(revisions), 1)
         task = json.loads(revisions[0].read_text())
@@ -4418,9 +4418,9 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # into Mirror's re-review prompt. Without this, Mirror would
         # re-derive findings from scratch on round 2.
         data = {
-            'task_id': 't-rerev',
+            'task_id': 'real-rerev',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-rerev',
+            'branch': 'forge/real-rerev',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 1,
             'max_revisions': 3,
@@ -4432,7 +4432,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         }
         on._dispatch_mirror_review_rerun(data, 1, 'fixed it')
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-t-rerev-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-rerev-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
@@ -4450,7 +4450,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # If somehow previous_findings is missing or empty, prompt should
         # still render (degrade) without the findings section.
         data = {
-            'task_id': 't-empty-findings',
+            'task_id': 'real-empty-findings',
             'target_repo': 'ourliberty-agent-core',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 1,
@@ -4471,9 +4471,9 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # — it propagates as a marker value into the next revision prompt.
         # Instead, log + skip the dispatch (matches target_repo gate shape).
         data = {
-            'task_id': 't-no-url',
+            'task_id': 'real-no-url',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/t-no-url',
+            'branch': 'forge/real-no-url',
             'revision_count': 1,
             'max_revisions': 3,
             # NO pr_url
@@ -4541,7 +4541,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
     def test_bug_b_mirror_marker_error_keeps_original_task_id(self):
         data = {
             'agent': 'mirror', 'source': 'beacon',
-            'task_id': 't-mirror-bad-marker',
+            'task_id': 'real-mirror-bad-marker',
             'phase': 'review', 'forge_build_session_id': 'forge-sess',
             'target_repo': 'ourliberty-agent-core',
             'result': '=== REVIEW_PASS ===\n<prose>\n=== END_REVIEW_PASS ===',
@@ -4552,7 +4552,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         )
         self.assertEqual(len(notifies), 1)
         notify = json.loads(notifies[0].read_text())
-        self.assertEqual(notify['task_id'], 't-mirror-bad-marker')
+        self.assertEqual(notify['task_id'], 'real-mirror-bad-marker')
         self.assertEqual(notify['marker_error_count'], 1)
 
     # ---- Bug C: dead-letter triggers Larry DM ----
@@ -4564,7 +4564,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # silent after "approved + dispatched".
         data = {
             'agent': 'forge', 'source': 'beacon',
-            'task_id': 't-exhausted',
+            'task_id': 'real-exhausted',
             'reply_chat_id': 7998341473,
             'marker_error_count': 3,
             'original_source': 'beacon',
@@ -4583,7 +4583,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertEqual(len(notifs), 1)
         self.assertEqual(notifs[0]['intent'], 'dead-letter')
         self.assertEqual(notifs[0]['chat_id'], 7998341473)
-        self.assertEqual(notifs[0]['task_id'], 't-exhausted')
+        self.assertEqual(notifs[0]['task_id'], 'real-exhausted')
         self.assertIn('failed after 4 marker-error retries', notifs[0]['message'])
         self.assertIn('no JSON', notifs[0]['message'])
 
@@ -4592,7 +4592,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # dead-letter still writes to Beacon's inbox; no DM is queued
         # (silent skip in _maybe_dm_larry).
         data = {
-            'agent': 'forge', 'source': 'beacon', 'task_id': 't-auto',
+            'agent': 'forge', 'source': 'beacon', 'task_id': 'real-auto',
             # NO reply_chat_id
             'original_source': 'beacon',
         }
@@ -4612,9 +4612,9 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # Template should substitute task_id, reason, retry_count.
         template = on.DM_TEMPLATES['dead-letter']
         rendered = template.format(
-            task_id='t-foo', reason='bad marker', retry_count=3,
+            task_id='real-foo', reason='bad marker', retry_count=3,
         )
-        self.assertIn('t-foo', rendered)
+        self.assertIn('real-foo', rendered)
         self.assertIn('bad marker', rendered)
         self.assertIn('3', rendered)
         self.assertIn('no PR was opened', rendered)
@@ -4648,7 +4648,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # Defensive: if reply_chat_id is absent (autonomous Pulse runs),
         # the retry task must NOT inject a falsy reply_chat_id key.
         data = {
-            'agent': 'forge', 'source': 'beacon', 'task_id': 't-no-chat',
+            'agent': 'forge', 'source': 'beacon', 'task_id': 'real-no-chat',
             'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
             'result': 'failed',
         }
@@ -4665,7 +4665,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
 
 
 def _beacon_approval_request_marker(
-    task_id='task-001',
+    task_id='real-001',
     summary=(
         'Address Mirror\'s concern about missing input validation by '
         'narrowing the parser interface and adding boundary checks.'
@@ -4807,12 +4807,12 @@ class BeaconReplanLoopTest(unittest.TestCase):
         dispatch. Marker is appended after the narrative — _route_beacon_
         replan_approval extracts it via approval.extract_approval_request.
 
-        Defaults match the discipline-gate-pass shape: task_id='task-001'
+        Defaults match the discipline-gate-pass shape: task_id='real-001'
         matches the envelope, the summary shares >2 >3-char tokens with
         mirror_escalate_reason ('validation', 'parser', etc).
         """
         if marker_text is None:
-            marker_text = _beacon_approval_request_marker(task_id='task-001')
+            marker_text = _beacon_approval_request_marker(task_id='real-001')
         result = (
             f'{narrative_prefix}\n\n{marker_text}'
             if marker_text else narrative_prefix
@@ -4826,11 +4826,11 @@ class BeaconReplanLoopTest(unittest.TestCase):
         # discipline-gate prefix-stripping logic is exercised. Beacon's
         # marker payload uses the ORIGINAL task_id (no prefix) per her
         # Shape 8 guidance — that's already what _beacon_approval_request_
-        # marker emits as task_id='task-001'.
+        # marker emits as task_id='real-001'.
         body = _good_outbox(
             agent='beacon',
             source='mirror-result',
-            task_id='notify-task-001',
+            task_id='notify-real-001',
             result=result,
         )
         body['inbound_intent'] = 'review-escalate'
@@ -4850,14 +4850,14 @@ class BeaconReplanLoopTest(unittest.TestCase):
         produces a notify-task on Beacon's inbox that carries replan_count,
         max_replans, and mirror_escalate_reason for the next leg."""
         marker = _mirror_escalate_marker(
-            task_id='task-001', reason='Missing input validation in the parser.',
+            task_id='real-001', reason='Missing input validation in the parser.',
         )
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
         body['reply_chat_id'] = 7998341473
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         # Notify task on Beacon's inbox
         notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
@@ -4874,14 +4874,14 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """When Mirror's envelope carries replan_count=1 (because Beacon
         already replanned once and this is the second escalate), the
         notify to Beacon must carry replan_count=1 forward."""
-        marker = _mirror_escalate_marker(task_id='task-001')
+        marker = _mirror_escalate_marker(task_id='real-001')
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
         body['replan_count'] = 1
         body['max_replans'] = 2
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         notify = json.loads(
             list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
@@ -4900,7 +4900,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         pending = state.get('pending', [])
         self.assertEqual(len(pending), 1)
         entry = pending[0]
-        self.assertEqual(entry['id'], 'task-001')
+        self.assertEqual(entry['id'], 'real-001')
         self.assertEqual(entry['chat_id'], 7998341473)
         self.assertEqual(entry.get('_replan_count'), 1)
         self.assertEqual(entry.get('_max_replans'), 2)
@@ -4909,9 +4909,9 @@ class BeaconReplanLoopTest(unittest.TestCase):
         approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
         self.assertEqual(len(approval_records), 1)
         rec = approval_records[0]
-        self.assertEqual(rec['approval_id'], 'task-001')
+        self.assertEqual(rec['approval_id'], 'real-001')
         self.assertEqual(rec['chat_id'], 7998341473)
-        self.assertIn('task-001', rec['body'])
+        self.assertIn('real-001', rec['body'])
 
     def test_beacon_no_marker_falls_through_to_default_routing(self):
         """Beacon's response with no APPROVAL_REQUEST is a push-back via
@@ -4958,7 +4958,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
 
     def test_discipline_gate_no_reason_overlap_falls_through(self):
         marker = _beacon_approval_request_marker(
-            task_id='task-001',
+            task_id='real-001',
             summary='Implement an entirely unrelated thing instead.',
         )
         body = self._beacon_replan_outbox(
@@ -4973,7 +4973,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """When mirror_escalate_reason is empty (defensive fallback), the
         reason-overlap check is skipped — task_id match is still enforced."""
         marker = _beacon_approval_request_marker(
-            task_id='task-001',
+            task_id='real-001',
             summary='Any unrelated summary at all.',
         )
         body = self._beacon_replan_outbox(
@@ -5016,7 +5016,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
     def test_malformed_approval_marker_falls_through(self):
         """Malformed APPROVAL_REQUEST (missing required field) logs WARN
         and falls through to default routing — no cascade per 5c sign-off."""
-        bad_payload = json.dumps({'task_id': 'task-001'})  # missing fields
+        bad_payload = json.dumps({'task_id': 'real-001'})  # missing fields
         bad_marker = (
             f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
             f'=== END_APPROVAL_REQUEST ==='
@@ -5046,7 +5046,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         body = self._beacon_replan_outbox(replan_count=0, max_replans=2)
         f = self._write_outbox('beacon', 'beacon-rt.json', body)
         on.process_outbox(f)
-        entry = self._ah.find_pending_by_id('task-001')
+        entry = self._ah.find_pending_by_id('real-001')
         self.assertIsNotNone(entry)
         # Simulate Larry approving — bot calls dispatch_approved
         dest = self._ah.dispatch_approved(entry)
@@ -5108,7 +5108,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         # Forge inbox should have exactly one task (the first dispatch);
         # the safe_write_inbox call from the replay would have been skipped
         # by the dedup gate before reaching the inbox write.
-        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('real-001.json'))
         self.assertEqual(len(forge_tasks), 1)
 
     # ----- C-1 regression: replan_count propagates through dispatch hops -----
@@ -5117,18 +5117,18 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """C-1 fix: replan_count + max_replans flow through preflight→build."""
         # Synthesize a Forge preflight outbox carrying replan_count=1
         preflight = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='preflight', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             result=(
                 'Plan looks clean.\n=== PROCEED ===\n'
-                '{"task_id": "task-001", "preflight_summary": "Ready."}\n'
+                '{"task_id": "real-001", "preflight_summary": "Ready."}\n'
                 '=== END_PROCEED ==='
             ),
         )
         preflight['replan_count'] = 1
         preflight['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', preflight)
+        f = self._write_outbox('forge', 'real-001.json', preflight)
         on.process_outbox(f)
         # Forge's build task should now exist with replan_count=1
         build_tasks = list(
@@ -5142,14 +5142,14 @@ class BeaconReplanLoopTest(unittest.TestCase):
     def test_dispatch_mirror_review_propagates_replan_count(self):
         """C-1 fix: replan_count + max_replans flow through build→review."""
         build = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
         )
         build['replan_count'] = 1
         build['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', build)
+        f = self._write_outbox('forge', 'real-001.json', build)
         on.process_outbox(f)
         review_tasks = list(
             (on.INBOXES_ROOT / 'mirror').glob('review-*.json')
@@ -5165,22 +5165,22 @@ class BeaconReplanLoopTest(unittest.TestCase):
         through a revision round before re-escalating has the replan
         budget silently reset to 0."""
         marker = _mirror_revision_marker(
-            task_id='task-001', confidence='high', severity='medium',
+            task_id='real-001', confidence='high', severity='medium',
         )
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
         )
         body['forge_build_session_id'] = 'sess-abc'
         body['pr_url'] = 'https://github.com/x/y/pull/77'
         body['replan_count'] = 1
         body['max_replans'] = 2
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         # Revision task to Forge should carry the replan budget forward.
         revision_tasks = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-001-*.json')
         )
         self.assertEqual(len(revision_tasks), 1)
         revision = json.loads(revision_tasks[0].read_text())
@@ -5191,13 +5191,13 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """C-X1 second-pass fix: re-review dispatch also carries replan_count."""
         # Synthesize a Forge revision outbox with replan budget on envelope.
         revision_outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='revision', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             claude_session_id='sess-abc',
             result=(
                 'Revision 1 applied: added validation per Mirror finding.\n\n'
-                'Tests pass; pushed to forge/task-001.'
+                'Tests pass; pushed to forge/real-001.'
             ),
         )
         revision_outbox['pr_url'] = 'https://github.com/x/y/pull/77'
@@ -5205,11 +5205,11 @@ class BeaconReplanLoopTest(unittest.TestCase):
         revision_outbox['max_revisions'] = 3
         revision_outbox['replan_count'] = 1
         revision_outbox['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', revision_outbox)
+        f = self._write_outbox('forge', 'real-001.json', revision_outbox)
         on.process_outbox(f)
         # D3.5 5c-followup-2 HIGH-1 keyed filename when replan_count>0
         rereviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan*-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-001-replan*-rev*.json')
         )
         self.assertEqual(len(rereviews), 1)
         rereview = json.loads(rereviews[0].read_text())
@@ -5224,7 +5224,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         just the procedural framing. Without findings in the reason text,
         Beacon's level-3 discipline gate can never find token overlap."""
         marker = _mirror_revision_marker(
-            task_id='task-001', confidence='low',
+            task_id='real-001', confidence='low',
             findings=[
                 {'file': 'parser.py', 'line_range': 'L12-L15',
                  'severity': 'medium',
@@ -5232,10 +5232,10 @@ class BeaconReplanLoopTest(unittest.TestCase):
             ],
         )
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         notify = json.loads(
             list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
@@ -5251,7 +5251,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """C-2 fix: budget-exhausted REVISION downgrade to ESCALATE must
         also carry findings in the reason."""
         marker = _mirror_revision_marker(
-            task_id='task-001', confidence='high',
+            task_id='real-001', confidence='high',
             findings=[
                 {'file': 'parser.py', 'line_range': 'L20',
                  'severity': 'medium',
@@ -5259,12 +5259,12 @@ class BeaconReplanLoopTest(unittest.TestCase):
             ],
         )
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
         body['revision_count'] = 3  # at the max, next would exhaust
         body['max_revisions'] = 3
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         notify = json.loads(
             list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
@@ -5287,7 +5287,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         self.assertEqual(result, 'notified-replan')
         # Forge inbox has the dispatched task
         forge_tasks = list(
-            (on.INBOXES_ROOT / 'forge').glob('task-001.json')
+            (on.INBOXES_ROOT / 'forge').glob('real-001.json')
         )
         self.assertEqual(len(forge_tasks), 1)
         forge_task = json.loads(forge_tasks[0].read_text())
@@ -5329,7 +5329,7 @@ class BeaconReplanLoopTest(unittest.TestCase):
         ]
         self.assertEqual(len(notifs), 1)
         # No Forge task dispatched
-        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('real-001.json'))
         self.assertEqual(len(forge_tasks), 0)
 
     def test_inbound_intent_propagates_through_full_chain(self):
@@ -5340,12 +5340,12 @@ class BeaconReplanLoopTest(unittest.TestCase):
         contract: the notify task on Beacon's inbox has `intent=review-
         escalate`, which inbox_watcher._build_outbox would surface as
         `inbound_intent` on the outbox."""
-        marker = _mirror_escalate_marker(task_id='task-001')
+        marker = _mirror_escalate_marker(task_id='real-001')
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
         self.assertEqual(len(notifies), 1)
@@ -5357,16 +5357,16 @@ class BeaconReplanLoopTest(unittest.TestCase):
         """Regression: a review-pass / review-revision (mid-chain) marker
         decision should NOT add replan_count + max_replans to the notify
         task. Only review-escalate carries the replan budget."""
-        marker = _mirror_pass_marker(task_id='task-001')
+        marker = _mirror_pass_marker(task_id='real-001')
         body = _mirror_outbox_body(
-            marker, source='beacon', task_id='task-001',
+            marker, source='beacon', task_id='real-001',
             target_repo='ourliberty-agent-core',
         )
         # Even if envelope has replan_count from a prior cycle, the
         # marker-driven routing should only carry it on escalate notifies.
         body['replan_count'] = 1
         body['max_replans'] = 2
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         notify = json.loads(
             list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))[0].read_text()
@@ -5487,7 +5487,7 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         marker_text=None,
         narrative_prefix='Plan for the Pulse-flagged proposal below.',
         reply_chat_id=7998341473,
-        task_id='task-001',
+        task_id='real-001',
         **overrides,
     ):
         """Synthetic Beacon outbox responding to a Pulse-auto-dispatch
@@ -5521,15 +5521,15 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         pending = state.get('pending', [])
         self.assertEqual(len(pending), 1)
         entry = pending[0]
-        self.assertEqual(entry['id'], 'task-001')
+        self.assertEqual(entry['id'], 'real-001')
         self.assertEqual(entry['chat_id'], 7998341473)
         alerts = self._read_alerts()
         approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
         self.assertEqual(len(approval_records), 1)
         rec = approval_records[0]
-        self.assertEqual(rec['approval_id'], 'task-001')
+        self.assertEqual(rec['approval_id'], 'real-001')
         self.assertEqual(rec['chat_id'], 7998341473)
-        self.assertIn('task-001', rec['body'])
+        self.assertIn('real-001', rec['body'])
 
     # ----- no marker → falls through to default routing -----
 
@@ -5547,7 +5547,7 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
     # ----- malformed marker → WARN + fall through -----
 
     def test_malformed_marker_falls_through(self):
-        bad_payload = json.dumps({'task_id': 'task-001'})  # missing fields
+        bad_payload = json.dumps({'task_id': 'real-001'})  # missing fields
         bad_marker = (
             f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
             f'=== END_APPROVAL_REQUEST ==='
@@ -5605,7 +5605,7 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         state = self._ah.load_state()
         self.assertEqual(len(state.get('pending', [])), 0)
         self.assertEqual(len(state.get('history', [])), 1)
-        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('task-001.json'))
+        forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('real-001.json'))
         self.assertEqual(len(forge_tasks), 1)
 
     # ----- replay dedup: second run skips add_pending -----
@@ -5644,11 +5644,11 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         # Reuse the replan helper shape by hand (avoid reaching into another
         # test class). Source is 'mirror-result' + inbound_intent triggers
         # the replan branch.
-        marker = _beacon_approval_request_marker(task_id='task-001')
+        marker = _beacon_approval_request_marker(task_id='real-001')
         body = _good_outbox(
             agent='beacon',
             source='mirror-result',
-            task_id='notify-task-001',
+            task_id='notify-real-001',
             result=f'Plan revision.\n\n{marker}',
         )
         body['inbound_intent'] = 'review-escalate'
@@ -5666,11 +5666,11 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
 
     def test_headless_larry_source_path_still_fires(self):
         """Regression guard: source='larry' headless path is unchanged."""
-        marker = _beacon_approval_request_marker(task_id='task-001')
+        marker = _beacon_approval_request_marker(task_id='real-001')
         body = _good_outbox(
             agent='beacon',
             source='larry',
-            task_id='task-001',
+            task_id='real-001',
             result=f'Plan ready.\n\n{marker}',
         )
         body['reply_chat_id'] = 7998341473
@@ -5745,32 +5745,32 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         # Simulate iteration 1 having archived a build task
         forge_inbox_archive = on.INBOXES_ROOT / 'forge' / '.archive'
         forge_inbox_archive.mkdir(parents=True, exist_ok=True)
-        (forge_inbox_archive / 'build-task-001.json').write_text('{}')
+        (forge_inbox_archive / 'build-real-001.json').write_text('{}')
 
         # Iteration 2 preflight proceeds — dispatch should land at the
         # replan-keyed filename, not collide
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "task-001", "preflight_summary": "Iteration 2 ready."}\n'
+            '{"task_id": "real-001", "preflight_summary": "Iteration 2 ready."}\n'
             '=== END_PROCEED ==='
         )
         preflight = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='preflight', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             claude_session_id='sess-iter2-xyz',
             result=f'Ready.\n\n{marker}',
         )
         preflight['replan_count'] = 1
         preflight['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', preflight)
+        f = self._write_outbox('forge', 'real-001.json', preflight)
         on.process_outbox(f)
 
         # New build task lands at the keyed filename
-        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-task-001-replan1.json'))
+        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-real-001-replan1.json'))
         self.assertEqual(
             len(keyed), 1,
-            f'expected build-task-001-replan1.json (round-keyed); '
+            f'expected build-real-001-replan1.json (round-keyed); '
             f'inbox contents: {list((on.INBOXES_ROOT / "forge").iterdir())}',
         )
 
@@ -5779,23 +5779,23 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         unkeyed filename so prior idempotency behavior is preserved."""
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "task-001", "preflight_summary": "Fresh dispatch."}\n'
+            '{"task_id": "real-001", "preflight_summary": "Fresh dispatch."}\n'
             '=== END_PROCEED ==='
         )
         preflight = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='preflight', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             claude_session_id='sess-fresh-xyz',
             result=f'Ready.\n\n{marker}',
         )
         # replan_count omitted (defaults to 0)
-        f = self._write_outbox('forge', 'task-001.json', preflight)
+        f = self._write_outbox('forge', 'real-001.json', preflight)
         on.process_outbox(f)
 
-        legacy = list((on.INBOXES_ROOT / 'forge').glob('build-task-001.json'))
+        legacy = list((on.INBOXES_ROOT / 'forge').glob('build-real-001.json'))
         self.assertEqual(len(legacy), 1)
-        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-task-001-replan*.json'))
+        keyed = list((on.INBOXES_ROOT / 'forge').glob('build-real-001-replan*.json'))
         self.assertEqual(len(keyed), 0)
 
     # ----- C-2: _dispatch_mirror_review keyed by replan_count -----
@@ -5805,41 +5805,41 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         iteration 1's archived review task."""
         mirror_inbox_archive = on.INBOXES_ROOT / 'mirror' / '.archive'
         mirror_inbox_archive.mkdir(parents=True, exist_ok=True)
-        (mirror_inbox_archive / 'review-task-001.json').write_text('{}')
+        (mirror_inbox_archive / 'review-real-001.json').write_text('{}')
 
         build = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
         )
         build['replan_count'] = 1
         build['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', build)
+        f = self._write_outbox('forge', 'real-001.json', build)
         on.process_outbox(f)
 
-        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan1.json'))
+        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-real-001-replan1.json'))
         self.assertEqual(
             len(keyed), 1,
-            f'expected review-task-001-replan1.json (round-keyed); '
+            f'expected review-real-001-replan1.json (round-keyed); '
             f'inbox contents: {list((on.INBOXES_ROOT / "mirror").iterdir())}',
         )
 
     def test_mirror_review_dispatch_unkeyed_when_replan_count_zero(self):
         """Backward-compat: round 1 still uses the legacy unkeyed filename."""
         build = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             result='PR opened: https://github.com/x/y/pull/77\n\nBuild done.',
         )
         # replan_count omitted
-        f = self._write_outbox('forge', 'task-001.json', build)
+        f = self._write_outbox('forge', 'real-001.json', build)
         on.process_outbox(f)
 
-        legacy = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001.json'))
+        legacy = list((on.INBOXES_ROOT / 'mirror').glob('review-real-001.json'))
         self.assertEqual(len(legacy), 1)
-        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan*.json'))
+        keyed = list((on.INBOXES_ROOT / 'mirror').glob('review-real-001-replan*.json'))
         self.assertEqual(len(keyed), 0)
 
     # ----- HIGH-1 (PR #10 review): combined-state revision filename keying -----
@@ -5853,11 +5853,11 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         # Seed archive with replan-iter-1's revision file (the collision target)
         forge_archive = on.INBOXES_ROOT / 'forge' / '.archive'
         forge_archive.mkdir(parents=True, exist_ok=True)
-        (forge_archive / 'revision-task-001-1.json').write_text('{}')
+        (forge_archive / 'revision-real-001-1.json').write_text('{}')
 
         # Synthesize Mirror REVIEW_REVISION outbox for replan iter 2
         marker_payload = json.dumps({
-            'task_id': 'task-001',
+            'task_id': 'real-001',
             'pr_url': 'https://github.com/x/y/pull/77',
             'findings': [{
                 'file': 'foo.py', 'line_range': 'L12-L15',
@@ -5871,20 +5871,20 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
             f'=== END_REVIEW_REVISION ==='
         )
         body = _good_outbox(
-            agent='mirror', source='beacon', task_id='task-001',
+            agent='mirror', source='beacon', task_id='real-001',
             phase='review', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             result=f'Findings.\n\n{marker}',
         )
         body['forge_build_session_id'] = 'sess-abc'
         body['pr_url'] = 'https://github.com/x/y/pull/77'
         body['replan_count'] = 1  # replan iteration 2
         body['max_replans'] = 2
-        f = self._write_outbox('mirror', 'task-001.json', body)
+        f = self._write_outbox('mirror', 'real-001.json', body)
         on.process_outbox(f)
         # Revision task should land at the replan-keyed filename, not collide
         keyed = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-replan1-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-001-replan1-*.json')
         )
         self.assertEqual(
             len(keyed), 1,
@@ -5894,7 +5894,7 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         # And the legacy unkeyed filename should NOT have been written
         # (the archived collider is still the only one there)
         legacy_inbox = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-task-001-1.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-001-1.json')
         )
         self.assertEqual(len(legacy_inbox), 0)
 
@@ -5904,16 +5904,16 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         archived re-reviews."""
         mirror_archive = on.INBOXES_ROOT / 'mirror' / '.archive'
         mirror_archive.mkdir(parents=True, exist_ok=True)
-        (mirror_archive / 'review-task-001-rev1.json').write_text('{}')
+        (mirror_archive / 'review-real-001-rev1.json').write_text('{}')
 
         revision_outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='task-001',
+            agent='forge', source='beacon', task_id='real-001',
             phase='revision', target_repo='ourliberty-agent-core',
-            branch='forge/task-001',
+            branch='forge/real-001',
             claude_session_id='sess-abc',
             result=(
                 'Revision 1 applied: validation added per Mirror finding.\n'
-                '\nTests pass; pushed to forge/task-001.'
+                '\nTests pass; pushed to forge/real-001.'
             ),
         )
         revision_outbox['pr_url'] = 'https://github.com/x/y/pull/77'
@@ -5921,14 +5921,14 @@ class ReplanDispatchKeyingTest(unittest.TestCase):
         revision_outbox['max_revisions'] = 3
         revision_outbox['replan_count'] = 1
         revision_outbox['max_replans'] = 2
-        f = self._write_outbox('forge', 'task-001.json', revision_outbox)
+        f = self._write_outbox('forge', 'real-001.json', revision_outbox)
         on.process_outbox(f)
         keyed = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-replan1-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-001-replan1-rev*.json')
         )
         self.assertEqual(len(keyed), 1)
         legacy = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-task-001-rev1.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-real-001-rev1.json')
         )
         self.assertEqual(len(legacy), 0)
 
@@ -5960,7 +5960,7 @@ class PRUrlRegexAcceptsBothPrefixesTest(unittest.TestCase):
         sibling — both had the URL on a non-first line and missed Mirror
         review under the prior \\A anchor."""
         result = (
-            "Commit `8e5c692` pushed to `forge/task-001`, the head branch "
+            "Commit `8e5c692` pushed to `forge/real-001`, the head branch "
             "of PR #8 (OPEN).\n\nPR opened: https://github.com/x/y/pull/8"
         )
         self.assertEqual(
@@ -6102,7 +6102,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
 
     def _beacon_replan_outbox(self):
         marker_payload = json.dumps({
-            'task_id': 'task-001',
+            'task_id': 'real-001',
             'summary': (
                 "Address Mirror's input validation concern in the parser."
             ),
@@ -6118,7 +6118,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
         body = _good_outbox(
             agent='beacon',
             source='mirror-result',
-            task_id='notify-task-001',
+            task_id='notify-real-001',
             result=f'Revising.\n\n{marker}',
         )
         body['inbound_intent'] = 'review-escalate'
@@ -6141,7 +6141,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
         state = self._ah.load_state()
         pending = state.get('pending', [])
         self.assertEqual(len(pending), 1)
-        self.assertEqual(pending[0]['id'], 'task-001')
+        self.assertEqual(pending[0]['id'], 'real-001')
         self.assertTrue(pending[0].get('queued_during_pause'))
         self.assertEqual(pending[0].get('_replan_count'), 1)
         # No approval-request alert
@@ -6164,7 +6164,7 @@ class BeaconReplanPauseTest(unittest.TestCase):
         self._ah.set_paused(False)
         backlog = self._ah.pop_paused_backlog()
         self.assertEqual(len(backlog), 1)
-        self.assertEqual(backlog[0]['id'], 'task-001')
+        self.assertEqual(backlog[0]['id'], 'real-001')
         self.assertEqual(backlog[0].get('_replan_count'), 1)
 
     def test_no_pause_proceeds_normally(self):
@@ -6377,7 +6377,7 @@ class AlreadyMergedResumeTest(unittest.TestCase):
         decision = {
             'intent': 'review-pass',
             'payload': {
-                'task_id': 't-resume',
+                'task_id': 'real-resume',
                 'pr_url': self.PR_URL,
                 'summary': 'Resume after crash',
             },
@@ -6403,7 +6403,7 @@ class AlreadyMergedResumeTest(unittest.TestCase):
         decision = {
             'intent': 'review-pass',
             'payload': {
-                'task_id': 't-fail',
+                'task_id': 'real-fail',
                 'pr_url': self.PR_URL,
                 'summary': 'A summary',
             },
@@ -6430,7 +6430,7 @@ class AlreadyMergedResumeTest(unittest.TestCase):
         decision = {
             'intent': 'review-pass',
             'payload': {
-                'task_id': 't-ok',
+                'task_id': 'real-ok',
                 'pr_url': self.PR_URL,
                 'summary': 'Done',
             },
@@ -6489,7 +6489,7 @@ class EmergencyHaltTripTest(unittest.TestCase):
             setattr(la, name, value)
         self._tmp.cleanup()
 
-    def _data(self, task_id='t-halt', reply_chat_id=None):
+    def _data(self, task_id='real-halt', reply_chat_id=None):
         d = {'task_id': task_id, 'agent': 'mirror'}
         if reply_chat_id is not None:
             d['reply_chat_id'] = reply_chat_id
@@ -6498,7 +6498,7 @@ class EmergencyHaltTripTest(unittest.TestCase):
     def _payload(self, reason='credentials in diff', evidence='line 42: API_KEY=...',
                  pr_url='https://github.com/owner/repo/pull/1'):
         return {'reason': reason, 'evidence': evidence, 'pr_url': pr_url,
-                'task_id': 't-halt'}
+                'task_id': 'real-halt'}
 
     def _read_alerts(self):
         import larry_alerts as la
@@ -6511,7 +6511,7 @@ class EmergencyHaltTripTest(unittest.TestCase):
         self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
         env = json.loads(on.EMERGENCY_HALT_FLAG.read_text())
         self.assertEqual(env['activated_by'], 'mirror-marker')
-        self.assertEqual(env['task_id'], 't-halt')
+        self.assertEqual(env['task_id'], 'real-halt')
         self.assertEqual(env['reason'], 'credentials in diff')
         self.assertIn('API_KEY', env['evidence'])
         self.assertEqual(env['pr_url'], 'https://github.com/owner/repo/pull/1')
@@ -6545,7 +6545,7 @@ class EmergencyHaltTripTest(unittest.TestCase):
         # kind: alert (no explicit kind field — bot reads missing/alert as broadcast)
         self.assertNotIn('chat_id', a)  # not targeted; broadcast shape
         self.assertEqual(a['severity'], 'critical')
-        self.assertEqual(a['subject'], 'emergency-halt:t-halt')
+        self.assertEqual(a['subject'], 'emergency-halt:real-halt')
         self.assertIn('EMERGENCY_HALT tripped', a['message'])
 
     def test_alert_suggested_action_includes_recovery_command(self):
@@ -6566,24 +6566,24 @@ class EmergencyHaltTripTest(unittest.TestCase):
     def test_per_task_cooldown_bucket(self):
         """Two halts for different task_ids should both queue alerts;
         the per-task subject avoids cross-task suppression."""
-        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        on._trip_emergency_halt(self._data(task_id='real-A'), self._payload())
         # Remove file so the second trip's idempotent check doesn't skip
         # (the alert path is separate from the halt-file path, but both
         # share the data-flow we're testing).
         on.EMERGENCY_HALT_FLAG.unlink()
-        on._trip_emergency_halt(self._data(task_id='t-B'), self._payload())
+        on._trip_emergency_halt(self._data(task_id='real-B'), self._payload())
         alerts = self._read_alerts()
         emergency = [a for a in alerts if a.get('severity') == 'critical']
         subjects = {a.get('subject') for a in emergency}
-        self.assertIn('emergency-halt:t-A', subjects)
-        self.assertIn('emergency-halt:t-B', subjects)
+        self.assertIn('emergency-halt:real-A', subjects)
+        self.assertIn('emergency-halt:real-B', subjects)
 
     def test_same_task_cooldown_suppresses(self):
         """Re-tripping for the SAME task within 10 min — second alert
         suppressed by cooldown bucket (subject keyed on task_id)."""
-        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        on._trip_emergency_halt(self._data(task_id='real-A'), self._payload())
         on.EMERGENCY_HALT_FLAG.unlink()
-        on._trip_emergency_halt(self._data(task_id='t-A'), self._payload())
+        on._trip_emergency_halt(self._data(task_id='real-A'), self._payload())
         alerts = self._read_alerts()
         emergency = [a for a in alerts if a.get('severity') == 'critical']
         self.assertEqual(len(emergency), 1)  # second suppressed
@@ -6642,36 +6642,36 @@ class CostBudgetGateTest(unittest.TestCase):
                 f.write(json.dumps(r) + '\n')
 
     def test_missing_ledger_allows_dispatch(self):
-        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, cap = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertFalse(at_cap)
         self.assertEqual(current, 0.0)
         self.assertEqual(cap, 5.0)
 
     def test_below_cap_allows_dispatch(self):
         self._write_costs(
-            {'task_id': 't-x', 'cost_usd': 1.0},
-            {'task_id': 't-x', 'cost_usd': 2.0},
-            {'task_id': 't-other', 'cost_usd': 999.0},  # different task; ignored
+            {'task_id': 'real-x', 'cost_usd': 1.0},
+            {'task_id': 'real-x', 'cost_usd': 2.0},
+            {'task_id': 'real-other', 'cost_usd': 999.0},  # different task; ignored
         )
-        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, cap = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertFalse(at_cap)
         self.assertEqual(current, 3.0)
 
     def test_at_cap_refuses_dispatch(self):
         self._write_costs(
-            {'task_id': 't-x', 'cost_usd': 3.0},
-            {'task_id': 't-x', 'cost_usd': 2.0},
+            {'task_id': 'real-x', 'cost_usd': 3.0},
+            {'task_id': 'real-x', 'cost_usd': 2.0},
         )
-        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, cap = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertTrue(at_cap)
         self.assertEqual(current, 5.0)
 
     def test_over_cap_refuses_dispatch(self):
         self._write_costs(
-            {'task_id': 't-x', 'cost_usd': 4.0},
-            {'task_id': 't-x', 'cost_usd': 2.0},
+            {'task_id': 'real-x', 'cost_usd': 4.0},
+            {'task_id': 'real-x', 'cost_usd': 2.0},
         )
-        at_cap, current, cap = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, cap = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertTrue(at_cap)
         self.assertEqual(current, 6.0)
 
@@ -6679,47 +6679,47 @@ class CostBudgetGateTest(unittest.TestCase):
         # Mix of valid + malformed (not JSON, wrong shape, missing fields)
         # — gate stays robust.
         with open(on.COSTS_FILE, 'w', encoding='utf-8') as f:
-            f.write('{"task_id": "t-x", "cost_usd": 1.0}\n')
+            f.write('{"task_id": "real-x", "cost_usd": 1.0}\n')
             f.write('not json at all\n')
-            f.write('{"task_id": "t-x"}\n')  # no cost_usd
+            f.write('{"task_id": "real-x"}\n')  # no cost_usd
             f.write('{}\n')                   # no task_id
             f.write('[1,2,3]\n')              # not a dict
-            f.write('{"task_id": "t-x", "cost_usd": 2.0}\n')
+            f.write('{"task_id": "real-x", "cost_usd": 2.0}\n')
             f.write('\n')                     # empty line
-        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, _ = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertFalse(at_cap)
         self.assertEqual(current, 3.0)
 
     def test_negative_cost_ignored(self):
         # Defensive — negative cost_usd is meaningless; skip.
         self._write_costs(
-            {'task_id': 't-x', 'cost_usd': 1.0},
-            {'task_id': 't-x', 'cost_usd': -100.0},
-            {'task_id': 't-x', 'cost_usd': 1.0},
+            {'task_id': 'real-x', 'cost_usd': 1.0},
+            {'task_id': 'real-x', 'cost_usd': -100.0},
+            {'task_id': 'real-x', 'cost_usd': 1.0},
         )
-        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, _ = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertEqual(current, 2.0)
         self.assertFalse(at_cap)
 
     def test_bool_cost_ignored(self):
         # bool is an int subclass — defensive guard.
         self._write_costs(
-            {'task_id': 't-x', 'cost_usd': True},  # treated as 1 by Python
-            {'task_id': 't-x', 'cost_usd': 1.0},
+            {'task_id': 'real-x', 'cost_usd': True},  # treated as 1 by Python
+            {'task_id': 'real-x', 'cost_usd': 1.0},
         )
-        at_cap, current, _ = on._check_cost_budget('t-x', cap_usd=5.0)
+        at_cap, current, _ = on._check_cost_budget('real-x', cap_usd=5.0)
         self.assertEqual(current, 1.0)  # bool skipped, only the 1.0 counts
 
     def test_enforce_allows_below_cap(self):
-        self._write_costs({'task_id': 't-x', 'cost_usd': 1.0})
+        self._write_costs({'task_id': 'real-x', 'cost_usd': 1.0})
         data = {'reply_chat_id': 12345}
-        ok = on._enforce_cost_budget('t-x', 'build-phase', data)
+        ok = on._enforce_cost_budget('real-x', 'build-phase', data)
         self.assertTrue(ok)
 
     def test_enforce_refuses_at_cap_and_dms_larry(self):
-        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
-        ok = on._enforce_cost_budget('t-x', 'build-phase', data)
+        ok = on._enforce_cost_budget('real-x', 'build-phase', data)
         self.assertFalse(ok)
         # DM queued
         import larry_alerts as la
@@ -6732,8 +6732,8 @@ class CostBudgetGateTest(unittest.TestCase):
 
     def test_enforce_no_chat_id_still_refuses(self):
         """Refusal happens regardless of reply_chat_id; DM is best-effort."""
-        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
-        ok = on._enforce_cost_budget('t-x', 'build-phase', {})
+        self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
+        ok = on._enforce_cost_budget('real-x', 'build-phase', {})
         self.assertFalse(ok)
 
     def test_enforce_dedups_same_task_within_daemon_lifetime(self):
@@ -6741,10 +6741,10 @@ class CostBudgetGateTest(unittest.TestCase):
         within the same daemon-instance suppress the DM (code-review #4).
         """
         import larry_alerts as la
-        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         # First refusal — DM queued.
-        on._enforce_cost_budget('t-x', 'build-phase', data)
+        on._enforce_cost_budget('real-x', 'build-phase', data)
         records = [
             json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
             if line.strip()
@@ -6752,7 +6752,7 @@ class CostBudgetGateTest(unittest.TestCase):
         cost_dms_first = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
         self.assertEqual(len(cost_dms_first), 1)
         # Second refusal on the SAME task — suppressed.
-        on._enforce_cost_budget('t-x', 'mirror-review', data)
+        on._enforce_cost_budget('real-x', 'mirror-review', data)
         records = [
             json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
             if line.strip()
@@ -6760,7 +6760,7 @@ class CostBudgetGateTest(unittest.TestCase):
         cost_dms_second = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
         self.assertEqual(len(cost_dms_second), 1, 'second fire should not queue a duplicate DM')
         # Third refusal on the SAME task — still suppressed.
-        on._enforce_cost_budget('t-x', 'revision-to-forge', data)
+        on._enforce_cost_budget('real-x', 'revision-to-forge', data)
         records = [
             json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
             if line.strip()
@@ -6772,11 +6772,11 @@ class CostBudgetGateTest(unittest.TestCase):
         """Cap-fire on task A does NOT suppress DM for task B (different
         task — different dedup bucket)."""
         import larry_alerts as la
-        self._write_costs({'task_id': 't-A', 'cost_usd': 20.0})
-        self._write_costs({'task_id': 't-B', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 'real-A', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 'real-B', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
-        on._enforce_cost_budget('t-A', 'build-phase', data)
-        on._enforce_cost_budget('t-B', 'build-phase', data)
+        on._enforce_cost_budget('real-A', 'build-phase', data)
+        on._enforce_cost_budget('real-B', 'build-phase', data)
         records = [
             json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
             if line.strip()
@@ -6784,7 +6784,7 @@ class CostBudgetGateTest(unittest.TestCase):
         cost_dms = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
         self.assertEqual(len(cost_dms), 2)
         task_ids = {r.get('task_id') for r in cost_dms}
-        self.assertEqual(task_ids, {'t-A', 't-B'})
+        self.assertEqual(task_ids, {'real-A', 'real-B'})
 
     def test_enforce_dedups_resets_after_daemon_restart(self):
         """Simulating a daemon restart (test helper clears the set) —
@@ -6793,11 +6793,11 @@ class CostBudgetGateTest(unittest.TestCase):
         is intentional: Larry may have raised the cap and a restart
         means the issue might be resolved."""
         import larry_alerts as la
-        self._write_costs({'task_id': 't-x', 'cost_usd': 20.0})
+        self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
-        on._enforce_cost_budget('t-x', 'build-phase', data)
+        on._enforce_cost_budget('real-x', 'build-phase', data)
         on._reset_cost_budget_dmed_tasks()  # simulate daemon restart
-        on._enforce_cost_budget('t-x', 'mirror-review', data)
+        on._enforce_cost_budget('real-x', 'mirror-review', data)
         records = [
             json.loads(line) for line in la.ALERTS_FILE.read_text().splitlines()
             if line.strip()
@@ -6957,34 +6957,34 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
 
     def test_auto_merge_fires_on_review_pass(self):
         body = self._body_with_chat(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-pass.json', body)
+        f = self._write_mirror_outbox('real-pass.json', body)
         on.process_outbox(f)
         self.assertEqual(len(self._auto_merge_calls), 1)
         pr_url, task_id = self._auto_merge_calls[0]
         self.assertEqual(pr_url, PR_URL_FIXTURE)
-        self.assertEqual(task_id, 't-rev')  # the marker fixture's task_id
+        self.assertEqual(task_id, 'real-rev')  # the marker fixture's task_id
 
     def test_auto_merge_skipped_on_review_revision(self):
         body = self._body_with_chat(_mirror_revision_marker(confidence='high'))
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         on.process_outbox(f)
         self.assertEqual(self._auto_merge_calls, [])
 
     def test_auto_merge_skipped_on_review_escalate(self):
         body = self._body_with_chat(_mirror_escalate_marker())
-        f = self._write_mirror_outbox('t-esc.json', body)
+        f = self._write_mirror_outbox('real-esc.json', body)
         on.process_outbox(f)
         self.assertEqual(self._auto_merge_calls, [])
 
     def test_auto_merge_skipped_on_emergency_halt(self):
         body = self._body_with_chat(_mirror_emergency_marker())
-        f = self._write_mirror_outbox('t-halt.json', body)
+        f = self._write_mirror_outbox('real-halt.json', body)
         on.process_outbox(f)
         self.assertEqual(self._auto_merge_calls, [])
 
     def test_dm_body_reflects_merged_outcome(self):
         body = self._body_with_chat(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-pass.json', body)
+        f = self._write_mirror_outbox('real-pass.json', body)
         on.process_outbox(f)
         notifications = [
             r for r in self._read_notifications()
@@ -7002,7 +7002,7 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
             'repo_coords': 'test-owner/test-repo',
         }
         body = self._body_with_chat(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-pass.json', body)
+        f = self._write_mirror_outbox('real-pass.json', body)
         on.process_outbox(f)
         notifications = [
             r for r in self._read_notifications()
@@ -7031,11 +7031,11 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
         Per Larry's sign-off: already-merged on resume reads as success.
         """
         body = self._body_with_chat(_mirror_pass_marker(), chat_id=98765)
-        f = self._write_mirror_outbox('t-resume.json', body)
+        f = self._write_mirror_outbox('real-resume.json', body)
         # First pass — normal `merged` outcome.
         on.process_outbox(f)
         # Restore the outbox from archive (simulate crash before archive).
-        archived = on.OUTBOXES_ROOT / 'mirror' / '.archive' / 't-resume.json'
+        archived = on.OUTBOXES_ROOT / 'mirror' / '.archive' / 'real-resume.json'
         self.assertTrue(archived.exists())
         archived.rename(f)
         # Flip the override to the resume-after-crash outcome.
@@ -7068,7 +7068,7 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
             'repo_coords': 'test-owner/test-repo',
         }
         body = self._body_with_chat(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-pass.json', body)
+        f = self._write_mirror_outbox('real-pass.json', body)
         on.process_outbox(f)
         notifications = [
             r for r in self._read_notifications()
@@ -7087,7 +7087,7 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
             raise RuntimeError('test override deliberately broken')
         on._AUTO_MERGE_FN_OVERRIDE = _broken
         body = self._body_with_chat(_mirror_pass_marker())
-        f = self._write_mirror_outbox('t-pass.json', body)
+        f = self._write_mirror_outbox('real-pass.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         notifications = [
@@ -7100,12 +7100,12 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
 
     def test_marker_error_no_auto_merge(self):
         """Malformed PASS marker → marker-error cascade → NO auto-merge."""
-        bad_payload = json.dumps({'task_id': 't-rev', 'pr_url': PR_URL_FIXTURE})
+        bad_payload = json.dumps({'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE})
         marker = (
             f'=== REVIEW_PASS ===\n{bad_payload}\n=== END_REVIEW_PASS ==='
         )
         body = self._body_with_chat(marker)
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         on.process_outbox(f)
         self.assertEqual(self._auto_merge_calls, [])
 
@@ -7133,7 +7133,7 @@ class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
     PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
     REPO_COORDS = 'Larry-Yatch/ourliberty-agent-core'
     SUMMARY = 'AC coverage clean.'
-    TASK_ID = 't-rev'
+    TASK_ID = 'real-rev'
     CHAT_ID = 98765
 
     def setUp(self):
@@ -7555,7 +7555,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
         # Pre-load $99 onto the test task to put it past the $5 cap.
         on.BLACKBOARD.mkdir(parents=True, exist_ok=True)
         with open(on.COSTS_FILE, 'w', encoding='utf-8') as f:
-            f.write(json.dumps({'task_id': 't-over', 'cost_usd': 99.0}) + '\n')
+            f.write(json.dumps({'task_id': 'real-over', 'cost_usd': 99.0}) + '\n')
 
     def tearDown(self):
         for name, value in self._originals.items():
@@ -7579,7 +7579,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
 
     def test_build_phase_refused_at_cap(self):
         data = {
-            'task_id': 't-over',
+            'task_id': 'real-over',
             'claude_session_id': 'session-abc',
             'target_repo': 'ourliberty-agent-core',
             'branch': 'feature/x',
@@ -7590,7 +7590,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
 
     def test_mirror_review_refused_at_cap(self):
         data = {
-            'task_id': 't-over',
+            'task_id': 'real-over',
             'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 555,
         }
@@ -7602,7 +7602,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
 
     def test_revision_dispatch_refused_at_cap(self):
         data = {
-            'task_id': 't-over',
+            'task_id': 'real-over',
             'forge_build_session_id': 'session-abc',
             'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 555,
@@ -7613,7 +7613,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
 
     def test_review_rerun_refused_at_cap(self):
         data = {
-            'task_id': 't-over',
+            'task_id': 'real-over',
             'target_repo': 'ourliberty-agent-core',
             'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
             'reply_chat_id': 555,
@@ -7624,7 +7624,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
     def test_cost_budget_dm_queued_on_refusal(self):
         import larry_alerts as la
         data = {
-            'task_id': 't-over',
+            'task_id': 'real-over',
             'claude_session_id': 'session-abc',
             'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 555,
@@ -7639,7 +7639,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
         """Sanity: clean task_id below cap → dispatch proceeds normally."""
         # Use a different task_id with no cost records.
         data = {
-            'task_id': 't-clean',
+            'task_id': 'real-clean',
             'claude_session_id': 'session-abc',
             'target_repo': 'ourliberty-agent-core',
             'branch': 'feature/x',
@@ -7655,18 +7655,18 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
         a false-alarm cost-DM to Larry. The idempotency check returns
         early; the gate isn't reached."""
         import larry_alerts as la
-        # Pre-load $99 onto t-already so cost would fire if reached.
+        # Pre-load $99 onto real-already so cost would fire if reached.
         with open(on.COSTS_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps({'task_id': 't-already', 'cost_usd': 99.0}) + '\n')
+            f.write(json.dumps({'task_id': 'real-already', 'cost_usd': 99.0}) + '\n')
         # Pre-stage the build dispatch as already-archived (simulates
         # the daemon having processed this outbox + dispatched + archived
         # in a prior run; now re-processing on resume).
         (on.INBOXES_ROOT / 'forge' / '.archive').mkdir(parents=True, exist_ok=True)
-        (on.INBOXES_ROOT / 'forge' / '.archive' / 'build-t-already.json').write_text(
-            json.dumps({'task_id': 't-already', 'prompt': 'noop'}),
+        (on.INBOXES_ROOT / 'forge' / '.archive' / 'build-real-already.json').write_text(
+            json.dumps({'task_id': 'real-already', 'prompt': 'noop'}),
         )
         data = {
-            'task_id': 't-already',
+            'task_id': 'real-already',
             'claude_session_id': 'session-abc',
             'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 555,
@@ -7676,7 +7676,7 @@ class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
         # No new inbox file (the existing .archive entry blocks).
         new_files = [
             p for p in (on.INBOXES_ROOT / 'forge').glob('*.json')
-            if p.name != 'build-t-already.json'
+            if p.name != 'build-real-already.json'
         ]
         self.assertEqual(new_files, [])
         # Critical: no cost-budget DM queued.
@@ -7698,9 +7698,9 @@ class CostDmTemplateTest(unittest.TestCase):
     def test_renders_with_full_fields(self):
         decision = {
             'intent': 'cost-budget-exhausted',
-            'payload': {'task_id': 't-x'},
+            'payload': {'task_id': 'real-x'},
             'intent_kwargs': {
-                'task_id': 't-x',
+                'task_id': 'real-x',
                 'current_usd': '6.50',
                 'cap_usd': '5.00',
                 'dispatch_label': 'mirror-review-rerun',
@@ -7708,7 +7708,7 @@ class CostDmTemplateTest(unittest.TestCase):
         }
         body = on._render_dm_message('cost-budget-exhausted', decision)
         self.assertIsNotNone(body)
-        self.assertIn('t-x', body)
+        self.assertIn('real-x', body)
         self.assertIn('$6.50', body)
         self.assertIn('$5.00', body)
         self.assertIn('mirror-review-rerun', body)
@@ -7721,7 +7721,7 @@ class CostDmTemplateTest(unittest.TestCase):
         """Missing intent_kwargs → renders with '?' placeholders, never crashes."""
         decision = {
             'intent': 'cost-budget-exhausted',
-            'payload': {'task_id': 't-x'},
+            'payload': {'task_id': 'real-x'},
             'intent_kwargs': {},
         }
         body = on._render_dm_message('cost-budget-exhausted', decision)
@@ -7840,7 +7840,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
             source='larry',
             reply_chat_id=12345,
         )
-        f = self._write_mirror_outbox('t-direct.json', body)
+        f = self._write_mirror_outbox('real-direct.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
         # Auto-merge fired.
@@ -7865,7 +7865,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
             source='larry',
             reply_chat_id=None,
         )
-        f = self._write_mirror_outbox('t-no-chat.json', body)
+        f = self._write_mirror_outbox('real-no-chat.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'archived-no-notify')
         self.assertEqual(self._auto_merge_calls, [])
@@ -7887,18 +7887,18 @@ class LarryDirectDispatchTest(unittest.TestCase):
             # to --resume against, plus the standard PR envelope fields.
             forge_build_session_id='forge-build-sess',
             target_repo='ourliberty-agent-core',
-            branch='forge/t-rev',
+            branch='forge/real-rev',
             pr_url=PR_URL_FIXTURE,
             revision_count=0,
             max_revisions=3,
         )
-        f = self._write_mirror_outbox('t-rev.json', body)
+        f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
         # Revision dispatched to Forge.
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-rev-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-rev-*.json')
         )
         self.assertEqual(len(revisions), 1)
         # No synth DM — the chain continues via Forge.
@@ -7910,7 +7910,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
             source='larry',
             reply_chat_id=12345,
         )
-        f = self._write_mirror_outbox('t-esc.json', body)
+        f = self._write_mirror_outbox('real-esc.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
@@ -7927,7 +7927,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
             source='beacon',
             reply_chat_id=99,
         )
-        f = self._write_mirror_outbox('t-beacon.json', body)
+        f = self._write_mirror_outbox('real-beacon.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         # Auto-merge fired.
@@ -7946,7 +7946,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
             source='larry',
             reply_chat_id=12345,
         )
-        f = self._write_mirror_outbox('t-chat.json', body)
+        f = self._write_mirror_outbox('real-chat.json', body)
         result = on.process_outbox(f)
         # Default path archives non-agent-source outboxes; no marker = no
         # larry_direct branch.
@@ -8096,18 +8096,18 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # build phase MUST auto-dispatch, NO synth DM fires.
         marker = (
             '=== PROCEED ===\n'
-            '{"task_id": "t-19-proceed", '
+            '{"task_id": "real-19-proceed", '
             '"preflight_summary": "Edit foo.py."}\n'
             '=== END_PROCEED ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='larry', task_id='t-19-proceed',
+            agent='forge', source='larry', task_id='real-19-proceed',
             claude_session_id='sess-larry-direct-proceed',
             target_repo='ourliberty-agent-core',
             reply_chat_id=7998341473,
             result=f'Spec is clear; ready.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 't-19-proceed.json', outbox)
+        f = self._write_outbox('forge', 'real-19-proceed.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
@@ -8123,7 +8123,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         )
         build_data = json.loads(forge_builds[0].read_text())
         self.assertEqual(build_data['phase'], 'build')
-        self.assertEqual(build_data['task_id'], 't-19-proceed')
+        self.assertEqual(build_data['task_id'], 'real-19-proceed')
         self.assertEqual(
             build_data['session_id'], 'sess-larry-direct-proceed',
         )
@@ -8150,19 +8150,19 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # leaked onto every non-terminal intent.
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "t-19-clarify", '
+            '{"task_id": "real-19-clarify", '
             '"question": "Which config file should I modify?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='larry', task_id='t-19-clarify',
+            agent='forge', source='larry', task_id='real-19-clarify',
             claude_session_id='sess-larry-clarify',
             clarification_count=0, max_clarifications=3,
             target_repo='ourliberty-agent-core',
             reply_chat_id=7998341473,
             result=f'Need more info.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 't-19-clarify.json', outbox)
+        f = self._write_outbox('forge', 'real-19-clarify.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
@@ -8192,19 +8192,19 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # narrowing fix, dispatch fires and no synth DM goes out.
         body = _mirror_outbox_body(
             _mirror_revision_marker(
-                task_id='t-19-revision', confidence='high',
+                task_id='real-19-revision', confidence='high',
             ),
-            task_id='t-19-revision',
+            task_id='real-19-revision',
             source='larry',
             reply_chat_id=7998341473,
             forge_build_session_id='forge-build-sess-19',
             target_repo='ourliberty-agent-core',
-            branch='forge/t-19-revision',
+            branch='forge/real-19-revision',
             pr_url=PR_URL_FIXTURE,
             revision_count=0,
             max_revisions=3,
         )
-        f = self._write_outbox('mirror', 't-19-revision.json', body)
+        f = self._write_outbox('mirror', 'real-19-revision.json', body)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
@@ -8212,7 +8212,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
 
         # Revision dispatched to Forge — the existing handler fires.
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-t-19-revision-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-19-revision-*.json')
         )
         self.assertEqual(
             len(revisions), 1,
@@ -8229,12 +8229,12 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # REVIEW_PASS auto-merges the PR and DMs Larry with the standard
         # review-pass template (NOT the synth DM).
         body = _mirror_outbox_body(
-            _mirror_pass_marker(task_id='t-19-pass'),
-            task_id='t-19-pass',
+            _mirror_pass_marker(task_id='real-19-pass'),
+            task_id='real-19-pass',
             source='larry',
             reply_chat_id=7998341473,
         )
-        f = self._write_outbox('mirror', 't-19-pass.json', body)
+        f = self._write_outbox('mirror', 'real-19-pass.json', body)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'larry-direct-marker')
@@ -8258,12 +8258,12 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # 'no routable target' path and auto-merge does NOT fire (silent
         # action would be worse than no action).
         body = _mirror_outbox_body(
-            _mirror_pass_marker(task_id='t-19-pass-nochat'),
-            task_id='t-19-pass-nochat',
+            _mirror_pass_marker(task_id='real-19-pass-nochat'),
+            task_id='real-19-pass-nochat',
             source='larry',
             reply_chat_id=None,
         )
-        f = self._write_outbox('mirror', 't-19-pass-nochat.json', body)
+        f = self._write_outbox('mirror', 'real-19-pass-nochat.json', body)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'archived-no-notify')
@@ -8279,16 +8279,16 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         # locks in distinct bodies per intent so the template can't
         # silently regress to a one-size-fits-all string.
         data = {
-            'task_id': 't-template',
+            'task_id': 'real-template',
             'reply_chat_id': 7998341473,
         }
         bodies = {}
         for intent, marker_type, payload in (
-            ('ack-proceed', 'proceed', {'task_id': 't-template'}),
+            ('ack-proceed', 'proceed', {'task_id': 'real-template'}),
             (
                 'review-revision', 'review_revision',
                 {
-                    'task_id': 't-template', 'pr_url': PR_URL_FIXTURE,
+                    'task_id': 'real-template', 'pr_url': PR_URL_FIXTURE,
                     'findings': [
                         {'file': 'a.py', 'line_range': 'L1',
                          'severity': 'low', 'description': 'x'},
@@ -8298,7 +8298,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
             (
                 'clarify', 'clarify_request',
                 {
-                    'task_id': 't-template',
+                    'task_id': 'real-template',
                     'question': 'Which file?',
                 },
             ),
@@ -8695,7 +8695,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
     def _revision_decision(self, findings=None, summary=None, confidence='high'):
         """Build a synthetic decision dict shaped like `_classify_mirror_marker`."""
         payload = {
-            'task_id': 't-claude-as-forge',
+            'task_id': 'real-claude-as-forge',
             'pr_url': PR_URL_FIXTURE,
             'severity': 'medium',
             'confidence': confidence,
@@ -8723,7 +8723,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         # no Larry DM is queued (Forge picking up the revision is the
         # closing signal, not a DM).
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-claude-as-forge',
+            agent='mirror', source='larry', task_id='real-claude-as-forge',
             phase='review', target_repo='ourliberty-agent-core',
             branch='feat/claude-direct',
             pr_url=PR_URL_FIXTURE,
@@ -8748,7 +8748,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
 
     def test_no_session_larry_source_with_chat_id_queues_dm(self):
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-claude-as-forge',
+            agent='mirror', source='larry', task_id='real-claude-as-forge',
             phase='review', target_repo='ourliberty-agent-core',
             branch='feat/claude-direct',
             pr_url=PR_URL_FIXTURE,
@@ -8778,10 +8778,10 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         self.assertEqual(rec['kind'], 'notification')
         self.assertEqual(rec['intent'], 'review-revision')
         self.assertEqual(rec['chat_id'], 12345)
-        self.assertEqual(rec['task_id'], 't-claude-as-forge')
+        self.assertEqual(rec['task_id'], 'real-claude-as-forge')
         body = rec['message']
         self.assertIn(PR_URL_FIXTURE, body)
-        self.assertIn('t-claude-as-forge', body)
+        self.assertIn('real-claude-as-forge', body)
         self.assertIn('no forge session', body.lower())
         self.assertIn('feat/claude-direct', body)
         self.assertIn('Two findings need addressing', body)
@@ -8797,7 +8797,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         # target a notification at, fall back to broadcast `append_alert`
         # so Larry still sees the rejection on the next bot sweep.
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-no-chat',
+            agent='mirror', source='larry', task_id='real-no-chat',
             phase='review', target_repo='ourliberty-agent-core',
             branch='feat/claude-direct',
             pr_url=PR_URL_FIXTURE,
@@ -8820,7 +8820,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         rec = alerts[0]
         self.assertEqual(rec.get('severity'), 'warning')
         self.assertNotEqual(rec.get('kind'), 'notification')  # broadcast, not chat-targeted
-        self.assertIn('t-no-chat', rec.get('subject', ''))
+        self.assertIn('real-no-chat', rec.get('subject', ''))
         self.assertIn('No Forge build session', rec.get('message', ''))
         self.assertIn('Add validation.', rec.get('message', ''))
 
@@ -8833,9 +8833,9 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         # The original WARN-only fallthrough was silent today on the
         # `feedback_claude_as_forge_boundaries` PR. Must now broadcast.
         data = _good_outbox(
-            agent='mirror', source='beacon', task_id='t-prop-bug',
+            agent='mirror', source='beacon', task_id='real-prop-bug',
             phase='review', target_repo='ourliberty-agent-core',
-            branch='forge/t-prop-bug',
+            branch='forge/real-prop-bug',
             pr_url=PR_URL_FIXTURE,
             result='Reviewed.',
         )
@@ -8853,14 +8853,14 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         rec = alerts[0]
         self.assertEqual(rec.get('severity'), 'warning')
         self.assertNotEqual(rec.get('kind'), 'notification')
-        self.assertIn('t-prop-bug', rec.get('subject', ''))
+        self.assertIn('real-prop-bug', rec.get('subject', ''))
         self.assertIn('beacon', rec.get('message', ''))
 
     # ---------------- DM body rendering: multi/single/empty findings ----------------
 
     def test_dm_body_renders_multi_finding_payload(self):
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-multi',
+            agent='mirror', source='larry', task_id='real-multi',
             phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
             result='Reviewed.',
         )
@@ -8880,7 +8880,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
 
     def test_dm_body_renders_single_finding_payload(self):
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-single',
+            agent='mirror', source='larry', task_id='real-single',
             phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
             result='Reviewed.',
         )
@@ -8899,7 +8899,7 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         # DM body must still render — summary line present, no Findings
         # header, next-step instruction intact.
         data = _good_outbox(
-            agent='mirror', source='larry', task_id='t-summary-only',
+            agent='mirror', source='larry', task_id='real-summary-only',
             phase='review', branch='feat/x', pr_url=PR_URL_FIXTURE,
             result='Reviewed.',
         )
@@ -8999,6 +8999,144 @@ class PrUrlAllowlistAndRewriteTest(unittest.TestCase):
             result,
             'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107/files',
         )
+
+
+class OutboxFixtureGateTest(unittest.TestCase):
+    """Outbox-side fixture-pattern allowlist gate (extend-fixture-gate-outbox-side).
+
+    The gate fires at the top of process_outbox and short-circuits any outbox
+    file whose stem matches a fixture pattern (via matched_fixture_envelope —
+    same single-source-of-truth allowlist used by inbox_watcher.py:415, Check
+    III/VIII/IX, and run_cycle.sh). The match is filename-only so partial /
+    malformed JSON in a fixture file still gets quarantined without invoking
+    the marker parser or burning an Opus cycle.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        self._tmp.cleanup()
+
+    def _write(self, agent: str, name: str, body: dict | str | None = None) -> Path:
+        outbox_dir = on.OUTBOXES_ROOT / agent
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        if body is None:
+            body = _good_outbox()
+        if isinstance(body, dict):
+            f.write_text(json.dumps(body))
+        else:
+            f.write_text(body)
+        return f
+
+    def test_t_prefix_fixture_filename_quarantined(self):
+        # `t-bad-rev.5.json` — the documented 23-burn half of the cost-loop.
+        f = self._write('forge', 't-bad-rev.5.json')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        # File moved into <outbox>/.fixture-quarantine/ — original gone.
+        self.assertFalse(f.exists())
+        dest = on.OUTBOXES_ROOT / 'forge' / '.fixture-quarantine' / 't-bad-rev.5.json'
+        self.assertTrue(dest.exists())
+        # No marker-error notify written to Forge's inbox.
+        forge_inbox = on.INBOXES_ROOT / 'forge'
+        if forge_inbox.is_dir():
+            self.assertEqual(list(forge_inbox.glob('marker-error-*.json')), [])
+
+    def test_envelope_id_fixture_filename_quarantined(self):
+        # `envelope-id.20.json` — the documented 54-burn half (added to
+        # FIXTURE_PATTERN_EXACT in this PR).
+        f = self._write('forge', 'envelope-id.20.json')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        dest = on.OUTBOXES_ROOT / 'forge' / '.fixture-quarantine' / 'envelope-id.20.json'
+        self.assertTrue(dest.exists())
+
+    def test_envelope_id_collision_suffix_quarantined(self):
+        # `envelope-id.54.json` — _strip_seq_suffix peels the `.54`
+        # collision suffix so the bare `envelope-id` matches EXACT. The
+        # 58 archived envelope-id outboxes from the documented loop all
+        # have this `.N` shape (verified via find on ~/agents/outboxes/).
+        f = self._write('forge', 'envelope-id.54.json')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        dest = on.OUTBOXES_ROOT / 'forge' / '.fixture-quarantine' / 'envelope-id.54.json'
+        self.assertTrue(dest.exists())
+
+    def test_notify_t_fixture_wrapper_quarantined(self):
+        # `notify-t-pf-answer.json` — wrapper-peel hits `t-` prefix.
+        f = self._write('beacon', 'notify-t-pf-answer.json')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        dest = (
+            on.OUTBOXES_ROOT / 'beacon' / '.fixture-quarantine'
+            / 'notify-t-pf-answer.json'
+        )
+        self.assertTrue(dest.exists())
+
+    def test_non_fixture_outbox_falls_through(self):
+        # Real task_id passes the gate and continues to existing routing
+        # (the body has source='pulse' → notify back to pulse). Regression
+        # guard for the "non-fixture happy path".
+        body = _good_outbox(agent='beacon', source='pulse', task_id='real-1')
+        f = self._write('beacon', 'real-1.json', body)
+        # Need safe_write_inbox sandboxed too so the notify lands in tmp.
+        swi_inboxes_backup = swi.INBOXES_ROOT
+        swi_agents_backup = swi.AGENTS_ROOT
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        try:
+            self.assertEqual(on.process_outbox(f), 'notified')
+        finally:
+            swi.AGENTS_ROOT = swi_agents_backup
+            swi.INBOXES_ROOT = swi_inboxes_backup
+        # No fixture-quarantine directory was created.
+        self.assertFalse((on.OUTBOXES_ROOT / 'beacon' / '.fixture-quarantine').exists())
+
+    def test_quarantine_dir_created_on_first_use(self):
+        # `.fixture-quarantine/` does not pre-exist; gate creates it.
+        outbox_dir = on.OUTBOXES_ROOT / 'forge'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        qdir = outbox_dir / '.fixture-quarantine'
+        self.assertFalse(qdir.exists())
+        f = self._write('forge', 't-loop.json')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        self.assertTrue(qdir.is_dir())
+
+    def test_quarantine_preserves_filename_for_forensics(self):
+        # Filename is preserved verbatim under .fixture-quarantine/ so an
+        # operator can inspect what was quarantined and when.
+        f = self._write('forge', 't-bad-rev.17.json')
+        on.process_outbox(f)
+        dest = on.OUTBOXES_ROOT / 'forge' / '.fixture-quarantine' / 't-bad-rev.17.json'
+        self.assertTrue(dest.exists())
+        body = json.loads(dest.read_text())
+        self.assertEqual(body['task_id'], 'real-001')  # _good_outbox default
+
+    def test_fixture_quarantine_runs_before_json_parse(self):
+        # Partial / malformed JSON in a fixture filename should still
+        # quarantine cleanly — the gate matches filename only, no read.
+        # This is the cost-saving property: bad fixture content never
+        # reaches the marker parser or the Opus session.
+        f = self._write('forge', 't-pf-bad.json', body='{not-json}')
+        self.assertEqual(on.process_outbox(f), 'fixture-quarantined')
+        dest = on.OUTBOXES_ROOT / 'forge' / '.fixture-quarantine' / 't-pf-bad.json'
+        self.assertTrue(dest.exists())
 
 
 if __name__ == '__main__':
