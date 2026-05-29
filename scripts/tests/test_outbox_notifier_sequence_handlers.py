@@ -882,5 +882,230 @@ class SignalSequenceStepMergedRobustness(SignalSequenceStepMergedHarness):
         )
 
 
+# ============================================================================
+# Regression: V6 hook fires from EVERY auto-merge chokepoint caller
+# ============================================================================
+#
+# 2026-05-29 silent-miss on `operator-ux-rollout` step `step-rescue-runbook`
+# (dashboard PR #21): `_auto_merge_pr` logged `outcome=merged` but no
+# `SEQUENCE_STEP_MERGED` line followed. Root cause: V6 was wired only
+# at the marker-routing call site in `process_outbox`, so PRs that
+# merged via `_queue_release` (blocker resolves and re-attempts queued
+# entries) or `_auto_merge_queue_sweep` (UNKNOWN-retry) silently
+# skipped the sequence-state propagation. Fix: V6 hook lives inside
+# `_attempt_auto_merge_with_gates` — the single chokepoint all three
+# callers share. These tests lock that contract in.
+
+
+class AutoMergeChokepointFiresV6Hook(SignalSequenceStepMergedHarness):
+    """V6 must fire from `_attempt_auto_merge_with_gates` regardless of
+    which caller drove it."""
+
+    def setUp(self):
+        super().setUp()
+        # Reroute the auto-merge queue file so _queue_push / _queue_release
+        # write to tmpdir, not the droplet's real state file.
+        self._orig_queue_file = on.AUTO_MERGE_QUEUE_FILE
+        on.AUTO_MERGE_QUEUE_FILE = (
+            self._root / 'state' / 'auto-merge-queue.json'
+        )
+        (self._root / 'state').mkdir(parents=True, exist_ok=True)
+
+        # Install the test-bypass: skip serializer gates, swap merge_fn
+        # for a stub returning a clean 'merged' outcome. The bypass is
+        # also a chokepoint caller (see _attempt_auto_merge_with_gates'
+        # early-return branch), so V6 must fire from it too.
+        self._orig_skip = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        self._orig_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = True
+        on._AUTO_MERGE_FN_OVERRIDE = self._make_merge_stub('merged')
+
+    def tearDown(self):
+        on._AUTO_MERGE_QUEUE_FILE = self._orig_queue_file
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._orig_skip
+        on._AUTO_MERGE_FN_OVERRIDE = self._orig_override
+        super().tearDown()
+
+    def _make_merge_stub(self, outcome):
+        """Return a stand-in for `_auto_merge_pr` that records calls
+        and returns a fixed outcome."""
+        self._merge_calls = []
+
+        def _stub(pr_url, task_id):
+            self._merge_calls.append((pr_url, task_id))
+            return {
+                'merge_outcome': outcome,
+                'merge_reason': f'stub: {outcome}',
+                'pr_number': 21,
+                'repo_coords': 'Larry-Yatch/ourliberty-dashboard',
+            }
+        return _stub
+
+    def _push_queue_entry(self, pr_number, task_id, blocker_pr_number,
+                          repo='Larry-Yatch/ourliberty-dashboard'):
+        """Seed an auto-merge queue entry shaped like the real serializer
+        writes (see `_attempt_auto_merge_with_gates` line ~4298)."""
+        on._queue_push({
+            'pr_number': pr_number,
+            'task_id': task_id,
+            'repo': repo,
+            'pr_url': f'https://github.com/{repo}/pull/{pr_number}',
+            'changed_files': ['some/file.py'],
+            'queued_at': '2026-05-29T06:24:00Z',
+            'blocker_pr_number': blocker_pr_number,
+            'watchdog_dm_sent': False,
+            'unknown_attempts': 0,
+            'reply_chat_id': None,
+            'summary': 'queued behind blocker',
+        })
+
+    # --- chokepoint-direct (marker-routing analogue) ---
+
+    def test_direct_attempt_fires_v6_on_merged(self):
+        # Equivalent to the marker-routing call site: a Mirror PASS that
+        # reaches the gate, passes, and merges cleanly. V6 must fire.
+        seq = self._make_active_sequence(
+            seq_id='operator-ux-rollout',
+            dispatched_step='step-rescue-runbook',
+        )
+        self._write_sequence(seq)
+
+        result = on._attempt_auto_merge_with_gates(
+            pr_url='https://github.com/Larry-Yatch/ourliberty-dashboard/pull/21',
+            repo_coords='Larry-Yatch/ourliberty-dashboard',
+            pr_number=21,
+            task_id='step-rescue-runbook',
+            summary='step body',
+            chat_id=None,
+            changed_files=['app/foo.py'],
+        )
+        self.assertEqual(result['merge_outcome'], 'merged')
+        on_disk = self._read_sequence('operator-ux-rollout')
+        step = next(
+            s for s in on_disk['steps']
+            if s['step_id'] == 'step-rescue-runbook'
+        )
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(
+            step['pr_url'],
+            'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/21',
+        )
+        self.assertNotIn(
+            'step-rescue-runbook', on_disk['current_steps'],
+        )
+
+    # --- _queue_release (the 2026-05-29 silent-miss path) ---
+
+    def test_queue_release_fires_v6_on_merged(self):
+        # The exact regression: step-rescue-runbook was queued behind
+        # blocker PR #184; when #184 merged, _queue_release re-attempted
+        # PR #21 via _attempt_auto_merge_with_gates -> merged -> the V6
+        # hook MUST fire so the sequence file flips to 'merged' instead
+        # of staying 'dispatched' for hours.
+        seq = self._make_active_sequence(
+            seq_id='operator-ux-rollout',
+            dispatched_step='step-rescue-runbook',
+        )
+        self._write_sequence(seq)
+        self._push_queue_entry(
+            pr_number=21,
+            task_id='step-rescue-runbook',
+            blocker_pr_number=184,
+        )
+
+        on._queue_release(merged_pr_number=184,
+                          repo_coords='Larry-Yatch/ourliberty-dashboard')
+
+        # Merge stub was invoked exactly once for the released entry.
+        self.assertEqual(len(self._merge_calls), 1)
+        self.assertEqual(self._merge_calls[0][1], 'step-rescue-runbook')
+        # The queue is now drained.
+        self.assertEqual(on._load_auto_merge_queue(), [])
+        # V6 hook fired — sequence file's step is now merged.
+        on_disk = self._read_sequence('operator-ux-rollout')
+        step = next(
+            s for s in on_disk['steps']
+            if s['step_id'] == 'step-rescue-runbook'
+        )
+        self.assertEqual(step['status'], 'merged')
+        self.assertNotIn(
+            'step-rescue-runbook', on_disk['current_steps'],
+        )
+        # An audit-log entry was appended by apply_step_merged.
+        events = [e['event'] for e in on_disk['audit_log']]
+        self.assertIn('step-merged', events)
+
+    # --- _auto_merge_queue_sweep UNKNOWN-retry ---
+
+    def test_queue_sweep_unknown_retry_fires_v6_on_merged(self):
+        # Gate 2 deferred this PR one tick (UNKNOWN). The sweep retries
+        # with second_attempt_on_unknown=True. The retry merges. V6 must
+        # fire even on this path.
+        seq = self._make_active_sequence(
+            seq_id='operator-ux-rollout',
+            dispatched_step='step-rescue-runbook',
+        )
+        self._write_sequence(seq)
+        # UNKNOWN-deferred entries have blocker_pr_number=None and
+        # unknown_attempts>=1 (see _attempt_auto_merge_with_gates ~4347).
+        on._queue_push({
+            'pr_number': 21,
+            'task_id': 'step-rescue-runbook',
+            'repo': 'Larry-Yatch/ourliberty-dashboard',
+            'pr_url': (
+                'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/21'
+            ),
+            'changed_files': ['app/foo.py'],
+            'queued_at': '2026-05-29T06:24:00Z',
+            'blocker_pr_number': None,
+            'watchdog_dm_sent': False,
+            'unknown_attempts': 1,
+            'reply_chat_id': None,
+            'summary': 'deferred',
+        })
+
+        on._auto_merge_queue_sweep()
+
+        on_disk = self._read_sequence('operator-ux-rollout')
+        step = next(
+            s for s in on_disk['steps']
+            if s['step_id'] == 'step-rescue-runbook'
+        )
+        self.assertEqual(step['status'], 'merged')
+
+    # --- idempotency: chokepoint fire once per merge, not double ---
+
+    def test_chokepoint_fires_v6_exactly_once_per_merge(self):
+        # The marker-routing block used to call V6 directly; the
+        # chokepoint refactor removed that duplicate. Verify there's no
+        # double-fire — apply_step_merged is invoked exactly once per
+        # successful merge (audit_log gains exactly one 'step-merged'
+        # entry).
+        seq = self._make_active_sequence(
+            seq_id='operator-ux-rollout',
+            dispatched_step='step-rescue-runbook',
+        )
+        self._write_sequence(seq)
+
+        on._attempt_auto_merge_with_gates(
+            pr_url=(
+                'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/21'
+            ),
+            repo_coords='Larry-Yatch/ourliberty-dashboard',
+            pr_number=21,
+            task_id='step-rescue-runbook',
+            summary='',
+            chat_id=None,
+            changed_files=['app/foo.py'],
+        )
+
+        on_disk = self._read_sequence('operator-ux-rollout')
+        step_merged_events = [
+            e for e in on_disk['audit_log']
+            if e['event'] == 'step-merged'
+        ]
+        self.assertEqual(len(step_merged_events), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

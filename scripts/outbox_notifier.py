@@ -3620,10 +3620,20 @@ def _signal_sequence_step_merged(
     status `dispatched → merged`, record `pr_url` + `merged_at`, and
     remove the step from `current_steps`.
 
-    Fired AFTER `_attempt_auto_merge_with_gates` returns
-    `merge_outcome in {merged, already_merged}` from the marker-routing
-    block. Without this signal the build_sequence_advancer never observes
-    the merge — bootstrap-002 V6 surfaced exactly that wedge (step
+    Fired from inside `_attempt_auto_merge_with_gates` whenever
+    `merge_outcome ∈ {merged, already_merged}`, regardless of which
+    caller drove the gate (marker-routing for fresh Mirror PASSes,
+    `_queue_release` for blocked-then-released PRs, or
+    `_auto_merge_queue_sweep` for UNKNOWN-retry releases). Centralizing
+    here closes the 2026-05-29 silent-miss: previously the hook lived
+    only at the marker-routing call site, so PRs that merged via the
+    release/retry paths (e.g. `step-rescue-runbook` PR #21 on
+    `operator-ux-rollout`) succeeded without ever signalling the
+    sequence — sequence.current_steps stayed stale until manual
+    `apply_step_merged`.
+
+    Without this signal the build_sequence_advancer never observes
+    the merge — bootstrap-002 V6 surfaced the original wedge (step
     merged at 17:36 MDT; sequence.current_steps still listed it 9 hours
     later until manual cancel).
 
@@ -4263,14 +4273,25 @@ def _attempt_auto_merge_with_gates(
     if _AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST:
         merge_fn = _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr
         try:
-            return merge_fn(pr_url, task_id)
+            bypass_result = merge_fn(pr_url, task_id)
         except Exception as e:  # noqa: BLE001 — daemon-never-wedge
-            return {
+            bypass_result = {
                 'merge_outcome': 'failed',
                 'merge_reason': f'override raised: {type(e).__name__}: {e}',
                 'pr_number': pr_number,
                 'repo_coords': repo_coords,
             }
+        # V6 hook also fires on the test-bypass path so the chokepoint
+        # contract is uniform. The helper is a no-op when no sequences
+        # directory exists (the case for the D3.5 5d render tests that
+        # use this bypass), so existing tests are unaffected.
+        if bypass_result.get('merge_outcome') in ('merged', 'already_merged'):
+            _signal_sequence_step_merged(
+                task_id=task_id,
+                pr_url=pr_url,
+                merged_at_iso=datetime.now(timezone.utc).isoformat(),
+            )
+        return bypass_result
 
     # Fail-closed gate (highest priority — never merge when queue is corrupt).
     if _AUTO_MERGE_QUEUE_FAIL_CLOSED:
@@ -4395,6 +4416,20 @@ def _attempt_auto_merge_with_gates(
             'pr_number': pr_number,
             'repo_coords': repo_coords,
         }
+
+    # V6 (orchestrator-rectification-v2): propagate the merge to any active
+    # sequence whose step_id matches `task_id`. Centralized here so all
+    # three callers of this chokepoint — the marker-routing block,
+    # _queue_release (post-blocker), and _auto_merge_queue_sweep
+    # (UNKNOWN-retry) — fire the hook exactly once per merge. Fired
+    # before _queue_release so the merged step's sequence-state
+    # propagation lands before any chained release work begins.
+    if result.get('merge_outcome') in ('merged', 'already_merged'):
+        _signal_sequence_step_merged(
+            task_id=task_id,
+            pr_url=pr_url,
+            merged_at_iso=datetime.now(timezone.utc).isoformat(),
+        )
 
     # Post-merge release: if this PR merged successfully, re-attempt every
     # queue entry that was blocked behind it.
@@ -6516,16 +6551,10 @@ def process_outbox(outbox_file: Path) -> str:
                         }
                 marker_decision['merge_result'] = merge_result
                 marker_decision['merge_outcome'] = merge_result['merge_outcome']
-                # V6 (orchestrator-rectification-v2): when this PR merged
-                # successfully, propagate the signal to any active sequence
-                # whose step_id matches data['task_id']. Best-effort; the DM
-                # path below is unaffected by failure here.
-                if merge_result.get('merge_outcome') in ('merged', 'already_merged'):
-                    _signal_sequence_step_merged(
-                        task_id=str(data.get('task_id') or ''),
-                        pr_url=pr_url,
-                        merged_at_iso=datetime.now(timezone.utc).isoformat(),
-                    )
+                # V6 step-merged signal fires inside
+                # `_attempt_auto_merge_with_gates` so every merge path
+                # (marker-routing here, _queue_release, sweep
+                # UNKNOWN-retry) propagates exactly once.
             else:
                 # Mirror PASS without a pr_url is malformed; the marker
                 # parser would normally catch this, but defensive — render
