@@ -97,7 +97,7 @@
     {
       "id": "operator-ux-clarify-visibility",
       "name": "CLARIFY round visibility on Missions cards",
-      "phase": "drafting",
+      "phase": "deferred",
       "brief": "Surface the Forge↔Beacon CLARIFY round-trip Q&A on Missions-tab card side-panel. Today the operator only learns CLARIFY-exhausted post-mortem from logs. Read-only v1; later optional 'intervene' affordance.",
       "spec_docs": [
         "agents/beacon/specs/operator-ux-clarify-visibility.md"
@@ -105,6 +105,19 @@
       "task_ids": [],
       "repo": "ourliberty-dashboard",
       "created": "2026-05-28",
+      "deferred_reason": "Superseded by clarify-round-visibility mission (full Q+A scope) per 2026-05-29 design pass. Stub spec only contemplated question-side; complete feature lives in agents/beacon/specs/clarify-round-visibility.md."
+    },
+    {
+      "id": "clarify-round-visibility",
+      "name": "CLARIFY round visibility — full Q+A on Missions cards",
+      "phase": "ready",
+      "brief": "Render the full Forge↔Beacon CLARIFY round-trip (questions AND answers) on Missions tab side-panel. Supersedes stub operator-ux-clarify-visibility (answer side gap surfaced 2026-05-29). 2-step sequence: agent-core chain_event_shipper extension + dashboard ClarifyRoundDrawer component.",
+      "spec_docs": [
+        "agents/beacon/specs/clarify-round-visibility.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-29",
       "deferred_reason": null
     }
   ]
