@@ -9,15 +9,21 @@ fires from /cycle on Mondays alongside Check I, observes the ledger over a
 trailing 4w window, and proposes threshold adjustments per doctrine #48
 (self-optimizing config via Pulse Check pattern).
 
+2026-05-28 re-base: the burn-rate healer now meters a quota-consuming
+token-volume proxy (input+output+cache_creation) against
+`tier1_quota.max_5h_token_threshold`, not a dollar sum against
+`max_5h_spend_threshold_usd`. This analyzer parses the new DM body shape
+and proposes token-denominated raise/lower thresholds.
+
 Inputs (read-only, no LLM calls):
 
   - `~/agents/blackboard/larry-alerts.jsonl` entries where
     `source == 'heal-claude-max-burn-rate'` over the trailing 4w (28d).
   - `~/agents/blackboard/anthropic-quota-events.jsonl` events over the
     trailing 4w (28d) plus an 8w (56d) lookback for the deprecate rule.
-  - `~/agents/blackboard/costs.jsonl` for rolling-5h spend at FN-event
-    timestamps (used to compute the LOWER proposal target).
-  - `config/agent-models.json:tier1_quota.max_5h_spend_threshold_usd` as
+  - `~/agents/blackboard/costs.jsonl` for rolling-5h token volume at
+    FN-event timestamps (used to compute the LOWER proposal target).
+  - `config/agent-models.json:tier1_quota.max_5h_token_threshold` as
     the current threshold.
 
 Classification (per spec):
@@ -34,14 +40,14 @@ Proposal-firing rules (priority: deprecate > defer > raise > lower):
 
   - **deprecate** — TP == 0 across trailing 8w with >= 5 quota-events in
     that 8w window. Signal has no observable predictive value; propose
-    removing the dollar gate.
+    removing the token gate.
   - **defer** — precision < 0.4 (>= 5 DMs) AND recall < 0.6 (>= 3 events)
     both fire. DM Larry the metric tension; emit no proposal artifact.
   - **raise** — precision < 0.4 with >= 5 DMs. Propose raising threshold
-    to 75th-percentile spend at TP events, or +20% if no TPs.
+    to 75th-percentile token usage at TP events, or +20% if no TPs.
   - **lower** — recall < 0.6 with >= 3 quota-events. Propose lowering
-    threshold to 75th-percentile rolling-5h spend at FN events, or -20%
-    if no FNs.
+    threshold to 75th-percentile rolling-5h token volume at FN events, or
+    -20% if no FNs.
   - **insufficient_signal** — DM_count < 5 OR event_count < 3 (4w window).
     No proposal, no DM.
   - **none** — none of the above; healer is well-calibrated this week.
@@ -93,7 +99,7 @@ RECALL_FLOOR = 0.6
 RAISE_FALLBACK_PCT = 0.20           # +20% if no TPs
 LOWER_FALLBACK_PCT = 0.20           # -20% if no FNs
 
-DEFAULT_THRESHOLD_USD = 60.0        # fallback when config unreadable
+DEFAULT_THRESHOLD_TOKENS = 10_000_000  # fallback when config unreadable
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -120,8 +126,8 @@ def log(msg: str, level: str = 'INFO') -> None:
 @dataclass
 class BurnRateDM:
     ts: datetime
-    spend_usd: float
-    threshold_usd: float
+    usage_tokens: int
+    threshold_tokens: int
 
 
 @dataclass
@@ -134,12 +140,13 @@ class QuotaEvent:
 @dataclass
 class CostEntry:
     ts: datetime
-    cost_usd: float
+    usage_tokens: int
 
 
-# DM body shape from heal_claude_max_burn_rate.py:
-#   "...dollar gate ($60.00 of $75.00)..."
-_DM_SPEND_RE = re.compile(r'\$(\d+(?:\.\d+)?)\s+of\s+\$(\d+(?:\.\d+)?)')
+# DM body shape from heal_claude_max_burn_rate.py (post 2026-05-28 re-base):
+#   "...token gate (8,432,109 of 10,000,000 tokens; ...)"
+# Commas are allowed in either number so the human-readable body parses cleanly.
+_DM_USAGE_RE = re.compile(r'\(([\d,]+)\s+of\s+([\d,]+)\s+tokens')
 
 
 def _parse_ts(ts_str: Any) -> Optional[datetime]:
@@ -157,17 +164,19 @@ def _parse_ts(ts_str: Any) -> Optional[datetime]:
     return dt
 
 
-def parse_dm_body(body: str) -> Optional[tuple[float, float]]:
-    """Extract (spend_usd, threshold_usd) from a burn-rate DM body. Returns
-    None if the body doesn't match the expected shape (e.g. older record
-    pre-PR-2a reframe)."""
+def parse_dm_body(body: str) -> Optional[tuple[int, int]]:
+    """Extract (usage_tokens, threshold_tokens) from a burn-rate DM body.
+    Returns None if the body doesn't match the expected shape (e.g. older
+    pre-re-base record with dollar denomination)."""
     if not isinstance(body, str):
         return None
-    m = _DM_SPEND_RE.search(body)
+    m = _DM_USAGE_RE.search(body)
     if not m:
         return None
     try:
-        return float(m.group(1)), float(m.group(2))
+        usage = int(m.group(1).replace(',', ''))
+        threshold = int(m.group(2).replace(',', ''))
+        return usage, threshold
     except ValueError:
         return None
 
@@ -205,8 +214,9 @@ def load_burn_rate_dms(
                 parsed = parse_dm_body(rec.get('message', ''))
                 if parsed is None:
                     continue
-                spend, threshold = parsed
-                out.append(BurnRateDM(ts=ts, spend_usd=spend, threshold_usd=threshold))
+                usage, threshold = parsed
+                out.append(BurnRateDM(ts=ts, usage_tokens=usage,
+                                      threshold_tokens=threshold))
     except OSError as e:
         log(f'read {alerts_path} failed: {e}', 'WARN')
         return []
@@ -263,13 +273,16 @@ def load_cost_entries(
     lookback_days: int = LOOKBACK_DAYS,
 ) -> list[CostEntry]:
     """Read costs.jsonl entries inside the trailing window (used to compute
-    rolling 5h spend at FN-event timestamps)."""
+    rolling-5h token volume at FN-event timestamps). Mirrors the healer's
+    token-volume definition: input + output + cache_creation. cache_read
+    is excluded — it's the largely-free cached re-read and is not the
+    right quota signal."""
     if not costs_path.exists():
         return []
     if now is None:
         now = datetime.now(timezone.utc)
     # Pad cutoff by the 5h window so a FN event near the edge can still
-    # see the costs that contributed to its rolling sum.
+    # see the tokens that contributed to its rolling sum.
     cutoff = now - timedelta(days=lookback_days, hours=COSTS_ROLLING_WINDOW_HOURS)
     out: list[CostEntry] = []
     try:
@@ -287,28 +300,33 @@ def load_cost_entries(
                 ts = _parse_ts(rec.get('ts'))
                 if ts is None or ts < cutoff:
                     continue
-                cost = rec.get('cost_usd')
-                if not isinstance(cost, (int, float)):
+                tokens = 0
+                for key in ('input_tokens', 'output_tokens', 'cache_creation'):
+                    v = rec.get(key, 0)
+                    if isinstance(v, (int, float)) and v > 0:
+                        tokens += int(v)
+                if tokens == 0:
                     continue
-                out.append(CostEntry(ts=ts, cost_usd=float(cost)))
+                out.append(CostEntry(ts=ts, usage_tokens=tokens))
     except OSError as e:
         log(f'read {costs_path} failed: {e}', 'WARN')
         return []
     return out
 
 
-def rolling_5h_spend_at(
+def rolling_5h_tokens_at(
     target_ts: datetime,
     costs: Iterable[CostEntry],
     *,
     window_hours: int = COSTS_ROLLING_WINDOW_HOURS,
-) -> float:
-    """Sum cost_usd over [target_ts - window, target_ts]. Used to estimate
-    spend at the moment of an FN event (no DM in the 2h before, so we read
-    costs.jsonl directly to learn what spend the healer would have seen)."""
+) -> int:
+    """Sum quota-consuming tokens over [target_ts - window, target_ts]. Used
+    to estimate the volume the healer would have seen at the moment of an
+    FN event (no DM in the 2h before, so we read costs.jsonl directly to
+    learn what usage the healer would have summed)."""
     window_start = target_ts - timedelta(hours=window_hours)
     return sum(
-        c.cost_usd for c in costs
+        c.usage_tokens for c in costs
         if window_start <= c.ts <= target_ts
     )
 
@@ -373,10 +391,13 @@ def classify_events(
 class ProposalResult:
     """Output of run_check. `rule_fired` is one of:
       raise, lower, deprecate, defer, insufficient_signal, none.
+
+    Threshold values are token counts (post 2026-05-28 re-base) — the field
+    names stay unit-agnostic so the artifact schema doesn't churn.
     """
     rule_fired: str
-    current_threshold_usd: float
-    proposed_threshold_usd: Optional[float]   # None when no config change
+    current_threshold_tokens: int
+    proposed_threshold_tokens: Optional[int]   # None when no config change
     tp_count: int
     fp_count: int
     fn_count: int
@@ -421,7 +442,7 @@ def run_check(
     dms: list[BurnRateDM],
     events: list[QuotaEvent],
     costs: Optional[list[CostEntry]] = None,
-    current_threshold_usd: float,
+    current_threshold_tokens: int,
     now: Optional[datetime] = None,
     lookback_days: int = LOOKBACK_DAYS,
     deprecate_lookback_days: int = DEPRECATE_LOOKBACK_DAYS,
@@ -466,13 +487,13 @@ def run_check(
     def _result(
         rule: str,
         *,
-        proposed: Optional[float],
+        proposed: Optional[int],
         rationale: str,
     ) -> ProposalResult:
         return ProposalResult(
             rule_fired=rule,
-            current_threshold_usd=current_threshold_usd,
-            proposed_threshold_usd=proposed,
+            current_threshold_tokens=current_threshold_tokens,
+            proposed_threshold_tokens=proposed,
             tp_count=tp_count, fp_count=fp_count, fn_count=fn_count,
             dm_count=dm_count, event_count=event_count,
             precision=precision, recall=recall,
@@ -485,7 +506,7 @@ def run_check(
     if tp_count_8w == 0 and event_count_8w >= MIN_EVENTS_FOR_DEPRECATE:
         rationale = (
             f'TP=0 across trailing 8w with {event_count_8w} quota-events: '
-            'dollar gate has no observable predictive value. '
+            'token gate has no observable predictive value. '
             'Propose deprecating the gate entirely.'
         )
         return _result('deprecate', proposed=None, rationale=rationale)
@@ -521,44 +542,44 @@ def run_check(
 
     # 4. Raise.
     if raise_fires:
-        tp_spends = [tp.spend_usd for tp in tps]
-        if tp_spends:
-            proposed = round(compute_percentile(tp_spends, 0.75), 2)
-            target_source = f'75th-pct spend at {len(tp_spends)} TP DM(s)'
+        tp_usages = [float(tp.usage_tokens) for tp in tps]
+        if tp_usages:
+            proposed = int(round(compute_percentile(tp_usages, 0.75)))
+            target_source = f'75th-pct usage at {len(tp_usages)} TP DM(s)'
         else:
-            proposed = round(current_threshold_usd * (1 + RAISE_FALLBACK_PCT), 2)
+            proposed = int(round(current_threshold_tokens * (1 + RAISE_FALLBACK_PCT)))
             target_source = f'+{int(RAISE_FALLBACK_PCT * 100)}% (no TPs)'
         rationale = (
             f'precision={precision:.2f} (<{PRECISION_FLOOR}) over '
             f'{dm_count} DMs: too many FP alerts. Raise '
-            f'${current_threshold_usd:.2f} -> ${proposed:.2f} '
+            f'{current_threshold_tokens:,} -> {proposed:,} tokens '
             f'({target_source}).'
         )
         return _result('raise', proposed=proposed, rationale=rationale)
 
     # 5. Lower.
     if lower_fires:
-        fn_spends: list[float] = []
+        fn_usages: list[float] = []
         for fn in fns:
-            s = rolling_5h_spend_at(fn.ts, costs)
-            if s > 0:
-                fn_spends.append(s)
-        if fn_spends:
-            proposed = round(compute_percentile(fn_spends, 0.75), 2)
+            t = rolling_5h_tokens_at(fn.ts, costs)
+            if t > 0:
+                fn_usages.append(float(t))
+        if fn_usages:
+            proposed = int(round(compute_percentile(fn_usages, 0.75)))
             target_source = (
-                f'75th-pct rolling-5h spend at {len(fn_spends)} '
+                f'75th-pct rolling-5h usage at {len(fn_usages)} '
                 f'FN event(s) (of {fn_count})'
             )
         else:
-            proposed = round(current_threshold_usd * (1 - LOWER_FALLBACK_PCT), 2)
+            proposed = int(round(current_threshold_tokens * (1 - LOWER_FALLBACK_PCT)))
             target_source = (
                 f'-{int(LOWER_FALLBACK_PCT * 100)}% '
-                '(no spend data at FN events)'
+                '(no usage data at FN events)'
             )
         rationale = (
             f'recall={recall:.2f} (<{RECALL_FLOOR}) over '
             f'{event_count} events: too many FN events slip past the gate. '
-            f'Lower ${current_threshold_usd:.2f} -> ${proposed:.2f} '
+            f'Lower {current_threshold_tokens:,} -> {proposed:,} tokens '
             f'({target_source}).'
         )
         return _result('lower', proposed=proposed, rationale=rationale)
@@ -580,8 +601,9 @@ def build_artifact(result: ProposalResult) -> dict[str, Any]:
         'as_of': result.as_of_iso,
         'week_anchor': result.week_anchor,
         'rule_fired': result.rule_fired,
-        'current_threshold': result.current_threshold_usd,
-        'proposed_threshold': result.proposed_threshold_usd,
+        'unit': 'tokens',
+        'current_threshold': result.current_threshold_tokens,
+        'proposed_threshold': result.proposed_threshold_tokens,
         'sample_sizes': {
             'TP': result.tp_count,
             'FP': result.fp_count,
@@ -619,12 +641,12 @@ def format_digest(artifact: dict[str, Any]) -> str:
     date_str = artifact['as_of'][:10]
 
     def _amt(x: Optional[float]) -> str:
-        return f'${x:.2f}' if isinstance(x, (int, float)) else '—'
+        return f'{int(x):,} tokens' if isinstance(x, (int, float)) else '—'
 
     header_map = {
-        'raise': 'Check VIII — propose RAISE burn-rate dollar gate',
-        'lower': 'Check VIII — propose LOWER burn-rate dollar gate',
-        'deprecate': 'Check VIII — propose DEPRECATE burn-rate dollar gate',
+        'raise': 'Check VIII — propose RAISE burn-rate token gate',
+        'lower': 'Check VIII — propose LOWER burn-rate token gate',
+        'deprecate': 'Check VIII — propose DEPRECATE burn-rate token gate',
         'defer': 'Check VIII — metric tension (defer, no proposal)',
         'insufficient_signal': 'Check VIII — insufficient signal',
         'none': 'Check VIII — no proposal (healer calibrated)',
@@ -700,26 +722,27 @@ def dm_digest(artifact: dict[str, Any]) -> bool:
 # -------------------- config IO --------------------
 
 
-def load_current_threshold(path: Path = AGENT_MODELS_CONFIG) -> float:
-    """Read tier1_quota.max_5h_spend_threshold_usd. Fail safe to the
-    DEFAULT_THRESHOLD_USD on any read/parse error."""
+def load_current_threshold(path: Path = AGENT_MODELS_CONFIG) -> int:
+    """Read tier1_quota.max_5h_token_threshold. Fail safe to the
+    DEFAULT_THRESHOLD_TOKENS on any read/parse error."""
     try:
         data = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as e:
         log(f'config read failed ({type(e).__name__}: {e}) — '
-            f'using default ${DEFAULT_THRESHOLD_USD}', 'WARN')
-        return DEFAULT_THRESHOLD_USD
+            f'using default {DEFAULT_THRESHOLD_TOKENS} tokens', 'WARN')
+        return DEFAULT_THRESHOLD_TOKENS
     block = data.get('tier1_quota')
     if not isinstance(block, dict):
         log(f'config missing tier1_quota — using default '
-            f'${DEFAULT_THRESHOLD_USD}', 'WARN')
-        return DEFAULT_THRESHOLD_USD
-    raw = block.get('max_5h_spend_threshold_usd')
+            f'{DEFAULT_THRESHOLD_TOKENS} tokens', 'WARN')
+        return DEFAULT_THRESHOLD_TOKENS
+    raw = block.get('max_5h_token_threshold')
     if not isinstance(raw, (int, float)) or raw <= 0:
-        log(f'config tier1_quota.max_5h_spend_threshold_usd invalid '
-            f'({raw!r}) — using default ${DEFAULT_THRESHOLD_USD}', 'WARN')
-        return DEFAULT_THRESHOLD_USD
-    return float(raw)
+        log(f'config tier1_quota.max_5h_token_threshold invalid '
+            f'({raw!r}) — using default {DEFAULT_THRESHOLD_TOKENS} tokens',
+            'WARN')
+        return DEFAULT_THRESHOLD_TOKENS
+    return int(raw)
 
 
 # -------------------- main --------------------
@@ -755,9 +778,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         dms = [
             BurnRateDM(
                 ts=_parse_ts(d['ts']) or now,
-                spend_usd=float(d['spend_usd']),
-                threshold_usd=float(d.get('threshold_usd',
-                                          current_threshold)),
+                usage_tokens=int(d['usage_tokens']),
+                threshold_tokens=int(d.get('threshold_tokens',
+                                           current_threshold)),
             )
             for d in raw.get('dms', [])
         ]
@@ -772,7 +795,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         ]
         costs = [
             CostEntry(ts=_parse_ts(c['ts']) or now,
-                      cost_usd=float(c['cost_usd']))
+                      usage_tokens=int(c['usage_tokens']))
             for c in raw.get('costs', [])
         ]
     else:
@@ -782,7 +805,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     result = run_check(
         dms=dms, events=events, costs=costs,
-        current_threshold_usd=current_threshold, now=now,
+        current_threshold_tokens=current_threshold, now=now,
     )
     artifact = build_artifact(result)
 
