@@ -8913,92 +8913,477 @@ class NoSessionRevisionDmTest(unittest.TestCase):
         self.assertIn('Mirror review', body)
 
 
-class PrUrlAllowlistAndRewriteTest(unittest.TestCase):
-    """Chain discipline v3 GAP 2 (2026-05-26).
+class PrUrlStructuralShapeCheckTest(unittest.TestCase):
+    """Layer 1 — pure regex shape check (no shell-out, no network).
 
-    PR #107 review surfaced Mirror emitting a pr_url with `lyatch/agent-core`
-    (missing 'L', stripped 'ourliberty-' prefix); AUTO_MERGE couldn't act.
-    `_validate_or_rewrite_pr_url` runs at the call site BEFORE _parse_pr_url
-    and either passes through (allowlisted), rewrites once + passes through
-    (known-wrong prefix variant), or fails closed (DM Larry; no merge).
+    Replaces the prior name-based allowlist + canonical-form rewrite
+    table. The discipline-correct fix is to validate intrinsic
+    properties of the pr_url (shape + existence), not surface forms of
+    the task_id, so the gate doesn't grow a fresh allowlist row every
+    time a new fixture family leaks into the outbox.
     """
 
-    def test_allowlisted_url_passes_through_unchanged(self):
-        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(result, url)
-        self.assertIsNone(reason)
-
-    def test_allowlisted_url_dashboard_passes_through(self):
-        url = 'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/42'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(result, url)
-        self.assertIsNone(reason)
-
-    def test_lyatch_owner_typo_rewritten_to_canonical(self):
-        # The PR #107 shape: missing 'L', missing 'ourliberty-' prefix.
-        url = 'https://github.com/lyatch/agent-core/pull/107'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(
-            result,
-            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107',
+    def test_canonical_agent_core_url_accepted(self):
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107'
         )
-        self.assertIsNotNone(reason)
-        self.assertIn('lyatch/agent-core', reason)
+        self.assertEqual(repo, 'Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(n, 107)
+        self.assertEqual(reason, 'ok')
 
-    def test_larryyatch_owner_no_hyphen_rewritten(self):
-        url = 'https://github.com/LarryYatch/dashboard/pull/9'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(
-            result,
-            'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/9',
+    def test_canonical_dashboard_url_accepted(self):
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/42'
         )
-        self.assertIsNotNone(reason)
+        self.assertEqual(repo, 'Larry-Yatch/ourliberty-dashboard')
+        self.assertEqual(n, 42)
+        self.assertEqual(reason, 'ok')
 
-    def test_lowercase_owner_only_rewritten(self):
-        # Owner is canonical-but-lowercased; repo is already canonical.
-        url = 'https://github.com/larry-yatch/ourliberty-agent-core/pull/3'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(
-            result,
-            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/3',
+    def test_wrong_owner_rejected(self):
+        # Old validator would rewrite `x/y` and fail closed via rewrite
+        # table; new validator just rejects on the regex anchor.
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/x/y/pull/5'
         )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
 
-    def test_unknown_owner_fails_closed(self):
-        url = 'https://github.com/some-attacker/malicious-repo/pull/1'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertIsNone(result)
-        self.assertIsNotNone(reason)
-        self.assertIn('not in allowlist', reason)
-
-    def test_unknown_repo_with_known_owner_fails_closed(self):
-        # Even with the correct owner, an unknown repo (not in the
-        # known-wrong rewrite table AND not allowlisted) must fail.
-        url = 'https://github.com/Larry-Yatch/some-other-repo/pull/1'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertIsNone(result)
-        self.assertIsNotNone(reason)
-
-    def test_malformed_url_fails_closed(self):
-        url = 'not-a-github-url'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertIsNone(result)
-        self.assertIsNotNone(reason)
-        self.assertIn('github.com PR shape', reason)
-
-    def test_empty_url_fails_closed(self):
-        result, reason = on._validate_or_rewrite_pr_url('')
-        self.assertIsNone(result)
-        self.assertIsNotNone(reason)
-
-    def test_url_with_trailing_path_preserved_after_rewrite(self):
-        # Anchor/fragment after the PR number should survive rewriting.
-        url = 'https://github.com/lyatch/agent-core/pull/107/files'
-        result, reason = on._validate_or_rewrite_pr_url(url)
-        self.assertEqual(
-            result,
-            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107/files',
+    def test_wrong_owner_case_rejected(self):
+        # 'ourliberty' as the owner (the 2026-05-29 incident shape).
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/ourliberty/ourliberty-agent-core/pull/3'
         )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+    def test_pr_number_zero_rejected(self):
+        # The crucial gap the old allowlist missed: pull/0 in a known
+        # repo. Old code accepted it because owner+repo matched; new
+        # code rejects because regex anchors the integer to [1-9]\d*.
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/0'
+        )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+    def test_not_a_url_rejected(self):
+        repo, n, reason = on._pr_url_shape_check('not-a-url')
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+    def test_empty_string_rejected(self):
+        repo, n, reason = on._pr_url_shape_check('')
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'empty-or-non-string')
+
+    def test_none_rejected(self):
+        repo, n, reason = on._pr_url_shape_check(None)
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'empty-or-non-string')
+
+    def test_trailing_path_rejected(self):
+        # Strictness check: `/files` after the PR number is rejected at
+        # this layer (the gate wants the exact form `gh pr merge` needs;
+        # trailing junk should be cleaned up upstream, not silently
+        # accepted by the AUTO_MERGE gate).
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/107/files'
+        )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+    def test_unknown_repo_with_correct_owner_rejected(self):
+        # Owner is right; repo is not one of the two allowed.
+        repo, n, reason = on._pr_url_shape_check(
+            'https://github.com/Larry-Yatch/some-other-repo/pull/1'
+        )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+    def test_http_scheme_rejected(self):
+        # https only — http is rejected (the gate is feeding gh pr merge
+        # which always uses https; accept-http is needless surface area).
+        repo, n, reason = on._pr_url_shape_check(
+            'http://github.com/Larry-Yatch/ourliberty-agent-core/pull/5'
+        )
+        self.assertIsNone(repo)
+        self.assertIsNone(n)
+        self.assertEqual(reason, 'shape-mismatch')
+
+
+class PrUrlExistenceStateTest(unittest.TestCase):
+    """Layer 2 — gh pr view --json state existence check.
+
+    Mocks subprocess.run directly so no network shell-out fires.
+    """
+
+    REPO = 'Larry-Yatch/ourliberty-agent-core'
+    PR = 42
+
+    def _proc(self, *, returncode=0, stdout='', stderr=''):
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    def test_open_state_returned(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertEqual(state, 'OPEN')
+        self.assertEqual(reason, 'ok')
+
+    def test_merged_state_returned(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'state': 'MERGED'}),
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertEqual(state, 'MERGED')
+        self.assertEqual(reason, 'ok')
+
+    def test_closed_state_returned(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'state': 'CLOSED'}),
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertEqual(state, 'CLOSED')
+        self.assertEqual(reason, 'ok')
+
+    def test_http_404_returns_none(self):
+        # gh pr view on a nonexistent PR exits non-zero with HTTP 404
+        # in stderr. Treated as not-found at the caller.
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=1,
+                stderr='HTTP 404: Not Found (https://api.github.com/repos/...)',
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertIsNone(state)
+        self.assertIn('404', reason)
+        self.assertIn('gh exit=1', reason)
+
+    def test_timeout_returns_none(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = on.subprocess.TimeoutExpired(
+                cmd=['gh'], timeout=on._PR_URL_EXISTENCE_TIMEOUT_S,
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertIsNone(state)
+        self.assertIn('timeout', reason)
+
+    def test_gh_missing_returns_none(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.side_effect = FileNotFoundError('gh')
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertIsNone(state)
+        self.assertIn('FileNotFoundError', reason)
+
+    def test_parse_error_returns_none(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(returncode=0, stdout='not json')
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertIsNone(state)
+        self.assertEqual(reason, 'parse-error')
+
+    def test_no_state_field_returns_none(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'unrelated': 'value'}),
+            )
+            state, reason = on._pr_url_existence_state(self.REPO, self.PR)
+        self.assertIsNone(state)
+        self.assertEqual(reason, 'no-state-field')
+
+    def test_uses_ten_second_timeout(self):
+        # Layer 2 timeout is intentionally tighter than the general
+        # _AUTO_MERGE_TIMEOUT_S so a degraded gh CLI doesn't stall
+        # the notifier poll loop.
+        self.assertEqual(on._PR_URL_EXISTENCE_TIMEOUT_S, 10)
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+            )
+            on._pr_url_existence_state(self.REPO, self.PR)
+        _, kwargs = m_run.call_args
+        self.assertEqual(kwargs.get('timeout'), 10)
+
+    def test_gh_command_shape(self):
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            m_run.return_value = self._proc(
+                returncode=0, stdout=json.dumps({'state': 'OPEN'}),
+            )
+            on._pr_url_existence_state(self.REPO, self.PR)
+        args, _ = m_run.call_args
+        cmd = args[0]
+        self.assertEqual(cmd[:3], ['gh', 'pr', 'view'])
+        self.assertIn('42', cmd)
+        self.assertIn('--repo', cmd)
+        self.assertIn(self.REPO, cmd)
+        self.assertIn('--json', cmd)
+        self.assertIn('state', cmd)
+
+
+class AutoMergeStructuralValidatorIntegrationTest(unittest.TestCase):
+    """process_outbox integration — confirms the two-layer validator
+    short-circuits the AUTO_MERGE shell-out on the cases the prior
+    name-based allowlist either missed (pull/0 in known repo,
+    pull/99999) or caught only by surface-form heuristic.
+
+    Layout mirrors MirrorMarkerRoutingTest (per-test tmp AGENTS_ROOT,
+    routing-validator sandbox, larry_alerts sandbox). Does NOT install
+    `_AUTO_MERGE_FN_OVERRIDE` — that flag triggers the test-mode
+    existence-check bypass at the call site. The explicit goal here is
+    to exercise the validator end-to-end.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        import larry_alerts as la
+        self._la_originals = {
+            'AGENTS_ROOT': la.AGENTS_ROOT,
+            'ALERTS_FILE': la.ALERTS_FILE,
+            'COOLDOWN_ROOT': la.COOLDOWN_ROOT,
+            'OFFSET_FILE': la.OFFSET_FILE,
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _make_pass_outbox(self, pr_url, task_id='real-rev'):
+        payload = json.dumps({
+            'task_id': task_id, 'pr_url': pr_url,
+            'summary': 'AC coverage clean.',
+        })
+        marker = (
+            f'=== REVIEW_PASS ===\n{payload}\n=== END_REVIEW_PASS ==='
+        )
+        body = _good_outbox(
+            agent='mirror', source='beacon', task_id=task_id, phase='review',
+            result='Reviewed.\n\n' + marker,
+        )
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / f'{task_id}.json'
+        f.write_text(json.dumps(body))
+        return f
+
+    def _beacon_notify_count(self):
+        beacon_inbox = on.INBOXES_ROOT / 'beacon'
+        if not beacon_inbox.is_dir():
+            return 0
+        return len(list(beacon_inbox.glob('notify-*.json')))
+
+    def _larry_dm_count(self):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return 0
+        return sum(1 for _ in la.ALERTS_FILE.read_text().splitlines() if _.strip())
+
+    # ---- Shape-invalid cases short-circuit before any gh shell-out ----
+
+    def test_wrong_owner_skipped_without_shellout(self):
+        f = self._make_pass_outbox('https://github.com/x/y/pull/5')
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_run.assert_not_called()
+        # No DM to Larry queued for the skip outcome.
+        self.assertEqual(self._larry_dm_count(), 0)
+
+    def test_known_repo_wrong_owner_case_skipped(self):
+        # The 2026-05-29 incident shape: owner='ourliberty' instead of
+        # 'Larry-Yatch'. Old allowlist correctly caught this — new
+        # validator's regex catches it too (more precisely: nothing
+        # outside `Larry-Yatch/<allowed>/pull/[1-9]\d*$` matches).
+        f = self._make_pass_outbox(
+            'https://github.com/ourliberty/ourliberty-agent-core/pull/3'
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_run.assert_not_called()
+
+    def test_pull_zero_in_known_repo_skipped(self):
+        # The crucial regression case. The old allowlist's repo-coords
+        # check accepted this because owner/repo were canonical; the
+        # shell-out to `gh pr merge 0` then wasted cycles + logged the
+        # 404. The new shape regex's [1-9]\d* anchor rejects it
+        # without any shell-out.
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/0'
+        )
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_run.assert_not_called()
+
+    def test_not_a_url_skipped(self):
+        f = self._make_pass_outbox('not-a-url')
+        with mock.patch.object(on.subprocess, 'run') as m_run:
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_run.assert_not_called()
+
+    # ---- Shape-valid + Layer-2 outcomes ----
+
+    def test_shape_valid_nonexistent_pr_skipped(self):
+        # The other side of the 2026-05-29 gap: `pull/99999` in
+        # ourliberty-agent-core. Shape valid (passes Layer 1) but the
+        # PR doesn't exist. `gh pr view` returns HTTP 404; skipped
+        # before any `gh pr merge` attempt.
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/99999'
+        )
+        view_proc = mock.MagicMock()
+        view_proc.returncode = 1
+        view_proc.stdout = ''
+        view_proc.stderr = 'HTTP 404: Not Found'
+        merge_called = []
+        def _fake_merge(*args, **kwargs):
+            merge_called.append(1)
+            raise AssertionError('gh pr merge MUST NOT be called on 404')
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates',
+                                  side_effect=_fake_merge):
+            m_run.return_value = view_proc
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        # Existence check fired exactly once; no merge attempt.
+        self.assertEqual(m_run.call_count, 1)
+        self.assertEqual(merge_called, [])
+
+    def test_shape_valid_merged_pr_skipped_no_remerge(self):
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+        )
+        view_proc = mock.MagicMock()
+        view_proc.returncode = 0
+        view_proc.stdout = json.dumps({'state': 'MERGED'})
+        view_proc.stderr = ''
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates') as m_merge:
+            m_run.return_value = view_proc
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        # Existence check fired exactly once; no merge attempt.
+        self.assertEqual(m_run.call_count, 1)
+        m_merge.assert_not_called()
+
+    def test_shape_valid_closed_pr_skipped(self):
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+        )
+        view_proc = mock.MagicMock()
+        view_proc.returncode = 0
+        view_proc.stdout = json.dumps({'state': 'CLOSED'})
+        view_proc.stderr = ''
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates') as m_merge:
+            m_run.return_value = view_proc
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_merge.assert_not_called()
+
+    def test_shape_valid_open_pr_proceeds_to_merge(self):
+        # Happy path: Layer 1 passes, Layer 2 confirms OPEN, merge fires.
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+        )
+        view_proc = mock.MagicMock()
+        view_proc.returncode = 0
+        view_proc.stdout = json.dumps({'state': 'OPEN'})
+        view_proc.stderr = ''
+        merged_result = {
+            'merge_outcome': 'merged',
+            'merge_reason': 'squash-merged + branch deleted',
+            'pr_number': 42,
+            'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        with mock.patch.object(on.subprocess, 'run') as m_run, \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates',
+                                  return_value=merged_result) as m_merge:
+            m_run.return_value = view_proc
+            result = on.process_outbox(f)
+        self.assertIn(result, ('larry-direct-marker', 'notified-marker'))
+        # Existence check fired once.
+        self.assertEqual(m_run.call_count, 1)
+        # Merge fired exactly once with the canonical repo coords + PR#.
+        m_merge.assert_called_once()
+        _, kwargs = m_merge.call_args
+        self.assertEqual(kwargs['repo_coords'], 'Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(kwargs['pr_number'], 42)
+
+    def test_shape_valid_existence_check_timeout_skipped(self):
+        # Timeout is treated the same as not-found for safety — we
+        # never shell out to `gh pr merge` without first having
+        # confirmed PR existence.
+        f = self._make_pass_outbox(
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+        )
+        def _timeout(*args, **kwargs):
+            raise on.subprocess.TimeoutExpired(
+                cmd=['gh'], timeout=on._PR_URL_EXISTENCE_TIMEOUT_S,
+            )
+        with mock.patch.object(on.subprocess, 'run', side_effect=_timeout), \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates') as m_merge:
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        m_merge.assert_not_called()
 
 
 class OutboxFixtureGateTest(unittest.TestCase):
