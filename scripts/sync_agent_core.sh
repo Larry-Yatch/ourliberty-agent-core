@@ -131,6 +131,64 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
+# Pulse-runtime auto-commit (sync resilience). Closes the 2026-05-28 iter-98
+# incident class: an interactive Pulse /cycle leaves runbooks/cycle-journal.md,
+# runbooks/cycle-actions.jsonl, agents/pulse/MEMORY.md, or agents/pulse/memory/*
+# uncommitted, and sync refuses to pull for hours until Larry intervenes.
+#
+# Posture change (bounded): sync, which has historically been pull-only,
+# gains the ability to push EXACTLY ONE commit to origin/main, and only when
+# every modified file is inside the hardcoded Pulse runtime allowlist in
+# scripts/_lib_pulse_runtime.sh. Any non-allowlist dirt falls through to the
+# existing refuse-and-alert path unchanged.
+#
+# Failure mode: if the push fails (non-FF, network, auth), the local commit is
+# hard-reset to its pre-auto-commit HEAD so we never leave a local-only commit
+# on main that would break the next fast-forward. The fixture-pattern guard
+# (mirrored from run_cycle.sh) refuses to auto-commit any staged change whose
+# diff mentions a fixture-leak task_id.
+# shellcheck source=_lib_pulse_runtime.sh
+source "${SCRIPTS_DIR}/_lib_pulse_runtime.sh"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    if all_modified_in_pulse_runtime_allowlist "$REPO_DIR"; then
+        AUTO_PRE_HEAD="$(git rev-parse HEAD)"
+        log "Pulse runtime allowlist dirty (no other modifications) — auto-commit + push"
+        git add -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
+
+        FIXTURE_TOKEN_REGEX="$(pulse_runtime_fixture_token_regex)"
+        # NB: greps must be -E (or -F) — BRE treats \+ as the GNU one-or-more
+        # operator, so `grep -v "^\+\+\+"` would strip every +-prefixed diff line
+        # and silently disable the guard. See run_cycle.sh's matching comment.
+        FIXTURE_DIFF=$(git diff --cached -U0 | grep -E "^\+" | grep -Ev "^\+\+\+" | grep -E "$FIXTURE_TOKEN_REGEX" | head -5 || true)
+        if [ -n "$FIXTURE_DIFF" ]; then
+            log "ERROR: fixture-pattern token in staged Pulse runtime files; refusing auto-commit"
+            git reset -q HEAD -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
+            write_status "error" "Fixture-pattern token in Pulse runtime files"
+            FIXTURE_TAIL=$(echo "$FIXTURE_DIFF" | head -3 | tr '\n' ' | ')
+            alert_larry "fixture pattern in pulse runtime files" "sync_agent_core.sh refused to auto-commit Pulse runtime files because the staged diff contains a fixture-pattern token (likely fixture-leak hallucination). Excerpts: ${FIXTURE_TAIL}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, inspect runbooks/cycle-journal.md and runbooks/cycle-actions.jsonl, remove fixture entries, re-run sync."
+            emit_larry_alert_envelope "sync-blocked:fixture-pattern-detected" "ourliberty-sync.service: refused to auto-commit Pulse runtime files because the staged diff contains a fixture-pattern token. Excerpts: ${FIXTURE_TAIL}. Recovery: cd ${REPO_DIR}; inspect runbooks/cycle-journal.md and runbooks/cycle-actions.jsonl; remove fixture entries; re-run sync."
+            exit 1
+        fi
+
+        TS=$(date -u +%Y%m%dT%H%M%SZ)
+        if git commit -q -m "pulse: auto-commit runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only Pulse-owned runtime files dirty (see scripts/_lib_pulse_runtime.sh allowlist). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
+            log "Auto-committed Pulse runtime files; pushing to origin/main"
+            if git push -q origin main 2>/dev/null; then
+                log "Pushed Pulse runtime auto-commit to origin/main"
+            else
+                log "ERROR: push of Pulse runtime auto-commit failed; rolling back to ${AUTO_PRE_HEAD}"
+                git reset --hard "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
+                write_status "error" "Auto-commit push failed; rolled back"
+                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
+                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8}. Recovery: cd ${REPO_DIR}; investigate push failure (non-FF, auth, network); resolve, then sync will retry on next tick."
+                exit 1
+            fi
+        else
+            log "Auto-commit produced no commit (nothing staged?); falling through"
+        fi
+    fi
+fi
+
 # Refuse to operate with uncommitted changes — same rationale.
 if ! git diff --quiet || ! git diff --cached --quiet; then
     log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
