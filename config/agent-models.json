@@ -90,11 +90,11 @@
     "tier1_window_minutes": 120,
     "tier2_window_minutes": 60,
     "max_drain_minutes": 45,
-    "engage_5h_spend_usd": 42.0,
-    "disengage_5h_spend_usd": 30.0,
+    "engage_at_fraction": 0.70,
+    "disengage_at_fraction": 0.50,
     "tier1_home": "/home/larry",
     "tier2_home": "/home/larry/.claude-larry-personal",
-    "_note": "Account-rotation scheduler config (spec § 6.3, ships default OFF). enabled is the master kill switch — flipping to false on the next tick forces tier1, clears draining, and disables both engage and drain-then-switch. tier1_window_minutes / tier2_window_minutes set the 2:1 ratio (120/60 = Tier 1 runs ~2/3 of the cycle). max_drain_minutes caps how long the scheduler waits for in-flight work to clear before deferring a flip (never force-kills). engage_5h_spend_usd / disengage_5h_spend_usd are the load-gated engage/disengage hysteresis thresholds — read by § 6.4 (next PR); this PR treats engaged=true whenever enabled=true. tier1_home / tier2_home pin the two OAuth credential roots; must agree with scripts/active_tier.TIER1_HOME / TIER2_HOME. Master kill at any time: set enabled=false and the scheduler clears any partial drain state on the next 2-min tick."
+    "_note": "Account-rotation scheduler config (spec § 6.3 + § 6.4 load gating). enabled is the master kill switch — flipping to false on the next tick forces tier1, clears draining, and disables both engage and drain-then-switch. tier1_window_minutes / tier2_window_minutes set the 2:1 ratio (120/60 = Tier 1 runs ~2/3 of the cycle). max_drain_minutes caps how long the scheduler waits for in-flight work to clear before deferring a flip (never force-kills). engage_at_fraction / disengage_at_fraction are the load-gate hysteresis thresholds expressed as fractions of tier1_quota.max_5h_token_threshold (the pulse-tuned Tier 1 quota ceiling read via heal_claude_max_burn_rate.load_threshold). Rotation ENGAGES when rolling_5h_token_volume >= engage_at_fraction * threshold; DISENGAGES (forces tier1 + clears drain) when usage < disengage_at_fraction * threshold; HOLDS current engaged state between the two so it does not flap near the boundary. Fractions track the pulse-tuned token threshold rather than a second hand-tuned constant — when Check VIII raises or lowers the threshold, the gate moves with it. tier1_home / tier2_home pin the two OAuth credential roots; must agree with scripts/active_tier.TIER1_HOME / TIER2_HOME. Master kill at any time: set enabled=false and the scheduler clears any partial drain state on the next 2-min tick."
   },
   "models": {
     "haiku": {
@@ -159,6 +159,11 @@
     {
       "date": "2026-05-28",
       "change": "Add top-level 'rotation' block (default enabled=false) consumed by new scripts/rotate_active_tier.py and the inbox_watcher drain+cooldown gate. Spec § 6.3. Ships default-off so there is no runtime behavior change on merge — flipping enabled=true activates the 2:1 Tier 1 / Tier 2 rotation cadence (120/60 min) with drain-then-switch on the IN_FLIGHT_DIR + build_sequence_advancer state. tier{1,2}_window_minutes set the cycle ratio; max_drain_minutes caps how long the scheduler waits for in-flight work before deferring a flip (never force-kills). engage_5h_spend_usd / disengage_5h_spend_usd are forward-compat for the load-gated engage/disengage hysteresis in § 6.4 (next PR); this PR treats engaged=true whenever enabled=true.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-29",
+      "change": "rotation load-gating + observability (spec § 6.4): replace stale dollar keys engage_5h_spend_usd / disengage_5h_spend_usd with engage_at_fraction=0.70 / disengage_at_fraction=0.50, expressed as fractions of tier1_quota.max_5h_token_threshold. Driven by PR #184's burn-rate-healer re-base off dollars onto rolling_5h_token_volume — rolling_5h_spend() no longer exists. scripts/rotate_active_tier.py now reads heal_claude_max_burn_rate.rolling_5h_token_volume() and load_threshold(): ENGAGE when usage >= engage_at_fraction * threshold, DISENGAGE (force tier1 + clear drain) when usage < disengage_at_fraction * threshold, HOLD current engaged state between the two (hysteresis prevents flapping). Each rotation action (engage/disengage/switch/drain-defer) emits a JSON line to blackboard/rotation-events.jsonl for a future Pulse Check to tune the ratio/thresholds. Default rotation.enabled=false unchanged — no behavior change on merge.",
       "author": "Claude (via Larry's session)"
     }
   ]

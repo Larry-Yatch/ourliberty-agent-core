@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """rotate_active_tier.py — proactive account-rotation scheduler.
 
-Spec: ``agents/beacon/specs/account-rotation.md`` § 6.3.
+Spec: ``agents/beacon/specs/account-rotation.md`` §§ 6.3 + 6.4.
 
 One tick (driven by ``ourliberty-rotate-active-tier.timer``, ~2 min cadence)
 does the following, in order:
@@ -12,10 +12,17 @@ does the following, in order:
    can disable the rotation at any time by flipping ``enabled`` to false;
    the next tick reverts state to today's behavior.
 
-2. Decide "engaged" — for THIS PR, ``engaged = enabled``. The load-gated
-   engage/disengage hysteresis lands in § 6.4 (a separate PR) and reads
-   ``engage_5h_spend_usd`` / ``disengage_5h_spend_usd`` from the same
-   block. For now, when enabled, we always run the rotation cadence.
+2. Decide "engaged" via § 6.4 load gating with hysteresis. Read the
+   rolling-5h quota-consuming token volume from
+   ``heal_claude_max_burn_rate.rolling_5h_token_volume()`` and the
+   pulse-tuned tier1 token threshold from ``load_threshold()``. Compute
+   ``engage_thr = engage_at_fraction * threshold`` and ``disengage_thr =
+   disengage_at_fraction * threshold``. ENGAGE when usage >= engage_thr;
+   DISENGAGE (force tier1 + clear drain) when usage < disengage_thr; HOLD
+   the current engaged state when usage is between the two — this is what
+   prevents the gate from flapping near the boundary. The fractions track
+   the pulse-tuned threshold so when Check VIII raises or lowers the
+   ceiling, the gate moves with it.
 
 3. If engaged and not draining: initialize ``next_switch_due`` if missing,
    otherwise compare against ``now``. When the window has elapsed, set
@@ -28,6 +35,12 @@ does the following, in order:
    If ``max_drain_minutes`` has been exceeded, DEFER the flip (log + leave
    ``draining=true``) — NEVER force-kill in-flight work. The next tick
    will re-evaluate.
+
+Each state-changing action (engage / disengage / switch / drain-defer)
+appends one JSON line to ``blackboard/rotation-events.jsonl`` for a future
+Pulse Check to tune the ratio/thresholds against ground-truth rate-limit
+events. Schema: ``{ts, action, from_tier, to_tier, trigger,
+rolling_5h_tokens, threshold, drained_after_sec}``.
 
 Idempotency: every tick reads state fresh, recomputes, writes only the
 minimum necessary state. Multiple concurrent ticks would race on the
@@ -59,21 +72,29 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import active_tier  # noqa: E402
+import heal_claude_max_burn_rate as hcmbr  # noqa: E402
 
 HOME = Path.home()
 AGENT_CORE = HOME / 'agent-core'
 DEFAULT_MODELS_FILE = AGENT_CORE / 'config' / 'agent-models.json'
 
 LOG_FILE_NAME = 'rotate-active-tier.log'
+EVENTS_FILE_NAME = 'rotation-events.jsonl'
 
-# Spec § 6.3 default config values; only used when the rotation block is
-# missing OR partial. The shipped block in config/agent-models.json carries
-# the same numbers; this duplication is a defensive default-of-defaults.
+# Spec §§ 6.3 + 6.4 default config values; only used when the rotation block
+# is missing OR partial. The shipped block in config/agent-models.json
+# carries the same numbers; this duplication is a defensive
+# default-of-defaults. engage_at_fraction / disengage_at_fraction are
+# fractions of tier1_quota.max_5h_token_threshold (see § 6.4 / config
+# _note); using fractions keeps the gate tracking the pulse-tuned token
+# threshold rather than a second hand-tuned constant.
 _DEFAULTS = {
     'enabled': False,
     'tier1_window_minutes': 120,
     'tier2_window_minutes': 60,
     'max_drain_minutes': 45,
+    'engage_at_fraction': 0.70,
+    'disengage_at_fraction': 0.50,
 }
 
 
@@ -97,6 +118,52 @@ def _log_file():
     base = Path(log_dir) if log_dir else (_agents_root() / 'logs')
     base.mkdir(parents=True, exist_ok=True)
     return base / LOG_FILE_NAME
+
+
+def _events_file():
+    """Resolve ``blackboard/rotation-events.jsonl``. Append-only; one JSON
+    line per state-changing tick. Consumed by a future Pulse Check to tune
+    the rotation ratio and load-gate fractions against the ground-truth
+    rate-limit ledger."""
+    return _agents_root() / 'blackboard' / EVENTS_FILE_NAME
+
+
+def _emit_event(action, from_tier, to_tier, trigger, rolling_5h_tokens,
+                threshold, drained_after_sec=None, now=None):
+    """Append one event line to ``blackboard/rotation-events.jsonl``.
+
+    Schema (per spec § 6.4):
+
+        {ts, action, from_tier, to_tier, trigger, rolling_5h_tokens,
+         threshold, drained_after_sec}
+
+    Write failures are swallowed (best-effort observability — a missing
+    event line must not wedge the tick). ``drained_after_sec`` is ``None``
+    for engage/disengage actions where no drain timer applies; the field
+    is always present in the line so consumers can rely on a stable
+    schema.
+    """
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    rec = {
+        'ts': now.astimezone(timezone.utc).isoformat(),
+        'action': action,
+        'from_tier': from_tier,
+        'to_tier': to_tier,
+        'trigger': trigger,
+        'rolling_5h_tokens': int(rolling_5h_tokens),
+        'threshold': int(threshold),
+        'drained_after_sec': (None if drained_after_sec is None
+                              else int(drained_after_sec)),
+    }
+    try:
+        path = _events_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a') as f:
+            f.write(json.dumps(rec) + '\n')
+    except OSError:
+        pass
 
 
 def _logger():
@@ -197,6 +264,46 @@ def _parse_iso(s):
     return dt.astimezone(timezone.utc)
 
 
+def _is_engaged_state(state):
+    """Derive the current "engaged" bit from existing active-tier state —
+    no new field needed. We're engaged whenever rotation machinery is
+    visibly running: a non-tier1 tier, an in-progress drain, or a scheduled
+    next-switch deadline. A clean tier1 state with no draining and no
+    deadline is disengaged (parked).
+    """
+    if state.get('tier') != 'tier1':
+        return True
+    if state.get('draining'):
+        return True
+    if state.get('next_switch_due'):
+        return True
+    return False
+
+
+def _decide_engaged(currently_engaged, usage, threshold, cfg):
+    """Apply § 6.4 hysteresis. Returns (new_engaged, engage_thr,
+    disengage_thr).
+
+    Engage when usage >= engage_thr; disengage when usage < disengage_thr;
+    hold the current state in the middle band. A zero or negative
+    threshold collapses to "always disengaged" — defensive against a
+    misconfigured tier1_quota block, never wedge the runner.
+    """
+    engage_frac = float(cfg.get('engage_at_fraction',
+                                _DEFAULTS['engage_at_fraction']))
+    disengage_frac = float(cfg.get('disengage_at_fraction',
+                                   _DEFAULTS['disengage_at_fraction']))
+    engage_thr = engage_frac * threshold if threshold > 0 else 0
+    disengage_thr = disengage_frac * threshold if threshold > 0 else 0
+    if threshold <= 0:
+        return False, engage_thr, disengage_thr
+    if usage >= engage_thr:
+        return True, engage_thr, disengage_thr
+    if usage < disengage_thr:
+        return False, engage_thr, disengage_thr
+    return currently_engaged, engage_thr, disengage_thr
+
+
 def tick(now=None, models_file=None, logger=None):
     """Run one scheduler tick. Returns a short dict summarizing the action
     taken — useful for tests + structured logging. Side effects: at most one
@@ -228,19 +335,77 @@ def tick(now=None, models_file=None, logger=None):
         logger.info('rotation disabled tick: ' + json.dumps(result))
         return result
 
-    # § 6.3 LOCKED DECISION: engaged = always-true when enabled. Load-gating
-    # lands in § 6.4 as a follow-up PR.
-    engaged = True
+    # § 6.4 load gating with hysteresis. The token signal lives in
+    # heal_claude_max_burn_rate; we do not reimplement the window math.
+    usage = hcmbr.rolling_5h_token_volume(now=now)
+    threshold = hcmbr.load_threshold()
+    currently_engaged = _is_engaged_state(state)
+    engaged, engage_thr, disengage_thr = _decide_engaged(
+        currently_engaged, usage, threshold, cfg,
+    )
+
     if not engaged:
-        result = {'action': 'not-engaged', 'tier': tier}
-        logger.info('rotation tick: ' + json.dumps(result))
+        # Disengaged. Force tier1 + clear any drain state. Idempotent when
+        # already parked. On the engaged → disengaged transition, emit a
+        # disengage event with the threshold-cross trigger so the future
+        # Pulse Check can correlate against rate-limit ground truth.
+        if currently_engaged:
+            _emit_event(
+                action='disengage',
+                from_tier=tier,
+                to_tier='tier1',
+                trigger='load_gate_below_disengage',
+                rolling_5h_tokens=usage,
+                threshold=threshold,
+                now=now,
+            )
+        actions = []
+        if tier != 'tier1':
+            active_tier.set_tier('tier1')
+            actions.append('forced-tier1')
+        if state['draining']:
+            active_tier.set_draining(False)
+            actions.append('cleared-draining')
+        if state['next_switch_due']:
+            active_tier.set_next_switch_due(None)
+            actions.append('cleared-next-switch-due')
+        result = {
+            'action': 'disengaged',
+            'changes': actions,
+            'tier': 'tier1',
+            'rolling_5h_tokens': usage,
+            'threshold': threshold,
+            'disengage_threshold': int(disengage_thr),
+            'transitioned': currently_engaged,
+        }
+        logger.info('rotation disengaged tick: ' + json.dumps(result))
         return result
+
+    # Engaged. Emit an engage event on the disengaged → engaged transition
+    # before the existing rotation logic runs.
+    if not currently_engaged:
+        _emit_event(
+            action='engage',
+            from_tier=tier,
+            to_tier=tier,
+            trigger='load_gate_above_engage',
+            rolling_5h_tokens=usage,
+            threshold=threshold,
+            now=now,
+        )
 
     if state['draining']:
         # Drain phase. Check whether the world has settled enough to flip,
         # OR whether we've waited too long and should defer until next tick.
         in_flight_clear = _in_flight_empty()
         no_open_seq = not _any_open_build_sequence()
+        # Drain-start anchor for drained_after_sec: prefer next_switch_due
+        # (the deadline at which set_draining(True) fired in normal flow);
+        # fall back to since when the test/initial state pre-set draining
+        # without a deadline.
+        drain_start = (_parse_iso(state.get('next_switch_due'))
+                       or _parse_iso(state.get('since'))
+                       or now)
         if in_flight_clear and no_open_seq:
             # FLIP — set new tier, reset window, clear draining. The order
             # matters: set_tier() stamps `since`; set_next_switch_due() pins
@@ -252,6 +417,16 @@ def tick(now=None, models_file=None, logger=None):
             window_min = _window_for(next_tier, cfg)
             active_tier.set_next_switch_due(now + timedelta(minutes=window_min))
             active_tier.set_draining(False)
+            _emit_event(
+                action='switch',
+                from_tier=tier,
+                to_tier=next_tier,
+                trigger='window_elapsed_drain_complete',
+                rolling_5h_tokens=usage,
+                threshold=threshold,
+                drained_after_sec=(now - drain_start).total_seconds(),
+                now=now,
+            )
             result = {
                 'action': 'flipped',
                 'from_tier': tier,
@@ -270,6 +445,16 @@ def tick(now=None, models_file=None, logger=None):
             # DEFER — log + leave draining=true. Never force-kill. Next tick
             # will re-evaluate; eventually the in-flight work finishes (or
             # Larry's operator action clears it) and the flip lands.
+            _emit_event(
+                action='drain-defer',
+                from_tier=tier,
+                to_tier=tier,
+                trigger='max_drain_minutes_exceeded',
+                rolling_5h_tokens=usage,
+                threshold=threshold,
+                drained_after_sec=(now - drain_start).total_seconds(),
+                now=now,
+            )
             result = {
                 'action': 'drain-deferred',
                 'tier': tier,
