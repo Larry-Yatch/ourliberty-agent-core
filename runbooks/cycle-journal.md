@@ -4,6 +4,37 @@
 
 ---
 
+## Iteration 101 — 2026-05-29 UTC (interactive)
+
+**Health:** ✅ Nominal
+**Found:**
+- **(A) Source repo: nominal.** Branch=main, local HEAD=9d06420=origin/main. Was 1 commit behind (PR #193 "feat(chain-events): clarify_response events") at cycle start; fast-forward applied via `git pull --ff-only` (result: already current, likely advanced by prior sync). Untracked: `agents/beacon/specs/pulse-uncommitted-local-main-guard.md` (Beacon spec draft from iter 99-notify; not committed; not blocking sync). [blue] ✅
+- **(B) Sync health: nominal.** Last successful sync 2026-05-29T16:21:44Z (no-change at ed083dc, pre–PR #192/#193 merges). Sync < 2h. Repo now current to 9d06420; next automated sync will record clean state. ✅
+- **(C) Agent liveness: 6/6 active.** All systemd units: ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — active. Log silence for forge/mirror/pulse is calibrated false positive (no Telegram activity = no log entries). Beacon last log 10:49:39 MDT (fresh, PR #193 step-2 dispatch). ✅
+- **(D) Inboxes: nominal.** Forge: 3 in-flight tasks (alpha-1, fix-apply-skip-finalization, clarify-dashboard-render — all non-fixture, all created 16:45–16:49Z, <1h old, inbox-watcher active). Beacon/mirror/pulse empty. .invalid: beacon=10, forge=118 (down from 219 iter 100 total; non-alarming cleanup trend). ✅
+- **(E) PRs: 0 open.** ✅
+- **(F) Cost/quota: nominal.** Fresh session. ✅
+- **(H) Forge digest: 10 PRs shipped since iter 100.** #183 fix(sync): auto-commit+push Pulse runtime allowlist 14:23Z; #174 docs: bootstrap log 14:30Z; #186 feat(rotation): load-gated engage/disengage 14:19Z; #187 fix(notifier): V6 silent-miss on auto-merge 14:50Z; #188 docs(pulse): α₁ cycle-prompt brief 15:47Z; #189 docs(beacon): escalation-discipline doctrine 15:47Z; #190 docs(clarify-round-visibility) 16:12Z; #191 docs(pulse): alpha-2+beta briefs 16:16Z; #192 docs(pulse): prep bundle 16:31Z; #193 feat(chain-events): clarify_response events 16:43Z. **Notable: PR #183 merged — diverged-main watch item CLOSED.** 0 open. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (84d, outside window). ✅
+- **Check I: skip.** audit file check-i-2026-05-29.json exists (fired iter 100 at 12:30Z). Avoiding idempotency duplicate per iter 86 precedent. Fix APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` still pending Larry. ✅
+- **Check VIII/IX: off day** (Friday; both Monday-only). ✅
+- **(Pending) dashboard-dispatch-source-blocked:** APPROVAL_REQUEST `validator-allow-dashboard-source-001` pending Larry. ⚠️
+- **(Pending) Check I idempotency:** `pulse-check-i-journal-idempotency-001` pending Larry → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Pending Larry authorization since iter 43. ⚠️
+
+**Did:**
+1. fast-forward attempted: `git -C ~/agent-core pull --ff-only` — already at 9d06420 (prior sync or fetch-during-check advanced it). Local=origin=9d06420. ✅
+
+**Escalated:** Nothing new. Three standing [yellow] items unchanged: dashboard-dispatch-source-blocked, Check I idempotency, stuck-cycle timeout guard. Untracked Beacon spec `pulse-uncommitted-local-main-guard.md` noted [blue] — draft awaiting Larry review per spec header.
+
+**Forge:** shipped 10 since iter 100 (see H above). **PR #183 closes the diverged-main pattern.** 0 open.
+
+**Patterns:** Diverged-main watch item: CLOSED (PR #183 merged). No new G-rule triggers this cycle.
+
+**Learned:** PR #183 merged — auto-commit+push for Pulse runtime allowlist now live. Monitor next 5+ automated cycles to confirm no diverged-main recurrence before formally closing in MEMORY.md. Forge in-flight (3 tasks) normal; clarify-dashboard-render is PR #193 step-2 build task.
+
+---
+
 ## Iteration 100 — 2026-05-29 12:30 UTC (interactive)
 
 **Health:** ⚠️ Drift (local main diverged ahead:2/behind:3; dirty tree; sync blocked — unchanged from iter 99)
