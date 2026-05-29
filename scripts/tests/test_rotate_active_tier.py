@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tests for scripts/rotate_active_tier.py — the proactive account-rotation
-scheduler (spec § 6.3).
+scheduler (spec §§ 6.3 + 6.4).
 
 Covers the acceptance criteria verbatim from the spec + the dispatch:
 
@@ -10,9 +10,17 @@ Covers the acceptance criteria verbatim from the spec + the dispatch:
   - Draining + open build sequence → no flip.
   - Draining + clear → flip + windows reset for new tier.
   - Drain timeout → defer (NEVER force-kill).
+  - § 6.4 load gating: usage >= engage_thr → engaged; usage between the
+    two fractions → HOLD current state (hysteresis, no flap); usage <
+    disengage_thr → disengaged + forced tier1.
+  - § 6.4 rotation-events.jsonl: every state-changing action emits one
+    well-formed JSON line with the locked schema.
 
 Each test wires a tmp ``OURLIBERTY_AGENTS_ROOT`` so the state file + the
-in-flight directory + the build-sequences directory live in tmp.
+in-flight directory + the build-sequences directory live in tmp. The
+shared fixture also pre-seeds ``costs.jsonl`` with a high-volume entry so
+the load gate engages by default — tests that exercise the gate itself
+override the seed via ``_set_load_tokens``.
 
 Run::
 
@@ -21,6 +29,7 @@ Run::
 """
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import sys
@@ -34,6 +43,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import active_tier  # noqa: E402
+import heal_claude_max_burn_rate  # noqa: E402
 import rotate_active_tier  # noqa: E402
 
 
@@ -50,26 +60,61 @@ _BASE_ROTATION = {
     'tier1_window_minutes': 120,
     'tier2_window_minutes': 60,
     'max_drain_minutes': 45,
+    'engage_at_fraction': 0.70,
+    'disengage_at_fraction': 0.50,
 }
+
+# Production tier1_quota.max_5h_token_threshold is 10M; engage at 0.70 = 7M.
+# Pre-seed costs.jsonl with 8M tokens so the load gate engages by default
+# in tests that don't explicitly exercise the gate. Tests that DO exercise
+# the gate override via _set_load_tokens.
+_DEFAULT_LOAD_TOKENS = 8_000_000
 
 
 class RotateTickBaseTest(unittest.TestCase):
-    """Shared fixture: redirect ~/agents and pre-build a models file."""
+    """Shared fixture: redirect ~/agents, pre-build a models file, and seed
+    costs.jsonl so the § 6.4 load gate engages by default."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self._prev = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        # Reload hcmbr so its module-level COSTS_FILE / RATE_LIMIT_LEDGER_FILE
+        # pick up the new OURLIBERTY_AGENTS_ROOT. rotate_active_tier's
+        # `import heal_claude_max_burn_rate as hcmbr` reference stays bound
+        # to the same module object — in-place reload propagates.
+        importlib.reload(heal_claude_max_burn_rate)
         self.models_file = self.root / 'config' / 'agent-models.json'
         _write_models_file(self.models_file, dict(_BASE_ROTATION))
+        self._set_load_tokens(_DEFAULT_LOAD_TOKENS)
 
     def tearDown(self):
         if self._prev is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
             os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev
+        # Restore hcmbr to production paths so subsequent tests in other
+        # modules don't see our tmp-rooted COSTS_FILE.
+        importlib.reload(heal_claude_max_burn_rate)
         self.tmp.cleanup()
+
+    def _set_load_tokens(self, total_tokens):
+        """Write a single costs.jsonl record with `total_tokens` quota-
+        consuming tokens (input+output+cache_creation, per the healer's
+        token-volume signal) stamped recently enough to land inside the
+        rolling 5h window. Overwrites any prior seed."""
+        d = self.root / 'blackboard'
+        d.mkdir(parents=True, exist_ok=True)
+        rec = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'agent': 'test-seed',
+            'input_tokens': int(total_tokens),
+            'output_tokens': 0,
+            'cache_creation': 0,
+            'cache_read': 0,
+        }
+        (d / 'costs.jsonl').write_text(json.dumps(rec) + '\n')
 
     def _set_state(self, **fields):
         state = active_tier.read()
@@ -284,6 +329,253 @@ class DrainTimeoutTest(RotateTickBaseTest):
         third = rotate_active_tier.tick(now=later + timedelta(minutes=2),
                                         models_file=self.models_file)
         self.assertEqual(third['action'], 'flipped')
+
+
+class LoadGatingTest(RotateTickBaseTest):
+    """Spec § 6.4 acceptance: load-gated engage/disengage with hysteresis.
+
+    Production tier1_quota.max_5h_token_threshold = 10M;
+    engage_at_fraction=0.70 → engage_thr=7M; disengage_at_fraction=0.50 →
+    disengage_thr=5M. So:
+
+      - usage >= 7M  → engaged
+      - 5M <= usage < 7M → HOLD current engaged state
+      - usage <  5M  → disengaged + forced tier1
+
+    The hysteresis band is the whole point: a flapping signal near the
+    boundary must NEVER produce engage/disengage thrash.
+    """
+
+    def _events_lines(self):
+        path = self.root / 'blackboard' / 'rotation-events.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines()
+                if line.strip()]
+
+    def test_usage_at_engage_threshold_engages_when_parked(self):
+        # Initial state: tier1, no drain, no deadline → currently_engaged
+        # is False. Usage 8M >= 7M engage_thr → engages, initializes the
+        # tier1 window, emits an engage event.
+        self._set_load_tokens(8_000_000)
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'initialized-window')
+        events = self._events_lines()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['action'], 'engage')
+        self.assertEqual(events[0]['trigger'], 'load_gate_above_engage')
+        self.assertEqual(events[0]['rolling_5h_tokens'], 8_000_000)
+        self.assertEqual(events[0]['threshold'], 10_000_000)
+
+    def test_usage_between_thresholds_holds_engaged_state(self):
+        # State is engaged (deadline pinned), usage drops into the hold
+        # band (5M-7M). Expect: state held (still engaged, idle), NO
+        # disengage event emitted, NO state mutation beyond the normal
+        # idle/init path.
+        self._set_load_tokens(6_000_000)  # between 5M and 7M
+        self._set_state(tier='tier1',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'idle')
+        state = active_tier.read()
+        # Still engaged: deadline preserved, not forced to tier1.
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertEqual(state['next_switch_due'],
+                         '2026-05-28T14:00:00+00:00')
+        # No engage/disengage event — the hold band must be silent.
+        events = self._events_lines()
+        action_set = {e['action'] for e in events}
+        self.assertNotIn('engage', action_set)
+        self.assertNotIn('disengage', action_set)
+
+    def test_usage_between_thresholds_holds_disengaged_state(self):
+        # State is disengaged (parked: tier1, no draining, no deadline),
+        # usage rises into the hold band (5M-7M). Expect: state held
+        # (still disengaged), NO engage event emitted, no window init.
+        self._set_load_tokens(6_000_000)
+        # Initial state is already the parked default.
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'disengaged')
+        self.assertFalse(result['transitioned'])
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertFalse(state['draining'])
+        self.assertIsNone(state['next_switch_due'])
+        # Hold-disengaged must NOT emit a disengage event — it would
+        # double-count on every tick. Engage is also silent. Total events: 0.
+        self.assertEqual(self._events_lines(), [])
+
+    def test_usage_below_disengage_disengages_and_forces_tier1(self):
+        # State is tier2, engaged. Usage drops below 5M → disengage path:
+        # force tier1, clear draining, clear deadline, emit disengage
+        # event with from_tier=tier2.
+        self._set_load_tokens(4_000_000)
+        self._set_state(tier='tier2', draining=True,
+                        since='2026-05-28T11:00:00+00:00',
+                        next_switch_due='2026-05-28T12:00:00+00:00')
+        now = datetime(2026, 5, 28, 12, 30, 0, tzinfo=timezone.utc)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'disengaged')
+        self.assertTrue(result['transitioned'])
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertFalse(state['draining'])
+        self.assertIsNone(state['next_switch_due'])
+        events = self._events_lines()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['action'], 'disengage')
+        self.assertEqual(events[0]['from_tier'], 'tier2')
+        self.assertEqual(events[0]['to_tier'], 'tier1')
+        self.assertEqual(events[0]['trigger'], 'load_gate_below_disengage')
+        self.assertEqual(events[0]['rolling_5h_tokens'], 4_000_000)
+
+    def test_disengaged_when_already_parked_is_idempotent(self):
+        # Already parked + usage low → still parked, no event emitted,
+        # `transitioned` is False. Critical: a sustained low-load period
+        # must NOT spam disengage events on every 2-min tick.
+        self._set_load_tokens(1_000_000)
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'disengaged')
+        self.assertFalse(result['transitioned'])
+        self.assertEqual(self._events_lines(), [])
+
+    def test_load_gating_disengage_does_not_fire_when_kill_switch_off(self):
+        # enabled=false short-circuits before load gating. Even if usage
+        # is high, the master kill switch wins and no engage/disengage
+        # event is emitted (the kill switch path is its own concern,
+        # surfaced as action=disabled).
+        self._set_load_tokens(8_000_000)
+        self._set_rotation(enabled=False)
+        self._set_state(tier='tier2', draining=True)
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['action'], 'disabled')
+        self.assertEqual(self._events_lines(), [])
+
+
+class RotationEventsTest(RotateTickBaseTest):
+    """Spec § 6.4 acceptance: rotation-events.jsonl carries one
+    well-formed JSON line per state-changing action with the locked
+    schema {ts, action, from_tier, to_tier, trigger, rolling_5h_tokens,
+    threshold, drained_after_sec}."""
+
+    _SCHEMA_KEYS = {
+        'ts', 'action', 'from_tier', 'to_tier', 'trigger',
+        'rolling_5h_tokens', 'threshold', 'drained_after_sec',
+    }
+
+    def _events_lines(self):
+        path = self.root / 'blackboard' / 'rotation-events.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines()
+                if line.strip()]
+
+    def _assert_schema(self, rec):
+        self.assertEqual(set(rec.keys()), self._SCHEMA_KEYS,
+                         f'rotation event missing fields: {rec}')
+        # ts parseable as ISO 8601 UTC
+        ts = datetime.fromisoformat(rec['ts'])
+        self.assertIsNotNone(ts.tzinfo)
+        self.assertIsInstance(rec['rolling_5h_tokens'], int)
+        self.assertIsInstance(rec['threshold'], int)
+        if rec['drained_after_sec'] is not None:
+            self.assertIsInstance(rec['drained_after_sec'], int)
+
+    def test_switch_event_emitted_on_flip(self):
+        # Set up a state that flips this tick: draining=True, no
+        # in-flight, no open sequence. Expect: action=switch, from→to,
+        # drained_after_sec reflects time since drain started.
+        self._set_load_tokens(8_000_000)
+        now = datetime(2026, 5, 28, 14, 30, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'flipped')
+        events = self._events_lines()
+        switch_events = [e for e in events if e['action'] == 'switch']
+        self.assertEqual(len(switch_events), 1)
+        sw = switch_events[0]
+        self._assert_schema(sw)
+        self.assertEqual(sw['from_tier'], 'tier1')
+        self.assertEqual(sw['to_tier'], 'tier2')
+        self.assertEqual(sw['trigger'], 'window_elapsed_drain_complete')
+        self.assertEqual(sw['rolling_5h_tokens'], 8_000_000)
+        self.assertEqual(sw['threshold'], 10_000_000)
+        # drain started at next_switch_due=14:00; now=14:30 → 1800 sec.
+        self.assertEqual(sw['drained_after_sec'], 1800)
+
+    def test_drain_defer_event_emitted_on_timeout(self):
+        # Drain stuck past max_drain → drain-defer event with the
+        # max_drain_minutes_exceeded trigger.
+        self._set_load_tokens(8_000_000)
+        now = datetime(2026, 5, 28, 14, 46, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        self._add_in_flight('stuck-task-001')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'drain-deferred')
+        events = [e for e in self._events_lines()
+                  if e['action'] == 'drain-defer']
+        self.assertEqual(len(events), 1)
+        ev = events[0]
+        self._assert_schema(ev)
+        self.assertEqual(ev['from_tier'], 'tier1')
+        self.assertEqual(ev['to_tier'], 'tier1')
+        self.assertEqual(ev['trigger'], 'max_drain_minutes_exceeded')
+        self.assertEqual(ev['drained_after_sec'], 46 * 60)
+
+    def test_no_events_emitted_on_silent_paths(self):
+        # Idle / drain-waiting / hold-band ticks must NOT emit events.
+        # We exercise idle here: engaged, deadline in future, no flip.
+        self._set_load_tokens(8_000_000)
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'idle')
+        self.assertEqual(self._events_lines(), [])
+
+    def test_engage_event_schema_well_formed(self):
+        # Initial parked state + high load → engage event lands with the
+        # complete schema. Covers the first-engage path's event shape.
+        self._set_load_tokens(8_500_000)
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        rotate_active_tier.tick(now=now, models_file=self.models_file)
+        events = self._events_lines()
+        engage_events = [e for e in events if e['action'] == 'engage']
+        self.assertEqual(len(engage_events), 1)
+        ev = engage_events[0]
+        self._assert_schema(ev)
+        self.assertEqual(ev['from_tier'], 'tier1')
+        self.assertEqual(ev['to_tier'], 'tier1')
+        self.assertEqual(ev['trigger'], 'load_gate_above_engage')
+        # No drain on an engage event.
+        self.assertIsNone(ev['drained_after_sec'])
+
+
+class ConfigSchemaTest(unittest.TestCase):
+    """The stale dollar keys engage_5h_spend_usd / disengage_5h_spend_usd
+    must be gone from the shipped rotation block — PR #184 retired
+    rolling_5h_spend() and the gate now reads token volume + fractions."""
+
+    def test_dollar_keys_absent_from_shipped_config(self):
+        config_path = (Path(__file__).resolve().parent.parent.parent
+                       / 'config' / 'agent-models.json')
+        data = json.loads(config_path.read_text())
+        rotation = data.get('rotation') or {}
+        self.assertNotIn('engage_5h_spend_usd', rotation)
+        self.assertNotIn('disengage_5h_spend_usd', rotation)
+        self.assertIn('engage_at_fraction', rotation)
+        self.assertIn('disengage_at_fraction', rotation)
+        # Fractions must satisfy disengage < engage (hysteresis ordering).
+        self.assertLess(rotation['disengage_at_fraction'],
+                        rotation['engage_at_fraction'])
 
 
 if __name__ == '__main__':
