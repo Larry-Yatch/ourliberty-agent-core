@@ -59,7 +59,7 @@ Closes the 2026-05-27 hallucination class: I dispatched `cycle-fix-<slug>.json` 
 
 Prefix patterns: `t-`, `sess-abc-`, `notify-t-`, `notify-q-`, `marker-error-t-`, `marker-error-opmanual-`.
 
-Exact-match patterns: `task-001`, `task-legacy`, `headless-001`, `opmanual-d35-5b-shipped-note-001`, `pf-ok`, `bad-pf`, `no-preamble`, `no-chat`, `dead-letter-bad`, `dead-letter-gc`, `dead-letter-bad-task`, `envelope-id`.
+Exact-match patterns: `task-001`, `task-legacy`, `headless-001`, `opmanual-d35-5b-shipped-note-001`, `pf-ok`, `bad-pf`, `no-preamble`, `no-chat`, `dead-letter-bad`, `dead-letter-gc`, `dead-letter-bad-task`, `envelope-id`, `real-mirror-bad-marker`, `real-mirror-retry`, `real-ok`, `real-empty-findings`, `real-loop`, `real-built`, `real-build-ok`.
 
 When I match: append `{"event": "fixture-suppressed", "task_id": "<id>", "pattern": "<matched>", "ts": "<ISO 8601>"}` to `~/agents/state/pulse-fixture-suppressions.jsonl` (state file, NOT git-tracked — the `state/` directory is gitignored) and skip. **Do NOT** touch git-tracked `runbooks/cycle-actions.jsonl` or `runbooks/cycle-journal.md` for fixture suppressions — that path caused recurring sync churn (V7, 2026-05-28: out-of-cycle Pulse invocations append to git-tracked files but never commit, dirty tree blocks sync). The state-file path preserves audit value without churn. The same allowlist is enforced at four other surfaces (cycle-prompt teach in §G; `scripts/run_cycle.sh` commit guard; `scripts/pulse_check_i.py` σ-anomaly + retry-repeat filter; `scripts/pulse_check_iii.py` chain_events filter) so a fixture envelope that gets past me here still cannot tune Check thresholds or land in `main` — defense in depth.
 

@@ -190,7 +190,7 @@ if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
         # the left so we match JSONL ("task_id":"t-fail"), markdown prose
         # (`t-fail`), and KV-style log lines (task_id=t-fail) without
         # tripping on incidental prose.
-        FIXTURE_TOKEN_REGEX='["`=](t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|marker-error-opmanual-|task-001([^A-Za-z0-9_-]|$)|task-legacy([^A-Za-z0-9_-]|$)|headless-001([^A-Za-z0-9_-]|$)|opmanual-d35-5b-shipped-note-001([^A-Za-z0-9_-]|$)|pf-ok([^A-Za-z0-9_-]|$)|bad-pf([^A-Za-z0-9_-]|$)|no-preamble([^A-Za-z0-9_-]|$)|no-chat([^A-Za-z0-9_-]|$)|dead-letter-bad([^A-Za-z0-9_-]|$)|dead-letter-gc([^A-Za-z0-9_-]|$)|dead-letter-bad-task([^A-Za-z0-9_-]|$)|envelope-id([^A-Za-z0-9_-]|$))'
+        FIXTURE_TOKEN_REGEX='["`=](t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|marker-error-opmanual-|task-001([^A-Za-z0-9_-]|$)|task-legacy([^A-Za-z0-9_-]|$)|headless-001([^A-Za-z0-9_-]|$)|opmanual-d35-5b-shipped-note-001([^A-Za-z0-9_-]|$)|pf-ok([^A-Za-z0-9_-]|$)|bad-pf([^A-Za-z0-9_-]|$)|no-preamble([^A-Za-z0-9_-]|$)|no-chat([^A-Za-z0-9_-]|$)|dead-letter-bad([^A-Za-z0-9_-]|$)|dead-letter-gc([^A-Za-z0-9_-]|$)|dead-letter-bad-task([^A-Za-z0-9_-]|$)|envelope-id([^A-Za-z0-9_-]|$)|real-mirror-bad-marker([^A-Za-z0-9_-]|$)|real-mirror-retry([^A-Za-z0-9_-]|$)|real-ok([^A-Za-z0-9_-]|$)|real-empty-findings([^A-Za-z0-9_-]|$)|real-loop([^A-Za-z0-9_-]|$)|real-built([^A-Za-z0-9_-]|$)|real-build-ok([^A-Za-z0-9_-]|$))'
         # NB: every grep here must be -E (or -F) — BRE treats `\+` as the
         # GNU "one-or-more" operator, so `grep -v "^\+\+\+"` would strip
         # every `+`-prefixed diff line and silently disable the guard.

@@ -1464,6 +1464,13 @@ Exact-match patterns:
 - `dead-letter-gc`
 - `dead-letter-bad-task`
 - `envelope-id`
+- `real-mirror-bad-marker`
+- `real-mirror-retry`
+- `real-ok`
+- `real-empty-findings`
+- `real-loop`
+- `real-built`
+- `real-build-ok`
 
 **Discipline when you match:**
 
