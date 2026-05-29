@@ -3,7 +3,7 @@
 
 Covers each proposal-firing rule with synthetic fixture corpora, the
 fixture-pattern filter on quota events, the idempotency artifact write,
-and the digest format.
+and the digest format. Re-based 2026-05-28 onto the token-volume signal.
 
 larry-alerts and config IO are never touched live — every test exercises
 the pure-function core (`run_check`) with injected inputs.
@@ -32,10 +32,11 @@ import pulse_check_viii as p8  # noqa: E402
 NOW = datetime(2026, 5, 25, 12, 0, tzinfo=timezone.utc)  # Monday
 
 
-def _dm(hours_ago: float, spend: float = 55.0, threshold: float = 60.0):
+def _dm(hours_ago: float, usage: int = 9_000_000,
+        threshold: int = 10_000_000):
     return p8.BurnRateDM(
         ts=NOW - timedelta(hours=hours_ago),
-        spend_usd=spend, threshold_usd=threshold,
+        usage_tokens=usage, threshold_tokens=threshold,
     )
 
 
@@ -46,25 +47,39 @@ def _event(hours_ago: float, task_id: str = 'real-task-001', agent: str = 'beaco
     )
 
 
-def _cost(hours_ago: float, cost: float):
+def _cost(hours_ago: float, tokens: int):
     return p8.CostEntry(
         ts=NOW - timedelta(hours=hours_ago),
-        cost_usd=cost,
+        usage_tokens=tokens,
     )
 
 
 class TestParseDmBody(unittest.TestCase):
 
-    def test_extracts_spend_and_threshold(self):
+    def test_extracts_usage_and_threshold(self):
         body = (
-            'Trailing 5h LLM pace at 92% of dollar gate '
-            '($55.20 of $60.00). Pace indicator only ...'
+            'Trailing 5h quota pace at 92% of token gate '
+            '(9,200,000 of 10,000,000 tokens; input+output+cache_creation). '
+            'Pace indicator only ...'
         )
         out = p8.parse_dm_body(body)
-        self.assertEqual(out, (55.20, 60.00))
+        self.assertEqual(out, (9_200_000, 10_000_000))
+
+    def test_handles_uncommatized_numbers(self):
+        body = 'token gate (5000 of 10000 tokens; ...).'
+        self.assertEqual(p8.parse_dm_body(body), (5000, 10000))
 
     def test_no_match_returns_none(self):
-        self.assertIsNone(p8.parse_dm_body('random text without dollars'))
+        self.assertIsNone(p8.parse_dm_body('random text without tokens'))
+
+    def test_pre_re_base_dollar_body_returns_none(self):
+        # Old DM bodies (pre-2026-05-28) used "$X of $Y" — the new parser
+        # should NOT match those; they're filtered out of the corpus.
+        old_body = (
+            'Trailing 5h LLM pace at 92% of dollar gate '
+            '($55.20 of $60.00). ...'
+        )
+        self.assertIsNone(p8.parse_dm_body(old_body))
 
     def test_non_string_returns_none(self):
         self.assertIsNone(p8.parse_dm_body(None))  # type: ignore[arg-type]
@@ -130,28 +145,28 @@ class TestComputePercentile(unittest.TestCase):
         self.assertEqual(p8.compute_percentile([42.0], 0.75), 42.0)
 
 
-class TestRollingSpend(unittest.TestCase):
+class TestRollingTokens(unittest.TestCase):
 
-    def test_sums_costs_within_5h_window_before_target(self):
+    def test_sums_tokens_within_5h_window_before_target(self):
         target = NOW
         costs = [
-            _cost(hours_ago=1, cost=2.0),   # in window
-            _cost(hours_ago=4, cost=3.0),   # in window
-            _cost(hours_ago=6, cost=10.0),  # outside
+            _cost(hours_ago=1, tokens=2_000_000),   # in window
+            _cost(hours_ago=4, tokens=3_000_000),   # in window
+            _cost(hours_ago=6, tokens=10_000_000),  # outside
         ]
-        out = p8.rolling_5h_spend_at(target, costs)
-        self.assertAlmostEqual(out, 5.0)
+        out = p8.rolling_5h_tokens_at(target, costs)
+        self.assertEqual(out, 5_000_000)
 
 
 class TestRunCheckRules(unittest.TestCase):
 
-    CURRENT_THRESHOLD = 60.0
+    CURRENT_THRESHOLD = 10_000_000
 
     def _run(self, *, dms, events, costs=None):
         return p8.run_check(
             dms=dms, events=events,
             costs=costs or [],
-            current_threshold_usd=self.CURRENT_THRESHOLD,
+            current_threshold_tokens=self.CURRENT_THRESHOLD,
             now=NOW,
         )
 
@@ -163,7 +178,7 @@ class TestRunCheckRules(unittest.TestCase):
         events = [_event(hours_ago=8 + i * 24) for i in range(3)]
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'insufficient_signal')
-        self.assertIsNone(result.proposed_threshold_usd)
+        self.assertIsNone(result.proposed_threshold_tokens)
 
     def test_insufficient_signal_when_too_few_events(self):
         # 5 DMs + 2 events (< floor 3).
@@ -177,116 +192,124 @@ class TestRunCheckRules(unittest.TestCase):
     def test_raise_fires_when_precision_low(self):
         # 10 DMs: 3 TPs paired 1:1 with 3 events, 7 FPs far from any event.
         # precision = 3/10 = 0.3 (< 0.4 → raise). recall = 3/3 = 1.0
-        # (avoids defer). Proposed = p75 of TP spends [40, 50, 60] = 55.0.
+        # (avoids defer). Proposed = p75 of TP usages [7M, 8M, 9M] = 8.5M.
         dms = []
         events = []
-        for i, sp in enumerate([40.0, 50.0, 60.0]):
+        for i, usage in enumerate([7_000_000, 8_000_000, 9_000_000]):
             base = 24 + i * 12
-            dms.append(_dm(hours_ago=base, spend=sp))
+            dms.append(_dm(hours_ago=base, usage=usage))
             events.append(_event(hours_ago=base - 0.5))
         for j in range(7):
-            dms.append(_dm(hours_ago=200 + j * 24, spend=10.0))
+            dms.append(_dm(hours_ago=200 + j * 24, usage=2_000_000))
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'raise')
-        self.assertAlmostEqual(result.proposed_threshold_usd, 55.0, places=2)
+        self.assertEqual(result.proposed_threshold_tokens, 8_500_000)
 
-    def test_raise_proposed_is_p75_of_tp_spends(self):
-        # 8 DMs: 5 FPs at low spend + 3 TPs paired with 3 events at high
-        # spend. precision = 3/8 = 0.375 (< 0.4 → raise). recall = 3/3 = 1.0.
-        # Proposed = 75th pct of TP spends [99, 99, 99] = 99.0.
-        dms = [_dm(hours_ago=10 + i * 24, spend=10.0) for i in range(5)]
+    def test_raise_proposed_is_p75_of_tp_usages(self):
+        # 8 DMs: 5 FPs at low usage + 3 TPs paired with 3 events at high
+        # usage. precision = 3/8 = 0.375 (< 0.4 → raise). recall = 1.0.
+        # Proposed = 75th pct of TP usages [12M, 12M, 12M] = 12M.
+        dms = [_dm(hours_ago=10 + i * 24, usage=2_000_000) for i in range(5)]
         events = []
         for i in range(3):
             evhrs = 100 + i * 24
             events.append(_event(hours_ago=evhrs))
-            dms.append(_dm(hours_ago=evhrs + 0.5, spend=99.0))
+            dms.append(_dm(hours_ago=evhrs + 0.5, usage=12_000_000))
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'raise')
-        self.assertAlmostEqual(result.proposed_threshold_usd, 99.0, places=2)
+        self.assertEqual(result.proposed_threshold_tokens, 12_000_000)
 
     # ---- lower ----
 
     def test_lower_fires_when_recall_low(self):
         # We need recall < 0.6 (>= 3 events), precision NOT < 0.4 (else
-        # defer). precision = TP/(TP+FP). With 5 DMs all TP → precision = 1.0.
-        # recall = 5/(5+5) = 0.5 < 0.6 → lower fires.
+        # defer). 5 DMs all TP → precision = 1.0. recall = 5/10 = 0.5
+        # < 0.6 → lower fires.
         dms = []
         events = []
-        # 5 paired DM->event TPs.
         for i in range(5):
             base = 24 + i * 6
-            dms.append(_dm(hours_ago=base, spend=40.0))
+            dms.append(_dm(hours_ago=base, usage=6_000_000))
             events.append(_event(hours_ago=base - 0.5))
         # 5 unpaired events (FNs) at distant times.
         fn_event_hours = [200 + i * 12 for i in range(5)]
         for h in fn_event_hours:
             events.append(_event(hours_ago=h))
-        # Costs at FN-event moments (rolling-5h spend each = 30.0).
+        # Tokens at FN-event moments (rolling-5h tokens each = 4M).
         costs = []
         for h in fn_event_hours:
-            costs.append(_cost(hours_ago=h, cost=15.0))
-            costs.append(_cost(hours_ago=h + 1, cost=15.0))  # within 5h
+            costs.append(_cost(hours_ago=h, tokens=2_000_000))
+            costs.append(_cost(hours_ago=h + 1, tokens=2_000_000))  # within 5h
         result = self._run(dms=dms, events=events, costs=costs)
         self.assertEqual(result.rule_fired, 'lower',
                          f'rule={result.rule_fired}, precision={result.precision}, '
                          f'recall={result.recall}, TP={result.tp_count}, '
                          f'FP={result.fp_count}, FN={result.fn_count}')
-        # 75th-pct of [30.0]*5 = 30.0
-        self.assertAlmostEqual(result.proposed_threshold_usd, 30.0, places=2)
+        # 75th-pct of [4_000_000]*5 = 4_000_000.
+        self.assertEqual(result.proposed_threshold_tokens, 4_000_000)
 
-    def test_lower_fallback_when_no_fn_spend_data(self):
+    def test_lower_fallback_when_no_fn_token_data(self):
         # Recall low, FNs exist, but no costs in window → fallback to -20%.
         dms = []
         events = []
         for i in range(5):
             base = 24 + i * 6
-            dms.append(_dm(hours_ago=base, spend=40.0))
+            dms.append(_dm(hours_ago=base, usage=6_000_000))
             events.append(_event(hours_ago=base - 0.5))
         for h in [200, 224, 248, 272, 296]:
             events.append(_event(hours_ago=h))
         result = self._run(dms=dms, events=events, costs=[])
         self.assertEqual(result.rule_fired, 'lower')
-        # 60.0 * 0.80 = 48.0
-        self.assertAlmostEqual(result.proposed_threshold_usd, 48.0, places=2)
+        # 10_000_000 * 0.80 = 8_000_000
+        self.assertEqual(result.proposed_threshold_tokens, 8_000_000)
 
     # ---- defer ----
 
     def test_defer_when_both_raise_and_lower_fire(self):
-        # 10 DMs, 1 of which is TP (paired with 1 event). 9 FPs.
+        # 10 DMs, 1 of which is TP. 9 FPs.
         # 4 events, 1 paired (TP), 3 unpaired (FN).
         # precision = 1/10 = 0.1 < 0.4 (raise).
         # recall = 1/(1+3) = 0.25 < 0.6 (lower).
         # Both fire → defer.
         dms = []
         events = []
-        dms.append(_dm(hours_ago=24, spend=55.0))
+        dms.append(_dm(hours_ago=24, usage=9_000_000))
         events.append(_event(hours_ago=23.5))
         for j in range(9):
-            dms.append(_dm(hours_ago=100 + j * 12, spend=10.0))
+            dms.append(_dm(hours_ago=100 + j * 12, usage=1_000_000))
         for k in range(3):
             events.append(_event(hours_ago=400 + k * 6))
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'defer')
-        self.assertIsNone(result.proposed_threshold_usd)
+        self.assertIsNone(result.proposed_threshold_tokens)
 
     # ---- deprecate ----
 
     def test_deprecate_when_zero_tp_8w_and_many_events(self):
         # 8w window: TP = 0 (no DM has an event within 2h after).
         # 5+ events scattered in the 8w window.
-        dms = [_dm(hours_ago=24 + i * 24, spend=20.0) for i in range(5)]
+        dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
         # Place events 10h BEFORE each DM — outside the 2h-after window.
         events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'deprecate')
-        self.assertIsNone(result.proposed_threshold_usd)
+        self.assertIsNone(result.proposed_threshold_tokens)
         self.assertEqual(result.tp_count_8w, 0)
         self.assertGreaterEqual(result.event_count_8w, 5)
+
+    def test_deprecate_rationale_uses_token_framing(self):
+        dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
+        events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
+        result = self._run(dms=dms, events=events)
+        self.assertIn('token gate', result.rationale)
+        # No dollar denomination anywhere in the rationale.
+        self.assertNotIn('$', result.rationale)
+        self.assertNotIn('dollar gate', result.rationale)
 
     def test_deprecate_takes_priority_over_lower(self):
         # Even if recall would be < 0.6, deprecate (TP_8w==0, ≥5 events_8w)
         # fires first.
-        dms = [_dm(hours_ago=24 + i * 24, spend=20.0) for i in range(5)]
+        dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
         events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'deprecate')
@@ -299,12 +322,12 @@ class TestRunCheckRules(unittest.TestCase):
         events = []
         for i in range(5):
             base = 24 + i * 6
-            dms.append(_dm(hours_ago=base, spend=50.0))
+            dms.append(_dm(hours_ago=base, usage=8_000_000))
             events.append(_event(hours_ago=base - 0.5))
         events.append(_event(hours_ago=400))  # 1 lonely FN
         result = self._run(dms=dms, events=events)
         self.assertEqual(result.rule_fired, 'none')
-        self.assertIsNone(result.proposed_threshold_usd)
+        self.assertIsNone(result.proposed_threshold_tokens)
 
 
 class TestFixturePatternFilter(unittest.TestCase):
@@ -325,6 +348,29 @@ class TestFixturePatternFilter(unittest.TestCase):
             # Only the real-task-001 entry survives.
             self.assertEqual(len(events), 1)
             self.assertEqual(events[0].task_id, 'real-task-001')
+
+
+class TestLoadCostEntries(unittest.TestCase):
+
+    def test_sums_quota_consuming_tokens_and_excludes_cache_read(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'costs.jsonl'
+            recs = [
+                {'ts': (NOW - timedelta(hours=2)).isoformat(),
+                 'input_tokens': 100, 'output_tokens': 200,
+                 'cache_creation': 1000, 'cache_read': 99999,
+                 'cost_usd': 1.0},
+                {'ts': (NOW - timedelta(hours=3)).isoformat(),
+                 'input_tokens': 50, 'output_tokens': 50,
+                 'cache_creation': 0, 'cache_read': 1000000,
+                 'cost_usd': 0.5},
+            ]
+            path.write_text('\n'.join(json.dumps(r) for r in recs))
+            costs = p8.load_cost_entries(path, now=NOW)
+            self.assertEqual(len(costs), 2)
+            # Tokens = io + cache_creation; cache_read excluded.
+            self.assertEqual(costs[0].usage_tokens, 1300)
+            self.assertEqual(costs[1].usage_tokens, 100)
 
 
 class TestIdempotency(unittest.TestCase):
@@ -353,7 +399,8 @@ class TestIdempotency(unittest.TestCase):
             'as_of': NOW.isoformat(),
             'week_anchor': p8.iso_week_monday(NOW.date()),
             'rule_fired': 'none',
-            'current_threshold': 60.0,
+            'unit': 'tokens',
+            'current_threshold': 10_000_000,
             'proposed_threshold': None,
             'sample_sizes': {'TP': 0, 'FP': 0, 'FN': 0,
                              'DM_count': 0, 'event_count': 0,
@@ -369,6 +416,23 @@ class TestIdempotency(unittest.TestCase):
         self.assertEqual(path, path2)
 
 
+class TestBuildArtifact(unittest.TestCase):
+    """The artifact schema is the contract Beacon's approve flow reads.
+    Pin the field shapes so a refactor can't break the downstream flow."""
+
+    def test_artifact_carries_token_unit_and_int_thresholds(self):
+        result = p8.run_check(
+            dms=[], events=[],
+            costs=[],
+            current_threshold_tokens=10_000_000,
+            now=NOW,
+        )
+        art = p8.build_artifact(result)
+        self.assertEqual(art['unit'], 'tokens')
+        self.assertEqual(art['current_threshold'], 10_000_000)
+        self.assertIsNone(art['proposed_threshold'])
+
+
 class TestFormatDigest(unittest.TestCase):
 
     def _base_artifact(self, rule: str, **kwargs):
@@ -376,8 +440,9 @@ class TestFormatDigest(unittest.TestCase):
             'as_of': '2026-05-25T12:00:00+00:00',
             'week_anchor': '2026-05-25',
             'rule_fired': rule,
-            'current_threshold': 60.0,
-            'proposed_threshold': kwargs.get('proposed', 75.0),
+            'unit': 'tokens',
+            'current_threshold': 10_000_000,
+            'proposed_threshold': kwargs.get('proposed', 12_500_000),
             'sample_sizes': {
                 'TP': 1, 'FP': 9, 'FN': 0,
                 'DM_count': 10, 'event_count': 1,
@@ -388,10 +453,13 @@ class TestFormatDigest(unittest.TestCase):
             'applied': False,
         }
 
-    def test_raise_digest_includes_approve_command(self):
+    def test_raise_digest_includes_approve_command_and_token_units(self):
         digest = p8.format_digest(self._base_artifact('raise'))
         self.assertIn('RAISE', digest)
         self.assertIn('approve check-viii-update-2026-05-25', digest)
+        self.assertIn('10,000,000 tokens', digest)
+        self.assertIn('12,500,000 tokens', digest)
+        self.assertNotIn('$', digest)
 
     def test_none_digest_has_no_approve_command(self):
         a = self._base_artifact('none', proposed=None)
@@ -402,7 +470,9 @@ class TestFormatDigest(unittest.TestCase):
         a = self._base_artifact('deprecate', proposed=None)
         digest = p8.format_digest(a)
         self.assertIn('DEPRECATE', digest)
+        self.assertIn('token gate', digest)
         self.assertIn('approve check-viii-update-2026-05-25', digest)
+        self.assertNotIn('dollar gate', digest)
 
     def test_defer_digest_no_approve(self):
         a = self._base_artifact('defer', proposed=None)

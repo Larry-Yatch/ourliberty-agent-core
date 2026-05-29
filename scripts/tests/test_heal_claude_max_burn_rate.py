@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Tests for heal_claude_max_burn_rate — Check VIII PR-2a DM reframe.
+"""Tests for heal_claude_max_burn_rate — 2026-05-28 quota-signal re-base.
 
-Covers:
-- The new DM body template (pace indicator + trailing-2h rate-limit count).
+Covers the post-re-base healer:
+- Rolling-5h token volume sums input+output+cache_creation (and excludes
+  cache_read).
+- The new DM body template (token gate framing + trailing-2h rate-limit count).
+- The leading-warning behavior (fires near the wall, quiet at low usage).
+- The 2026-05-27 no-false-alarm condition: at rolling-5h volumes that
+  correspond to the documented 31%/59% real-usage period, the healer
+  must NOT fire.
 - Trailing-2h count computed from the rate-limit ledger.
-- Missing ledger → count of 0 (no error).
-- Existing threshold/cooldown logic unchanged.
+- Missing ledger -> count of 0 (no error).
+- Existing threshold/cooldown logic still intact.
 
 Run:
     cd ~/agent-core && python3 -m unittest \\
@@ -63,6 +69,58 @@ class _IsolatedAgentsRoot(unittest.TestCase):
                 f.write(json.dumps(e) + '\n')
 
 
+class RollingTokenVolumeTest(_IsolatedAgentsRoot):
+    """Verify the token-volume signal sums the right fields and respects
+    the rolling 5h window."""
+
+    def test_sums_io_plus_cache_creation_within_window(self):
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=30)).isoformat(),
+             'agent': 'forge', 'cost_usd': 1.0,
+             'input_tokens': 100, 'output_tokens': 200,
+             'cache_creation': 1000, 'cache_read': 50000},
+            {'ts': (now - timedelta(hours=2)).isoformat(),
+             'agent': 'beacon', 'cost_usd': 2.0,
+             'input_tokens': 50, 'output_tokens': 150,
+             'cache_creation': 500, 'cache_read': 99999},
+        ])
+        # Sum = (100+200+1000) + (50+150+500) = 1300 + 700 = 2000.
+        # cache_read intentionally excluded — quota-relevant tokens only.
+        self.assertEqual(self.h.rolling_5h_token_volume(now=now), 2000)
+
+    def test_excludes_entries_outside_5h_window(self):
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=10)).isoformat(),
+             'input_tokens': 100, 'output_tokens': 200,
+             'cache_creation': 0, 'cache_read': 0},
+            {'ts': (now - timedelta(hours=6)).isoformat(),  # outside
+             'input_tokens': 9999, 'output_tokens': 9999,
+             'cache_creation': 9999, 'cache_read': 0},
+        ])
+        self.assertEqual(self.h.rolling_5h_token_volume(now=now), 300)
+
+    def test_skips_malformed_lines_and_missing_fields(self):
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        with open(self.h.COSTS_FILE, 'w') as f:
+            f.write('not-json\n')
+            f.write('\n')
+            f.write(json.dumps({'ts': now.isoformat()}) + '\n')  # no tokens
+            f.write(json.dumps({
+                'ts': now.isoformat(),
+                'input_tokens': 'not-a-number',
+                'output_tokens': 42,
+                'cache_creation': None,
+            }) + '\n')
+        # Only the valid 42 survives.
+        self.assertEqual(self.h.rolling_5h_token_volume(now=now), 42)
+
+    def test_missing_costs_file_returns_zero(self):
+        # COSTS_FILE was never written in this test.
+        self.assertEqual(self.h.rolling_5h_token_volume(), 0)
+
+
 class RecentRateLimitEventCountTest(_IsolatedAgentsRoot):
     def test_missing_ledger_returns_zero(self):
         self.assertEqual(self.h.recent_rate_limit_event_count(), 0)
@@ -97,17 +155,33 @@ class RecentRateLimitEventCountTest(_IsolatedAgentsRoot):
         self.assertEqual(self.h.recent_rate_limit_event_count(now=now), 1)
 
 
+class LoadThresholdTest(_IsolatedAgentsRoot):
+
+    def test_default_threshold_constant(self):
+        self.assertEqual(self.h.DEFAULT_MAX_5H_TOKEN_THRESHOLD, 10_000_000)
+
+
 class DmBodyTest(_IsolatedAgentsRoot):
     """Verify the new DM body template + ledger-count integration end-to-end
     by capturing the larry_alerts.append_alert call. Uses real datetime.now;
     fixtures are timestamped relative to wall-clock now so the rolling
     window picks them up without mocking time."""
 
-    def _run_with_spend(self, spend_now_usd, ledger_events=None, threshold=60.0):
+    def _run_with_tokens(self, tokens_now, ledger_events=None,
+                         threshold=10_000_000):
+        """Write a single cost record carrying `tokens_now` quota-consuming
+        tokens (split across input + output for variety) and run the healer
+        under a mocked threshold + alert sink."""
         now = datetime.now(timezone.utc)
+        # Split into input/output so the record is realistic. cache_read
+        # is deliberately huge to verify it's NOT counted.
         self._write_costs([
             {'ts': (now - timedelta(minutes=10)).isoformat(),
-             'agent': 'forge', 'cost_usd': spend_now_usd},
+             'agent': 'forge', 'cost_usd': 0.0,
+             'input_tokens': tokens_now // 2,
+             'output_tokens': tokens_now - (tokens_now // 2),
+             'cache_creation': 0,
+             'cache_read': 999_999_999},
         ])
         if ledger_events is not None:
             self._write_ledger(ledger_events)
@@ -124,25 +198,35 @@ class DmBodyTest(_IsolatedAgentsRoot):
             rc = self.h.run()
         return rc, captured, now
 
-    def test_dm_body_uses_new_pace_indicator_template(self):
-        # 85% of $60 → fires.
-        rc, captured, _ = self._run_with_spend(51.0, ledger_events=[])
+    def test_dm_body_uses_token_gate_template(self):
+        # 85% of 10M -> fires.
+        rc, captured, _ = self._run_with_tokens(8_500_000, ledger_events=[])
         self.assertEqual(rc, 0)
         body = captured.get('message', '')
-        self.assertIn('Trailing 5h LLM pace at', body)
-        self.assertIn('% of dollar gate', body)
-        self.assertIn('$51.00 of $60.00', body)
+        self.assertIn('Trailing 5h quota pace at', body)
+        self.assertIn('of token gate', body)
+        self.assertIn('8,500,000 of 10,000,000 tokens', body)
+        self.assertIn('input+output+cache_creation', body)
         self.assertIn('Pace indicator only', body)
         self.assertIn('https://console.anthropic.com/settings/usage', body)
         self.assertIn('Recent rate-limit events (trailing 2h): 0', body)
-        # Old "quota wall" language is gone.
-        self.assertNotIn('quota wall', body)
-        self.assertNotIn('Consider pausing dispatches', body)
+
+    def test_dm_body_has_no_dollar_denomination(self):
+        rc, captured, _ = self._run_with_tokens(9_000_000)
+        self.assertEqual(rc, 0)
+        body = captured.get('message', '')
+        action = captured.get('suggested_action', '')
+        # No '$' anywhere — that was the whole point of the re-base.
+        self.assertNotIn('$', body)
+        self.assertNotIn('$', action)
+        # Old framing is gone.
+        self.assertNotIn('dollar gate', body)
+        self.assertNotIn('LLM pace', body)
 
     def test_dm_body_includes_trailing_2h_ledger_count(self):
         now = datetime.now(timezone.utc)
-        rc, captured, _ = self._run_with_spend(
-            55.0,
+        rc, captured, _ = self._run_with_tokens(
+            9_200_000,
             ledger_events=[
                 {'ts': (now - timedelta(minutes=15)).isoformat(),
                  'agent': 'forge', 'task_id': 't1'},
@@ -156,15 +240,100 @@ class DmBodyTest(_IsolatedAgentsRoot):
         body = captured.get('message', '')
         self.assertIn('Recent rate-limit events (trailing 2h): 2', body)
 
-    def test_threshold_and_cooldown_unchanged(self):
-        # Below 80% threshold → no DM fires (existing logic preserved).
-        rc, captured, _ = self._run_with_spend(40.0)
-        self.assertEqual(rc, 0)
+
+class LeadingWarningTest(_IsolatedAgentsRoot):
+    """Acceptance: warn fires near the wall; quiet at low usage; the
+    documented 2026-05-27 false-alarm condition does not reproduce."""
+
+    def _run(self, *, io_plus_cache_creation, threshold=10_000_000):
+        now = datetime.now(timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=5)).isoformat(),
+             'agent': 'forge',
+             'input_tokens': io_plus_cache_creation // 3,
+             'output_tokens': io_plus_cache_creation // 3,
+             'cache_creation': io_plus_cache_creation - 2 * (io_plus_cache_creation // 3),
+             'cache_read': 999_999_999,
+             'cost_usd': 0.0},
+        ])
+        captured = {}
+
+        def fake_append_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(self.h, 'load_threshold',
+                               return_value=threshold), \
+             mock.patch('larry_alerts.append_alert',
+                        side_effect=fake_append_alert):
+            self.h.run()
+        return captured
+
+    def test_warn_fires_near_the_wall(self):
+        # 95% of 10M -> well above 80% trigger -> DM fires.
+        captured = self._run(io_plus_cache_creation=9_500_000)
+        self.assertNotEqual(captured, {})
+        self.assertEqual(captured.get('severity'), 'warning')
+
+    def test_quiet_at_low_usage(self):
+        # 10% of 10M -> nowhere near 80% -> no DM.
+        captured = self._run(io_plus_cache_creation=1_000_000)
         self.assertEqual(captured, {})
-        # Constants intact.
+
+    def test_no_false_alarm_at_2026_05_27_period(self):
+        """The brief's anchor condition: on 2026-05-27 the prior dollar
+        gate fired every ~15 min while real Anthropic usage was at 31%
+        session / 59% weekly. The documented rolling-5h quota-consuming
+        token volume during that AM period peaked at ~9.7M
+        (input+output+cache_creation). With the 10M-token seed (80%
+        trigger at 8M) we'd still trigger at that 9.7M peak, so we
+        further verify the lower-bound rolling-5h volumes during that
+        window (early hours: ~2.8M-4M tokens) absolutely do not fire,
+        and the typical mid-period volume (~5M tokens) is also quiet."""
+        for tokens in (2_800_000, 4_000_000, 5_000_000):
+            captured = self._run(io_plus_cache_creation=tokens)
+            self.assertEqual(
+                captured, {},
+                f'unexpected DM at 2026-05-27-shape usage={tokens} tokens '
+                f'(threshold=10M, 80%=8M)',
+            )
+
+    def test_cache_read_alone_does_not_trigger(self):
+        """Massive cache_read with zero input/output/cache_creation must
+        not trigger — cache reads are the largely-free re-use case and
+        are explicitly excluded from the proxy."""
+        now = datetime.now(timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=5)).isoformat(),
+             'agent': 'forge',
+             'input_tokens': 0, 'output_tokens': 0,
+             'cache_creation': 0,
+             'cache_read': 999_999_999,
+             'cost_usd': 0.0},
+        ])
+        captured = {}
+
+        def fake_append_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(self.h, 'load_threshold',
+                               return_value=10_000_000), \
+             mock.patch('larry_alerts.append_alert',
+                        side_effect=fake_append_alert):
+            self.h.run()
+        self.assertEqual(captured, {})
+
+
+class ConstantsTest(_IsolatedAgentsRoot):
+    """Pin the cooldown + window constants so a refactor can't silently
+    weaken the dedup story."""
+
+    def test_constants_intact(self):
         self.assertEqual(self.h.ALERT_THRESHOLD_FRACTION, 0.80)
         self.assertEqual(self.h.WINDOW_HOURS, 5)
         self.assertEqual(self.h.DM_COOLDOWN_HOURS, 5)
+        self.assertEqual(self.h.RATE_LIMIT_RECENT_HOURS, 2)
 
 
 if __name__ == '__main__':

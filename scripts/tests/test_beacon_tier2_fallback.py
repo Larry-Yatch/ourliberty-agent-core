@@ -321,7 +321,11 @@ class Check8CursorCorruptionTest(_TempDirBase):
 
 
 class BurnRateMonitorTest(_TempDirBase):
-    """79% → no DM. 81% → one DM. 81% on next tick → no second DM."""
+    """79% → no DM. 81% → one DM. 81% on next tick → no second DM.
+
+    Re-based 2026-05-28 onto the token-volume signal — token gate at 10M
+    quota-consuming tokens (input+output+cache_creation), 80% trigger at
+    8M, replacing the prior $60 dollar gate."""
 
     def setUp(self):
         super().setUp()
@@ -337,26 +341,36 @@ class BurnRateMonitorTest(_TempDirBase):
         self.healer.COSTS_FILE = self.tmp / 'blackboard' / 'costs.jsonl'
         self.healer.KILL_SWITCH = self.tmp / 'healers.disabled'
 
-    def _write_costs(self, total_usd: float):
-        # Single entry inside the 5h window summing to total_usd
+    def _write_costs(self, total_tokens: int):
+        # Single entry inside the 5h window summing to total_tokens of
+        # quota-consuming usage. Split across input/output/cache_creation
+        # so the record mirrors real costs.jsonl shape.
         ts = datetime.now(timezone.utc).isoformat()
-        rec = {'ts': ts, 'agent': 'forge', 'cost_usd': total_usd,
-               'model': 'claude-opus-4-7'}
+        rec = {
+            'ts': ts, 'agent': 'forge', 'model': 'claude-opus-4-7',
+            'input_tokens': total_tokens // 3,
+            'output_tokens': total_tokens // 3,
+            'cache_creation': total_tokens - 2 * (total_tokens // 3),
+            'cache_read': 999_999_999,  # excluded — must not affect signal
+            'cost_usd': 0.0,
+        }
         self.healer.COSTS_FILE.write_text(json.dumps(rec) + '\n')
 
     def test_below_threshold_no_dm(self):
-        # Threshold $60 * 0.80 = $48. $47 is 78.3% → no DM.
-        self._write_costs(47.0)
-        with mock.patch.object(self.healer, 'load_threshold', return_value=60.0), \
+        # Threshold 10M * 0.80 = 8M. 7.8M is 78% → no DM.
+        self._write_costs(7_800_000)
+        with mock.patch.object(self.healer, 'load_threshold',
+                               return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert') as dm:
             rc = self.healer.run()
         self.assertEqual(rc, 0)
         dm.assert_not_called()
 
     def test_at_threshold_fires_dm_once(self):
-        # $50 / $60 = 83.3% → fires
-        self._write_costs(50.0)
-        with mock.patch.object(self.healer, 'load_threshold', return_value=60.0), \
+        # 8.3M / 10M = 83% → fires
+        self._write_costs(8_300_000)
+        with mock.patch.object(self.healer, 'load_threshold',
+                               return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm:
             self.healer.run()
@@ -364,14 +378,16 @@ class BurnRateMonitorTest(_TempDirBase):
 
     def test_dm_window_dedup_on_next_tick(self):
         # First tick: fires
-        self._write_costs(50.0)
-        with mock.patch.object(self.healer, 'load_threshold', return_value=60.0), \
+        self._write_costs(8_300_000)
+        with mock.patch.object(self.healer, 'load_threshold',
+                               return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm1:
             self.healer.run()
         self.assertEqual(dm1.call_count, 1)
         # Second tick — same conditions, still high — must NOT fire again
-        with mock.patch.object(self.healer, 'load_threshold', return_value=60.0), \
+        with mock.patch.object(self.healer, 'load_threshold',
+                               return_value=10_000_000), \
              mock.patch.object(self.healer.larry_alerts, 'append_alert',
                                return_value=True) as dm2:
             self.healer.run()
@@ -383,16 +399,16 @@ class BurnRateMonitorTest(_TempDirBase):
                                self.tmp / 'does-not-exist.json'):
             thresh = self.healer.load_threshold()
         self.assertEqual(thresh,
-                         self.healer.DEFAULT_MAX_5H_SPEND_THRESHOLD_USD)
+                         self.healer.DEFAULT_MAX_5H_TOKEN_THRESHOLD)
 
     def test_load_threshold_reads_config(self):
         cfg = self.tmp / 'config.json'
         cfg.write_text(json.dumps({
-            'tier1_quota': {'max_5h_spend_threshold_usd': 99.5}
+            'tier1_quota': {'max_5h_token_threshold': 12_500_000}
         }))
         with mock.patch.object(self.healer, '_CONFIG_FILE', cfg):
             thresh = self.healer.load_threshold()
-        self.assertEqual(thresh, 99.5)
+        self.assertEqual(thresh, 12_500_000)
 
 
 class BurnRateMonitorPurityTest(unittest.TestCase):
