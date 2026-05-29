@@ -39,6 +39,34 @@ fi
 echo "$$" > "$LOCK_FILE"
 trap 'rm -f "$LOCK_FILE"; log "lock released"' EXIT
 
+# --- tier-window gate (PR-β) ---
+# systemd fires every 5 min (Tier 1 cadence); Tier 2/3 sessions self-throttle
+# by sleeping until their next window elapses. The tier state machine lives
+# at ~/agents/state/cycle-tier.json (see scripts/cycle_tier_state.py).
+#
+# Window per tier (seconds): Tier 1 = 300, Tier 2 = 900, Tier 3 = 1800.
+# Idempotency anchor: ~/agents/state/cycle-last-run.flag mtime. Even if the
+# clock skews or systemd fires faster than expected, we never invoke /cycle
+# more than once per Tier-1 window (Mirror review focus #5 + #8).
+TIER_STATE_FLAG="${LOCK_DIR}/cycle-last-run.flag"
+TIER_STATE_JSON=$(python3 "${HOME}/agent-core/scripts/cycle_tier_state.py" read 2>>"$LOG_FILE" || echo '{"tier":1}')
+CURRENT_TIER=$(echo "$TIER_STATE_JSON" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); print(d.get("tier",1))' 2>>"$LOG_FILE" || echo 1)
+case "$CURRENT_TIER" in
+    1) TIER_WINDOW_S=300 ;;
+    2) TIER_WINDOW_S=900 ;;
+    3) TIER_WINDOW_S=1800 ;;
+    *) TIER_WINDOW_S=300 ; log "tier-window: unknown tier=${CURRENT_TIER}; defaulting to 300s" ;;
+esac
+LAST_RUN=$(stat -c %Y "$TIER_STATE_FLAG" 2>/dev/null || stat -f %m "$TIER_STATE_FLAG" 2>/dev/null || echo 0)
+NOW_TS=$(date +%s)
+ELAPSED=$((NOW_TS - LAST_RUN))
+if [ "$ELAPSED" -lt "$TIER_WINDOW_S" ]; then
+    log "tier-window: tier ${CURRENT_TIER} window not elapsed (${ELAPSED}s < ${TIER_WINDOW_S}s); skipping this fire"
+    exit 0
+fi
+touch "$TIER_STATE_FLAG"
+log "tier-window: tier ${CURRENT_TIER}, elapsed=${ELAPSED}s >= ${TIER_WINDOW_S}s; proceeding"
+
 # --- wrong-branch guard ---
 # Added 2026-05-27 (closes 2026-05-26 'merged but not deployed' outage class):
 # run_cycle.sh auto-commits cycle-journal / cycle-actions / Pulse MEMORY on
