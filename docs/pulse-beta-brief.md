@@ -22,7 +22,7 @@
 6. **Systemd cadence change** — `ourliberty-cycle.timer` `OnUnitActiveSec=4h` → `OnUnitActiveSec=5min` (Tier 1 cadence; the script self-throttles to Tier 2/3 windows).
 7. **Test coverage** — unittest for tier state machine, ledger ratio computation, alert-triage lifecycle transitions, each of the 4 new analyzers.
 
-Total file count: ~12-14 new + ~3 modified.
+Total file count: 7 new (3 state libs + 4 analyzers) + 5 test modules + 3 modified.
 
 ---
 
@@ -146,7 +146,7 @@ Three proposal-firing rules per spec § 12.3 with the ≥10/≥20 consecutive th
 
 Artifact: `~/agents/blackboard/pulse-check-vii-proposals/check-vii-<date>.json`. Fires immediately after each new escalation-response row arrives.
 
-#### 8-12. Test files (~5 unittest modules)
+### Test files (~5 unittest modules)
 
 - `scripts/tests/test_cycle_tier_state.py` — tier transitions, atomic-write semantics, corruption-recovery.
 - `scripts/tests/test_cycle_prime_ledger.py` — append + ratio computation + promote logic.
@@ -209,7 +209,7 @@ Update § 5.3 + § 5.7 references from `cycle-actions.jsonl` → `cycle-prime-le
 
 ## Acceptance criteria
 
-- [ ] All 8 new files present (3 state libraries + 4 analyzers + 1 test-helper-or-fixture if needed)
+- [ ] All 7 new files present (3 state libraries + 4 analyzers)
 - [ ] All 5 test files present with passing tests
 - [ ] `scripts/run_cycle.sh` updated with tier-window gate
 - [ ] `systemd/ourliberty-cycle.timer` updated to `OnUnitActiveSec=5min`

@@ -23,7 +23,7 @@ Deliverables in order:
 5. **§ 6.9 Post-hoc DM threshold logic** — encodes Decision IV ($5 cost / 30 min wall / >2 PR cycles thresholds + daily 8:00 MDT digest + guarded-always-immediate carve-out).
 6. **§ 6.10 The plain-language DM template** — single canonical Pulse→Larry message format: `Pulse triaged: <plain language>. Acting: <what the system did or is doing>. Status: <dispatched | merged | verified | failed>. Detail: <expandable raw context>.`
 7. **§ 5.4 Check family overview** — short subsection at end of α₁'s § 5 conditional-checks block, naming Checks III, IV, V, VI, VII with one-line summaries each + cross-reference to the analyzer scripts (which β ships). Existing Check III prose stays where it is in agents/pulse/CLAUDE.md — α₂ just acknowledges the family pattern at cycle-prompt level.
-8. **§ 6.6 Known-pattern allowlist semantics** — Tier-3 known-pattern allowlist seeded from `config/alert-translations.json` (the PR-0 stopgap that became PR #121). Cross-reference, not duplication.
+8. **§ 6.11 Known-pattern allowlist semantics** — Tier-3 known-pattern allowlist seeded from `config/alert-translations.json` (the PR-0 stopgap that became PR #121). Cross-reference, not duplication.
 9. **§ 14 actions-log extension** — extend α₁'s § 14 to also record `triage_decisions` rows in the alert-triage state file at `~/agents/state/alert-triage.json` per lifecycle `pending → triaged-tier-N → action-dispatched → resolved`.
 
 Target file length post-α₂: ~2000 lines (α₁'s ~1200 + α₂'s ~800).
