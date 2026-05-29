@@ -1,0 +1,42 @@
+[Unit]
+Description=Account-rotation scheduler — proactive Tier 1 / Tier 2 drain-then-switch (spec § 6.3)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/rotate_active_tier.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/account-rotation.md
+After=network.target ourliberty-inbox-watcher.service
+Wants=ourliberty-inbox-watcher.service
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Activation gate is the in-config `rotation.enabled` flag, not an
+# environment variable — the script reads config/agent-models.json on
+# every tick and force-tier1's when enabled=false. So the service can
+# stay enabled at the systemd level while the rotation is off in config;
+# flipping enabled=true in config picks up on the next 2-min tick.
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/rotate_active_tier.py --once
+TimeoutStartSec=60
+Nice=10
+# Hardening (matches existing ourliberty-build-sequence-advancer.service).
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents/blackboard /home/larry/agents/logs
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# Bounded memory — a runaway tick must not starve the droplet's bot
+# processes. The scheduler reads a few JSON files and writes one; 128M is
+# generous.
+MemoryMax=128M
+MemoryHigh=64M
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-rotate-active-tier
+
+[Install]
+WantedBy=multi-user.target

@@ -37,6 +37,7 @@ from task_type_inference import infer_task_type
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
+import active_tier  # noqa: E402
 import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
@@ -439,6 +440,21 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         write_invalid(task_file, f"validator: {reason}")
         return
 
+    # Rotation drain + cooldown gate (spec § 6.3). After fixture-suppression
+    # + structural validation (so malformed tasks still write_invalid
+    # promptly), skip dispatching NEW top-level tasks when the rotation
+    # scheduler has opened the drain gate OR the active tier has a
+    # per-account rate-limit cooldown. ALLOW --resume / phase=build|revision
+    # continuations through so in-flight work finishes on its original
+    # account. Mirrors the _emergency_halt_active() pattern: the task stays
+    # in the inbox; the next poll re-evaluates. No archive, no write_invalid
+    # — drain must NEVER drop work, only delay it.
+    rotation_block = _rotation_gate_block_reason(task)
+    if rotation_block:
+        log(f"[{agent}] rotation-gate {rotation_block} blocking new "
+            f"top-level task={task_file.stem} (continuations pass through)")
+        return
+
     # Phase D3 — defense in depth: re-check role-boundary topology even though
     # tasks written via safe_write_inbox already passed it. Catches tasks that
     # bypassed safe_write_inbox (manual drops, future buggy dispatchers).
@@ -627,6 +643,55 @@ def _emergency_halt_active() -> bool:
     requires the operator (no auto-clear) — a tripped halt is sticky until
     investigated."""
     return EMERGENCY_HALT_FILE.exists()
+
+
+def _is_continuation_task(task: dict) -> bool:
+    """True if the envelope is a continuation / --resume dispatch that must
+    NOT be blocked by the rotation gate. Mirrors the resume gate in
+    process_task: a continuation either carries an explicit
+    ``resume_session_id`` (clarification-response writes one under
+    phase=preflight) OR has ``phase in (build, revision)`` (outbox notifier
+    writes these with the target agent's session_id).
+
+    Continuations finish on the original account because session IDs are
+    not portable between OAuth tiers (see agent_runner.TIER2_HOME comment).
+    Blocking them on rotation state would orphan in-flight work."""
+    if not isinstance(task, dict):
+        return False
+    if task.get("resume_session_id"):
+        return True
+    if task.get("phase") in ("build", "revision"):
+        return True
+    return False
+
+
+def _rotation_gate_block_reason(task: dict) -> str | None:
+    """Return a short reason string if the rotation state should block
+    dispatching THIS task, else None. Reasons: ``draining`` (a tier flip is
+    pending; new top-level dispatches must wait) or ``cooldown`` (the
+    active tier has a per-account rate-limit cooldown). Continuations are
+    never blocked — they pass through so in-flight work can finish on its
+    original account.
+
+    Defense-in-depth: any error reading rotation state is treated as
+    open-gate (return None). The gate is an additive guard, not the
+    primary correctness mechanism for the runner."""
+    if _is_continuation_task(task):
+        return None
+    try:
+        state = active_tier.read()
+    except Exception:
+        return None
+    if state.get("draining"):
+        return "draining"
+    tier = state.get("tier")
+    if tier:
+        try:
+            if active_tier.cooldown_until(tier):
+                return "cooldown"
+        except Exception:
+            return None
+    return None
 
 
 def agent_loop(agent: str, models_config: dict) -> None:

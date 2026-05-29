@@ -170,15 +170,15 @@ class AgentRunnerSourceTimezoneTest(unittest.TestCase):
 
     def test_meta_started_at_uses_utc(self):
         # _meta_started_at assignment inside run_claude.
-        self._assert_callsite_uses_utc(target_line=729)
+        self._assert_callsite_uses_utc(target_line=730)
 
     def test_completed_at_uses_utc(self):
         # out_meta['completed_at'] inside run_claude's success branch.
-        self._assert_callsite_uses_utc(target_line=1061)
+        self._assert_callsite_uses_utc(target_line=1100)
 
     def test_process_task_timestamp_uses_utc(self):
         # result['timestamp'] inside process_task.
-        self._assert_callsite_uses_utc(target_line=1527)
+        self._assert_callsite_uses_utc(target_line=1566)
 
     def _assert_callsite_uses_utc(self, target_line: int) -> None:
         # Tolerate ±3 lines of drift from upstream edits before failing
