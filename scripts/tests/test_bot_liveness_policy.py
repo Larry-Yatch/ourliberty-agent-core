@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Tests for scripts/bot_liveness_policy.py.
 
-Covers the five spec-required cases:
+Covers the spec-required cases:
   (1) Malformed policy → BotPolicyError (schema gate).
   (2) systemd-mode liveness reads `systemctl is-active`.
   (3) tmux-or-systemd mode considers BOTH paths.
   (4) recovery_command shape per mode.
   (5) Bot missing from policy defaults to systemd mode.
+  (6) desired_state: valid values gate, default 'up', and the live
+      policy file's `systemd_unit` for every bot resolves to a real
+      unit file on disk (desired-state reconciler enforcement, per
+      desired-state-reconciler-brief.md §6).
 
 Run: python3 -m unittest scripts.tests.test_bot_liveness_policy
 """
@@ -214,6 +218,103 @@ class DefaultModeTest(unittest.TestCase):
     def test_missing_bot_recovery_uses_conventional_unit(self):
         cmd = bot_liveness_policy.recovery_command('newbot', policy=VALID_POLICY)
         self.assertEqual(cmd, 'sudo systemctl restart ourliberty-newbot-bot.service')
+
+
+class DesiredStateSchemaTest(unittest.TestCase):
+    """Case (6) part 1: desired_state validation + default.
+
+    The reconciler reads `desired_state` to decide whether to restart a
+    down bot. A malformed value would silently mis-reconcile (e.g. typo
+    'Down' would default-fall-through to 'up' and the bot would be
+    fought back online). The schema gate catches it at load.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp_path = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_valid_desired_state_up_loads(self):
+        policy = dict(VALID_POLICY)
+        policy['forge'] = {'mode': 'systemd', 'desired_state': 'up',
+                           'systemd_unit': 'ourliberty-forge-bot.service'}
+        p = _write_policy(self._tmp_path, policy)
+        loaded = bot_liveness_policy.load_policy(p)
+        self.assertEqual(bot_liveness_policy.desired_state('forge', policy=loaded), 'up')
+
+    def test_valid_desired_state_down_loads(self):
+        policy = dict(VALID_POLICY)
+        policy['forge'] = {'mode': 'systemd', 'desired_state': 'down',
+                           'systemd_unit': 'ourliberty-forge-bot.service'}
+        p = _write_policy(self._tmp_path, policy)
+        loaded = bot_liveness_policy.load_policy(p)
+        self.assertEqual(bot_liveness_policy.desired_state('forge', policy=loaded), 'down')
+
+    def test_bad_desired_state_raises(self):
+        bad = dict(VALID_POLICY)
+        bad['forge'] = {'mode': 'systemd', 'desired_state': 'Down',
+                        'systemd_unit': 'ourliberty-forge-bot.service'}
+        p = _write_policy(self._tmp_path, bad)
+        with self.assertRaises(bot_liveness_policy.BotPolicyError) as ctx:
+            bot_liveness_policy.load_policy(p)
+        self.assertIn('desired_state', str(ctx.exception))
+
+    def test_absent_desired_state_defaults_to_up(self):
+        # VALID_POLICY entries above don't include desired_state; default is 'up'.
+        self.assertEqual(
+            bot_liveness_policy.desired_state('forge', policy=VALID_POLICY),
+            bot_liveness_policy.DESIRED_UP,
+        )
+
+    def test_missing_bot_defaults_to_up(self):
+        # Bot not in policy at all → default entry → desired_state='up'.
+        self.assertEqual(
+            bot_liveness_policy.desired_state('newbot', policy=VALID_POLICY),
+            'up',
+        )
+
+
+class LivePolicySystemdUnitsTest(unittest.TestCase):
+    """Case (6) part 2: every bot in the shipped policy file resolves a
+    `systemd_unit` whose unit file exists on the droplet.
+
+    The reconciler's actuation path is `sudo systemctl restart <unit>`.
+    A typoed unit name would let the policy validate, the watchdog
+    reconcile happily, and `systemctl restart` silently no-op — exactly
+    the kind of green-without-teeth gate the brief warns against.
+
+    Skipped where /etc/systemd cannot be inspected (e.g. CI runners
+    without our units installed); the assertion has teeth on the droplet
+    where it matters.
+    """
+
+    SYSTEMD_UNIT_DIRS = (
+        Path('/etc/systemd/system'),
+        Path('/usr/lib/systemd/system'),
+        Path('/lib/systemd/system'),
+    )
+
+    def test_every_policy_bot_has_unit_file(self):
+        policy = bot_liveness_policy.load_policy()
+        agents = bot_liveness_policy.policy_agents(policy)
+        self.assertGreater(len(agents), 0, 'policy declares no bots — gate is empty')
+
+        any_dir_present = any(d.exists() for d in self.SYSTEMD_UNIT_DIRS)
+        if not any_dir_present:
+            self.skipTest('no systemd unit directory present (non-droplet env)')
+
+        missing: list[str] = []
+        for agent in agents:
+            unit = bot_liveness_policy.systemd_unit(agent, policy=policy)
+            found = any((d / unit).exists() for d in self.SYSTEMD_UNIT_DIRS if d.exists())
+            if not found:
+                missing.append(f'{agent} -> {unit}')
+        self.assertEqual(
+            missing, [],
+            f'policy bots without an installed unit file: {missing}',
+        )
 
 
 if __name__ == '__main__':

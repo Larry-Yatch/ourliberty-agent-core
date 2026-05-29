@@ -23,15 +23,32 @@ exists to prevent.
 
 ```json
 {
-  "_schema": { "version": 1, "purpose": "...", "default_mode": "systemd" },
+  "_schema": { "version": 2, "purpose": "...", "default_mode": "systemd" },
   "<agent>": {
     "mode": "systemd" | "tmux-or-systemd",
+    "desired_state": "up" | "down",   // optional, defaults to "up"
     "systemd_unit": "<unit>.service",
-    "tmux_session": "<session>",   // tmux-or-systemd only
-    "launcher": "<repo-rel-path>"  // tmux-or-systemd only
+    "tmux_session": "<session>",      // tmux-or-systemd only
+    "launcher": "<repo-rel-path>"     // tmux-or-systemd only
   }
 }
 ```
+
+### desired_state semantics
+
+Operator-declared intent, read by the watchdog desired-state reconciler.
+Defaults to `"up"` when absent.
+
+- **`up`** — reconciler restarts the bot if it goes down (subject to the
+  M=3 attempts / 30 min flapping cap; on exhaustion it pages
+  `bot-reconcile-flapping:<agent>` and stops actuating until the window
+  resets).
+- **`down`** — reconciler will NOT restart the bot, and the per-tick
+  down-alert is suppressed. Use this to hold a bot off deliberately
+  (replaces the mask-unit / kill-healer hack and the TERM-kill emergency
+  stop). If the bot is alive when intent is `down`, the reconciler logs
+  one INFO note about the divergence but does not enforce shutdown —
+  recovery only, not policing.
 
 ### Mode semantics
 
@@ -64,12 +81,11 @@ pre-policy behavior so a dropped entry does not crash the watchdog.
 4. Run `python3 -m unittest scripts.tests.test_bot_liveness_policy` to
    confirm the schema gate is happy.
 
-If the bot is alert-only (which is the default), no further change is
-needed — watchdog derives `ALERT_ONLY_BOTS` from the policy keys minus
-`{'beacon'}`. If the bot needs auto-restart (the beacon-bot carve-out),
-also add it to `AUTO_RESTART_SERVICES` in `scripts/watchdog.py` and
-write the corresponding `check_<agent>_bot()` wrapper around
-`_check_auto_restart`.
+All policy-declared bots are reconciled by `reconcile_bot_desired_state`
+in `scripts/watchdog.py` — there is no longer a separate alert-only set
+or a per-bot auto-restart carve-out. Setting `desired_state: "down"` is
+the supported way to keep a bot off; everything else gets restarted on
+detect-down (within the flapping cap).
 
 ## Rule + enforcement pairing
 
@@ -89,13 +105,15 @@ enforcement mechanism.
 - **Tests.** `scripts/tests/test_bot_liveness_policy.py::LoadPolicyTest`
   asserts each schema-violation shape raises `BotPolicyError`.
 
-## Beacon carve-out
+## Beacon carve-out — retired
 
-`beacon-bot` is auto-restarted (via `_check_auto_restart` from
-`check_beacon_bot()` in `scripts/watchdog.py`), not alert-only, because
-beacon-bot IS the alert delivery channel — an alert about beacon-bot
-being down cannot reach Larry's phone if beacon-bot stays down. The
-policy file lists beacon for completeness (it documents that beacon
-has a liveness mode at all), but `ALERT_ONLY_BOTS` is derived as
-`policy_agents(policy) - {'beacon'}` to keep the carve-out visible in
-one place.
+beacon-bot used to be auto-restarted by a bespoke `check_beacon_bot()`
+path while every other bot was alert-only. With the desired-state
+reconciler that asymmetry is gone: beacon (and pulse, forge, mirror)
+are all reconciled by the same `reconcile_bot_desired_state()` pass.
+This avoids a double-restart race between the bespoke carve-out and the
+reconciler. The original motivation (beacon is the alert delivery
+channel, so an alert about beacon being down cannot reach Larry) is
+preserved — beacon's `desired_state` is `up`, so the reconciler
+restarts it the same way the carve-out used to. See
+`docs/desired-state-reconciler-brief.md` §4d for context.

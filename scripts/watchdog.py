@@ -9,27 +9,27 @@ Checks (9 total):
 
   1. inbox-watcher service active — auto-restart if down
   2. outbox-notifier service active — auto-restart if down
-  3. beacon-bot service active — auto-restart if down (carve-out from the
-     bots-are-alert-only rule, because beacon-bot IS the alert delivery
-     channel; alerts about beacon-bot being down can't reach Larry's phone
-     if beacon-bot stays down. See design review C1)
-  4. inbox-watcher process RSS < 1.5 GB — auto-restart if exceeded
+  3. inbox-watcher process RSS < 1.5 GB — auto-restart if exceeded
      (15 min cooldown; V2 RSS-via-MainPID pattern from upstream)
-  5. inbox-watcher cgroup memory — warn at 80% of MemoryMax, critical at
+  4. inbox-watcher cgroup memory — warn at 80% of MemoryMax, critical at
      95%. Catches the spawned-claude-subprocess overrun shape that the
      V2 single-process check misses. No auto-restart (a child-driven
      cgroup spike that restarts the watcher orphans in-flight tasks)
-  6. Disk usage — warn at 80%, critical at 90%
-  7. System memory — warn at 80%, critical at 90%
-  8. inbox_watcher.log freshness (idle-aware: stale log only matters when
+  5. Disk usage — warn at 80%, critical at 90%
+  6. System memory — warn at 80%, critical at 90%
+  7. inbox_watcher.log freshness (idle-aware: stale log only matters when
      work is queued AND no active workers)
-  9. Bots health — forge/mirror/pulse alert-only (their systemd
-     `Restart=always` handles crashes; watchdog surfaces sustained
-     outages where StartLimitBurst has been exhausted)
+  8. Bot desired-state reconciliation — for each bot in
+     `bot-liveness-policy.json`, restart `desired_state=up` bots that are
+     down (subject to a per-bot M=3 attempts / 30 min flapping cap),
+     suppress the down alert for `desired_state=down` bots, and emit an
+     INFO divergence note for `desired_state=down` bots that are alive.
+     Subsumes the prior beacon-bot carve-out — beacon is reconciled by
+     exactly one mechanism so two paths cannot race to restart it.
 
-Auto-recovery scope: per Q1-Dial-3 with carve-out for beacon-bot, only
-inbox-watcher, outbox-notifier, and beacon-bot get auto-restart. The
-other 3 bots are alert-only.
+Auto-recovery scope: inbox-watcher + outbox-notifier via the original
+`_check_auto_restart` path; every policy-declared bot via the desired-
+state reconciler (driven by `desired_state` in bot-liveness-policy.json).
 
 Alerts route to Larry's phone via the shared `larry_alerts` queue read by
 Beacon's Telegram bot. Local `system-health.json` blackboard summary
@@ -68,32 +68,23 @@ BLACKBOARD = AGENTS_ROOT / 'blackboard'
 LOG_DIR = AGENTS_ROOT / 'logs'
 HEALTH_FILE = BLACKBOARD / 'system-health.json'
 
-# Services watchdog will auto-restart on detect-down. beacon-bot is here
-# (despite being a bot) because it's the alert delivery channel — its
-# down-alert can't reach the user if its consumer is down.
+# Services watchdog will auto-restart on detect-down. Bots are NOT in
+# this list — they are reconciled per the desired-state reconciler below
+# (subsumes the prior beacon-bot carve-out so one mechanism owns bot
+# restart and the two paths cannot race).
 AUTO_RESTART_SERVICES = (
     'ourliberty-inbox-watcher',
     'ourliberty-outbox-notifier',
-    'ourliberty-beacon-bot',
 )
 
-# Bots that watchdog ALERTS on but does not auto-restart. Their systemd
-# units have Restart=always so crash recovery is already automatic;
-# watchdog surfaces the case where StartLimitBurst (10 starts / 300s) is
-# exhausted and systemd has given up.
-#
-# Derived from config/bot-liveness-policy.json minus {'beacon'} — beacon
-# is auto-restarted via _check_auto_restart (carve-out, see
-# check_beacon_bot below) rather than alert-only. The subtraction keeps
-# the carve-out visible in one place; new bots added to the policy file
-# join ALERT_ONLY_BOTS automatically.
-def _derive_alert_only_bots() -> tuple[str, ...]:
-    policy = bot_liveness_policy.load_policy()
-    agents = bot_liveness_policy.policy_agents(policy)
-    return tuple(a for a in agents if a != 'beacon')
-
-
-ALERT_ONLY_BOTS = _derive_alert_only_bots()
+# Desired-state reconciler safety cap: M attempts per WINDOW window.
+# Mirrors systemd's StartLimitBurst philosophy at watchdog cadence. On
+# exhaustion the reconciler stops actuating and emits a single
+# `bot-reconcile-flapping:<bot>` critical alert per window so a true
+# crash-loop pages once and stays paged (the regular per-tick down alert
+# is suppressed once we've given up).
+RECONCILE_MAX_ATTEMPTS = 3
+RECONCILE_WINDOW_SEC = 30 * 60
 
 # Service-active states treated as "alive enough — leave it alone".
 # Includes 'auto-restart' SubState (M1 fix): systemd has scheduled a
@@ -225,12 +216,6 @@ def check_inbox_watcher() -> dict:
 
 def check_outbox_notifier() -> dict:
     return _check_auto_restart('ourliberty-outbox-notifier', 'outbox-notifier')
-
-
-def check_beacon_bot() -> dict:
-    """beacon-bot is the alert delivery channel — auto-restart on detect-down
-    despite being a bot (design review C1 carve-out)."""
-    return _check_auto_restart('ourliberty-beacon-bot', 'beacon-bot')
 
 
 def _inbox_watcher_main_pid() -> int | None:
@@ -530,51 +515,198 @@ def check_log_growth() -> dict:
     }
 
 
-def check_bots() -> dict:
-    """Alert-only sweep over bots declared in bot-liveness-policy.json
-    (minus beacon, which is auto-restarted via the carve-out).
+# ---------- bot desired-state reconciler ----------
 
-    Liveness and the recovery command come from bot_liveness_policy so
-    each bot's deployment mode (systemd vs tmux-or-systemd) is honored
-    — pulse-bot lives in a tmux session after PR #161, so suggesting
-    `sudo systemctl restart` would start a second instance fighting for
-    getUpdates. The alert subject embeds the observed mode
-    (`bots:<agent>:<mode>`, e.g. `bots:pulse:tmux`, `bots:pulse:down`)
-    so alert-translations can render mode-correct plain-language text.
 
-    M3 fix preserved: subject-specific cooldown keys so each bot has
-    its own dedup bucket.
+def _reconcile_marker_path(short: str) -> Path:
+    return AGENTS_ROOT / 'state' / f'{short}-reconcile-cooldown'
+
+
+def _read_reconcile_marker(short: str, now: float) -> dict:
+    """Return rolling-window state for `short`: window_start, count, paged.
+
+    Window auto-resets when current time is past `window_start + WINDOW`,
+    so a bot that recovered and re-failed gets a fresh attempt budget.
+    Malformed markers reset to a fresh window — better than tripping the
+    cap from corrupt JSON.
+    """
+    path = _reconcile_marker_path(short)
+    fresh = {'window_start': now, 'count': 0, 'paged': False}
+    if not path.exists():
+        return fresh
+    try:
+        data = json.loads(path.read_text())
+        window_start = float(data['window_start'])
+        count = int(data['count'])
+        paged = bool(data.get('paged', False))
+    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        return fresh
+    if now - window_start > RECONCILE_WINDOW_SEC:
+        return fresh
+    return {'window_start': window_start, 'count': count, 'paged': paged}
+
+
+def _write_reconcile_marker(short: str, state: dict) -> None:
+    path = _reconcile_marker_path(short)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state))
+    except OSError:
+        pass
+
+
+def _attempt_restart(unit: str, wait_sec: int = 5) -> bool:
+    """Run `sudo -n systemctl restart <unit>`, wait briefly, return aliveness.
+
+    Mirrors `_attempt_start` but uses `restart` because the reconciler is
+    invoked for both freshly-down units (where start/restart are equivalent)
+    and units that may have residual failed state needing reset.
+    """
+    try:
+        subprocess.run(['sudo', '-n', 'systemctl', 'restart', unit],
+                       capture_output=True, timeout=30)
+    except Exception as e:
+        log(f'{unit} restart exception: {e}', 'ERROR')
+        return False
+    time.sleep(wait_sec)
+    return is_service_alive(unit)
+
+
+def reconcile_bot_desired_state() -> dict:
+    """Reconcile each policy-declared bot toward its `desired_state`.
+
+    For each bot in `config/bot-liveness-policy.json`:
+      - `up`+alive   -> no-op; reset the flapping window (clean recovery).
+      - `up`+down    -> `sudo -n systemctl restart <unit>` (subject to
+                        M=3 attempts / 30 min cap). Emits `bots:<bot>:down`
+                        critical while still attempting; switches to
+                        `bot-reconcile-flapping:<bot>` once the cap is
+                        hit, and suppresses the per-tick down alert from
+                        that point until the window resets.
+      - `down`+down  -> no-op; alert suppressed (intended state must not page).
+      - `down`+alive -> leave it (reconciler restores availability, it does
+                        not enforce shutdown). Emits one INFO log line
+                        about the intent/actual divergence — surfaced in
+                        watchdog.log rather than as a Larry-paging alert
+                        because nothing is broken.
+
+    SubState='auto-restart' is treated as alive via `is_service_alive`
+    so we never race systemd's own pending restart (M1 fix preserved).
+
+    Subsumes the prior beacon-bot carve-out: beacon is restarted by
+    exactly one mechanism (this reconciler), removing the double-restart
+    race with the bespoke `check_beacon_bot` carve-out.
     """
     policy = bot_liveness_policy.load_policy()
+    now = time.time()
     results: dict = {}
-    down: list[str] = []
-    for short in ALERT_ONLY_BOTS:
-        service = f'ourliberty-{short}-bot'
-        alive, mode_used = bot_liveness_policy.check_liveness(short, policy=policy)
-        results[service] = mode_used if alive else 'inactive'
-        if alive:
+    for short in bot_liveness_policy.policy_agents(policy):
+        intent = bot_liveness_policy.desired_state(short, policy=policy)
+        unit = bot_liveness_policy.systemd_unit(short, policy=policy)
+        alive = is_service_alive(unit)
+        entry: dict = {'desired': intent, 'alive': alive, 'unit': unit}
+
+        if intent == bot_liveness_policy.DESIRED_UP and alive:
+            entry['action'] = 'noop'
+            marker = _reconcile_marker_path(short)
+            if marker.exists():
+                try:
+                    marker.unlink()
+                except OSError:
+                    pass
+            results[short] = entry
             continue
-        down.append(service)
+
+        if intent == bot_liveness_policy.DESIRED_DOWN and not alive:
+            log(f'{unit} is down per desired_state=down — alert suppressed', 'INFO')
+            entry['action'] = 'suppressed'
+            results[short] = entry
+            continue
+
+        if intent == bot_liveness_policy.DESIRED_DOWN and alive:
+            log(
+                f'{unit} is alive but desired_state=down — reconciler does not '
+                f'enforce shutdown; leave running',
+                'INFO',
+            )
+            entry['action'] = 'divergence'
+            results[short] = entry
+            continue
+
+        # intent == up, alive == False: attempt recovery within window.
+        state = _read_reconcile_marker(short, now)
+        if state['count'] >= RECONCILE_MAX_ATTEMPTS:
+            entry['action'] = 'flapping'
+            entry['attempts'] = state['count']
+            if not state['paged']:
+                log(
+                    f'{unit} reconcile flapping: {state["count"]} restart attempts '
+                    f'in {int((now - state["window_start"])/60)}m — halting actuation, paging',
+                    'ERROR',
+                )
+                larry_alerts.append_alert(
+                    source='watchdog',
+                    severity='critical',
+                    subject=f'bot-reconcile-flapping:{short}',
+                    message=(
+                        f'{unit} crash-looping: reconciler attempted '
+                        f'{state["count"]} restarts in '
+                        f'{RECONCILE_WINDOW_SEC // 60} min and gave up. '
+                        f'Further restarts halted until window resets.'
+                    ),
+                    suggested_action=(
+                        f'sudo systemctl status {unit} && '
+                        f'sudo journalctl -u {unit} -n 100'
+                    ),
+                )
+                state['paged'] = True
+                _write_reconcile_marker(short, state)
+            results[short] = entry
+            continue
+
+        # Within budget: attempt restart, increment counter.
+        state['count'] += 1
+        _write_reconcile_marker(short, state)
         log(
-            f'{service} is DOWN — alert-only (systemd Restart=always handles '
-            f'crash recovery; watchdog surfaces sustained outage)',
+            f'{unit} is DOWN with desired_state=up — restart attempt '
+            f'{state["count"]}/{RECONCILE_MAX_ATTEMPTS}',
             'WARN',
         )
-        larry_alerts.append_alert(
-            source='watchdog',
-            severity='critical',
-            subject=f'bots:{short}:{mode_used}',
-            message=(
-                f'{service} is DOWN. All policy-declared liveness paths '
-                'failed to report alive.'
-            ),
-            suggested_action=bot_liveness_policy.recovery_command(short, policy=policy),
-        )
-    return {
-        'status': 'critical' if down else 'ok',
-        'services': results,
-        'down': down,
-    }
+        recovered = _attempt_restart(unit)
+        entry['action'] = 'restarted' if recovered else 'restart_failed'
+        entry['attempts'] = state['count']
+        if recovered:
+            log(f'{unit} recovered via reconciler', 'INFO')
+            larry_alerts.append_alert(
+                source='watchdog',
+                severity='warning',
+                subject=f'bots:{short}:recovered',
+                message=(
+                    f'{unit} was down; reconciler restarted it '
+                    f'(attempt {state["count"]}/{RECONCILE_MAX_ATTEMPTS}).'
+                ),
+            )
+        else:
+            larry_alerts.append_alert(
+                source='watchdog',
+                severity='critical',
+                subject=f'bots:{short}:down',
+                message=(
+                    f'{unit} is DOWN; reconciler restart attempt '
+                    f'{state["count"]}/{RECONCILE_MAX_ATTEMPTS} failed.'
+                ),
+                suggested_action=f'sudo systemctl restart {unit}',
+            )
+        results[short] = entry
+
+    statuses = [e.get('action') for e in results.values()]
+    if any(s in ('flapping', 'restart_failed') for s in statuses):
+        overall = 'critical'
+    elif any(s == 'restarted' for s in statuses):
+        overall = 'recovered'
+    else:
+        overall = 'ok'
+    return {'status': overall, 'bots': results}
 
 
 # ---------- orchestration ----------
@@ -587,13 +719,12 @@ def run_all_checks() -> dict:
         'checks': {
             'inbox_watcher': check_inbox_watcher(),
             'outbox_notifier': check_outbox_notifier(),
-            'beacon_bot': check_beacon_bot(),
             'inbox_watcher_memory': check_inbox_watcher_memory(),
             'inbox_watcher_cgroup': check_inbox_watcher_cgroup(),
             'disk': check_disk(),
             'memory': check_memory(),
             'log_growth': check_log_growth(),
-            'bots': check_bots(),
+            'bots': reconcile_bot_desired_state(),
         },
     }
     statuses = [c.get('status', 'ok') for c in results['checks'].values()]
