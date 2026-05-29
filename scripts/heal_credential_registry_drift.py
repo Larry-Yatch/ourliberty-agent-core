@@ -51,7 +51,7 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
@@ -78,6 +78,12 @@ _GH_SCOPES_RE = re.compile(r"Token scopes:\s*(.+)$", re.MULTILINE)
 
 GH_TIMEOUT_S = 15
 GIT_TIMEOUT_S = 30
+CLAUDE_AUTH_TIMEOUT_S = 20
+
+TIER1_HOME = '/home/larry'
+TIER2_HOME = '/home/larry/.claude-larry-personal'
+TIER_DISTINCTNESS_NAME = 'tier-distinctness'
+TIER_DISTINCTNESS_KIND = 'claude-oauth'
 
 
 # -------------------- logging + heartbeat --------------------
@@ -644,6 +650,179 @@ def _activation_message() -> tuple[str, str, str]:
     return message, subject, suggested
 
 
+# -------------------- tier distinctness --------------------
+
+def _run_claude_auth_status(
+    home: str, timeout_s: int = CLAUDE_AUTH_TIMEOUT_S,
+) -> tuple[str, Optional[str]]:
+    """Probe `claude auth status` under `HOME=home`. Returns (status, identity).
+
+    status is one of:
+      - 'ok' — process exited 0, stdout parsed, loggedIn=true; identity is
+        the orgId (preferred) or email (fallback) as a non-empty string.
+      - 'logged_out' — stdout parsed, loggedIn=false.
+      - 'unparseable' — JSON parse failed OR loggedIn=true but no orgId/email
+        OR subprocess errored with a non-timeout failure (gone CLI, OSError).
+      - 'timeout' — subprocess.TimeoutExpired. Caller treats this as
+        'unknown' and does NOT alarm — see check_tier_distinctness.
+
+    The CLI emits JSON when stdout is non-TTY (which is always the case
+    under capture_output=True). Verified 2026-05-28 against the prod
+    binary: orgId is a stable UUID per Anthropic org, email is the
+    account address. orgId is preferred because the email of a duped
+    tier looks identical to the original — only orgId reliably
+    distinguishes accounts that share a login address.
+    """
+    env = {**os.environ, 'HOME': home, 'PATH': '/usr/bin:/usr/local/bin:/snap/bin'}
+    try:
+        result = subprocess.run(
+            ['claude', 'auth', 'status'],
+            capture_output=True, text=True, timeout=timeout_s, env=env,
+        )
+    except subprocess.TimeoutExpired:
+        return ('timeout', None)
+    except (FileNotFoundError, OSError) as e:
+        log(f'_run_claude_auth_status({home}): subprocess failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return ('unparseable', None)
+
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return ('unparseable', None)
+    if not isinstance(data, dict):
+        return ('unparseable', None)
+    if not data.get('loggedIn'):
+        return ('logged_out', None)
+    org_id = data.get('orgId')
+    email = data.get('email')
+    identity = org_id if isinstance(org_id, str) and org_id else email
+    if not isinstance(identity, str) or not identity:
+        return ('unparseable', None)
+    return ('ok', identity)
+
+
+def _render_tier_distinctness(reason: str) -> tuple[str, str, str]:
+    """Build (message, subject, suggested_action) for the tier-distinctness DM."""
+    message = (
+        f'Tier 1 and Tier 2 Claude OAuth credentials are NOT distinct: '
+        f'{reason}. The Tier 1→Tier 2 fallback in `agent_runner.py` '
+        f'cannot relieve rate limits when both tiers authenticate as the '
+        f'same account (or either tier is logged-out / unparseable) — '
+        f'the fallback becomes a silent no-op. Origin: '
+        f'`agents/beacon/specs/account-rotation.md` § 6.1, and the '
+        f'2026-05-28 incident where Tier 2 returned identical "resets 3:30pm" '
+        f'messages because both tiers shared one account.'
+    )
+    subject = (
+        f'{TIER_DISTINCTNESS_NAME}:{TIER_DISTINCTNESS_KIND}'
+    )
+    suggested = (
+        f'Re-authenticate Tier 2 against a DIFFERENT Claude.ai account than '
+        f'Tier 1: `HOME={TIER2_HOME} claude` and complete the OAuth flow. '
+        f'Tier 1 lives at `{TIER1_HOME}/.claude/.credentials.json`; Tier 2 '
+        f'must end up at `{TIER2_HOME}/.claude/.credentials.json` with a '
+        f'distinct orgId. After re-auth, manually verify with '
+        f'`scripts/heal_credential_registry_drift.py --check-tiers` — '
+        f'it will re-probe both tiers and re-DM only if still not distinct.'
+    )
+    return message, subject, suggested
+
+
+def check_tier_distinctness(
+    state: dict[str, Any],
+    now: Optional[datetime] = None,
+    probe: Optional[Callable[[str], tuple[str, Optional[str]]]] = None,
+) -> tuple[dict[str, int], set[str]]:
+    """Run `claude auth status` under each tier HOME and DM Larry when the
+    tiers are not distinct.
+
+    DM fires when:
+      - both tiers ok but identity strings match (Tier 2 silently logging in
+        as Tier 1's account — the 2026-05-28 failure mode), OR
+      - either tier reports loggedIn=false (cannot authenticate), OR
+      - either tier returns unparseable JSON / subprocess error (state we
+        can't reason about — safer to surface than to ignore).
+
+    No DM and no state change when either tier times out: a transient
+    `claude auth status` hang must NOT page Larry. The prior alarm state
+    (if any) is preserved across timeouts.
+
+    Dedup is shared with the rest of the healer via `_should_re_dm` /
+    `_record_dm` keyed `{TIER_DISTINCTNESS_NAME}:{TIER_DISTINCTNESS_KIND}`.
+
+    Returns (counts, live_keys). `live_keys` carries the canonical drift
+    key when the alarm state should be preserved (alarming or recently
+    alarmed and timed out), and is empty when the tiers are healthy —
+    `run_once` merges this into its GC sweep so a previously-alarmed entry
+    is cleared from state when the operator fixes the underlying duplicate.
+    """
+    counts = {
+        'tier_distinct': 0, 'tier_identical': 0,
+        'tier_logged_out': 0, 'tier_unparseable': 0, 'tier_timeout': 0,
+        'tier_dm_sent': 0, 'tier_dm_suppressed_dedup': 0,
+    }
+    runner = probe or _run_claude_auth_status
+    drift_key = _drift_key(TIER_DISTINCTNESS_NAME, TIER_DISTINCTNESS_KIND)
+    live_keys: set[str] = set()
+
+    s1, id1 = runner(TIER1_HOME)
+    s2, id2 = runner(TIER2_HOME)
+
+    if s1 == 'timeout' or s2 == 'timeout':
+        counts['tier_timeout'] = 1
+        log(
+            f'tier-distinctness: probe timed out (tier1={s1}, tier2={s2}); '
+            f'treating as unknown — no DM, no state change', 'WARN',
+        )
+        if drift_key in state.get('drifts', {}):
+            live_keys.add(drift_key)
+        return counts, live_keys
+
+    if s1 == 'ok' and s2 == 'ok' and id1 != id2:
+        counts['tier_distinct'] = 1
+        return counts, live_keys
+
+    reason_parts: list[str] = []
+    for label, status, ident in (('Tier 1', s1, id1), ('Tier 2', s2, id2)):
+        if status == 'ok':
+            reason_parts.append(f'{label} ok ({ident})')
+        elif status == 'logged_out':
+            reason_parts.append(f'{label} logged-out')
+            counts['tier_logged_out'] = 1
+        elif status == 'unparseable':
+            reason_parts.append(f'{label} unparseable')
+            counts['tier_unparseable'] = 1
+    if s1 == 'ok' and s2 == 'ok' and id1 == id2:
+        counts['tier_identical'] = 1
+        reason = f'both tiers authenticate as identity `{id1}`'
+    else:
+        reason = '; '.join(reason_parts)
+
+    live_keys.add(drift_key)
+
+    if not _should_re_dm(
+        state, TIER_DISTINCTNESS_NAME, TIER_DISTINCTNESS_KIND, now=now,
+    ):
+        counts['tier_dm_suppressed_dedup'] = 1
+        return counts, live_keys
+
+    msg, subj, sug = _render_tier_distinctness(reason)
+    if dm_larry(
+        message=msg, subject=subj, suggested_action=sug, severity='warning',
+    ):
+        counts['tier_dm_sent'] = 1
+        _record_dm(
+            state, TIER_DISTINCTNESS_NAME, TIER_DISTINCTNESS_KIND, now=now,
+        )
+        log(f'DM sent: tier-distinctness ({reason})')
+    else:
+        log(
+            f'DM append suppressed for tier-distinctness ({reason})', 'WARN',
+        )
+    return counts, live_keys
+
+
 # -------------------- main --------------------
 
 def run_once(
@@ -696,6 +875,12 @@ def run_once(
     )
 
     drifts, live_keys = detect_drift(registry, scan_overrides=scan_overrides)
+
+    tier_counts, tier_live_keys = check_tier_distinctness(state, now=now)
+    counts.update(tier_counts)
+    counts['dm_sent'] += tier_counts['tier_dm_sent']
+    counts['dm_suppressed_dedup'] += tier_counts['tier_dm_suppressed_dedup']
+    live_keys |= tier_live_keys
 
     for name, kind, payload in drifts:
         if kind == 'MISSING_REGISTRY_ENTRY':
@@ -770,12 +955,45 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             'tree directly, no fetch, no fallback DM.'
         ),
     )
+    parser.add_argument(
+        '--check-tiers',
+        action='store_true',
+        help=(
+            'One-shot manual run of the tier-distinctness check only. '
+            'Skips the registry-drift scan and the origin/main fetch. '
+            'Probes `claude auth status` under HOME=/home/larry (Tier 1) '
+            'and HOME=/home/larry/.claude-larry-personal (Tier 2); DMs '
+            'Larry on identical orgIds, logged-out, or unparseable '
+            'output. Honors the standard 6h dedup window so manual '
+            'invocations do not bypass the cooldown.'
+        ),
+    )
     return parser.parse_args(argv)
+
+
+def run_tier_check_only() -> dict[str, int]:
+    """One-shot tier-distinctness probe — used by `--check-tiers`.
+
+    Skips the kill-switch and heartbeat (this is an operator-driven manual
+    run, not a healer tick). Loads + saves state so the 6h dedup cooldown
+    still applies across manual invocations.
+    """
+    state = load_state()
+    counts, _ = check_tier_distinctness(state)
+    save_state(state)
+    log(
+        'check-tiers one-shot: '
+        + ' '.join(f'{k}={v}' for k, v in counts.items() if v),
+    )
+    return counts
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     try:
+        if args.check_tiers:
+            run_tier_check_only()
+            return 0
         run_once(source=args.source)
         return 0
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge
