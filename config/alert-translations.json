@@ -123,8 +123,8 @@
     "claude_max_5h_burn_threshold_breached": {
       "severity": "INFO",
       "tier": "FYI",
-      "plain_language_summary": "The trailing-5h imputed-dollar 'pace' figure crossed its threshold. On our OAuth Max plan this is NOT money spent (there is no per-token billing) and only a rough proxy for the rolling-5h usage window. The real quota signal is the Anthropic usage page and the rate-limit-event ledger. A re-base of this healer onto the real quota signal (dropping the dollar framing) is already queued.",
-      "recommended_action": "No action required and no money is being spent — treat this as a soft heads-up only. For actual quota headroom, check https://console.anthropic.com/settings/usage or ~/agents/blackboard/anthropic-quota-events.jsonl (real rate-limit events). Do NOT hold or gate work on this dollar number — that gate is deprecated."
+      "plain_language_summary": "The trailing-5h Tier 1 quota-consuming token volume (input + output + cache_creation, from costs.jsonl; cache_read excluded) crossed 80% of the configured pace gate (tier1_quota.max_5h_token_threshold). This is a leading proxy for the real rolling-5h Anthropic rate-limit window — heads-up that sustained pace will hit the wall if it continues. No money is involved (OAuth Max has no per-token billing); the prior dollar framing was retired 2026-05-28.",
+      "recommended_action": "Decide whether to pause dispatches or let the rolling-5h window cycle out. For ground-truth quota state, check https://console.anthropic.com/settings/usage; for the actual rate-limit-event log, see ~/agents/blackboard/anthropic-quota-events.jsonl. The threshold is auto-tuned weekly by scripts/pulse_check_viii.py against precision/recall on the event ledger — don't hand-tune."
     }
   },
   "heal-tier2-weekly-probe": {
