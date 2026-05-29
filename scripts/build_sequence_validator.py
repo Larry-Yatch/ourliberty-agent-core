@@ -83,6 +83,13 @@ REQUIRED_STEP_FIELDS = (
     'current_actor', 'failure_reason',
 )
 
+# Per spec `agents/beacon/specs/operator-ux-gap-log-field.md`: optional
+# sequence-level field for structured mid-run gap findings. Each entry
+# requires these four string fields. Severity taxonomy is intentionally
+# unenumerated (spec § 3 open question — NOW/SOON/FYI vs low/medium/high
+# unresolved); the validator type-checks but doesn't constrain the value.
+REQUIRED_GAP_LOG_ENTRY_FIELDS = ('ts', 'severity', 'finding', 'surfaced_by')
+
 
 @dataclass
 class ValidationResult:
@@ -150,6 +157,39 @@ def _check_top_level_types(seq: dict[str, Any], errors: list[str]) -> None:
         errors.append('steps list is empty — a sequence with zero steps is meaningless')
     if not isinstance(seq.get('audit_log'), list):
         errors.append('audit_log must be a list')
+
+
+def _check_gap_log(seq: dict[str, Any], errors: list[str]) -> None:
+    """Validate the optional `gap_log` field if present.
+
+    Absent gap_log is fine (existing sequences validate unchanged). When
+    present, must be a list of dicts each carrying string `ts`, `severity`,
+    `finding`, `surfaced_by`. Severity values are not enumerated — spec
+    § 3 leaves the taxonomy open."""
+    if 'gap_log' not in seq:
+        return
+    log = seq['gap_log']
+    if not isinstance(log, list):
+        errors.append('gap_log must be a list')
+        return
+    for idx, entry in enumerate(log):
+        if not isinstance(entry, dict):
+            errors.append(
+                f'gap_log[{idx}] is {type(entry).__name__}, expected dict'
+            )
+            continue
+        missing = [f for f in REQUIRED_GAP_LOG_ENTRY_FIELDS if f not in entry]
+        if missing:
+            errors.append(
+                f'gap_log[{idx}] missing required field(s): {sorted(missing)}'
+            )
+            continue
+        for field_name in REQUIRED_GAP_LOG_ENTRY_FIELDS:
+            value = entry[field_name]
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f'gap_log[{idx}] {field_name} must be a non-empty string'
+                )
 
 
 def _check_step_shape(step: Any, idx: int, errors: list[str]) -> bool:
@@ -334,6 +374,7 @@ def validate_dag(sequence_dict: Any) -> ValidationResult:
     if not _check_top_level_shape(sequence_dict, errors):
         return ValidationResult(valid=False, errors=errors, seq_id=seq_id)
     _check_top_level_types(sequence_dict, errors)
+    _check_gap_log(sequence_dict, errors)
     steps = sequence_dict.get('steps')
     if not isinstance(steps, list) or not steps:
         # Already flagged in _check_top_level_types.

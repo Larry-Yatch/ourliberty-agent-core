@@ -241,6 +241,96 @@ class TestValidateDagSchema(unittest.TestCase):
         self.assertFalse(result.valid)
 
 
+class TestValidateGapLog(unittest.TestCase):
+    """Spec: agents/beacon/specs/operator-ux-gap-log-field.md.
+
+    `gap_log` is an optional sequence-level field. Existing sequences
+    (gap_log absent) MUST continue to validate. When present, entries are
+    type-checked but severity values are not enumerated."""
+
+    def _entry(self, **overrides) -> dict:
+        base = {
+            'ts': '2026-05-28T13:42:00Z',
+            'severity': 'medium',
+            'finding': 'Message 2 unreachable without notification',
+            'surfaced_by': 'bootstrap-003-verifier',
+        }
+        base.update(overrides)
+        return base
+
+    def test_absent_gap_log_validates(self):
+        seq = _valid_sequence()
+        self.assertNotIn('gap_log', seq)
+        self.assertTrue(bsv.validate_dag(seq).valid)
+
+    def test_empty_gap_log_validates(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = []
+        self.assertTrue(bsv.validate_dag(seq).valid)
+
+    def test_valid_gap_log_entry(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = [self._entry()]
+        self.assertTrue(bsv.validate_dag(seq).valid)
+
+    def test_multiple_valid_entries(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = [
+            self._entry(),
+            self._entry(severity='FYI', surfaced_by='pulse-check-ix'),
+        ]
+        self.assertTrue(bsv.validate_dag(seq).valid)
+
+    def test_gap_log_not_a_list(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = 'not a list'
+        result = bsv.validate_dag(seq)
+        self.assertFalse(result.valid)
+        self.assertTrue(any('gap_log must be a list' in e for e in result.errors))
+
+    def test_gap_log_entry_not_a_dict(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = ['oops']
+        result = bsv.validate_dag(seq)
+        self.assertFalse(result.valid)
+        self.assertTrue(any('gap_log[0]' in e for e in result.errors))
+
+    def test_gap_log_entry_missing_field(self):
+        seq = _valid_sequence()
+        entry = self._entry()
+        del entry['ts']
+        seq['gap_log'] = [entry]
+        result = bsv.validate_dag(seq)
+        self.assertFalse(result.valid)
+        self.assertTrue(any("'ts'" in e for e in result.errors))
+
+    def test_gap_log_entry_non_string_field(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = [self._entry(severity=3)]
+        result = bsv.validate_dag(seq)
+        self.assertFalse(result.valid)
+        self.assertTrue(
+            any('severity' in e and 'non-empty string' in e
+                for e in result.errors)
+        )
+
+    def test_gap_log_entry_empty_string_field(self):
+        seq = _valid_sequence()
+        seq['gap_log'] = [self._entry(finding='   ')]
+        result = bsv.validate_dag(seq)
+        self.assertFalse(result.valid)
+        self.assertTrue(
+            any('finding' in e and 'non-empty string' in e
+                for e in result.errors)
+        )
+
+    def test_gap_log_severity_not_enumerated(self):
+        """Spec § 3 leaves taxonomy open — any non-empty string works."""
+        seq = _valid_sequence()
+        seq['gap_log'] = [self._entry(severity='wildly-custom-tier')]
+        self.assertTrue(bsv.validate_dag(seq).valid)
+
+
 class TestValidateNoConcurrentActive(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
