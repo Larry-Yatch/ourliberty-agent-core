@@ -27,33 +27,36 @@ Target size: ~1200 lines total (current 486 + ~700 net add).
 
 ## Audit of current state — what stays, what changes
 
-Read [`runbooks/cycle-prompt.md`](../runbooks/cycle-prompt.md) in full before drafting. Current 486-line structure:
+Read [`runbooks/cycle-prompt.md`](../runbooks/cycle-prompt.md) in full before drafting. Current 523-line structure (as of HEAD 2026-05-29, post-#179 Check IX add):
 
 | Current section | Lines | α₁ disposition |
 |---|---|---|
 | Mission filter | 9-15 | **Keep verbatim.** No change. |
 | § 1 Read continuity | 19-23 | **Keep + extend.** Add reads for `cycle-tier.json` and `cycle-actions.jsonl` ratio context. |
-| § 2 Health Check Suite intro + classify-finding rubric | 25-40 | **Keep + extend.** Same nominal/always-fix/ask-then-do/never-auto/route taxonomy. Add `tier-reset` as a side-effect any finding may emit (§ 5.2 last paragraph). |
-| Check A — Source repo discipline | 42-58 | **Keep.** Re-home under new "§ 2b Additive checks (every iter)" — not part of the new mandatory 5, but still load-bearing. |
-| Check B — Sync health | 60-78 | **Keep** under § 2b additive checks. |
-| Check C — Agent process liveness | 80-100 | **Keep** under § 2b additive checks. |
-| Check D — Inbox / dispatch state | 102-115 | **Fold into new Check 3** (chain_events stall scan). The Check 3 scan + heal_pipeline_stall.py cross-reference subsume what Check D was doing manually. Preserve the duplicate-archive + malformed-JSON always-fix actions in § 3 auto-fix allow-list. |
-| Check E — PR / merge state | 117-130 | **Keep** under § 2b additive checks. Re-frame to acknowledge auto-merge healer is now in front of this. |
-| Check F — Cost / quota signals | 132-145 | **Replace.** Subsumed by Tier-1 escalation + § 5.6 WARN-vs-INFO + Decision III soft-cap (note: Decision III ships in α₂; α₁ leaves a stub `(see α₂ post-merge for Decision III soft-cap)`). |
-| Check H — Forge activity digest | 147-170 | **Keep** under § 2b additive checks. |
-| Credential rotation check (E1.5.2) | 172-205 | **Keep** under § 2b additive checks. Long-form unchanged. |
-| Check I — Optimization mode (Mon/Wed/Fri/Sun) | 207-245 | **Keep** as a conditional check. Re-home under new "§ 2c Conditional/Periodic checks" subsection. Trigger logic unchanged. |
-| Check VIII — Burn-rate signal validity (Mondays) | 247-285 | **Keep** under § 2c conditional checks. Trigger logic unchanged. |
-| Check G — Pattern detection | 287-323 | **Replace by PRIME DIRECTIVE accounting** (§ 5.3). The pattern-detection routing rules (Forge/Beacon/Mirror/Pulse cycle-prompt edit + the `cycle-fix-<slug>.json` envelope shape) survive in the new "permanent-fix dispatch protocol" subsection. The "no direct-commit path" doctrine + the doctrine-of-doctrine mechanism rule stay verbatim. |
-| Fixture-pattern allowlist | 289-322 (inline above) | **Keep verbatim.** No change. Referenced by Checks 1-5 the same way it's referenced by current Checks A-I. |
-| § 3 Auto-fix allow-list | 324-362 | **Keep verbatim.** No change in scope. Add tier-reset side-effect note. |
-| § 4 Write the journal entry | 363-382 | **Extend.** Add `Tier:` field (current tier + consecutive_clean count), `PRIME DIRECTIVE ratio:` field, `Leverage proposals:` field (if quiet-iter). |
-| § 5 Write the actions log | 383-390 | **Extend.** Append also to `cycle-actions.jsonl` per § 5.3 (NEW file separate from `cycle-actions.jsonl` already used for auto-fix actions — verify naming during build: spec calls it `cycle-actions.jsonl` and so does current prompt; they're the same file or different? OPEN QUESTION 1 below). |
-| § 6 Send escalations | 391-418 | **Keep verbatim.** No change. |
-| § 7 End the cycle (with no-direct-commit doctrine from PR #157) | 419-428 | **Keep verbatim.** The PR #157 doctrine is load-bearing and must not be diluted. |
-| § 8 Dispatch task format | 429-467 | **Keep verbatim.** Reference table for the `cycle-fix-<slug>.json` envelope shape. |
-| When the cycle should NOT run | 468-479 | **Keep + extend.** Add tier-state corruption case (§ 5.3 risks table row). |
-| When you genuinely don't know | 480-486 | **Keep verbatim.** |
+| § 2 Health Check Suite intro + classify-finding rubric | 25-36 | **Keep + extend.** Same nominal/always-fix/ask-then-do/never-auto/route taxonomy. Add `tier-reset` as a side-effect any finding may emit (§ 5.2 last paragraph). |
+| Check A — Source repo discipline | 37-53 | **Keep.** Re-home under new "§ 4 Additive checks (every iter)" — not part of the new mandatory 5, but still load-bearing. |
+| Check B — Sync health | 54-69 | **Keep** under § 4 additive checks. |
+| Check C — Agent process liveness | 70-87 | **Keep** under § 4 additive checks. |
+| Check D — Inbox / dispatch state | 88-106 | **Fold into new Check 3** (chain_events stall scan). The Check 3 scan + heal_pipeline_stall.py cross-reference subsume what Check D was doing manually. Preserve the duplicate-archive + malformed-JSON always-fix actions in § 11 auto-fix allow-list. |
+| Check E — PR / merge state | 107-121 | **Keep** under § 4 additive checks. Re-frame to acknowledge auto-merge healer is now in front of this. |
+| Check F — Cost / quota signals | 122-134 | **Replace.** Subsumed by Tier-1 escalation + § 9 WARN-vs-INFO + Decision III soft-cap (note: Decision III ships in α₂; α₁ leaves a stub `(see α₂ post-merge for Decision III soft-cap)`). |
+| Check H — Forge activity digest | 135-154 | **Keep** under § 4 additive checks. |
+| Credential rotation check (E1.5.2) | 155-184 | **Keep** under § 4 additive checks. Long-form unchanged. |
+| Check I — Optimization mode (Mon/Wed/Fri/Sun) | 185-227 | **Keep** as a conditional check. Re-home under new "§ 5 Conditional/Periodic checks" subsection. Trigger logic unchanged. |
+| Check VIII — Burn-rate signal validity (Mondays) | 228-263 | **Keep** under § 5 conditional checks. Trigger logic unchanged. |
+| Check IX — Operator-friction signal (Mondays) | 264-299 | **Keep** under § 5 conditional checks alongside Check VIII. Trigger logic unchanged. PR #179 added 2026-05-28, just before this brief was drafted; missions-API integration + sentinel-cum-artifact shape mirror Check VIII. |
+| Check G — Pattern detection | 300-324 | **Replace by PRIME DIRECTIVE accounting** (§ 5.3). The pattern-detection routing rules (Forge/Beacon/Mirror/Pulse cycle-prompt edit + the `cycle-fix-<slug>.json` envelope shape) survive in the new "permanent-fix dispatch protocol" subsection. The "no direct-commit path" doctrine + the doctrine-of-doctrine mechanism rule stay verbatim. |
+| Fixture-pattern allowlist | 325-360 | **Keep verbatim.** No change. Referenced by Checks 1-5 the same way it's referenced by current Checks A-IX. |
+| § 3 Auto-fix allow-list | 361-399 | **Keep verbatim.** No change in scope. Add tier-reset side-effect note. |
+| § 4 Write the journal entry | 400-419 | **Extend.** Add `Tier:` field (current tier + consecutive_clean count), `PRIME DIRECTIVE ratio:` field, `Leverage proposals:` field (if quiet-iter). |
+| § 5 Write the actions log | 420-427 | **Extend** — see OQ1 below; same-name collision with the PRIME DIRECTIVE ledger needs resolution. |
+| § 6 Send escalations | 428-455 | **Keep verbatim.** No change. |
+| § 7 End the cycle (with no-direct-commit doctrine from PR #157) | 456-465 | **Keep verbatim.** The PR #157 doctrine is load-bearing and must not be diluted. |
+| § 8 Dispatch task format | 466-504 | **Keep verbatim.** Reference table for the `cycle-fix-<slug>.json` envelope shape. |
+| When the cycle should NOT run | 505-516 | **Keep + extend.** Add tier-state corruption case (§ 5.3 risks table row). |
+| When you genuinely don't know | 517-523 | **Keep verbatim.** |
+
+**Disposition count:** 20 Keep / 1 Fold / 2 Replace. Total 23 rows in the audit table.
 
 ---
 
@@ -84,6 +87,7 @@ After applying the audit above, the α₁ file should read in this order:
 6. § 5 Conditional/Periodic checks (~100 lines, mostly preserved)
    - 5.1 Check I — Optimization mode (Mon/Wed/Fri/Sun)
    - 5.2 Check VIII — Burn-rate signal validity (Mondays)
+   - 5.3 Check IX — Operator-friction signal (Mondays)
 7. § 6 PRIME DIRECTIVE — intervention + systemic-fix accounting (NEW, ~150 lines)
    - 6.1 The directive verbatim from § 5.3
    - 6.2 Empirical-verification gating + dual-clock-anchor rule (§ 5.3 Mirror PR #108 amendment)
@@ -155,7 +159,7 @@ Default Option A unless preflight CLARIFY surfaces an issue.
 
 ## Acceptance criteria
 
-- [ ] All audit-table dispositions reflected (12 keep + 4 fold + 4 replace per current count above)
+- [ ] All audit-table dispositions reflected (20 keep + 1 fold + 2 replace per current count above)
 - [ ] All new sections (§§ 2, 3, 6, 7, 8, 9, 10 in target order) present with the spec-cited content
 - [ ] Total file length 1100-1300 lines (target ~1200)
 - [ ] No α₂ scope leaked
