@@ -357,11 +357,15 @@ class ApplySkipTests(_HelpersHarness):
         # `skipped` step status.
         self.assertEqual(b['status'], 'merged')
         self.assertIsNotNone(b['merged_at'])
-        last = on_disk['audit_log'][-1]
-        self.assertEqual(last['event'], 'step-skipped')
-        self.assertEqual(last['step_id'], 'b')
-        self.assertEqual(last['actor'], 'larry')
-        self.assertEqual(last['reason'], 'Work done out-of-band via hotfix')
+        # The skip flips the last non-terminal step in this fixture, so
+        # finalization also appends a sequence-completed entry after the
+        # step-skipped one. Find step-skipped by event, not by position.
+        skipped = next(
+            e for e in on_disk['audit_log'] if e['event'] == 'step-skipped'
+        )
+        self.assertEqual(skipped['step_id'], 'b')
+        self.assertEqual(skipped['actor'], 'larry')
+        self.assertEqual(skipped['reason'], 'Work done out-of-band via hotfix')
         # `skipped` is NOT a valid step status per the schema enum.
         self.assertNotIn('skipped', bsv.VALID_STEP_STATUS)
         v = bsv.validate_dag(on_disk)
@@ -378,9 +382,11 @@ class ApplySkipTests(_HelpersHarness):
         self._write_sequence(seq)
         result = ssh.apply_skip('sk-no-reason', 'a', actor='larry')
         self.assertTrue(result.applied)
-        last = self._read_sequence('sk-no-reason')['audit_log'][-1]
-        self.assertEqual(last['event'], 'step-skipped')
-        self.assertNotIn('reason', last)
+        skipped = next(
+            e for e in self._read_sequence('sk-no-reason')['audit_log']
+            if e['event'] == 'step-skipped'
+        )
+        self.assertNotIn('reason', skipped)
 
     def test_idempotent_when_step_already_merged(self):
         seq = _make_sequence(
@@ -656,6 +662,244 @@ class ApplyStepMergedTests(_HelpersHarness):
         on_disk = self._read_sequence('step-merged-003')
         step1 = next(s for s in on_disk['steps'] if s['step_id'] == 'step-1')
         self.assertEqual(step1['status'], 'merged')
+
+
+# ============================================================================
+# Sequence-completion finalization (fix-apply-skip-finalization)
+#
+# Coverage for the _check_sequence_completion helper wired into
+# apply_skip and apply_step_merged. The zombie-active gap surfaced on
+# operator-ux-rollout 2026-05-29: skip mutated the final step to merged
+# but never triggered the sequence-level rollup, leaving status=active +
+# current_steps naming the just-skipped step.
+# ============================================================================
+
+
+class SequenceCompletionFinalizationTests(_HelpersHarness):
+
+    def test_skip_on_last_pending_step_finalizes_sequence(self):
+        """apply_skip on the final non-terminal step → sequence flips
+        active → complete, current_steps cleared, audit_log records
+        sequence-completed attributed to the apply_skip caller."""
+        seq = _make_sequence(
+            seq_id='fin-skip-last',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='failed'),
+            ],
+            current_steps=['b'],
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_skip(
+            'fin-skip-last', 'b', actor='larry',
+            reason='superseded by replacement mission',
+        )
+        self.assertTrue(result.applied)
+        self.assertFalse(result.error)
+        on_disk = self._read_sequence('fin-skip-last')
+        self.assertEqual(on_disk['status'], 'complete')
+        self.assertEqual(on_disk['current_steps'], [])
+        events = [e['event'] for e in on_disk['audit_log']]
+        self.assertIn('step-skipped', events)
+        self.assertIn('sequence-completed', events)
+        completion = on_disk['audit_log'][-1]
+        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['actor'], 'larry')
+        self.assertIn('ts', completion)
+        # Schema invariant holds across the finalization mutation.
+        v = bsv.validate_dag(on_disk)
+        self.assertTrue(v.valid, v.errors)
+
+    def test_skip_on_non_last_step_does_not_finalize(self):
+        """apply_skip on a non-last step → step flips to merged and is
+        removed from current_steps, but the sequence stays active with
+        the other steps still present in current_steps."""
+        seq = _make_sequence(
+            seq_id='fin-skip-mid',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='failed'),
+                _make_step('c', deps=['a'], status='dispatched',
+                           dispatched_at='2026-05-27T02:00:00Z'),
+            ],
+            current_steps=['b', 'c'],
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_skip('fin-skip-mid', 'b', actor='larry')
+        self.assertTrue(result.applied)
+        on_disk = self._read_sequence('fin-skip-mid')
+        # Sequence stays live; only the skipped step leaves current_steps.
+        self.assertEqual(on_disk['status'], 'active')
+        self.assertEqual(on_disk['current_steps'], ['c'])
+        events = [e['event'] for e in on_disk['audit_log']]
+        self.assertNotIn('sequence-completed', events)
+
+    def test_step_merged_on_last_pending_step_finalizes_sequence(self):
+        """apply_step_merged on the final non-terminal step → sequence
+        rollup fires. Validates the substantive-mutation finalization
+        path (the canonical AUTO_MERGE flow that motivated V6)."""
+        seq = _make_sequence(
+            seq_id='fin-merged-last',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='dispatched',
+                           dispatched_at='2026-05-27T02:00:00Z'),
+            ],
+            current_steps=['b'],
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='fin-merged-last',
+            step_id='b',
+            pr_url='https://github.com/x/y/pull/77',
+            merged_at='2026-05-27T03:00:00Z',
+            actor='notifier',
+        )
+        self.assertTrue(result.applied)
+        on_disk = self._read_sequence('fin-merged-last')
+        self.assertEqual(on_disk['status'], 'complete')
+        self.assertEqual(on_disk['current_steps'], [])
+        completion = on_disk['audit_log'][-1]
+        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['actor'], 'notifier')
+
+    def test_step_merged_idempotency_branch_finalizes_zombie_sequence(self):
+        """The zombie-recovery path: step was previously skipped to
+        merged but the sequence never finalized (pre-fix world). A later
+        apply_step_merged call on the same step short-circuits the
+        step-level mutation but the new idempotency-branch finalization
+        call still flips the sequence to complete."""
+        seq = _make_sequence(
+            seq_id='fin-zombie',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='merged',
+                           merged_at='2026-05-27T02:00:00Z'),
+            ],
+            current_steps=['b'],  # zombie residue from the pre-fix skip
+        )
+        self._write_sequence(seq)
+        result = ssh.apply_step_merged(
+            seq_id='fin-zombie',
+            step_id='b',
+            pr_url='https://github.com/x/y/pull/88',
+            merged_at='2026-05-27T03:00:00Z',
+            actor='notifier',
+        )
+        # Step-level no-op (was already merged), but sequence finalized.
+        self.assertFalse(result.applied)
+        self.assertFalse(result.error)
+        on_disk = self._read_sequence('fin-zombie')
+        self.assertEqual(on_disk['status'], 'complete')
+        self.assertEqual(on_disk['current_steps'], [])
+        completion = on_disk['audit_log'][-1]
+        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['actor'], 'notifier')
+
+    def test_cancel_then_all_merged_keeps_failed_status(self):
+        """Regression guard: a cancelled (status=failed) sequence whose
+        remaining steps later get flipped to merged must NOT auto-flip
+        to complete — apply_cancel is operator-overriding terminal."""
+        seq = _make_sequence(
+            seq_id='fin-cancel-then-merge',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='dispatched',
+                           dispatched_at='2026-05-27T02:00:00Z'),
+            ],
+            current_steps=['b'],
+        )
+        self._write_sequence(seq)
+        cancel_result = ssh.apply_cancel(
+            'fin-cancel-then-merge', actor='larry', reason='abandoned',
+        )
+        self.assertTrue(cancel_result.applied)
+        # Now flip the last step to merged via the notifier path.
+        merged_result = ssh.apply_step_merged(
+            seq_id='fin-cancel-then-merge',
+            step_id='b',
+            pr_url='https://github.com/x/y/pull/9',
+            merged_at='2026-05-27T03:00:00Z',
+            actor='notifier',
+        )
+        self.assertTrue(merged_result.applied)
+        on_disk = self._read_sequence('fin-cancel-then-merge')
+        # Sequence stays failed; finalization gate refused to overwrite.
+        self.assertEqual(on_disk['status'], 'failed')
+        events = [e['event'] for e in on_disk['audit_log']]
+        self.assertNotIn('sequence-completed', events)
+
+    def test_double_finalization_is_idempotent(self):
+        """Calling _check_sequence_completion twice on the same
+        already-finalized sequence: second call is a clean no-op (no
+        duplicate sequence-completed audit entry, no mutation)."""
+        seq = _make_sequence(
+            seq_id='fin-double',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+            ],
+            current_steps=['a'],
+        )
+        self._write_sequence(seq)
+        # First trigger: step-merged-on-zombie path finalizes.
+        ssh.apply_step_merged(
+            seq_id='fin-double',
+            step_id='a',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at='2026-05-27T02:00:00Z',
+            actor='notifier',
+        )
+        after_first = self._read_sequence('fin-double')
+        self.assertEqual(after_first['status'], 'complete')
+        completed_count = sum(
+            1 for e in after_first['audit_log']
+            if e['event'] == 'sequence-completed'
+        )
+        self.assertEqual(completed_count, 1)
+        # Second trigger: same call again. Step still merged, sequence
+        # already complete → no further mutation, no audit churn.
+        ssh.apply_step_merged(
+            seq_id='fin-double',
+            step_id='a',
+            pr_url='https://github.com/x/y/pull/1',
+            merged_at='2026-05-27T02:00:00Z',
+            actor='notifier',
+        )
+        after_second = self._read_sequence('fin-double')
+        self.assertEqual(after_second, after_first)
+
+    def test_skip_passes_actor_through_to_completion_audit(self):
+        """The sequence-completed audit entry carries the apply_skip
+        caller's actor, not a hardcoded value. Mirrors the per-call
+        attribution Beacon needs for the dashboard build-sequences tab."""
+        seq = _make_sequence(
+            seq_id='fin-skip-actor',
+            status='active',
+            steps=[
+                _make_step('a', status='merged',
+                           merged_at='2026-05-27T01:00:00Z'),
+                _make_step('b', deps=['a'], status='failed'),
+            ],
+            current_steps=['b'],
+        )
+        self._write_sequence(seq)
+        ssh.apply_skip('fin-skip-actor', 'b', actor='beacon')
+        on_disk = self._read_sequence('fin-skip-actor')
+        completion = on_disk['audit_log'][-1]
+        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['actor'], 'beacon')
 
 
 if __name__ == '__main__':

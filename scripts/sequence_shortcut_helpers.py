@@ -166,6 +166,43 @@ def _find_step(seq: dict[str, Any], step_id: str) -> Optional[dict[str, Any]]:
     return None
 
 
+def _check_sequence_completion(seq: dict[str, Any], actor: str) -> bool:
+    """If every step in `seq` is `merged` AND the sequence is currently in
+    a live state (`active` or `pending`), mutate `seq` in place to
+    finalize: status → `complete`, current_steps → [], append a
+    `sequence-completed` audit_log entry attributed to `actor`. Returns
+    True iff a finalization mutation was applied.
+
+    Why: the zombie-active gap surfaced on operator-ux-rollout
+    (2026-05-29) — apply_skip mutated the final pending step to merged
+    but never ran the rollup, leaving status=active and current_steps
+    naming the just-skipped step. Centralizing the rollup here lets
+    apply_step_merged AND apply_skip share one finalization path; the
+    apply_step_merged idempotency branch can also call it so a
+    skipped-then-real-merge ordering still finalizes.
+
+    Idempotent: a sequence already in any non-live status (complete,
+    failed, paused, archived) is a no-op — terminal statuses are
+    operator-overriding (apply_cancel sets failed; auto-flip to complete
+    would silently undo the cancel). The caller owns atomic write.
+    """
+    if seq.get('status') not in ('active', 'pending'):
+        return False
+    steps = seq.get('steps') or []
+    if not steps:
+        return False
+    if not all(step.get('status') == 'merged' for step in steps):
+        return False
+    seq['status'] = 'complete'
+    seq['current_steps'] = []
+    _append_audit(seq, {
+        'ts': _now_iso(),
+        'event': 'sequence-completed',
+        'actor': actor,
+    })
+    return True
+
+
 # -------------------- pause / resume --------------------
 
 
@@ -446,6 +483,9 @@ def apply_skip(
     now = _now_iso()
     step['status'] = 'merged'
     step['merged_at'] = now
+    seq['current_steps'] = [
+        s for s in (seq.get('current_steps') or []) if s != step_id
+    ]
     entry: dict[str, Any] = {
         'ts': now,
         'event': 'step-skipped',
@@ -455,6 +495,7 @@ def apply_skip(
     if reason:
         entry['reason'] = reason
     _append_audit(seq, entry)
+    _check_sequence_completion(seq, actor)
     write_err = _atomic_write(path, seq)
     if write_err is not None:
         return write_err
@@ -530,6 +571,14 @@ def apply_step_merged(
 
     current = step.get('status')
     if current == 'merged':
+        # Step-level no-op, but a previously-skipped step that never
+        # triggered the rollup (or any pre-existing zombie-active state)
+        # gets one more chance to finalize the sequence here.
+        finalized = _check_sequence_completion(seq, actor)
+        if finalized:
+            write_err = _atomic_write(path, seq)
+            if write_err is not None:
+                return write_err
         return Result(
             applied=False,
             reason=(
@@ -553,6 +602,7 @@ def apply_step_merged(
         'pr_url': pr_url,
         'actor': actor,
     })
+    _check_sequence_completion(seq, actor)
     write_err = _atomic_write(path, seq)
     if write_err is not None:
         return write_err
