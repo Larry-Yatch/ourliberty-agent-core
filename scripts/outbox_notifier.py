@@ -219,35 +219,31 @@ _GH_PR_URL_RE = re.compile(
     r'^https?://github\.com/([^/]+/[^/]+)/pull/(\d+)',
 )
 
-# Chain discipline v3 GAP 2 (2026-05-26) — pr_url repo-coords allowlist.
-# PR #107 review surfaced Mirror emitting a pr_url with `lyatch/agent-core`
-# (missing 'L', stripped 'ourliberty-' prefix); AUTO_MERGE couldn't act on
-# the mangled URL. Validate the parsed (owner/repo) against the allowlist
-# before any gate runs; on mismatch, attempt a canonical-form rewrite once
-# against the known-wrong prefixes below. If the rewrite resolves to an
-# allowlisted repo, log INFO PR_URL_REWRITTEN + proceed; otherwise queue an
-# alert to Larry and skip the merge attempt.
-_PR_URL_REPO_ALLOWLIST = (
-    'Larry-Yatch/ourliberty-agent-core',
-    'Larry-Yatch/ourliberty-dashboard',
+# Structural pr_url validator (2026-05-29 — structural-pr-url-validator).
+# Replaces the prior name-based repo-coords allowlist + canonical-form
+# rewrite table. The AUTO_MERGE gate now validates two intrinsic
+# properties of the pr_url: (1) shape — does it match the canonical
+# `https://github.com/Larry-Yatch/<allowed-repo>/pull/<N>` form with N>=1,
+# and (2) existence — does the PR actually exist and have state=OPEN
+# (Layer 2, `gh pr view`). Anchored start-and-end so trailing junk
+# (anchors, query strings, doctored fragments) is rejected — at this
+# layer we want the exact form `gh pr merge` needs, nothing else.
+# Hardcodes the two operating-environment repos rather than reading
+# config: Larry-Yatch + the two repos are ground truth, not configurable
+# at runtime (env vars / extra config files would just be another moving
+# part that can drift).
+_PR_URL_STRUCTURAL_RE = re.compile(
+    r'^https://github\.com/Larry-Yatch/'
+    r'(ourliberty-agent-core|ourliberty-dashboard)/pull/([1-9]\d*)$'
 )
 
-# Wrong-prefix variants observed in the wild OR plausibly typo-derivable
-# from the canonical owner. Lowercase-comparison driven, so the rewrite
-# logic stays case-tolerant. Order doesn't matter — the rewrite tries each.
-_PR_URL_WRONG_OWNER_PREFIXES = (
-    'lyatch',
-    'larryyatch',
-    'larry-yatch',  # case-only variant of the canonical owner
-)
-
-# Wrong repo-name variants observed in the wild. Mirror stripped the
-# 'ourliberty-' prefix on PR #107; we re-add it on rewrite. Order matters
-# only so far as the rewrite picks the first allowlisted match.
-_PR_URL_REPO_REWRITES = {
-    'agent-core': 'ourliberty-agent-core',
-    'dashboard': 'ourliberty-dashboard',
-}
+# Existence-check timeout. Tighter than _AUTO_MERGE_TIMEOUT_S (30s) because
+# this is the cheap "does the PR exist" probe; if `gh pr view` doesn't
+# answer in 10s the right behavior is to skip the merge attempt entirely,
+# not hold the notifier's poll loop. Treated structurally identically to
+# a 404 — the discipline is "don't shell out to gh pr merge unless we
+# already know the PR is real and open".
+_PR_URL_EXISTENCE_TIMEOUT_S = 10
 
 # D3.5 commit 5d — fallback cap when config is missing/malformed. The
 # config (`loop_bounds.cost_per_task_usd`) has been pre-staged since 5a at
@@ -3340,109 +3336,73 @@ def _dispatch_mirror_review_rerun(
         )
 
 
-def _validate_or_rewrite_pr_url(pr_url: str) -> tuple[Optional[str], Optional[str]]:
-    """Validate `pr_url`'s repo coords against the allowlist; on mismatch,
-    attempt a single canonical-form rewrite using known-wrong prefixes.
+def _pr_url_shape_check(
+    pr_url: Any,
+) -> tuple[Optional[str], Optional[int], str]:
+    """Layer 1 of the AUTO_MERGE pr_url validator — pure regex shape check.
 
-    Chain discipline v3 GAP 2. Returns `(canonical_url, rewrite_reason)`:
+    Returns `(repo_coords, pr_number, reason)`. On valid shape:
+    `('Larry-Yatch/<repo>', <int>, 'ok')`. On invalid shape:
+    `(None, None, '<short diagnostic>')`.
 
-      - `(pr_url, None)` — already allowlisted; no rewrite needed.
-      - `(canonical_url, reason)` — rewrite succeeded; caller should log
-        INFO PR_URL_REWRITTEN and proceed with `canonical_url`.
-      - `(None, reason)` — neither validation nor rewrite resolves to an
-        allowlisted repo. Caller should alert Larry and skip the merge.
-
-    The `reason` string is a short human-readable diagnostic for log/alert
-    rendering. No shell-out; pure string manipulation against the
-    regex-extracted (owner, repo) tuple.
+    No shell-out; no network. The whole point of Layer 1 is to fail fast
+    on garbage URLs (`pull/0`, wrong-owner spoofs, fixture-generated
+    pointers to nonexistent repos) before any shell-out to `gh pr view`
+    or `gh pr merge`. Anchored start-and-end so trailing junk after the
+    PR number is rejected — at the AUTO_MERGE layer we want the exact
+    canonical form, nothing fuzzy.
     """
     if not isinstance(pr_url, str) or not pr_url:
-        return None, 'empty or non-string pr_url'
-    m = _GH_PR_URL_RE.search(pr_url)
+        return None, None, 'empty-or-non-string'
+    m = _PR_URL_STRUCTURAL_RE.match(pr_url)
     if not m:
-        return None, f'pr_url does not match github.com PR shape: {pr_url!r}'
-    repo_coords = m.group(1)
-    if repo_coords in _PR_URL_REPO_ALLOWLIST:
-        return pr_url, None
-    # Mismatch — try a canonical-form rewrite. Split owner/repo,
-    # case-insensitively check whether owner is one of the known-wrong
-    # variants, and whether repo is one of the known-wrong (or repo-prefix-
-    # stripped) shapes.
-    parts = repo_coords.split('/', 1)
-    if len(parts) != 2:
-        return None, f'pr_url repo coords malformed: {repo_coords!r}'
-    owner, repo = parts
-    owner_lower = owner.lower()
-    repo_lower = repo.lower()
-    rewritten_owner: Optional[str] = None
-    if owner_lower in _PR_URL_WRONG_OWNER_PREFIXES:
-        rewritten_owner = 'Larry-Yatch'
-    rewritten_repo: Optional[str] = None
-    if repo_lower in _PR_URL_REPO_REWRITES:
-        rewritten_repo = _PR_URL_REPO_REWRITES[repo_lower]
-    elif repo in (canonical.split('/', 1)[1] for canonical in _PR_URL_REPO_ALLOWLIST):
-        rewritten_repo = repo  # repo name was already canonical
-    if rewritten_owner is None and rewritten_repo is None:
-        return None, (
-            f'pr_url repo coords {repo_coords!r} not in allowlist '
-            f'(neither owner nor repo matched known-wrong variants)'
-        )
-    final_owner = rewritten_owner or owner
-    final_repo = rewritten_repo or repo
-    canonical_coords = f'{final_owner}/{final_repo}'
-    if canonical_coords not in _PR_URL_REPO_ALLOWLIST:
-        return None, (
-            f'pr_url rewrite produced {canonical_coords!r} which is still '
-            f'not in allowlist'
-        )
-    # Substitute the corrected coords back into the URL. Preserve the
-    # post-PR-number tail (anchor, query string, etc.) by splicing at the
-    # regex match boundaries.
-    canonical_url = pr_url[:m.start(1)] + canonical_coords + pr_url[m.end(1):]
-    return canonical_url, f'rewrote {repo_coords!r} → {canonical_coords!r}'
+        return None, None, 'shape-mismatch'
+    repo = m.group(1)
+    return f'Larry-Yatch/{repo}', int(m.group(2)), 'ok'
 
 
-def _alert_larry_pr_url_unrewritable(
-    pr_url: str, task_id: str, reason: str,
-    canonical_guess: Optional[str] = None,
-) -> None:
-    """Queue a Larry alert when pr_url validation + rewrite both fail.
+def _pr_url_existence_state(
+    repo_coords: str, pr_number: int,
+) -> tuple[Optional[str], str]:
+    """Layer 2 of the AUTO_MERGE pr_url validator — gh-backed existence check.
 
-    Chain discipline v3 GAP 2. Fires when Mirror's pr_url can't be
-    resolved to an allowlisted repo even after one canonical-form retry.
-    Alert subject keys on task_id so the per-subject cooldown doesn't
-    suppress different mangled PRs. Suggested action carries the
-    canonical-form guess (if any) so Larry can paste-and-fix.
+    Returns `(state, reason)`. On success: `('OPEN'|'CLOSED'|'MERGED', 'ok')`.
+    On failure: `(None, '<short diagnostic>')` — covers 404 (PR doesn't
+    exist), timeout, gh-cli missing, parse error.
+
+    Treats timeout the same as not-found by collapsing both into a `None`
+    state at the call site. The discipline is "don't shell out to
+    `gh pr merge` unless we already know the PR exists" — a degraded gh
+    that can't answer in `_PR_URL_EXISTENCE_TIMEOUT_S` is structurally
+    equivalent to not-found for safety purposes (the next poll cycle
+    retries naturally if the outbox hasn't archived; it has, in our
+    case — but a real PR's REVIEW_PASS marker doesn't re-arrive
+    spontaneously, so the cost of a transient gh outage skipping a real
+    merge is bounded to "Larry runs `gh pr merge` manually" which is the
+    same cost as the existing `_AUTO_MERGE_FN_OVERRIDE`-less failure path).
     """
-    body_lines = [
-        f'Mirror REVIEW_PASS on task `{task_id}` carried an unrecognized '
-        f'pr_url; AUTO_MERGE was NOT attempted.',
-        f'Original pr_url: {pr_url}',
-        f'Validator: {reason}',
-    ]
-    if canonical_guess:
-        body_lines.append(f'Canonical-form guess: {canonical_guess}')
-    suggested_action = (
-        f'Verify the PR URL is for a tracked repo '
-        f'({", ".join(_PR_URL_REPO_ALLOWLIST)}). If the guess is correct, '
-        f'manually merge: `gh pr merge <N> --repo <owner/repo> --squash '
-        f'--delete-branch`. If Mirror emitted a mangled URL, file a '
-        f'marker-discipline followup so the test catches the shape.'
-    )
     try:
-        larry_alerts.append_alert(
-            source='outbox-notifier',
-            severity='warning',
-            message='\n'.join(body_lines),
-            subject=f'pr-url-unrewritable:{task_id}',
-            suggested_action=suggested_action,
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords, '--json', 'state'],
+            capture_output=True, text=True,
+            timeout=_PR_URL_EXISTENCE_TIMEOUT_S,
         )
-    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
-        log(
-            f'pr_url unrewritable alert raised for task {task_id}: '
-            f'{type(e).__name__}: {e}',
-            'WARN',
-        )
+    except subprocess.TimeoutExpired:
+        return None, f'timeout after {_PR_URL_EXISTENCE_TIMEOUT_S}s'
+    except (FileNotFoundError, OSError) as e:
+        return None, f'{type(e).__name__}: {e}'
+    if proc.returncode != 0:
+        stderr = (proc.stderr or '').strip().replace('\n', ' ')[:200]
+        return None, f'gh exit={proc.returncode}: {stderr or "no stderr"}'
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None, 'parse-error'
+    state = data.get('state')
+    if not isinstance(state, str):
+        return None, 'no-state-field'
+    return state, 'ok'
 
 
 def _parse_pr_url(pr_url: str) -> Optional[tuple[str, int]]:
@@ -6526,112 +6486,93 @@ def process_outbox(outbox_file: Path) -> str:
             payload = marker_decision.get('payload') or {}
             pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
             if pr_url:
-                # D3.5 5d-prime — route through the serializer gates
-                # before any `gh pr merge` shell-out. Two gates:
-                #   1) FIFO queue: if another open PR in the same repo
-                #      touches overlapping files, hold this merge behind
-                #      it (auto-release when the blocker resolves).
-                #   2) Mergeable check: skip-with-rebase-DM on
-                #      CONFLICTING; defer-one-tick on UNKNOWN.
-                # When both gates pass, the gate helper itself fires the
-                # merge (via _AUTO_MERGE_FN_OVERRIDE or _auto_merge_pr)
-                # and runs the post-merge release pass.
-                # Chain discipline v3 GAP 2 (2026-05-26): validate the
-                # pr_url's repo coords against the allowlist BEFORE any
-                # gate or shell-out. On allowlist hit: pass-through. On
-                # mismatch: attempt a single canonical-form rewrite using
-                # the known-wrong-prefix table. If the rewrite resolves
-                # to an allowlisted repo, log INFO PR_URL_REWRITTEN and
-                # use the rewritten URL downstream. If it doesn't, queue
-                # an alert + render a failed-outcome DM without firing
-                # the merge — we never call gh pr merge with an
-                # unverified URL.
-                canonical_url, rewrite_reason = _validate_or_rewrite_pr_url(pr_url)
-                if canonical_url is None:
-                    canonical_guess: Optional[str] = None
-                    if rewrite_reason and '→' in rewrite_reason:
-                        canonical_guess = rewrite_reason.split('→', 1)[1].strip().strip("'")
+                # Structural pr_url validator (2026-05-29 —
+                # structural-pr-url-validator). Two layers run BEFORE the
+                # serializer gates / `gh pr merge` shell-out:
+                #   Layer 1 (shape) — regex match against
+                #     `https://github.com/Larry-Yatch/<allowed>/pull/<N>`
+                #     with N>=1. Cheap, deterministic, rejects garbage
+                #     (`pull/0`, wrong-owner spoofs, fixture pointers).
+                #   Layer 2 (existence) — `gh pr view --json state` with
+                #     10s timeout. Confirms the PR is real AND state=OPEN.
+                #     404 / timeout / non-OPEN state → skip without
+                #     shell-out to `gh pr merge`.
+                # Either skip is a SKIP outcome, not a failed outcome:
+                # log a clean line, archive, and continue. No DM to Larry,
+                # no marker-error notify back to Mirror — these are
+                # operating-environment ground-truth violations (the URL
+                # was structurally invalid or pointed at nothing), not
+                # marker-discipline failures.
+                task_id_log = data.get('task_id', '?')
+                shape_repo, shape_pr_number, shape_reason = _pr_url_shape_check(pr_url)
+                if shape_repo is None:
                     log(
-                        f'AUTO_MERGE task={data.get("task_id", "?")} '
-                        f'pr={pr_url!r} outcome=failed '
-                        f'reason=pr-url-allowlist-mismatch ({rewrite_reason})',
+                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                        f'outcome=skipped reason=pr-url-shape-invalid '
+                        f'({shape_reason})',
                         'WARN',
                     )
-                    _alert_larry_pr_url_unrewritable(
+                    _archive_outbox(outbox_file)
+                    return 'auto-merge-skipped'
+                # Layer 2 bypass when `_AUTO_MERGE_FN_OVERRIDE` is installed:
+                # the integration-test classes use the override to mock the
+                # merge path end-to-end and pre-date this validator; they
+                # use known-good fixture URLs and don't expect a real
+                # `gh pr view` shell-out. Production never sets the
+                # override, so the existence check always runs.
+                if _AUTO_MERGE_FN_OVERRIDE is not None:
+                    pr_state, exist_reason = 'OPEN', 'ok (test-override bypass)'
+                else:
+                    pr_state, exist_reason = _pr_url_existence_state(
+                        shape_repo, shape_pr_number,
+                    )
+                if pr_state is None:
+                    log(
+                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                        f'outcome=skipped reason=pr-not-found '
+                        f'({exist_reason})',
+                        'WARN',
+                    )
+                    _archive_outbox(outbox_file)
+                    return 'auto-merge-skipped'
+                if pr_state != 'OPEN':
+                    log(
+                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                        f'outcome=skipped reason=pr-state-{pr_state} '
+                        f'(already terminal)',
+                    )
+                    _archive_outbox(outbox_file)
+                    return 'auto-merge-skipped'
+                repo_coords, pr_number = shape_repo, shape_pr_number
+                envelope_changed_files = data.get('changed_files')
+                if not isinstance(envelope_changed_files, list):
+                    envelope_changed_files = None
+                try:
+                    merge_result = _attempt_auto_merge_with_gates(
                         pr_url=pr_url,
+                        repo_coords=repo_coords,
+                        pr_number=pr_number,
                         task_id=data.get('task_id') or 'unknown',
-                        reason=rewrite_reason or 'unknown',
-                        canonical_guess=canonical_guess,
+                        summary=(payload.get('summary') if isinstance(payload, dict) else '') or '',
+                        chat_id=data.get('reply_chat_id'),
+                        changed_files=envelope_changed_files,
+                    )
+                except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+                    log(
+                        f'AUTO_MERGE serializer raised on task '
+                        f'{data.get("task_id", "?")}: '
+                        f'{type(e).__name__}: {e}; rendering failed '
+                        f'outcome',
+                        'WARN',
                     )
                     merge_result = {
                         'merge_outcome': 'failed',
                         'merge_reason': (
-                            f'pr_url not in allowlist; AUTO_MERGE skipped '
-                            f'({rewrite_reason})'
+                            f'serializer raised: {type(e).__name__}: {e}'
                         ),
-                        'pr_number': '?',
-                        'repo_coords': '?',
+                        'pr_number': pr_number,
+                        'repo_coords': repo_coords,
                     }
-                    # Skip the parse-and-gate block; the unconditional
-                    # marker_decision write below picks up merge_result.
-                    parsed = None
-                    pr_url_gate_failed = True
-                else:
-                    if canonical_url != pr_url:
-                        log(
-                            f'PR_URL_REWRITTEN from={pr_url!r} '
-                            f'to={canonical_url!r} task={data.get("task_id", "?")} '
-                            f'({rewrite_reason})'
-                        )
-                        pr_url = canonical_url
-                    parsed = _parse_pr_url(pr_url)
-                    pr_url_gate_failed = False
-                if pr_url_gate_failed:
-                    pass  # merge_result already set above
-                elif parsed is None:
-                    log(
-                        f'AUTO_MERGE task={data.get("task_id", "?")} '
-                        f'pr={pr_url!r} outcome=failed reason=malformed-pr-url '
-                        f'(no serializer gate attempted)',
-                        'WARN',
-                    )
-                    merge_result = {
-                        'merge_outcome': 'failed',
-                        'merge_reason': f'malformed PR URL: {pr_url!r}',
-                        'pr_number': '?',
-                        'repo_coords': '?',
-                    }
-                else:
-                    repo_coords, pr_number = parsed
-                    envelope_changed_files = data.get('changed_files')
-                    if not isinstance(envelope_changed_files, list):
-                        envelope_changed_files = None
-                    try:
-                        merge_result = _attempt_auto_merge_with_gates(
-                            pr_url=pr_url,
-                            repo_coords=repo_coords,
-                            pr_number=pr_number,
-                            task_id=data.get('task_id') or 'unknown',
-                            summary=(payload.get('summary') if isinstance(payload, dict) else '') or '',
-                            chat_id=data.get('reply_chat_id'),
-                            changed_files=envelope_changed_files,
-                        )
-                    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
-                        log(
-                            f'AUTO_MERGE serializer raised on task '
-                            f'{data.get("task_id", "?")}: '
-                            f'{type(e).__name__}: {e}; rendering failed '
-                            f'outcome',
-                            'WARN',
-                        )
-                        merge_result = {
-                            'merge_outcome': 'failed',
-                            'merge_reason': (
-                                f'serializer raised: {type(e).__name__}: {e}'
-                            ),
-                            'pr_number': pr_number,
-                            'repo_coords': repo_coords,
-                        }
                 marker_decision['merge_result'] = merge_result
                 marker_decision['merge_outcome'] = merge_result['merge_outcome']
                 # V6 step-merged signal fires inside
