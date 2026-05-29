@@ -64,6 +64,27 @@ FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     # whose task_id is `envelope-id`. matched_fixture_envelope peels routing
     # wrappers (`marker-error-envelope-id-1` etc.) automatically.
     "envelope-id",
+    # 2026-05-29 incident: 5 AUTO_MERGE failures (15:17–15:26 UTC) on fixture
+    # task_ids producing bogus pr_urls (`x/y/pull/N` placeholder repo, or
+    # `ourliberty/ourliberty-agent-core/pull/0`). The AUTO_MERGE pr-url-
+    # allowlist gate caught them, but they still drove Forge→Mirror→notifier
+    # cycles before being refused. The outbox-side fixture gate added in
+    # PR #201 (15:27 UTC) reads through this allowlist — these entries make
+    # it catch the family. Exact entries (not a `real-` prefix) because the
+    # test suite uses `real-*` as the literal mock name for non-fixture work
+    # (`real-task`, `real-heavy-task`, `real-build-123`, `real-0..real-9`);
+    # a broad prefix would silently swallow those mocks and would conflict
+    # with the discipline at L21-22 of this module ("prove no collision with
+    # any real task_id"). Collision proof: 57 `real-*` archive hits, all
+    # confirmed as fixture cascade artifacts (placeholder pr_urls, no real
+    # specs, dated 2026-05-27/29).
+    "real-mirror-bad-marker",
+    "real-mirror-retry",
+    "real-ok",
+    "real-empty-findings",
+    "real-loop",
+    "real-built",
+    "real-build-ok",
 })
 
 

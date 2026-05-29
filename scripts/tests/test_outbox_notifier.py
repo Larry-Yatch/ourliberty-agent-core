@@ -948,12 +948,12 @@ class ForgeMarkerRoutingTest(unittest.TestCase):
         outbox = _good_outbox(
             agent='forge',
             source='outbox-notifier',
-            task_id='real-loop',
+            task_id='prod-loop',
             result=marker,
             original_source='beacon',
             marker_error_count=on.MAX_MARKER_ERROR_RETRIES,  # next retry exceeds cap
         )
-        f = self._write_outbox('forge', 'real-loop.json', outbox)
+        f = self._write_outbox('forge', 'prod-loop.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'marker-error')
@@ -2826,14 +2826,14 @@ class PreflightDisciplineGateTest(unittest.TestCase):
         # phase=build, no marker — this is EXPECTED (build responses don't
         # carry markers per Forge's CLAUDE.md). The gate must not fire here.
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='real-build-ok',
+            agent='forge', source='beacon', task_id='prod-build-ok',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/real-build-ok',
+            branch='forge/prod-build-ok',
             result=('PR opened: https://github.com/Larry-Yatch/'
                     'ourliberty-agent-core/pull/100\n\n'
                     'Fixed the typo per spec.'),
         )
-        f = self._write_outbox('forge', 'real-build-ok.json', outbox)
+        f = self._write_outbox('forge', 'prod-build-ok.json', outbox)
         result = on.process_outbox(f)
         # Default routing path (no marker, no preflight gate fire) →
         # notifies Beacon with the build result. ALSO dispatches a
@@ -2916,9 +2916,9 @@ class MirrorReviewDispatchTest(unittest.TestCase):
 
     def _build_outbox(self, **overrides):
         base = _good_outbox(
-            agent='forge', source='beacon', task_id='real-built',
+            agent='forge', source='beacon', task_id='prod-built',
             phase='build', target_repo='ourliberty-agent-core',
-            branch='forge/real-built',
+            branch='forge/prod-built',
             result=('PR opened: https://github.com/Larry-Yatch/'
                     'ourliberty-agent-core/pull/77\n\n'
                     'Implemented the fix; tests pass.'),
@@ -2935,17 +2935,17 @@ class MirrorReviewDispatchTest(unittest.TestCase):
 
     def test_pr_opened_dispatches_review_request_to_mirror(self):
         body = self._build_outbox()
-        f = self._write_outbox('forge', 'real-built.json', body)
+        f = self._write_outbox('forge', 'prod-built.json', body)
         on.process_outbox(f)
         # review-request task in Mirror's inbox
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         self.assertEqual(len(review_tasks), 1)
         data = json.loads(review_tasks[0].read_text())
-        self.assertEqual(data['task_id'], 'real-built')
+        self.assertEqual(data['task_id'], 'prod-built')
         self.assertEqual(data['source'], 'beacon')
         self.assertEqual(data['phase'], 'review')
         self.assertEqual(data['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(data['branch'], 'forge/real-built')
+        self.assertEqual(data['branch'], 'forge/prod-built')
         self.assertIn('pull/77', data['pr_url'])
         self.assertEqual(data['revision_count'], 0)
         # max_revisions sourced from mirror_review_handler default
@@ -2956,7 +2956,7 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # The review dispatch is ADDITIVE — Beacon still gets her notify
         # via the default routing path so she can journal "PR opened."
         body = self._build_outbox()
-        f = self._write_outbox('forge', 'real-built.json', body)
+        f = self._write_outbox('forge', 'prod-built.json', body)
         on.process_outbox(f)
         beacon_notifies = list(
             (on.INBOXES_ROOT / 'beacon').glob('notify-*.json')
@@ -3011,12 +3011,12 @@ class MirrorReviewDispatchTest(unittest.TestCase):
         # outbox, re-processing the same outbox should NOT write a second
         # review-request (Mirror would otherwise spawn a duplicate review).
         body = self._build_outbox()
-        f = self._write_outbox('forge', 'real-built.json', body)
+        f = self._write_outbox('forge', 'prod-built.json', body)
         on.process_outbox(f)
         # Simulate re-processing: re-write the outbox + run again. (In
         # production this happens when the notifier crashes after the
         # dispatch write but before the archive move.)
-        f2 = self._write_outbox('forge', 'real-built.json', body)
+        f2 = self._write_outbox('forge', 'prod-built.json', body)
         on.process_outbox(f2)
         review_tasks = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
         # Still exactly one review-request, despite two process_outbox calls.
@@ -3677,12 +3677,12 @@ class RevisionLoopTest(unittest.TestCase):
         """Mirror outbox with a REVIEW_REVISION marker — the trigger for
         the 5b revision-loop dispatch."""
         marker = _mirror_revision_marker(
-            task_id='real-loop', severity='medium', confidence='high',
+            task_id='prod-loop', severity='medium', confidence='high',
         )
         body = _good_outbox(
-            agent='mirror', source='beacon', task_id='real-loop', phase='review',
+            agent='mirror', source='beacon', task_id='prod-loop', phase='review',
             target_repo='ourliberty-agent-core',
-            branch='forge/real-loop',
+            branch='forge/prod-loop',
             result=f'Found 1 medium finding.\n\n{marker}',
         )
         # 5b prerequisite: forge_build_session_id must be on the envelope.
@@ -3695,14 +3695,14 @@ class RevisionLoopTest(unittest.TestCase):
         """Forge outbox after a revision dispatch — must start with the
         Revision N applied: preamble per the 5b strict gate."""
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='real-loop',
+            agent='forge', source='beacon', task_id='prod-loop',
             phase='revision', target_repo='ourliberty-agent-core',
-            branch='forge/real-loop',
+            branch='forge/prod-loop',
             claude_session_id='forge-build-sess-abc',
             result=(
                 f'Revision {round_num} applied: added input validation on '
                 f'foo.py L12-L15 per Mirror finding.\n\n'
-                f'Tests pass; pushed to forge/real-loop.'
+                f'Tests pass; pushed to forge/prod-loop.'
             ),
         )
         body['pr_url'] = 'https://github.com/x/y/pull/77'
@@ -3715,21 +3715,21 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_review_revision_dispatches_revision_to_forge(self):
         body = self._mirror_revision_outbox()
-        f = self._write_outbox('mirror', 'real-loop.json', body)
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified-marker')
         # Revision task lands in Forge's inbox keyed on round number
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json')
         )
         self.assertEqual(len(revisions), 1)
         revision = json.loads(revisions[0].read_text())
-        self.assertEqual(revision['task_id'], 'real-loop')
+        self.assertEqual(revision['task_id'], 'prod-loop')
         self.assertEqual(revision['source'], 'beacon')
         self.assertEqual(revision['phase'], 'revision')
         self.assertEqual(revision['session_id'], 'forge-build-sess-abc')
         self.assertEqual(revision['target_repo'], 'ourliberty-agent-core')
-        self.assertEqual(revision['branch'], 'forge/real-loop')
+        self.assertEqual(revision['branch'], 'forge/prod-loop')
         self.assertEqual(revision['revision_count'], 1)
         self.assertEqual(revision['max_revisions'], 3)
         self.assertEqual(revision['dispatched_by'], 'outbox-notifier')
@@ -3765,7 +3765,7 @@ class RevisionLoopTest(unittest.TestCase):
         body = self._mirror_revision_outbox(
             revision_count=3, max_revisions=3,
         )
-        f = self._write_outbox('mirror', 'real-loop-exhausted.json', body)
+        f = self._write_outbox('mirror', 'prod-loop-exhausted.json', body)
         on.process_outbox(f)
         revisions = list(
             (on.INBOXES_ROOT / 'forge').glob('revision-*.json')
@@ -3792,14 +3792,14 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_revision_dispatch_idempotent_on_reprocess(self):
         body = self._mirror_revision_outbox()
-        f = self._write_outbox('mirror', 'real-loop.json', body)
+        f = self._write_outbox('mirror', 'prod-loop.json', body)
         on.process_outbox(f)
         # Re-write the same outbox + re-process (simulates notifier crash
         # between dispatch and archive)
-        f2 = self._write_outbox('mirror', 'real-loop.json', body)
+        f2 = self._write_outbox('mirror', 'prod-loop.json', body)
         on.process_outbox(f2)
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json')
         )
         # Still exactly one revision-task, despite two process_outbox calls
         self.assertEqual(len(revisions), 1)
@@ -3808,15 +3808,15 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_forge_revision_outbox_dispatches_rereview(self):
         body = self._forge_revision_outbox(round_num=1)
-        f = self._write_outbox('forge', 'revision-real-loop-1.json', body)
+        f = self._write_outbox('forge', 'revision-prod-loop-1.json', body)
         on.process_outbox(f)
         # Mirror inbox gets a fresh review-request keyed on round number
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-prod-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
-        self.assertEqual(review['task_id'], 'real-loop')
+        self.assertEqual(review['task_id'], 'prod-loop')
         self.assertEqual(review['source'], 'beacon')
         self.assertEqual(review['phase'], 'review')
         self.assertEqual(review['revision_count'], 1)
@@ -3854,22 +3854,22 @@ class RevisionLoopTest(unittest.TestCase):
 
     def test_rereview_dispatch_idempotent_on_reprocess(self):
         body = self._forge_revision_outbox(round_num=1)
-        f = self._write_outbox('forge', 'revision-real-loop-1.json', body)
+        f = self._write_outbox('forge', 'revision-prod-loop-1.json', body)
         on.process_outbox(f)
-        f2 = self._write_outbox('forge', 'revision-real-loop-1.json', body)
+        f2 = self._write_outbox('forge', 'revision-prod-loop-1.json', body)
         on.process_outbox(f2)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-prod-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
 
     def test_forge_revision_round_2_extracted_correctly(self):
         # Round 2 prefix should parse and feed Mirror's revision_count=2.
         body = self._forge_revision_outbox(round_num=2)
-        f = self._write_outbox('forge', 'revision-real-loop-2.json', body)
+        f = self._write_outbox('forge', 'revision-prod-loop-2.json', body)
         on.process_outbox(f)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-real-loop-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-prod-loop-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
@@ -3949,7 +3949,7 @@ class RevisionLoopTest(unittest.TestCase):
         body = self._mirror_revision_outbox(
             revision_count=3, max_revisions=3, reply_chat_id=7998341473,
         )
-        f = self._write_outbox('mirror', 'real-loop-exhausted.json', body)
+        f = self._write_outbox('mirror', 'prod-loop-exhausted.json', body)
         on.process_outbox(f)
         # Check larry-alerts.jsonl for the notification
         pending = self._la.read_pending(0)
@@ -4091,10 +4091,10 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # forge_build_session_id so _build_outbox propagates it to Forge's
         # revision outbox, so round 2's REVIEW_REVISION can find it.
         data = {
-            'task_id': 'real-loop',
+            'task_id': 'prod-loop',
             'forge_build_session_id': 'forge-sess-abc',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/real-loop',
+            'branch': 'forge/prod-loop',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 0,
             'max_revisions': 3,
@@ -4103,7 +4103,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         decision = {
             'marker_type': 'review_revision',
             'payload': {
-                'task_id': 'real-loop', 'pr_url': data['pr_url'],
+                'task_id': 'prod-loop', 'pr_url': data['pr_url'],
                 'findings': [
                     {'file': 'a.py', 'line_range': 'L10', 'severity': 'medium',
                      'description': 'fix this'},
@@ -4113,7 +4113,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         }
         on._dispatch_revision_to_forge(data, decision)
         revisions = list(
-            (on.INBOXES_ROOT / 'forge').glob('revision-real-loop-*.json')
+            (on.INBOXES_ROOT / 'forge').glob('revision-prod-loop-*.json')
         )
         self.assertEqual(len(revisions), 1)
         task = json.loads(revisions[0].read_text())
@@ -4215,17 +4215,17 @@ class RevisionFollowupFixesTest(unittest.TestCase):
     def test_m3_correct_round_passes(self):
         # Sanity: round matches envelope → dispatches the re-review normally.
         body = _good_outbox(
-            agent='forge', source='beacon', task_id='real-ok',
+            agent='forge', source='beacon', task_id='prod-ok',
             phase='revision', target_repo='ourliberty-agent-core',
             claude_session_id='sess',
             result='Revision 2 applied: all findings addressed.',
         )
         body['revision_count'] = 2
         body['pr_url'] = 'https://github.com/x/y/pull/1'
-        f = self._write_outbox('forge', 'revision-real-ok-2.json', body)
+        f = self._write_outbox('forge', 'revision-prod-ok-2.json', body)
         on.process_outbox(f)
         reviews = list(
-            (on.INBOXES_ROOT / 'mirror').glob('review-real-ok-rev*.json')
+            (on.INBOXES_ROOT / 'mirror').glob('review-prod-ok-rev*.json')
         )
         self.assertEqual(len(reviews), 1)
         review = json.loads(reviews[0].read_text())
@@ -4349,11 +4349,11 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # her clean retry's outbox has the field, _build_outbox propagates,
         # and _dispatch_revision_to_forge can find the session to --resume.
         data = {
-            'agent': 'mirror', 'source': 'beacon', 'task_id': 'real-mirror-retry',
+            'agent': 'mirror', 'source': 'beacon', 'task_id': 'prod-mirror-retry',
             'phase': 'review',
             'forge_build_session_id': 'forge-build-sess',
             'target_repo': 'ourliberty-agent-core',
-            'branch': 'forge/real-mirror-retry',
+            'branch': 'forge/prod-mirror-retry',
             'pr_url': 'https://github.com/x/y/pull/5',
             'revision_count': 0,
             'max_revisions': 3,
@@ -4450,7 +4450,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # If somehow previous_findings is missing or empty, prompt should
         # still render (degrade) without the findings section.
         data = {
-            'task_id': 'real-empty-findings',
+            'task_id': 'prod-empty-findings',
             'target_repo': 'ourliberty-agent-core',
             'pr_url': 'https://github.com/x/y/pull/1',
             'revision_count': 1,
@@ -4541,7 +4541,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
     def test_bug_b_mirror_marker_error_keeps_original_task_id(self):
         data = {
             'agent': 'mirror', 'source': 'beacon',
-            'task_id': 'real-mirror-bad-marker',
+            'task_id': 'prod-mirror-bad-marker',
             'phase': 'review', 'forge_build_session_id': 'forge-sess',
             'target_repo': 'ourliberty-agent-core',
             'result': '=== REVIEW_PASS ===\n<prose>\n=== END_REVIEW_PASS ===',
@@ -4552,7 +4552,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         )
         self.assertEqual(len(notifies), 1)
         notify = json.loads(notifies[0].read_text())
-        self.assertEqual(notify['task_id'], 'real-mirror-bad-marker')
+        self.assertEqual(notify['task_id'], 'prod-mirror-bad-marker')
         self.assertEqual(notify['marker_error_count'], 1)
 
     # ---- Bug C: dead-letter triggers Larry DM ----
@@ -6430,7 +6430,7 @@ class AlreadyMergedResumeTest(unittest.TestCase):
         decision = {
             'intent': 'review-pass',
             'payload': {
-                'task_id': 'real-ok',
+                'task_id': 'prod-ok',
                 'pr_url': self.PR_URL,
                 'summary': 'Done',
             },
