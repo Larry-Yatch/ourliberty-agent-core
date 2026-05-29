@@ -3,9 +3,17 @@
     "version": 1,
     "purpose": "Plain-language translation layer for healer alerts. Render-time lookup keyed by (source, subject); on match, surface severity + summary + recommended_action above a collapsed technical-detail footer. See docs/runbooks/add-new-healer-alert.md.",
     "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). Source must match exactly.",
-    "severity_vocab": ["URGENT", "WARNING", "INFO"],
+    "severity_vocab": [
+      "URGENT",
+      "WARNING",
+      "INFO"
+    ],
     "severity_note": "Display-only label, decoupled from the producer's queue severity ('warning' | 'critical'). URGENT does NOT imply queue severity='critical' — it's the operator-facing urgency.",
-    "tier_vocab": ["NOW", "SOON", "FYI"],
+    "tier_vocab": [
+      "NOW",
+      "SOON",
+      "FYI"
+    ],
     "tier_note": "Operator-triage gradient (spec: agents/beacon/specs/operator-ux-alert-taxonomy.md). NOW = blocks the chain right now, requires immediate action. SOON = needs attention within hours. FYI = informational, no action required. Conservative classification — when uncertain, lean toward FYI rather than NOW. Unknown subjects (not in this table) default to SOON in the renderer per spec § 2.",
     "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger."
   },
@@ -133,6 +141,44 @@
       "tier": "SOON",
       "plain_language_summary": "The backup (Tier 2) OAuth account failed its weekly health probe — the automatic failover safety net may be down. The primary (Tier 1) account is unaffected, but if Tier 1 ever hits its limit there would be no working fallback.",
       "recommended_action": "Re-auth Tier 2 per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. Manual re-probe: `HOME=/home/larry/.claude-larry-personal claude -p --model claude-opus-4-7 'say ok'` — a clean 'ok' means Tier 2 is healthy again."
+    }
+  },
+  "sync.service": {
+    "sync-blocked": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "ourliberty-sync refused to fast-forward main from origin. The working tree on the VM is not receiving PR merges until the underlying block is cleared.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && git status` to see the gating condition. Most common causes: uncommitted modifications, wrong branch checkout, divergence with origin. Resolve per the more-specific subject (uncommitted-changes / wrong-branch / fast-forward-failed)."
+    },
+    "sync-blocked:uncommitted-changes": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "ourliberty-sync refused to pull because ~/agent-core has uncommitted modifications. Commonly Pulse runtime files (cycle-journal, cycle-actions, MEMORY) left dirty by an interactive /cycle — those should now auto-commit; anything else is human-touched dirt.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && git status` to identify the dirty files. If they are Pulse-owned, commit + push manually; otherwise commit/stash the human work. Sync resumes on the next tick once the tree is clean."
+    },
+    "sync-blocked:wrong-branch": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "ourliberty-sync refused to pull because ~/agent-core is checked out on a non-main branch. Per the ourliberty-agent-core operating model, all work commits direct to main; a feature branch on the VM is unexpected.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core`, `git checkout main`, and merge or discard the feature branch as appropriate. Then sync will resume on the next tick."
+    },
+    "sync-blocked:fast-forward-failed": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "ourliberty-sync tried to fast-forward main from origin/main and failed — the local repo and origin have diverged. The chain stops receiving PR merges until the divergence is resolved.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core`, run `git log --oneline origin/main..HEAD` to see what is local-only, then rebase or hard-reset to origin/main once it is safe to drop the local commits."
+    },
+    "sync-blocked:validation-failed": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "ourliberty-sync pulled a new commit from origin/main but validate_agent_core.py rejected it; the sync rolled back to the previous HEAD. The tree is consistent but stuck behind origin until the bad commit is fixed upstream.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core`, `git checkout <new-head>`, then `python3 scripts/validate_agent_core.py` to see what failed. Fix on origin/main; the next sync tick will pick it up."
+    },
+    "sync-blocked:quiescence-timeout": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "ourliberty-sync ran with REQUIRE_QUIESCENCE=1 and the strict-quiescence wait exceeded its timeout; sync rolled back. A non-quiescent agent kept the tree from being safely swapped.",
+      "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && python3 scripts/await_quiescence.py` to identify the busy agent(s). Resolve before the next sync tick (or let sync run without REQUIRE_QUIESCENCE if soft-quiescence is acceptable)."
     }
   }
 }
