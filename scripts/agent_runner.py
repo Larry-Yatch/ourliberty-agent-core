@@ -37,6 +37,7 @@ def get_manager():
             return None
     return _StubTokenManager()
 from concurrency_guard import get_guard
+import active_tier
 
 AGENTS_ROOT = Path.home() / 'agents'
 
@@ -748,6 +749,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             env = os.environ.copy()
             env['CLAUDE_CODE_OAUTH_TOKEN'] = token
             env['CLAUDE_CODE_EFFORT_LEVEL'] = effort
+            # Account-rotation plumbing (spec § 6.2): drive the primary
+            # subprocess HOME off blackboard/active-tier.json instead of
+            # inheriting from the orchestrator. Default state ships tier1,
+            # so this resolves to /home/larry today — identical to the
+            # inherited HOME — until the rotation scheduler (PR 6.3) flips
+            # the state file.
+            env['HOME'] = active_tier.current_home()
 
             if model_override:
                 model, fallback = model_override, 'sonnet'
@@ -948,12 +956,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             # transient rate-limit might clear on its own,
                             # though auth-401 will keep failing the same way.
                         else:
+                            # The failure-fallback retry targets the OTHER
+                            # tier (spec § 6.2). With state=tier1, this is
+                            # /home/larry/.claude-larry-personal — the
+                            # historical TIER2_HOME path.
+                            fallback_home = active_tier.other_home()
                             log(agent_id,
                                 'TIER2_FALLBACK_ATTEMPT reason=' +
-                                failure_type + ' home=' + TIER2_HOME,
+                                failure_type + ' home=' + fallback_home,
                                 'INFO')
                             t2_env = dict(env)
-                            t2_env['HOME'] = TIER2_HOME
+                            t2_env['HOME'] = fallback_home
                             t2_cmd = _build_cmd_for_tier(
                                 cmd, model, fallback, session_id,
                             )
