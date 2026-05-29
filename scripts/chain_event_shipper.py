@@ -114,6 +114,7 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # them the moment PR-B ships.
     'approval_request',
     'clarify_request',
+    'clarify_response',
     'larry_action',
 })
 
