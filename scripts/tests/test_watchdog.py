@@ -365,76 +365,210 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         self.assertEqual(result['status'], 'critical')
 
 
-# ---------- bots ----------
+# ---------- bot desired-state reconciler ----------
 
 
-class CheckBotsTest(_IsolatedRootsTest):
-    def _patch_liveness(self, liveness_fn):
-        return mock.patch.object(
-            watchdog.bot_liveness_policy, 'check_liveness', side_effect=liveness_fn,
-        )
+def _stub_policy(*agents: str, desired: dict | None = None) -> dict:
+    """Build a minimal in-memory policy with the named agents."""
+    desired = desired or {}
+    policy: dict = {'_schema': {'version': 2}}
+    for a in agents:
+        policy[a] = {
+            'mode': 'systemd',
+            'desired_state': desired.get(a, 'up'),
+            'systemd_unit': f'ourliberty-{a}-bot.service',
+        }
+    return policy
 
-    def test_all_bots_alive_returns_ok(self):
-        # Mirror/forge → systemd; pulse → tmux (intended deployment).
-        def liveness(agent, policy=None):
-            return (True, 'tmux' if agent == 'pulse' else 'systemd')
-        with self._patch_liveness(liveness):
-            result = watchdog.check_bots()
-        self.assertEqual(result['status'], 'ok')
-        self.assertEqual(result['down'], [])
-        # pulse is reported via its winning path.
-        self.assertEqual(result['services']['ourliberty-pulse-bot'], 'tmux')
 
-    def test_one_bot_down_alerts_only_that_bot(self):
-        def liveness(agent, policy=None):
-            if agent == 'forge':
-                return (False, 'down')
-            return (True, 'tmux' if agent == 'pulse' else 'systemd')
-        with self._patch_liveness(liveness):
-            result = watchdog.check_bots()
-        self.assertEqual(result['status'], 'critical')
-        self.assertEqual(result['down'], ['ourliberty-forge-bot'])
+class ReconcileBotDesiredStateTest(_IsolatedRootsTest):
+    """Brief §8 unit tests: branch table for the reconciler."""
+
+    def _patch(self, *, policy: dict, alive_for: dict[str, bool],
+               restart_succeeds: bool = True):
+        """Patch policy load, is_service_alive, and _attempt_restart.
+
+        alive_for maps unit-name -> bool. _attempt_restart returns
+        restart_succeeds (and we capture which units were restarted).
+        """
+        self.restarted: list[str] = []
+
+        def fake_restart(unit, wait_sec=5):
+            self.restarted.append(unit)
+            return restart_succeeds
+
+        return [
+            mock.patch.object(watchdog.bot_liveness_policy, 'load_policy',
+                              return_value=policy),
+            mock.patch.object(watchdog, 'is_service_alive',
+                              side_effect=lambda u: alive_for.get(u, False)),
+            mock.patch.object(watchdog, '_attempt_restart', side_effect=fake_restart),
+        ]
+
+    def _run(self, patches):
+        for p in patches:
+            p.start()
+        try:
+            return watchdog.reconcile_bot_desired_state()
+        finally:
+            for p in patches:
+                p.stop()
+
+    # --- branch: up + alive → no-op ---
+
+    def test_up_alive_is_noop(self):
+        policy = _stub_policy('forge')
+        result = self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-forge-bot.service': True},
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'noop')
+        self.assertEqual(self.restarted, [])
+        # No alert emitted.
+        self.assertFalse(larry_alerts.ALERTS_FILE.exists())
+
+    # --- branch: up + down → restart attempted ---
+
+    def test_up_down_triggers_restart(self):
+        policy = _stub_policy('forge')
+        result = self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-forge-bot.service': False},
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'restarted')
+        self.assertEqual(self.restarted, ['ourliberty-forge-bot.service'])
+        # Recovery alert is a 'warning' on the recovered subject.
         contents = larry_alerts.ALERTS_FILE.read_text()
-        self.assertIn('ourliberty-forge-bot', contents)
-        # Subject embeds the observed mode (M3 fix preserved; bot+mode-specific cooldown).
-        record = json.loads(contents.strip().splitlines()[0])
-        self.assertEqual(record['subject'], 'bots:forge:down')
-        # Recovery command is the policy-mode recovery shape.
-        self.assertEqual(
-            record['suggested_action'],
-            'sudo systemctl restart ourliberty-forge-bot.service',
-        )
+        self.assertIn('bots:forge:recovered', contents)
+        self.assertIn('"warning"', contents)
 
-    def test_two_bots_down_get_independent_subjects(self):
-        def liveness(agent, policy=None):
-            if agent in ('forge', 'mirror'):
-                return (False, 'down')
-            return (True, 'tmux' if agent == 'pulse' else 'systemd')
-        with self._patch_liveness(liveness):
-            watchdog.check_bots()
-        lines = larry_alerts.ALERTS_FILE.read_text().strip().splitlines()
-        subjects = {json.loads(l)['subject'] for l in lines}
-        self.assertEqual(subjects, {'bots:forge:down', 'bots:mirror:down'})
+    def test_up_down_restart_fails_emits_critical(self):
+        policy = _stub_policy('forge')
+        result = self._run(self._patch(
+            policy=policy,
+            alive_for={'ourliberty-forge-bot.service': False},
+            restart_succeeds=False,
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'restart_failed')
+        contents = larry_alerts.ALERTS_FILE.read_text()
+        self.assertIn('"critical"', contents)
+        self.assertIn('bots:forge:down', contents)
 
-    def test_pulse_down_uses_tmux_launcher_recovery(self):
-        # The destructive shape this policy exists to prevent: a `sudo
-        # systemctl restart` recovery for pulse would start a second
-        # process competing with tmux for getUpdates. Recovery must be
-        # the launcher.
-        def liveness(agent, policy=None):
-            if agent == 'pulse':
-                return (False, 'down')
-            return (True, 'systemd')
-        with self._patch_liveness(liveness):
-            watchdog.check_bots()
-        record = json.loads(larry_alerts.ALERTS_FILE.read_text().strip().splitlines()[0])
-        self.assertEqual(record['subject'], 'bots:pulse:down')
-        self.assertEqual(record['suggested_action'], 'bash scripts/pulse_telegram_bot.sh')
-        self.assertNotIn('systemctl restart', record['suggested_action'])
+    # --- branch: down + down → suppressed (NEVER restart intended-down bots) ---
 
-    def test_beacon_bot_not_in_alert_only_set(self):
-        # beacon-bot is the carve-out — should NOT appear in check_bots.
-        self.assertNotIn('beacon', watchdog.ALERT_ONLY_BOTS)
+    def test_down_down_is_suppressed(self):
+        policy = _stub_policy('forge', desired={'forge': 'down'})
+        result = self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-forge-bot.service': False},
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'suppressed')
+        # NEVER restart an intended-down bot.
+        self.assertEqual(self.restarted, [])
+        # Down-alert is suppressed for intended-down bots — no alert file written.
+        self.assertFalse(larry_alerts.ALERTS_FILE.exists())
+
+    # --- branch: down + alive → divergence INFO, no actuation ---
+
+    def test_down_alive_logs_divergence_no_actuation(self):
+        policy = _stub_policy('forge', desired={'forge': 'down'})
+        result = self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-forge-bot.service': True},
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'divergence')
+        # Reconciler does NOT enforce shutdown.
+        self.assertEqual(self.restarted, [])
+        # And does not page Larry — divergence is a watchdog.log INFO.
+        self.assertFalse(larry_alerts.ALERTS_FILE.exists())
+
+    # --- flapping cap: M+1 down ticks → actuation halts, pages once ---
+
+    def test_flapping_cap_halts_actuation_and_pages_once(self):
+        policy = _stub_policy('forge')
+        # Three consecutive ticks attempt restart (each fails → still down).
+        for _ in range(watchdog.RECONCILE_MAX_ATTEMPTS):
+            self._run(self._patch(
+                policy=policy,
+                alive_for={'ourliberty-forge-bot.service': False},
+                restart_succeeds=False,
+            ))
+        # Marker now records M attempts in current window.
+        marker = watchdog._reconcile_marker_path('forge')
+        self.assertTrue(marker.exists())
+        state = json.loads(marker.read_text())
+        self.assertEqual(state['count'], watchdog.RECONCILE_MAX_ATTEMPTS)
+
+        # Reset alerts to isolate the flapping-tick output.
+        larry_alerts.ALERTS_FILE.write_text('')
+        # 4th tick: still down → should NOT actuate, should page flapping.
+        result = self._run(self._patch(
+            policy=policy,
+            alive_for={'ourliberty-forge-bot.service': False},
+            restart_succeeds=False,
+        ))
+        self.assertEqual(result['bots']['forge']['action'], 'flapping')
+        self.assertEqual(self.restarted, [], 'must NOT restart past the M-cap')
+        contents = larry_alerts.ALERTS_FILE.read_text()
+        self.assertIn('bot-reconcile-flapping:forge', contents)
+        self.assertIn('"critical"', contents)
+
+        # 5th tick (still down): paged flag set → no further alert.
+        larry_alerts.ALERTS_FILE.write_text('')
+        # Also clear larry_alerts cooldown so a re-emit WOULD reach the file
+        # — proves suppression is from the marker, not the alert cooldown.
+        import shutil
+        if larry_alerts.COOLDOWN_ROOT.exists():
+            shutil.rmtree(larry_alerts.COOLDOWN_ROOT)
+        self._run(self._patch(
+            policy=policy,
+            alive_for={'ourliberty-forge-bot.service': False},
+            restart_succeeds=False,
+        ))
+        self.assertEqual(self.restarted, [])
+        # No second flapping page in the same window.
+        post = larry_alerts.ALERTS_FILE.read_text() if larry_alerts.ALERTS_FILE.exists() else ''
+        self.assertNotIn('bot-reconcile-flapping', post)
+
+    def test_recovery_clears_marker(self):
+        # A bot that comes back alive should reset its flapping window so
+        # a later outage gets a fresh M-attempt budget.
+        policy = _stub_policy('forge')
+        # Tick 1: down, restart fails.
+        self._run(self._patch(
+            policy=policy,
+            alive_for={'ourliberty-forge-bot.service': False},
+            restart_succeeds=False,
+        ))
+        marker = watchdog._reconcile_marker_path('forge')
+        self.assertTrue(marker.exists())
+        # Tick 2: now alive.
+        self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-forge-bot.service': True},
+        ))
+        self.assertFalse(marker.exists(), 'recovery must clear flapping marker')
+
+    # --- beacon: reconciled by the unified path, no double-restart ---
+
+    def test_beacon_reconciled_by_unified_path_no_double_restart(self):
+        # Mirror: beacon is now driven by the reconciler alone — the
+        # bespoke `check_beacon_bot` carve-out is retired so the two
+        # paths cannot race to restart it.
+        self.assertFalse(hasattr(watchdog, 'check_beacon_bot'),
+                         'check_beacon_bot carve-out must be retired')
+        self.assertNotIn('ourliberty-beacon-bot', watchdog.AUTO_RESTART_SERVICES)
+
+        policy = _stub_policy('beacon')
+        result = self._run(self._patch(
+            policy=policy, alive_for={'ourliberty-beacon-bot.service': False},
+        ))
+        # Reconciler restarted beacon exactly once.
+        self.assertEqual(self.restarted, ['ourliberty-beacon-bot.service'])
+        self.assertEqual(result['bots']['beacon']['action'], 'restarted')
+
+    # --- inbox-watcher / outbox-notifier paths NOT regressed ---
+
+    def test_existing_inbox_watcher_carve_out_preserved(self):
+        # The reconciler must not subsume the inbox-watcher / outbox-
+        # notifier auto-restart paths (those are services, not bots).
+        self.assertIn('ourliberty-inbox-watcher', watchdog.AUTO_RESTART_SERVICES)
+        self.assertIn('ourliberty-outbox-notifier', watchdog.AUTO_RESTART_SERVICES)
 
 
 # ---------- orchestration ----------
@@ -447,17 +581,16 @@ class RunAllChecksTest(_IsolatedRootsTest):
             watchdog,
             check_inbox_watcher=mock.MagicMock(return_value=ok_result),
             check_outbox_notifier=mock.MagicMock(return_value=ok_result),
-            check_beacon_bot=mock.MagicMock(return_value=ok_result),
             check_inbox_watcher_memory=mock.MagicMock(return_value=ok_result),
             check_inbox_watcher_cgroup=mock.MagicMock(return_value=ok_result),
             check_disk=mock.MagicMock(return_value=ok_result),
             check_memory=mock.MagicMock(return_value=ok_result),
             check_log_growth=mock.MagicMock(return_value=ok_result),
-            check_bots=mock.MagicMock(return_value=ok_result),
+            reconcile_bot_desired_state=mock.MagicMock(return_value=ok_result),
         ):
             results = watchdog.run_all_checks()
         self.assertEqual(results['overall'], 'healthy')
-        self.assertEqual(len(results['checks']), 9)
+        self.assertEqual(len(results['checks']), 8)
 
     def test_warning_when_any_check_warning(self):
         ok = {'status': 'ok'}
@@ -466,13 +599,12 @@ class RunAllChecksTest(_IsolatedRootsTest):
             watchdog,
             check_inbox_watcher=mock.MagicMock(return_value=ok),
             check_outbox_notifier=mock.MagicMock(return_value=ok),
-            check_beacon_bot=mock.MagicMock(return_value=ok),
             check_inbox_watcher_memory=mock.MagicMock(return_value=ok),
             check_inbox_watcher_cgroup=mock.MagicMock(return_value=warn),
             check_disk=mock.MagicMock(return_value=ok),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
-            check_bots=mock.MagicMock(return_value=ok),
+            reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             results = watchdog.run_all_checks()
         self.assertEqual(results['overall'], 'warning')
@@ -484,13 +616,12 @@ class RunAllChecksTest(_IsolatedRootsTest):
             watchdog,
             check_inbox_watcher=mock.MagicMock(return_value=ok),
             check_outbox_notifier=mock.MagicMock(return_value=ok),
-            check_beacon_bot=mock.MagicMock(return_value=ok),
             check_inbox_watcher_memory=mock.MagicMock(return_value=ok),
             check_inbox_watcher_cgroup=mock.MagicMock(return_value=ok),
             check_disk=mock.MagicMock(return_value=crit),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
-            check_bots=mock.MagicMock(return_value=ok),
+            reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             results = watchdog.run_all_checks()
         self.assertEqual(results['overall'], 'critical')
@@ -501,13 +632,12 @@ class RunAllChecksTest(_IsolatedRootsTest):
             watchdog,
             check_inbox_watcher=mock.MagicMock(return_value=ok),
             check_outbox_notifier=mock.MagicMock(return_value=ok),
-            check_beacon_bot=mock.MagicMock(return_value=ok),
             check_inbox_watcher_memory=mock.MagicMock(return_value=ok),
             check_inbox_watcher_cgroup=mock.MagicMock(return_value=ok),
             check_disk=mock.MagicMock(return_value=ok),
             check_memory=mock.MagicMock(return_value=ok),
             check_log_growth=mock.MagicMock(return_value=ok),
-            check_bots=mock.MagicMock(return_value=ok),
+            reconcile_bot_desired_state=mock.MagicMock(return_value=ok),
         ):
             watchdog.run_all_checks()
         self.assertTrue(watchdog.HEALTH_FILE.exists())
@@ -519,16 +649,18 @@ class RunAllChecksTest(_IsolatedRootsTest):
 
 
 class TopologyConstantsTest(unittest.TestCase):
-    def test_auto_restart_includes_beacon_bot_carve_out(self):
-        # C1 fix — beacon-bot must be auto-restarted.
-        self.assertIn('ourliberty-beacon-bot', watchdog.AUTO_RESTART_SERVICES)
+    def test_auto_restart_covers_only_services_not_bots(self):
+        # Bots are reconciled by reconcile_bot_desired_state(); the
+        # AUTO_RESTART_SERVICES tuple is for non-bot daemons only.
+        self.assertEqual(
+            set(watchdog.AUTO_RESTART_SERVICES),
+            {'ourliberty-inbox-watcher', 'ourliberty-outbox-notifier'},
+        )
 
-    def test_alert_only_set_does_not_include_beacon(self):
-        self.assertNotIn('beacon', watchdog.ALERT_ONLY_BOTS)
-
-    def test_alert_only_set_covers_three_other_bots(self):
-        self.assertEqual(set(watchdog.ALERT_ONLY_BOTS),
-                         {'forge', 'mirror', 'pulse'})
+    def test_beacon_carve_out_retired(self):
+        # The bespoke check_beacon_bot path is gone; reconciler owns it.
+        self.assertFalse(hasattr(watchdog, 'check_beacon_bot'))
+        self.assertNotIn('ourliberty-beacon-bot', watchdog.AUTO_RESTART_SERVICES)
 
 
 if __name__ == '__main__':

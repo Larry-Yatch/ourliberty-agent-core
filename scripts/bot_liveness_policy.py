@@ -41,6 +41,11 @@ VALID_MODES = (MODE_SYSTEMD, MODE_TMUX_OR_SYSTEMD)
 
 DEFAULT_MODE = MODE_SYSTEMD
 
+DESIRED_UP = 'up'
+DESIRED_DOWN = 'down'
+VALID_DESIRED_STATES = (DESIRED_UP, DESIRED_DOWN)
+DEFAULT_DESIRED_STATE = DESIRED_UP
+
 # Repo-rooted default path. Tests override via BOT_LIVENESS_POLICY_PATH.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_POLICY_PATH = _REPO_ROOT / 'config' / 'bot-liveness-policy.json'
@@ -78,6 +83,11 @@ def _validate_entry(agent: str, entry: dict) -> None:
             raise BotPolicyError(
                 f'{agent!r}: tmux-or-systemd mode requires non-empty {missing}'
             )
+    if 'desired_state' in entry and entry['desired_state'] not in VALID_DESIRED_STATES:
+        raise BotPolicyError(
+            f'{agent!r}: desired_state must be one of {VALID_DESIRED_STATES}, '
+            f'got {entry["desired_state"]!r}'
+        )
 
 
 def load_policy(path: Optional[Path | str] = None) -> dict:
@@ -117,6 +127,7 @@ def _default_entry(agent: str) -> dict:
     behavior so a dropped entry doesn't crash watchdog."""
     return {
         'mode': MODE_SYSTEMD,
+        'desired_state': DEFAULT_DESIRED_STATE,
         'systemd_unit': f'ourliberty-{agent}-bot.service',
     }
 
@@ -126,6 +137,26 @@ def _entry_for(policy: dict, agent: str) -> dict:
     if isinstance(entry, dict) and 'mode' in entry:
         return entry
     return _default_entry(agent)
+
+
+def desired_state(agent: str, policy: Optional[dict] = None) -> str:
+    """Return operator-declared intent for `agent` ('up' or 'down').
+
+    Defaults to 'up' when the field is absent, preserving prior behavior
+    (every bot in the file was implicitly desired-up before this field
+    existed).
+    """
+    if policy is None:
+        policy = load_policy()
+    entry = _entry_for(policy, agent)
+    return entry.get('desired_state', DEFAULT_DESIRED_STATE)
+
+
+def systemd_unit(agent: str, policy: Optional[dict] = None) -> str:
+    """Return the systemd unit name for `agent` per policy."""
+    if policy is None:
+        policy = load_policy()
+    return _entry_for(policy, agent)['systemd_unit']
 
 
 def _systemd_is_active(unit: str) -> bool:
