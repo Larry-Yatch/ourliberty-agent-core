@@ -1320,6 +1320,55 @@ def _emit_clarify_request_chain_event(
         )
 
 
+def _emit_clarify_response_chain_event(
+    *,
+    task_id: str,
+    question: str,
+    answer: str,
+    clarification_round: int,
+) -> None:
+    """Push a `clarify_response` chain_event for clarify-round-visibility § 6.
+
+    Sibling to `_emit_clarify_request_chain_event`. Fires from
+    `_handle_beacon_clarification_response` after Beacon's answer has been
+    successfully written to Forge's inbox as the resume continuation.
+
+    Payload:
+      - task_id: original Forge task (stripped of `notify-` prefix)
+      - clarification_round: 1-indexed, sourced from envelope's
+        `clarification_count` (incremented when Forge first emitted
+        CLARIFY_REQUEST, propagated through Beacon's round-trip)
+      - question: the inbound clarify prompt from Forge (full notify body;
+        the dashboard renderer extracts what it needs)
+      - answer: Beacon's verbatim response text
+      - responded_at: ISO-8601 UTC at emit time
+
+    Best-effort: emit_event logs WARN and returns False on Supabase outage;
+    the resume cascade does NOT depend on the row landing. Same daemon-
+    never-wedge invariant as the request-side helper.
+    """
+    chain_payload = {
+        'task_id': task_id,
+        'clarification_round': clarification_round,
+        'question': question,
+        'answer': answer,
+        'responded_at': datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type='clarify_response',
+            agent='beacon',
+            task_id=task_id,
+            payload=chain_payload,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'clarify_response chain_event emit raised unexpectedly for '
+            f'task {task_id!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Forge outbox for a preflight marker. Returns routing decision or None.
 
@@ -5938,6 +5987,16 @@ def _handle_beacon_clarification_response(
         f'clarification-response continuation dispatched forge <- beacon '
         f'(task={original_task_id}, round={count_for_filename}, '
         f'resume={forge_session_id[:12]}..., file={dest.name})'
+    )
+    # clarify-round-visibility § 6: emit clarify_response chain_event so the
+    # dashboard can render the Forge↔Beacon Q+A round-trip. Sibling pattern
+    # to _emit_clarify_request_chain_event (fired from Forge's CLARIFY
+    # classification at line 6151). Best-effort; failures log WARN.
+    _emit_clarify_response_chain_event(
+        task_id=original_task_id,
+        question=data.get('prompt', '') or '',
+        answer=data.get('result', '') or '',
+        clarification_round=count_for_filename,
     )
     return str(dest)
 

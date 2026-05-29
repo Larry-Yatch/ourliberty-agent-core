@@ -1757,6 +1757,179 @@ class EmitClarifyRequestChainEventTest(unittest.TestCase):
         self.assertEqual(payload.get('resume_session_id'), '')
 
 
+class EmitClarifyResponseChainEventTest(unittest.TestCase):
+    """clarify-round-visibility § 6: clarify_response chain_event emission.
+
+    Sibling to EmitClarifyRequestChainEventTest. The helper fires from
+    `_handle_beacon_clarification_response` after Beacon's answer routes
+    to Forge's resume envelope, and pushes a `clarify_response` row so the
+    dashboard can render the Q+A round-trip.
+    """
+
+    def test_emit_helper_carries_all_payload_fields(self):
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_clarify_response_chain_event(
+                task_id='task-clarify-001',
+                question='Inbound clarify prompt from Forge',
+                answer='Beacon answer body',
+                clarification_round=1,
+            )
+        self.assertEqual(captured.get('event_type'), 'clarify_response')
+        self.assertEqual(captured.get('agent'), 'beacon')
+        self.assertEqual(captured.get('task_id'), 'task-clarify-001')
+        payload = captured.get('payload') or {}
+        self.assertEqual(payload.get('task_id'), 'task-clarify-001')
+        self.assertEqual(payload.get('clarification_round'), 1)
+        self.assertEqual(payload.get('question'),
+                         'Inbound clarify prompt from Forge')
+        self.assertEqual(payload.get('answer'), 'Beacon answer body')
+        self.assertIn('responded_at', payload)
+
+    def test_emit_helper_does_not_raise_on_emit_failure(self):
+        # Daemon-never-wedge: emit_event raising must not propagate.
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            on._emit_clarify_response_chain_event(
+                task_id='t-r',
+                question='Q',
+                answer='A',
+                clarification_round=2,
+            )
+
+    def test_handler_fires_emit_on_successful_resume_dispatch(self):
+        # Integration: _handle_beacon_clarification_response calls the
+        # emit helper exactly once with fields sourced from the Beacon
+        # outbox. The shape mirrors the HeadlessClarificationRoutingTest
+        # happy path so any future shape drift surfaces here too.
+        captured = []
+
+        def _fake_emit(**kwargs):
+            captured.append(kwargs)
+            return True
+
+        beacon_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-roundtrip-001',
+            forge_session_id='forge-sess-rt-001',
+            result='Beacon\'s answer text long enough for any future validator.' * 3,
+            clarification_count=1,
+            max_clarifications=3,
+            target_repo='ourliberty-agent-core',
+            branch='forge/task-roundtrip-001',
+            prompt='[Inter-agent notify | intent=clarify | from=forge | '
+                   'task=task-roundtrip-001]\n\nForge\'s clarify question body.',
+        )
+
+        # Need tmp dirs because the handler writes to the inbox.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        on_orig = {n: getattr(on, n) for n in (
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        )}
+        on.AGENTS_ROOT = root
+        on.INBOXES_ROOT = root / 'inboxes'
+        on.OUTBOXES_ROOT = root / 'outboxes'
+        on.BLACKBOARD = root / 'blackboard'
+        on.LOG_FILE = root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        swi_orig = {n: getattr(swi, n) for n in (
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'ROUTING_EVENTS_LOG',
+        )}
+        swi.AGENTS_ROOT = root
+        swi.INBOXES_ROOT = root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = root / 'logs' / 'routing-events.jsonl'
+        rv_orig = rv.REPO_ROOT
+        rv.REPO_ROOT = root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+        def _restore():
+            for n, v in on_orig.items():
+                setattr(on, n, v)
+            for n, v in swi_orig.items():
+                setattr(swi, n, v)
+            rv.REPO_ROOT = rv_orig
+            rv.invalidate_cache()
+        self.addCleanup(_restore)
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            result = on._handle_beacon_clarification_response(beacon_outbox)
+
+        # Resume envelope landed (sanity — confirms we hit the success
+        # branch where the emit fires).
+        self.assertIsNotNone(result)
+        self.assertEqual(len(captured), 1,
+                         f'expected exactly one emit, got {len(captured)}')
+        kwargs = captured[0]
+        self.assertEqual(kwargs.get('event_type'), 'clarify_response')
+        self.assertEqual(kwargs.get('agent'), 'beacon')
+        # task_id stripped of `notify-` prefix.
+        self.assertEqual(kwargs.get('task_id'), 'task-roundtrip-001')
+        payload = kwargs.get('payload') or {}
+        self.assertEqual(payload.get('clarification_round'), 1)
+        self.assertIn('Forge\'s clarify question body', payload.get('question', ''))
+        self.assertIn('Beacon\'s answer text', payload.get('answer', ''))
+
+    def test_handler_does_not_emit_when_falling_through_to_default_routing(self):
+        # Negative case: a Beacon outbox without forge_session_id falls back
+        # to default notify routing (the legacy path). The emit must NOT fire
+        # because clarify_response is for the resume-dispatch surface only.
+        captured = []
+
+        def _fake_emit(**kwargs):
+            captured.append(kwargs)
+            return True
+
+        legacy_outbox = _good_outbox(
+            agent='beacon',
+            source='forge-question',
+            task_id='notify-task-legacy',
+            # No forge_session_id — handler returns None early.
+            result='Legacy answer; chain in flight at upgrade time.',
+            clarification_count=1,
+            max_clarifications=3,
+        )
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            res = on._handle_beacon_clarification_response(legacy_outbox)
+        self.assertIsNone(res)
+        self.assertEqual(captured, [],
+                         'emit must not fire on legacy fall-through path')
+
+    def test_handler_does_not_emit_for_non_clarification_beacon_outbox(self):
+        # Negative case: a Beacon outbox whose source is not `*-question`
+        # is not a clarification response. Handler returns early; no emit.
+        captured = []
+
+        def _fake_emit(**kwargs):
+            captured.append(kwargs)
+            return True
+
+        regular_outbox = _good_outbox(
+            agent='beacon',
+            source='telegram-webhook',  # Not *-question.
+            task_id='t-regular',
+            result='Beacon doing some other work.',
+        )
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            res = on._handle_beacon_clarification_response(regular_outbox)
+        self.assertIsNone(res)
+        self.assertEqual(captured, [],
+                         'emit must not fire when handler declines the path')
+
+
 class BuildPhaseDispatchTest(unittest.TestCase):
     """Phase D3 commit 4b: PROCEED marker → build-phase task to Forge."""
 
