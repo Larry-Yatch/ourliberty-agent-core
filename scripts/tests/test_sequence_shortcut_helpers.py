@@ -358,7 +358,7 @@ class ApplySkipTests(_HelpersHarness):
         self.assertEqual(b['status'], 'merged')
         self.assertIsNotNone(b['merged_at'])
         # The skip flips the last non-terminal step in this fixture, so
-        # finalization also appends a sequence-completed entry after the
+        # finalization also appends a sequence-complete entry after the
         # step-skipped one. Find step-skipped by event, not by position.
         skipped = next(
             e for e in on_disk['audit_log'] if e['event'] == 'step-skipped'
@@ -680,7 +680,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
     def test_skip_on_last_pending_step_finalizes_sequence(self):
         """apply_skip on the final non-terminal step → sequence flips
         active → complete, current_steps cleared, audit_log records
-        sequence-completed attributed to the apply_skip caller."""
+        sequence-complete attributed to the apply_skip caller."""
         seq = _make_sequence(
             seq_id='fin-skip-last',
             status='active',
@@ -703,9 +703,9 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(on_disk['current_steps'], [])
         events = [e['event'] for e in on_disk['audit_log']]
         self.assertIn('step-skipped', events)
-        self.assertIn('sequence-completed', events)
+        self.assertIn('sequence-complete', events)
         completion = on_disk['audit_log'][-1]
-        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['event'], 'sequence-complete')
         self.assertEqual(completion['actor'], 'larry')
         self.assertIn('ts', completion)
         # Schema invariant holds across the finalization mutation.
@@ -736,7 +736,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(on_disk['status'], 'active')
         self.assertEqual(on_disk['current_steps'], ['c'])
         events = [e['event'] for e in on_disk['audit_log']]
-        self.assertNotIn('sequence-completed', events)
+        self.assertNotIn('sequence-complete', events)
 
     def test_step_merged_on_last_pending_step_finalizes_sequence(self):
         """apply_step_merged on the final non-terminal step → sequence
@@ -766,7 +766,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(on_disk['status'], 'complete')
         self.assertEqual(on_disk['current_steps'], [])
         completion = on_disk['audit_log'][-1]
-        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['event'], 'sequence-complete')
         self.assertEqual(completion['actor'], 'notifier')
 
     def test_step_merged_idempotency_branch_finalizes_zombie_sequence(self):
@@ -801,7 +801,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(on_disk['status'], 'complete')
         self.assertEqual(on_disk['current_steps'], [])
         completion = on_disk['audit_log'][-1]
-        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['event'], 'sequence-complete')
         self.assertEqual(completion['actor'], 'notifier')
 
     def test_cancel_then_all_merged_keeps_failed_status(self):
@@ -837,12 +837,12 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         # Sequence stays failed; finalization gate refused to overwrite.
         self.assertEqual(on_disk['status'], 'failed')
         events = [e['event'] for e in on_disk['audit_log']]
-        self.assertNotIn('sequence-completed', events)
+        self.assertNotIn('sequence-complete', events)
 
     def test_double_finalization_is_idempotent(self):
         """Calling _check_sequence_completion twice on the same
         already-finalized sequence: second call is a clean no-op (no
-        duplicate sequence-completed audit entry, no mutation)."""
+        duplicate sequence-complete audit entry, no mutation)."""
         seq = _make_sequence(
             seq_id='fin-double',
             status='active',
@@ -865,7 +865,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(after_first['status'], 'complete')
         completed_count = sum(
             1 for e in after_first['audit_log']
-            if e['event'] == 'sequence-completed'
+            if e['event'] == 'sequence-complete'
         )
         self.assertEqual(completed_count, 1)
         # Second trigger: same call again. Step still merged, sequence
@@ -881,7 +881,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         self.assertEqual(after_second, after_first)
 
     def test_skip_passes_actor_through_to_completion_audit(self):
-        """The sequence-completed audit entry carries the apply_skip
+        """The sequence-complete audit entry carries the apply_skip
         caller's actor, not a hardcoded value. Mirrors the per-call
         attribution Beacon needs for the dashboard build-sequences tab."""
         seq = _make_sequence(
@@ -898,7 +898,7 @@ class SequenceCompletionFinalizationTests(_HelpersHarness):
         ssh.apply_skip('fin-skip-actor', 'b', actor='beacon')
         on_disk = self._read_sequence('fin-skip-actor')
         completion = on_disk['audit_log'][-1]
-        self.assertEqual(completion['event'], 'sequence-completed')
+        self.assertEqual(completion['event'], 'sequence-complete')
         self.assertEqual(completion['actor'], 'beacon')
 
 

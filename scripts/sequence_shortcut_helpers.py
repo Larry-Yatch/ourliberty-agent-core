@@ -170,7 +170,7 @@ def _check_sequence_completion(seq: dict[str, Any], actor: str) -> bool:
     """If every step in `seq` is `merged` AND the sequence is currently in
     a live state (`active` or `pending`), mutate `seq` in place to
     finalize: status → `complete`, current_steps → [], append a
-    `sequence-completed` audit_log entry attributed to `actor`. Returns
+    `sequence-complete` audit_log entry attributed to `actor`. Returns
     True iff a finalization mutation was applied.
 
     Why: the zombie-active gap surfaced on operator-ux-rollout
@@ -197,7 +197,7 @@ def _check_sequence_completion(seq: dict[str, Any], actor: str) -> bool:
     seq['current_steps'] = []
     _append_audit(seq, {
         'ts': _now_iso(),
-        'event': 'sequence-completed',
+        'event': 'sequence-complete',
         'actor': actor,
     })
     return True
