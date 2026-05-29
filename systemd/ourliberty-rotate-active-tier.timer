@@ -1,0 +1,10 @@
+[Unit]
+Description=Run rotate_active_tier every 2 minutes (spec § 6.3)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=ourliberty-rotate-active-tier.service
+
+[Install]
+WantedBy=timers.target

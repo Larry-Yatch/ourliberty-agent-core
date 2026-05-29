@@ -922,6 +922,23 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 )
                             except Exception:
                                 pass
+                            # Spec § 6.3 retry-storm fix: cool down the
+                            # tier that just rate-limited. The watcher's
+                            # drain gate sees the cooldown and blocks new
+                            # top-level dispatches to this tier until the
+                            # parsed reset time (or capped backoff for
+                            # unparseable messages). Continuations are
+                            # never blocked (the gate lets phase=build/
+                            # revision through), so an in-flight resume
+                            # task can still take its retry path.
+                            try:
+                                active_tier.set_cooldown(
+                                    active_tier.read()['tier'],
+                                    raw_excerpt=(result.stdout or '') +
+                                    '\n' + (result.stderr or ''),
+                                )
+                            except Exception:
+                                pass
                         # Resume-discipline rule: --resume session IDs are
                         # NOT portable between accounts. A Tier 2 retry on a
                         # resume task would fail with 'session not found'
@@ -999,6 +1016,28 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     _dm_tier2_unavailable(
                                         failure_type, task_stem, agent_id, None,
                                     )
+                                    # Spec § 6.3: when the fallback tier ALSO
+                                    # rate-limited (both tiers walled at once),
+                                    # cool down the other tier too so the
+                                    # watcher gate doesn't keep poking it. We
+                                    # detect by re-running the rate-limit
+                                    # classifier on the Tier 2 output.
+                                    if classify_tier1_failure(
+                                        t2.stdout, t2.stderr,
+                                    ) == 'rate_limit':
+                                        try:
+                                            other_tier = (
+                                                'tier2'
+                                                if active_tier.read()['tier']
+                                                == 'tier1' else 'tier1'
+                                            )
+                                            active_tier.set_cooldown(
+                                                other_tier,
+                                                raw_excerpt=(t2.stdout or '') +
+                                                '\n' + (t2.stderr or ''),
+                                            )
+                                        except Exception:
+                                            pass
                             except (subprocess.TimeoutExpired,
                                     FileNotFoundError, OSError) as t2_exc:
                                 log(agent_id,

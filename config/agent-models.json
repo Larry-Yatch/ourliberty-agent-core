@@ -85,6 +85,17 @@
     "max_5h_spend_threshold_usd": 60.0,
     "_note": "Rolling 5h account-wide ceiling for Tier 1 Claude Pro/Max account. heal_claude_max_burn_rate.py DMs Larry once when the summed costs.jsonl spend in the trailing 5h window crosses 80% of this. Read at every healer tick (15 min). $60 default is a reasonable starting point for a Max account; tune against the Anthropic usage page (https://console.anthropic.com/settings/usage) post-merge. V1 limitation: costs.jsonl has no per-account field so the sum includes Tier 2 fallback spend — in steady state Tier 2 is rare and the inflation is conservative (alerts slightly early, not late)."
   },
+  "rotation": {
+    "enabled": false,
+    "tier1_window_minutes": 120,
+    "tier2_window_minutes": 60,
+    "max_drain_minutes": 45,
+    "engage_5h_spend_usd": 42.0,
+    "disengage_5h_spend_usd": 30.0,
+    "tier1_home": "/home/larry",
+    "tier2_home": "/home/larry/.claude-larry-personal",
+    "_note": "Account-rotation scheduler config (spec § 6.3, ships default OFF). enabled is the master kill switch — flipping to false on the next tick forces tier1, clears draining, and disables both engage and drain-then-switch. tier1_window_minutes / tier2_window_minutes set the 2:1 ratio (120/60 = Tier 1 runs ~2/3 of the cycle). max_drain_minutes caps how long the scheduler waits for in-flight work to clear before deferring a flip (never force-kills). engage_5h_spend_usd / disengage_5h_spend_usd are the load-gated engage/disengage hysteresis thresholds — read by § 6.4 (next PR); this PR treats engaged=true whenever enabled=true. tier1_home / tier2_home pin the two OAuth credential roots; must agree with scripts/active_tier.TIER1_HOME / TIER2_HOME. Master kill at any time: set enabled=false and the scheduler clears any partial drain state on the next 2-min tick."
+  },
   "models": {
     "haiku": {
       "model_id": "claude-haiku-4-5-20251001",
@@ -143,7 +154,11 @@
     },
     {
       "date": "2026-05-27",
-      "change": "claude-quota-fixes-v2 bundle: add top-level 'tier1_quota' block (max_5h_spend_threshold_usd=60.0) consumed by new heal_claude_max_burn_rate.py — DMs Larry at 80% of the rolling 5h Tier 1 spend ceiling so quota walls don't hit unannounced (would have given 1-2h warning before the 2026-05-26/27 incident). Add top-level 'models' block with models.haiku.model_id=claude-haiku-4-5-20251001 consumed by new heal_tier2_weekly_health_probe.py — cheap Sunday probe of Tier 2 OAuth health catches silent credential rot before the next Tier 1 quota event. Field placements per CLARIFY response (top-level, not nested under loop_bounds — different semantics: per-window/per-account vs per-task).",
+      "change": "claude-quota-fixes-v2 bundle: add top-level 'tier1_quota' block (max_5h_spend_threshold_usd=60.0) consumed by new heal_claude_max_burn_rate.py — DMs Larry at 80% of the rolling 5h Tier 1 spend ceiling so quota walls don't hit unannounced (would have given 1-2h warning before the 2026-05-26/27 incident). Add top-level 'models' block with models.haiku.model_id=claude-haiku-4-5-20251001 consumed by new heal_tier2_weekly_health_probe.py — cheap Sunday probe of Tier 2 OAuth health catches silent credential rot before the next Tier 1 quota event. Field placements per CLARIFY response (top-level, not nested under loop_bounds — different semantics: per-window/per-account vs per-task)."
+    },
+    {
+      "date": "2026-05-28",
+      "change": "Add top-level 'rotation' block (default enabled=false) consumed by new scripts/rotate_active_tier.py and the inbox_watcher drain+cooldown gate. Spec § 6.3. Ships default-off so there is no runtime behavior change on merge — flipping enabled=true activates the 2:1 Tier 1 / Tier 2 rotation cadence (120/60 min) with drain-then-switch on the IN_FLIGHT_DIR + build_sequence_advancer state. tier{1,2}_window_minutes set the cycle ratio; max_drain_minutes caps how long the scheduler waits for in-flight work before deferring a flip (never force-kills). engage_5h_spend_usd / disengage_5h_spend_usd are forward-compat for the load-gated engage/disengage hysteresis in § 6.4 (next PR); this PR treats engaged=true whenever enabled=true.",
       "author": "Claude (via Larry's session)"
     }
   ]
