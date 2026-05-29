@@ -1,0 +1,303 @@
+#!/usr/bin/env python3
+"""Tests for the active-tier HOME plumbing in ``agent_runner.run_claude``
+(spec § 6.2).
+
+We exercise the Popen / subprocess.run call sites with mocks and assert
+the ``env['HOME']`` value tracks ``active_tier.current_home()`` for the
+primary subprocess and ``active_tier.other_home()`` for the
+failure-fallback retry. The fallback's existing ``--resume`` refusal must
+keep working unchanged when the active state flips.
+
+Run:
+    cd ~/agent-core && python3 -m unittest \\
+        scripts.tests.test_agent_runner_active_tier
+"""
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+import agent_runner as ar  # noqa: E402
+import active_tier  # noqa: E402
+
+
+def _ok_response(text='ok', session_id='sid-new'):
+    return json.dumps({'result': text, 'session_id': session_id})
+
+
+class _FakeProc:
+    """Minimal stand-in for ``subprocess.Popen``'s returned object.
+
+    Returns the configured ``returncode`` on first ``poll()`` so the
+    run_claude loop exits immediately without sleeping. ``stdin`` is a
+    sink; ``stdout`` / ``stderr`` are pre-loaded readers.
+    """
+
+    def __init__(self, returncode, stdout='', stderr=''):
+        self.returncode = returncode
+        self.pid = 4242
+        self.stdin = mock.MagicMock()
+        self.stdout = mock.MagicMock()
+        self.stdout.read.return_value = stdout
+        self.stderr = mock.MagicMock()
+        self.stderr.read.return_value = stderr
+
+    def poll(self):
+        return self.returncode
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+    def terminate(self):
+        pass
+
+    def kill(self):
+        pass
+
+
+class _NoopGuard:
+    def wait_for_slot(self, *_a, **_kw):
+        return True
+
+    def release(self, *_a, **_kw):
+        pass
+
+    def active_count(self):
+        return 0
+
+
+class RunClaudeActiveTierEnvTest(unittest.TestCase):
+    """Verify that ``env['HOME']`` follows active-tier state across both
+    the primary and fallback subprocess invocations."""
+
+    def setUp(self):
+        # Per-test scratch agents-root: the state file is rooted under it
+        # via active_tier._state_path()'s OURLIBERTY_AGENTS_ROOT lookup.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        import os
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        # Working dir must exist for Popen's cwd= arg
+        self.workdir = self.root / 'work'
+        self.workdir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        import os
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
+        self.tmp.cleanup()
+
+    def _write_state(self, tier):
+        path = self.root / 'blackboard' / 'active-tier.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'tier': tier}))
+
+    def _run(self, popen_proc, t2_result=None):
+        """Drive run_claude with the supplied Popen result + optional
+        Tier 2 ``subprocess.run`` result. Returns the captured env dicts
+        ``(popen_env, run_env)`` (run_env is None if no Tier 2 retry
+        fired)."""
+        popen_env = {}
+        run_env = {}
+
+        def fake_popen(cmd, **kwargs):
+            popen_env.update(kwargs.get('env', {}))
+            return popen_proc
+
+        def fake_run(cmd, **kwargs):
+            run_env.update(kwargs.get('env', {}))
+            return t2_result if t2_result else mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='',
+            )
+
+        # Patches: stub out all the heavy collaborators that run_claude
+        # touches. Each patch is justified inline so future readers can
+        # tell what's load-bearing and what's just noise-suppression.
+        patches = [
+            # token manager: hand back a stable token + account
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            # concurrency guard: always grant a slot
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            # the two subprocess entry points
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=fake_run),
+            # filesystem probes the fallback path needs to evaluate True
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            # Tier-2 unavailable DM + paused marker must not fire in
+            # tests; if they do, surface the call so the test fails loud
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            # ledger I/O — no-op so tests don't touch ~/agents
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            # CLAUDE.md poison guard + landmine scrub — irrelevant here
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            # suppress the time.sleep inside the cancel-poll loop and the
+            # retry backoff (the fake proc returns immediately, but the
+            # cancel-poll loop body still sleeps once)
+            mock.patch('agent_runner.time.sleep'),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        return ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            timeout=60,
+        ), popen_env, run_env
+
+    # ---- primary HOME (default tier1) ----------------------------------
+
+    def test_primary_home_tier1_when_state_missing(self):
+        # Acceptance: missing state → HOME=/home/larry (today's behavior).
+        proc = _FakeProc(0, stdout=_ok_response())
+        (_result, popen_env, _run_env) = self._run(proc)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
+
+    def test_primary_home_tier1_when_state_tier1(self):
+        self._write_state('tier1')
+        proc = _FakeProc(0, stdout=_ok_response())
+        (_result, popen_env, _run_env) = self._run(proc)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
+
+    def test_primary_home_tier2_when_state_tier2(self):
+        self._write_state('tier2')
+        proc = _FakeProc(0, stdout=_ok_response())
+        (_result, popen_env, _run_env) = self._run(proc)
+        self.assertEqual(
+            popen_env['HOME'], '/home/larry/.claude-larry-personal',
+        )
+
+    # ---- fallback HOME ------------------------------------------------
+
+    def test_fallback_targets_tier2_when_state_tier1(self):
+        # Tier 1 rate-limit → fallback subprocess gets HOME=tier2 home.
+        self._write_state('tier1')
+        proc = _FakeProc(
+            1,
+            stdout="You've hit your limit · resets 11:30am",
+            stderr='',
+        )
+        t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
+        (_result, popen_env, run_env) = self._run(proc, t2_result=t2)
+        self.assertEqual(popen_env['HOME'], '/home/larry')
+        self.assertEqual(
+            run_env['HOME'], '/home/larry/.claude-larry-personal',
+        )
+
+    def test_fallback_targets_tier1_when_state_tier2(self):
+        # Mirror direction: with state=tier2, the fallback target flips
+        # back to /home/larry — the OTHER home — instead of the
+        # historical hardcoded TIER2_HOME constant.
+        self._write_state('tier2')
+        proc = _FakeProc(
+            1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        t2 = mock.Mock(returncode=0, stdout=_ok_response(), stderr='')
+        (_result, popen_env, run_env) = self._run(proc, t2_result=t2)
+        self.assertEqual(
+            popen_env['HOME'], '/home/larry/.claude-larry-personal',
+        )
+        self.assertEqual(run_env['HOME'], '/home/larry')
+
+
+class ResumeNoFallbackRefusalTest(unittest.TestCase):
+    """The existing ``--resume`` refusal must remain intact: a Tier 1
+    failure during a resume session NEVER falls back, regardless of the
+    active-tier state, because session IDs are account-bound."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        import os
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        self.workdir = self.root / 'work'
+        self.workdir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        import os
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
+        self.tmp.cleanup()
+
+    def test_resume_refuses_fallback_when_tier1_rate_limits(self):
+        proc = _FakeProc(
+            1,
+            stdout="You've hit your limit · resets 11:30am",
+            stderr='',
+        )
+        run_called = mock.Mock()
+
+        def fake_popen(cmd, **kwargs):
+            return proc
+
+        patches = [
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=run_called),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        success, output, _ = ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            session_id='sess-abc',
+            timeout=60,
+        )
+
+        # Refused fallback → no subprocess.run() call ever happened
+        run_called.assert_not_called()
+        self.assertFalse(success)
+        self.assertIn('--resume', output)
+        self.assertIn('account-bound', output)
+
+
+if __name__ == '__main__':
+    unittest.main()
