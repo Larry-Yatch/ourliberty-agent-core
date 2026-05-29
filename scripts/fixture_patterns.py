@@ -50,6 +50,11 @@ FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     "bad-pf",
     "no-preamble",
     "no-chat",
+    # 2026-05-29 incident: dead-letter GC/bad-task D3.5 fixtures. Collision-
+    # proof — 202/104/96 archive hits, all `.N` loop artifacts, never real work.
+    "dead-letter-bad",
+    "dead-letter-gc",
+    "dead-letter-bad-task",
 })
 
 
