@@ -214,7 +214,7 @@ Plus tier-state machine documentation: how `~/agents/state/cycle-tier.json` is r
 
 Estimate: ~600-800 lines of new prompt content. Mirror reviews for: faithful capture of the 8 locked decisions A-H, no contradictions with `agents/pulse/CLAUDE.md`, the 5 mandatory checks are concretely executable (no "vibe-check" prose), the tier-state machine is unambiguous.
 
-### PR-β: cycle-tier state machine + cycle-actions ledger (~½ day, ~$3 LLM)
+### PR-β: cycle-tier state machine + cycle-prime-ledger (~½ day, ~$3 LLM)
 
 Implementation of the support infrastructure cycle-prompt.md references:
 
@@ -261,7 +261,7 @@ Small additions to Pulse's persona doc:
 | Tier-state file gets corrupted (atomic write fails mid-write) | `cycle_tier_state.py` validates schema on read; on corruption, resets to Tier 1 with a journal entry | Manual reset: `echo '{"tier":1,"consecutive_clean":0,"last_signal_at":null}' > ~/agents/state/cycle-tier.json` |
 | Cycle blocks itself in a tight loop (Tier 1 forces, can't escape) | 3-clean-iter de-escalation rule; explicit pause command Larry can issue (`/pulse-pause 1h`) | Manual: `touch ~/agents/healers.disabled` halts all Pulse cycles |
 | Cycle catches false-positive Larry directives in the Telegram thread sweep | Pulse DMs Larry for clarification before acting on ambiguous directives ("did you mean for me to dispatch X?") | Tighten Check 2 keyword heuristics; could move to LLM-judgment-only on ambiguous matches |
-| Cycle-action ledger grows unbounded | Daily rotation: `cycle-actions-YYYY-MM.jsonl`; older months archived to `.archive/` | Manual archive + start fresh |
+| Cycle-prime-ledger grows unbounded | Daily rotation: `cycle-prime-ledger-YYYY-MM.jsonl`; older months archived to `.archive/` | Manual archive + start fresh |
 
 ---
 

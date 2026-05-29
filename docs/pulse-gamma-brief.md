@@ -35,7 +35,7 @@ Current 220-line file (HEAD as of 2026-05-29). γ extends ONLY by appending. NO 
 | `## Session startup` list (steps 1-9) | None | Stays verbatim. cycle-prompt.md is already listed at step 8 — no need to add another reference. |
 | `## Working directory` | None | Stays verbatim. |
 | `## Tier rules (non-negotiable)` | None | Stays verbatim. |
-| `## What you do — the Cycle Loop` | **Extend** | After step 8 of the existing loop, insert deliverable 2 ("When you wake up for a cycle iter, here's the order you operate in") as a NEW sub-section. Existing 8-step loop stays verbatim — the new sub-section provides ALTERNATE operating order that aligns with α₁/α₂'s cycle-prompt structure. Note in a one-line preface: "Use the cycle-prompt.md § 1-§ 16 order from α₁'s rewrite for autonomous cycles; this 8-step list remains the human-readable summary." |
+| `## What you do — the Cycle Loop` | None | Stays verbatim. Deliverable 2 ("When you wake up for a cycle iter") ships as a NEW separate top-level section AFTER `## Memory discipline` and BEFORE `## When something is genuinely broken`, not as a sub-section here. The 8-step loop above remains the human-readable summary; the new section provides the autonomous-cycle operating order that aligns with alpha-1/alpha-2 cycle-prompt structure. |
 | `## Fixture-pattern allowlist for /cycle` | None | Stays verbatim. Load-bearing per [[feedback_pulse_triages_operational_signals]] + PR #157 doctrine. |
 | `## Commit discipline — Pulse is Observer, not Forge` | None | Stays verbatim. PR #157 doctrine is load-bearing. |
 | `## /optimize` | None | Stays verbatim. |
