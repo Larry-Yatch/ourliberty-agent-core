@@ -28,6 +28,84 @@
       "repo": "ourliberty-dashboard",
       "created": "2026-05-24",
       "deferred_reason": "Prioritized Missions tab first per 2026-05-28 design pass"
+    },
+    {
+      "id": "e4-4g-operator-action-queue",
+      "name": "Operator Action Queue",
+      "phase": "drafting",
+      "brief": "New panel on Missions tab collecting every chain state requiring operator action (approvals, paused sequences, dispatched-but-stuck steps, CLARIFY-exhausted PRs, NOW-severity alerts) with copy-paste commands. Closes the bootstrap-003 skip-window gap class.",
+      "spec_docs": [
+        "agents/beacon/specs/e4-4g-operator-action-queue.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "operator-ux-alert-taxonomy",
+      "name": "Tiered Telegram Alert Taxonomy (NOW / SOON / FYI)",
+      "phase": "drafting",
+      "brief": "Add tier field to alert-translations.json so each subject maps to NOW (blocks chain), SOON (within hours), FYI (informational). DM rendering surfaces tier visually. Reduces operator fatigue from undifferentiated alerts.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-ux-alert-taxonomy.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "operator-ux-rescue-runbook",
+      "name": "Claude-as-Forge Rescue Runbook + Dashboard Trigger",
+      "phase": "drafting",
+      "brief": "Document the out-of-chain manual rescue path operator uses when chain CLARIFY-exhausts (test-isolation-v3, Missions PR-A, fixture-gate #169 patterns). Add Missions-tab card affordance to trigger rescue. Closes tribal-knowledge gap.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-ux-rescue-runbook.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "operator-ux-catch-me-up-shortcut",
+      "name": "Beacon catch-me-up Telegram shortcut",
+      "phase": "drafting",
+      "brief": "Single Telegram command (e.g. 'catch me up' / 'status') that returns structured since-last-checkpoint summary: merged PRs + open PRs + pending approvals + active alerts + sequence state. Eliminates 5+ refetch round-trips per check-in.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-ux-catch-me-up-shortcut.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "operator-ux-gap-log-field",
+      "name": "Structured gap-log field on sequence files",
+      "phase": "drafting",
+      "brief": "Add gap_log: [{ts, severity, finding, surfaced_by}] field to build-sequence schema. Verifier specs (bootstrap-N) populate it during run. Missions tab renders the log; cross-sequence search becomes possible.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-ux-gap-log-field.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-28",
+      "deferred_reason": null
+    },
+    {
+      "id": "operator-ux-clarify-visibility",
+      "name": "CLARIFY round visibility on Missions cards",
+      "phase": "drafting",
+      "brief": "Surface the Forge↔Beacon CLARIFY round-trip Q&A on Missions-tab card side-panel. Today the operator only learns CLARIFY-exhausted post-mortem from logs. Read-only v1; later optional 'intervene' affordance.",
+      "spec_docs": [
+        "agents/beacon/specs/operator-ux-clarify-visibility.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-28",
+      "deferred_reason": null
     }
   ]
 }
