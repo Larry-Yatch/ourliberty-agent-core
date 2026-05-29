@@ -6,6 +6,23 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 
 ---
 
+## Desired-state reconciler — bot liveness auto-recovery
+
+- **Status:** in flight (approved 2026-05-28; Forge dispatched)
+- **Next:** Forge build per brief → Mirror review → merge
+- **Owner:** Claude (spec) → Forge (build) → Mirror (review)
+- **Reference:** `docs/desired-state-reconciler-brief.md`
+- **Why:** pulse-bot sat cleanly down ~1d 8h (2026-05-27/28) with no actor recovering it. Watchdog detected but did not actuate; pulse's tmux deployment was a recovery artifact with no supervisor. Closes the actuation gap (Option B: return pulse to systemd, recover all four uniformly from the privileged watchdog) and models intended-down via a `desired_state` field, retiring the mask-unit / kill-healer hack.
+- **Notes:** retires the bespoke beacon-bot watchdog carve-out; bundles the pulse tmux→systemd cutover into the same PR. `desired_state` is the substrate for a future paused-on-rate-limit healer. Channel-heartbeat is the separate follow-up below.
+
+## Channel-heartbeat Pulse Check — end-to-end Telegram liveness
+
+- **Status:** proposed
+- **Next:** spec after the desired-state reconciler lands
+- **Owner:** Claude (spec) → Forge (build)
+- **Depends on:** desired-state reconciler (this is the observation half; the reconciler is the actuation half)
+- **Why:** existence checks (`systemctl is-active`) cannot catch a bot whose process is alive but whose Telegram channel is wedged (2026-05-20 HTTP 502 storm; 2026-05-28 HTTP 409 double-poll). A periodic end-to-end probe (`getMe` + getUpdates-not-erroring + optional self-ping watermark) closes this. Scoped as a Pulse Check because it is observation/triage, not restart-actuation.
+
 ## Ledger — CFO agent
 
 - **Status:** proposed
