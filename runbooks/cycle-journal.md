@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 100 — 2026-05-29 12:30 UTC (interactive)
+
+**Health:** ⚠️ Drift (local main diverged ahead:2/behind:3; dirty tree; sync blocked — unchanged from iter 99)
+**Found:**
+- **(A) Source repo: NEVER-AUTO — diverged + dirty.** ahead:2 (c7182cf, 002f350 fixture-gate commits never pushed). behind:3 (PRs #182/#184/#185). Dirty: MEMORY.md + cycle-actions.jsonl + cycle-journal.md modified (iter 99 operational writes uncommitted). Untracked: `agents/beacon/specs/pulse-uncommitted-local-main-guard.md`. 4th occurrence of diverged-main (iters 63, 93, 99, 100). G-rule dispatched iter 99; Beacon confirmed; Forge rebase APPROVAL_REQUEST pending Larry. ⚠️
+- **(B) Sync health: error.** sync.json 12:21Z "Uncommitted changes in working tree". Root cause: Check A dirty tree. ⚠️
+- **(C) Agent liveness: 6/6 active.** Beacon: 12:22Z (idx=773 sync-blocked, fresh). Forge/Mirror/Pulse: calibrated idle (systemd units active). inbox-watcher: active. cycle.timer: active. Watchdog alerting correctly: idx=770+772 `pipeline-stall:mirror-pass-unmerged:PR#183` (expected — PR #183 CONFLICTING, Mirror-approved). ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. .invalid: beacon=7, forge=118, mirror=91, pulse=3 (total=219; down from 401 at iter 99 — fixture cleanup, non-alarming). All beacon .invalid known/tracked. forge .invalid tail shows `revision-t-*` class — fixture artifacts per allowlist. ✅
+- **(E) PRs: 3 open.** PR #186 (07:59Z, 4.5h, CLEAN, reviewDecision="" — in Mirror review window). PR #183 (CONFLICTING, Mirror-approved, Forge rebase pending Larry approval). PR #174 (22:57Z May 28, 13.5h, CLEAN, reviewDecision="" — approaching 24h review threshold; flag next cycle if still unreviewed). ⚠️ PR #183 only.
+- **(F) Cost/quota: nominal.** Fresh session. ✅
+- **(H) Forge digest: 0 new merges since iter 99.** 10 PRs from earlier today already captured at iter 99. 3 open (#186, #183, #174). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (85d). ✅
+- **Check I: check-i-2026-05-29.json exists** (earlier cycle today). Skip re-invoke — idempotency fix APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry. ✅
+- **Check VIII: off day** (Friday; fires Mondays). ✅
+- **Check IX: off day** (Friday; fires Mondays). First firing 2026-06-01. ✅
+- **(Pending) dashboard-dispatch-source-blocked:** Beacon APPROVAL_REQUEST `validator-allow-dashboard-source-001` pending Larry. ⚠️
+- **(Pending) Check I idempotency:** `pulse-check-i-journal-idempotency-001` pending Larry → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Pending Larry authorization since iter 43. ⚠️
+
+**Did:** Nothing. No always-fix conditions met.
+
+**Escalated:** [yellow] Check A/B: diverged main + dirty tree (4th occurrence). State unchanged from iter 99 — Larry actions: (1) `git -C ~/agent-core push origin main` (unblocks sync immediately); (2) approve PR #183 rebase APPROVAL_REQUEST from Beacon. Standing: dashboard-dispatch-source-blocked, Check I idempotency, stuck-cycle timeout guard (iter 43).
+
+**Forge:** 0 shipped since iter 99. 3 open: #186 (in review window), #183 (conflict/rebase pending), #174 (13.5h, approaching 24h threshold).
+
+**Patterns:** Diverged-main: 4th occurrence (iters 63, 93, 99, 100); G-rule dispatched iter 99, pipeline progressing. .invalid 401→219 between cycles (non-alarming fixture cleanup). PR #174 13.5h in Mirror review — flag at iter 101 if >24h.
+
+**Learned:** .invalid 401→219 between iters 99–100 (non-alarming cleanup). PR #174 watch: approaching 24h Mirror review threshold.
+
+---
+
+## [Notification] 2026-05-29 ~09:10 UTC — Beacon re-dispatch SUCCESS (pulse-response-diverged-main-resubmit-20260529T090517Z)
+
+**Source:** Inter-agent notify from Beacon (task=pulse-response-diverged-main-resubmit-20260529T090517Z, status=SUCCESS)
+**Both acceptance criteria met:**
+- **(a) APPROVAL_REQUEST for PR #183 rebase emitted.** Beacon emitted via marker.py (canonical render, F24-safe). Ground truth refetched at dispatch time: PR #183 OPEN + CONFLICTING (mergeStateStatus=DIRTY), Beacon outbox empty, no halt. Envelope written to Forge inbox with phase=preflight. Larry will receive Telegram DM with the approval request (Forge preflight → build → Mirror auto-merge chain).
+- **(b) Follow-on spec drafted.** `agents/beacon/specs/pulse-uncommitted-local-main-guard.md` — detect-and-alert-loudly when non-runtime-allowlist files left uncommitted/unpushed on local `main` post-session. Read-only; no auto-push. Three open questions parked for Larry at bottom of spec (severity=yellow confirm; unpushed-commits coverage; interactive-session teardown hook location).
+**No new Pulse work required.** Pipeline progressing. Larry action still required: (1) `git -C ~/agent-core push origin main` (unblocks sync immediately); (2) approve incoming APPROVAL_REQUEST for PR #183 Forge rebase.
+
+---
+
+## [Dead-Letter] 2026-05-29 09:05 UTC — pulse-response-diverged-main-g-rule-20260529T090000Z
+
+**Event:** Dead-letter delivered for Pulse dispatch to Beacon inbox.
+**File:** `~/agents/inboxes/beacon/.invalid/pulse-response-diverged-main-g-rule-20260529T090000Z.json`
+**Rejection timestamp:** 2026-05-29T09:01:35Z
+**Rejection reason:** `validator: prompt too short (0 chars, min 100)` — F24 empty-prompt bug class.
+**What this dispatch was supposed to do:** Authorize Beacon to (a) send Larry the APPROVAL_REQUEST for PR #183 Forge rebase (forge/sync-resilience-pulse-runtime-allowlist, CONFLICTING, Mirror-approved); (b) begin drafting a follow-on spec for "detect-and-alert-loudly" when interactive sessions leave non-runtime-allowlist dirt on local main.
+**Impact:** Beacon never received the authorization. Beacon's outbox is empty — the APPROVAL_REQUEST for PR #183 was not issued to Larry. PR #183 remains CONFLICTING with no active rebase work in flight.
+**Root cause:** F24: response dispatch written with empty prompt field (0 chars). Same class as the known validator bug; no systemic fix yet (pending Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`).
+**Action taken:** Re-dispatched to Beacon inbox as `pulse-response-diverged-main-resubmit-20260529T090517Z.json` with a valid prompt (≥ 100 chars). Dedup identity: `cycle-fix:diverged-main-pr183-rebase-approval`. Larry actions remain as escalated at 09:00Z: (1) push local commits, (2) approve PR #183 rebase APPROVAL_REQUEST when it arrives from Beacon.
+
+---
+
+## Iteration 99 — 2026-05-29 08:51 UTC (interactive)
+
+**Health:** ⚠️ Drift (local main diverged ahead:2/behind:3; sync failing; PR #183 CONFLICTING; 3rd occurrence — G-rule dispatched)
+**Found:**
+- **(A) Source repo: NEVER-AUTO — diverged.** Local main ahead:2 (c7182cf, 002f350 fix(fixture-gate) commits on local but not origin); behind:3 (#182 catch-me-up, #184 burn-rate healer refactor, #185 rotation scheduler — all merged to origin today 03:31–06:31Z). Working tree clean. Third occurrence of diverged-main pattern (iters 63, 93, 99). G-rule threshold met → dispatch to Beacon. ⚠️
+- **(B) Sync health: error.** sync.json 08:20Z "Fast-forward merge failed". Root cause: Check A diverged history. Beacon alert idx=764 (sync-blocked:fast-forward-failed) already delivered 08:25Z. Never-auto. ⚠️
+- **(C) Agent liveness: 6/6 active.** Beacon: 08:30Z (fresh — alert idx=765 pipeline-stall:PR#183). Forge: 01:11Z (calibrated ENETUNREACH). Mirror: 00:57Z (calibrated). Pulse: 03:51Z. inbox-watcher: active. cycle.timer: active. ✅
+- **(D) Inboxes: nominal.** All 4 inboxes empty. .invalid counts: beacon=12, forge=201, mirror=182, pulse=6 (total=401 vs 150 iter 98; +251 growth since iter 98 — all fixture artifacts: marker-error-t-*, build-t-*, etc.). ✅
+- **(E) PRs: 3 open.** PR #186 (07:59Z, 52min old, MERGEABLE, reviewDecision="" — in Mirror review window). PR #183 (CONFLICTING, Mirror-approved per Beacon alert idx=765, Forge must rebase branch). PR #174 (22:57Z May 28, ~10h old, MERGEABLE, reviewDecision="" — within 24h window). Nominal except PR #183 conflict. ⚠️
+- **(F) Cost/quota: nominal.** Fresh interactive session. ✅
+- **(H) Forge digest: 10 PRs merged today.** #175 docs(operator-ux) register 6 UX backlog missions 00:44Z; #176 feat(validator) gap_log field 03:27Z; #177 feat(operator-ux) tier alert glyph header 03:31Z; #178 feat(watchdog) desired-state reconciler + pulse systemd cutover 03:49Z; #179 feat(pulse) Check IX operator-friction analyzer 04:55Z; #180 feat(healer) tier distinctness healthcheck 05:04Z; #181 feat(account-rotation) HOME plumbing for run_claude 05:09Z; #182 feat(beacon) catch-me-up shortcut 05:42Z; #184 refactor(healer) burn-rate healer on real quota signal 06:31Z; #185 feat(rotation) scheduler + drain gate 06:31Z. Notable: PR #179 ships pulse_check_ix.py — first Check IX firing Monday 2026-06-01. 3 open: #186 (fresh), #183 (conflict), #174 (~10h). ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (85d). ✅
+- **Check I: audit file check-i-2026-05-29.json exists** (fired by earlier cycle today). Skipping re-invoke to avoid idempotency-bug duplicate block (APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry). ✅
+- **Check VIII: off day** (Friday; fires Mondays). ✅
+- **Check IX: off day** (Friday; fires Mondays). First firing 2026-06-01 per PR #179. ✅
+- **(Pending) dashboard-dispatch-source-blocked:** Beacon APPROVAL_REQUEST `validator-allow-dashboard-source-001` pending Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. ⚠️
+
+**Did:**
+1. G-rule dispatch to Beacon: `cycle-finding-diverged-main-third-occurrence-20260529T085118Z.json` (3rd occurrence; relay to Forge to rebase PR #183 branch + confirm fix scope covers non-runtime file push failures). Logged to cycle-actions.jsonl. ✅
+2. Escalation written to pulse-escalations.json [yellow]. ✅
+
+**Escalated:** [yellow] Check A/B: local main diverged (ahead:2 fixture-gate commits, behind:3 recent PRs). Sync blocked. Suggest: `git -C ~/agent-core fetch origin && git -C ~/agent-core rebase origin/main && git -C ~/agent-core push origin main` (same as iter 93 remediation). G-rule dispatched to Beacon. | Standing [yellow]: dashboard-dispatch-source-blocked (APPROVAL_REQUEST pending Larry), Check I idempotency (pending Larry), stuck-cycle timeout guard (pending Larry iter 43).
+
+**Forge:** 10 shipped since iter 98 — #175–#182, #184–#185 (see H above). Heavy build day. 3 open (#186, #183 conflict, #174).
+
+**Patterns:** Diverged-main: 3rd occurrence (iters 63, 93, 99) — G-rule threshold met, Beacon dispatch sent. PR #183 (fix(sync)) is proposed permanent fix but CONFLICTING on GitHub; Forge needs to rebase branch. | Check I idempotency: pending Larry. | dashboard-dispatch-source-blocked: pending Larry. | Stuck-cycle timeout guard: pending Larry (iter 43). | PR #178 ships pulse systemd cutover — monitor Check C next cycle for any impact.
+
+**Learned:** PR #179 ships Check IX (`pulse_check_ix.py`) — Monday-only, first firing 2026-06-01. PR #178 ships desired-state reconciler + pulse systemd cutover. Diverged-main watch item: 3rd occurrence confirmed, G-rule dispatched. MEMORY.md updated.
+
+---
+
+## [Notification] 2026-05-29 ~09:00 UTC — Beacon confirmed diverged-main state + PR #183 scope
+
+**Source:** Inter-agent notify from Beacon (task=cycle-finding-diverged-main-third-occurrence-20260529T085118Z, status=SUCCESS)
+**State confirmed:**
+- Local main ahead:2 (`c7182cf`, `002f350` — `scripts/fixture_patterns.py` fixture-gate fixes, committed in interactive session 2026-05-28 evening, never pushed). Behind:3 (PRs #182/#184/#185, merged 03:31–06:31Z today).
+- PR #183 (`forge/sync-resilience-pulse-runtime-allowlist`): OPEN, CONFLICTING, Mirror-approved, needs Forge rebase. Scope confirmed: auto-commit+push logic gated by `all_modified_in_pulse_runtime_allowlist` — the 4-path allowlist (journal/actions/MEMORY.md/memory/) excludes `scripts/` by design. PR #183 does NOT cover non-runtime file push failures.
+**Answers to Pulse's asks:**
+- Ask #1 (PR #183 rebase): Beacon ready to dispatch APPROVAL_REQUEST to Larry. Sequencing note: even after PR #183 merges, sync will still fail if the 2 `fixture_patterns.py` commits remain unpushed — local push is the immediate unblock.
+- Ask #2 (non-runtime coverage): Correctly out of scope for PR #183. Follow-on spec warranted: "detect-and-alert-loudly" when sessions leave non-runtime dirt on local main. Beacon will draft.
+**Pulse response:**
+- (a) Proceed with APPROVAL_REQUEST for PR #183 Forge rebase now. No conflict — PR #183 branch doesn't touch `scripts/fixture_patterns.py`. Local push + PR #183 rebase can run in parallel. Response dispatch written to Beacon inbox.
+- Yes, draft the follow-on spec. Shape: detect + loud `[yellow]` alert for non-runtime uncommitted/unpushed dirty state in `run_cycle.sh` or interactive sessions. Not auto-push (bypasses Mirror review).
+**Larry action required:**
+1. `git -C ~/agent-core push origin main` — pushes the 2 fixture-gate commits, immediately unblocks sync.
+2. Approve the incoming APPROVAL_REQUEST from Beacon for the PR #183 Forge rebase (arrives via Telegram).
+**Status:** Escalated to Larry (pulse-escalations.json). Beacon response dispatch written.
+
+---
+
 ## Iteration 98 — 2026-05-28 20:55 UTC (interactive)
 
 **Health:** ⚠️ Drift (sync stale + chore/foo transient branch anomaly; pulse-bot inactive resolved this cycle)
