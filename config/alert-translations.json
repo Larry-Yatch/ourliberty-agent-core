@@ -5,36 +5,44 @@
     "lookup_rule": "Exact match on subject first; if miss, strip trailing ':'-segments from subject one at a time and retry. First match wins (longest-prefix). Source must match exactly.",
     "severity_vocab": ["URGENT", "WARNING", "INFO"],
     "severity_note": "Display-only label, decoupled from the producer's queue severity ('warning' | 'critical'). URGENT does NOT imply queue severity='critical' — it's the operator-facing urgency.",
+    "tier_vocab": ["NOW", "SOON", "FYI"],
+    "tier_note": "Operator-triage gradient (spec: agents/beacon/specs/operator-ux-alert-taxonomy.md). NOW = blocks the chain right now, requires immediate action. SOON = needs attention within hours. FYI = informational, no action required. Conservative classification — when uncertain, lean toward FYI rather than NOW. Unknown subjects (not in this table) default to SOON in the renderer per spec § 2.",
     "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger."
   },
   "heal-pipeline-stall": {
     "pipeline-stall:forge-no-pr": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Forge finished a build but the PR never opened. The branch was pushed (or at least built) but `gh pr create` failed silently — the chain stalled because Mirror has nothing to review.",
       "recommended_action": "Check ~/agent-worktrees/wt-forge-<task_id>/ for the branch state and ~/agents/logs/inbox_watcher.log around the alert timestamp for the gh error. If the branch is pushed, run `gh pr create` manually from the worktree. Runbook: runbooks/heal-pipeline-stall.md."
     },
     "pipeline-stall:marker-invisible": {
       "severity": "WARNING",
+      "tier": "SOON",
       "plain_language_summary": "Mirror finished a review but the outbox-notifier never parsed her marker — the verdict block was wrapper-shaped or inline-prefix shaped instead of canonical `=== REVIEW_PASS ===` / `=== REVIEW_REVISION ===`. The chain stalled because the verdict is invisible to the dispatcher.",
       "recommended_action": "Open the Mirror session for the named task and re-emit the verdict via `scripts/marker.py render mirror <type>`. Don't hand-type marker blocks. Runbook: runbooks/heal-pipeline-stall.md (marker-invisible section)."
     },
     "pipeline-stall:no-session-revision": {
       "severity": "WARNING",
+      "tier": "SOON",
       "plain_language_summary": "A REVIEW_REVISION verdict dispatched a revision back to Forge but didn't carry a `--resume <session_id>` — Forge will start fresh with no context from the original build session, which usually means re-solving the same problem.",
       "recommended_action": "Check the notifier session at ~/agents/logs/outbox_notifier.log around the alert timestamp for the missing session_id. Re-dispatch the revision with the original session_id pulled from inbox-watcher's session log, or accept the cold-start cost. Runbook: runbooks/heal-pipeline-stall.md."
     },
     "pipeline-stall:retry-exhausted": {
       "severity": "WARNING",
+      "tier": "SOON",
       "plain_language_summary": "The MAX_RETRIES loop in agent_runner.py burned through every attempt for this task without success. The chain stopped because retrying further would just hit the same wall — likely a stuck premise, missing dependency, or upstream blocker.",
       "recommended_action": "Read ~/agents/logs/<agent>.log filtered to the named task_id to find the recurring failure mode. Either fix the upstream issue and re-dispatch, or REJECT the task from the inbox with a reason. Runbook: runbooks/heal-pipeline-stall.md."
     },
     "pipeline-stall:tier2-fallback-failed-rate_limit": {
       "severity": "WARNING",
+      "tier": "SOON",
       "plain_language_summary": "Tier 1 (agent Claude Max account) hit a rate-limit AND the Tier 2 fallback (HOME-swap to /home/larry/.claude-larry-personal) also failed. Both accounts are limited or one of them has stale credentials.",
       "recommended_action": "Wait for Tier 1's reset window (the original CLI error gives the time). If Tier 2 should have worked, audit credentials per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. The chain is paused on this task; it will not auto-recover."
     },
     "pipeline-stall:tier2-fallback-unavailable-auth_401": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Tier 1 OAuth hit a 401 (expired refresh token) AND the Tier 2 fallback directory at /home/larry/.claude-larry-personal is missing or unprovisioned. The chain is stuck — no working account to retry against.",
       "recommended_action": "Run `python3 scripts/auth_orchestrator.py` to re-authenticate Tier 1, OR `python3 scripts/auth_orchestrator_tier2.py` to provision Tier 2. Full recovery steps: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
     }
@@ -42,6 +50,7 @@
   "heal-systemd-install-drift": {
     "install-drift": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "A systemd unit is shipped in the repo's `systemd/` directory but is NOT installed at /etc/systemd/system/. The unit isn't running on this droplet — whatever the unit does (a daemon, a timer, a healer) is silently absent.",
       "recommended_action": "Run `sudo cp systemd/<unit-name> /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now <unit-name>` from the repo root. Verify with `systemctl status <unit-name>`. Runbook: runbooks/heal-systemd-install-drift.md."
     }
@@ -49,6 +58,7 @@
   "heal-credential-registry-drift": {
     "credential-drift:MISSING_REGISTRY_ENTRY": {
       "severity": "WARNING",
+      "tier": "SOON",
       "plain_language_summary": "A credential exists on disk (e.g., a token file, OAuth refresh token, API key) but has no entry in config/token-rotation-schedule.json. It's invisible to rotation tracking — when it expires, it will silently die instead of being rotated on schedule.",
       "recommended_action": "Add an entry to config/token-rotation-schedule.json for the named credential per the existing entries' shape (4-artifact discipline: registry + runbook + calendar event + drift-healer awareness). Runbook: runbooks/heal-credential-registry-drift.md."
     }
@@ -56,6 +66,7 @@
   "heal-chain-event-shipper-heartbeat": {
     "chain-event-shipper-stale": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "The chain-event-shipper daemon has not posted a heartbeat in over its threshold. Mission-control dashboard is now showing stale data — the chain may or may not be moving, but you can't see it from the UI.",
       "recommended_action": "Run `sudo systemctl restart chain-event-shipper.service` and check `journalctl -u chain-event-shipper.service -n 50` for the underlying error. If the shipper crashes immediately on restart, inspect ~/agents/logs/chain_event_shipper.log for the stack trace."
     }
@@ -63,6 +74,7 @@
   "outbox-notifier": {
     "auto-merge-queue-corrupt": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "The auto-merge queue file at ~/agents/blackboard/auto-merge-queue.json failed to parse — JSON syntax error or structural surprise. The notifier has fail-closed: every subsequent auto-merge attempt is HELD until the file is repaired and the daemon restarts.",
       "recommended_action": "Inspect the file with `cat ~/agents/blackboard/auto-merge-queue.json` to find the corruption. Move it aside (`mv ... .broken`) to clear the queue, then `sudo systemctl restart outbox-notifier.service`. Recovery steps: runbooks/auto-merge-queue.md."
     }
@@ -70,26 +82,31 @@
   "watchdog": {
     "bots:pulse:tmux": {
       "severity": "INFO",
+      "tier": "FYI",
       "plain_language_summary": "Pulse-bot is running via tmux (the intended deployment after PR #161). No action needed unless the tmux session is also down.",
       "recommended_action": "If you want to verify or relaunch: `tmux has-session -t pulse-bot` to check, `bash ~/agent-core/scripts/pulse_telegram_bot.sh` to (re)launch into the same tmux session. Do NOT run `sudo systemctl restart ourliberty-pulse-bot.service` — that would start a second pulse-bot instance competing with tmux for getUpdates."
     },
     "bots:pulse:down": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Pulse-bot is DOWN: both the tmux session and the systemd unit failed liveness checks. No Telegram pulse-side traffic is flowing.",
       "recommended_action": "Relaunch the intended tmux deployment: `bash ~/agent-core/scripts/pulse_telegram_bot.sh`. Verify with `tmux has-session -t pulse-bot && tmux capture-pane -p -t pulse-bot | tail -20`. Runbook: runbooks/watchdog-bot-policy.md."
     },
     "bots:beacon:down": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Beacon-bot is DOWN and the auto-restart carve-out also failed. Telegram alert delivery itself is broken — DMs cannot reach you until beacon-bot is back.",
       "recommended_action": "Run `sudo systemctl status ourliberty-beacon-bot.service && sudo journalctl -u ourliberty-beacon-bot.service -n 50` to find the failure mode, then `sudo systemctl restart ourliberty-beacon-bot.service`. Runbook: runbooks/watchdog-bot-policy.md."
     },
     "bots:forge:down": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Forge-bot is DOWN and systemd has not recovered it — StartLimitBurst (10 starts / 300s) likely exhausted. Forge tasks queued in the inbox will not be picked up.",
       "recommended_action": "Run `sudo systemctl status ourliberty-forge-bot.service && sudo systemctl restart ourliberty-forge-bot.service`. Check `journalctl -u ourliberty-forge-bot.service -n 50` for the underlying crash cause. Runbook: runbooks/watchdog-bot-policy.md."
     },
     "bots:mirror:down": {
       "severity": "URGENT",
+      "tier": "NOW",
       "plain_language_summary": "Mirror-bot is DOWN and systemd has not recovered it — StartLimitBurst likely exhausted. PR reviews queued for mirror will not run.",
       "recommended_action": "Run `sudo systemctl status ourliberty-mirror-bot.service && sudo systemctl restart ourliberty-mirror-bot.service`. Check `journalctl -u ourliberty-mirror-bot.service -n 50` for the underlying crash cause. Runbook: runbooks/watchdog-bot-policy.md."
     }
