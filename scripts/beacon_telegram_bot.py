@@ -54,6 +54,7 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 import beacon_approval_handler as approval  # noqa: E402
+import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
 import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
@@ -811,6 +812,25 @@ def _process_update(update: dict) -> None:
     if action.get('action') != 'none':
         if handle_user_command(chat_id, action):
             return
+
+    # Operator-UX shortcut — intercept "catch me up" / "status" / variants
+    # before any Beacon round-trip. Cheap local synthesis from refetched
+    # ground truth; no chain mutations. Spec:
+    # agents/beacon/specs/operator-ux-catch-me-up-shortcut.md.
+    if catch_me_up.is_catch_me_up_shortcut(text):
+        try:
+            summary = catch_me_up.synthesize(chat_id)
+        except Exception as e:
+            log(f"catch_me_up synth error: {type(e).__name__}: {e}")
+            telegram_send(
+                chat_id,
+                f"⚠ catch-me-up synthesis failed ({type(e).__name__}). "
+                f"Falling back to normal chat — say it again to retry.",
+            )
+        else:
+            telegram_send(chat_id, summary)
+            log(f"catch_me_up delivered to {chat_id}")
+        return
 
     # Strip leading `/` AFTER approval handling so pause/resume/approve
     # tokens still match in parse_user_reply, but novel slash-prefixed
