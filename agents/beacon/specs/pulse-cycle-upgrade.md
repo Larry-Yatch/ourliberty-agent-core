@@ -130,7 +130,7 @@ TODO comments, "I'll watch this" deferrals, and untested patches DO NOT count.
 
 **Healer first-execution accounting.** When a new healer's first run drains an existing backlog AND establishes future prevention, that single ship counts as ONE systemic fix — not "1 one-off + 1 systemic." The healer IS the systemic mechanism; its first execution is the empirical proof.
 
-**Cycle-action ledger.** Every iter appends a row to `~/agents/blackboard/cycle-actions.jsonl` with `{ts, tier, interventions: [...], systemic_fixes: [...], ratio_this_iter, ratio_cumulative_30d, ratio_trend}`. Pulse reads this on each cycle to know if the ratio is improving.
+**Cycle-action ledger.** Every iter appends a row to `~/agents/blackboard/cycle-prime-ledger.jsonl` with `{ts, tier, interventions: [...], systemic_fixes: [...], ratio_this_iter, ratio_cumulative_30d, ratio_trend}`. Pulse reads this on each cycle to know if the ratio is improving.
 
 ### 5.4 Pipeline-driver behavior (conservative V1)
 
@@ -190,7 +190,7 @@ After E4.4d ships, Pulse's input surface is:
 | `~/agents/blackboard/heal-stale-daemon-code-state.json` | Stale-code findings (consume don't recompute) | Every iter |
 | `~/agents/blackboard/heal-pipeline-stall-state.json` | Stall findings (consume don't recompute) | Every iter |
 | `~/agents/blackboard/pulse-escalations.json` | Her own prior escalations for `needs_response` follow-up | Every iter |
-| `~/agents/blackboard/cycle-actions.jsonl` | Her own action history for PRIME DIRECTIVE ratio | Every iter |
+| `~/agents/blackboard/cycle-prime-ledger.jsonl` | Her own action history for PRIME DIRECTIVE ratio | Every iter |
 | `gh pr list` across both repos | PR pipeline state for leverage-proposal evaluation | Quiet iters only |
 | `agents/beacon/specs/*.md` | Spec backlog for leverage-proposal evaluation | Quiet iters only |
 
@@ -219,7 +219,7 @@ Estimate: ~600-800 lines of new prompt content. Mirror reviews for: faithful cap
 Implementation of the support infrastructure cycle-prompt.md references:
 
 - `scripts/cycle_tier_state.py` (NEW) — small helper library: `get_current_tier()`, `record_iter_result(checks_clean: bool)`, `advance_tier()`. Reads/writes `~/agents/state/cycle-tier.json`.
-- `scripts/cycle_actions_ledger.py` (NEW) — small library: `append_action(tier, interventions, systemic_fixes)`, `compute_ratio_30d()`. Reads/writes `~/agents/blackboard/cycle-actions.jsonl`.
+- `scripts/cycle_prime_ledger.py` (NEW) — small library: `append_action(tier, interventions, systemic_fixes)`, `compute_ratio_30d()`. Reads/writes `~/agents/blackboard/cycle-prime-ledger.jsonl`. (Renamed from cycle_actions_ledger.py / cycle-actions.jsonl per 2026-05-29 OQ1 resolution to avoid collision with existing auto-fix log at runbooks/cycle-actions.jsonl.)
 - `scripts/tests/test_cycle_tier_state.py` + `test_cycle_actions_ledger.py` — unittest coverage.
 - `scripts/run_cycle.sh` (UPDATED) — read tier state at startup, sleep-until-next-tier-window if appropriate, invoke `/cycle` with the right prompt context.
 - `systemd/ourliberty-cycle.timer` (UPDATED) — change `OnUnitActiveSec=4h` → `OnUnitActiveSec=5min` (Tier 1 cadence; the script self-throttles to Tier 2/3 windows).
@@ -230,7 +230,7 @@ Small additions to Pulse's persona doc:
 
 - Reference the new cycle-prompt.md sections (don't duplicate; cycle-prompt is the canonical operational doctrine).
 - Add an explicit "When you wake up for a cycle iter, here's the order you operate in" section.
-- Add the `cycle-actions.jsonl` append discipline.
+- Add the `cycle-prime-ledger.jsonl` append discipline (distinct from the existing auto-fix log at `runbooks/cycle-actions.jsonl`).
 - Add the WARN-vs-INFO calibration heuristic as a top-of-mind rule.
 
 ---
@@ -370,8 +370,8 @@ Doctrine #48 (`feedback_self_optimizing_config_via_pulse_check_pattern`) says an
 |---|---|---|---|---|
 | III | Stuck-detection thresholds | 14-day Sunday-anchored | `chain_events` (live now) | Live (Sun 2026-05-31 first run) |
 | IV | Marker-drift enforcement strictness | Weekly | `chain_events` query for `mirror_marker_invisible:*` | Live immediately (has data now) |
-| V | Tier-1 action-template trust list | Monthly | `cycle-actions.jsonl` | ~30d of cycle ledger data |
-| VI | PRIME DIRECTIVE posture (Generous / Neutral / Strict) | Monthly | `cycle-actions.jsonl` `verification_pending` rates + auto-promote ratios + ratio-trend | ~30d of cycle ledger data |
+| V | Tier-1 action-template trust list | Monthly | `cycle-prime-ledger.jsonl` | ~30d of cycle ledger data |
+| VI | PRIME DIRECTIVE posture (Generous / Neutral / Strict) | Monthly | `cycle-prime-ledger.jsonl` `verification_pending` rates + auto-promote ratios + ratio-trend | ~30d of cycle ledger data |
 | VII | Cost-ceiling escalation thresholds ($50/$100 bands) | After every escalation DM logged | Pulse's escalation-response log | ~20 logged escalations |
 
 Each Check follows the same five-step pattern per doctrine #48:

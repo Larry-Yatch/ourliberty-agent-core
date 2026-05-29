@@ -33,8 +33,8 @@ Per Larry's 2026-05-29 decision: **rename the PRIME DIRECTIVE ledger to `cycle-p
 **Concrete impact:**
 
 - `scripts/cycle_prime_ledger.py` writes to `~/agents/blackboard/cycle-prime-ledger.jsonl` (NEW path). Schema per α₁'s § 6.4 row shape.
-- Spec § 5.3 says `~/agents/blackboard/cycle-actions.jsonl` — α₂ already updates the spec language to match the rename (verify in α₂'s output before dispatching β). If α₂ missed it, β raises a CLARIFY in preflight.
-- Spec § 5.7 data-sources table — same update.
+- Spec § 5.3, § 5.7, § 6 PR-β, § 6 PR-γ, § 12.3 Check V/VI substrate references — all renamed in the 2026-05-29 prep PR (pulse-prep-bundle) before this sequence kicked off. β builds against the renamed spec; no CLARIFY needed.
+- Spec § 5.7 data-sources table — renamed in prep PR.
 - Existing `runbooks/cycle-actions.jsonl` (auto-fix log) is UNTOUCHED. Continues to be written by α₁'s § 14 logic. No migration needed; the two files are semantically distinct (auto-fix actions vs intervention/systemic-fix ratio rows) and live at different paths.
 - Check V's data substrate per § 12.3 ("`cycle-actions.jsonl`") MEANS the new ledger `cycle-prime-ledger.jsonl` — Check V analyzes intervention/systemic-fix history, not the auto-fix log.
 - Check VI's data substrate ("`cycle-actions.jsonl` `verification_pending` rates") — same: means `cycle-prime-ledger.jsonl`.
@@ -185,7 +185,7 @@ Change `OnUnitActiveSec=4h` → `OnUnitActiveSec=5min`. Post-merge: Larry `sudo 
 
 #### 3. `agents/beacon/specs/pulse-cycle-upgrade.md`
 
-Update § 5.3 + § 5.7 references from `cycle-actions.jsonl` → `cycle-prime-ledger.jsonl` per OQ1 resolution. Should already be done by α₂ — if not, β does it.
+All OQ1 references already updated in the 2026-05-29 prep PR (pulse-prep-bundle). β does NOT need to touch the spec.
 
 ---
 
