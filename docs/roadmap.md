@@ -17,11 +17,11 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 
 ## Channel-heartbeat Pulse Check — end-to-end Telegram liveness
 
-- **Status:** proposed
-- **Next:** spec after the desired-state reconciler lands
-- **Owner:** Claude (spec) → Forge (build)
-- **Depends on:** desired-state reconciler (this is the observation half; the reconciler is the actuation half)
-- **Why:** existence checks (`systemctl is-active`) cannot catch a bot whose process is alive but whose Telegram channel is wedged (2026-05-20 HTTP 502 storm; 2026-05-28 HTTP 409 double-poll). A periodic end-to-end probe (`getMe` + getUpdates-not-erroring + optional self-ping watermark) closes this. Scoped as a Pulse Check because it is observation/triage, not restart-actuation.
+- **Status:** proposed — folded into the Pulse cycle upgrade (2026-05-29)
+- **Next:** ships within the Pulse cycle upgrade as Check X (PR-β/γ); spec lives in `docs/pulse-cycle-upgrade-design-pass-2026-05-26.md` § 12.6 — no longer a standalone dispatch
+- **Owner:** Claude (spec) → Forge (build), as part of the Pulse cycle upgrade workstream
+- **Depends on:** desired-state reconciler — MERGED (PR #178, 2026-05-28); this is the observation half, the reconciler is the actuation half
+- **Why:** existence checks (`systemctl is-active`) cannot catch a bot whose process is alive but whose Telegram channel is wedged (2026-05-20 HTTP 502 storm; 2026-05-28 HTTP 409 double-poll). A periodic end-to-end probe (`getMe` + getUpdates-not-erroring + optional self-ping watermark) closes this. Scoped as a Pulse Check because it is observation/triage, not restart-actuation; bundled into the cycle upgrade so it travels with that work rather than orphaning as a one-off.
 
 ## Ledger — CFO agent
 

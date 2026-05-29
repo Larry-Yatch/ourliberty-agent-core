@@ -123,6 +123,17 @@ The 2026-05-26 design pass identified that the PR-α₁/α₂/β/γ sequence (an
 
 PR-0 (this PR) ships independently of the orchestrator; the translation stopgap and this spec amendment do not require the orchestrator to exist.
 
+### 12.6 Channel-heartbeat liveness Check — folded in 2026-05-29
+
+Folded into this upgrade's scope on 2026-05-29 (Larry-chat decision): the **channel-heartbeat liveness Check** — the observation half of the desired-state bot reconciler (`project_desired_state_reconciler_dispatched`, PR #178). The reconciler closed process-down recovery for all four bots; this Check closes the complementary gap where a bot process is alive but its Telegram channel is wedged, which existence checks (`systemctl is-active`) cannot see — e.g. the 2026-05-20 HTTP 502 storm and the 2026-05-28 HTTP 409 double-poll.
+
+- **Number:** Check X (VIII burn-rate + IX operator-friction already shipped since the 2026-05-26 pass).
+- **Observes:** per-bot end-to-end Telegram liveness — `getMe` success + getUpdates not erroring (no sustained 409/502) + optional self-ping watermark (bot confirms it received a heartbeat token).
+- **Cadence:** short-interval (align with the watchdog 4-min tick or a dedicated 5-min timer) — a wedged channel is a live outage, not a slow-tuning constant.
+- **Action on failure:** DM Larry via `larry_alerts.append_alert` with a plain-language tier (per § 12.1 healer-triage doctrine). Recovery is a bot restart, which the reconciler already actuates — so the Check signals/lets the reconciler restart rather than restarting directly. Observation stays single-owner-separate from actuation.
+- **Not a self-tuning Check:** unlike III-VII it tunes no constant, so it does NOT follow the § 12.3 propose-adjustment pattern; it fits the Check family by cadence + DM doctrine only.
+- **Sequencing:** ships in PR-β or PR-γ of this upgrade (not α — α is core doctrine). Only dependency is the reconciler, already merged.
+
 ---
 
 End of § 12.
