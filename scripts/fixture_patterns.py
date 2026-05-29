@@ -55,6 +55,15 @@ FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     "dead-letter-bad",
     "dead-letter-gc",
     "dead-letter-bad-task",
+    # 2026-05-29 incident: envelope-id retry-loop — the 54-burn half of the
+    # cost leak documented in extend-fixture-gate-outbox-side. Archive search:
+    # 218 hits across ~/agents/{outboxes,inboxes}/, ALL as `envelope-id.N`
+    # cascade artifacts (one bare `envelope-id.json` from source
+    # `outbox-notifier`) — never a bare real task. Closes the larger of the
+    # two halves so the outbox-side gate quarantines marker-error responses
+    # whose task_id is `envelope-id`. matched_fixture_envelope peels routing
+    # wrappers (`marker-error-envelope-id-1` etc.) automatically.
+    "envelope-id",
 })
 
 

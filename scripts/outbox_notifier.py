@@ -66,6 +66,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 import beacon_approval_handler as approval  # noqa: E402
 import chain_event_emit             # noqa: E402  # E4.4e PR-A: push writer
 import dispatch_validator         # noqa: E402
+import fixture_patterns             # noqa: E402  # outbox-side fixture gate
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
@@ -6006,8 +6007,31 @@ def process_outbox(outbox_file: Path) -> str:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
        'skip-self' | 'partial-json' | 'notify-failed' | 'marker-error' |
        'notified-replan' | 'notified-pulse-auto-dispatch' |
-       'headless-approval-dispatched' | 'clarification-resume-dispatched'.
+       'headless-approval-dispatched' | 'clarification-resume-dispatched' |
+       'fixture-quarantined'.
     """
+    # Outbox-side fixture gate. Mirrors inbox_watcher.py:415, Check III/VIII/IX,
+    # and run_cycle.sh. The inbox-side gate archives the marker-error response
+    # AFTER outbox_notifier has already parsed it and burned an Opus cycle
+    # writing a fresh marker-error notify; this gate short-circuits the same
+    # filename pattern BEFORE the marker parser runs. Closes the 23-burn
+    # `t-bad-rev.*` and 54-burn `envelope-id.*` retry-loop cost leak documented
+    # in the extend-fixture-gate-outbox-side dispatch. The match is filename-
+    # only — `matched_fixture_envelope` peels `.<N>` collision suffixes and
+    # routing-wrapper prefixes (`marker-error-`, `notify-`, `dead-letter-`),
+    # so an `envelope-id.54.json` outbox or a `notify-t-pf-answer.json` wrapper
+    # both quarantine without reading the file.
+    if fixture_patterns.matched_fixture_envelope(outbox_file.stem) is not None:
+        quarantine_dir = outbox_file.parent / '.fixture-quarantine'
+        quarantine_dir.mkdir(parents=True, exist_ok=True)
+        dest = quarantine_dir / outbox_file.name
+        outbox_file.rename(dest)
+        log(
+            f'FIXTURE_QUARANTINE outbox={outbox_file.name} '
+            f'→ {quarantine_dir.name}/'
+        )
+        return 'fixture-quarantined'
+
     try:
         data = json.loads(outbox_file.read_text())
     except (OSError, json.JSONDecodeError):

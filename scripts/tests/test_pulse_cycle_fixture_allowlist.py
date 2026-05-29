@@ -138,11 +138,13 @@ class FixturePatternMatchingTest(unittest.TestCase):
         ]
         # marker-error-envelope-id-1 and marker-error-notify-t-pf-1 do not
         # start with a covered prefix (they are wrapped notify-t-* /
-        # envelope-id artifacts). The allowlist deliberately stays narrow;
-        # these get caught by their unwrapped base when gather_retry_repeats
-        # walks them — the test asserts the unwrap path here.
+        # envelope-id artifacts). Both get caught by their unwrapped base
+        # when gather_retry_repeats walks them — the test asserts the
+        # unwrap path here. envelope-id was added to FIXTURE_PATTERN_EXACT
+        # in extend-fixture-gate-outbox-side (2026-05-29) when the outbox-
+        # side gate closed the 54-burn envelope-id retry-loop.
         unwrap_exceptions = {
-            "marker-error-envelope-id-1": False,  # legitimately unflagged
+            "marker-error-envelope-id-1": True,   # base envelope-id flagged
             "marker-error-notify-t-pf-1": True,   # base notify-t-pf flagged
         }
         for tid in observed:
