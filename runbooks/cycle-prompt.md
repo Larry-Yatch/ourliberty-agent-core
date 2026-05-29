@@ -261,6 +261,42 @@ Behaviors you can rely on:
 
 **First-data-month limitation:** Check VIII needs ≥5 burn-rate DMs and ≥3 quota-events in the trailing 4w to fire a real proposal (otherwise `insufficient_signal`). For the first ~4 weeks after PR-2a + PR-2b ship, expect quiet output. That's expected, not a regression.
 
+#### IX. Operator-friction signal (Mondays)
+
+Check IX fires on **Mondays only**, alongside Check I + Check VIII. It scans four operator-friction signals across the trailing 7d (catch-me-up gap from beacon-bot logs, time-to-action gap from `chain_events`, alert-ignored repeats from `larry-alerts.jsonl`, and out-of-chain rescue burden from outbox-notifier logs) and registers a `phase: drafting` mission for each signal that crosses its threshold. Registration goes through `POST /api/system/missions/new` so the audit trail matches Larry's manual `+ New mission` flow. Spec: `agents/beacon/specs/pulse-check-ix-operator-friction.md`.
+
+```
+Trigger conditions:
+  • Today is Monday (UTC weekday == 0), AND
+  • EMERGENCY_HALT not present, AND
+  • Sentinel ~/agents/blackboard/pulse-check-ix-proposals/check-ix-<this-week-Monday>.json
+    is missing OR older than 7 days.
+
+If any condition fails on a Monday, journal a one-line skip note and proceed.
+On non-Monday cycles, skip silently.
+```
+
+**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. It loads the 4 input streams, classifies each per spec § 2, and POSTs to the missions endpoint when any signal crosses its threshold. Idempotency (spec § 3): before POSTing, the analyzer queries `GET /api/system/missions` and skips registration when a `phase: drafting` mission with the `pulse-check-ix-<signal>-` prefix already exists. The analyzer requires `DASHBOARD_API_TOKEN` (already on the droplet) and, for the time-to-action signal, `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (already on the droplet); a missing Supabase env just drops the time-to-action signal for the cycle.
+
+```bash
+python3 /home/larry/agent-core/scripts/pulse_check_ix.py
+```
+
+The analyzer writes the cycle artifact (findings + register/skip/error tallies) to `~/agents/blackboard/pulse-check-ix-proposals/check-ix-<week-Monday>.json` (the sentinel-cum-artifact). It does NOT DM Larry directly — every fired signal becomes a kanban card via the missions API, which already DMs through the standard +New mission flow on PR open.
+
+Behaviors you can rely on:
+
+| Scenario | Analyzer behavior | Your action |
+|---|---|---|
+| Monday + sentinel missing, one or more signals fire + first cycle | POSTs new missions; artifact records `registered` entries | Note Check IX fired + count of new missions in journal |
+| Monday + sentinel missing, signal fires + existing drafting mission for that signal | Skips POST; artifact records `skipped` entry per spec § 3 | Note Check IX deduped (no new mission this week) |
+| Monday + sentinel missing, no signals cross threshold | Writes artifact with empty `findings` | Note Check IX quiet in journal |
+| Monday + sentinel exists for this week's Monday | Skips silently (idempotent — analyzer's own gate handles this) | No journal note needed |
+| EMERGENCY_HALT tripped | Don't invoke | Same as Checks A-H |
+| Tue–Sun (non-firing day) | Don't invoke | Journal nothing for Check IX |
+
+**False-positive discipline (Mirror review focus):** Check IX never auto-promotes a drafting mission to `ready` — Larry's manual review on the kanban is the human gate. A false-positive signal lands as a drafting card and Larry rejects it; no chain dispatch fires until promotion. The signal thresholds are deliberately conservative starting points; Check III's self-tuning (per spec § 8) will revise once 8 cycles of data are accumulated.
+
 #### G. Pattern detection
 
 For each finding type from A–F, count occurrences in the **last 10 cycles**:
