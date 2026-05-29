@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-05-28 (Iter 97 + post-notify)
+## Status snapshot — updated 2026-05-28 (Iter 98)
 
 Ninety-seven cycles/responses run. **System: ⚠️ Drift (pulse-bot inactive 4th cycle; dashboard-dispatch-source-blocked APPROVAL_REQUEST pending Larry authorization).** Iter 97 findings (13:00Z May 28) — A (nominal: f93b051=origin/main; sync 12:16Z no-change), B (nominal), C (5/6 active: pulse-bot inactive 4th cycle ~24h; Beacon APPROVAL_REQUEST for `pulse_telegram_bot.sh` pending Larry), D (**updating**: 4 dashboard-sourced tasks in beacon/.invalid confirmed real by Beacon; APPROVAL_REQUEST task_id=validator-allow-dashboard-source-001 received — add 'dashboard' to dispatch_validator.ALLOWED_SOURCES; pending Larry authorization), E (0 open PRs), H (0 merged since iter 96). Check I off day (Thursday). APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` pending Larry. Stuck-cycle timeout guard pending Larry (iter 43). Standing [yellow]: pulse-bot inactive (Beacon APPROVAL_REQUEST pending Larry); dashboard-dispatch-source-blocked (Beacon APPROVAL_REQUEST pending Larry authorization → Forge).
 

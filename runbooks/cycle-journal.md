@@ -4,6 +4,35 @@
 
 ---
 
+## Iteration 98 — 2026-05-28 20:55 UTC (interactive)
+
+**Health:** ⚠️ Drift (sync stale + chore/foo transient branch anomaly; pulse-bot inactive resolved this cycle)
+**Found:**
+- **(A) Source repo: chore/foo transient anomaly, now main.** Session gitStatus (conversation start): branch=main, one untracked file (`docs/inbox-watcher-fixture-gate-brief.md`). `.git/HEAD` confirms main. sync.json 20:38Z error: "Wrong branch: chore/foo" — branch was on chore/foo 12-17 min before this cycle; now on main. First occurrence of `chore/foo`; self-resolved before session start. [blue] 
+- **(B) Sync health: stale → fixed.** Last successful sync 12:16Z (iter 97, 8.5h ago). sync.json 20:38Z error (wrong branch now resolved). Always-fix triggered: `sync_agent_core.sh` at 20:55Z → no-change at bae9b913 (current with origin/main). ✅
+- **(C) Agent liveness: 5/6 → 6/6.** `ourliberty-pulse-bot` inactive at cycle start (5th consecutive cycle: iters 94–98). Always-fix triggered: PR #161 (18:37Z) shipped `pulse_telegram_bot.sh`; PR #166 (20:41Z) fixed `/dev/null` redirect. `bash ~/agent-core/scripts/pulse_telegram_bot.sh` → tmux session `pulse-bot` created 14:55:51 MDT. **RESOLVED: pulse-bot watch item closed after 5 cycles.** Other 5 units active. ✅
+- **(D) Inboxes: nominal (1 fixture suppressed).** forge inbox: 5 files at cycle start. 4 real Beacon-dispatched tasks (inbox-watcher-fixture-gate, fixture-journal-strip-guard-001, doctrine-enforcement-emit-gate-001, test-isolation-v3-inbox-paths-001) — all < 30 min old, under stale threshold; `inbox-watcher-fixture-gate` in-flight per log (started 20:48:18Z). 1 fixture: `marker-error-t-drift-2.json` (task_id=`t-drift`, source=outbox-notifier) — matches `t-` fixture prefix; already run once (20:44–20:48Z, success=False). Fixture suppression write to `~/agents/state/pulse-fixture-suppressions.jsonl` **blocked by session scope** (state dir outside allowed paths). Noted here for audit; `run_cycle.sh` wrapper can write post-exit if needed. beacon/mirror/pulse inboxes empty. ✅
+- **(E) PRs: nominal.** 0 open PRs. ✅
+- **(F) Cost/quota: nominal.** Fresh interactive session. Automated cycle also in flight (lock PID 1897969, created 14:48 MDT — ~7 min before this entry; interactive session takes precedence per iter 3 precedent). ✅
+- **(H) Forge digest.** 12 PRs merged since iter 97 (13:00Z): #157 fix(pulse) discipline boundary (15:25Z); #158 docs(check-viii) brief (15:49Z); #160 feat(check-viii) PR-2a ledger (16:33Z); #159 feat(missions) E4.4f PR-A (18:22Z); **#161 feat(scripts) pulse_telegram_bot.sh launcher (18:37Z) ← closes pulse-bot watch item**; #162 docs(missions) (18:38Z); #163 docs(doctrine) enforcement mandate (19:33Z); **#164 feat(check-viii) PR-2b burn-rate analyzer (19:36Z) ← Check VIII now live**; #167 spec(orchestrator) bootstrap-003 (20:30Z); #168 fix(watchdog) per-bot liveness policy (20:39Z); #166 fix(launcher) stdin redirect (20:41Z); #165 fix(cycle) TimeoutStartSec 600→1200s α₁ prep (20:42Z). 0 open forge/ PRs. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (85d out). ✅
+- **Check I: off day.** Thursday 2026-05-28 (fires Mon/Wed/Fri/Sun). ✅
+- **Check VIII: off day.** Thursday (fires Mondays only). PR #164 ships analyzer — fires next Monday 2026-06-01. ✅
+- **(Pending) dashboard-dispatch-source-blocked:** Beacon APPROVAL_REQUEST `validator-allow-dashboard-source-001` pending Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Check I idempotency APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001`:** Awaiting Larry authorization → Beacon → Forge. ⚠️
+- **(Pending) Stuck-cycle timeout guard:** Awaiting Larry authorization since iter 43. (Note: PR #165 bumped systemd TimeoutStartSec 600→1200s — related α₁ prep but separate from the run_cycle.sh `timeout` wrapper guard.) ⚠️
+
+**Did:**
+1. Triggered sync: `bash ~/agent-core/scripts/sync_agent_core.sh` → no-change at bae9b913. Logged to cycle-actions.jsonl. ✅
+2. Relaunched pulse-bot: `bash ~/agent-core/scripts/pulse_telegram_bot.sh` → tmux session `pulse-bot` active. Logged to cycle-actions.jsonl. ✅
+3. Attempted fixture suppression log (t-drift): **BLOCKED** — state file outside session allowed paths. Noted in journal only.
+**Escalated:** [blue] chore/foo transient branch: 1st occurrence, self-resolved, no action needed. Standing [yellow] dashboard-dispatch-source-blocked (Beacon APPROVAL_REQUEST pending Larry). Standing [yellow] Check I idempotency (pending Larry). Standing [yellow] stuck-cycle timeout guard (pending Larry, iter 43).
+**Forge:** 12 shipped since iter 97 — #157–#168 (see H above). Heavy build day. 0 open.
+**Patterns:** pulse-bot inactive watch item: **CLOSED** — PR #161+166 fixed launcher; always-fix succeeded iter 98. | chore/foo transient branch: 1st occurrence, watch (need 3 for G-rule). | dashboard-dispatch-source-blocked: Beacon APPROVAL_REQUEST pending Larry (iter 97). | Check I idempotency: pending Larry. | Stuck-cycle timeout guard: pending Larry (iter 43). | Fixture suppression scope block: session scope prevents writes to `~/agents/state/`; fixture log incomplete; add `~/agents/state/` to session allowlist (same Forge task as other path expansions).
+**Learned:** PR #161 ships `pulse_telegram_bot.sh` — the missing tmux launcher that blocked `relaunch-missing-bot` for 5 cycles. PR #164 ships Check VIII (`pulse_check_viii.py`) — fires first on next Monday (2026-06-01). Session scope blocks `~/agents/state/` writes (fixture suppression log, potentially others). MEMORY.md updated below.
+
+---
+
 ## [Notification] 2026-05-28 ~13:30 UTC — Beacon confirmed dashboard-dispatch-source-blocked + APPROVAL_REQUEST received
 
 **Source:** Inter-agent notify from Beacon (task=cycle-finding-dashboard-dispatch-source-blocked-20260528T130000Z, status=SUCCESS)
@@ -2430,4 +2459,13 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 - High-repeat tasks: `opmanual-d35-5b-shipped-note-001`×3, `smoke-5a-pf-no-marker`×3
 - Mode: digest — 1 proposal(s):
   1. [medium] Template / fast-path repeating shape `opmanual-d35-5b-shipped-note-001` — 3 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-05-25):**
+
+- Ledger total: $251.49; 0 anomaly(ies)
+- Retry overhead: $5.50 (2.2%)
+- High-repeat tasks: `smoke-5a-pf-no-marker`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
      Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
