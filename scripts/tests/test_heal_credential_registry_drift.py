@@ -37,7 +37,13 @@ class _IsolatedAgentsRoot(unittest.TestCase):
     Without this redirection, running tests in a worktree pollutes prod
     `/home/larry/agents/...` state. Reload the module so its module-level
     constants pick up the override.
+
+    Subclasses that exercise `_run_claude_auth_status` directly (rather than
+    going through `check_tier_distinctness`) set `_stub_tier_probe = False`
+    to disable the default stub.
     """
+
+    _stub_tier_probe = True
 
     def setUp(self):
         super().setUp()
@@ -47,6 +53,17 @@ class _IsolatedAgentsRoot(unittest.TestCase):
         self._isolated_env_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = self._isolated_tmp
         importlib.reload(h)
+        # Stub the tier-distinctness probe to return distinct identities by
+        # default so the existing credential-drift tests don't shell out to
+        # the real `claude` binary. Tests focused on the tier check
+        # override this via mock.patch within the test method.
+        if self._stub_tier_probe:
+            self._tier_probe_patch = mock.patch.object(
+                h, '_run_claude_auth_status',
+                side_effect=lambda home: ('ok', f'distinct-{home}'),
+            )
+            self._tier_probe_patch.start()
+            self.addCleanup(self._tier_probe_patch.stop)
 
     def tearDown(self):
         if self._isolated_env_orig is None:
@@ -598,7 +615,7 @@ class ResolveRegistryOriginTest(_IsolatedAgentsRoot):
 
 
 class CliArgsTest(unittest.TestCase):
-    """--source local|origin CLI flag plumbing."""
+    """--source local|origin and --check-tiers CLI flag plumbing."""
 
     def test_default_is_origin(self):
         args = h._parse_args([])
@@ -615,6 +632,293 @@ class CliArgsTest(unittest.TestCase):
     def test_invalid_source_rejected(self):
         with self.assertRaises(SystemExit):
             h._parse_args(['--source', 'bogus'])
+
+    def test_check_tiers_default_false(self):
+        args = h._parse_args([])
+        self.assertFalse(args.check_tiers)
+
+    def test_check_tiers_flag_sets_true(self):
+        args = h._parse_args(['--check-tiers'])
+        self.assertTrue(args.check_tiers)
+
+
+# -------------------- tier-distinctness check --------------------
+
+
+class TierDistinctnessTest(_IsolatedAgentsRoot):
+    """`check_tier_distinctness` directly: distinct, identical, logged-out,
+    unparseable, timeout. The 2026-05-28 incident was Tier 2 silently
+    authenticating as Tier 1's account — these tests verify the healer
+    would catch that and the other shapes that mask the same problem.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._dm_calls: list[dict] = []
+
+        def fake_dm(message, subject, suggested_action, severity='warning'):
+            self._dm_calls.append({
+                'message': message, 'subject': subject,
+                'suggested_action': suggested_action, 'severity': severity,
+            })
+            return True
+
+        self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
+        self._dm_patch.start()
+        self.addCleanup(self._dm_patch.stop)
+
+    def _probe(self, mapping):
+        """Build a probe stub that maps HOME → (status, identity)."""
+        def probe(home):
+            return mapping[home]
+        return probe
+
+    def test_distinct_orgs_no_dm(self):
+        """Tier 1 and Tier 2 ok with different orgIds → no DM, no
+        live_keys, no state change. The healthy steady state."""
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-tier1'),
+                h.TIER2_HOME: ('ok', 'org-tier2'),
+            }),
+        )
+        self.assertEqual(counts['tier_distinct'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 0)
+        self.assertEqual(self._dm_calls, [])
+        self.assertEqual(live, set())
+        self.assertEqual(state['drifts'], {})
+
+    def test_identical_orgs_dms_larry(self):
+        """Both tiers authenticate as the SAME orgId — the 2026-05-28
+        failure mode. DM fires, live_keys preserves dedup state."""
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-shared'),
+                h.TIER2_HOME: ('ok', 'org-shared'),
+            }),
+        )
+        self.assertEqual(counts['tier_identical'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        self.assertEqual(
+            self._dm_calls[0]['subject'], 'tier-distinctness:claude-oauth',
+        )
+        self.assertIn('org-shared', self._dm_calls[0]['message'])
+        self.assertIn(
+            'tier-distinctness:claude-oauth',
+            live.pop() if live else '',
+        )
+        # State recorded the DM so a follow-up tick will dedup.
+        self.assertIn('tier-distinctness:claude-oauth', state['drifts'])
+
+    def test_tier2_logged_out_dms_larry(self):
+        """Tier 2 not logged-in at all → DM. (This is the post-incident
+        state on 2026-05-26 just before Larry re-authed Tier 2.)"""
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-tier1'),
+                h.TIER2_HOME: ('logged_out', None),
+            }),
+        )
+        self.assertEqual(counts['tier_logged_out'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        self.assertIn('logged-out', self._dm_calls[0]['message'])
+        self.assertIn(
+            h._drift_key(h.TIER_DISTINCTNESS_NAME, h.TIER_DISTINCTNESS_KIND),
+            live,
+        )
+
+    def test_unparseable_dms_larry(self):
+        """Tier 1 returns unparseable JSON (CLI broken / wrong version) →
+        DM. We can't reason about a tier whose status we can't read."""
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('unparseable', None),
+                h.TIER2_HOME: ('ok', 'org-tier2'),
+            }),
+        )
+        self.assertEqual(counts['tier_unparseable'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 1)
+        self.assertIn('unparseable', self._dm_calls[0]['message'])
+        self.assertNotEqual(live, set())
+
+    def test_timeout_no_dm_no_state_change(self):
+        """A transient `claude auth status` hang must NEVER page Larry.
+        Counts the timeout, but no DM and no state mutation. This is
+        the 'do not alarm on unknown' clause from the spec."""
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('timeout', None),
+                h.TIER2_HOME: ('ok', 'org-tier2'),
+            }),
+        )
+        self.assertEqual(counts['tier_timeout'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 0)
+        self.assertEqual(self._dm_calls, [])
+        # No prior alarm → no live_keys preserved.
+        self.assertEqual(live, set())
+        self.assertEqual(state['drifts'], {})
+
+    def test_timeout_preserves_prior_alarm_state(self):
+        """If we previously DMed about identical tiers and now the probe
+        times out, we must NOT let the run_once GC sweep clear the dedup
+        state — otherwise the next probe would re-DM immediately."""
+        drift_key = h._drift_key(
+            h.TIER_DISTINCTNESS_NAME, h.TIER_DISTINCTNESS_KIND,
+        )
+        state = {'drifts': {drift_key: {
+            'dm_count': 1,
+            'last_dm_at': datetime(2026, 5, 28, 12, 0,
+                                   tzinfo=timezone.utc).isoformat(),
+        }}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('timeout', None),
+                h.TIER2_HOME: ('timeout', None),
+            }),
+        )
+        self.assertEqual(counts['tier_timeout'], 1)
+        self.assertIn(drift_key, live)
+        self.assertIn(drift_key, state['drifts'])
+
+    def test_dedup_suppresses_second_tick_within_window(self):
+        """Same tier-distinctness drift within the 6h window → no second
+        DM. Matches the existing credential-drift dedup behavior."""
+        state = {'drifts': {}}
+        probe = self._probe({
+            h.TIER1_HOME: ('ok', 'org-shared'),
+            h.TIER2_HOME: ('ok', 'org-shared'),
+        })
+        now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+        h.check_tier_distinctness(state, now=now, probe=probe)
+        self._dm_calls.clear()
+        counts, _ = h.check_tier_distinctness(
+            state, now=now + timedelta(hours=1), probe=probe,
+        )
+        self.assertEqual(counts['tier_dm_sent'], 0)
+        self.assertEqual(counts['tier_dm_suppressed_dedup'], 1)
+        self.assertEqual(self._dm_calls, [])
+
+    def test_resolution_clears_alarm_state_via_run_once_gc(self):
+        """After Larry re-auths Tier 2 to a distinct account, the next
+        run_once tick must garbage-collect the tier-distinctness dedup
+        entry — otherwise the alarm would silently linger in state."""
+        # Pre-seed state as if we had previously alarmed on identical tiers.
+        drift_key = h._drift_key(
+            h.TIER_DISTINCTNESS_NAME, h.TIER_DISTINCTNESS_KIND,
+        )
+        state = {
+            'drifts': {drift_key: {
+                'dm_count': 1,
+                'last_dm_at': datetime(2026, 5, 28, 0, 0,
+                                       tzinfo=timezone.utc).isoformat(),
+            }},
+        }
+        # Patch the module probe so run_once sees distinct tiers.
+        with mock.patch.object(
+            h, '_run_claude_auth_status',
+            side_effect=self._probe({
+                h.TIER1_HOME: ('ok', 'org-tier1'),
+                h.TIER2_HOME: ('ok', 'org-tier2'),
+            }),
+        ):
+            counts = h.run_once(
+                registry=_registry(), state=state,
+                scan_overrides={}, dry_run_override=False,
+            )
+        self.assertEqual(counts['tier_distinct'], 1)
+        self.assertNotIn(drift_key, state['drifts'])
+        self.assertEqual(counts['reconciled_gc'], 1)
+
+
+class RunClaudeAuthStatusTest(_IsolatedAgentsRoot):
+    """Subprocess wrapper: `claude auth status` JSON parsing + classification."""
+
+    _stub_tier_probe = False
+
+    def _mock_run(self, stdout='', stderr='', returncode=0, side_effect=None):
+        m = mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+        if side_effect is not None:
+            return mock.patch('subprocess.run', side_effect=side_effect)
+        return mock.patch('subprocess.run', return_value=m)
+
+    def test_ok_with_orgid(self):
+        body = json.dumps({
+            'loggedIn': True, 'email': 'a@b.com',
+            'orgId': '43441a1c-123f-4933-8f7f-55572925600f',
+        })
+        with self._mock_run(stdout=body):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'ok')
+        self.assertEqual(ident, '43441a1c-123f-4933-8f7f-55572925600f')
+
+    def test_ok_orgid_missing_falls_back_to_email(self):
+        body = json.dumps({'loggedIn': True, 'email': 'a@b.com'})
+        with self._mock_run(stdout=body):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'ok')
+        self.assertEqual(ident, 'a@b.com')
+
+    def test_logged_out(self):
+        body = json.dumps({'loggedIn': False, 'authMethod': 'none'})
+        with self._mock_run(stdout=body):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'logged_out')
+        self.assertIsNone(ident)
+
+    def test_unparseable_json(self):
+        with self._mock_run(stdout='not json at all'):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'unparseable')
+        self.assertIsNone(ident)
+
+    def test_logged_in_but_no_identity_is_unparseable(self):
+        """Defensive: loggedIn=true but neither orgId nor email present —
+        treat as unparseable so we surface the unexpected shape."""
+        body = json.dumps({'loggedIn': True})
+        with self._mock_run(stdout=body):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'unparseable')
+
+    def test_timeout(self):
+        import subprocess
+        with self._mock_run(side_effect=subprocess.TimeoutExpired(
+            cmd=['claude', 'auth', 'status'], timeout=20,
+        )):
+            status, ident = h._run_claude_auth_status(
+                '/some/home', timeout_s=20,
+            )
+        self.assertEqual(status, 'timeout')
+        self.assertIsNone(ident)
+
+    def test_filenotfound_is_unparseable(self):
+        with self._mock_run(side_effect=FileNotFoundError('no claude bin')):
+            status, ident = h._run_claude_auth_status('/some/home')
+        self.assertEqual(status, 'unparseable')
+
+    def test_home_env_passed_to_subprocess(self):
+        """The HOME env var is the whole mechanism — verify it's set."""
+        body = json.dumps({'loggedIn': True, 'orgId': 'org-x'})
+        with mock.patch('subprocess.run') as mock_run:
+            mock_run.return_value = mock.Mock(
+                returncode=0, stdout=body, stderr='',
+            )
+            h._run_claude_auth_status('/some/test/home')
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs['env']['HOME'], '/some/test/home')
+        self.assertEqual(kwargs['timeout'], h.CLAUDE_AUTH_TIMEOUT_S)
 
 
 if __name__ == '__main__':
