@@ -354,9 +354,17 @@ def translate_alert(source: str, subject: Optional[str]) -> Optional[dict]:
     return None
 
 
+# Tier glyphs per spec agents/beacon/specs/operator-ux-alert-taxonomy.md § 2.
+# Conservative default: an entry missing a `tier` field renders as FYI rather
+# than NOW (mirror-review focus from the dispatch).
+_TIER_GLYPHS = {'NOW': '🔴', 'SOON': '🟡', 'FYI': '⚪'}
+_TIER_DEFAULT = 'FYI'
+
+
 def _render_translated_alert(record: dict, translation: dict) -> str:
     """Render a matched alert with the new layered shape:
 
+        <GLYPH> <TIER> · <subject>            (operator-triage header)
         <SEVERITY_WORD>                       (plain text, no emoji prefix)
         <plain-language summary>
 
@@ -365,14 +373,23 @@ def _render_translated_alert(record: dict, translation: dict) -> str:
         ---technical detail---
         <original raw header + body verbatim>
 
-    The technical-detail block preserves the pre-translation render so the
+    The tier line is prepended per the operator-UX alert taxonomy spec; the
+    technical-detail block preserves the pre-translation render so the
     operator can still see source, subject, original message, and any
     suggested_action that the producer wrote."""
     severity_label = translation.get('severity', 'WARNING')
+    tier = translation.get('tier', _TIER_DEFAULT)
+    if tier not in _TIER_GLYPHS:
+        tier = _TIER_DEFAULT
+    glyph = _TIER_GLYPHS[tier]
+    subject = record.get('subject') or ''
+    tier_line = f'{glyph} {tier}'
+    if subject:
+        tier_line += f' · {subject}'
     summary = translation.get('plain_language_summary', '').strip()
     action = translation.get('recommended_action', '').strip()
     raw_body = _render_raw_alert_body(record)
-    lines: list[str] = [severity_label]
+    lines: list[str] = [tier_line, severity_label]
     if summary:
         lines.append('')
         lines.append(summary)

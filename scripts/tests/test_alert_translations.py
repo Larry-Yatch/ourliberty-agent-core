@@ -314,6 +314,7 @@ class TranslationFileShapeTest(unittest.TestCase):
 
     def test_every_entry_has_required_fields(self):
         allowed_severities = {'URGENT', 'WARNING', 'INFO'}
+        allowed_tiers = {'NOW', 'SOON', 'FYI'}
         for source, entries in self.data.items():
             if source.startswith('_'):
                 continue
@@ -322,7 +323,8 @@ class TranslationFileShapeTest(unittest.TestCase):
                 self.assertIsInstance(entry, dict,
                                       f'{source}:{subject}')
                 for field in (
-                    'severity', 'plain_language_summary', 'recommended_action',
+                    'severity', 'tier', 'plain_language_summary',
+                    'recommended_action',
                 ):
                     self.assertIn(field, entry, f'{source}:{subject}')
                     self.assertTrue(
@@ -333,6 +335,11 @@ class TranslationFileShapeTest(unittest.TestCase):
                     entry['severity'], allowed_severities,
                     f'{source}:{subject} severity={entry["severity"]!r} '
                     f'not in {allowed_severities}',
+                )
+                self.assertIn(
+                    entry['tier'], allowed_tiers,
+                    f'{source}:{subject} tier={entry["tier"]!r} '
+                    f'not in {allowed_tiers}',
                 )
 
 
@@ -400,37 +407,51 @@ class FormatDmTranslationTest(unittest.TestCase):
             'suggested_action': 'do thing',
         })
         lines = text.split('\n')
-        # First line is the severity word, no emoji.
-        self.assertEqual(lines[0], 'URGENT')
-        self.assertNotIn('🚨', lines[0])
-        self.assertNotIn('⚠', lines[0])
+        # First line is the tier header (glyph + label + subject).
+        self.assertTrue(
+            lines[0].startswith('🔴 NOW · '),
+            f'expected tier-NOW header on line 0, got {lines[0]!r}',
+        )
+        self.assertIn('pipeline-stall:forge-no-pr:wt-forge-foo', lines[0])
+        # Second line is the severity word, no emoji.
+        self.assertEqual(lines[1], 'URGENT')
+        self.assertNotIn('🚨', lines[1])
+        self.assertNotIn('⚠', lines[1])
         # Technical-detail footer is present and includes the raw body.
         self.assertIn('---technical detail---', text)
         self.assertIn('raw producer message', text)
         self.assertIn('Run: do thing', text)
 
-    def test_severity_header_is_plain_word_for_every_translation(self):
-        """Mirror-review focus: severity strings must be one of {URGENT,
-        WARNING, INFO} on the first line of the rendered DM with no
-        emoji prefix/suffix. Asserts this for every (source, subject) the
-        translation table claims to cover."""
+    def test_tier_glyph_renders_for_every_translation(self):
+        """Mirror-review focus: every translation entry must render a tier
+        glyph + label as the first line. Confirms tier mapping is wired end
+        to end and the severity word remains plain on line 1."""
         data = json.loads(TRANSLATIONS_FILE.read_text(encoding='utf-8'))
-        allowed = {'URGENT', 'WARNING', 'INFO'}
+        allowed_severities = {'URGENT', 'WARNING', 'INFO'}
+        tier_to_glyph = {'NOW': '🔴', 'SOON': '🟡', 'FYI': '⚪'}
         for source, entries in data.items():
             if source.startswith('_'):
                 continue
-            for subject in entries.keys():
+            for subject, entry in entries.items():
                 text = larry_alerts.format_dm({
                     'source': source,
                     'subject': subject,
                     'severity': 'warning',
                     'message': 'm',
                 })
-                first = text.split('\n', 1)[0]
-                self.assertIn(
-                    first, allowed,
+                lines = text.split('\n')
+                expected_glyph = tier_to_glyph[entry['tier']]
+                self.assertTrue(
+                    lines[0].startswith(
+                        f'{expected_glyph} {entry["tier"]}'),
                     f'first line of matched DM for {source}:{subject} '
-                    f'was {first!r}, expected one of {allowed}',
+                    f'was {lines[0]!r}, expected to start with '
+                    f'{expected_glyph} {entry["tier"]}',
+                )
+                self.assertIn(
+                    lines[1], allowed_severities,
+                    f'second line of matched DM for {source}:{subject} '
+                    f'was {lines[1]!r}, expected one of {allowed_severities}',
                 )
 
     def test_unmatched_alert_has_no_translation_footer(self):
