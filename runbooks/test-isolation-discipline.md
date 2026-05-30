@@ -89,6 +89,52 @@ The gate's `WHITELIST` dict (top of the test file) covers cases where the litera
 
 A second sub-test (`test_whitelist_entries_still_exist`) prevents the whitelist from drifting: if a whitelisted file:line no longer contains a leak literal (because the file was refactored), the entry must be removed. Otherwise the whitelist silently swallows future regressions at that line number.
 
+## Reserved fixture task-id namespace (`zz-fixture-`)
+
+Path redirection (above) is the first line of defense: a well-behaved test
+never writes to a daemon-input path, so its fixtures never reach a daemon.
+The reserved task-id namespace is the second, independent line of defense:
+if a fixture task_id *does* reach a classification surface — a leaked
+envelope, an emission path that re-reads its own output, a Pulse /cycle
+scanning recent task_ids — `fixture_patterns.is_fixture_task_id()` must be
+able to say "this is a test artifact, not real work" with zero ambiguity.
+
+**The convention:** every synthetic fixture whose `task_id` can flow through
+dispatch, gating, or any `is_fixture_task_id()` surface MUST use a
+`zz-fixture-<scenario>` task_id. Production task_ids NEVER use this prefix.
+`zz-` sorts last in any listing (fixtures cluster at the bottom), and
+`-fixture-` is self-documenting; `<scenario>` names the case under test
+(e.g. `zz-fixture-mirror-bad-marker`).
+
+**Why a reserved prefix and not just "any test id":** before this
+convention, the same string spaces — `t-*`, `real-*` — were used for BOTH
+synthetic leak-fixtures AND legitimate mock task names (the subjects of
+routing/cost/revision unit tests). That collision is the deep root of the
+2026-05-29/30 fixture-replay incident: a classifier cannot both gate a leak
+named `t-fail` and pass a legit mock named `t-core` if they share a prefix.
+Reserving `zz-fixture-` removes the ambiguity by construction — see
+`feedback_reserve_namespace_for_test_fixtures` in agent memory.
+
+**Per-occurrence disambiguation (when migrating existing tests):** the
+invariant is *an id matches `is_fixture_task_id()` if and only if it is a
+synthetic fixture that flows through a dispatch/gating surface.* Apply it
+case by case — do NOT blanket-rename:
+
+- A synthetic leak-fixture (an envelope/task_id that exists only to prove the
+  gate catches it) -> rename to `zz-fixture-<scenario>`.
+- A legitimate mock task name that flows through an emission/gate surface and
+  must NOT be gated (e.g. it stands in for real work in a routing test) ->
+  rename to a non-matching name (a `real-*` style id that is NOT in
+  `FIXTURE_PATTERN_EXACT`).
+- A legitimate mock that is passed directly to a helper and never reaches a
+  classification surface -> leave it untouched; renaming is churn.
+
+**Where it's enforced:** `scripts/fixture_patterns.py` is the single source
+of truth (`FIXTURE_PATTERN_PREFIXES` lists `zz-fixture-` first). The prefix
+list is mirrored into `runbooks/cycle-prompt.md` and `agents/pulse/CLAUDE.md`;
+`AllowlistDriftTest` (in `scripts/tests/test_pulse_cycle_fixture_allowlist.py`)
+fails loudly if any live mirror surface drifts from the source of truth.
+
 ## What if my test legitimately needs to test real inbox-watcher behavior?
 
 That's an **integration test**, not a unit test. It goes in a separate test class (eventually a separate file) with explicit pause-the-watcher / cleanup-on-success / cleanup-on-failure discipline. The watcher must be paused before writes, fixtures must be tagged so the cleanup step can find them, and the cleanup step must run unconditionally. None of that exists today — there is no integration-test harness for the inbox flow. If you have a use case for one, file a spec proposal; out of scope for V1 of this discipline.
