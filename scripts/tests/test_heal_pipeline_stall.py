@@ -1475,5 +1475,56 @@ class TestResolutionSignalRegressionGuards(_TempAgentsRootMixin,
         self.assertEqual(state, {})
 
 
+class TestFixtureSkipDurable(_TempAgentsRootMixin, unittest.TestCase):
+    """2026-05-30 fixture-replay incident — durable guard: run() must not DM
+    Larry about stalls whose task is a synthetic fixture, even when a stale
+    fixture build record lingers in forge/.archive. Check functions still
+    detect them; the skip is at emission."""
+
+    def test_alert_is_fixture_helper(self) -> None:
+        f = self.hps._alert_is_fixture
+        self.assertTrue(f({'key': 'forge_built_no_pr:real-loop'}))
+        self.assertTrue(f({'key': 'forge_built_no_pr:t-no-preamble'}))
+        self.assertTrue(f({'key': 'forge_built_no_pr:prod-mirror-retry'}))
+        self.assertTrue(f({'key': 'mirror_pass_unmerged:real-built'}))
+        # legit tasks are NOT fixtures
+        self.assertFalse(f({'key': 'forge_built_no_pr:add-real-prefix-fixture-allowlist'}))
+        self.assertFalse(f({'key': 'forge_built_no_pr:chain-discipline-001'}))
+        self.assertFalse(f({'key': 'tier2_fallback:beacon-bot:FAILED:rate_limit'}))
+        self.assertFalse(f({'key': 'no-mirror-dispatch:PR#5'}))
+
+    def test_check_detects_but_run_suppresses_fixture(self) -> None:
+        task = 'real-phantom-stall-001'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task, 'phase': 'preflight',
+            'result': '=== PROCEED ===\n{}\n=== END_PROCEED ===',
+        }))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        # check function STILL detects it (detection logic unchanged)
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertTrue(self.hps._alert_is_fixture(alerts[0]))
+
+        # but run() must NOT DM Larry about it
+        def side_effect(log_path, hours):
+            if 'inbox_watcher.log' in str(log_path):
+                return lines
+            return []
+        with patch.object(self.hps, '_all_open_prs', return_value=[]), \
+             patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
+             patch.object(self.hps, '_read_recent_log_lines', side_effect=side_effect), \
+             patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            self.hps.run()
+        fixture_dms = [c for c in mock_alert.call_args_list
+                       if task in (c.kwargs.get('subject', '') or '')]
+        self.assertEqual(fixture_dms, [])
+
+
 if __name__ == '__main__':
     unittest.main()

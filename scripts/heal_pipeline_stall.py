@@ -101,6 +101,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import larry_alerts  # noqa: E402
+import fixture_patterns  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -1333,6 +1334,28 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
 
 # ---------- Main ----------
 
+def _alert_is_fixture(alert: dict) -> bool:
+    """True if a stall alert's task is a synthetic test fixture.
+
+    Storm-era fixture build records linger in forge/.archive and would
+    otherwise phantom-alert Larry forever (the 2026-05-29/30 fixture-replay
+    incident). Skipped at EMISSION so the check functions still detect them
+    (their unit tests stay green); only the DM is suppressed. Uses the shared
+    fixture_patterns definitions plus a healer-local real-*/prod-* prefix
+    guard: in the production pipeline those prefixes are exclusively fixtures
+    (legit tasks are descriptively named; the only real "real" task,
+    add-real-prefix-*, starts with "add-"). The cross-cutting durable fix is
+    the zz-fixture- namespace migration.
+    """
+    key = alert.get('key', '')
+    task = key.split(':', 1)[1] if ':' in key else key
+    if not isinstance(task, str):
+        return False
+    if fixture_patterns.is_fixture_task_id(task) or fixture_patterns.is_fixture_envelope_name(task):
+        return True
+    return task.startswith('real-') or task.startswith('prod-')
+
+
 def run() -> int:
     """Single pass. Returns 0 always (healer never fails systemd)."""
     if KILL_SWITCH.exists():
@@ -1395,6 +1418,9 @@ def run() -> int:
 
     fired = 0
     for alert in all_alerts:
+        if _alert_is_fixture(alert):
+            log(f'suppressed (fixture task): {alert["key"]}', 'INFO')
+            continue
         if not should_alert(state, alert['key']):
             log(f'suppressed (cooldown): {alert["key"]}', 'INFO')
             continue
