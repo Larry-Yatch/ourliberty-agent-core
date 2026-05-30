@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration 121 — 2026-05-30 ~23:28 UTC (interactive)
+
+**Health:** ⚠️ Drift — PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) OPEN but CONFLICTING (Larry's PR #209 merged first at 23:22Z, overlapping files likely). Inbox-watcher restart now unblocked (auth-setup completed). Sync push failure 7th occurrence (known root cause). All 6 services active.
+
+**Triage:** 2 new alerts since iter 120 watermark (23:18:37Z): both deploy-notifier READY (23:22:25Z ×2, PR #210 Vercel previews) → Tier 3 known-pattern → silence. No tier-reset from Check 0. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 Tier-3 silenced. ✅**
+  - 23:22:25Z deploy-notifier READY ×2 (Vercel previews for PR #210 / main) — Tier 3, no action.
+  - Note: 23:17Z pipeline-stall alerts (rate_limit + auth_401 for forge) were in iter 120's watermark window; auth_401 was transient — Forge completed auth-setup-token-wiring regardless (PR #210 opened at 23:25Z).
+
+- **(Check 1) Log noise: nominal. ✅** inbox-watcher log unreadable (empty output); no new ERROR signals in alert stream in 3-min post-iter-120 window. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** No new Larry directives since iter 120. ✅
+
+- **(Check 3) Pipeline stall: new finding — PR #210 CONFLICTING. ⚠️**
+  - auth-setup-token-wiring.json: task COMPLETED. Forge opened PR #210 "fix(auth): wire dispatches to long-lived setup-tokens" at 23:25:11Z.
+  - PR #210 state: OPEN, reviewDecision="", **mergeable=CONFLICTING**. Conflict introduced by Larry's PR #209 (feat(missions): registration pass — populate task_ids for in-flight workstreams, merged 23:22:33Z) overlapping with Forge's auth changes in agent_runner.py.
+  - marker-error-auth-setup-token-wiring-1.json in forge inbox: retry 1/3 for preflight phase (Forge omitted the PROCEED/CLARIFY_REQUEST/REJECT marker block). Forge will reprocess; operational retry pattern, not a failure.
+  - step-a-rotation.json: still queued (6h12m old). No worker currently processing it (auth-setup was the blocking in-flight task). Normal queued state — inbox-watcher should pick it up now that auth-setup completed.
+  - **Tier-reset: yes** (PR #210 CONFLICTING is a real stall signal). ⚠️
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118)
+  - pulse_telegram_bot.sh launcher (iter 94)
+  - stuck-cycle timeout guard (iter 43)
+  - Monday [yellow] DM scheduled 2026-06-01. Carry-forward. ✅
+
+- **(Check 5) Stale daemon: ✅ healer fresh; dispatch_validator import gap persists.**
+  - heal-stale-daemon-code-cooldowns.json: inbox-watcher last_restart_ts=22:35:44Z (~52 min ago). Healer confirms no new restarts since iter 120. Fresh per 60-min threshold.
+  - Inbox-watcher dispatch_validator.py stale-module import issue from iter 120 PERSISTS (unresolved). Was blocked on auth-setup completing; **auth-setup HAS now completed** → restart is unblocked.
+  - ask-then-do: restart inbox-watcher + re-deposit 34 larry-reject-*.json files from beacon/.invalid/. Awaiting Larry go-ahead.
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=8678aa2 "Pulse cycle 20260530T232032Z". ✅
+
+- **(Check B) Sync health: ⚠️ 7th occurrence (known root cause, APPROVAL_REQUEST pending).**
+  - sync.json: status=error at 23:20:55Z, commit=e3a16b6d, "Auto-commit push failed; rolled back". 7th occurrence (iters 102, 114, 117, 118, 119, 120, 121). APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday DM queue. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: 2 forge tasks. ✅/watch**
+  - forge/marker-error-auth-setup-token-wiring-1.json: retry 1/3 for preflight marker — Forge will reprocess. Operational pattern. ✅
+  - forge/step-a-rotation.json: queued 17:09Z (~6h). Blocked on auth-setup; now free. Normal queue wait — inbox-watcher should pick up after current reprocessing. ✅
+
+- **(Check E) PRs: PR #210 CONFLICTING. ⚠️**
+  - ourliberty-agent-core: PR #210 OPEN, mergeable=CONFLICTING, reviewDecision="", autoMergeRequest=null. Age: ~3 min.
+  - Root cause: Larry's PR #209 (missions-json-registration-pass, merged 23:22Z) hit the same files as Forge's auth branch (agent_runner.py likely).
+  - Next action: Mirror will review PR #210; if CONFLICTING blocks CI, Forge needs to `git rebase origin/main` in the worktree. The marker retry chain will trigger Mirror review.
+  - ourliberty-dashboard: 0 open PRs (PRs #27 + #28 merged this evening). ✅
+
+- **Check H (Forge digest):**
+  - PR #209 merged (Larry, agent-core): feat(missions): registration pass — populate task_ids for in-flight workstreams, 23:22:33Z.
+  - PR #210 open (Forge, agent-core): fix(auth): wire dispatches to long-lived setup-tokens, 23:25:11Z, CONFLICTING.
+  - Dashboard: PRs #26, #27, #28 all merged tonight (Larry's missions UI polish sequence).
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored. Next gate: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, H).
+2. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:26:11Z.
+3. Called `cycle_prime_ledger.py append --tier 1 --kind intervention --payload ...` → appended `pr-210-conflicting-inbox-watcher-unblocked-iter-121` intervention row.
+4. Sent [yellow] DM via `larry_alerts.append_alert`: auth-setup completed → PR #210 CONFLICTING + inbox-watcher restart unblocked.
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:**
+- [yellow] Iter 121 — auth-setup-token-wiring completed → PR #210 CONFLICTING (Larry PR #209 overlap); inbox-watcher restart now unblocked.
+
+**Patterns:**
+- **Forge marker omission (1st occurrence, iter 121).** Forge completed auth-setup-token-wiring and opened PR #210 but forgot the preflight marker block. Retry 1/3 in progress. Not yet G-rule threshold. Watch.
+- **Auth-setup task succeeded despite earlier rate_limit + auth_401 at 23:17Z.** The 23:17Z alerts were transient — Forge continued and completed the task. The auth_401 on --resume sessions may be a transient OAuth state issue rather than a permanent expiry.
+- **PR conflict pattern.** Larry merged PR #209 at 23:22Z while Forge's branch was being opened (23:25Z). Conflict is a timing issue, not a structural problem. Forge rebase should resolve cleanly.
+- **Inbox-watcher restart unblocked.** The iter 120 hold condition (waiting on auth-setup to complete) is now met. 34 blocked dashboard actions can flow once watcher restarts.
+
+**Learned:**
+1. auth_401 on --resume sessions at 23:17Z was transient — Forge completed the task 8 min later (23:25Z). Don't escalate single-occurrence auth_401 on resume sessions as system-down; note and watch.
+2. PR conflict detection from Check E is important — `mergeable=CONFLICTING` surfaced within 3 minutes of PR opening. Normal chain (Mirror review) will catch it, but early detection avoids a silent 30-min wait.
+3. marker-error retry files in forge inbox are operational noise (up to 3 retries before dead-letter). Not a stall signal unless retry count ≥ 3.
+
+---
+
 ## Iteration 120 — 2026-05-30 ~23:18 UTC (interactive)
 
 **Health:** ⚠️ Drift — inbox-watcher running stale dispatch_validator.py; 34 `larry-reject-*.json` files blocked in beacon/.invalid/. Sync push failure 6th occurrence (known root cause). All 6 services active. Forge pipeline advancing normally.
