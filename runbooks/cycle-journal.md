@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 116 — 2026-05-30 ~22:37 UTC (interactive)
+
+**Health:** ✅ Nominal — all checks clean. PR #207 merged resolving long-standing APPROVAL_REQUEST. Inbox-watcher graceful restart in progress with Forge step-c-ledger task in-flight.
+
+**Triage:** 0 new alerts since iter 115 watermark (22:24Z). alert-triage.json still MISSING (ongoing). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** Last alert: 22:24Z [yellow] iter 114 Pulse DM (idx=1017). No new entries since iter 115 watermark. alert-triage.json MISSING (ongoing). ✅
+
+- **(Check 1) Log noise: nominal. ✅** journalctl last 30min: 0 WARN/ERROR from ourliberty services. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 1 session re-established (7998341473 → 1b5ed242). Last delivery idx=1017 (22:24Z, iter 114 Pulse DM). No new Larry messages since iter 115. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** heal-pipeline-stall-state.json MISSING (first confirmed observation this iter; healer refactored to alert-cooldown/ directory structure). No new stall alerts after 22:12Z (iter 115's watermark). Known watch items (Tier 2 rate_limit SKIPPED) carry forward. ✅ [see Learned]
+
+- **(Check 4) Pending Larry directives: APPROVAL_REQUEST queue reduced 3→2. ✅**
+  - **RESOLVED: validator-allow-dashboard-source-001.** PR #207 "fix(dispatch_validator): allow 'dashboard' as source" merged at 22:32:51Z. This was the Beacon APPROVAL_REQUEST (iter 97, ~2026-05-27/28). Mirror review passed (cost $0.67); Beacon processed the result notify (cost $0.49). Dashboard dispatch source now in ALLOWED_SOURCES. ⚠️ NOTE: 4 previously-dropped dashboard actions (2 approvals + 2 rejects from 2026-05-27/28) still need re-actioning via Telegram — those actions never reached Beacon per the MEMORY.md watch item.
+  - Standing (2): pulse_telegram_bot.sh launcher (pending iter 94), stuck-cycle timeout guard (pending iter 43, ~19d). [yellow] DM queue unchanged for 2026-06-01 Monday.
+
+- **(Check 5) Stale daemon: nominal — graceful restart in progress. ✅** heal-stale-daemon-code-cooldowns.json shows last restarts at ~22:11Z (PR #206 deploy). New: inbox-watcher received SIGTERM at 22:35:14Z — graceful shutdown triggered. In-flight claude session (Forge step-c-ledger task PID 2508012) still running; service in `deactivating (stop-sigterm)` state, waiting for it to finish. Expected behavior: systemd will restart the watcher automatically after the forge session completes. No manual intervention needed. ✅
+
+- **(A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=60db422 "Pulse cycle 20260530T223123Z" (iter 115 wrapper). ✅
+
+- **(B) Sync health: ⚠️ watch (stable, carry forward).** sync.json: status=error at 22:08:48Z. Last successful sync: 22:04Z (~33 min ago, within 2h threshold). Root cause (dirty tree) resolved by commit 01d1717. Auto-recovery pending at next scheduled sync run. No re-DM (iter 114 already escalated). ✅
+
+- **(C) Agent liveness: 6/6 at check time; inbox-watcher deactivating (graceful). ✅** At 22:32Z: 6/6 active. By 22:35Z: inbox-watcher received SIGTERM (graceful restart). Classified as nominal — controlled shutdown, not crash. forge-bot log silence (last entry 2026-05-28T19:11Z, ~45h): calibrated known behavior (no Telegram traffic → no log entries). Forge work is via inbox-watcher dispatch, not Telegram, so silence expected. ✅
+
+- **(D) Inboxes: 2 tasks in inbox — both handled. ✅**
+  - beacon/notify-review-validator-allow-dashboard.json (6h old): NOT stale in substance — inbox-watcher processed it at 22:33:18Z (success, $0.49). Archive step likely interrupted by the 22:35:14Z SIGTERM; task file remains in inbox but work is done. Will archive after watcher restarts. ✅
+  - forge/step-c-ledger.json (6h in queue): IN-FLIGHT — inbox-watcher spawned Forge claude session (PID 2508012) for this task. The 6h queue time was real but harmless (watcher was busy with mirror + beacon tasks first). Currently executing. ✅
+
+- **(E) PRs: 0 open. ✅** ourliberty-agent-core: PR #207 merged 22:32:51Z. 0 remaining. ourliberty-dashboard: 0 open. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next firing 2026-06-01. ✅
+
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d, outside 60d window). ✅
+
+- **(Pending, carry forward):**
+  - **Sync recovery watch:** sync.json error at 22:08Z; expect auto-recovery next sync run (~23:08Z). If still error at iter 117, re-escalate.
+  - **APPROVAL_REQUESTs (2, reduced from 3):** pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. [yellow] DM on 2026-06-01 Monday.
+  - **4 dropped dashboard actions:** approvals/rejects from 2026-05-27/28 that never reached Beacon (validator-allow-dashboard-source-001 root cause). Larry must re-action via Telegram. Carry per MEMORY.md watch item; [yellow] DM on Monday.
+  - Tier 2 rate_limit SKIPPED variant (22:12Z): sub-threshold (2 alerts). Watch continues.
+  - inbox-watcher Unit-not-found (1st occurrence 10:31Z May 30): no recurrence in 14h+. Sub-threshold; watch.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - Check I idempotency (64fdcfb): verify on 2026-06-01 Monday first firing.
+  - heal-pipeline-stall-state.json MISSING: calibration note (alert-cooldown/ dir is replacement). No action needed.
+
+**Did:**
+1. Ran all checks (0–5, A–E).
+2. Called `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2, tier stays 1.
+3. Wrote journal entry.
+4. No escalations sent (all findings nominal or carried forward from prior iter).
+
+**Escalated:** Nothing. PR #207 merge is good news, not an escalation.
+
+**Forge:** step-c-ledger task in-flight (PID 2508012, spawned by inbox-watcher just before SIGTERM). Task: "PR C: rate-limit ledger completeness (retry_after_sec + auth_401/resume/bot-wrapper capture + per-account costs.jsonl)". Once forge session completes, inbox-watcher restarts and picks up from there.
+
+**Patterns:**
+- Tier state: consecutive_clean 1→2. 1 more consecutive clean iter → de-escalate to Tier 2 (15-min cadence).
+- APPROVAL_REQUEST queue now at 2 (down from 4 peak). Good velocity: 4→3 (iter 115) → 3→2 (this iter). Two remaining are Larry-authorization-blocked (not pipeline issues).
+- inbox-watcher + SIGTERM + in-flight task: graceful shutdown/restart cycle working correctly. No manual intervention needed.
+- PR #207 (validator-allow-dashboard-source-001): demonstrates the full Beacon→Forge→Mirror→merge pipeline working end-to-end in ~1 session.
+
+**Learned:**
+1. heal-pipeline-stall-state.json is gone — healer refactored to `alert-cooldown/` directory structure (individual files per cooldown key instead of monolithic JSON). First confirmed observation. Will update MEMORY.md to reflect the correct state file location. Future Check 3 should look for `alert-cooldown/` entries, not the old monolithic file.
+2. inbox-watcher's forge session (step-c-ledger, PID 2508012) was in-flight when SIGTERM arrived — the 6h queue time was deceptive; watcher was processing tasks in order (mirror review first, then beacon notify, then forge build). The queue time reflects FIFO processing, not a stuck forge.
+3. validator-allow-dashboard-source-001 RESOLVED (MEMORY.md watch item). 4 dropped dashboard actions still need Telegram re-action — this is a carry-forward human action item for Larry.
+
+---
+
 ## Iteration 115 — 2026-05-30 ~22:27 UTC (interactive)
 
 **Health:** ✅ Nominal — iter 114's dirty-tree finding resolved; all checks clean. System quiescent.
