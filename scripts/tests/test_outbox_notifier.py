@@ -6718,7 +6718,8 @@ class CostBudgetGateTest(unittest.TestCase):
         ok = on._enforce_cost_budget('real-x', 'build-phase', data)
         self.assertTrue(ok)
 
-    def test_enforce_refuses_at_cap_and_dms_larry(self):
+    @mock.patch.object(on, '_load_cost_per_task_cap_usd_from_config', return_value=5.0)
+    def test_enforce_refuses_at_cap_and_dms_larry(self, _mock_cap):
         self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
         data = {'reply_chat_id': 12345}
         ok = on._enforce_cost_budget('real-x', 'build-phase', data)
@@ -6732,13 +6733,15 @@ class CostBudgetGateTest(unittest.TestCase):
         self.assertIn('build-phase', cost_dms[0]['message'])
         self.assertIn('cap', cost_dms[0]['message'])
 
-    def test_enforce_no_chat_id_still_refuses(self):
+    @mock.patch.object(on, '_load_cost_per_task_cap_usd_from_config', return_value=5.0)
+    def test_enforce_no_chat_id_still_refuses(self, _mock_cap):
         """Refusal happens regardless of reply_chat_id; DM is best-effort."""
         self._write_costs({'task_id': 'real-x', 'cost_usd': 20.0})
         ok = on._enforce_cost_budget('real-x', 'build-phase', {})
         self.assertFalse(ok)
 
-    def test_enforce_dedups_same_task_within_daemon_lifetime(self):
+    @mock.patch.object(on, '_load_cost_per_task_cap_usd_from_config', return_value=5.0)
+    def test_enforce_dedups_same_task_within_daemon_lifetime(self, _mock_cap):
         """First cap-fire DMs Larry; subsequent fires for the same task
         within the same daemon-instance suppress the DM (code-review #4).
         """
@@ -6770,7 +6773,8 @@ class CostBudgetGateTest(unittest.TestCase):
         cost_dms_third = [r for r in records if r.get('intent') == 'cost-budget-exhausted']
         self.assertEqual(len(cost_dms_third), 1)
 
-    def test_enforce_dedups_per_task_not_globally(self):
+    @mock.patch.object(on, '_load_cost_per_task_cap_usd_from_config', return_value=5.0)
+    def test_enforce_dedups_per_task_not_globally(self, _mock_cap):
         """Cap-fire on task A does NOT suppress DM for task B (different
         task — different dedup bucket)."""
         import larry_alerts as la
@@ -6788,7 +6792,8 @@ class CostBudgetGateTest(unittest.TestCase):
         task_ids = {r.get('task_id') for r in cost_dms}
         self.assertEqual(task_ids, {'real-A', 'real-B'})
 
-    def test_enforce_dedups_resets_after_daemon_restart(self):
+    @mock.patch.object(on, '_load_cost_per_task_cap_usd_from_config', return_value=5.0)
+    def test_enforce_dedups_resets_after_daemon_restart(self, _mock_cap):
         """Simulating a daemon restart (test helper clears the set) —
         the same task can DM again. Models the real production behavior
         where the daemon-lifetime set is cleared on every restart, which
