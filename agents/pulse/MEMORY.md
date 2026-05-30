@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-30 ~22:02Z UTC (Iter 112)
+## Status snapshot — updated 2026-05-30 ~22:22Z UTC (Iter 113)
 
-**System: ✅ Nominal.** Iter 112 findings — all checks clean (3rd consecutive clean iter). A (✅ HEAD=d50be5e=wrapper commit for iter 111, clean tree, on main), B (✅ last sync 21:04Z, < 2h), C (6/6 active ✅), D (0 inboxes), E (0 open PRs). Check I/VIII/IX Saturday = off day; next all fire 2026-06-01 (Monday). APPROVAL_REQUEST queue: 4 remaining unchanged: validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~18d); [yellow] DM to Larry on 2026-06-01 Monday cycle. NOTE: cycle-tier.json consecutive_clean expected to advance to 2 via wrapper (Bash write outside session scope in interactive mode). New watch item: ourliberty-health "notify script missing, alert dropped" WARN at 21:57Z — 1st occurrence, sub-threshold (1/hr), monitor.
+**System: ✅ Nominal.** Iter 113 findings — 4th consecutive clean iter. A (✅ HEAD=14876b7=wrapper commit for iter 112, clean tree, on main), B (✅ last sync 22:04Z, < 2h), C (6/6 active ✅), D (1 inbox: mirror/review-cycle-timer-oncalendar-fallback.json — Mirror review task for PR #206, nominal), E (1 open PR: #206 "fix(systemd): switch cycle.timer to OnCalendar", created 22:02Z, MERGEABLE, Mirror review pending). cycle-tier.json: tier=1, consecutive_clean=2 (advanced via cycle_tier_state.py record --checks-clean true; 1 more clean iter → Tier 2 de-escalation). Check I/VIII/IX Saturday = off day; next all fire 2026-06-01 (Monday). APPROVAL_REQUEST queue: 4 unchanged: validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~18d); [yellow] DM to Larry on 2026-06-01 Monday cycle. Watch: beacon_telegram_bot.log rate-limit look-alike entries at 22:07-22:08Z — likely test artifacts (cost-gate mocks), not new production rate-limit incident. ourliberty-health "notify script missing" WARN: 0 recurrences in 2h, sub-threshold.
 
 **Diverged-main watch: CLOSED** (iters 101, 102, 103 all clean; iter 104 HEAD=origin, no ahead/behind). PR #183 confirmed effective. 5-cycle window complete. Formally closed.
 

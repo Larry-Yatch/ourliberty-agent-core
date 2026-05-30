@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 113 — 2026-05-30 ~16:22 MDT / 2026-05-30 ~22:22 UTC (interactive)
+
+**Health:** ✅ Nominal — fourth consecutive clean iter (110–113). 1 new PR (#206) in pipeline, awaiting Mirror review. All other checks clean.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No new entries in larry-alerts.jsonl since iter 112 watermark (~22:02Z). Last entry 16:20Z May 30 (deploy-notifier, dashboard PR #23 main-deploy). alert-triage.json still MISSING (ongoing). ✅
+
+- **(Check 1) Log noise: nominal. ✅** journalctl 30min: 0 WARN/ERROR from ourliberty services. beacon_telegram_bot.log has rate-limit–looking entries at 22:07–22:08Z (see Log-noise note below). ourliberty-health: 0 entries in last 2h (21:57Z WARN did not recur since iter 112). ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 1 session; most recent delivery idx=992 at 10:31Z (beacon stale-daemon alert). No new Larry messages since iter 112 (~22:02Z watermark). No orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** larry-alerts.jsonl: no new stall alerts since 15:29Z real-clr (CLOSED iter 110/111). heal-pipeline-stall-state.json: non-2099-snoozed entries all have expired snooze timestamps from 2026-05-26 to 2026-05-29 — healer has not re-fired on any of these (underlying conditions cleared). No active stalls. ✅
+
+- **(Check 4) Pending Larry directives: nominal. ✅** No new directives since iter 112. 4 standing APPROVAL_REQUESTs unchanged (validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard — oldest ~18d). [yellow] DM planned 2026-06-01 Monday cycle. ✅
+
+- **(Check 5) Stale daemon: nominal. ✅** heal-stale-daemon-code-cooldowns.json present (mtime 04:31Z). No new restart events since 10:31Z May 30. inbox-watcher active. ✅
+
+- **(A) Source repo: ✅.** gitStatus (session start): branch=main, clean tree, HEAD=14876b7 ("Pulse cycle 20260530T220504Z" = wrapper commit for iter 112). ✅
+
+- **(B) Sync health: ✅.** Last sync 2026-05-30T22:04:36Z (~18 min ago, < 2h). status=no-change at 5507eca. ✅
+
+- **(C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer: all active. Log silence (no Telegram traffic since 21:32Z) — calibrated known behavior. ✅
+
+- **(D) Inboxes: 1 task, nominal. ✅** mirror/review-cycle-timer-oncalendar-fallback.json — Mirror review task for PR #206 (source=beacon; cycle-timer-oncalendar-fallback). Expected in-flight, not stale (PR created 22:02Z, <25 min). ✅
+
+- **(E) PRs: 1 open — nominal/watch.** PR #206 "fix(systemd): switch cycle.timer to OnCalendar to avoid NextElapse=infinity" — MERGEABLE, reviewDecision="" (Mirror review pending), no auto-merge, no CI checks. Created 22:02:31Z (this session, ~23 min ago). Not yet at 30-min auto-merge threshold AND not yet clean+green (requires Mirror PASS first). Mirror has the review task. Monitor next cycle. ✅
+
+- **Log-noise note (informational):** beacon_telegram_bot.log has entries at 22:07–22:08Z including "TIER2_FALLBACK_ATTEMPT", "You've hit your limit · resets 11:30am", and mock-looking strings like "stdout='also broken'" and "stdout='auth_401: provider not enabled (TIER 2 distinct)'". Mixed real+fixture-looking content → interpretation: these are likely test artifacts from building PR #206 (the `test(cost-gate): decouple CostBudgetGateTest from config cap drift` commit runs tier-rotation mocks). No matching journalctl events in the last 30 min. Not a new production rate-limit incident. Watch: if healer fires new `tier2_fallback` alerts in larry-alerts.jsonl, escalate.
+
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (83d, outside 60d window). ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — off day. Next firing 2026-06-01 (Monday). Check III 14d gate: no prior artifact, 30d data requirement likely not met. ✅
+
+- **(Pending, carry forward):**
+  - APPROVAL_REQUESTs (4 unchanged): validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~18d). [yellow] DM on 2026-06-01 Monday cycle.
+  - PR #206: awaiting Mirror review (cycle-timer-oncalendar-fallback task). Monitor: if reviewDecision=APPROVED and auto-merge not enabled after 30 min → always-fix.
+  - Tier 2 rate_limit: no new production events. Watch continues.
+  - inbox-watcher "Unit not found" (1st occurrence 10:31Z May 30): no recurrence in 11.8h. Watch continues.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - ourliberty-health "notify script missing" (21:57Z): 0 recurrences in 2h. Sub-threshold; watch.
+
+**Did:** Nothing. All checks nominal.
+
+**Escalated:** Nothing new. [yellow] DM queue for Monday 2026-06-01 unchanged.
+
+**Forge:** 0 open Forge tasks (PR #206 already submitted by Forge; Mirror reviewing). Last Forge output: dashboard PR #23 merged 16:19Z.
+
+**Patterns:**
+- Tier state: consecutive_clean advances 1→2 (this clean iter). Need 3 consecutive at Tier 1 to de-escalate to Tier 2 — 1 more clean iter needed.
+- PR #206 systemd timer fix: first PR since dashboard PR #23 (16:19Z). Healthy pipeline throughput.
+- APPROVAL_REQUEST queue: 4 items, oldest 18d. [yellow] DM flag at Monday cycle (2026-06-01).
+- beacon_telegram_bot.log rate-limit look-alikes: 1st appearance of this pattern in log. Sub-threshold; watch for production healer alerts as distinguishing signal.
+
+**Learned:**
+1. PR #206 "fix(systemd): switch cycle.timer to OnCalendar" was created by Forge at 22:02:31Z — one minute before iter 112 ran its E-check snapshot. Iter 112 therefore missed it (race condition between PR creation and gh api cache). Consistent — not an anomaly.
+2. cycle_tier_state.py exists at scripts/cycle_tier_state.py and is callable for record_iter_result. Will use to advance consecutive_clean=2 after this journal write.
+
+---
+
 ## Iteration 112 — 2026-05-30 ~16:02 MDT / 2026-05-30 ~22:02 UTC (interactive)
 
 **Health:** ✅ Nominal — third consecutive clean iter. 0 new alerts; 6/6 units active; 0 open PRs; 0 inboxes; sync fresh; all checks pass.
