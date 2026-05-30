@@ -572,11 +572,47 @@ def is_stale(
 def auto_restart_unit(unit: str) -> tuple[int, str]:
     """Run `sudo -n systemctl restart <unit>`. Return (returncode, stderr).
 
+    Prepended with `sudo -n systemctl daemon-reload` so a restart picks up
+    unit-file edits that landed since systemd last parsed them. Without the
+    daemon-reload, a `.timer` whose unit file changed mid-deploy comes back
+    up with stale config and (for timers specifically) hits the infinity
+    trap — `NextElapseUSecRealtime` empty, `NextElapseUSecMonotonic=infinity`.
+
+    A failed daemon-reload is logged WARN but never blocks the restart: a
+    stale-but-running daemon is better than a stopped daemon. The returned
+    `(rc, stderr)` is always from the restart, not the daemon-reload.
+
     Returns (-1, descriptive) on FileNotFoundError / TimeoutExpired so the
     caller can route to the failure DM uniformly. Sudoers contract on the
     droplet is `(ALL) NOPASSWD: ALL`; -n errors immediately if that ever
     changes rather than blocking the healer tick on a password prompt.
     """
+    try:
+        reload_result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'daemon-reload'],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+        if reload_result.returncode != 0:
+            log(
+                f'daemon-reload before restart of {unit} failed '
+                f'rc={reload_result.returncode} '
+                f'stderr={(reload_result.stderr or "").strip()!r}; '
+                f'proceeding with restart anyway',
+                'WARN',
+            )
+    except subprocess.TimeoutExpired:
+        log(
+            f'daemon-reload before restart of {unit} timed out after '
+            f'{RESTART_TIMEOUT_S}s; proceeding with restart anyway',
+            'WARN',
+        )
+    except FileNotFoundError:
+        log(
+            f'daemon-reload before restart of {unit}: sudo or systemctl '
+            f'not found in PATH; proceeding with restart anyway',
+            'WARN',
+        )
+
     try:
         result = subprocess.run(
             ['sudo', '-n', 'systemctl', 'restart', unit],

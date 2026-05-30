@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -37,6 +38,9 @@ INSTALLED_SYSTEMD_DIR = Path('/etc/systemd/system')
 ENV_HEALER_ENABLED = 'OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED'
 
 RE_DM_WINDOW = timedelta(hours=12)
+
+SYSTEMCTL_TIMEOUT_S = 10
+RESTART_TIMEOUT_S = 30
 
 
 # -------------------- logging + heartbeat --------------------
@@ -75,11 +79,12 @@ def load_state() -> dict[str, Any]:
     try:
         data = json.loads(STATE_FILE.read_text())
         if not isinstance(data, dict):
-            return {'units': {}}
+            return {'units': {}, 'stuck_timers': {}}
         data.setdefault('units', {})
+        data.setdefault('stuck_timers', {})
         return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {'units': {}}
+        return {'units': {}, 'stuck_timers': {}}
 
 
 def save_state(state: dict[str, Any]) -> None:
@@ -93,9 +98,10 @@ def save_state(state: dict[str, Any]) -> None:
 def _should_re_dm(
     state: dict[str, Any], unit: str,
     now: Optional[datetime] = None, window: timedelta = RE_DM_WINDOW,
+    bucket: str = 'units',
 ) -> bool:
     now = now or datetime.now(timezone.utc)
-    entry = state['units'].get(unit)
+    entry = state.setdefault(bucket, {}).get(unit)
     if not entry:
         return True
     last_iso = entry.get('last_dm_at')
@@ -112,9 +118,10 @@ def _should_re_dm(
 
 def _record_dm(
     state: dict[str, Any], unit: str, now: Optional[datetime] = None,
+    bucket: str = 'units',
 ) -> None:
     now = now or datetime.now(timezone.utc)
-    entry = state['units'].setdefault(unit, {'dm_count': 0})
+    entry = state.setdefault(bucket, {}).setdefault(unit, {'dm_count': 0})
     entry['dm_count'] = entry.get('dm_count', 0) + 1
     entry['last_dm_at'] = now.isoformat()
 
@@ -183,7 +190,160 @@ def detect_drift(
     return sorted(u for u in repo_units if u not in installed)
 
 
+# -------------------- stuck-timer detection --------------------
+
+_STUCK_TIMER_PROPS = (
+    'ActiveState',
+    'NextElapseUSecRealtime',
+    'NextElapseUSecMonotonic',
+    'LastTriggerUSec',
+)
+
+
+def _systemctl_show(unit: str) -> Optional[dict[str, str]]:
+    """Return parsed KEY=VALUE map from `systemctl show <unit> --property=...`.
+
+    Returns None on shell-out failure or parse error so the caller can skip
+    the unit + log without raising.
+    """
+    try:
+        result = subprocess.run(
+            [
+                'systemctl', 'show', unit,
+                '--property=' + ','.join(_STUCK_TIMER_PROPS),
+                '--no-pager',
+            ],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'systemctl show {unit} raised {type(e).__name__}: {e}', 'INFO')
+        return None
+    if result.returncode != 0:
+        log(
+            f'systemctl show {unit} rc={result.returncode} '
+            f'stderr={(result.stderr or "").strip()!r}',
+            'INFO',
+        )
+        return None
+    props: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, sep, value = line.partition('=')
+        if not sep:
+            continue
+        props[key.strip()] = value.strip()
+    return props
+
+
+def detect_stuck_timers(
+    installed_dir: Path = INSTALLED_SYSTEMD_DIR,
+) -> list[dict[str, Optional[str]]]:
+    """Return a list of `.timer` units in the infinity trap.
+
+    Trap predicate: ActiveState=active AND NextElapseUSecRealtime is empty
+    AND NextElapseUSecMonotonic=infinity. Both empty-realtime and infinity-
+    monotonic are required — either alone is a normal transient state.
+
+    Per-unit shell-out failures are logged INFO and the unit is skipped;
+    the function never raises.
+    """
+    stuck: list[dict[str, Optional[str]]] = []
+    for unit in sorted(list_installed_units(installed_dir)):
+        if not unit.endswith('.timer'):
+            continue
+        props = _systemctl_show(unit)
+        if props is None:
+            continue
+        if props.get('ActiveState') != 'active':
+            continue
+        if props.get('NextElapseUSecRealtime', '') != '':
+            continue
+        if props.get('NextElapseUSecMonotonic') != 'infinity':
+            continue
+        stuck.append({
+            'unit': unit,
+            'last_trigger': props.get('LastTriggerUSec') or None,
+        })
+    return stuck
+
+
+def _heal_stuck_timer(unit: str) -> tuple[int, str]:
+    """Inline daemon-reload + restart for a stuck timer.
+
+    Mirrors `heal_stale_daemon_code.auto_restart_unit` shape but inlined
+    here to avoid a cross-module import dependency between the two healers.
+    Returns `(restart_rc, restart_stderr)`; a failed daemon-reload is
+    logged WARN and we continue to the restart anyway.
+    """
+    try:
+        reload_result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'daemon-reload'],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+        if reload_result.returncode != 0:
+            log(
+                f'daemon-reload before stuck-timer restart of {unit} failed '
+                f'rc={reload_result.returncode} '
+                f'stderr={(reload_result.stderr or "").strip()!r}; '
+                f'proceeding with restart anyway',
+                'WARN',
+            )
+    except subprocess.TimeoutExpired:
+        log(
+            f'daemon-reload before stuck-timer restart of {unit} timed out '
+            f'after {RESTART_TIMEOUT_S}s; proceeding with restart anyway',
+            'WARN',
+        )
+    except FileNotFoundError:
+        log(
+            f'daemon-reload before stuck-timer restart of {unit}: sudo or '
+            f'systemctl not found in PATH; proceeding with restart anyway',
+            'WARN',
+        )
+
+    try:
+        result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'restart', unit],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+        return result.returncode, (result.stderr or '').strip()
+    except subprocess.TimeoutExpired:
+        return -1, f'systemctl restart timed out after {RESTART_TIMEOUT_S}s'
+    except FileNotFoundError:
+        return -1, 'sudo or systemctl not found in PATH'
+
+
 # -------------------- DM rendering --------------------
+
+def _render_stuck_timer_heal(unit: str, next_fire: str) -> tuple[str, str, str]:
+    message = (
+        f'Auto-healed stuck timer `{unit}`. Trap: `NextElapseUSecRealtime` '
+        f'empty + `NextElapseUSecMonotonic=infinity` (timer never fires). '
+        f'Recovery: daemon-reload + restart. Next fire now: {next_fire}.'
+    )
+    subject = f'stuck-timer:{unit}'
+    suggested = (
+        f'Verify on the droplet: '
+        f'`systemctl show {unit} --property=NextElapseUSecRealtime`.'
+    )
+    return message, subject, suggested
+
+
+def _render_stuck_timer_dry_run(unit: str) -> tuple[str, str, str]:
+    message = (
+        f'Stuck timer detected: `{unit}`. `NextElapseUSecRealtime` empty + '
+        f'`NextElapseUSecMonotonic=infinity`. Manual recovery: '
+        f'`sudo systemctl daemon-reload && sudo systemctl restart {unit}`.'
+    )
+    subject = f'stuck-timer:{unit}'
+    suggested = (
+        f'On the droplet (ssh larry@134.209.44.80):\n'
+        f'  sudo systemctl daemon-reload\n'
+        f'  sudo systemctl restart {unit}\n'
+        f'Then verify: '
+        f'`systemctl show {unit} --property=NextElapseUSecRealtime`.'
+    )
+    return message, subject, suggested
+
 
 def _render_missing_install(unit: str) -> tuple[str, str, str]:
     repo_path = f'~/agent-core/systemd/{unit}'
@@ -241,6 +401,7 @@ def run_once(
     counts = {
         'missing_install': 0, 'dm_sent': 0,
         'dm_suppressed_dedup': 0, 'reconciled_gc': 0,
+        'stuck_timer': 0, 'timer_healed': 0,
     }
     if kill_switch_active():
         log(f'KILL_SWITCH active at {KILL_SWITCH}; exiting cleanly')
@@ -293,6 +454,58 @@ def run_once(
     for gone in list(state['units'].keys()):
         if gone not in live_set:
             state['units'].pop(gone, None)
+            counts['reconciled_gc'] += 1
+
+    # Stuck-timer pass — independent of the missing-install loop. Cooldown
+    # via the same _should_re_dm helper, but in a separate state bucket so
+    # the two surfaces don't collide on a unit name.
+    stuck = detect_stuck_timers(installed_dir or INSTALLED_SYSTEMD_DIR)
+    counts['stuck_timer'] = len(stuck)
+    stuck_live = set()
+    for entry in stuck:
+        unit = entry['unit']
+        if not isinstance(unit, str):
+            continue
+        stuck_live.add(unit)
+        if not _should_re_dm(state, unit, now=now, bucket='stuck_timers'):
+            counts['dm_suppressed_dedup'] += 1
+            continue
+
+        if dry_run:
+            msg, subj, sug = _render_stuck_timer_dry_run(unit)
+            ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+            if ok:
+                counts['dm_sent'] += 1
+                _record_dm(state, unit, now=now, bucket='stuck_timers')
+                log(f'DRY-RUN stuck timer: {unit} (DM sent; no restart attempted)')
+            else:
+                log(f'DM append suppressed for stuck timer {unit}', 'WARN')
+            continue
+
+        rc, stderr = _heal_stuck_timer(unit)
+        if rc != 0:
+            log(
+                f'stuck-timer restart of {unit} failed rc={rc} '
+                f'stderr={stderr!r}',
+                'WARN',
+            )
+            continue
+        post = _systemctl_show(unit) or {}
+        next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
+        counts['timer_healed'] += 1
+        msg, subj, sug = _render_stuck_timer_heal(unit, next_fire)
+        ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+        if ok:
+            counts['dm_sent'] += 1
+            _record_dm(state, unit, now=now, bucket='stuck_timers')
+            log(f'auto-healed stuck timer: {unit} next_fire={next_fire!r}')
+        else:
+            log(f'DM append suppressed for healed timer {unit}', 'WARN')
+
+    # GC reconciled stuck-timer entries.
+    for gone in list(state.get('stuck_timers', {}).keys()):
+        if gone not in stuck_live:
+            state['stuck_timers'].pop(gone, None)
             counts['reconciled_gc'] += 1
 
     log(f'tick: dry_run={dry_run} '
