@@ -4496,7 +4496,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # original; filename + marker_error_count handle uniqueness.
         data = {
             'agent': 'forge', 'source': 'beacon',
-            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'task_id': 'real-shipped-note',
             'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 7998341473,
             'result': '=== PROCEED ===\n<prose, no JSON>\n=== END_PROCEED ===',
@@ -4509,12 +4509,12 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         notify = json.loads(notifies[0].read_text())
         # The envelope task_id MUST be the original, not the wrapper.
         self.assertEqual(
-            notify['task_id'], 'opmanual-d35-5b-shipped-note-001',
+            notify['task_id'], 'real-shipped-note',
         )
         # marker_error_count carries the retry counter.
         self.assertEqual(notify['marker_error_count'], 1)
         # Filename has the wrap for disk-level uniqueness.
-        self.assertIn('marker-error-opmanual-d35-5b-shipped-note-001-1',
+        self.assertIn('marker-error-real-shipped-note-1',
                       notifies[0].name)
 
     def test_bug_b_forge_retry_2_also_keeps_original_task_id(self):
@@ -4523,7 +4523,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # task_id=original, marker_error_count=2.
         data = {
             'agent': 'forge', 'source': 'beacon',
-            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'task_id': 'real-shipped-note',
             'marker_error_count': 1,  # this is now the 2nd retry
             'original_source': 'beacon',
             'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
@@ -4536,7 +4536,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertEqual(len(notifies), 1)
         notify = json.loads(notifies[0].read_text())
         self.assertEqual(
-            notify['task_id'], 'opmanual-d35-5b-shipped-note-001',
+            notify['task_id'], 'real-shipped-note',
         )
         self.assertEqual(notify['marker_error_count'], 2)
 
@@ -4633,7 +4633,7 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         # Symmetric with the existing M-3 fix on _notify_mirror_marker_error.
         data = {
             'agent': 'forge', 'source': 'beacon',
-            'task_id': 'opmanual-d35-5b-shipped-note-001',
+            'task_id': 'real-shipped-note',
             'phase': 'preflight', 'target_repo': 'ourliberty-agent-core',
             'reply_chat_id': 7998341473,
             'result': '=== PROCEED ===\n<prose>\n=== END_PROCEED ===',
