@@ -6,6 +6,10 @@
 
 ---
 
+## Status snapshot — updated 2026-05-30 ~23:56Z UTC (Iter 125)
+
+**System: ✅ Nominal-with-watch.** Iter 125 findings: PR #211 (fix(rotation): step-a-rotation) opened 23:47:53Z — step-a-rotation task completed 23:50:55Z ($0.24, 40s), harden-systemd-timer-recovery in progress (resume 764f42af, 23:50:56Z). No new escalation-worthy findings. Sync push failure 10th occurrence at 23:47:14Z (carry-forward). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Monday DM 2026-06-01. Checks I/III fire Sunday 2026-06-01. All 6 services active. Tier=1, consecutive_clean=0.
+
 ## Status snapshot — updated 2026-05-30 ~23:48Z UTC (Iter 124)
 
 **System: ⚠️ Drift (improving).** Iter 124 findings: PR #210 (fix(auth): wire dispatches) MERGED 23:43Z — carry-forward from iters 121–123 CLOSED. inbox-watcher running fresh code (PID 2554803, 23:36:45Z restart via systemd RestartSec) — stale dispatch_validator issue from iter 120 SELF-RESOLVED. Always-fix: agent-core fast-forwarded 89ecbea→1a8d539 (4 commits). Check B sync push failure (9th occurrence, carry-forward APPROVAL_REQUEST pending). Forge: step-a-rotation in-flight, harden-systemd-timer-recovery queued. 34 larry-reject-*.json in beacon/.invalid/ still need Larry re-deposit auth. Tier=1, consecutive_clean=0. Monday DM queue: 3 APPROVAL_REQUESTs (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard).

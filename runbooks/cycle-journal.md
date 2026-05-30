@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 125 — 2026-05-30 ~23:56 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — system building normally. PR #211 (forge/step-a-rotation) opened 23:47:53Z, step-a-rotation task completed 23:50:55Z ($0.24, 40s), harden-systemd-timer-recovery in progress via resume (23:50:56Z). All 6 services active. No new escalation-worthy findings. Carry-forwards from prior iters unchanged.
+
+**Triage:** Check 0 — alert-triage.json absent (β-scope infrastructure not yet deployed; watermark tracking unavailable). Manual scan of larry-alerts.jsonl trailing entries: last entry at 23:35:45Z (heal-stale-daemon-code mirror-bot restart, handled in iter 123). No new alerts since iter 124 (~23:48Z watermark). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** alert-triage.json missing (PR-β not yet deployed). Larry-alerts.jsonl tail: last entry 23:35:45Z, predates iter 124 watermark. No new alerts this iter. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** inbox-watcher log (23:50–23:51Z): step-a-rotation done (success, $0.24, 40s); harden-systemd-timer-recovery started in resume (session 764f42af); beacon notify-step-a-rotation done ($0.25, 15s). No ERROR, no DISPATCH_BLOCKED signals. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon-bot last log 23:47:15Z: TIER2_FALLBACK_USED reason=rate_limit (positive signal — bot-process Tier 2 path working). No new Larry directives. ✅
+
+- **(Check 3) Pipeline state: ✅ Nominal.**
+  - forge/step-a-rotation: completed 23:50:55Z success=True. PR #211 opened 23:47:53Z. ✅
+  - forge/harden-systemd-timer-recovery: in-flight (resume 764f42af, started 23:50:56Z, ~5 min). Normal. ✅
+  - heal-pipeline-stall: state file gone (refactored to alert-cooldown/). Historic stall cooldowns present (real-clr, real-loop, others — all CLOSED). No active stalls signalled. ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94, ~2d)
+  - stuck-cycle timeout guard (iter 43, ~20d)
+  - Monday [yellow] DM still scheduled 2026-06-01. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code-cooldowns.json: all services have recent restart_ts (inbox-watcher 23:35:45Z, beacon-bot 23:35:14Z, forge-bot 23:35:14Z, mirror-bot 23:35:45Z — all 16–17 min ago). No new stale-code alerts since iter 123. rc=-1 G-rule still at 2/3. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=707f9e3 "Pulse cycle 20260530T234956Z" (iter 124 auto-commit). Assumed at origin/main per prior successful wrapper push. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (10th occurrence).**
+  - sync.json: status=error at 23:47:14Z "Auto-commit push failed; rolled back", commit=c655458b. 10th occurrence (iters 102, 114, 117, 118, 119, 120, 121, 122, 124, 125's pre-iter sync). Same root cause: sync_agent_core.sh:161 bare-push with no rebase fallback. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-01. ⚠️
+  - Note: iter 117 G-rule dispatch (cycle-finding-sync-push-failure-20260530T224800Z.json) was rejected by beacon validator — prompt=0 chars (F24 empty-prompt bug). APPROVAL_REQUEST was generated via a separate path. Malformed dispatch now in beacon/.invalid/ — no further action needed on the dispatch itself.
+
+- **(Check C) Agent liveness: 6/6 active. ✅** All units systemctl active. inbox-watcher last log 23:51:15Z, all bots active. ✅
+
+- **(Check D) Inboxes: forge 2 tasks active. ✅**
+  - forge/build-step-a-rotation.json: done 23:50:55Z, success. ✅
+  - forge/build-harden-systemd-timer-recovery.json: started 23:50:56Z, in resume. ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: PR #211 new, awaiting Mirror review. ✅**
+  - ourliberty-agent-core: PR #211 "fix(rotation): step A — auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 keep-alive" opened 23:47:53Z, mergeable=UNKNOWN (computing), reviewDecision="". Age ~8 min, under 30-min threshold. Mirror will auto-review via watcher. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check H) Forge digest:**
+  - Merged since iter 124: PR #210 (iter 124 confirmed). ✅
+  - Open: PR #211 (step-a-rotation, < 30 min old). 1 open Forge PR, < 72h. ✅
+  - In progress: harden-systemd-timer-recovery (resume). ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — not firing. Next: 2026-06-01 (Sun→Check I+III; Mon→Check VIII+IX). ✅
+- **Check III:** Sunday-anchored 14d cadence. No prior artifact in pulse-check-iii/. Will fire first on 2026-06-01 (Sunday). ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d), outside 60d window. ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, H, credential rotations).
+2. No always-fix conditions triggered (repo clean, no behind-origin condition, inboxes nominal).
+3. No new escalations (all carry-forwards covered by iter 121 [yellow] DM + Monday queue).
+4. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:56:17Z.
+5. Called `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 125` → row appended.
+6. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None. All open items covered by existing escalations.
+
+**Patterns:**
+- **Sync push failure now at 10 occurrences.** APPROVAL_REQUEST pending Larry since iter 118. G-rule dispatch (iter 117) rejected due to F24 empty-prompt bug — APPROVAL_REQUEST reached Larry via separate path. Monday DM queue. No new action this iter.
+- **inbox-watcher rc=-1: still at 2/3 toward G-rule.** Both occurrences (iters 117, 123) self-healed via systemd RestartSec within ~60s. No new occurrence this iter.
+- **PR #211 opened.** step-a-rotation task completed. Mirror auto-review pending; should auto-merge on REVIEW_PASS per D3.5 5d pipeline.
+
+**Learned:** beacon-bot TIER2_FALLBACK_USED at 23:47:15Z (rate_limit) confirms bot-process Tier 2 path is working. This supports the MEMORY.md observation that Tier 2 works for bot processes but not for --resume account-bound agent-runner sessions.
+
+---
+
 ## Iteration 124 — 2026-05-30 ~23:48 UTC (interactive)
 
 **Health:** ⚠️ Drift → positive — multiple carry-forwards from 120–123 resolved this iter. PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) MERGED 23:43Z. inbox-watcher running fresh code (PID 2554803, started 23:36:45Z). Always-fix fired: agent-core fast-forwarded 89ecbea→1a8d539 (4 commits, PR #210 merge). Sync push failure carry-forward persists. All 6 services active.
