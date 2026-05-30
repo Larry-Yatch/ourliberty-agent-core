@@ -43,7 +43,7 @@ import dispatch_validator  # noqa: E402
 import routing_validator   # noqa: E402
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / 'agents'
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
 INBOXES_ROOT = AGENTS_ROOT / 'inboxes'
 ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 

@@ -47,6 +47,7 @@ def setUpModule():  # noqa: N802 — unittest hook name
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
     for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
         Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
+    importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
     importlib.reload(on)
 
 
@@ -57,6 +58,7 @@ def tearDownModule():  # noqa: N802 — unittest hook name
         os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_BACKUP
     if _AGENTS_ROOT_TMPDIR:
         shutil.rmtree(_AGENTS_ROOT_TMPDIR, ignore_errors=True)
+    importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
     importlib.reload(on)
 
 
