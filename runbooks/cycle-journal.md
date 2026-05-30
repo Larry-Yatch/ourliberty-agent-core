@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 115 — 2026-05-30 ~22:27 UTC (interactive)
+
+**Health:** ✅ Nominal — iter 114's dirty-tree finding resolved; all checks clean. System quiescent.
+
+**Triage:** 0 new alerts since iter 114 watermark (~22:24Z). Last alert was iter 114's own [yellow] DM (source=pulse, idx=1017 delivered 22:24Z). alert-triage.json still MISSING (ongoing known issue). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No new entries in larry-alerts.jsonl beyond iter 114 watermark (22:24Z). alert-triage.json MISSING (ongoing). ✅
+
+- **(Check 1) Log noise: nominal. ✅** journalctl last 30 min: 0 WARN/ERROR from ourliberty services. beacon_telegram_bot.log: last delivery idx=1017 at 22:24Z (iter 114 Pulse DM). No new error patterns. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 0 sessions (beacon-bot restarted 22:11Z after PR #206 deploy — sessions cleared on restart, expected). Last Larry message: "give me the exact command to run and why" at 21:30Z May 30 (Beacon responded 21:32Z; accounted for in iters 110/112). No new directives since. No orphans. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** heal-pipeline-stall-state.json: 0 active stalls (non-2099-snoozed). All prior real-clr/real-loop stalls CLOSED (2099-snoozed). No new stall conditions. ✅
+
+- **(Check 4) Pending Larry directives: ✅ — queue reduced 4→3.** 
+  - **CLOSED: pulse-check-i-journal-idempotency-001.** Commit 64fdcfb "fix(pulse): make Check I journal append idempotent per week" landed between iters 113 and 114. Implements the idempotency guard + `--no-auto-commit` flag + auto-commit on actual write. APPROVAL_REQUEST resolved. ✅
+  - Standing (3): validator-allow-dashboard-source-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~19d). [yellow] DM still queued for 2026-06-01 Monday cycle.
+  - New commit d711143 "chore(rate-limit-resilience): add C/A/B briefs + temporary trust carve-out for sequence run" — rate-limit-resilience context doc. May partially address Tier 2 rate_limit watch item (trust carve-out for sequence runs). Monitor next Monday for whether forge/beacon-bot rate_limit alerts subside.
+
+- **(Check 5) Stale daemon: nominal. ✅** heal-stale-daemon-code-cooldowns.json present (no new restart events since 22:11Z heal). All daemons alive. inbox-watcher "Unit not found" (1st occurrence 10:31Z May 30): no recurrence in 12h+. ✅
+
+- **(A) Source repo: ✅ RESOLVED.** Session-start gitStatus: branch=main, clean, HEAD=dce8f46 ("Pulse cycle 20260530T222518Z"). Iter 114's dirty tree (scripts/fixture_patterns.py) resolved by commit 01d1717 "feat(fixtures): reserve zz-fixture- namespace prefix + mirror to live surfaces". CLAUDE.md mirrors confirm zz-fixture- prefix now listed. ✅
+
+- **(B) Sync health: ⚠️ watch (lower severity).** sync.json still shows status=error at 22:08:48Z (mtime 22:08Z). Last SUCCESSFUL sync: 22:04Z (~23 min ago, within 2h threshold). Root cause (dirty tree) resolved. Sync should auto-recover at next scheduled run (~23:08Z). Already escalated iter 114 — no re-DM. Watch: if sync still showing error at iter 116, escalate. ✅
+
+- **(C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer: all active. ✅
+
+- **(D) Inboxes: 0/0/0/0. ✅** All agent inboxes empty. ✅
+
+- **(E) PRs: 0 open. ✅** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next firing 2026-06-01. ✅
+
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d, outside 60d window). ✅
+
+- **(Pending, carry forward):**
+  - **Sync recovery watch:** sync.json error state (22:08Z); expect auto-recovery ~23:08Z. If still error at iter 116, re-escalate.
+  - APPROVAL_REQUESTs (3, reduced from 4): validator-allow-dashboard-source-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. [yellow] DM on 2026-06-01 Monday.
+  - Tier 2 rate_limit: d711143 trust carve-out landed; watch whether alerts subside.
+  - inbox-watcher Unit-not-found (1st occurrence 10:31Z May 30): 12h+ no recurrence. Sub-threshold; watch.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - Check I idempotency (64fdcfb): verify behavior on 2026-06-01 Monday first Check I firing.
+
+**Did:** 
+1. Ran all checks (0–5, A–E).
+2. Called `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1, tier stays 1.
+3. Wrote journal entry.
+4. No escalations sent.
+
+**Escalated:** Nothing. Iter 114 findings resolved or carried forward; no new issues.
+
+**Forge:** 0 open tasks. Last activity: d711143 + 64fdcfb + 01d1717 landed (all config/tooling changes). System quiescent.
+
+**Patterns:**
+- Tier state: consecutive_clean 0→1. Need 2 more consecutive clean iters to de-escalate to Tier 2.
+- APPROVAL_REQUEST queue now at 3 (down from 4): 64fdcfb closed `pulse-check-i-journal-idempotency-001`. Demonstrates the Beacon→Forge→merge pipeline working correctly.
+- Monday 2026-06-01: first Check I firing with the new idempotency guard (64fdcfb). Watch that it writes exactly once and does NOT leave a dirty tree.
+
+**Learned:**
+1. APPROVAL_REQUEST `pulse-check-i-journal-idempotency-001` resolved by 64fdcfb "fix(pulse): make Check I journal append idempotent per week" — committed between iters 113 and 114 (iters ran too close together for either to observe it).
+2. d711143 "chore(rate-limit-resilience): add C/A/B briefs + temporary trust carve-out for sequence run" adds resilience context for rate-limit scenarios. "Sequence run" trust carve-out likely means: sequences of beacon/forge calls can proceed under Tier 1 rate-limit conditions without being halted. Monitor for reduction in tier2-fallback-skipped alerts.
+
+---
+
 ## Iteration 114 — 2026-05-30 ~22:22 UTC (interactive)
 
 **Health:** ⚠️ Drift — dirty working tree (scripts/fixture_patterns.py modified, sync push failed at 22:08Z). System services healthy; drift confined to source repo + sync state.
