@@ -48,6 +48,13 @@ ALLOWED_SOURCES = {
     # outbox_notifier branch added in step 4 (PR #82) keys off this exact
     # source on Beacon's outbox; the envelope source must match.
     'pulse-auto-dispatch',
+    # E4.4 dashboard UI Approve/Reject actions. Pulse iter 97 + iter 97-notify
+    # (2026-05-28) discovered that 'dashboard' was never in this allowlist;
+    # 4 dashboard-sourced envelopes were silently dropped to beacon/.invalid
+    # between 2026-05-27T17:55Z and 2026-05-28T05:30Z, breaking the UI as a
+    # control surface. Adding here closes the gap. NOTE: do not auto-replay
+    # the stale envelopes already in beacon/.invalid — they predate this fix.
+    'dashboard',
 }
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
