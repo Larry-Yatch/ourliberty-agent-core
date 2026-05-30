@@ -57,6 +57,19 @@ _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)
 # Base unit for capped exponential backoff: 1 min, doubling each attempt.
 _COOLDOWN_BACKOFF_BASE = timedelta(minutes=1)
 
+# Fixed cooldown applied when a tier hits auth_401 (Step A rotation fix).
+# Auth-401 messages don't carry a reset time, so there's nothing to parse;
+# the cooldown just has to be long enough that a single bad token cannot
+# storm the dispatcher. 30 min matches the rate-limit backoff cap.
+_AUTH_COOLDOWN = timedelta(minutes=30)
+
+# Lead margin for tier_auth_ok: the target tier's OAuth credentials must
+# remain valid at least this far past `now`. The Claude CLI's auto-refresh
+# typically lands well before expiry, but a few minutes of headroom keeps a
+# tier flip from racing the refresh path. Tunable; not in config because
+# this is a structural invariant of the gate, not an operator dial.
+_AUTH_EXPIRY_MIN_LEAD = timedelta(minutes=10)
+
 # "resets <time>" parsers — the Claude CLI rate-limit message uses
 # account-local time without a tz hint. The 2026-05-28 incident shows
 # variants like "resets 3:30pm", "resets 14:00", "resets 3pm". The fallback
@@ -214,16 +227,22 @@ def parse_reset_time(raw, now=None):
     return candidate
 
 
-def set_cooldown(tier, raw_excerpt='', now=None):
-    """Set a per-tier rate-limit cooldown. Tries to parse ``"resets <time>"``
-    from ``raw_excerpt``; falls back to capped exponential backoff when the
-    message is unparseable (per spec § 6.3). Returns the persisted ``until``
-    ISO string.
+def set_cooldown(tier, raw_excerpt='', now=None, kind='rate_limit'):
+    """Set a per-tier cooldown. Returns the persisted ``until`` ISO string.
 
-    The exponential backoff grows 1m → 2m → 4m → 8m → 16m → 30m (capped) for
-    each consecutive unparseable rate_limit on the same tier. A successful
-    parse resets the backoff counter for that tier — fresh parseable events
-    are not penalized by an earlier unparseable streak.
+    ``kind='rate_limit'`` (default): tries to parse ``"resets <time>"`` from
+    ``raw_excerpt``; falls back to capped exponential backoff when the
+    message is unparseable (spec § 6.3). The exponential backoff grows
+    1m → 2m → 4m → 8m → 16m → 30m (capped) for each consecutive unparseable
+    rate_limit on the same tier. A successful parse resets the backoff
+    counter for that tier — fresh parseable events are not penalized by an
+    earlier unparseable streak.
+
+    ``kind='auth_401'``: fixed ``_AUTH_COOLDOWN`` window (Step A rotation
+    fix). Auth-401 messages don't carry a parseable reset time and have a
+    different recovery model (operator re-auths the bad tier), so a single
+    fixed window is the right shape. The rate_limit backoff counter is left
+    untouched — auth and rate-limit streaks are independent signals.
     """
     if tier not in _VALID_TIERS:
         raise ValueError('invalid tier: ' + repr(tier))
@@ -234,6 +253,13 @@ def set_cooldown(tier, raw_excerpt='', now=None):
     state = read()
     cooldowns = dict(state.get('cooldowns') or {})
     backoff = dict(state.get('cooldown_backoff') or {})
+
+    if kind == 'auth_401':
+        until = now + _AUTH_COOLDOWN
+        cooldowns[tier] = until.astimezone(timezone.utc).isoformat()
+        state['cooldowns'] = cooldowns
+        _write(state)
+        return cooldowns[tier]
 
     parsed = parse_reset_time(raw_excerpt, now=now)
     if parsed is not None:
@@ -253,6 +279,55 @@ def set_cooldown(tier, raw_excerpt='', now=None):
     state['cooldown_backoff'] = backoff
     _write(state)
     return cooldowns[tier]
+
+
+def _credentials_path(tier):
+    """Path to the OAuth credentials file for a tier. Reads the home dirs
+    at call time so tests can monkey-patch ``TIER1_HOME`` / ``TIER2_HOME``."""
+    home = TIER1_HOME if tier == 'tier1' else TIER2_HOME
+    return Path(home, '.claude', '.credentials.json')
+
+
+def tier_auth_ok(tier, now=None):
+    """Return True iff the target tier's OAuth credentials file exists and
+    its ``claudeAiOauth.expiresAt`` is at least ``_AUTH_EXPIRY_MIN_LEAD``
+    in the future.
+
+    Used by the rotation scheduler's pre-engage gate (Step A rotation fix)
+    to refuse switching into a tier with a stale token. The 2026-05-29
+    storm root cause was Tier 2 going silently expired and the scheduler
+    flipping into it anyway; this gate is the structural fix.
+
+    Any I/O error, parse error, missing field, or wrong-shape payload
+    returns False. The defensive posture is intentional: a tier we can't
+    verify is treated as not auth-ok, so the scheduler holds the current
+    tier rather than committing to an unverifiable target.
+    """
+    if tier not in _VALID_TIERS:
+        return False
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    path = _credentials_path(tier)
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    oauth = data.get('claudeAiOauth')
+    if not isinstance(oauth, dict):
+        return False
+    expires_at_ms = oauth.get('expiresAt')
+    if not isinstance(expires_at_ms, (int, float)):
+        return False
+    try:
+        expires = datetime.fromtimestamp(
+            float(expires_at_ms) / 1000.0, tz=timezone.utc,
+        )
+    except (OverflowError, OSError, ValueError):
+        return False
+    return expires > now + _AUTH_EXPIRY_MIN_LEAD
 
 
 def cooldown_until(tier, now=None):

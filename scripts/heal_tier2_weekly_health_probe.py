@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""heal_tier2_weekly_health_probe.py — weekly liveness probe for Tier 2 OAuth.
+"""heal_tier2_weekly_health_probe.py — Tier 2 OAuth liveness + keep-alive probe.
 
-Runs every Sunday at 06:00 MDT (per the systemd timer in
-`ourliberty-heal-tier2-weekly-health-probe.timer`). Invokes a minimal
+Runs every 6h (00/06/12/18 UTC) per the systemd timer in
+`ourliberty-heal-tier2-weekly-health-probe.timer`. Invokes a minimal
 `claude -p 'say PROBE_OK'` against the Tier 2 account (HOME-overridden
 to `/home/larry/.claude-larry-personal`) using the Haiku model — the
 cheapest viable option so the probe costs ~$0.001 per run.
+
+Filename / symbol names still carry the legacy ``weekly`` token because
+the systemd unit, the alert subject (``tier2_weekly_probe_failed``), the
+log token (``TIER2_WEEKLY_PROBE_OK``), and the alert-translations entry
+key on it — renaming would force a coordinated change across all of them
+plus shipped state files. The cadence is the only thing that changed.
 
 Motivation
 ----------
@@ -13,8 +19,12 @@ Motivation
 then silently rotted (credential expiry, OAuth refresh failure). The
 failure mode only surfaced when Tier 1 hit its rate limit and Tier 2
 fallback was attempted — at which point the incident had already
-escalated. A weekly probe catches credential rot BEFORE Tier 1 needs
-the fallback.
+escalated. The original weekly probe caught credential rot but at
+7-day cadence could NOT keep the Tier 2 OAuth token warm (~14h
+lifetime). The 2026-05-30 step-A fix dropped the cadence to 6h so the
+probe fires inside the token's lifetime and triggers the CLI's
+auto-refresh path, keeping the refresh token exercised. Liveness +
+keep-alive are now a single probe.
 
 Success path: probe returns `PROBE_OK` with exit 0 → log
 `TIER2_WEEKLY_PROBE_OK`, no DM. Silence is the success signal.
