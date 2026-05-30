@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 124 — 2026-05-30 ~23:48 UTC (interactive)
+
+**Health:** ⚠️ Drift → positive — multiple carry-forwards from 120–123 resolved this iter. PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) MERGED 23:43Z. inbox-watcher running fresh code (PID 2554803, started 23:36:45Z). Always-fix fired: agent-core fast-forwarded 89ecbea→1a8d539 (4 commits, PR #210 merge). Sync push failure carry-forward persists. All 6 services active.
+
+**Triage:** Check 0 — no new alerts since iter 123 watermark (23:41:27Z). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No entries in larry-alerts.jsonl after 23:41:27Z watermark. No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** inbox-watcher log (last 15 min): no ERROR, no DISPATCH_BLOCKED signals. New PID 2554803 (started 23:36:45Z) running fresh dispatch_validator.py — stale-code issue from iter 120 is resolved. step-a-rotation processing normally. Mirror review of auth-setup-token-wiring completed 23:43:03Z ($0.69, 115s). Beacon notify completed 23:43:25Z ($0.26). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. ✅
+
+- **(Check 3) Pipeline state: ✅ Nominal.**
+  - forge/step-a-rotation: in-flight (started 23:36:46Z, ~8 min running at check time, model=claude-opus-4-7). inbox-watcher marked prior session forfeit at reap and re-launched. Normal. ✅
+  - forge/harden-systemd-timer-recovery: queued (18 min old). Waiting for pickup. Under 60-min threshold. ✅
+  - Mirror inbox empty (auth-setup-token-wiring review completed, task archived). ✅
+  - No heal-pipeline-stall alerts. ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94, ~2d)
+  - stuck-cycle timeout guard (iter 43, ~20d)
+  - Monday [yellow] DM still scheduled 2026-06-01. ✅
+
+- **(Check 5) Stale daemon: ✅ inbox-watcher stale-code issue SELF-RESOLVED.**
+  - heal-stale-daemon-code-cooldowns.json: inbox-watcher last_restart_ts=23:35:45Z (healer attempt, rc=-1). Systemd's own RestartSec launched new PID 2554803 at 23:36:45Z (1 min after healer failure). New session loaded fresh dispatch_validator.py. Stale-module issue from iter 120 closed by this systemd restart path.
+  - rc=-1 pattern: 2 occurrences (iter 117, iter 123). G-rule threshold=3. Outcome: service self-recovered both times via systemd RestartSec. Note for G-rule: 1 more rc=-1 → dispatch to Beacon (propose defer-to-systemd or extend healer timeout for inbox-watcher). ✅/watch
+
+- **(Check A) Source repo: ⚠️ → ✅ always-fix applied.**
+  - After fetch: local=89ecbea0, origin=1a8d539d, behind by 4 commits. Working tree clean, on main. → always-fix: `git -C ~/agent-core pull --ff-only` → fast-forwarded to 1a8d539d. ✅
+  - 4 commits: eeabe2e (fix(auth)), 4e581e3 (merge rebase into forge branch), c09c860/a598826 were local (those were our last Pulse cycles already on remote). Actually the new commits are: PR #210's eeabe2e (fix(auth): authenticate dispatches via long-lived setup-tokens) + 4e581e3 (merge remote-tracking branch into forge/auth-setup-token-wiring) + merge commit 1a8d539 (Merge PR #210). Logged to cycle-actions.jsonl. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward.**
+  - sync.json: status=error at 23:43:33Z "Auto-commit push failed; rolled back". 9th occurrence (iters 102, 114, 117, 118, 119, 120, 121, 122, 124's sync attempt). APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-01. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: forge 2 tasks (normal). ✅**
+  - forge/step-a-rotation: in-flight (23:36:46Z start). ✅
+  - forge/harden-systemd-timer-recovery: queued (18 min old). ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: ✅ All clear.**
+  - ourliberty-agent-core: PR #210 MERGED at 23:43Z. reviewDecision="" but state=MERGED (Mirror left REVIEW_PASS → auto-merge chain triggered). 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored. Next gate: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E).
+2. **Always-fix applied:** `git -C ~/agent-core pull --ff-only` — fast-forwarded 89ecbea→1a8d539 (PR #210 merge). Logged to cycle-actions.jsonl.
+3. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:48:04Z.
+4. Called `cycle_prime_ledger.py append --tier 1 --kind intervention` → appended ff-main-when-behind row.
+5. No new escalations (all carry-forwards covered by iter 121 [yellow] DM + Monday queue).
+6. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** None. All open items covered by existing escalations.
+
+**Patterns:**
+- **PR #210 MERGED (carry-forward CLOSED, iters 121–123).** CONFLICTING status resolved by Forge rebase + Mirror REVIEW_PASS + auto-merge. Chain worked cleanly. No new pattern needed.
+- **inbox-watcher stale-code issue SELF-RESOLVED (iters 120–123).** Systemd RestartSec path self-healed even when heal-stale-daemon-code failed (rc=-1). Healer's explicit restart is redundant/conflicting with systemd policy for this service. G-rule still watching (2/3 rc=-1 occurrences). If 3rd fires: dispatch to Beacon "propose defer-to-systemd or extend healer timeout for inbox-watcher."
+- **dashboard-dispatch-source-blocked CLOSED.** inbox-watcher now has fresh dispatch_validator.py with 'dashboard' in ALLOWED_SOURCES. 34 larry-reject-*.json in beacon/.invalid/ remain — need Larry auth to re-deposit. Ask-then-do still pending.
+- **ff-main-when-behind (1st auto-fix this session).** Local was behind origin by PR #210 merge commits. Fast-forward applied cleanly.
+
+**Learned:**
+1. Systemd's RestartSec is a reliable fallback when heal-stale-daemon-code rc=-1 — the service self-heals within ~60s. The healer's timeout (30s) may simply be too short for inbox-watcher restart (which needs to reap orphans, set up worktrees, etc.). 1 more rc=-1 → dispatch to Beacon.
+2. PR #210 resolved faster than expected: Forge rebase completed between iters 123→124, Mirror auto-reviewed within minutes, auto-merge fired. The auth-setup chain is now live in production.
+3. fast-forward is safe and needed this iter — the local cached refs showed local=remote (89ecbea) but a fetch revealed the actual remote was 4 commits ahead. Check A should always fetch before comparing.
+
+---
+
 ## Iteration 123 — 2026-05-30 ~23:38 UTC (interactive)
 
 **Health:** ⚠️ Drift — carry-forwards from iters 120–122: inbox-watcher running stale dispatch_validator.py (healer restart failed 3rd time today at 23:35:45Z rc=-1); sync push failure carry-forward (APPROVAL_REQUEST pending); PR #210 mergeable=UNKNOWN (was CONFLICTING in iter 122, likely recomputing). heal-stale-daemon-code auto-restarted beacon-bot/forge-bot/mirror-bot at 23:35Z (ebe7368 now live). rotate-active-tier blocked on Tier 2 OAuth at 23:34Z (known state). All 6 services active.
