@@ -124,13 +124,14 @@ class FixturePatternMatchingTest(unittest.TestCase):
             "marker-error-t-no-preamble-1",
             "marker-error-t-pf-1",
             "marker-error-t-zero-1",
-            # 2026-05-29 incident: AUTO_MERGE-failure fixture family caught
-            # post-incident by adding the 5 bases to FIXTURE_PATTERN_EXACT.
-            "real-mirror-bad-marker",
-            "real-mirror-retry",
-            "real-ok",
-            "real-empty-findings",
-            "real-loop",
+            # 2026-05-29 incident: AUTO_MERGE-failure fixture family,
+            # migrated to the zz-fixture- reserved namespace (2026-05-30).
+            # Caught via FIXTURE_PATTERN_PREFIXES, not enumerated real-* exacts.
+            "zz-fixture-mirror-bad-marker",
+            "zz-fixture-mirror-retry",
+            "zz-fixture-ok",
+            "zz-fixture-empty-findings",
+            "zz-fixture-loop",
         ]
         # marker-error-envelope-id-1 and marker-error-notify-t-pf-1 do not
         # start with a covered prefix (they are wrapped notify-t-* /

@@ -1483,10 +1483,10 @@ class TestFixtureSkipDurable(_TempAgentsRootMixin, unittest.TestCase):
 
     def test_alert_is_fixture_helper(self) -> None:
         f = self.hps._alert_is_fixture
-        self.assertTrue(f({'key': 'forge_built_no_pr:real-loop'}))
+        self.assertTrue(f({'key': 'forge_built_no_pr:zz-fixture-loop'}))
         self.assertTrue(f({'key': 'forge_built_no_pr:t-no-preamble'}))
         self.assertTrue(f({'key': 'forge_built_no_pr:prod-mirror-retry'}))
-        self.assertTrue(f({'key': 'mirror_pass_unmerged:real-built'}))
+        self.assertTrue(f({'key': 'mirror_pass_unmerged:zz-fixture-built'}))
         # legit tasks are NOT fixtures
         self.assertFalse(f({'key': 'forge_built_no_pr:add-real-prefix-fixture-allowlist'}))
         self.assertFalse(f({'key': 'forge_built_no_pr:chain-discipline-001'}))
