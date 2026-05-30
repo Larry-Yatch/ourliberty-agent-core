@@ -905,8 +905,34 @@ def render_journal_block(check_i: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+# Identifies a `**Check I (YYYY-MM-DD):**` header line so append_journal can
+# skip re-writing a block whose week is already in the journal (a single week
+# is hit by the scheduled /cycle, on-demand /optimize, and manual re-runs).
+_CHECK_I_HEADER_RE = re.compile(
+    r"^\*\*Check I \((\d{4}-\d{2}-\d{2})\):\*\*", re.MULTILINE
+)
+
+
 def append_journal(journal_path: Path, block: str) -> None:
+    """Append a journal block, idempotent per Check I week marker.
+
+    If ``block`` carries a ``**Check I (YYYY-MM-DD):**`` header and the
+    journal already contains that week's header, skip the write so the same
+    week never stacks duplicate blocks. Blocks without a parseable Check I
+    header always append (other callers are unaffected).
+    """
     journal_path.parent.mkdir(parents=True, exist_ok=True)
+    m = _CHECK_I_HEADER_RE.search(block)
+    if m and journal_path.exists():
+        week = m.group(1)
+        existing = journal_path.read_text(encoding="utf-8")
+        if week in _CHECK_I_HEADER_RE.findall(existing):
+            print(
+                f"[pulse-check-i] journal: skipped \u2014 block for {week} "
+                "already present",
+                file=sys.stderr,
+            )
+            return
     with open(journal_path, "a", encoding="utf-8") as f:
         f.write(block + "\n")
 

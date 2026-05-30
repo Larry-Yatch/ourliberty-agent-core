@@ -1441,5 +1441,50 @@ class ManualDispatchTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
 
+
+
+class AppendJournalIdempotencyTests(unittest.TestCase):
+    """append_journal skips a Check I block whose week is already present."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.journal = Path(self._tmp.name) / "cycle-journal.md"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _block(self, week):
+        result = pci.assemble_check_i(
+            sidecar=None, repeats=[], week_ending=week,
+            sidecar_filename=None, fired_at=FIRED_AT,
+        )
+        return pci.render_journal_block(result)
+
+    def test_appends_when_absent(self):
+        pci.append_journal(self.journal, self._block(WEEK_ENDING))
+        text = self.journal.read_text(encoding="utf-8")
+        self.assertEqual(text.count(f"**Check I ({WEEK_ENDING}):**"), 1)
+
+    def test_skips_duplicate_same_week(self):
+        block = self._block(WEEK_ENDING)
+        pci.append_journal(self.journal, block)
+        pci.append_journal(self.journal, block)
+        text = self.journal.read_text(encoding="utf-8")
+        self.assertEqual(text.count(f"**Check I ({WEEK_ENDING}):**"), 1)
+
+    def test_appends_different_week(self):
+        pci.append_journal(self.journal, self._block("2026-05-11"))
+        pci.append_journal(self.journal, self._block(WEEK_ENDING))
+        text = self.journal.read_text(encoding="utf-8")
+        self.assertEqual(text.count("**Check I (2026-05-11):**"), 1)
+        self.assertEqual(text.count(f"**Check I ({WEEK_ENDING}):**"), 1)
+
+    def test_non_check_i_block_always_appends(self):
+        pci.append_journal(self.journal, "\nplain note\n")
+        pci.append_journal(self.journal, "\nplain note\n")
+        text = self.journal.read_text(encoding="utf-8")
+        self.assertEqual(text.count("plain note"), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
