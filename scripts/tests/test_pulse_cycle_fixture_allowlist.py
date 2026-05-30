@@ -3,8 +3,9 @@
 
 Closes the /cycle hallucination class: Pulse dispatched cycle-fix envelopes
 for fixture-pattern task_ids (test artifacts leaked into ~/agents/inboxes/
-and chain_events). The systemic fix is an allowlist applied at five
-surfaces; this test exercises three of them as a regression gate:
+and chain_events). The systemic fix is an allowlist applied across several
+surfaces; this test exercises two of them as a regression gate (the
+run_cycle.sh commit-guard surface was retired in afe9d07):
 
   Family A — pattern-matching unit tests on `is_fixture_task_id`:
     every fixture prefix matches a sample task_id; every exact-match
@@ -16,15 +17,7 @@ surfaces; this test exercises three of them as a regression gate:
     Check I's σ-anomaly filter drops fixture task_ids; Check III's
     run_check drops fixture durations before bucketing.
 
-  Family C — run_cycle.sh commit guard:
-    A staged cycle-actions entry containing a fixture-pattern task_id
-    triggers the guard: exit non-zero, larry_alert with subject
-    `cycle-blocked:fixture-pattern-detected`, nothing committed.
-    Inverse: a real task_id only → guard passes, commit proceeds.
-
 Test isolation: all writes are tmp_path-rooted. No real ~/agents/ writes.
-Subprocess invocations of run_cycle.sh use a fake agent-core tree with a
-stub `claude` on PATH (same pattern as test_run_cycle_wrong_branch_guard).
 
 Run:
     python3 -m unittest scripts.tests.test_pulse_cycle_fixture_allowlist
@@ -32,10 +25,6 @@ Run:
 
 from __future__ import annotations
 
-import json
-import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -364,181 +353,11 @@ class CheckIIIDurationFilterTest(unittest.TestCase):
         self.assertEqual(len(artifact["proposals"]), 1)
 
 
-# ---------------------------------------------------------------------------
-# Family C — run_cycle.sh fixture-pattern commit guard
-# ---------------------------------------------------------------------------
-
-
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_RUN_CYCLE = _REPO_ROOT / "scripts" / "run_cycle.sh"
-_LARRY_ALERTS = _REPO_ROOT / "scripts" / "larry_alerts.py"
-_LIB_PUSH = _REPO_ROOT / "scripts" / "_lib_push_with_rebase.sh"
-
-
-# Stub `claude` exits 0 with a cost-capture-parseable JSON shape AND
-# writes a fixture-pattern task_id into cycle-actions.jsonl, simulating
-# what would happen if Pulse hallucinated a cycle-fix on a fixture id.
-_CLAUDE_STUB_FIXTURE = '''#!/usr/bin/env bash
-cat >> "${REPO_DIR_FOR_TEST}/runbooks/cycle-actions.jsonl" <<'JSONL'
-{"ts": "2026-05-27T12:00:00Z", "iter": 1, "check": "D", "finding": "stale inbox", "task_id": "t-pf", "action": "dispatch cycle-fix", "result": "success"}
-JSONL
-echo '{"total_cost_usd": 0.0, "duration_ms": 1}'
-exit 0
-'''
-
-# Stub for the clean-path test: writes a REAL task_id only.
-_CLAUDE_STUB_CLEAN = '''#!/usr/bin/env bash
-cat >> "${REPO_DIR_FOR_TEST}/runbooks/cycle-actions.jsonl" <<'JSONL'
-{"ts": "2026-05-27T12:00:00Z", "iter": 1, "check": "D", "finding": "real stale", "task_id": "heal-pipeline-stall-reconciliation", "action": "dispatch cycle-fix", "result": "success"}
-JSONL
-echo '{"total_cost_usd": 0.0, "duration_ms": 1}'
-exit 0
-'''
-
-
-class _RunCycleFixtureGuardBase(unittest.TestCase):
-    """Builds an isolated agent-core + origin + claude stub. Same shape as
-    test_run_cycle_wrong_branch_guard but with a stub claude that writes
-    cycle-actions.jsonl so we can exercise the post-cycle commit guard."""
-
-    claude_stub_body = _CLAUDE_STUB_CLEAN  # subclasses override
-
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.tmp_path = Path(self._tmp.name)
-        self.home = self.tmp_path / "home"
-        self.home.mkdir()
-        self.repo_dir = self.home / "agent-core"
-        self.repo_dir.mkdir()
-        self.scripts_dir = self.repo_dir / "scripts"
-        self.scripts_dir.mkdir()
-        pulse_dir = self.repo_dir / "agents" / "pulse"
-        pulse_dir.mkdir(parents=True)
-        # Auto-commit's `git add` lists these specific paths; git add fails
-        # atomically if any pathspec is missing, so all four must exist.
-        (pulse_dir / "MEMORY.md").write_text("")
-        (pulse_dir / "memory").mkdir()
-        (pulse_dir / "memory" / ".gitkeep").write_text("")
-        runbooks_dir = self.repo_dir / "runbooks"
-        runbooks_dir.mkdir()
-        (runbooks_dir / "cycle-prompt.md").write_text("# stub\n")
-        (runbooks_dir / "cycle-journal.md").write_text("")
-        (runbooks_dir / "cycle-actions.jsonl").write_text("")
-        for src in (_RUN_CYCLE, _LARRY_ALERTS, _LIB_PUSH):
-            shutil.copy2(src, self.scripts_dir / src.name)
-        os.chmod(self.scripts_dir / "run_cycle.sh", 0o755)
-        self.origin = self.tmp_path / "origin.git"
-        subprocess.run(
-            ["git", "init", "-q", "--bare", "--initial-branch=main",
-             str(self.origin)], check=True,
-        )
-        self._git("init", "-q", "--initial-branch=main")
-        self._git("config", "user.email", "test@example.com")
-        self._git("config", "user.name", "Test")
-        (self.repo_dir / "README").write_text("seed\n")
-        self._git("add", "README")
-        self._git("commit", "-q", "-m", "seed")
-        self._git("remote", "add", "origin", str(self.origin))
-        self._git("push", "-q", "-u", "origin", "main")
-        # Stub claude on PATH. The stub interpolates REPO_DIR_FOR_TEST to
-        # locate the journal it should pollute.
-        self.stub_bin = self.tmp_path / "stub-bin"
-        self.stub_bin.mkdir()
-        stub_path = self.stub_bin / "claude"
-        stub_path.write_text(self.claude_stub_body)
-        os.chmod(stub_path, 0o755)
-
-    def tearDown(self):
-        self._tmp.cleanup()
-
-    def _git(self, *args):
-        subprocess.run(
-            ["git", *args], cwd=self.repo_dir, check=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        )
-
-    def _run_cycle(self):
-        env = os.environ.copy()
-        env["HOME"] = str(self.home)
-        env["PATH"] = f"{self.stub_bin}:{env['PATH']}"
-        env["REPO_DIR_FOR_TEST"] = str(self.repo_dir)
-        return subprocess.run(
-            ["bash", str(self.scripts_dir / "run_cycle.sh")],
-            env=env, cwd=self.repo_dir,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
-        )
-
-    def _read_alerts(self):
-        alerts_file = self.home / "agents" / "blackboard" / "larry-alerts.jsonl"
-        if not alerts_file.exists():
-            return []
-        return [
-            json.loads(ln) for ln in alerts_file.read_text().splitlines() if ln.strip()
-        ]
-
-    def _last_commit_subject(self):
-        result = subprocess.run(
-            ["git", "-C", str(self.repo_dir), "log", "-1", "--format=%s"],
-            check=True, capture_output=True, text=True,
-        )
-        return result.stdout.strip()
-
-    def _commit_count(self):
-        result = subprocess.run(
-            ["git", "-C", str(self.repo_dir), "rev-list", "--count", "HEAD"],
-            check=True, capture_output=True, text=True,
-        )
-        return int(result.stdout.strip())
-
-
-class FixturePatternBlocksCommitTest(_RunCycleFixtureGuardBase):
-    """Cycle writes a fixture-pattern task_id → guard refuses commit + alerts."""
-
-    claude_stub_body = _CLAUDE_STUB_FIXTURE
-
-    def test_fixture_pattern_blocks_commit(self):
-        result = self._run_cycle()
-
-        self.assertNotEqual(
-            result.returncode, 0,
-            f"expected non-zero exit; stderr={result.stderr.decode()[:500]}",
-        )
-        # Alert emitted with the canonical subject.
-        alerts = self._read_alerts()
-        self.assertTrue(alerts, "expected at least one alert")
-        subjects = [a.get("subject") for a in alerts]
-        self.assertIn("cycle-blocked:fixture-pattern-detected", subjects)
-        # No commit landed beyond the seed.
-        self.assertEqual(self._commit_count(), 1)
-        self.assertEqual(self._last_commit_subject(), "seed")
-
-
-class CleanPathProceedsTest(_RunCycleFixtureGuardBase):
-    """Cycle writes only real task_ids → guard is silent, auto-commit lands."""
-
-    claude_stub_body = _CLAUDE_STUB_CLEAN
-
-    def test_clean_path_commits(self):
-        result = self._run_cycle()
-
-        self.assertEqual(
-            result.returncode, 0,
-            f"expected exit 0; stderr={result.stderr.decode()[:500]}",
-        )
-        # No fixture alert.
-        alerts = self._read_alerts()
-        fixture_alerts = [
-            a for a in alerts
-            if a.get("subject") == "cycle-blocked:fixture-pattern-detected"
-        ]
-        self.assertEqual(fixture_alerts, [])
-        # Auto-commit landed (seed + cycle commit).
-        self.assertEqual(self._commit_count(), 2)
-        self.assertTrue(self._last_commit_subject().startswith("Pulse cycle "))
 
 
 # ---------------------------------------------------------------------------
-# Drift gate — the four mirror surfaces must reference every pattern
+# Drift gate — the two live mirror surfaces must reference every pattern
 # ---------------------------------------------------------------------------
 
 
@@ -566,15 +385,6 @@ class AllowlistDriftTest(unittest.TestCase):
         for exact in fp.FIXTURE_PATTERN_EXACT:
             with self.subTest(exact=exact):
                 self.assertIn(f"`{exact}`", body)
-
-    def test_run_cycle_sh_regex_covers_every_pattern(self):
-        body = self._read("scripts/run_cycle.sh")
-        for prefix in fp.FIXTURE_PATTERN_PREFIXES:
-            with self.subTest(prefix=prefix):
-                self.assertIn(prefix, body)
-        for exact in fp.FIXTURE_PATTERN_EXACT:
-            with self.subTest(exact=exact):
-                self.assertIn(exact, body)
 
 
 if __name__ == "__main__":

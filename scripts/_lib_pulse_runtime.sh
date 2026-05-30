@@ -8,10 +8,6 @@
 #
 # Single source of truth for:
 #   - PULSE_RUNTIME_PATHS  — the four paths/prefixes Pulse rewrites every cycle.
-#   - pulse_runtime_fixture_token_regex — the shell-side fixture-pattern guard
-#     regex (mirrors scripts/fixture_patterns.py SHELL_FIXTURE_REGEX). Callers
-#     use it to refuse auto-commits whose staged diff mentions a fixture-leak
-#     task_id (defense-in-depth against the 2026-05-27 cycle hallucination class).
 #   - all_modified_in_pulse_runtime_allowlist — true if every tracked file
 #     modified vs HEAD is inside PULSE_RUNTIME_PATHS.
 
@@ -21,15 +17,6 @@ PULSE_RUNTIME_PATHS=(
     "agents/pulse/MEMORY.md"
     "agents/pulse/memory/"
 )
-
-pulse_runtime_fixture_token_regex() {
-    # Token boundary requires a ", `, or = on the left so we match
-    # JSONL ("task_id":"t-fail"), markdown prose (`t-fail`), and KV-style log
-    # lines (task_id=t-fail) without tripping on incidental prose. Keep in
-    # lock-step with run_cycle.sh's inline copy and with
-    # scripts/fixture_patterns.py SHELL_FIXTURE_REGEX.
-    echo '["`=](t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|marker-error-opmanual-|task-001([^A-Za-z0-9_-]|$)|task-legacy([^A-Za-z0-9_-]|$)|headless-001([^A-Za-z0-9_-]|$)|opmanual-d35-5b-shipped-note-001([^A-Za-z0-9_-]|$)|pf-ok([^A-Za-z0-9_-]|$)|bad-pf([^A-Za-z0-9_-]|$)|no-preamble([^A-Za-z0-9_-]|$)|no-chat([^A-Za-z0-9_-]|$))'
-}
 
 _pulse_runtime_path_allowed() {
     local p="$1"
