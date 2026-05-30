@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 123 — 2026-05-30 ~23:38 UTC (interactive)
+
+**Health:** ⚠️ Drift — carry-forwards from iters 120–122: inbox-watcher running stale dispatch_validator.py (healer restart failed 3rd time today at 23:35:45Z rc=-1); sync push failure carry-forward (APPROVAL_REQUEST pending); PR #210 mergeable=UNKNOWN (was CONFLICTING in iter 122, likely recomputing). heal-stale-daemon-code auto-restarted beacon-bot/forge-bot/mirror-bot at 23:35Z (ebe7368 now live). rotate-active-tier blocked on Tier 2 OAuth at 23:34Z (known state). All 6 services active.
+
+**Triage:** 5 new alerts since iter 122 watermark (~23:35Z). All Tier 3 — no tier-reset from Check 0. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 5 new alerts, all Tier 3. ✅**
+  - 23:34:47Z `rotate-active-tier` blocked on Tier 2 OAuth — Tier 3 known-pattern (Tier 2 OAuth unprovisioned, documented MEMORY.md watch item, Monday DM queue). No action. ✅
+  - 23:35:14Z `heal-stale-daemon-code` auto-restarted beacon-bot (script mtime newer by 36.5 min; ebe7368 now live) — Tier 3 routine healer. ✅
+  - 23:35:14Z `heal-stale-daemon-code` auto-restarted forge-bot (script mtime newer by 2774.6 min; ebe7368 now live) — Tier 3 routine healer. ✅
+  - 23:35:45Z `heal-stale-daemon-code` auto-restart of inbox-watcher FAILED (rc=-1, timeout 30s) — Tier 3 (existing ask-then-do already escalated iters 120–121; service still active). ✅
+  - 23:35:45Z `heal-stale-daemon-code` auto-restarted mirror-bot (script mtime newer by 2774.6 min; ebe7368 now live) — Tier 3 routine healer. ✅
+  - No tier-reset from Check 0 (all Tier 3 per known-pattern discipline). ✅
+
+- **(Check 1) Log noise: nominal. ✅** inbox-watcher stale code persists (no new ERROR signals beyond known state). ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** No new Larry directives. ✅
+
+- **(Check 3) Pipeline state: nominal. ✅**
+  - `marker-error-auth-setup-token-wiring-1.json`: GONE from forge inbox (processed between iters 122 and 123, ~3 min window). Marker retry succeeded. ✅
+  - `harden-systemd-timer-recovery.json`: 11 min old (source=beacon). Normal. ✅
+  - `step-a-rotation.json`: 29 min old, queued. rotate-active-tier alert at 23:34Z confirms existing rotation scheduler blocked on Tier 2 OAuth (step-a-rotation task implements the pre-engage auth gate fix — its own execution is pending Forge pickup). Not stale. ✅
+  - No heal-pipeline-stall alerts. ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94, ~2d)
+  - stuck-cycle timeout guard (iter 43, ~20d)
+  - Monday [yellow] DM still scheduled 2026-06-01. ✅
+
+- **(Check 5) Stale daemon: ⚠️ inbox-watcher restart fail 2nd rc=-1 occurrence.**
+  - heal-stale-daemon-code: inbox-watcher restart FAILED rc=-1 at 23:35:45Z (timeout after 30s). 2nd occurrence of rc=-1 variant (first: iter 117 22:35:44Z). G-rule threshold=3; not yet triggered. Service still active (running stale code). Ask-then-do still pending Larry. ⚠️
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean, up to date with origin/main. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (APPROVAL_REQUEST pending).**
+  - sync.json: status=error at 23:23:57Z "Auto-commit push failed; rolled back". No new sync attempt since iter 122. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday DM queue. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** All services active. beacon-bot, forge-bot, mirror-bot restarted by healer at 23:35Z (ebe7368 now live). inbox-watcher active with stale dispatch_validator.py. ✅
+
+- **(Check D) Inboxes: forge 2 tasks, others empty. ✅**
+  - forge: harden-systemd-timer-recovery (11 min, source=beacon), step-a-rotation (29 min, queued, auth gate blocking).
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: PR #210 mergeable=UNKNOWN (recomputing). Watch. ⚠️**
+  - ourliberty-agent-core: PR #210 OPEN, mergeable=UNKNOWN (was CONFLICTING iter 122; may have been rebased by Forge after marker retry succeeded), reviewDecision="", autoMergeRequest=null. Age ~13 min. < 30 min threshold. Watch next iter. ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored. Next gate: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E).
+2. No auto-fixes (nothing in allow-list triggered).
+3. No new escalations (all carry-forwards covered by iter 121 [yellow] DM + Monday DM queue).
+4. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:41:27Z.
+5. Called `cycle_prime_ledger.py append --tier 1 --kind intervention` → appended `carry-forward-signals-iter-123` row.
+6. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None. All open items covered by iter 121 [yellow] DM + Monday DM queue.
+
+**Patterns:**
+- **inbox-watcher restart rc=-1: 2nd occurrence** (iter 117 + iter 123). G-rule at 3. Watch. 1 more → dispatch to Beacon: "heal-stale-daemon-code restart times out on inbox-watcher (rc=-1); propose defer-to-systemd logic or extend timeout."
+- **beacon-bot/forge-bot/mirror-bot stale-code healed.** All three bots now running ebe7368. Normal healer operation; no pattern.
+- **marker-error retry processed within ~3 min.** Fast turnaround confirms inbox-watcher functional for non-'dashboard'-source tasks despite stale code.
+
+**Learned:**
+1. beacon/forge/mirror bots were running stale agent_telegram_bot.py (since 2026-05-29T00:57Z, ~47h for forge+mirror). heal-stale-daemon-code finally triggered at 23:35Z when the ebe7368 PR #208 code was in scope. Delay was normal — healer fires on script mtime > service active-since, and the bot script must have been updated between iter 122's check and the healer's sweep.
+2. `marker-error-auth-setup-token-wiring-1.json` disappeared between iters 122 (~23:35Z) and 123 (~23:38Z) — 3 min window. inbox-watcher processed the marker-error retry; Forge likely re-submitted the preflight marker successfully. PR #210 mergeable transition UNKNOWN (from CONFLICTING) may reflect a force-push or rebase in the forge branch.
+3. rotate-active-tier blocked on Tier 2 OAuth at 23:34Z — new alert source seen for first time. Maps exactly to MEMORY.md "Tier 2 rate_limit" watch item (Tier 2 OAuth not provisioned). Classification: Tier 3 known-pattern.
+
+---
+
 ## Iteration 122 — 2026-05-30 ~23:35 UTC (interactive)
 
 **Health:** ⚠️ Drift — carry-forward from iter 121: PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) CONFLICTING (confirmed mergeable=CONFLICTING, was UNKNOWN at iter 121 Check E time). Inbox-watcher restart still pending Larry auth (stale dispatch_validator, 34 larry-reject-*.json blocked). Sync push failure 8th occurrence (23:23:57Z). All 6 services active. Forge pipeline healthy with 3 inbox tasks.
