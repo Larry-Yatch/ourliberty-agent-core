@@ -93,6 +93,50 @@ RETRY_DELAY = RETRY_BASE_DELAY
 # silent Tier 2 retry that would fail with 'session not found'.
 TIER2_HOME = '/home/larry/.claude-larry-personal'
 
+# Long-lived setup-token wiring (2026-05-30, auth_401-storm fix).
+# Each tier has a NON-refreshing `claude setup-token` (valid ~1 yr) stored in
+# the process env as CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2}. When configured, we
+# authenticate the dispatch via that token instead of HOME's auto-refreshing
+# .credentials.json — eliminating the concurrent-refresh race that produced
+# the 2026-05-29 ~140-event auth_401 storm. When the env var is unset/empty
+# the runner falls back to the existing credentials.json + HOME-swap path
+# byte-for-byte, so this change is a no-op if the tokens aren't provisioned.
+# NEVER log token values; only the auth-source label ('setup_token' vs
+# 'credentials_json') is safe to surface.
+_SETUP_TOKEN_ENV_BY_TIER = {
+    'tier1': 'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
+    'tier2': 'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
+}
+
+
+def _setup_token_for_tier(tier_name):
+    """Return the long-lived setup-token for ``tier_name`` or None if
+    unconfigured. Empty string counts as unset so a presence check is
+    equivalent to a usability check. Token values must never be logged."""
+    env_name = _SETUP_TOKEN_ENV_BY_TIER.get(tier_name)
+    if not env_name:
+        return None
+    return os.environ.get(env_name) or None
+
+
+def _apply_tier_auth(env_dict, tier_name, default_token):
+    """Set ``env_dict['CLAUDE_CODE_OAUTH_TOKEN']`` to the right value for
+    a dispatch on ``tier_name``. Returns the auth-source label
+    ('setup_token' or 'credentials_json') for log attribution.
+
+    Prefers the long-lived setup-token from the process environment when
+    configured — this bypasses the credentials.json refresh path entirely
+    and is the fix for concurrent-refresh auth_401 races. Falls back to
+    ``default_token`` (the token-manager value) when no setup-token is
+    configured for the tier, preserving the historical HOME-swap behavior.
+    """
+    setup_token = _setup_token_for_tier(tier_name)
+    if setup_token:
+        env_dict['CLAUDE_CODE_OAUTH_TOKEN'] = setup_token
+        return 'setup_token'
+    env_dict['CLAUDE_CODE_OAUTH_TOKEN'] = default_token
+    return 'credentials_json'
+
 RATE_LIMIT_RE = re.compile(
     r'(hit your limit|5-hour|resets \d+)', re.IGNORECASE,
 )
@@ -747,15 +791,18 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             token, account_id = tm.get_token()
 
             env = os.environ.copy()
-            env['CLAUDE_CODE_OAUTH_TOKEN'] = token
             env['CLAUDE_CODE_EFFORT_LEVEL'] = effort
             # Account-rotation plumbing (spec § 6.2): drive the primary
             # subprocess HOME off blackboard/active-tier.json instead of
             # inheriting from the orchestrator. Default state ships tier1,
             # so this resolves to /home/larry today — identical to the
             # inherited HOME — until the rotation scheduler (PR 6.3) flips
-            # the state file.
+            # the state file. HOME-swap stays even on the setup-token path
+            # because --resume session files live under
+            # ``HOME/.claude/projects/`` and are account-bound.
             env['HOME'] = active_tier.current_home()
+            active_tier_name = active_tier.read()['tier']
+            auth_source = _apply_tier_auth(env, active_tier_name, token)
 
             if model_override:
                 model, fallback = model_override, 'sonnet'
@@ -799,6 +846,8 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
             log(agent_id, 'Running (model=' + model +
                 ', account=' + account_id +
+                ', tier=' + active_tier_name +
+                ', auth=' + auth_source +
                 ', attempt=' + str(attempt+1) + '/' + str(MAX_RETRIES) +
                 ', active=' + str(guard.active_count()) + '/10' +
                 (', resume=' + session_id[:12] + '...' if session_id else '') +
@@ -978,12 +1027,26 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             # /home/larry/.claude-larry-personal — the
                             # historical TIER2_HOME path.
                             fallback_home = active_tier.other_home()
-                            log(agent_id,
-                                'TIER2_FALLBACK_ATTEMPT reason=' +
-                                failure_type + ' home=' + fallback_home,
-                                'INFO')
+                            other_tier_name = (
+                                'tier2' if active_tier_name == 'tier1'
+                                else 'tier1'
+                            )
                             t2_env = dict(env)
                             t2_env['HOME'] = fallback_home
+                            # Re-pick auth for the fallback tier: if the
+                            # other tier has a setup-token configured, use
+                            # it (race-free); otherwise revert to the
+                            # token-manager default so the HOME-swap path
+                            # still authenticates via creds.json.
+                            t2_auth_source = _apply_tier_auth(
+                                t2_env, other_tier_name, token,
+                            )
+                            log(agent_id,
+                                'TIER2_FALLBACK_ATTEMPT reason=' +
+                                failure_type + ' home=' + fallback_home +
+                                ' tier=' + other_tier_name +
+                                ' auth=' + t2_auth_source,
+                                'INFO')
                             t2_cmd = _build_cmd_for_tier(
                                 cmd, model, fallback, session_id,
                             )
