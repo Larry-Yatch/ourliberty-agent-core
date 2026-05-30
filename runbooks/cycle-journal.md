@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration 118 — 2026-05-30 ~23:01 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch. All services active. Forge step-c-ledger in progress. Sync push failure has known root cause and APPROVAL_REQUEST queued for Larry. No new alerts.
+
+**Triage:** 0 new alerts since iter 117 watermark (22:48:52Z). alert-triage.json MISSING (ongoing). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No entries in larry-alerts.jsonl beyond 22:48:52Z watermark. ✅
+
+- **(Check 1) Log noise: nominal. ✅** journalctl: own-user scope only (system logs not visible), 0 warnings. inbox-watcher log: 3 task completions since iter 117 — dead-letter-cycle-finding-sync-push-failure (Pulse, $0.41, 90s), cycle-finding-sync-push-failure-20260530T224800Z (Beacon investigation, $1.63, 280s), notify-cycle-finding-sync-push-failure (Pulse notify, $0.14, 45s). No ERROR lines. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 1 session (7998341473 → 1b5ed242), unchanged from iter 117. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** heal-pipeline-stall-state.json MISSING (known: alert-cooldown/ dir). Alert-cooldown/warning/ notable entries: mirror-pass-unmerged:PR_205 is STALE (PR #205 merged 00:59Z May 30, cooldown set 04:22Z — calibration lag); forge-no-pr:chain-discipline-marker-parser-and-regression-check-001 is STALE (26h old, mtime=2026-05-29T21:31Z, created during fixture storm, no matching real PR in recent history). Known-snoozed: rate_limit variants (beacon/forge/mirror/pulse), deploy-notifier READY entries, sentinel stalls for now-resolved tasks. Active in-flight: Forge step-c-ledger started 22:36:45Z, ~24 min at check time — normal build range. ✅
+
+- **(Check 4) Pending Larry directives: APPROVAL_REQUEST queue 2→3. ✅**
+  - **NEW: sync-push-rebase-fallback-001** — Beacon produced this APPROVAL_REQUEST at 22:55Z from the iter 117 G-rule dispatch. Larry needs to approve to dispatch Forge (fix: source push_with_rebase helper in sync_agent_core.sh + run_ledger.sh). [yellow] Monday DM (2026-06-01) queue now carries 3 items.
+  - Standing (2): pulse_telegram_bot.sh launcher (iter 94, ~2d), stuck-cycle timeout guard (iter 43, ~19d).
+  - Carry-forward: 4 dropped dashboard actions (2026-05-27/28) need Telegram re-action by Larry. ✅
+
+- **(Check 5) Stale daemon: nominal. ✅** heal-stale-daemon-code-cooldowns.json: last restart activity at ~22:35Z (beacon-bot + inbox-watcher). No new restart events since. State file ~26 min old at check time — fresh per 60-min threshold. ✅
+
+- **(A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=be8f9e2 "Pulse cycle 20260530T225148Z". ✅
+
+- **(B) Sync health: ⚠️ watch (4th occurrence, fix path known).** sync.json: status=error at 22:52:42Z, commit=1d567ac4, "Auto-commit push failed; rolled back" — 4th occurrence (iters 102, 114, 117, now). **Root cause now confirmed by Beacon (22:55Z):** `sync_agent_core.sh:161` bare-pushes `git push -q origin main 2>/dev/null` with no rebase fallback and swallowed stderr; `run_cycle.sh:190` uses the `push_with_rebase` helper that handles non-FF races. Fix: source `_lib_push_with_rebase.sh` in both `sync_agent_core.sh` and `run_ledger.sh`, replace bare pushes with `push_with_rebase`. APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending Larry approval. Non-clean finding → tier reset (tier=1, consecutive_clean=0). No new DM — Monday DM covers it. ⚠️
+
+- **(C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer: all active (running). ✅
+
+- **(D) Inboxes: forge/step-c-ledger in-progress. ✅** beacon: empty (cycle-finding-sync-push-failure archived 22:55Z after successful completion). forge: step-c-ledger.json in-flight (PID 2508428, started 22:36:45Z, ~24 min). mirror: empty. pulse: empty. ✅
+
+- **(E) PRs: 0 open. ✅** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored; next gate 2026-06-01 (first Sunday with available chain_events data). ✅
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d, outside 60d window). ✅
+
+**Did:**
+1. Ran all checks (0–5, A–E).
+2. Read Beacon's investigation result (22:55Z) + confirmed APPROVAL_REQUEST `sync-push-rebase-fallback-001` generated.
+3. Called `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 118` → appended `sync-push-failure-iter-118` intervention row.
+4. Called `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, tier=1.
+5. Wrote journal entry. Updated MEMORY.md status snapshot + watch items.
+
+**Escalated:** None this iter. APPROVAL_REQUEST `sync-push-rebase-fallback-001` added to Monday [yellow] DM queue alongside 2 standing items.
+
+**Patterns:**
+- **Sync push failure root cause confirmed.** Beacon identified bare-push in sync_agent_core.sh:161 + run_ledger.sh:70 (no rebase fallback, no stderr). push_with_rebase helper already exists (run_cycle.sh uses it). APPROVAL_REQUEST ready. 4 occurrences total; pending Larry approval.
+- **Beacon response latency:** G-rule dispatch 22:48Z → Beacon completed 22:55Z (7 min, $1.63). Fast turnaround at Tier 1.
+- **APPROVAL_REQUEST queue:** 2→3. Monday DM scheduled.
+
+**Learned:**
+1. sync_agent_core.sh:161 `2>/dev/null` was hiding the exact push error. Root cause was documented contract drift: `_lib_push_with_rebase.sh`'s own header names both sibling scripts as intended callers, but neither was ever updated to use it. Iter 117 race condition (wrapper pushed 6 min prior → sync's parent was stale) is textbook non-FF refusal with no recovery path.
+2. In-flight state cleanup timing: inbox-watcher may leave an in-flight record briefly after task completion. Authoritative state is the outbox entry + inbox archive, not the in-flight file. Not a bug.
+3. Forge step-c-ledger (rate-limit-resilience PR C) running 22:36:45Z–23:01Z (~24 min at journal write). Normal range. Check at next iter.
+
+---
+
+## Beacon result — sync-push-rebase-fallback-001 — 2026-05-30 ~22:51 UTC (notify)
+
+**Source:** Beacon outbox result for `cycle-finding-sync-push-failure-20260530T224800Z` (iter 117 G-rule dispatch).
+
+**Root cause confirmed:**
+- `sync_agent_core.sh:161` bare-pushes (`git push -q origin main 2>/dev/null`) with no rebase fallback and swallowed stderr — any non-FF rejection causes immediate rollback with no diagnostics.
+- `run_cycle.sh:190` already uses `push_with_rebase origin main "$LOG_FILE"` (sources `_lib_push_with_rebase.sh`). The helper tries push, pulls `--rebase --autostash` on refusal, retries.
+- Iter 117 was a textbook race: 6 min after iter 116's wrapper pushed, sync's auto-commit landed on a stale parent and got rejected with no recovery.
+- `run_ledger.sh:70` has the same bare-push shape.
+- The helper's own header already names both sibling scripts as intended callers — this was documented contract drift.
+
+**APPROVAL_REQUEST emitted by Beacon:**
+- `task_id: sync-push-rebase-fallback-001`
+- `target_agent: forge`, `target_repo: ourliberty-agent-core`
+- `pr_title: fix(sync): adopt push_with_rebase in sync_agent_core.sh + run_ledger.sh`
+- Scope: source helper in both scripts, replace bare pushes with `push_with_rebase`, keep existing rollback/alert/exit paths intact. New test covering the non-FF race + genuine-conflict rollback paths.
+
+**Pulse action:** None. This is Beacon's standard dispatch chain — Forge preflight → build → Mirror auto-merge. The APPROVAL_REQUEST is Larry's gate. Tracking as open until Forge step lands.
+
+**Closes:** iter 117 G-rule escalation (3rd sync push failure occurrence). Root cause is now known and has a fix path.
+
+---
+
 ## Dead-letter re-dispatch — 2026-05-30 ~22:49 UTC (notify)
 
 **Event:** Beacon dead-letter notify for `cycle-finding-sync-push-failure-20260530T224800Z` delivered to Pulse inbox. Dispatch was rejected by `dispatch_validator` with: `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug`. The iter 117 envelope had all structured fields (finding, context, spec_request) but was missing the required top-level `prompt` string.
