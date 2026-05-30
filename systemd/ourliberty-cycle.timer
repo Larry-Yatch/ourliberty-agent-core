@@ -3,13 +3,17 @@ Description=Run Ourliberty /cycle on a self-throttling tier cadence
 Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/cycle-prompt.md
 
 [Timer]
-# First run 5 min after boot (let other services settle)
-OnBootSec=5min
-# PR-β: fire every 5 min (Tier 1 cadence). The script reads
-# ~/agents/state/cycle-tier.json and self-throttles to Tier 2 (15 min) or
-# Tier 3 (30 min) windows when at higher tiers. See cycle_tier_state.py
-# + scripts/run_cycle.sh tier-window gate.
-OnUnitActiveSec=5min
+# Fire every 5 minutes on wall-clock. A wall-clock anchor always has a
+# guaranteed next-fire, so the timer cannot enter the NextElapse=infinity
+# trap that OnUnitActiveSec produces when stopped-then-started while the
+# service is idle (incident 2026-05-30).
+#
+# Cadence throttling lives entirely in scripts/run_cycle.sh's tier-window
+# gate: it reads ~/agents/state/cycle-tier.json and skips any fire that
+# lands inside the current tier window (Tier 1=300s, Tier 2=900s,
+# Tier 3=1800s), keyed on the mtime of ~/agents/state/cycle-last-run.flag.
+# Extra/early fires from this 5-min wall-clock cadence gate-skip cleanly.
+OnCalendar=*:0/5
 # If the system was off when a run was due, run on boot
 Persistent=true
 Unit=ourliberty-cycle.service
