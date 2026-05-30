@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration 114 — 2026-05-30 ~22:22 UTC (interactive)
+
+**Health:** ⚠️ Drift — dirty working tree (scripts/fixture_patterns.py modified, sync push failed at 22:08Z). System services healthy; drift confined to source repo + sync state.
+
+**Found:**
+
+- **(Check 0) Alert triage: 3 alerts, all nominal. ✅**
+  - 22:09:28Z `outbox-notifier`: Mirror approved PR #206 (agent-core) → Tier-3 informational success. PR #206 "fix(systemd): switch cycle.timer to OnCalendar" confirmed merged (commit 291102c). ✅
+  - 22:12:18Z `heal-pipeline-stall` ×2: forge + beacon-bot Tier 2 fallback `SKIPPED:rate_limit`. Known watch item (MEMORY.md 2026-05-29). Tier-3 known-watch; no DM. The `SKIPPED` sub-variant is new (prior entries used `FAILED` and `UNAVAILABLE` — both permanently snoozed in heal-pipeline-stall-state.json; `SKIPPED` snooze set to event time → already expired, healer may re-fire). Watch continues. ✅ (journal note only)
+  - Note: alert-triage.json still MISSING (ongoing). Iter 113 watermark at 22:22Z should have claimed the 22:09Z + 22:12Z alerts but didn't (watermark tracking broken without state file). Both classified here.
+
+- **(Check 1) Log noise: nominal. ✅** journalctl 1h: 0 WARN/ERROR from ourliberty services. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 1 session (chat_id 7998341473), 1 active session_id. No orphaned Larry directives. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** heal-pipeline-stall-state.json: No new stall conditions. `tier2_fallback:beacon-bot:SKIPPED:rate_limit` entry at 22:12:18Z (the new alert), snooze_until=event time (expired). All other active entries either permanently snoozed (2099) or expired old stalls (all underlying PRs merged/cleared per Check E). ✅
+
+- **(Check 4) Pending Larry directives: nominal. ✅** 4 standing APPROVAL_REQUESTs unchanged: validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~18d). **[yellow] DM queue for 2026-06-01 Monday cycle unchanged — still on track.**
+
+- **(Check 5) Stale daemon: nominal. ✅** heal-stale-daemon-code-cooldowns.json mtime ≈ 22:11Z. Healer restarted beacon-bot, outbox-notifier, and inbox-watcher at ~22:11Z (expected behavior: PR #206 deployed new scripts → mtime check triggered restarts). All services confirmed active by Check C. No Unit-not-found errors (contrast with 10:31Z May 30 event — 1st occurrence; no recurrence). ✅
+
+- **(A) Source repo: ⚠️ DIRTY TREE — never-auto.**
+  - Branch: main ✅
+  - HEAD: 3c3d9fe "Pulse cycle 20260530T221314Z" (iter 113 wrapper) ✅
+  - **Modified (unstaged): scripts/fixture_patterns.py** ← FINDING
+  - sync.json 22:08:48Z: status=error, "Auto-commit push failed; rolled back", commit=fe2318f5.
+  - Root cause: sync auto-commit path staged + committed `fixture_patterns.py` as fe2318f5, attempted push, push failed (likely concurrent remote update or auth issue), rolled back with `git reset HEAD~1` (leaving working tree dirty).
+  - The modification appears to be the addition of the `zz-fixture-` reserved-namespace prefix (present in working tree but not in last known clean HEAD).
+  - **Action: escalated to pulse-escalations.json. [yellow] DM Larry.**
+
+- **(B) Sync health: ⚠️ Error state — never-auto.**
+  - Last sync attempt: 22:08:48Z, status=error.
+  - Last known successful sync: 22:04Z (from iter 113 journal). Time-since-success: ~19 min at 22:22Z — within 2h threshold.
+  - Dirty tree blocks next auto-commit sync. Future syncs will hit the same push-failure or stall on the dirty tree.
+  - 2nd occurrence of "Auto-commit push failed; rolled back" pattern (1st: iter 102, 2026-05-29T20:50Z). G-rule threshold: 3 occurrences. Watch continues.
+  - **Action: never-auto (dirty tree per Check A). Escalated with Check A.**
+
+- **(C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer: all active. ✅
+
+- **(D) Inboxes: 0/0/0/0. ✅** All agent inboxes empty. ✅
+
+- **(E) PRs: 0 open. ✅**
+  - ourliberty-agent-core: 0 open PRs. PR #206 "fix(systemd): switch cycle.timer to OnCalendar" confirmed merged (commit 291102c). ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next firing 2026-06-01 (Monday). ✅
+
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d, outside 60d window). ✅
+
+- **(Pending, carry forward):**
+  - **[yellow] scripts/fixture_patterns.py dirty tree:** sync push failed (2nd occurrence). Larry to review diff + commit/revert. Escalated.
+  - APPROVAL_REQUESTs (4 unchanged): validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. [yellow] DM on 2026-06-01 Monday.
+  - Tier 2 rate_limit watch: 2 new alerts 22:12:18Z (SKIPPED variant). Not yet G-rule threshold. Watch continues.
+  - inbox-watcher Unit-not-found (1st occurrence 10:31Z May 30): no recurrence. Watch continues.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - ourliberty-health "notify script missing" (21:57Z May 30, iter 112): 0 recurrences since. Sub-threshold; watch.
+
+**Did:**
+1. Ran all mandatory checks (0–5) and additive checks A–E.
+2. Wrote [yellow] escalation to pulse-escalations.json (Check A dirty tree + Check B sync error).
+3. Called `cycle_tier_state.py record --checks-clean false` → consecutive_clean reset 2→0, tier stays 1.
+4. Appended `intervention` row to cycle-prime-ledger.jsonl (intervention_id: dirty-tree-fixture-patterns-iter-114).
+5. Sent [yellow] DM to Larry via larry_alerts.append_alert (see Escalated below).
+
+**Escalated:**
+- [yellow] Iter 114 — scripts/fixture_patterns.py dirty tree; sync push failed (2nd occurrence). Commit or revert the change to restore clean sync. pulse-escalations.json iter 114.
+
+**Forge:** 0 open Forge PRs. PR #206 merged (291102c). Last merged dashboard PR #23 (16:19Z). System quiescent.
+
+**Patterns:**
+- Tier state: consecutive_clean reset 2→0 (non-clean iter). Still Tier 1. Need 3 consecutive clean to de-escalate.
+- Sync "Auto-commit push failed; rolled back": 2nd occurrence (iter 102 + iter 114). G-rule threshold = 3. Watch continues. Root cause still unknown (push rejection reason not surfaced by sync.json).
+- Tier 2 rate_limit SKIPPED variant: new sub-variant of known rate_limit pattern. `SKIPPED` (not `FAILED`) suggests Tier 2 was available but deliberately bypassed. Distinct from prior `FAILED` + `UNAVAILABLE` variants. Monitor whether SKIPPED snooze logic re-fires consistently.
+- PR #206 merged and daemon healer auto-restarted affected services at 22:11Z: correct behavior, no action needed.
+
+**Learned:**
+1. The `zz-fixture-` reserved namespace prefix was added to `scripts/fixture_patterns.py` working tree (per 2026-05-30 comment in the file). It is NOT in CLAUDE.md's allowlist section. The CLAUDE.md, cycle-prompt.md, and SHELL_FIXTURE_REGEX mirrors will need to be updated when this commit lands — this is the test in `test_pulse_cycle_fixture_allowlist.py`. The push failure deferred the commit; the mirrors are currently out of sync with the working tree.
+2. Iter 113 check 0 watermark failure: the 22:09Z and 22:12Z alerts were not claimed by iter 113 despite being after iter 112's watermark (22:02Z). alert-triage.json MISSING is the cause. Corrected by this iter's manual classification.
+
+---
+
 ## Iteration 113 — 2026-05-30 ~16:22 MDT / 2026-05-30 ~22:22 UTC (interactive)
 
 **Health:** ✅ Nominal — fourth consecutive clean iter (110–113). 1 new PR (#206) in pipeline, awaiting Mirror review. All other checks clean.
