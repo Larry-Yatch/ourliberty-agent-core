@@ -4,6 +4,105 @@
 
 ---
 
+## Dead-letter re-dispatch — 2026-05-30 ~22:49 UTC (notify)
+
+**Event:** Beacon dead-letter notify for `cycle-finding-sync-push-failure-20260530T224800Z` delivered to Pulse inbox. Dispatch was rejected by `dispatch_validator` with: `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug`. The iter 117 envelope had all structured fields (finding, context, spec_request) but was missing the required top-level `prompt` string.
+
+**Fix:** Rewrote the envelope with `prompt` field (299 chars) added. Re-dropped to `~/agents/inboxes/beacon/`. Archived: pulse inbox notify + in-flight dead-letter state file.
+
+**Root cause of the omission:** The iter 117 dispatch was written during a mid-cycle sync-failure G-rule trigger. The `prompt` field was not included — an F24 class bug. Fix going forward: always include `prompt` as a first-class field when hand-writing Beacon dispatch envelopes (not just structured sub-fields).
+
+---
+
+## Iteration 117 — 2026-05-30 ~22:44 UTC (interactive)
+
+**Health:** ⚠️ Drift — sync "Auto-commit push failed; rolled back" at 22:45:23Z (3rd occurrence; G-rule threshold met; Beacon dispatch written). All service checks nominal. Tier promotion still valid (tier-reset triggered by Check B; reverting to Tier 1). Forge step-c-ledger task in-flight.
+
+**Triage:** 2 new alerts since iter 116 watermark; both Tier-3 known-pattern. alert-triage.json still MISSING (ongoing).
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new Tier-3 alerts. ✅**
+  - 22:35:44Z `heal-stale-daemon-code` warning: "Auto-restart of ourliberty-inbox-watcher.service FAILED (rc=-1)." → **Tier 3**. Service recovered via systemd's own restart policy; inbox-watcher is active (running) since 22:36:44Z (PID 2508373). rc=-1 is a new variant (prior variant: rc=5 "Unit not found" at 10:31Z May 30). 1st rc=-1 observation. Watch threshold=3.
+  - 22:38:26Z `heal-droplet-git-drift` warning: "Droplet branch `main` is 3 commit(s) behind `origin/main` (threshold > 2)." → **Tier 3**. Transient pre-push state: alert fired just before the iter 116 wrapper committed+pushed at 22:39:19Z. Confirmed resolved: HEAD=4a3b4b8=origin/main. **Calibration note**: heal-droplet-git-drift will fire whenever the wrapper hasn't pushed yet — consider threshold or debounce. 1st observation. ✅
+
+- **(Check 1) Log noise: nominal. ✅** journalctl last 30 min: 0 WARN/ERROR from ourliberty services. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** beacon_telegram_sessions.json: 1 session (7998341473 → 1b5ed242). No new Larry directives since iter 116. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** alert-cooldown/warning/: known snoozed entries only (rate_limit cooldowns for agent-runner-beacon/forge/mirror/pulse; auth_401 beacon-telegram-bot; deploy-notifier READY entries; build-sequence-advancer pulse-upgrade-001 complete). No new heal-pipeline-stall alerts in last 30 min. ✅
+
+- **(Check 4) Pending Larry directives: nominal — queue unchanged at 2. ✅**
+  - Standing (2): pulse_telegram_bot.sh launcher (pending iter 94), stuck-cycle timeout guard (pending iter 43, ~19d). [yellow] DM queued for 2026-06-01 Monday cycle. ✅
+  - Carry-forward human action: 4 dropped dashboard actions (2026-05-27/28) still need Telegram re-action by Larry. ✅
+
+- **(Check 5) Stale daemon: nominal. ✅** inbox-watcher active (running) since 22:36:44Z (PID 2508373); running Forge step-c-ledger claude session (PID 2508428). Inbox-watcher prior orphan (PID 2508012) was reaped at restart (1 orphan marked forfeit). Correct behavior. ✅
+
+- **(A) Source repo: ✅ Nominal.** HEAD=4a3b4b8=origin/main ("Pulse cycle 20260530T223919Z", iter 116 wrapper). Branch: main. Working tree: clean. Not behind, not ahead. heal-droplet-git-drift alert (22:38:26Z) confirmed transient — resolved by wrapper push at 22:39:19Z. ✅
+
+- **(B) Sync health: ⚠️ watch (stable carry-forward).** sync.json: status=error at 22:08:48Z (same as iters 115-116). Last successful wrapper push: 22:39:19Z (HEAD=origin/main). Last recorded successful sync (by sync_agent_core.sh): 22:04Z (~40 min ago, within 2h threshold). Auto-recovery expected when sync_agent_core.sh next runs (~23:08Z). No re-DM (iter 114 already escalated). ✅
+
+- **(C) Agent liveness: 6/6 active. ✅** All units active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher (22:36:44Z restart), cycle.timer. inbox-watcher currently processing Forge step-c-ledger (PID 2508428). forge-bot log silence: calibrated known behavior (no Telegram traffic → no log). ✅
+
+- **(D) Inboxes: 1 task (in-flight). ✅** forge/step-c-ledger.json (22:29Z, ~15 min old): IN-FLIGHT via inbox-watcher PID 2508428. Task: "PR C: rate-limit ledger completeness (retry_after_sec + auth_401/resume/bot-wrapper capture + per-account costs.jsonl)". Prior orphan session (PID 2508012) was forfeited at inbox-watcher restart; task being re-processed fresh. Not stale. ✅
+
+- **(E) PRs: 0 open. ✅** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+
+- **Check III:** Sunday-anchored; no prior artifact. Next gate: 2026-06-01 Sunday (first Sunday with available data — fires alongside Check I). ✅
+
+- **Credential rotations: nominal.** 0 overdue. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d, outside 60d window). ✅
+
+- **(Check B — mid-cycle update) Sync push FAILED again at 22:45:23Z — 3rd occurrence. ⚠️ G-RULE TRIGGERED.**
+  - sync.json updated: status=error, commit=135441faf3, "Auto-commit push failed; rolled back".
+  - Pattern: sync auto-committed cycle-journal.md (my iter 117 journal write, dirty at that point), tried to push 135441faf3 to origin, push failed, rolled back with git reset HEAD~1.
+  - Occurrences: iter 102 (2026-05-29T20:50Z, fixture_patterns.py) → iter 114 (2026-05-30T22:08Z, fixture_patterns.py) → NOW (2026-05-30T22:45Z, cycle-journal.md).
+  - Root cause unknown: wrapper direct-pushes succeed (iter 116 pushed 4a3b4b8 successfully at 22:39Z); sync_agent_core.sh auto-commit pushes consistently fail.
+  - G-rule: 3 occurrences → dispatch to Beacon for permanent fix investigation.
+  - **Tier-reset: Check B finding forces Tier 1 (overrides the tier promotion above).**
+  - **This journal entry is currently uncommitted** (sync rollback left it in dirty working tree). Wrapper auto-commit is not wrapping this interactive session; next automated cycle's wrapper or Larry's manual commit will persist it.
+
+- **(Pending, carry forward):**
+  - **[yellow] ESCALATED: Sync push failure G-rule (3rd occurrence).** Root cause investigation Beacon dispatch written. Larry [yellow] DM sent. Watch for Beacon spec.
+  - **Sync recovery watch:** sync.json error from 22:45Z. Auto-recovery blocked until root cause resolved.
+  - APPROVAL_REQUESTs (2): pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~19d). [yellow] DM on 2026-06-01 Monday.
+  - 4 dropped dashboard actions: Larry must re-action via Telegram. Carry per MEMORY.md.
+  - Tier 2 rate_limit SKIPPED: agent-runner-{forge,beacon,mirror,pulse} in alert-cooldown/warning/. Known snoozed. Watch.
+  - heal-stale-daemon-code rc=-1 on inbox-watcher (22:35:44Z): 1st rc=-1 observation. Watch (threshold=3).
+  - heal-droplet-git-drift (22:38:26Z, pre-push transient): 1st observation. Watch for recurrence.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - Check I idempotency (64fdcfb): verify behavior on 2026-06-01 Monday first firing.
+  - E3.2 dashboard-ui build task (iter 60): no new dispatch. Carry.
+
+**Did:**
+1. Ran all checks (0–5, A–E).
+2. Called `cycle_tier_state.py record --checks-clean true` → consecutive_clean 2→3 → tier promoted 1→2.
+3. Wrote journal entry.
+4. Mid-cycle sync failure (22:45Z): 3rd occurrence — reverted tier to Tier 1 (non-clean finding), called `cycle_tier_state.py record --checks-clean false`.
+5. Wrote Beacon dispatch envelope (sync-push-failure-root-cause) to ~/agents/inboxes/beacon/.
+6. Wrote [yellow] escalation to pulse-escalations.json.
+7. Sent [yellow] DM via larry_alerts.append_alert.
+
+**Escalated:**
+- [yellow] Iter 117 — sync_agent_core.sh "Auto-commit push failed; rolled back" 3rd occurrence. G-rule threshold met. Beacon dispatch written for root cause investigation. pulse-escalations.json iter 117.
+
+**Forge:** step-c-ledger task in-flight (PID 2508428). PR C: rate-limit ledger completeness. Prior PID 2508012 forfeited; re-processing fresh from 22:36Z.
+
+**Patterns:**
+- **Sync push failure (G-rule triggered at 3 occurrences).** Root cause: sync_agent_core.sh auto-commit pushes fail while wrapper direct-pushes succeed. Pattern suggests sync script is using different auth or encountering a race with the remote. Dispatch to Beacon for permanent fix.
+- **heal-droplet-git-drift (new healer, 1st observation):** Fired at 22:38:26Z (pre-push transient). Resolves within ~1 min. Watch for recurrence at every cycle.
+- **APPROVAL_REQUEST queue velocity:** stalled at 2. Monday DM planned.
+- **Forge step-c-ledger:** orphan-forfeit + restart-and-reprocess is correct recovery path.
+
+**Learned:**
+1. heal-droplet-git-drift is a new healer (first observation). Fires when droplet main is N+ commits behind origin/main. The 22:38:26Z alert was transient pre-push; resolved by wrapper push at 22:39Z. 1st occurrence; G-rule threshold=3.
+2. heal-stale-daemon-code rc=-1 on inbox-watcher: distinct from rc=5 "Unit not found" (iter 109). Service recovered via systemd restart policy. 1st rc=-1 occurrence.
+3. Sync push failure root cause unknown. Wrapper (direct git push) succeeds; sync_agent_core.sh (auto-commit + push) fails. Possible: different auth path, push protection rule, or race condition with concurrent push. G-rule triggered; Beacon dispatch sent.
+4. This interactive cycle has no wrapper auto-commit. Journal entry + MEMORY.md will remain uncommitted until next automated cycle wrapper or Larry manual commit.
+
+---
+
 ## Iteration 116 — 2026-05-30 ~22:37 UTC (interactive)
 
 **Health:** ✅ Nominal — all checks clean. PR #207 merged resolving long-standing APPROVAL_REQUEST. Inbox-watcher graceful restart in progress with Forge step-c-ledger task in-flight.
