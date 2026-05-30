@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 122 — 2026-05-30 ~23:35 UTC (interactive)
+
+**Health:** ⚠️ Drift — carry-forward from iter 121: PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) CONFLICTING (confirmed mergeable=CONFLICTING, was UNKNOWN at iter 121 Check E time). Inbox-watcher restart still pending Larry auth (stale dispatch_validator, 34 larry-reject-*.json blocked). Sync push failure 8th occurrence (23:23:57Z). All 6 services active. Forge pipeline healthy with 3 inbox tasks.
+
+**Triage:** No new alerts since iter 121 watermark (23:28:19Z). ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No entries in larry-alerts.jsonl after 23:28:19Z watermark. All prior alerts already handled or silenced (iter 121). No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: nominal. ✅** No new ERROR signals in alert stream. ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** No new Larry directives. ✅
+
+- **(Check 3) Pipeline state: nominal. ✅**
+  - forge/harden-systemd-timer-recovery.json: NEW since iter 121. Source=beacon, dispatched ~23:27Z (~8 min at check time). Permanent fix dispatch for today's cycle.timer infinity-trap incident: hardens heal_stale_daemon_code.auto_restart_unit() (daemon-reload before restart) + adds stuck-timer detector to heal_systemd_install_drift.py. Normal pipeline task, not stale.
+  - forge/marker-error-auth-setup-token-wiring-1.json: retry 1/3 for preflight marker (auth-setup-token-wiring). Operational retry pattern. Carry-forward from iter 121. ✅
+  - forge/step-a-rotation.json: created 23:09:46Z (~25 min at check time), source=beacon. Wait for auth-setup to complete was met (PR #210 opened 23:25Z); inbox-watcher should pick up on next sweep. Not stale. ✅
+  - No heal-pipeline-stall alerts since iter 121 watermark. ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94, ~2d)
+  - stuck-cycle timeout guard (iter 43, ~20d)
+  - Monday [yellow] DM still scheduled 2026-06-01. ✅
+
+- **(Check 5) Stale daemon: ✅ nominal per healer (known gap persists).**
+  - heal-stale-daemon-code-cooldowns.json: inbox-watcher last_restart_ts=22:35:44Z (~60 min). Healer not flagging (healer tracks main-script mtime only). Stale-dispatch-validator gap persists — awaiting inbox-watcher restart authorization from Larry (per iter 121 escalation). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus at session start: branch=main, clean, HEAD=a598826 "Pulse cycle 20260530T233005Z". Working tree clean. ✅
+
+- **(Check B) Sync health: ⚠️ 8th occurrence (known root cause, APPROVAL_REQUEST pending).**
+  - sync.json: status=error at 23:23:57Z, "Auto-commit push failed; rolled back". 8th occurrence (previous 7: iters 102, 114, 117, 118, 119, 120, 121). APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday DM queue. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: Forge 3 tasks (all normal), others empty. ✅**
+  - forge: harden-systemd-timer-recovery (NEW, 8 min, source=beacon), marker-error-auth-setup-token-wiring-1 (retry 1/3), step-a-rotation (25 min, queued).
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: PR #210 CONFLICTING, not yet stale. ⚠️**
+  - PR #210: state=OPEN, mergeable=CONFLICTING (confirmed, was UNKNOWN at iter 121's check time), reviewDecision="", autoMergeRequest=null. Age ~8 min. Conflict introduced by Larry's PR #209 merge (agent_runner.py overlap). Mirror review not started. Not stale (< 30 min). Carry-forward from iter 121. ⚠️
+
+- **Check H (Forge digest):**
+  - PR #210 open (Forge): fix(auth) wire dispatches to long-lived setup-tokens, CONFLICTING.
+  - harden-systemd-timer-recovery.json: NEW Beacon dispatch to Forge for systemd-healer hardening (cycle.timer infinity-trap today).
+  - marker-error-auth-setup-token-wiring-1 retry 1/3 in forge inbox.
+  - PR #209 merged (Larry, 23:22Z): missions-json-registration-pass.
+  - Dashboard PRs #26–#28 all merged tonight.
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored. Next gate: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, H).
+2. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:35:37Z.
+3. Called `cycle_prime_ledger.py append --tier 1 --kind intervention --payload ...` → appended `sync-push-failure-iter-122` row (8th sync occurrence, known root cause).
+4. No new escalations sent (all findings are carry-forwards; iter 121 escalations already cover open items).
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** None this iter. All open items covered by iter 121 [yellow] DM. Monday DM queue carries 3 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **PR #210 CONFLICTING (1st occurrence this iter).** Conflict confirmed. Mirror hasn't started review. Normal post-open timing — check next iter for Mirror pick-up.
+- **harden-systemd-timer-recovery:** Beacon dispatched permanent fix for today's cycle.timer infinity-trap to Forge. Normal pipeline. First sighting.
+- **Sync push failure: 8 consecutive.** Pattern is fully documented; APPROVAL_REQUEST queued. No new pattern action needed.
+- **Forge pipeline: active.** 3 inbox tasks, 2 are pipeline-continuation (marker-error retry + step-a-rotation), 1 is new feature (harden-systemd-timer-recovery).
+
+**Learned:**
+1. Step-a-rotation was created at 23:09Z MDT notation (not 17:09 UTC as iter 121 stated in parenthetical "~6h12m old"). Correct age was ~19-25 min, not 6h. Iter 121 had a time-zone/UTC-confusion in its age calculation. Step-a-rotation is not stale.
+2. PR #210 mergeable transitions from UNKNOWN → CONFLICTING within ~8 min of opening (GitHub computed it promptly). Early Check E detection working as designed.
+3. alert-triage.json is missing (state file absent) — Check 0 relies on larry-alerts.jsonl watermark from journal continuity instead. This is a known gap (no PR-β state file yet). Future: PR-β should write alert-triage.json so Check 0 has a proper persistent watermark.
+
+---
+
 ## Iteration 121 — 2026-05-30 ~23:28 UTC (interactive)
 
 **Health:** ⚠️ Drift — PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) OPEN but CONFLICTING (Larry's PR #209 merged first at 23:22Z, overlapping files likely). Inbox-watcher restart now unblocked (auth-setup completed). Sync push failure 7th occurrence (known root cause). All 6 services active.
