@@ -318,6 +318,10 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
         "exit_code": 0 if success else -1,
         "model": meta.get("model"),
         "account_id": meta.get("account_id"),
+        # Step C: tier1/tier2 from blackboard/active-tier.json, surfaced so
+        # the costs.jsonl row downstream can carry an `account` field.
+        # Distinct from `account_id` (OAuth pool identity).
+        "account_tier": meta.get("account_tier"),
         "attempts": meta.get("attempts"),
         "result": output_text or "",
         "claude_session_id": session_id,
@@ -425,6 +429,11 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             "task_id": task.get("task_id") or task_file.stem,
             "task_type": "fixture-suppressed",
             "model": None,
+            # Step C: per-account field for rolling-5h scoping. Fixture-
+            # suppressed rows never spawn a Claude subprocess so there is no
+            # real tier to record; use 'fixture' as a sentinel so they can be
+            # filtered out of account-scoped sums.
+            "account": "fixture",
             "cost_usd": 0.0,
             "input_tokens": 0,
             "output_tokens": 0,
@@ -616,6 +625,12 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             "task_id": task_id,
             "task_type": task_type,
             "model": outbox.get("model"),
+            # Step C: per-account field for rolling-5h scoping. Falls back to
+            # 'tier1' when meta did not populate `account_tier` (older outbox
+            # rows from before this PR), preserving the documented V1 default
+            # in config/agent-models.json:tier1_quota._note. Readers MUST
+            # tolerate an absent field too (= unknown/tier1).
+            "account": outbox.get("account_tier") or "tier1",
             "cost_usd": outbox.get("cost_usd"),
             "input_tokens": usage.get("input_tokens"),
             "output_tokens": usage.get("output_tokens"),

@@ -34,6 +34,11 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 from telegram_text_utils import strip_leading_slash  # noqa: E402
+# Step C — share the rate-limit ledger + failure classifier with the other
+# Claude-spawning paths. Pre-Step-C this bot path never wrote
+# anthropic-quota-events.jsonl, leaving zero events for 2026-05-29's stall
+# storm even though auth_401 dominated the failures here.
+import agent_runner  # noqa: E402
 
 # ---------- config ----------
 
@@ -137,6 +142,40 @@ def telegram_send_action(chat_id: int, action: str = "typing") -> None:
 
 # ---------- Claude Code bridge ----------
 
+def _append_bot_quota_event(
+    failure_type: str,
+    stdout: Optional[str],
+    stderr: Optional[str],
+) -> None:
+    """Best-effort append to anthropic-quota-events.jsonl for a bot-wrapper
+    Claude failure. Mirrors the helper in beacon_telegram_bot.py; lives here
+    so forge/mirror's generic bot path also writes the ledger. Failures are
+    swallowed — the ledger is observation-only and must never block reply."""
+    combined = (stdout or '') + '\n' + (stderr or '')
+    try:
+        retry_after = agent_runner._derive_retry_after_sec(combined)
+    except Exception:
+        retry_after = None
+    try:
+        # active_tier is the source of truth for which account just failed.
+        # Fall back to 'tier1' (the historical default) if the read errors.
+        tier_now = agent_runner.active_tier.read().get('tier') or 'tier1'
+    except Exception:
+        tier_now = 'tier1'
+    try:
+        agent_runner.append_rate_limit_event(
+            agent=f'{AGENT}-telegram-bot',
+            task_id='',
+            model='',
+            account=tier_now,
+            stderr=combined,
+            retry_after_sec=retry_after,
+            failure_class=failure_type,
+        )
+    except Exception:
+        pass
+
+
 def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[str]]:
     cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
     if session_id:
@@ -160,6 +199,17 @@ def call_agent(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[st
 
     if result.returncode != 0:
         log(f"claude exit {result.returncode}: {result.stderr[:500]}")
+        # Step C: classify and ledger rate_limit / auth_401 failures before
+        # any --resume retry or chat reply path. Resume-class is the dominant
+        # auth_401 carrier through this bot wrapper (session_id present + 401
+        # because the underlying account's OAuth expired). Pre-Step-C the
+        # operator got a DM via the chat reply, but the ledger Check VIII
+        # reads stayed empty.
+        failure_type = agent_runner.classify_tier1_failure(
+            result.stdout, result.stderr,
+        )
+        if failure_type:
+            _append_bot_quota_event(failure_type, result.stdout, result.stderr)
         if session_id and "session" in result.stderr.lower():
             log("retrying without --resume after session error")
             return call_agent(prompt, None)

@@ -24,7 +24,7 @@ import agent_runner  # noqa: E402
 
 _EXPECTED_KEYS = {
     'ts', 'agent', 'task_id', 'model', 'account',
-    'retry_after_sec', 'raw_excerpt',
+    'retry_after_sec', 'failure_class', 'raw_excerpt',
 }
 
 
@@ -173,6 +173,54 @@ class AppendRateLimitEventTest(unittest.TestCase):
         from datetime import datetime
         parsed = datetime.fromisoformat(rec['ts'].replace('Z', '+00:00'))
         self.assertIsNotNone(parsed.tzinfo)
+
+    def test_failure_class_defaults_to_rate_limit(self):
+        agent_runner.append_rate_limit_event(
+            agent='forge',
+            task_id='t-default-class',
+            model='claude-opus-4-7',
+            account='tier1',
+            stderr='hit your limit',
+            ts='2026-05-28T12:00:00+00:00',
+            ledger_path=self.ledger,
+        )
+        rec = _read_ledger(self.ledger)[0]
+        self.assertEqual(rec['failure_class'], 'rate_limit')
+
+    def test_failure_class_records_auth_401(self):
+        agent_runner.append_rate_limit_event(
+            agent='forge',
+            task_id='t-auth-401',
+            model='claude-opus-4-7',
+            account='tier1',
+            stderr='Invalid authentication credentials',
+            failure_class='auth_401',
+            ts='2026-05-29T12:00:00+00:00',
+            ledger_path=self.ledger,
+        )
+        rec = _read_ledger(self.ledger)[0]
+        self.assertEqual(rec['failure_class'], 'auth_401')
+
+    def test_derive_retry_after_sec_from_cli_output(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        # active_tier.parse_reset_time understands "resets at HH:MM<tz>"
+        secs = agent_runner._derive_retry_after_sec(
+            '5-hour limit reached, resets 14:00 UTC',
+            now=now,
+        )
+        self.assertIsNotNone(secs)
+        self.assertEqual(secs, 2 * 3600)
+
+    def test_derive_retry_after_sec_returns_none_for_auth_401(self):
+        # No "resets <time>" phrase => unparseable => None (not a crash).
+        self.assertIsNone(
+            agent_runner._derive_retry_after_sec(
+                'Invalid authentication credentials'
+            )
+        )
+        self.assertIsNone(agent_runner._derive_retry_after_sec(None))
+        self.assertIsNone(agent_runner._derive_retry_after_sec(''))
 
     def test_io_failure_returns_none_does_not_raise(self):
         # Path that can't be created (parent is a file, not a dir).
