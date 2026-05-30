@@ -4,6 +4,32 @@
 
 ---
 
+## Inter-agent notify — 2026-05-29 ~(current) (result-notification, not a cycle iter)
+
+**Type:** Inbound result notification from Beacon (not a /cycle invocation).
+
+**Received:** `[intent=result-notification | from=beacon | task=real-1 | status=SUCCESS]`
+**Content:** "task complete — observations recorded."
+
+**Assessment:** `real-1` is not a fixture (not in `FIXTURE_PATTERN_EXACT`; no `real-1` matches any prefix or exact pattern). Beacon completed a task and reported SUCCESS with no substantive output and no call to action. Task purpose unknown from the notification alone — `real-1` naming suggests a real-world observation task (consistent with `real-*` family used for live-system checks), distinct from the `real-clr`/`real-fail` stall pattern tracked in iter 108. Prior `real-fail` notification (also 2026-05-30 ~03:48Z) failed; `real-1` succeeded. No new watch item — single SUCCESS with no findings surfaced.
+
+**Action:** None. Informational record only.
+
+---
+
+## Inter-agent notify — 2026-05-30 ~03:48Z (result-notification, not a cycle iter)
+
+**Type:** Inbound result notification from Beacon (not a /cycle invocation).
+
+**Received:** `[intent=result-notification | from=beacon | task=real-fail | status=FAILED]`
+**Error:** `claude timed out after 3 attempts`
+
+**Assessment:** `real-fail` is not a fixture (not in `FIXTURE_PATTERN_EXACT`; no `real-` prefix pattern exists by design). Single Beacon task failure — Claude API timeout after exhausting retries. Not actionable by Pulse; no dispatch requested by sender. Noting for pattern tracking: first observed occurrence of `real-fail` task_id. If this recurs across cycles, escalate as potential Beacon retry-loop or Claude API reliability issue.
+
+**Action:** None. Informational record only.
+
+---
+
 ## Iteration 108 — 2026-05-29 ~21:48 MDT / 2026-05-30 ~03:48 UTC (interactive)
 
 **Health:** ⚠️ Drift (sync guard false positive persisting — 11th consecutive blocked auto-commit; real-clr stall re-opened; otherwise stable)
