@@ -137,18 +137,44 @@ def _rate_limit_ledger_path():
     return base / RATE_LIMIT_LEDGER_REL
 
 
+def _derive_retry_after_sec(raw_text, now=None):
+    """Convert a Claude CLI rate-limit message ("resets <time>") into the
+    number of seconds until reset, or None when the message is unparseable
+    (e.g. auth-401, or a rate-limit phrasing without a parseable reset time).
+
+    Reuses active_tier.parse_reset_time so the same parser covers both the
+    ledger and the per-tier cooldown bookkeeping.
+    """
+    if not raw_text:
+        return None
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    parsed = active_tier.parse_reset_time(raw_text, now=now)
+    if parsed is None:
+        return None
+    return max(0, int((parsed - now).total_seconds()))
+
+
 def append_rate_limit_event(agent, task_id, model, account, stderr,
-                            retry_after_sec=None, ts=None, ledger_path=None):
-    """Append one rate-limit event to the JSONL ledger. Idempotent on the
-    (ts, agent, task_id) tuple — re-appending the same event is a no-op.
+                            retry_after_sec=None, ts=None, ledger_path=None,
+                            failure_class='rate_limit'):
+    """Append one rate-limit / auth-401 event to the JSONL ledger. Idempotent
+    on the (ts, agent, task_id) tuple — re-appending the same event is a
+    no-op.
 
     Best-effort: any I/O error is swallowed so a failed ledger write never
     breaks the agent run. Returns the path on success, None when skipped
     (duplicate) or on error.
 
-    Schema (Check VIII brief, verbatim):
+    Schema (Check VIII brief + Step C extension):
       {"ts", "agent", "task_id", "model", "account",
-       "retry_after_sec", "raw_excerpt"}
+       "retry_after_sec", "failure_class", "raw_excerpt"}
+
+    `failure_class` defaults to 'rate_limit' for backward compatibility with
+    callers from the original PR-2a; Step C callers pass 'auth_401' for the
+    auth-expiry class (zero events landed on 2026-05-29 despite 6+ stalls,
+    because only rate_limit was appended).
     """
     path = Path(ledger_path) if ledger_path else _rate_limit_ledger_path()
     event_ts = ts or datetime.now(timezone.utc).isoformat()
@@ -160,6 +186,7 @@ def append_rate_limit_event(agent, task_id, model, account, stderr,
         'model': model or '',
         'account': account or '',
         'retry_after_sec': retry_after_sec,
+        'failure_class': failure_class or 'rate_limit',
         'raw_excerpt': excerpt,
     }
     try:
@@ -908,20 +935,42 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             ' stdout=' + repr((result.stdout or '')[:300]) +
                             ' stderr=' + repr((result.stderr or '')[:300]),
                             'WARN')
-                        # Check VIII PR-2a: record rate-limit events to the
-                        # observation ledger before retry/Tier-2 takes over.
-                        # Pure observation; never blocks the recovery path.
+                        # Check VIII PR-2a + Step C: record rate-limit AND
+                        # auth-401 events to the observation ledger before
+                        # retry/Tier-2 takes over. Pure observation; never
+                        # blocks the recovery path. The original PR-2a logged
+                        # only rate_limit, which left zero events for the
+                        # 2026-05-29 stall storm (root cause was auth-401).
+                        combined_output = (
+                            (result.stdout or '') + '\n' +
+                            (result.stderr or '')
+                        )
+                        # `parse_reset_time` only fires on the rate-limit
+                        # phrasing; auth-401 returns None and the ledger
+                        # record stores null — both are correct.
+                        try:
+                            retry_after = _derive_retry_after_sec(
+                                combined_output,
+                            )
+                        except Exception:
+                            retry_after = None
+                        try:
+                            tier_now = active_tier.read().get('tier') or 'tier1'
+                        except Exception:
+                            tier_now = 'tier1'
+                        try:
+                            append_rate_limit_event(
+                                agent=agent_id,
+                                task_id=task_stem or '',
+                                model=model,
+                                account=tier_now,
+                                stderr=combined_output,
+                                retry_after_sec=retry_after,
+                                failure_class=failure_type,
+                            )
+                        except Exception:
+                            pass
                         if failure_type == 'rate_limit':
-                            try:
-                                append_rate_limit_event(
-                                    agent=agent_id,
-                                    task_id=task_stem or '',
-                                    model=model,
-                                    account='tier1',
-                                    stderr=result.stderr,
-                                )
-                            except Exception:
-                                pass
                             # Spec § 6.3 retry-storm fix: cool down the
                             # tier that just rate-limited. The watcher's
                             # drain gate sees the cooldown and blocks new
@@ -1016,6 +1065,41 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     _dm_tier2_unavailable(
                                         failure_type, task_stem, agent_id, None,
                                     )
+                                    # Step C: record the Tier 2 failure as a
+                                    # distinct ledger event so Check VIII's
+                                    # both-tiers-walled-at-once class is
+                                    # visible. Re-classify against the t2
+                                    # output (it may be rate_limit even if
+                                    # the Tier 1 cause was auth_401).
+                                    t2_failure = classify_tier1_failure(
+                                        t2.stdout, t2.stderr,
+                                    ) or failure_type
+                                    t2_combined = (
+                                        (t2.stdout or '') + '\n' +
+                                        (t2.stderr or '')
+                                    )
+                                    try:
+                                        t2_retry_after = _derive_retry_after_sec(
+                                            t2_combined,
+                                        )
+                                    except Exception:
+                                        t2_retry_after = None
+                                    try:
+                                        other_tier_name = (
+                                            'tier2'
+                                            if tier_now == 'tier1' else 'tier1'
+                                        )
+                                        append_rate_limit_event(
+                                            agent=agent_id,
+                                            task_id=task_stem or '',
+                                            model=model,
+                                            account=other_tier_name,
+                                            stderr=t2_combined,
+                                            retry_after_sec=t2_retry_after,
+                                            failure_class=t2_failure,
+                                        )
+                                    except Exception:
+                                        pass
                                     # Spec § 6.3: when the fallback tier ALSO
                                     # rate-limited (both tiers walled at once),
                                     # cool down the other tier too so the
@@ -1095,6 +1179,20 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             }
                             out_meta['model'] = model
                             out_meta['account_id'] = account_id
+                            # Step C: surface the active-tier identity on the
+                            # outbox so costs.jsonl can carry a per-account
+                            # field. Distinct from `account_id` (the OAuth pool
+                            # identity, today always 'oauth' on the stub): this
+                            # is tier1/tier2 from blackboard/active-tier.json.
+                            # Future rolling-5h math is account-scoped on this
+                            # field. Absent => caller treats as 'tier1' for
+                            # historical-record backward compatibility.
+                            try:
+                                out_meta['account_tier'] = (
+                                    active_tier.read().get('tier') or 'tier1'
+                                )
+                            except Exception:
+                                out_meta['account_tier'] = 'tier1'
                             out_meta['attempts'] = attempt + 1
                             out_meta['started_at'] = _meta_started_at
                             out_meta['completed_at'] = datetime.now(timezone.utc).isoformat()
