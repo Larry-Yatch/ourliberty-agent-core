@@ -53,6 +53,7 @@ from typing import Optional
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
+import agent_runner  # noqa: E402  # shared rate-limit ledger writer (Step C)
 import beacon_approval_handler as approval  # noqa: E402
 import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
 import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push writer
@@ -237,6 +238,37 @@ def _tier2_refuse_on_resume_dm(failure_type: str) -> None:
         pass
 
 
+def _append_bot_quota_event(
+    failure_type: str,
+    stdout: Optional[str],
+    stderr: Optional[str],
+    account: str,
+) -> None:
+    """Best-effort append to the shared anthropic-quota-events.jsonl ledger
+    for a bot-wrapper Claude failure. Step C — pre-fix the bot path DMed
+    Larry but never wrote the ledger, which left zero rate_limit/auth_401
+    events for 2026-05-29's 6+ stalls. Failures are swallowed: the ledger
+    is observation-only and must never block the chat reply.
+    """
+    combined = (stdout or '') + '\n' + (stderr or '')
+    try:
+        retry_after = agent_runner._derive_retry_after_sec(combined)
+    except Exception:
+        retry_after = None
+    try:
+        agent_runner.append_rate_limit_event(
+            agent='beacon-telegram-bot',
+            task_id='',
+            model='',
+            account=account,
+            stderr=combined,
+            retry_after_sec=retry_after,
+            failure_class=failure_type,
+        )
+    except Exception:
+        pass
+
+
 # ---------- logging ----------
 
 def log(msg: str) -> None:
@@ -379,6 +411,16 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
         # Tier 2 detection: classify from the combined output.
         failure_type = classify_tier1_failure(result.stdout, result.stderr)
         if failure_type:
+            # Step C: record the Tier 1 failure (rate_limit OR auth_401) to
+            # the shared anthropic-quota-events ledger before any retry/DM
+            # path runs. Pre-Step-C this bot only DMed and the dominant
+            # auth_401 class never reached the ledger Check VIII relies on.
+            _append_bot_quota_event(
+                failure_type=failure_type,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                account='tier1',
+            )
             # Refuse-on-resume (mirrors agent_runner.py:822-828). A Tier 2
             # retry on a --resume session would fail with 'session not found'
             # AND orphan the original session's context — session IDs are
@@ -425,6 +467,18 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                 f"exit={t2.returncode if t2 else 'none'} "
                 f"stdout={(t2_stdout or '')[:300]!r} "
                 f"stderr={(t2_stderr or '')[:300]!r}"
+            )
+            # Step C: also capture the Tier 2 failure as a ledger event so
+            # the both-tiers-walled-at-once class is visible to Check VIII.
+            t2_failure = (
+                classify_tier1_failure(t2_stdout or '', t2_stderr or '')
+                or failure_type
+            )
+            _append_bot_quota_event(
+                failure_type=t2_failure,
+                stdout=t2_stdout,
+                stderr=t2_stderr,
+                account='tier2',
             )
             _tier2_failure_dm(failure_type, t2_stdout, t2_stderr)
             # Echo Tier 2's stdout (not Tier 1's) in the chat reply so the

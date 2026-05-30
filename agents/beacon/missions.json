@@ -10,7 +10,9 @@
         "agents/beacon/specs/e4-4f-missions-tab-v1.md"
       ],
       "task_ids": [
-        "e4-4f-missions-tab-v1"
+        "e4-4f-missions-tab-v1",
+        "e4-4f-missions-tab-v1-pr-a",
+        "e4-4f-missions-tab-v1-pr-b"
       ],
       "repo": "ourliberty-dashboard",
       "created": "2026-05-28",
@@ -115,9 +117,69 @@
       "spec_docs": [
         "agents/beacon/specs/clarify-round-visibility.md"
       ],
-      "task_ids": [],
+      "task_ids": [
+        "clarify-shipper-extend",
+        "clarify-dashboard-render",
+        "clarify-round-visibility-spec-register",
+        "dag-preflight-clarify-round-visibility"
+      ],
       "repo": "ourliberty-agent-core",
       "created": "2026-05-29",
+      "deferred_reason": null
+    },
+    {
+      "id": "pulse-cycle-upgrade",
+      "name": "Pulse Cycle Upgrade (alpha / beta / gamma sequence)",
+      "phase": "in_flight",
+      "brief": "Four-PR sequence implementing the self-optimizing operational config via Pulse Check pattern (design pass 2026-05-26). alpha-1 + alpha-2 + beta + gamma. Critical-path destination for the chain.",
+      "spec_docs": [
+        "agents/beacon/specs/pulse-cycle-upgrade.md",
+        "docs/pulse-cycle-upgrade-design-pass-2026-05-26.md"
+      ],
+      "task_ids": [
+        "alpha-1",
+        "alpha-2",
+        "beta",
+        "gamma",
+        "seq-pulse-upgrade-001-step-alpha-1",
+        "seq-pulse-upgrade-001-step-alpha-2",
+        "seq-pulse-upgrade-001-step-beta",
+        "seq-pulse-upgrade-001-step-gamma",
+        "dag-preflight-pulse-upgrade-001",
+        "sequence-complete-pulse-upgrade-001",
+        "fix-apply-skip-finalization"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-26",
+      "deferred_reason": null
+    },
+    {
+      "id": "rate-limit-resilience",
+      "name": "Rate-limit resilience sequence (001)",
+      "phase": "in_flight",
+      "brief": "Sequence hardening the chain against Anthropic rate-limit windows (the 5h burn-rate gate plus Tier 1/Tier 2 OAuth fallback boundaries).",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-rate-limit-resilience-001-step-alpha",
+        "seq-rate-limit-resilience-001-step-beta",
+        "seq-rate-limit-resilience-001-step-gamma"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-29",
+      "deferred_reason": null
+    },
+    {
+      "id": "pm-dashboard-project-due-date",
+      "name": "PM dashboard project due_date column",
+      "phase": "shipped",
+      "brief": "Add projects.due_date column to Supabase + expose on dashboard API (agent-core PR #23 shipped 2026-05-30).",
+      "spec_docs": [],
+      "task_ids": [
+        "pm-dashboard-project-due-date",
+        "pm-dashboard-project-due-date-v2"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-05-30",
       "deferred_reason": null
     }
   ]

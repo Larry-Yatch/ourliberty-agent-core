@@ -140,13 +140,22 @@ fi
 COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
 if command -v jq >/dev/null 2>&1 && [ -s "$CYCLE_OUT" ]; then
-    if COST_LINE=$(jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S%z)" --argjson ok "$CYCLE_OK" '
+    # Step C: per-account field. Read active tier from blackboard/active-tier.json
+    # so a future rotation flip is reflected here too. Fall back to tier1 (the
+    # historical default) when the file is missing or malformed.
+    ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
+    ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
+    if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
+        ACCOUNT_TIER="tier1"
+    fi
+    if COST_LINE=$(jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S%z)" --argjson ok "$CYCLE_OK" --arg acct "$ACCOUNT_TIER" '
         {
             ts: $ts,
             agent: "pulse",
             task_id: ("cycle-" + ($ts | gsub("[^0-9]"; ""))),
             task_type: "cycle",
             model: (.modelUsage // {} | keys | first // "claude-sonnet-4-6"),
+            account: $acct,
             cost_usd: (.total_cost_usd // .cost_usd // null),
             input_tokens: (.usage.input_tokens // null),
             output_tokens: (.usage.output_tokens // null),
