@@ -4,6 +4,92 @@
 
 ---
 
+## Iteration 120 — 2026-05-30 ~23:18 UTC (interactive)
+
+**Health:** ⚠️ Drift — inbox-watcher running stale dispatch_validator.py; 34 `larry-reject-*.json` files blocked in beacon/.invalid/. Sync push failure 6th occurrence (known root cause). All 6 services active. Forge pipeline advancing normally.
+
+**Triage:** 2 new alerts since iter 119 watermark (23:09:26Z): both deploy-notifier READY (PR #26 main + PR #26 branch) → Tier 3 known-pattern → silence. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new Tier-3 alerts. ✅**
+  - 23:09:26.889Z deploy-notifier READY: main branch push (PR #26 merged)
+  - 23:09:26.890Z deploy-notifier READY: PR #26 "fix(missions): filter sentinel + inbox-stall: from orphans lane (v1.2)"
+  - Both Tier 3 → silence. No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ⚠️ SIGNAL — dashboard source validator rejections (8 in ~15 sec at 23:12:45-23:13:00Z). tier-reset.**
+  - 8 `larry-reject-*.json` files rejected from beacon inbox: `source "dashboard" not in allowed list — would be DISPATCH_BLOCKED`
+  - 34 total `larry-reject-*.json` files now in beacon/.invalid/
+  - dispatch_validator.py on disk DOES have 'dashboard' in ALLOWED_SOURCES (confirmed)
+  - **Root cause:** inbox-watcher (PID 2508373) restarted at 22:36:44Z and imported dispatch_validator.py at that moment. sync_agent_core.sh updated dispatch_validator.py to disk at 22:39:20Z — 2m36s AFTER the restart. inbox-watcher is running the old in-memory module (pre-PR #207 code) and will continue doing so until restarted.
+  - **Impact:** Larry's kanban rejects/approves via dashboard are silently failing.
+  - **Proposed fix (ask-then-do):** After auth-setup-token-wiring completes, `systemctl restart ourliberty-inbox-watcher.service`. Then re-deposit recent .invalid/ reject files to beacon inbox.
+  - watchdog WARN (22:44Z, 22:49Z): stale watcher log 447s/747s — calibrated as normal during long forge Claude session. Not escalated.
+  - forge marker error retry 1/3 for step-c-ledger (22:59Z): self-resolved (PR #208 opened). ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** No new Larry directives. beacon TIER2_FALLBACK_USED at 23:04Z, 23:10Z, 23:12Z (consistent with known rate_limit + Tier 2 working pattern). ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅**
+  - auth-setup-token-wiring.json: in-flight (PID via inbox-watcher, started ~23:01Z, ~17 min at check time). Normal range.
+  - step-a-rotation.json (source=beacon, 23:09:46Z): queued in forge inbox, ~8 min old. Rate-limit-resilience-A: pre-engage auth gate in rotate_active_tier.tick(). Normal — waiting for auth-setup to complete.
+  - No heal-pipeline-stall alerts in alert-cooldown/ (known: using cooldown dir). ✅
+
+- **(Check 4) Pending Larry directives: unchanged at 3. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94, ~2d)
+  - stuck-cycle timeout guard (iter 43, ~19d)
+  - Monday [yellow] DM still scheduled 2026-06-01. ✅
+  - **Note:** 4 dropped dashboard actions from 2026-05-27/28 (per MEMORY.md) — still need Telegram re-action or defer. Now compounded by new batch of rejections.
+
+- **(Check 5) Stale daemon: ✅ nominal per healer (known gap for imported modules).**
+  - heal-stale-daemon-code-cooldowns.json fresh. inbox-watcher active since 22:36:44Z.
+  - heal-stale-daemon-code does NOT track imported Python module mtimes — only the main script. dispatch_validator.py changed 2m36s after restart, within the 5-min grace window for the inbox_watcher.py script itself. The stale-module-import case is a blind spot in the healer.
+  - The Check 1 finding is the surface expression of this gap.
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus at session start: branch=main, clean, HEAD=0532710 "Pulse cycle 20260530T231141Z". ✅
+
+- **(Check B) Sync health: ⚠️ 6th occurrence (known root cause, APPROVAL_REQUEST pending).**
+  - sync.json: status=error at 23:10:42Z, commit=1b2edf80, "Auto-commit push failed; rolled back"
+  - 6th occurrence (iters 102, 114, 117, 118, 119, 120). APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday DM queue. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: forge 2 tasks (1 in-flight, 1 queued). ✅**
+  - forge/auth-setup-token-wiring.json: in-flight (~23:01Z). Normal.
+  - forge/step-a-rotation.json: queued (~23:09Z). Normal — waiting for auth-setup to complete.
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: 0 open. ✅** agent-core: 0. dashboard: 0. PR #26 merged 23:07:47Z. ✅
+
+- **(Check H) Forge digest:** 0 open. Recent merges: PR #208 "feat(rate-limit-resilience-step-c)" merged (session start, ebe7368). Dashboard PRs #24, #25, #26 all merged tonight. Healthy shipping cadence.
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — Monday-only. Next: 2026-06-01. ✅
+- **Check III:** Sunday-anchored. Next gate: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, H).
+2. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:18:12Z.
+3. Called `cycle_prime_ledger.py append --tier 1 --kind intervention --payload ...` → appended `inbox-watcher-stale-dispatch-validator-iter-120` row.
+4. Sent [yellow] DM via `larry_alerts.append_alert` (subject: inbox-watcher:stale-dispatch-validator).
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:**
+- [yellow] Iter 120 — inbox-watcher running stale dispatch_validator.py. 34 `larry-reject-*.json` in beacon/.invalid/. Proposed: restart inbox-watcher after auth-setup-token-wiring completes + re-deposit recent .invalid/ files.
+
+**Patterns:**
+- **Stale imported-module gap (1st occurrence):** heal-stale-daemon-code tracks main-script mtime, not imported module mtimes. A module changed 2m36s after restart and fell within the 5-min grace period. The healer was blind; Check 1 caught it. Not yet G-rule threshold. Watch.
+- **Sync push failure 6th occurrence.** Same known root cause. APPROVAL_REQUEST pending. Monday DM.
+- **Forge pipeline: advancing.** auth-setup-token-wiring in-flight + step-a-rotation queued. Normal.
+- **Dashboard PR cadence:** #24, #25, #26 all merged tonight. Larry actively shipping missions UI.
+
+**Learned:**
+1. heal-stale-daemon-code has a blind spot: it compares the daemon's own script mtime vs service-start. Imported Python modules are not checked. If an imported module changes after a restart (within the 5-min grace), the healer won't flag it. The practical fix: inbox_watcher.py should `importlib.reload(dispatch_validator)` before each call, or heal-stale-daemon-code should also scan `import`-adjacent files.
+2. dispatch_validator.py was modified at 22:39:20Z (2m36s after inbox-watcher restart at 22:36:44Z). The window is narrow enough to be easy to miss.
+3. `larry_alerts.append_alert` signature: `(source, severity, message, subject=None, suggested_action=None)` — NOT `intent`.
+
+---
+
 ## Iteration 119 — 2026-05-30 ~23:09 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch. All 6 services active. Sync push failure 5th occurrence (known root cause, APPROVAL_REQUEST pending). Forge step-c-ledger completed → PR #208 → Mirror reviewing. New forge task: auth-setup-token-wiring (source=beacon). Beacon-bot Tier 2 fallback USED at 23:04Z (positive signal). Larry merged dashboard PRs #24 and #25 this cycle.
