@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 109 — 2026-05-30 ~09:57 MDT / 2026-05-30 ~15:57 UTC (interactive)
+
+**Health:** ⚠️ Drift (cycle.timer disabled; real-clr/real-loop stall alerts ongoing but fixture fix expected to suppress; inbox-watcher recovered from ~1h outage; sync guard FP CLOSED)
+
+**Found:**
+
+- **(Check 0) Alert triage (new since iter 108 watermark ~03:48Z):**
+  - **inbox-watcher DOWN ×6** (09:52Z–10:44Z): watchdog criticals; heal-stale-daemon-code restart FAILED at 10:31Z (rc=5 "Unit ourliberty-inbox-watcher.service not found"). inbox-watcher recovered at 10:48Z via alternate path (PID 2455324). 1st occurrence of "Unit not found" failure. Tier 4 (novel; escalated).
+  - **heal-stale-daemon-code** at 10:31Z: beacon-bot auto-restarted ✅; outbox-notifier auto-restarted ✅; inbox-watcher FAILED (Unit not found). Tier 3 (successes = known-pattern informational).
+  - **pipeline-stall:forge-no-pr:real-clr** (10:05Z–15:33Z, 10+ alerts): Tier 3 transition pending. PR #204 added `real-` to fixture prefix list; 88b0d1a added fixture-skip to heal-pipeline-stall.py. Next healer run (~16:30Z) should suppress. Monitoring.
+  - **pipeline-stall:forge-no-pr:real-loop** (through 15:13Z): real-loop is in exact-match fixture list; 88b0d1a should suppress on next run. Tier 3.
+  - alert-triage.json MISSING; manual triage performed.
+
+- **(A) Source repo:** Branch=main, tree=clean ✅. HEAD=b80660c. Sync.json last ran at dabcee6 (15:04Z); local HEAD is 2 commits newer (b80660c, 88b0d1a). Git commands blocked in interactive session; ahead/behind origin unverifiable. Tree clean so no always-fix applies. ⚠️ (watch — confirm push state)
+
+- **(B) Sync health:** Last sync 2026-05-30T15:04:20Z (53 min ago, < 2h ✅). Status=no-change. Nominal. ✅
+
+- **(C) Agent liveness: 5/6 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher: all active ✅. **cycle.timer: INACTIVE/DISABLED** — commit b80660c "re-enable after fixture incident; 5min → 4h" is in local HEAD but `systemctl enable --now ourliberty-cycle.timer` not executed. Without the timer, automated health monitoring is halted. ⚠️
+
+- **(D) Inboxes: 0/0/0/0.** All clean. gate-namespace-reserved-prefix was FORFEITED on inbox-watcher restart at 10:48Z (alive_at_reap=False — no Forge session alive during reap). ✅
+
+- **(E) PRs: 0 open.** Both repos clean. 5 PRs merged since iter 108: #205 (test artifact), #204 (real-* fixture prefix), #203 (pr_url validation), #202 (notify probe), #201 (fixture gate at outbox-read). ✅
+
+- **(Check 1) Log noise:** 0 WARNs/ERRORs in last 1h (journalctl). ✅
+
+- **(Check 2) Telegram sweep:** No orphaned Larry directives in last 4h. Alert deliveries nominal (idx=977–1005 delivered). ✅
+
+- **(Check 3) Pipeline stall:** heal-pipeline-stall-state.json: `forge_built_no_pr:real-clr` snooze expiry=15:29Z (will alert again unless suppressed by 88b0d1a fix). real-loop last alert 15:13Z. Both should be suppressed by combined PR #204 + 88b0d1a on next healer invocation. gate-namespace-reserved-prefix forfeited — alert suppression via fixture fix is the resolution path; rename cleanup can follow. ⚠️ (watch → expected self-resolving)
+
+- **(Check 4) Pending Larry directives:** No orphaned directives. ✅
+
+- **(Check 5) Stale daemon:** heal-stale-daemon-code-cooldowns.json present ✅. Healer last batch at 10:31Z (10:31Z = timestamp confirmed); 5.5h ago. Healer runs every 30min as a one-shot script — cooldowns file only updates on restart events, not heartbeats. No new stale-daemon alerts since 10:31Z. ✅
+
+- **Check I/VIII/IX:** Saturday — Monday-only. Next firing 2026-06-01. ✅
+
+- **Credential rotations:** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d). ✅
+
+- **(RESOLVED SINCE ITER 108):**
+  - **Sync guard false positive CLOSED** by afe9d07 "fix(sync): remove fixture-token guard from Pulse-runtime auto-commit paths". APPROVAL_REQUEST `fix-fixture-guard-scope-memory-md-001` → RESOLVED. Dirty tree iters 99–108 pattern ended. ✅
+  - 5 PRs merged (#201–#205): fixture storm cleanup complete. Outbox-notifier fixture gate, real-* prefix, PR URL validation all landed.
+
+- **(Pending, carry forward):**
+  - **[yellow] cycle.timer disabled** — `systemctl enable --now ourliberty-cycle.timer` needed
+  - real-clr/real-loop stall alerts: monitoring → expected suppression next healer run
+  - gate-namespace-reserved-prefix forfeited: monitoring (alert suppression is priority; rename follows)
+  - APPROVAL_REQUESTs (4 remaining, was 5): validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~15d). Flag [yellow] at iter 110+ if no movement.
+  - Tier 2 rate_limit: no recurrence since 22:47Z May 29 (>17h); watch continues
+
+**Did:**
+1. Ran all mandatory checks (0–5) and additive checks A–E.
+2. Escalated [yellow] cycle.timer disabled to pulse-escalations.json.
+
+**Escalated:** [yellow] cycle.timer INACTIVE/DISABLED. Commit b80660c "re-enable after fixture incident; 5min → 4h" is in local HEAD but systemd has not been reloaded/enabled. Without the timer, no automated health monitoring runs. Larry needs to: `sudo systemctl enable --now ourliberty-cycle.timer` (or equivalent for the deploy user). Manual cycles only until then.
+
+**Forge:** 0 new PRs open. 5 merged since iter 108 (#201–#205). gate-namespace-reserved-prefix forfeited during inbox-watcher outage; not re-dispatched (alert suppression via fixture fix is the active path).
+
+**Patterns:**
+- Sync guard FP CLOSED: 11 consecutive blocked iters (99–108) → afe9d07 landed. Pattern promoted to permanent fix confirmed.
+- real-clr/real-loop alert flood: 10+ alerts today → fixture prefix fix + healer fix both in HEAD; expect suppression at ~16:30Z on next healer run.
+- APPROVAL_REQUEST queue: 4 remaining. Oldest: stuck-cycle timeout guard (iter 43, ~15 days). Flag [yellow] at iter 110+ if no movement.
+- inbox-watcher "Unit not found" (1 occurrence at 10:31Z). Monitor; if recurs, dispatch to Beacon.
+
+**Learned:**
+1. fix-fixture-guard-scope-memory-md-001 (APPROVAL_REQUEST) → CLOSED. afe9d07 is the implementation. Dirty tree pattern ended.
+2. inbox-watcher "Unit not found" at 10:31Z is a NEW failure mode for heal-stale-daemon-code: service unit file was absent (likely during a deploy transition), healer's systemctl restart fails silently with rc=5. Service recovered via different path at 10:48Z. The two failure modes (systemctl non-0 exit vs unit-not-found) should eventually be surfaced differently by the healer.
+3. gate-namespace-reserved-prefix forfeit pattern: inbox-watcher crash during in-flight Forge task → forfeit on restart. The alert suppression fix (PR #204 + 88b0d1a) is the more durable path than re-dispatching the cleanup task. Separating "suppress alerts" from "clean up worktrees" is the right frame.
+
+---
+
 ## Inter-agent notify — 2026-05-29 ~(current) (result-notification, not a cycle iter)
 
 **Type:** Inbound result notification from Beacon (not a /cycle invocation).
