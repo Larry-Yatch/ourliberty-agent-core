@@ -28,6 +28,15 @@ from __future__ import annotations
 
 
 FIXTURE_PATTERN_PREFIXES: tuple[str, ...] = (
+    # 2026-05-30: RESERVED synthetic-fixture namespace. Any test fixture that
+    # flows through dispatch/gating MUST use a `zz-fixture-<scenario>` task_id
+    # so it is unambiguously distinguishable from real work; production NEVER
+    # uses this prefix. `real-*`/`t-*` stay reserved for LEGIT mock task names
+    # (subjects of routing/cost/revision unit tests) that must NOT be gated --
+    # see the collision note further down and runbooks/test-isolation-
+    # discipline.md. This reserved prefix is what lets is_fixture_task_id gate
+    # fixtures at emission without regressing legit-subject tests.
+    "zz-fixture-",
     "t-",
     "sess-abc-",
     "notify-t-",
@@ -200,7 +209,7 @@ def is_fixture_envelope_name(name: object) -> bool:
 # other bash consumer source from the same module. The `^` anchor matches
 # the start of the captured task_id literal; callers wrap as needed.
 SHELL_FIXTURE_REGEX = (
-    "^(t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|"
+    "^(zz-fixture-|t-|sess-abc-|notify-t-|notify-q-|marker-error-t-|"
     "marker-error-opmanual-|task-001$|task-legacy$|headless-001$|"
     "opmanual-d35-5b-shipped-note-001$|pf-ok$|bad-pf$|"
     "no-preamble$|no-chat$)"

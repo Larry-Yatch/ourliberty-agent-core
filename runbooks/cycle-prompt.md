@@ -1444,6 +1444,7 @@ Closes the 2026-05-27 /cycle hallucination class. Test artifacts (fixture envelo
 **Whenever a task_id you're about to dispatch on matches one of these patterns, log it and skip the dispatch:**
 
 Prefix patterns (match `task_id.startswith(prefix)`):
+- `zz-fixture-` (RESERVED synthetic-fixture namespace — every dispatch/gated test fixture uses this prefix; production task_ids never do. `real-*`/`t-*` are reserved for legit mock task names.)
 - `t-`
 - `sess-abc-`
 - `notify-t-`

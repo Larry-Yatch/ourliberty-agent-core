@@ -57,7 +57,7 @@ Closes the 2026-05-27 hallucination class: I dispatched `cycle-fix-<slug>.json` 
 
 **Do NOT dispatch `cycle-fix-*` envelopes for task_ids that match:**
 
-Prefix patterns: `t-`, `sess-abc-`, `notify-t-`, `notify-q-`, `marker-error-t-`, `marker-error-opmanual-`.
+Prefix patterns: `zz-fixture-`, `t-`, `sess-abc-`, `notify-t-`, `notify-q-`, `marker-error-t-`, `marker-error-opmanual-`.
 
 Exact-match patterns: `task-001`, `task-legacy`, `headless-001`, `opmanual-d35-5b-shipped-note-001`, `pf-ok`, `bad-pf`, `no-preamble`, `no-chat`, `dead-letter-bad`, `dead-letter-gc`, `dead-letter-bad-task`, `envelope-id`, `real-mirror-bad-marker`, `real-mirror-retry`, `real-ok`, `real-empty-findings`, `real-loop`, `real-built`, `real-build-ok`.
 
