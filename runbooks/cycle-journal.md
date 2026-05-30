@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 112 — 2026-05-30 ~16:02 MDT / 2026-05-30 ~22:02 UTC (interactive)
+
+**Health:** ✅ Nominal — third consecutive clean iter. 0 new alerts; 6/6 units active; 0 open PRs; 0 inboxes; sync fresh; all checks pass.
+
+**Triage:** 0 alerts. No new entries in larry-alerts.jsonl since iter 111 (~21:52Z watermark). alert-triage.json still MISSING (ongoing, known). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** No new entries in larry-alerts.jsonl since iter 111 watermark (~21:52Z). Last entry 16:20Z May 30 (deploy-notifier, dashboard PR #23 — claimed iters 110/111). alert-triage.json MISSING (ongoing). ✅
+
+- **(Check 1) Log noise: nominal. ✅** 24h WARN/ERROR count: 395 total — dominated by real-clr/real-loop fixture storm + inbox-watcher DOWN incident, both CLOSED by iter 110/111 (PR #204 + 88b0d1a). 1h count: 1 (ourliberty-health at 21:57Z: "notify script missing, alert dropped: 1 issue(s) need attention" — sub-threshold at 1/hr << 5/hr threshold; INFO-masquerade candidate; first watch occurrence). ✅
+
+- **(Check 2) Telegram sweep: nominal. ✅** Last Larry message: "give me the exact command to run and why" at 21:30Z (Beacon responded 21:32Z; tracked iter 110). No new messages since iter 111 (21:52Z). No orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: nominal. ✅** heal-pipeline-stall-state.json: all active entries permanently snoozed (2099-12-31) or resolved. No new stall alerts since 15:29Z real-clr (CLOSED iter 110/111). ✅
+
+- **(Check 4) Pending Larry directives: nominal. ✅** No new directives since iter 111. 4 standing APPROVAL_REQUESTs unchanged (validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard — oldest ~18d). [yellow] DM planned 2026-06-01 Monday cycle. ✅
+
+- **(Check 5) Stale daemon: nominal. ✅** heal-stale-daemon-code-cooldowns.json present. Last restart events at 10:31Z May 30 (beacon-bot + outbox-notifier + inbox-watcher). No new stale-daemon alerts since. Known calibration: file mtime only updates on restart events; idle file ≠ healer down. ✅
+
+- **(A) Source repo: ✅.** gitStatus (session start): branch=main, clean tree, HEAD=d50be5e ("Pulse cycle 20260530T215738Z" = wrapper commit for iter 111 pushed at 21:57Z). On main, clean, no divergence. ✅
+
+- **(B) Sync health: ✅.** Last sync 2026-05-30T21:04:35Z (~58 min ago, < 2h). status=no-change at 14d3b4e. ✅
+
+- **(C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer: all active. Log silence (all bots, no Telegram traffic since ~21:32Z) — calibrated known behavior. ✅
+
+- **(E) PRs: 0 open. ✅** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **(H) Forge digest.** 0 open Forge PRs. Last merged: dashboard PR #23 (feat(pm): projects.due_date column, 16:19Z). System quiescent. ✅
+
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (84d out, outside 60d window). ✅
+
+- **Check I/VIII/IX:** Saturday (weekday=5) — off day. Next firing 2026-06-01 (Monday). Check III 14d gate: no prior artifact exists → will fire if data sufficient; expected no-signal (< 30d chain_events data). ✅
+
+- **(Pending, carry forward):**
+  - APPROVAL_REQUESTs (4 unchanged): validator-allow-dashboard-source-001, pulse-check-i-journal-idempotency-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (iter 43, ~18d). [yellow] DM on 2026-06-01 Monday cycle.
+  - Tier 2 rate_limit: last 22:47Z May 29 (~23h). No recurrence since iter 111. Watch continues.
+  - inbox-watcher "Unit not found" (1st occurrence 10:31Z May 30): no recurrence in 11.5h. Watch continues.
+  - Verification_pending: sync-guard-false-positive (iter 103), verifies_at=2026-06-06. Open.
+  - ourliberty-health "notify script missing" (1st seen 21:57Z): sub-threshold (1 occurrence), watch over next cycles.
+
+**Did:** Nothing. All checks nominal.
+
+**Escalated:** Nothing new.
+
+**Forge:** 0 open PRs. Last merged: dashboard PR #23 at 16:19Z. System quiescent.
+
+**Patterns:**
+- Tier state: consecutive_clean advances 1→2. One more clean iter de-escalates to Tier 2.
+- APPROVAL_REQUEST queue: 4 items, oldest ~18d (stuck-cycle guard). [yellow] DM on 2026-06-01.
+- ourliberty-health "notify script missing" WARN: 1st occurrence this watch cycle. Sub-threshold (1/hr). Monitor; if >5/hr dispatch INFO-masquerade demotion to Beacon.
+
+**Learned:**
+1. 24h WARN count (395) is retrospective — all from the now-resolved fixture storm. Current hourly rate: 1 (sub-threshold). Not a systemic target today.
+2. Tier 2 rate_limit silent for ~23h; improving trend continues.
+
+---
+
 ## Iteration 111 — 2026-05-30 ~15:52 MDT / 2026-05-30 ~21:52 UTC (interactive)
 
 **Health:** ✅ Nominal — second consecutive clean iter. No new alerts in 5.5h; 6/6 units active; 0 open PRs; 0 inboxes; sync fresh.
