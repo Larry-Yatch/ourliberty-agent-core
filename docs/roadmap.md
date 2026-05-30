@@ -6,15 +6,6 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 
 ---
 
-## Desired-state reconciler — bot liveness auto-recovery
-
-- **Status:** in flight (approved 2026-05-28; Forge dispatched)
-- **Next:** Forge build per brief → Mirror review → merge
-- **Owner:** Claude (spec) → Forge (build) → Mirror (review)
-- **Reference:** `docs/desired-state-reconciler-brief.md`
-- **Why:** pulse-bot sat cleanly down ~1d 8h (2026-05-27/28) with no actor recovering it. Watchdog detected but did not actuate; pulse's tmux deployment was a recovery artifact with no supervisor. Closes the actuation gap (Option B: return pulse to systemd, recover all four uniformly from the privileged watchdog) and models intended-down via a `desired_state` field, retiring the mask-unit / kill-healer hack.
-- **Notes:** retires the bespoke beacon-bot watchdog carve-out; bundles the pulse tmux→systemd cutover into the same PR. `desired_state` is the substrate for a future paused-on-rate-limit healer. Channel-heartbeat is the separate follow-up below.
-
 ## Channel-heartbeat Pulse Check — end-to-end Telegram liveness
 
 - **Status:** proposed — folded into the Pulse cycle upgrade (2026-05-29)
@@ -22,6 +13,13 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 - **Owner:** Claude (spec) → Forge (build), as part of the Pulse cycle upgrade workstream
 - **Depends on:** desired-state reconciler — MERGED (PR #178, 2026-05-28); this is the observation half, the reconciler is the actuation half
 - **Why:** existence checks (`systemctl is-active`) cannot catch a bot whose process is alive but whose Telegram channel is wedged (2026-05-20 HTTP 502 storm; 2026-05-28 HTTP 409 double-poll). A periodic end-to-end probe (`getMe` + getUpdates-not-erroring + optional self-ping watermark) closes this. Scoped as a Pulse Check because it is observation/triage, not restart-actuation; bundled into the cycle upgrade so it travels with that work rather than orphaning as a one-off.
+
+## Pulse approval-queue reconciliation — kill phantom "pending Larry" items
+
+- **Status:** proposed — folded into the Pulse cycle upgrade (2026-05-30)
+- **Next:** add a reconcile step so Pulse's cycle cross-checks `~/agents/state/beacon-pending-approvals.json` before reporting anything as "standing APPROVAL_REQUEST pending Larry"
+- **Owner:** Claude (spec) → Forge (build), as part of the Pulse cycle upgrade workstream
+- **Why:** Pulse's journal re-lists resolved/processed findings as "standing [yellow] pending Larry" each cycle without reconciling against Beacon's real queue. On 2026-05-30 it claimed 5 pending (oldest "~14 days") while Beacon's pending queue was empty and every named finding was archived/processed. Inflates a phantom backlog and manufactures false urgency.
 
 ## Ledger — CFO agent
 
@@ -52,6 +50,12 @@ Status values: `proposed` → `in design` → `approved` → `in flight` → `bl
 ---
 
 ## Archive
+
+### Desired-state reconciler — bot liveness auto-recovery — resolved 2026-05-28
+
+- **Closed by:** PR #178 (squash `33a42d4`), built + Mirror-reviewed through the chain
+- **What shipped:** Option B — returned pulse to systemd; watchdog reconciles all four bots uniformly via `sudo systemctl restart` keyed on a new `desired_state` (up|down) field in `config/bot-liveness-policy.json`; M=3/30min flapping cap; retired the bespoke beacon-bot watchdog carve-out; bundled the pulse tmux→systemd cutover. Verified live (clean reconcile, pulse-down alert cleared). Channel-heartbeat split out as the observation-half follow-up (see active section).
+- **Reference:** `docs/desired-state-reconciler-brief.md`; memory `project_desired_state_reconciler_dispatched`
 
 ### E1.5 — Credential rotation discipline — resolved 2026-05-19 (single session)
 
