@@ -9,7 +9,7 @@ OnBootSec=5min
 # ~/agents/state/cycle-tier.json and self-throttles to Tier 2 (15 min) or
 # Tier 3 (30 min) windows when at higher tiers. See cycle_tier_state.py
 # + scripts/run_cycle.sh tier-window gate.
-OnUnitActiveSec=5min
+OnUnitActiveSec=4h
 # If the system was off when a run was due, run on boot
 Persistent=true
 Unit=ourliberty-cycle.service
