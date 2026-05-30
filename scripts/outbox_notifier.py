@@ -1505,6 +1505,21 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     }
 
 
+def _is_fixture_emission(task_id: object) -> bool:
+    """True iff a re-emission id/name resolves to a reserved fixture pattern.
+
+    Emission-path gate (mission #2, 2026-05-30). The marker-error and dead-
+    letter re-emit sites below bypass the read-time outbox gate
+    (matched_fixture_envelope at process_outbox time), so a fixture envelope
+    that slips past archival could be re-injected into an inbox and re-
+    dispatched -- burning real Opus credits (2026-05-28/29 cost-loop
+    incidents). Mirror the read-time gate's wrapper-peeling check at every
+    emission point. Gates the side-effect, not the detection helper -- the
+    discipline from commit 88b0d1a.
+    """
+    return fixture_patterns.is_fixture_envelope_name(task_id)
+
+
 def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
     """Write a marker-error notify back to Forge so she can re-emit a clean marker.
 
@@ -1624,6 +1639,13 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
     if data.get('reply_chat_id') is not None:
         notify_task['reply_chat_id'] = data['reply_chat_id']
 
+    if _is_fixture_emission(task_id):
+        log(
+            f'suppressing marker-error notify for fixture task {task_id} '
+            f'(reserved fixture namespace)'
+        )
+        return
+
     try:
         safe_write_inbox.safe_write_inbox(
             target_agent=agent,
@@ -1695,6 +1717,13 @@ def _dead_letter_marker_error_to_dispatcher(
     }
     if data.get('reply_chat_id') is not None:
         notify_task['reply_chat_id'] = data['reply_chat_id']
+
+    if _is_fixture_emission(task_id):
+        log(
+            f'suppressing dead-letter notify for fixture task {task_id} '
+            f'(reserved fixture namespace)'
+        )
+        return
 
     try:
         safe_write_inbox.safe_write_inbox(
@@ -2517,6 +2546,13 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
         notify_task['forge_build_session_id'] = data['forge_build_session_id']
     if data.get('phase'):
         notify_task['phase'] = data['phase']
+
+    if _is_fixture_emission(task_id):
+        log(
+            f'suppressing marker-error notify for fixture task {task_id} '
+            f'(reserved fixture namespace)'
+        )
+        return
 
     try:
         safe_write_inbox.safe_write_inbox(
@@ -6821,6 +6857,14 @@ def scan_dead_letters() -> int:
             try:
                 task_data = json.loads(invalid_file.read_text())
             except (OSError, json.JSONDecodeError):
+                processed.add(key)
+                continue
+
+            if _is_fixture_emission(invalid_file.stem):
+                log(
+                    f'skipping dead-letter notify for fixture envelope '
+                    f'{invalid_file.name} (reserved fixture namespace)'
+                )
                 processed.add(key)
                 continue
 

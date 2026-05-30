@@ -9531,5 +9531,139 @@ class OutboxFixtureGateTest(unittest.TestCase):
         self.assertTrue(dest.exists())
 
 
+class EmissionPathFixtureGateTest(unittest.TestCase):
+    """Emission-path fixture gates (mission #2, 2026-05-30).
+
+    Four re-emission sites bypass the read-time process_outbox gate:
+    _notify_forge_marker_error, _notify_mirror_marker_error,
+    _dead_letter_marker_error_to_dispatcher, and the scan_dead_letters
+    .invalid loop. Each calls _is_fixture_emission(task_id) right before its
+    safe_write_inbox and suppresses a reserved-namespace fixture so it can't
+    be re-injected into an inbox and re-dispatched (the 2026-05-28/29 cost-
+    loop shape). A legit task_id still emits.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    # ---- helper predicate ----
+    def test_is_fixture_emission_flags_reserved_namespace(self):
+        self.assertTrue(on._is_fixture_emission('zz-fixture-loop'))
+        self.assertTrue(on._is_fixture_emission('t-pf-1'))
+        # wrapper-peeling: a cascaded fixture name still resolves.
+        self.assertTrue(on._is_fixture_emission('marker-error-zz-fixture-loop'))
+
+    def test_is_fixture_emission_passes_legit_ids(self):
+        self.assertFalse(on._is_fixture_emission('real-chat'))
+        self.assertFalse(on._is_fixture_emission('opmanual-d35-7-001'))
+        self.assertFalse(on._is_fixture_emission(None))
+
+    # ---- site 1: _notify_forge_marker_error ----
+    def test_forge_marker_error_suppresses_fixture(self):
+        data = {'agent': 'forge', 'source': 'beacon', 'task_id': 'zz-fixture-loop'}
+        on._notify_forge_marker_error(data, 'no JSON in marker')
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json')), []
+        )
+
+    def test_forge_marker_error_emits_legit(self):
+        data = {'agent': 'forge', 'source': 'beacon', 'task_id': 'real-chat'}
+        on._notify_forge_marker_error(data, 'no JSON in marker')
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json'))), 1
+        )
+
+    # ---- site 2: _dead_letter_marker_error_to_dispatcher ----
+    def test_dead_letter_suppresses_fixture(self):
+        data = {'agent': 'forge', 'source': 'beacon', 'task_id': 'zz-fixture-loop'}
+        on._dead_letter_marker_error_to_dispatcher(data, 'beacon', 'parse err', 4)
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('dead-letter-marker-*.json')), []
+        )
+
+    def test_dead_letter_emits_legit(self):
+        data = {'agent': 'forge', 'source': 'beacon', 'task_id': 'real-chat'}
+        on._dead_letter_marker_error_to_dispatcher(data, 'beacon', 'parse err', 4)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'beacon').glob('dead-letter-marker-*.json'))), 1
+        )
+
+    # ---- site 3: _notify_mirror_marker_error ----
+    def test_mirror_marker_error_suppresses_fixture(self):
+        data = {'agent': 'mirror', 'source': 'beacon', 'task_id': 'zz-fixture-loop'}
+        on._notify_mirror_marker_error(data, 'prose, not JSON')
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')), []
+        )
+
+    def test_mirror_marker_error_emits_legit(self):
+        data = {'agent': 'mirror', 'source': 'beacon', 'task_id': 'real-chat'}
+        on._notify_mirror_marker_error(data, 'prose, not JSON')
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json'))), 1
+        )
+
+    # ---- site 4: scan_dead_letters .invalid loop ----
+    def _plant_invalid(self, agent, name, source='beacon'):
+        invalid_dir = on.INBOXES_ROOT / agent / '.invalid'
+        invalid_dir.mkdir(parents=True, exist_ok=True)
+        (invalid_dir / name).write_text(json.dumps({
+            'task_id': name.replace('.json', ''),
+            'source': source, 'prompt': 'too short',
+        }))
+        (invalid_dir / name.replace('.json', '.reason')).write_text('F24 empty-prompt')
+
+    def test_scan_dead_letters_suppresses_fixture(self):
+        self._plant_invalid('forge', 'zz-fixture-loop.json')
+        n = on.scan_dead_letters()
+        self.assertEqual(n, 0)
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-dead-letter-*.json')), []
+        )
+
+    def test_scan_dead_letters_emits_legit(self):
+        self._plant_invalid('forge', 'real-bad-task.json')
+        n = on.scan_dead_letters()
+        self.assertEqual(n, 1)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'beacon').glob('notify-dead-letter-*.json'))), 1
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
