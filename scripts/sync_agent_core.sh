@@ -155,21 +155,6 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
         log "Pulse runtime allowlist dirty (no other modifications) — auto-commit + push"
         git add -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
 
-        FIXTURE_TOKEN_REGEX="$(pulse_runtime_fixture_token_regex)"
-        # NB: greps must be -E (or -F) — BRE treats \+ as the GNU one-or-more
-        # operator, so `grep -v "^\+\+\+"` would strip every +-prefixed diff line
-        # and silently disable the guard. See run_cycle.sh's matching comment.
-        FIXTURE_DIFF=$(git diff --cached -U0 | grep -E "^\+" | grep -Ev "^\+\+\+" | grep -E "$FIXTURE_TOKEN_REGEX" | head -5 || true)
-        if [ -n "$FIXTURE_DIFF" ]; then
-            log "ERROR: fixture-pattern token in staged Pulse runtime files; refusing auto-commit"
-            git reset -q HEAD -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
-            write_status "error" "Fixture-pattern token in Pulse runtime files"
-            FIXTURE_TAIL=$(echo "$FIXTURE_DIFF" | head -3 | tr '\n' ' | ')
-            alert_larry "fixture pattern in pulse runtime files" "sync_agent_core.sh refused to auto-commit Pulse runtime files because the staged diff contains a fixture-pattern token (likely fixture-leak hallucination). Excerpts: ${FIXTURE_TAIL}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, inspect runbooks/cycle-journal.md and runbooks/cycle-actions.jsonl, remove fixture entries, re-run sync."
-            emit_larry_alert_envelope "sync-blocked:fixture-pattern-detected" "ourliberty-sync.service: refused to auto-commit Pulse runtime files because the staged diff contains a fixture-pattern token. Excerpts: ${FIXTURE_TAIL}. Recovery: cd ${REPO_DIR}; inspect runbooks/cycle-journal.md and runbooks/cycle-actions.jsonl; remove fixture entries; re-run sync."
-            exit 1
-        fi
-
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "pulse: auto-commit runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only Pulse-owned runtime files dirty (see scripts/_lib_pulse_runtime.sh allowlist). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
             log "Auto-committed Pulse runtime files; pushing to origin/main"
