@@ -6,22 +6,25 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~04:00Z UTC (Iter 157)
+## Status snapshot — updated 2026-05-31 ~04:09Z UTC (Iter 158)
 
-**System: ✅ Nominal-with-watch.** Iter 157 findings: 0 new alerts (watermark 1070 unchanged). PR #219 (fix-rotation-gate-setup-token-aware) OPEN MERGEABLE 03:57:17Z — Mirror reviewing with MalformedMirrorMarker retry 1/3 at 03:59:14Z (self-resolving per established pattern). 6/6 services active. cycle.last-output.json MISSING (was 0 bytes iter 156 — status degraded; watch). alert-triage.json MISSING (4th interactive observation; escalation gate = 2 automated cycles). APPROVAL_REQUEST queue: 5 unchanged. Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 158 findings: **PR #219 MERGED 04:00:13Z — rate-limit-resilience-001 sequence COMPLETE (all 4 PRs live).** ourliberty-cycle.timer WAS STUCK (auto-healed 04:00:21Z by heal-systemd-install-drift — root cause of cycle.last-output.json missing iters 156-157, CLOSED). NEW: heal-resume-paused-on-tier1.service + .timer NOT INSTALLED on droplet (ask-then-do Larry). 5 new alerts triaged. 6/6 services active. 0 open PRs. All inboxes empty. sync.json no-change (04:04:39Z). alert-triage.json MISSING (5th obs — expect recreation on next automated cycle now that timer fixed). APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
-- **fix-rotation-gate-setup-token-aware: Mirror review in-flight (retry 1/3 resolving).** PR #219 OPEN MERGEABLE. Expected: retry resolves → Mirror REVIEW_PASS → AUTO_MERGE. Rate limit resets 11:30am MDT. Close when merged.
-- **heal-claude-max-burn-rate:** Carry-forward. Fix pipeline (fix-rotation-gate-setup-token-aware PR #219) is the systemic response. Monday [yellow] DM 2026-06-01.
-- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01** (includes burn-rate context).
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 15 iters (143–157). Heartbeat fresh (03:35:16Z UTC). Verification: 2026-06-07.
+- **rate-limit-resilience-001: COMPLETE.** PR #211 + #217 + #218 + #219 all merged. ✅ CLOSED. Watch: heal-claude-max-burn-rate frequency drop in next 24-48h.
+- **heal-claude-max-burn-rate:** Fix pipeline complete (PR #219 merged). Watch for alert frequency drop. Monday [yellow] DM 2026-06-01.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01** (includes burn-rate context + install-drift action items).
+- **NEW [yellow] ask-then-do: heal-resume-paused-on-tier1 NOT INSTALLED.** PR #219 shipped ourliberty-heal-resume-paused-on-tier1.service + .timer but install dance not performed. Without install, paused-on-tier1 tasks won't auto-resume. Escalated pulse-escalations.json entry 73. Monday [yellow] DM 2026-06-01. Action: SSH + sudo cp + daemon-reload + enable --now.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 16 iters (143–158). Heartbeat fresh (04:05:16Z UTC). Verification: 2026-06-07.
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 3 self-resolved.** Doc-fix (forge-claude-md-preflight-self-check-bullet-001) pending Larry. G-rule posture: open through doc-PR + fix-rotation-gate-setup-token-aware merge.
-- **alert-triage.json MISSING: 4th consecutive interactive observation.** cycle.last-output.json also MISSING (was 0 bytes iter 156). Automated cycle unverifiable. Escalate on next confirmed automated cycle if still missing.
-- **cycle.last-output.json MISSING (new status, iter 157).** Was 0 bytes iter 156; now absent. 2nd observation. Watch: 3 consecutive missing/0-byte → dispatch to Forge.
-- Sync push error: carry-forward. Root cause fix pending Larry.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved** (step-b-resume, register-claude-setup-tokens-rotation, fix-rotation-gate-setup-token-aware preflight retry, fix-rotation-gate-setup-token-aware mirror retry). Doc-fix pending Larry. G-rule posture: doc-PR still pending Larry; PR #219 merged.
+- **alert-triage.json MISSING: 5th consecutive observation.** Root cause: cycle.timer was stuck. With timer fixed, expect recreation on next automated cycle. Escalate if still missing after 2 confirmed automated cycles.
+- **cycle.last-output.json watch: CLOSED.** Root cause was stuck cycle.timer (auto-healed iter 158). ✅
+- **Sync push error: self-resolved iter 158 (sync.json no-change).** APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Larry as defensive hardening. Watch for recurrence on next cycle with journal commit.
+- **systemd install-drift G-rule: 1/3.** PR ships new systemd unit files without install dance. PR #219 first instance. Next 2 instances → dispatch to Beacon for Forge PR template checklist update.
+- **ourliberty-cycle.timer stuck pattern: 1/3.** Both cycle.timer + heal-systemd-install-drift.timer entered infinity-trap simultaneously at ~04:00Z; auto-healed. Watch: if recurs in next 14 days → G-rule 2/3.
 
 ## Status snapshot — updated 2026-05-31 ~03:57Z UTC (Iter 156)
 

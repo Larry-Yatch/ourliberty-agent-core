@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 158 — 2026-05-31 04:09 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #219 MERGED (rate-limit-resilience-001 sequence COMPLETE). ourliberty-cycle.timer was STUCK (auto-healed at 04:00:21Z — root cause of cycle.last-output.json missing iters 156–157). NEW: heal-resume-paused-on-tier1 service/timer NOT INSTALLED (ask-then-do Larry). 5 new alerts, 2 ask-then-do, 2 auto-healed, 1 known-pattern. 6/6 services active. 0 open PRs. All inboxes empty. Sync clean. APPROVAL_REQUEST queue: 5 unchanged (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1075 lines** (+5 vs iter 157 watermark 1070). alert-triage.json still MISSING (5th consecutive observation; now that cycle.timer is fixed, next automated cycle should recreate it). 5 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 5 new alerts — 2 ask-then-do, 2 auto-healed (informational), 1 known-pattern.**
+  - Line 1071: `rotate-active-tier` 03:58:50Z — `rotation_auth_gate_blocked:tier2` — **Tier 3 known-pattern.** Tier 2 OAuth expired; already in APPROVAL_REQUEST queue (docs/runbooks/restore-larry-personal-claude-oauth-tier2.md). Silence + log. ✅
+  - Line 1072: `heal-systemd-install-drift` 04:00:20Z — `install-drift:ourliberty-heal-resume-paused-on-tier1.service` — **NEW ask-then-do.** Unit shipped in repo (systemd/ourliberty-heal-resume-paused-on-tier1.service) but not installed under /etc/systemd/system/. Without install, the paused-on-tier1 auto-resume capability introduced in PR #219 cannot fire. Escalated [yellow] Monday DM. ⚠️
+  - Line 1073: `heal-systemd-install-drift` 04:00:20Z — `install-drift:ourliberty-heal-resume-paused-on-tier1.timer` — **NEW ask-then-do.** Same — timer unit not installed. ⚠️
+  - Line 1074: `heal-systemd-install-drift` 04:00:21Z — `stuck-timer:ourliberty-cycle.timer` — **auto-healed by healer** (daemon-reload + restart). Root cause of cycle.last-output.json being 0 bytes/missing in iters 156–157. **CLOSED** cycle.last-output.json watch item. ✅
+  - Line 1075: `heal-systemd-install-drift` 04:00:22Z — `stuck-timer:ourliberty-heal-systemd-install-drift.timer` — **auto-healed by healer** (daemon-reload + restart). Informational. ✅
+  New watermark: **1075**. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log confirms: MalformedForgeMarker (21:42 MDT) self-resolved → build dispatched; PR #218 AUTO_MERGE 21:45:53 MDT ✅; MalformedMirrorMarker (21:59 MDT) retry 1/3 → self-resolved; **PR #219 AUTO_MERGE 22:00:13 MDT** ✅ (rate-limit-resilience-001 COMPLETE). No above-threshold WARN after 22:00Z. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last entries: alert delivery notifications (idx 1070–1074, 22:00:33–22:00:35 MDT). No Larry directives. No orphaned messages. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-30T22:05:16-0600 (= 2026-05-31T04:05:16Z, ~4 min old at check time — within 90-min threshold). ✅ alert-cooldown/warning/: known carry-forwards (agent-runner rate_limit × 4, beacon-bot auth_401, pulse-upgrade-001 sequence-complete, deploy-notifier READY entries). No new active stall conditions. ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged). NEW ask-then-do items added to Monday DM.**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` (iter 43) — pending Larry.
+  - **NEW [yellow] ask-then-do:** Install heal-resume-paused-on-tier1.service + .timer on droplet (SSH + sudo cp + daemon-reload + enable --now).
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ (includes burn-rate context + install-drift items)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 04:05:16Z UTC (fresh, within 90-min threshold). Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge trust-policy dispatch. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (session-start gitStatus confirmed). Latest commit: f3825cc "Pulse cycle 20260531T040204Z" (iter 157 automated). ✅
+
+- **(Check B) Sync health: ✅ CLEAN THIS ITER.** sync.json: status=no-change, last_sync=2026-05-31T04:04:39Z, commit=f3825cc. No push error. Previous "error" carry-forward appears self-resolved this cycle (wrapper pushed successfully; sync found repo already at origin). APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Larry as defensive hardening, but immediate error is gone. ✅→watch.
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — all empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.**
+  - **PR #219 "fix(active_tier): tier_auth_ok mirrors dispatch auth precedence" — MERGED 04:00:13Z UTC** (22:00:13 MDT). Mirror REVIEW_PASS retry-1/3 self-resolved → AUTO_MERGE. **rate-limit-resilience-001 sequence COMPLETE: PR #211 (step-a) + PR #217 (step-b) + PR #218 (register) + PR #219 (fix-rotation-gate) — all 4 steps live.** ✅ CLOSED watch item.
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday UTC). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **MalformedForgeMarker G-rule:** No non-self-resolving instances this iter. Doc-fix pending Larry. G-rule posture unchanged.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All services active, repo clean, 0 open PRs, inboxes empty.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '...'` → row appended at 04:09:02Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:09:03Z.
+5. Wrote [yellow] escalation to pulse-escalations.json (entry 73 — heal-resume-paused-on-tier1 install).
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** [yellow] — heal-resume-paused-on-tier1.service + .timer not installed. Added to Monday 2026-06-01 [yellow] DM queue. pulse-escalations.json entry 73. Suggested action in escalation entry.
+
+**Patterns:**
+- **rate-limit-resilience-001 sequence: COMPLETE** ✅. All 4 PRs (#211, #217, #218, #219) merged. The sequence that started in response to 105 rate-limit events/2h and 83% token gate usage is now fully live. Watch: does heal-claude-max-burn-rate alert frequency drop in the next 24–48h?
+- **ourliberty-cycle.timer stuck pattern (1st full observation).** Both ourliberty-cycle.timer and ourliberty-heal-systemd-install-drift.timer entered the infinity-trap state simultaneously (NextElapseUSecRealtime empty + NextElapseUSecMonotonic=infinity). heal-systemd-install-drift auto-healed both. Root symptom: cycle.last-output.json 0 bytes/missing iters 156–157 (iters ran incomplete or not at all). Self-resolving via healer. If this stuck-timer pattern recurs in next 14 days → G-rule 2/3, propose permanent debounce fix.
+- **systemd install-drift: PR ships unit files without install dance (G-rule 1/3).** PR #219 merged; ourliberty-heal-resume-paused-on-tier1 units landed in repo but not installed. Prior instance: cycle.timer at iter 110 (disabled, not uninstalled — slightly different). Treating as 1/3 for "PR ships new systemd units without operator install dance." If 2 more → dispatch to Beacon to add systemd unit install checklist to Forge PR template.
+- **alert-triage.json MISSING: 5th consecutive observation.** Root cause confirmed: cycle.timer was stuck, preventing automated cycles from running (which would recreate the state file). With timer now fixed, expect state file recreation on next automated cycle. If still missing after 2 confirmed automated cycles → dispatch to Forge.
+- **Sync push error: self-resolved this cycle.** sync.json shows no-change (clean). The APPROVAL_REQUEST sync-push-rebase-fallback-001 is still the right defensive fix, but the immediate error is gone. Watch: does it recur on next cycle with a journal commit to push?
+
+**Learned:**
+- **Stuck-timer pattern is real and healer-catchable.** Both timers entered infinity-trap simultaneously — likely the same daemon-reload event that didn't propagate correctly. The heal-systemd-install-drift healer correctly auto-healed. The symptom (0-byte cycle output) is now explained. 
+- **install-drift healer is now firing for uninstalled units.** This is the healer PR #212 (harden-systemd-timer-recovery) shipped. First observation of the install-drift detection (as opposed to stuck-timer detection). The healer is working correctly; the gap is the operator workflow (PRs should include install instructions more prominently).
+
+---
+
 ## Iteration 157 — 2026-05-31 04:00 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — 0 new alerts, PR #219 (fix-rotation-gate-setup-token-aware) OPEN MERGEABLE Mirror reviewing (fresh), MalformedMirrorMarker retry 1/3 at 03:59Z (self-resolving, consistent with established pattern). 6/6 services active. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
