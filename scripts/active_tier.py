@@ -52,6 +52,28 @@ _DEFAULT_STATE = {
 
 _VALID_TIERS = ('tier1', 'tier2')
 
+# Long-lived setup-token env-var mapping (single source of truth shared with
+# agent_runner._apply_tier_auth). Each tier has a NON-refreshing
+# `claude setup-token` (valid ~1 yr) stored in the process env; presence of a
+# non-empty value means dispatches will authenticate via the token and bypass
+# the credentials.json refresh path. tier_auth_ok mirrors that precedence so
+# the rotation pre-engage gate verifies the SAME auth source a dispatch would
+# actually use.
+_SETUP_TOKEN_ENV_BY_TIER = {
+    'tier1': 'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
+    'tier2': 'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
+}
+
+
+def _setup_token_for_tier(tier):
+    """Return the long-lived setup-token for ``tier`` or None if unconfigured.
+    Empty string counts as unset so a presence check is equivalent to a
+    usability check. Token values must never be logged."""
+    env_name = _SETUP_TOKEN_ENV_BY_TIER.get(tier)
+    if not env_name:
+        return None
+    return os.environ.get(env_name) or None
+
 # Max backoff when the "resets <time>" message is unparseable. Spec § 6.3.
 _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)
 # Base unit for capped exponential backoff: 1 min, doubling each attempt.
@@ -289,22 +311,42 @@ def _credentials_path(tier):
 
 
 def tier_auth_ok(tier, now=None):
-    """Return True iff the target tier's OAuth credentials file exists and
-    its ``claudeAiOauth.expiresAt`` is at least ``_AUTH_EXPIRY_MIN_LEAD``
-    in the future.
+    """Return True iff the target tier has usable dispatch auth.
 
-    Used by the rotation scheduler's pre-engage gate (Step A rotation fix)
-    to refuse switching into a tier with a stale token. The 2026-05-29
-    storm root cause was Tier 2 going silently expired and the scheduler
-    flipping into it anyway; this gate is the structural fix.
+    Precedence mirrors ``agent_runner._apply_tier_auth`` (the dispatch
+    path): if the tier's long-lived setup-token env var
+    (``CLAUDE_CODE_OAUTH_TOKEN_TIER1`` / ``..._TIER2``) is set and
+    non-empty, the gate returns True — that token is the live auth source
+    a dispatch would actually use, so presence alone is the signal.
+    (A per-tick live ``claude -p`` probe would be too expensive; the
+    auth_401 circuit-breaker in scripts/rotate_active_tier.py backstops
+    a bad token after a single failed flip.)
 
-    Any I/O error, parse error, missing field, or wrong-shape payload
-    returns False. The defensive posture is intentional: a tier we can't
-    verify is treated as not auth-ok, so the scheduler holds the current
-    tier rather than committing to an unverifiable target.
+    Only when no setup-token is configured for the tier does the gate
+    fall back to the legacy credentials.json ``claudeAiOauth.expiresAt``
+    check (>= ``_AUTH_EXPIRY_MIN_LEAD`` in the future), preserving the
+    historical Step-A semantics byte-for-byte for credentials.json-only
+    deployments.
+
+    Used by the rotation scheduler's pre-engage gate (Step A rotation
+    fix) to refuse switching into a tier with a stale token. The
+    2026-05-29 storm root cause was Tier 2 going silently expired and
+    the scheduler flipping into it anyway; this gate is the structural
+    fix. The setup-token short-circuit added 2026-05-30 prevents a
+    follow-on false-block where credentials.json lapses (because the
+    setup-token path no longer exercises/refreshes it) while the
+    setup-token itself remains valid for dispatches.
+
+    For the credentials.json fallback: any I/O error, parse error,
+    missing field, or wrong-shape payload returns False. The defensive
+    posture is intentional: a tier we can't verify is treated as not
+    auth-ok, so the scheduler holds the current tier rather than
+    committing to an unverifiable target.
     """
     if tier not in _VALID_TIERS:
         return False
+    if _setup_token_for_tier(tier):
+        return True
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
