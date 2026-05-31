@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~14:11Z UTC (Iter 187 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~14:18Z UTC (Iter 188 — interactive, full cycle)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync push error carry-forward (no new sync errors). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: 1083 (unchanged). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
@@ -14,9 +14,8 @@
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + sync error carry-forward).
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. No longer theoretical. Approve the defensive hardening fix.
-- **threshold-update-2026-05-31 COMPLETE.** PR #220 merged. Thresholds live. First Check III verification cycle: 2026-06-07. ✅ CLOSED.
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync error confirmation + Check VIII/IX first-firing note. threshold-update CLOSED (remove from DM).
+- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync error confirmation + Check VIII/IX first-firing note.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
 
 ---
