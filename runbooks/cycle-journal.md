@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 260 — 2026-05-31 23:22 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1088 lines** (+1 from iter 259 watermark of 1087). **1 new line**: line 1088 = Pulse's own Monday DM from iter 259 (source=pulse, subject=monday-dm:2026-06-01-stuck-timer, appended 23:16:07Z UTC). outbox-notifier delivered alert idx=1087 at 23:16:36Z UTC. New alert-cooldown file: `pulse:monday-dm:2026-06-01-stuck-timer`. Classification: **Tier 3** (Pulse self-write, already delivered; nominal). alert-triage.json MISSING (known). ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — Pulse self-write only.** 1 new line since iter 259 watermark (1087). Line 1088 = iter 259's Monday DM (source=pulse, already delivered by outbox-notifier at 23:16:36Z UTC). Tier 3 — no new healer alerts, no new actionable escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last Larry message: `'Go'` at 07:44:07-0600 (13:44Z UTC May 31; unchanged). Last outbox-notifier delivery: alert idx=1087 (Monday DM) at 17:16:36-0600 (23:16:36Z UTC). No new Larry directives. No agent distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **310** (+1 from iter 259's 309; new file = `pulse:monday-dm:2026-06-01-stuck-timer`, expected). heal-pipeline-stall prefix: 38 (unchanged). deploy-notifier prefix: 106 (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged).** No new Larry directives since 13:44Z May 31. cycle.timer still stuck; Monday automated cycle not firing. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T23:07:46Z UTC** — ~13 min old at check time (23:20Z). Same tick as iter 259; within 90-min threshold. State file missing (known; heartbeat canonical per MEMORY.md). Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=8c1e5a7 "Pulse cycle 20260531T231922Z" (wrapper auto-commit of iter 259), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: last_sync=2026-05-31T23:06:01Z, status=no-change, commit=d18e3a8. ~14 min old at check time (23:20Z); within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 6/6 non-timer active; ⚠️ cycle.timer STUCK (carry-forward).** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier — all `active`. ourliberty-cycle.timer: SubState=running, NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity — still stuck. No change from iter 259. ⚠️ (known)
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse): 0 active tasks. ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. All others due 2027. ✅
+
+- **Deploy-notifier cooldown file count: 106** (unchanged). Alert-cooldown/warning/ total 310 files (+1 from Monday DM cooldown, expected). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json on disk; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json on disk; next 2026-06-07. ✅ | Check VIII/IX: UTC still Sunday (23:20Z May 31; ~40 min until 2026-06-01 00:00Z). Monday gate → skip. BLOCKED by stuck cycle.timer in any case. ⚠️
+
+- **G-rule watch items:** cycle.timer stuck: G-rule **2/3** (no new occurrence this iter). heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), F24 empty-prompt APPROVAL_REQUEST #8 pending. All stable — no new G-rule triggers. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. No always-allowed auto-fixes this iter.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 260` → `{"ts": "2026-05-31T23:22:10.514279+00:00", "iter": 260, "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:22:11Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All active issues carry-forward from iter 259.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new findings this iter. All 8 APPROVAL_REQUEST items unchanged.
+- Alert-cooldown total +1 (expected: Monday DM cooldown file). No new healer alerts.
+- Healer heartbeat at 23:07:46Z UTC (same tick as iter 259; ~13 min old; within 90-min threshold). Healer alive.
+- cycle.timer stuck: G-rule 2/3 (no new occurrence). Recovery still requires Larry: `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`.
+- UTC: 23:22Z May 31 (still Sunday; ~38 min until Monday 2026-06-01 UTC). Check VIII/IX will fire on first clean automated cycle after timer recovery.
+
+**Learned:** Nominal observation iter. All carry-forward. Monday DM already delivered by outbox-notifier at 23:16Z UTC. No new escalations.
+
+---
+
 ## Iteration 259 — 2026-05-31 23:15 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired). **NEW: ourliberty-cycle.timer STUCK** (automated cycles stopped). 7/7 services show active (timer unit is active-but-will-never-fire). 0 open PRs. 0 active inbox tasks.
