@@ -6,15 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~05:24Z UTC (Iter 168 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~05:28Z UTC (Iter 169 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 05:05:17Z UTC (~17 min). Check B 10th consecutive clean. Tier=1, consecutive_clean=2. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078. Consecutive clean: 1→2; one more clean → Tier 2 de-escalation.
+**System: ✅ Nominal — All checks clean. **TIER 1 → TIER 2 DE-ESCALATION.** 3 consecutive clean iters (167, 168, 169). Now on 15-min cadence.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 05:05:17Z UTC (~23 min). Check B 11th consecutive clean. Tier=2, consecutive_clean=0. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
 
 **Watch items updated:**
-- **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Same as iter 167. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note.
+- **TIER 2 NOW ACTIVE.** 15-min cadence (1 in 3 fires). Next non-clean iter resets to Tier 1 immediately.
+- **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
+- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note + tier de-escalation context.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
-- All other watch items: unchanged from iter 167.
+- All other watch items: unchanged from iter 168.
 
 ## Status snapshot — updated 2026-05-31 ~05:17Z UTC (Iter 167 — interactive, full cycle)
 
