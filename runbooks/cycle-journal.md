@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 156 — 2026-05-31 03:54 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — 0 new alerts, 0 open PRs, 6/6 services active. Forge building fix-rotation-gate-setup-token-aware.json (dispatched iter 155, 11 min old, actively processing). Rate-limit cycling continues (expected; fix pipeline in Forge). APPROVAL_REQUEST queue: 5 unchanged (Monday DM 2026-06-01). Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1070 lines** (unchanged from iter 155 watermark 1070). alert-triage.json still MISSING (3rd consecutive interactive observation). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1070. Last 3 entries (lines 1068–1070): still-stale-after-restart:beacon-bot (03:35:16Z, Tier 3 self-resolved), agent-models-telegram-model-corruption:beacon (03:36:13Z, iter 154 false positive/retracted), claude_max_5h_burn_threshold_breached (03:45:39Z, Tier 4 iter 155 watch item). No new alert lines. alert-triage.json MISSING — 3rd consecutive interactive observation. MEMORY.md escalation condition: "2 automated cycles." Note: cycle.last-output.json = 0 bytes, mtime 21:52 MDT (03:52Z UTC) — automated cycle fired 1 min after iter 155. Empty output file; cannot confirm alert-triage.json was recreated during that automated run. Watch condition remains: automated cycle, not interactive. Deferring escalation.
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: last entry 21:45:53 MDT (03:45:53Z UTC, 8 min prior) — AUTO_MERGE PR #218. System quiet post-pipeline. ✅ beacon_telegram_bot.log: rate-limit/Tier 2 cycling at 21:53–21:54 MDT (03:53–03:54Z UTC): TIER2_FALLBACK_USED reason=rate_limit, TIER2_FALLBACK_FAILED reason=rate_limit (resume session, auth_401 path). Consistent with Forge building fix-rotation-gate-setup-token-aware under Tier 1 rate limit. Not above 5/h threshold. Known pattern. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No Larry directives since iter 152/153 carry-forward resolved by PR #216 merge. No orphaned messages. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall: 03:50Z tick — 0 new alerts, 4 suppressed (tier2_fallback cooldowns). ✅ Healer heartbeat: 2026-05-31T03:35:16Z UTC (~19 min old, within 90-min threshold). ✅ heal-pr-auto-merge: 03:45:22Z + 03:50:22Z ticks — "no mirror-passed failures in last 24h." ✅ Forge inbox task 11 min old at check time; rate-limit evidence shows Forge is actively processing (not stalled). ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook (docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending.
+  - `pulse_telegram_bot.sh launcher` — pending.
+  - `stuck-cycle timeout guard` (iter 43) — pending.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ carry-forward (includes burn-rate context from iter 155).
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code.heartbeat: 2026-05-31T03:35:16Z UTC (~19 min old, within 90-min threshold). Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge trust-policy dispatch via APPROVAL_REQUEST. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean tree (confirmed from session-start gitStatus). Latest commit: dd45f03 "Pulse cycle 20260531T035251Z" (iter 155). ✅
+
+- **(Check B) Sync health: ⚠️ Push error carry-forward.** sync.json: status=error "Auto-commit push failed; rolled back", commit d53d276a89. Known race condition. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge 1 task (active). ✅**
+  - forge: `build-fix-rotation-gate-setup-token-aware.json` (created 21:43:09 MDT = 03:43Z UTC, 11 min old at check time). Actively processing (rate-limit activity in beacon_telegram_bot.log at 03:53–03:54Z confirms Forge running under rate limit). Not stale. ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json guard (same Sunday). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday — tomorrow UTC). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window 2026-06-23 (~23 days). ✅
+- **MalformedForgeMarker G-rule:** No new occurrence this iter. Post-dispatch counter: 3 self-resolved (step-b-resume, register-claude-setup-tokens-rotation, fix-rotation-gate-setup-token-aware preflight retry 1/3 resolved at 21:43Z). Doc-fix pending. G-rule posture unchanged.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All services active, repo clean, 0 open PRs.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-156-checkb-sync-push-carry-forward"}'` → row appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. All findings carry-forward to Monday [yellow] DM 2026-06-01.
+
+**Patterns:**
+- **fix-rotation-gate-setup-token-aware in build.** Task dispatched at 03:43Z UTC; Forge actively processing under Tier 1 rate limit (evidence: beacon_telegram_bot.log 03:53–03:54Z). Expect PR to follow in the next 1–2 cycles once rate limit clears (11:30am MDT). rate-limit-resilience sequence: 1 step remaining.
+- **cycle.last-output.json 0 bytes.** Automated cycle ran at 21:52 MDT (03:52Z UTC) with empty output file. Not a known failure mode; may be normal (output path writes separately from cycle.last-output.json). Noting for pattern watch: if this persists for 3+ automated cycles → dispatch to Forge to investigate run_cycle.sh output capture.
+- **alert-triage.json missing (3rd observation).** Still no state file. All observations interactive. Per MEMORY.md: escalate after 2 *automated* cycles. The 03:52Z automated cycle is unverified (0-byte output). Watch.
+
+**Learned:** Nothing new this iter. Carry-forward state stable.
+
+---
+
 ## Iteration 155 — 2026-05-31 03:51 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — **PR #218 (register-claude-setup-tokens-rotation) MERGED 03:45:53Z UTC.** 0 open PRs on both repos. build-fix-rotation-gate-setup-token-aware dispatched to Forge (03:43Z UTC, fresh). New alert: heal-claude-max-burn-rate (83% of 5h token gate, 105 rate-limit events/2h) — Tier 4 informational, fix pipeline active. 6/6 services active. alert-triage.json still MISSING (second consecutive observation). Check B sync push error carry-forward. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.

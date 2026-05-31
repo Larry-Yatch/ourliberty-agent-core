@@ -6,6 +6,23 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~03:57Z UTC (Iter 156)
+
+**System: ✅ Nominal-with-watch.** Iter 156 findings: 0 new alerts (watermark 1070 unchanged). 0 open PRs. Forge building fix-rotation-gate-setup-token-aware.json (dispatched 03:43Z, actively processing under Tier 1 rate limit — beacon_telegram_bot.log at 03:53–03:54Z confirms). 6/6 services active. cycle.last-output.json = 0 bytes (automated cycle 03:52Z — unverified; noting for pattern watch). alert-triage.json still MISSING (3rd interactive observation; escalation gate is 2 automated cycles — not yet met). APPROVAL_REQUEST queue: 5 unchanged. Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- **fix-rotation-gate-setup-token-aware: IN FORGE BUILD.** Task dispatched 03:43Z UTC. Forge actively processing; rate limit holding per beacon_telegram_bot.log 03:53–03:54Z. Clears at 11:30am MDT (17:30Z UTC). Next: build → PR → Mirror → AUTO_MERGE. Close when merged.
+- **heal-claude-max-burn-rate:** 83% at 03:45:39Z UTC (iter 155/156). No new breach alert this iter. Fix pipeline (fix-rotation-gate-setup-token-aware) is the systemic response. Monday [yellow] DM 2026-06-01.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 14 iters (143–156). Heartbeat fresh (03:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01** (includes burn-rate context).
+- Sync push error: carry-forward. Root cause fix pending Larry.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 3 self-resolved (step-b-resume, register-claude-setup-tokens-rotation, fix-rotation-gate-setup-token-aware — all retry 1/3, all resolved <90s).** Doc-fix APPROVAL_REQUEST pending Larry. G-rule posture: keep open through doc-PR + fix-rotation-gate-setup-token-aware merge.
+- **alert-triage.json MISSING: 3rd consecutive interactive observation.** Escalation gate: "2 automated cycles." 03:52Z automated cycle unverified (0-byte output). Watch on next verified automated cycle.
+- **cycle.last-output.json 0 bytes (new observation, iter 156).** Automated cycle at 03:52Z UTC produced empty output. Watch: if 3 consecutive automated cycles show 0-byte output → dispatch to Forge to investigate run_cycle.sh output capture.
+
 ## Status snapshot — updated 2026-05-31 ~03:51Z UTC (Iter 155)
 
 **System: ✅ Nominal-with-watch.** Iter 155 findings: **PR #218 (register-claude-setup-tokens-rotation) MERGED 03:45:53Z UTC** — rate-limit-resilience-001 register step complete. 0 open PRs. build-fix-rotation-gate-setup-token-aware dispatched to Forge (03:43Z UTC, fresh). New alert: `heal-claude-max-burn-rate` (83% of 5h token gate, 105 rate-limit events/2h) — Tier 4 informational, added to Monday DM queue. 6/6 services active. alert-triage.json MISSING (2nd consecutive observation). Check B sync push error carry-forward. APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
