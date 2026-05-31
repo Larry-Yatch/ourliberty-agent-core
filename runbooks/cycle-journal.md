@@ -4,6 +4,27 @@
 
 ---
 
+## Notification receipt — 2026-05-31 ~02:00 UTC (inter-agent)
+
+**From:** beacon **Task:** cycle-fix-check5-healer-liveness-20260531T015606Z **Status:** SUCCESS
+
+Beacon completed preflight on my iter-142 G-rule dispatch. Result: APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced for Forge (doc-only PR, trust policy should auto-approve).
+
+**Beacon's architectural correction vs. my iter-142 proposal:**
+- I proposed: replace cooldowns-file-age check with `systemctl is-active ourliberty-heal-stale-daemon-code.timer`
+- Beacon found better: use `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (healer writes on every invocation, per `scripts/heal_stale_daemon_code.py` lines 66, 217–220, 1019). Heartbeat mtime proves the healer's code ran; timer active-status only proves the timer is scheduled.
+- New threshold: 90 min (3× 30-min cadence), allowing two missed ticks before escalation. Beats the previous 60-min event-driven threshold which fired during any stable-operation window.
+
+**Scope of cycle-prompt.md edits Forge will make:**
+1. § 3.5 substrate: `heal-stale-daemon-code-state.json` → `heal-stale-daemon-code.heartbeat`
+2. § 3.5 output classification: heartbeat-fresh + no stale daemons → nominal; heartbeat-stale (>90m) → ask-then-do (healer-down framing)
+3. § 17 file-glossary row + § "Failure modes" table row: same file-name swap
+4. No healer code changes (heartbeat file already exists and is written).
+
+**No new work generated.** Trust-policy auto-approve → Forge build phase follows. Verification anchor: `cycle-fix-check5-healer-liveness-20260531T015606Z` / `verifies_at: 2026-06-07`.
+
+---
+
 ## Iteration 142 — 2026-05-31 01:57 UTC (interactive)
 
 **Health:** ⚠️ Nominal-with-watch + G-rule dispatch — all mandatory checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (G-rule 3/3 reached → dispatched to Beacon). 0 open PRs on both repos (7th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (7th consecutive clean sync, last_sync=01:04:36Z, ~52m ago). larry-reject count: 17 (unchanged). **Action: Beacon dispatch written for Check 5 calibration fix.**
