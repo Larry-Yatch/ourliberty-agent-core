@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 191 — 2026-05-31 14:36 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired) + sync-push error (known). 7/7 services active. 0 open PRs. All inboxes empty.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1083 lines** (unchanged from iter 190 watermark of 1083). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1083 (unchanged since iter 190). No new alerts since iter 186 last cluster. alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** journalctl ourliberty-*.service --since 30min --priority warning: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon bot log — no new Larry directives since iter 185 ("approve threshold-update-2026-05-31" at 13:04Z UTC, handled). Same TIER2_FALLBACK events from 07:50 MDT (13:50Z UTC) — known carry-forward. No orphaned directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward).** Cooldown files at `~/agents/state/alert-cooldown/warning/` (newest 3): `heal-pipeline-stall:pipeline-stall:tier2-fallback-skipped-auth_401:forge` (May 31 07:59 = 13:59Z UTC), `heal-pipeline-stall:pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` (13:59Z), `heal-pipeline-stall:pipeline-stall:tier2-fallback-skipped-rate_limit:forge` (13:59Z) — all unchanged from iter 186. Root cause: Tier 2 OAuth expired (`/home/larry/.claude-larry-personal` missing credentials). APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. No new dispatch.
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items unchanged:
+  - `pulse-grule-check-c-canonical-names-001` — Beacon doc-fix, trust-policy → Forge pending.
+  - `alert-triage-persistence-invocation-001` — pending Larry approval.
+  - `forge-claude-md-preflight-self-check-bullet-001` — pending Larry.
+  - **Tier 2 OAuth restore** — ELEVATED (active pipeline stalls; runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`).
+  - **`sync-push-rebase-fallback-001`** — ELEVATED (confirmed failure at 13:50:29Z UTC).
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry.
+  - Carry-forward (iter 158): Install heal-resume-paused-on-tier1.service + .timer.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code.heartbeat: 2026-05-31T14:07:20Z UTC (~29 min old at check time, within 90-min threshold). **Note: static for 4th consecutive iter (188–191).** Escalation trigger: if >60 min old at next check (~15:08Z UTC onward). No action yet. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=c866ff8 "Pulse cycle 20260531T143355Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ⚠️ Known carry-forward, approaching 2h threshold.** agent-core-sync.json: status=error, last_sync=2026-05-31T13:50:29Z UTC (same error from iters 186-190). Last successful sync ~13:05:57Z UTC (~90 min ago at check time — ~30 min from 2h auto-fix trigger). No auto-fix triggered (threshold not yet breached). sync-push-rebase-fallback-001 APPROVAL_REQUEST pending Larry (elevated). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D) Inboxes: ✅ All empty.** forge, beacon, mirror, pulse — 0 active tasks. (forge/.hold: `marker-error-desired-state-reconciler-1.json` — fixture-pattern hold, expected.) ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate — today is Sunday → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. ✅
+
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (carry-forward signals; last_signal_at=14:36:20Z UTC).
+3. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=1, iter=191, intervention_id=iter191-carry-forward-stalls`.
+4. Updated MEMORY.md status snapshot.
+5. Wrote journal entry.
+
+**Escalated:** None. All active issues are carry-forward from iters 186-190. Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope unchanged: Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first firing + APPROVAL_REQUEST queue 7.
+
+**Patterns:**
+- System state identical to iters 187-190. No new findings this iter. All active signals are carry-forward.
+- **Tier 2 OAuth stalls persist** (>26h since May 30 first observation). Forge + beacon-bot tasks remain paused_on_tier1. Blocking action item. Monday DM covers this.
+- **Healer heartbeat static at 14:07:20Z UTC** across iters 188-191 (4 consecutive). Currently ~29 min old; within 90-min threshold. Escalation watch: if still static at next iter AND >60 min old (~15:08Z UTC), escalate.
+- **Sync approaching 2h threshold.** Last successful sync ~13:05:57Z UTC; ~90 min ago. Next automated cycle (~5 min) or next interactive session may trigger stale-sync auto-fix.
+- **Check VIII/IX first firing TOMORROW (Mon 2026-06-01 UTC).** Monitor for unexpected output.
+
+**Learned:** Healer heartbeat static pattern (4 iters) is consistent with healer itself being alive (cooldown/warning files updated at 07:59 MDT = 13:59Z UTC, 37 min before heartbeat stopped updating). This may indicate the healer ran and wrote cooldown files but hasn't run a new cycle since 14:07Z — normal if heal cadence is slower than Pulse. Not an escalation yet.
+
+---
+
 ## Iteration 190 — 2026-05-31 14:32 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired) + sync-push error (known). 7/7 services active. 0 open PRs. All inboxes empty.
