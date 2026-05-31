@@ -6,6 +6,25 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~03:44Z UTC (Iter 154)
+
+**System: ✅ Nominal-with-watch.** Iter 154 findings: **PR #217 (step-b-resume) MERGED 03:39:39Z** — rate-limit-resilience-001 step-b live. **PR #218 (register-claude-setup-tokens-rotation) OPEN**, MERGEABLE, Mirror reviewing (dispatched 03:40:54Z). **Iter 153 `[1m]` escalation RETRACTED** — confirmed intentional (1M-context window for Beacon Telegram per pilot step 2; `_history` is authoritative). Beacon-bot stale alert self-resolved (service restarted 03:35:18Z, 2s after healer fired). 6/6 services active. Forge inbox: 2 tasks (build-register archiving, fix-rotation-gate-setup-token-aware 7 min). APPROVAL_REQUEST queue: 5 unchanged. Sync push error carry-forward. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- **PR #217 (step-b-resume): MERGED 03:39:39Z.** ✅ CLOSED. rate-limit-resilience-001 step-b live.
+- **PR #218 (register-claude-setup-tokens-rotation): OPEN.** Mirror reviewing. Created 03:40:42Z. Watch Check E.
+- **iter 153 `[1m]` escalation: RETRACTED.** `claude-opus-4-8[1m]` is intentional — 1M context window for Beacon Telegram. `_history` entry 2026-05-30 (pilot step 2) is authoritative. Future: check `_history` before flagging config asymmetry.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 12 iters (143–154). Heartbeat fresh (03:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01**.
+- Sync push error: carry-forward. Root cause fix pending Larry.
+- **rate-limit-resilience sequence:** step-b MERGED; register-claude-setup-tokens-rotation Mirror review in-flight (PR #218). Next step: fix-rotation-gate-setup-token-aware (7 min in Forge inbox).
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 0 active.** Doc-fix APPROVAL_REQUEST pending Larry.
+- **alert-triage.json state file MISSING.** Journal-recorded watermark used (1069). Should self-recreate on next automated cycle. Watch: if still missing after 2 automated cycles → escalate.
+- **Calibration note (new): `_history` cross-reference discipline.** Before escalating on config-field asymmetry, read config's own `_history` block. Iter 153 false positive on `[1m]` would have been caught by checking `_history`. Add to future Check 0 judgment.
+
 ## Status snapshot — updated 2026-05-31 ~03:33Z UTC (Iter 153)
 
 **System: ✅ Nominal-with-watch.** Iter 153 findings: **PR #215 (chore/remove-yes-approval-token) MERGED at 03:22:59Z** — closes iter 152 watch. **Opus 4.8 pilot live** (commit 2f470f8 — beacon bumped to claude-opus-4-8; first activity observed at 03:27Z). 0 open PRs both repos. 6/6 services. Forge inbox: 2 fresh tasks (step-b-resume + register-claude-setup-tokens-rotation, <30 min). Tier 1 rate limit active (resets 11:30am MDT); tasks held pending recovery. Sync push errors at 03:27Z + 03:29Z (carry-forward). APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.

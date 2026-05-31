@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 154 — 2026-05-31 03:44 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #217 (step-b-resume) MERGED at 03:39:39Z. PR #218 (register-claude-setup-tokens-rotation) OPENED, Mirror reviewing. Beacon-bot stale alert self-resolved (service restarted at 03:35:18Z, 2s after healer fired). iter 153 `[1m]` escalation confirmed false positive (intentional per pilot step 2 history). 6/6 services active. 0 alerts requiring action. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1069 lines** (+2 vs iter 153 watermark of 1067). alert-triage.json missing (used journal-recorded watermark). 2 new alerts — both Tier 3 (self-resolved / false-positive).
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new alerts — both Tier 3.**
+  - Line 1068: `heal-stale-daemon-code` 03:35:16Z — "ourliberty-beacon-bot.service still stale after auto-restart; no further auto-restart attempts." Current check: `ActiveEnterTimestamp=2026-05-31T03:35:18Z UTC`, script mtime=`03:34:43Z UTC` → service started 35s AFTER script write → running latest code. **Self-resolved 2s after healer fired** (systemd restart or systemd RestartSec). Tier 3 known-pattern. ✅
+  - Line 1069: `pulse-cycle` 03:36:13Z — Pulse's own iter 153 escalation re `agent-models.json telegram_model "claude-opus-4-8[1m]"`. **FALSE POSITIVE — confirmed intentional.** config/agent-models.json `_history` entry 2026-05-30 (pilot step 2) explicitly documents: "beacon.telegram_model refined claude-opus-4-8 → claude-opus-4-8[1m] to preserve the 1M-context window Beacon chat ran on before; plain claude-opus-4-8 is 200k." The `[1m]` is NOT ANSI corruption — it's the model identifier suffix for 1M-context Opus 4.8. Commit `ae0de94 Wire Beacon chat to claude-opus-4-8[1m] (pilot step 2)` is the canonical source. Iter 153 ask-then-do finding: **RETRACTED**. Tier 3. ✅
+  - New watermark: **1069**. alert-triage.json state file missing — will be recreated on next automated cycle. Note in journal only.
+
+- **(Check 1) Log noise: ✅ Nominal.**
+  - outbox-notifier.log: Clean INFO-only pipeline activity. step-b-resume build → PR #217 → Mirror REVIEW_PASS → AUTO_MERGE 03:39:39Z. register-claude-setup-tokens-rotation build → PR #218 → Mirror review dispatched 03:40:54Z. No WARN/ERROR events. ✅
+  - beacon_telegram_bot.log: TIER2_FALLBACK_USED reason=rate_limit at 21:39:52 MDT — Tier 2 fallback working for bot processes (rate_limit path). TIER2_FALLBACK_UNAVAILABLE reason=auth_401 (expired credentials, known carry-forward). Neither above 5/h threshold. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry messages. Last inbound: `'go'` 20:44:09 MDT (iter 152/153 carry-forward — directive tracked by PR #216 MERGED). No orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 03:35:16Z UTC (~9 min old, within 90-min threshold). ✅ PR #217 (step-b-resume): Mirror REVIEW_PASS → AUTO_MERGE 03:39:39Z. ✅ PR #218 (register-claude-setup-tokens-rotation): opened 03:40:42Z, Mirror review dispatched 03:40:54Z — fresh, not a stall. ✅ fix-rotation-gate-setup-token-aware.json: 7 min in Forge inbox — fresh. ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending.
+  - `pulse_telegram_bot.sh launcher` — pending.
+  - `stuck-cycle timeout guard` (iter 43) — pending.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 03:35:16Z UTC (within 90-min threshold). Beacon-bot confirmed running latest code (ActiveEnterTimestamp=03:35:18Z > script mtime=03:34:43Z). Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge (APPROVAL_REQUEST). ⚠️→in-progress.
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (confirmed from session-start gitStatus). Ahead of origin due to sync push failure carry-forward (tracked under Check B). ✅
+
+- **(Check B) Sync health: ⚠️ Push error — status=error, last successful commit=ca229d9cb2bd.** Known race condition (sync-push-rebase-fallback-001 pending Larry). Carry-forward. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. Beacon-bot fresh (03:35:18Z restart, latest code). ✅
+
+- **(Check D) Inboxes: Forge 2 tasks (both fresh), Mirror 1 task (fresh). ✅**
+  - forge: `build-register-claude-setup-tokens-rotation.json` (22 min, build complete — PR #218 opened; file pending archive by inbox-watcher), `fix-rotation-gate-setup-token-aware.json` (7 min, from Beacon, fresh task). Both <60 min. ✅
+  - mirror: `review-register-claude-setup-tokens-rotation.json` (<5 min). Fresh. ✅
+  - beacon/pulse: empty. ✅
+
+- **(Check E) PRs: ⚠️ PR #218 open (fresh, Mirror reviewing).**
+  - **PR #217 (step-b-resume) MERGED at 03:39:39Z.** ✅ rate-limit-resilience-001 step-b complete! SEQUENCE_STEP_MERGED logged by notifier.
+  - **PR #218 "chore(creds): register Claude Code setup-tokens in rotation registry"** — OPEN, MERGEABLE, reviewDecision="", autoMergeRequest=null. Created 03:40:42Z (~4 min at check time). Mirror review dispatched 03:40:54Z. Below 30-min always-fix threshold; fresh + Mirror actively reviewing. Watch. ⚠️→normal-pipeline.
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅ No action.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All 6 services active, repo clean, inboxes fresh.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended at 03:44:21Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=03:44:21Z.
+5. Wrote journal entry. MEMORY.md status snapshot to be updated.
+
+**Escalated:** None new. All active findings carry-forward to Monday [yellow] DM 2026-06-01 (5 APPROVAL_REQUESTs).
+
+**Patterns:**
+- **PR #217 pipeline: textbook execution.** Forge built → PR #217 → Mirror REVIEW_PASS → AUTO_MERGE 03:39:39Z. rate-limit-resilience-001 step-b now live. Strong pipeline signal.
+- **iter 153 false positive: `[1m]` is intentional.** Pulse flagged `claude-opus-4-8[1m]` as ANSI corruption. Retracted this iter after reading agent-models.json `_history`. The 1M-context distinction (`[1m]`) is load-bearing: beacon.inbox_model=200k (claude-opus-4-8), beacon.telegram_model=1M (claude-opus-4-8[1m]). Future check: before escalating on config-field asymmetry, read the config's own `_history` block. This is a calibration data point.
+- **Beacon-bot "still stale" timing precision.** Healer fired at 03:35:16Z; service restarted at 03:35:18Z (2s later). Healer's second-check posture ("no further attempts") is correct, but the self-resolve was so fast that the alert was stale on delivery. Low concern; not a G-rule candidate yet.
+- **rate-limit-resilience sequence advancing.** step-b MERGED; register-claude-setup-tokens-rotation build → Mirror review dispatched within 1 min. Sequence proceeding cleanly. Tier 1 rate limit still active (resets 17:30Z UTC today).
+
+**Learned:**
+- `config/agent-models.json` carries a `_history` array documenting every change. This is the ground truth for "is this config value intentional?" Future escalations on config-field anomalies should cross-reference `_history` before classifying as corruption. The asymmetry between `inbox_model` and `telegram_model` (200k vs 1M context window) is intentional and meaningful.
+- alert-triage.json state file is missing — likely a stale-file-system issue or corruption from iter 153's session. The file should be recreated by the next automated cycle. Tracking here in case it persists.
+
+---
+
 ## Iteration 153 — 2026-05-31 03:33 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — PR #215 (chore/remove-yes-approval-token) MERGED at 03:22:59Z. Opus 4.8 pilot live (commit 2f470f8 — Beacon bumped to claude-opus-4-8). 0 open PRs on both repos. 6/6 services active. Forge inbox: 2 fresh tasks (<20 min). Tier 1 rate limit active (resets 11:30am MDT); Forge tasks held pending recovery — same known condition as iter 151 (03:02Z alerts). Sync push error carry-forward (03:27Z + 03:29Z). APPROVAL_REQUEST queue: 5 unchanged.
