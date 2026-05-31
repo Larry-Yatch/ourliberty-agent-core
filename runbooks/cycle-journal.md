@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 127 — 2026-05-31 00:18 UTC (interactive)
+
+**Health:** ⚠️ Drift-watch — PR #211 (step-a-rotation) CONFLICTING post-Mirror-REVIEW_PASS (00:10:57Z); Larry DM'd rebase command by outbox-notifier. Giving Larry response window before dispatching Forge rebase via Beacon. All 6 services active. Sync push failure carry-forward (12th+ occurrence). Check I + Check III already fired this Sunday (iter 126), idempotency guards holding.
+
+**Triage:** Check 0 — alert-triage.json absent (PR-β not deployed). Manual scan: 2 new alerts since iter 126 watermark (~00:12Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new alerts.**
+  - 00:05:15Z `heal-stale-daemon-code` auto-restarted pulse-bot (script mtime newer by 2600.7 min; ebe7368 now live) — Tier 3 known pattern, routine. ✅
+  - 00:10:57Z `outbox-notifier` AUTO_MERGE_SKIPPED_CONFLICTING for PR #211 (step-a-rotation; mergeable=CONFLICTING, Mirror REVIEW_PASS; DMed Larry rebase command). **ask-then-do.** ⚠️ No tier-reset from Tier-3 pulse-bot restart; tier-reset from PR #211 conflict alert.
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier: AUTO_MERGE_DEFERRED_UNKNOWN → AUTO_MERGE_SKIPPED_CONFLICTING for PR #211 at 00:10:57Z (single occurrence; expected for a post-build conflict). heal-pr-auto-merge: "no mirror-passed failures in last 24h" 00:14:18Z — healer not detecting CONFLICTING state (watch; may need substrate expansion). No WARN/ERROR spikes above threshold. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log latest at 18:10:37 MDT (00:10:37Z UTC): notification idx=1046 delivered (intent=review-pass for PR #212). No new Larry directives detected. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** All inboxes empty (beacon/forge/mirror/pulse). No heal-pipeline-stall cooldowns in alert-cooldown/warning/ (only Tier-2 rate_limit/auth_401 cooldowns dated May 28 — pre-existing stale state). No active stalls. ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, Beacon APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94)
+  - stuck-cycle timeout guard (iter 43)
+  - Monday [yellow] DM: 2026-06-02 (next Monday). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code-cooldowns.json current; pulse-bot restarted 00:05:15Z (routine). heal-stale-daemon-code.log 00:05:15Z: 29 services with "unparseable ActiveEnterTimestamp" — these are one-shot/timer services not currently running; expected. auto-restarted=1 (pulse-bot), fresh=19, unparseable=29. No new inbox-watcher rc=-1. G-rule still at 2/3. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean (session gitStatus). HEAD=8885a0a "Pulse cycle 20260531T001247Z" (iter 126 auto-commit, PR #212 in history). Git fetch blocked by session permissions; assumed at origin/main (no new merges since iter 126 — PR #211 still CONFLICTING, no merges landed). ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (12th+ occurrence).**
+  - sync.json: status=error 00:09:55Z "Auto-commit push failed; rolled back", commit=45efeaf7. Same root cause: sync_agent_core.sh:161 bare-push. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon/forge/mirror/pulse all empty. ✅
+
+- **(Check E) PRs: ⚠️ PR #211 CONFLICTING.**
+  - ourliberty-agent-core: PR #211 "fix(rotation): step A — auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 keep-alive" — OPEN, mergeable=UNKNOWN (GitHub recomputing after conflict detection), reviewDecision="", autoMergeRequest=null. Mirror REVIEW_PASS at 00:10:57Z. outbox-notifier AUTO_MERGE_SKIPPED_CONFLICTING, Larry DM'd rebase command. Age ~28 min. **ask-then-do: giving Larry response window (< 30 min since DM); will dispatch Forge rebase via Beacon next iter if unresolved.** ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
+  - Note: heal-pr-auto-merge healer reports "no mirror-passed failures" — substrate doesn't detect CONFLICTING state. 1st observation; watch.
+
+- **(Check I):** Fired iter 126 (00:04:14Z, week 2026-05-25). Idempotency guard: `week 2026-05-25 block already present` — correct, no re-fire. ✅
+- **(Check III):** Fired iter 126 (first run, 00:04:40Z, 4 high-attention proposals). Next run: 2026-06-07 (14d). ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** 0 overdue, 0 in 60d window. ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. No always-fix conditions triggered (repo appears at origin, inboxes empty).
+3. PR #211 conflict: ask-then-do — Larry DM'd by outbox-notifier at 00:10:57Z. Response window open (<30 min). No dispatch this iter; if CONFLICTING next iter → dispatch Forge rebase to Beacon.
+4. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:18:49Z.
+5. Called `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended.
+6. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None new. PR #211 already DM'd to Larry by outbox-notifier. APPROVAL_REQUEST queue (3) unchanged.
+
+**Patterns:**
+- **PR #211 CONFLICTING: 1st occurrence.** Same shape as PR #210 (iters 121–122). If unresolved next iter → dispatch to Beacon for Forge rebase. heal-pr-auto-merge healer substrate may not cover CONFLICTING detection (1st observation).
+- **Sync push failure: 12th+ occurrence.** APPROVAL_REQUEST pending. Monday DM queue. No new action.
+- **inbox-watcher rc=-1: still 2/3 toward G-rule.** No new occurrence this iter.
+- **heal-pr-auto-merge blind to CONFLICTING.** Healer checks "mirror-passed failures" but PR #211's CONFLICTING state doesn't register as a failure in that substrate. 1st observation; G-rule at 1/3 (threshold: 3). Watch.
+
+**Learned:**
+- outbox-notifier DMed Larry the rebase command before Pulse's iter completed — the notification chain is working. Pulse's journal records it; no additional DM needed from Pulse this iter.
+- heal-pr-auto-merge.log at 00:14:18Z still says "no mirror-passed failures in last 24h" despite PR #211 CONFLICTING at 00:10:57Z. The healer may be checking for merge failures (non-zero exit from `gh pr merge`) rather than conflicting-mergeable PRs. If this is structural, it's a healer substrate gap worth a Beacon dispatch. Watch for 2 more iters before proposing.
+
+---
+
 ## Iteration 126 — 2026-05-31 00:02 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — PR #212 (harden-systemd-timer-recovery) MERGED ~00:05Z, closing the iter 122 watch item. PR #211 (step-a-rotation) open, Mirror review queued. Check I + Check III both fired (first Sunday UTC crossing, 2026-05-31). All 6 services active. Sync push failure carry-forward unchanged.
