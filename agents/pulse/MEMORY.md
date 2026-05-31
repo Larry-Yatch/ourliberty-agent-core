@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:43Z UTC (Iter 140)
+## Status snapshot — updated 2026-05-31 ~01:51Z UTC (Iter 141)
 
-**System: ✅ Nominal-with-watch.** Iter 140 findings: All checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward, unchanged from iter 139). 0 open PRs (5th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (5th consecutive clean sync). 2-minute interactive cycle immediately after iter 139; no new signals. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 141 findings: All checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (G-rule 2/3, 3rd consecutive observation). 0 open PRs (6th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (6th consecutive clean sync). larry-reject count: 17 (down from 34 — partial cleanup). Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
-- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence (no CONFLICTING PR active). Watch.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m old: G-rule 1/3** (new tracking, iters 139+140). heal-stale-daemon-code-cooldowns.json last modified ~00:05Z UTC; seen as >60m old in both iters 139 and 140. All services active; restart_fails=0. 1 more occurrence → escalate healer-down.
-- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001 (Tier 2 OAuth diagnosis probe). Monday DM 2026-06-02.
-- Sync push error: **5th consecutive clean cycle.** Last error iter 135. Race-condition hypothesis holds. Root cause still unfixed; APPROVAL_REQUEST pending.
+- **Healer state file >60m old: G-rule 2/3** (iters 139+140=1/3, iter 141=2/3). heal-stale-daemon-code-cooldowns.json last modified 00:05:15Z UTC (104m old at check time). Benign interpretation: healer only writes on restart events; last restarts 23:35Z+00:05Z, no code changes since. Calibration note: prior "restart_fails=0" claims were schema misreads (field does not exist; actual fields: last_restart_ts, last_alert_ts). **Next occurrence → dispatch to Beacon: propose Check 5 healer process liveness check.**
+- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001. Monday DM 2026-06-02.
+- Sync push error: **6th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 

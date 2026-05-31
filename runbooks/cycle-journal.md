@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 141 — 2026-05-31 01:49 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — all mandatory checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (healer state file G-rule 2/3, 3rd consecutive observation). 0 open PRs on both repos (6th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (6th consecutive clean sync). larry-reject count: 17 (down from 34 — partial cleanup by Larry).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (unchanged from iter 140). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl unchanged at 1056 lines. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry at 01:02:05Z UTC (PR #211 merge DM — same as iters 139+140). No new WARN/ERROR. inbox-watcher.log absent (service active, quiet). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last Larry message: 19:33Z MDT (`approve tier2-verifier-probe-001` sequence, same as iter 139). No new directives since. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning/: all entries dated May 26–30 (same stale set as iters 138–140). No new pipeline-stall or healer entries since 01:02Z UTC. ✅
+
+- **(Check 4) Pending Larry directives: 4 items. ⚠️ (carry-forward)**
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+  - **tier2-verifier-probe-001** (iter 139) — Beacon DM'd Larry at 19:33Z MDT. Still pending Larry's `approve tier2-verifier-probe-001` reply. ⚠️
+
+- **(Check 5) Stale daemon: ⚠️ G-rule 2/3 — 3rd consecutive iter.** heal-stale-daemon-code-cooldowns.json last modified 2026-05-31T00:05:15Z UTC (104 min ago at check time). This is the 3rd consecutive iteration seeing this file >60m old (iters 139, 140, 141). MEMORY.md tracking at G-rule 2/3 (iters 139+140 = G-rule 1/3; iter 141 = G-rule 2/3; per MEMORY.md discipline "1 more → escalate healer-down"). **All 6 services are active; restart_fails field absent from actual JSON schema.** Benign interpretation: the healer only writes to the cooldowns file on restart events; last restarts were at 23:35Z (beacon/forge/mirror/inbox-watcher) and 00:05Z (pulse-bot). No code changes since then → healer has nothing to do → file correctly reflects last-restart time, not a heartbeat. **Calibration finding:** prior journal entries claimed "restart_fails=0" but the actual JSON has no such field — only `last_restart_ts` and `last_alert_ts`. Future Check 5 should not reference restart_fails. ⚠️
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean, HEAD=e8c5415=origin/main. ✅
+
+- **(Check B) Sync health: ✅ 6th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T01:04:36Z (~45m ago, within 2h threshold). Race-condition root cause (sync_agent_core.sh:161) still unfixed; APPROVAL_REQUEST pending Monday. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon/forge/mirror/pulse — 0 tasks each. ✅
+
+- **(Check E) PRs: ✅ PR-clear holds (6th consecutive iter).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Idempotency guard holds: check-i-2026-05-31.json exists (week_ending=2026-05-25). ✅
+- **(Check III):** Fired iter 126 (2026-05-31T00:04:40Z). Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23. ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean and at origin, services active, inboxes empty, no stale PRs).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T01:51:32Z.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-141-nominal-check5-g-rule-2-3"}'` → row appended.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None new. Check 5 G-rule at 2/3 — next occurrence dispatches to Beacon for Check 5 calibration proposal (healer process liveness check vs. cooldowns file age). All 4 APPROVAL_REQUESTs carry to Monday DM 2026-06-02.
+
+**Patterns:**
+- **APPROVAL_REQUEST queue: 4 items unchanged.** Monday DM 2026-06-02.
+- **Sync push error: 6th consecutive clean cycle.** Race-condition root cause fix (sync-push-rebase-fallback-001) still pending Larry. Active risk remains low.
+- **heal-stale-daemon-code state file >60m old: G-rule 2/3** (3rd consecutive iter: 139, 140, 141). Per discipline: next occurrence → dispatch to Beacon (propose: Check 5 should test healer process liveness rather than cooldowns file age; the current threshold fires whenever no service needs restart for >60m, which is normal during stable operation).
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR to test.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+
+**Learned:**
+- Larry cleaned up 17 of the 34 larry-reject-*.json files in beacon/.invalid/ (34→17). The remaining 17 are still unprocessed. No Telegram re-action observed yet; may have been cleaned manually.
+- Check 5's "restart_fails=0" claim was a schema misread — the actual JSON has `last_restart_ts` and `last_alert_ts` fields. Future cycles should use `last_restart_ts` to derive time-since-last-restart per service, not look for a non-existent restart_fails counter.
+- The healer state file >60m pattern (Check 5) appears benign when all services are active: the healer writes on restart-events, not on periodic heartbeats. If the threshold fires reliably during stable periods, the G-rule dispatch to Beacon should propose either removing this check or replacing it with a process-liveness check (e.g., confirm the healer script itself is being invoked by its timer).
+
+---
+
 ## Iteration 140 — 2026-05-31 01:42 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward, unchanged from iter 139). 0 open PRs on both repos. All 6 services active. All inboxes empty. sync.json: no-change (5th consecutive clean sync). 2 minutes after iter 139; no new Telegram activity, no new alerts.
