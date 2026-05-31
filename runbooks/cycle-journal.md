@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 213 — 2026-05-31 17:25 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired). 7/7 services active. 0 open PRs. **NEW: PR #223 MERGED — feat(healer): auto-remediate install-drift missing-install case (17:18:50Z UTC). Install-drift systemic fix LIVE.** Beacon inbox: 1 stalled notify (informational).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1085 lines** (unchanged from iter 212). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1085 (unchanged). alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Alert watermark unchanged at 1085. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged: `agent-runner-{forge,beacon,mirror,pulse}:claude_tier1_failed_tier2_unavailable:rate_limit`, `beacon-telegram-bot:claude_tier1_failed_on_resume_session_bound:auth_401`. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. **POSITIVE:** Forge executed `install-drift-auto-remediation-001` on Tier 1 (Sonnet) despite stall — rate-limit resilience (PR #211) is working. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). 8 APPROVAL_REQUEST items unchanged. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T17:07:21Z UTC** — ~18 min old at check time. Within 90-min threshold. **Note:** PR #223 updated `scripts/heal_systemd_install_drift.py`; `heal-stale-daemon-code` will detect and reload on next sweep. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=9b91204 "Pulse cycle 20260531T171700Z" (wrapper auto-commit of iter 212 artifacts), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: last_sync=2026-05-31T17:06:00Z, status=no-change. ~19 min old at check time; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ⚠️ Beacon inbox: 1 stalled notify / 0 open PRs.** `notify-install-drift-auto-remediation-001.json` in Beacon inbox (review-pass from Mirror, intent=review-pass). Beacon-bot stalled (Tier 2 OAuth expired); will be processed after OAuth restore. PR #223 already merged — this is Beacon's closing ceremony, no Pulse action needed. 0 open PRs in ourliberty-agent-core and ourliberty-dashboard. ⚠️ (informational)
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json on disk; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json on disk; next 2026-06-07. ✅ | Check VIII/IX: Sunday gate → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Deploy-notifier cooldown file count: 106** (unchanged from iter 212). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **G-rule watch items:** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), cycle.timer stuck (1/3). **systemd install-drift G-rule: CLOSED** (PR #223 shipped the systemic fix). F24 empty-prompt: APPROVAL_REQUEST `pulse-grule-prompt-template-001` pending (item #8). ✅
+
+- **✅ NEW: PR #223 MERGED — feat(healer): auto-remediate install-drift missing-install case (17:18:50Z UTC).** Full pipeline completed on Tier 1 despite OAuth stall: Forge built (3 files: `config/auto-remediation-allowlist.json`, `scripts/heal_systemd_install_drift.py`, `scripts/tests/test_heal_systemd_install_drift.py`), Mirror approved (43 tests pass, all ACs #1–#5 verified: allowlist matches spec verbatim; _remediation_allowed fails safe on malformed inputs; _remediate_missing_install mirrors _heal_stuck_timer discipline with post-verify gate; _render_install_healed reuses install-drift dedup key; run_once stacks third gate correctly under kill-switch and healer_enabled()), auto-merged. No new systemd unit files — no install dance needed for PR #223 itself. Carry-forward "Forge task install-drift-auto-remediation-001 blocked by OAuth" CLOSED. **systemd install-drift G-rule CLOSED.**
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. Verified PR #223 merge (17:18:50Z UTC), inspected 3 changed files, confirmed no new systemd unit files requiring install dance.
+3. No auto-fix needed this iter.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 213` → intervention appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at updated.
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. All active issues are carry-forward. **Monday [yellow] DM scope for 2026-06-01 UTC UPDATED:** Tier 2 OAuth ELEVATED (active stalls; Forge+Beacon-bot paused_on_tier1; Beacon notify stalled) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + APPROVAL_REQUEST queue 8 (incl. pulse-grule-prompt-template-001). REMOVED from Monday scope: "Forge task install-drift-auto-remediation-001 blocked" (PR #223 MERGED).
+
+**Patterns:**
+- PR #223 validated full pipeline under Tier 1 (Sonnet): Forge picked up task, built, Mirror reviewed, auto-merged — all while Tier 2 OAuth expired. Rate-limit resilience (PR #211) is working as designed.
+- Tier 2 OAuth stall is the last active blocker. Monday DM is the action gate.
+- Check VIII/IX first firing TOMORROW (2026-06-01 UTC). Monitor for unexpected output.
+
+**Learned:** install-drift G-rule pipeline (detect → spec → build → review → merge) completed end-to-end on Tier 1 in under 10 minutes from dispatch. Healer code is live; once `heal-stale-daemon-code` reloads it, future install-drift findings will be auto-remediated. Teach-to-fish loop closed for this pattern.
+
+---
+
 ## Iteration 212 — 2026-05-31 17:14 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. Forge inbox: 1 queued task (install-drift-auto-remediation-001, blocked by OAuth stall). **0 new alerts.** New: PR #222 merged (install-drift auto-remediation brief); Forge task dispatched and queued.
