@@ -6,27 +6,28 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~05:07Z UTC (Iter 165 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~05:10Z UTC (Iter 166 — interactive, full cycle)
 
-**System: ✅ Nominal-with-dispatch — All checks clean + Check C G-rule dispatch.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~32 min). Check B 7th consecutive clean. Tier=1, consecutive_clean=0 (tier-reset from dispatch). APPROVAL_REQUEST queue: 6 (unchanged). Alert watermark: 1078.
+**System: ✅ Nominal — All checks clean. Beacon result received: APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` (doc-fix for cycle-prompt.md § 4.3).** 0 new system alerts. 7/7 services active. 0 open PRs. All inboxes processed. Healer heartbeat 05:05:17Z UTC (~5 min). Check B 8th consecutive clean. Tier=1, consecutive_clean=1. APPROVAL_REQUEST queue: 7 (+1 this iter). Alert watermark: 1078.
 
 **Watch items updated:**
-- **Check C G-rule DISPATCHED (iter 165).** 3 consecutive clean iters (163, 164, 165) using canonical service names → doc-fix dispatched to Beacon (`check-c-service-names-doc-fix-20260531T050300Z.json`). Update cycle-prompt.md § 4.3: enumerate 7 canonical names + note deprecated `-telegram-bot` suffix. Close when Forge PR merges.
+- **Check C G-rule chain: APPROVAL_REQUEST produced (iter 166).** Beacon processed iter 165 dispatch in ~5 min. APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` (doc-only, cycle-prompt.md § 4.3 enumeration of 7 canonical names + stale-suffix callout + lookup command). Pending trust-policy → Forge build → PR → Mirror → merge. Close when PR merges and 3 clean Check C iters confirm no further calibration issues.
 - **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** Beacon diagnosed root cause (invocation gap in run_cycle.sh + cycle-prompt.md § 3.0). APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (pulse-escalations.json id=74). Close when Larry approves, Forge PR merges, + alert-triage.json appears in next automated cycle.
 - **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z. Rate limit reset 11:30am MDT today. Monday DM will include trend assessment.
 - **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
-- **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001 (NEW), alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01 (TOMORROW UTC)**.
 - **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Close when Larry installs via SSH.
-- **Check B CLEAN: 7th consecutive (iters 159–165).** sync-push-rebase-fallback-001 still pending as defensive fix.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 22 iters (143–165). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
+- **Check B CLEAN: 8th consecutive (iters 159–166).** sync-push-rebase-fallback-001 still pending as defensive fix.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 23 iters (143–166). Heartbeat fresh (05:05:17Z UTC). Verification: 2026-06-07.
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix pending Larry. G-rule posture unchanged.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` now in pipeline. G-rule posture unchanged.
 - **systemd install-drift G-rule: 1/3.** No new instance this iter.
 - **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
 - **deploy-notifier READY cooldowns: 309 entries in alert-cooldown/warning/.** Snoozed Vercel deploy notifications. No action required.
 - **inbox-watcher.log file MISSING on disk** (calibration note, iter 165). Service is active; use `journalctl -u ourliberty-inbox-watcher` for log access. Not a bug.
+- **Check VIII/IX: FIRST FIRING TOMORROW (2026-06-01 UTC).** First ever run. Monitor for any unexpected output.
 
 ## Status snapshot — updated 2026-05-31 ~05:00Z UTC (Iter 164 — interactive, full cycle)
 

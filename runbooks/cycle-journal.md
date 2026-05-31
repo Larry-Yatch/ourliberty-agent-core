@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration 166 — 2026-05-31 05:10 UTC (interactive)
+
+**Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new system alerts. Beacon result received: APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` produced for Forge doc-fix (iter 165 G-rule). APPROVAL_REQUEST queue: 6→7. 7/7 services active. 0 open PRs. All inboxes processed. Healer heartbeat 05:05:17Z UTC (~5 min). Check B: 8th consecutive clean. Tier=1, consecutive_clean=0→1.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1078 lines** (unchanged from iter 165 watermark). alert-triage.json STILL MISSING (APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry approval). 0 new system alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new system alerts.** Watermark unchanged at 1078. Last system alert at 04:35:29Z UTC (iter 165's own APPROVAL_REQUEST DM, line 1078). No new healer or process alerts since. ✅
+
+- **(Check 0) alert-triage.json MISSING: carry-forward.** APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry. No new action. ✅
+
+- **(Check 0 — new) Beacon result: APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` produced.** Beacon processed iter 165 Check C G-rule dispatch (`check-c-service-names-doc-fix-20260531T050300Z.json`) at ~05:08Z UTC (~5 min turnaround). Produced APPROVAL_REQUEST for Forge: doc-only PR updating `runbooks/cycle-prompt.md § 4.3` to enumerate the 7 canonical service names (`ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`, `ourliberty-inbox-watcher.service`, `ourliberty-cycle.timer`, `ourliberty-outbox-notifier.service`) + note the deprecated `-telegram-bot` suffix + add authoritative lookup command. Beacon note: "trust policy should auto-approve given task_type: doc-only and narrow scope." Forge inbox currently empty — pending trust-policy evaluation. Pulse assessment: SOUND, consistent with Beacon. APPROVAL_REQUEST queue: 6→7. ⚠️ (new item, no tier-reset — additive queue update only)
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: last WARN 04:00:13Z UTC (MalformedMirrorMarker for fix-rotation-gate-setup-token-aware, retry-1/3, self-resolved — already in post-dispatch counter=4). Last INFO: 05:08:23Z UTC (pulse←beacon notify for check-c G-rule result). No new WARNs. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 22:35:54 MDT (04:35:54Z UTC) — alert idx=1077 delivered. No new Larry directives. No orphaned messages. No agent distress. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat 05:05:17Z UTC (~5 min old, within 90-min threshold). alert-cooldown/warning: all known snoozed patterns (agent-runner rate_limit ×4, beacon-bot auth_401, build-sequence-advancer sequence-complete, deploy-notifier READY ×many, heal-build-sequence-advancer-heartbeat 4d stale, heal-chain-event-shipper-heartbeat 5d stale). No new active stall. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (+1 this iter).**
+  - `pulse-grule-check-c-canonical-names-001` — NEW: Beacon doc-fix PR for cycle-prompt.md § 4.3 canonical service names enumeration. Trust-policy evaluation pending.
+  - `alert-triage-persistence-invocation-001` — wire alert_triage_state.py into Check 0 (pending Larry approval).
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR (pending Larry).
+  - Tier 2 OAuth restore — pending Larry (runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry (iter 43).
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer.
+  - **Monday [yellow] DM: 2026-06-01 — TOMORROW UTC.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 05:05:17Z UTC (~5 min old, within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (session-start gitStatus + sync no-change confirmed). HEAD=c78791d "Pulse cycle 20260531T050901Z" (automated cycle at ~05:09Z UTC — ran clean). git commands blocked by interactive auth; using session gitStatus + sync.json as substrate. ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T05:04:39Z UTC (~6 min old, within 2h threshold). 8th consecutive clean Check B. sync-push-rebase-fallback-001 still pending Larry as defensive hardening. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** Confirmed: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. G-rule dispatched iter 165; doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` now pending. ✅
+
+- **(Check D) Inboxes: All processed. ✅** forge, beacon, mirror: empty. pulse: `notify-check-c-service-names-doc-fix-20260531T050300Z.json` (Beacon result — processed this iter; pending inbox-watcher archive). ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists (fired iter 126); idempotency guard fires. Next: Sunday 2026-06-07. ✅ | Check III: next 2026-06-07. ✅ | Check VIII/IX: **TOMORROW — Monday UTC 2026-06-01**. First firing. ⚠️ (upcoming)
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **G-rule watch items (no new occurrences this iter):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` in pipeline), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + day-gated check skips.
+2. Processed Beacon result notification `notify-check-c-service-names-doc-fix-20260531T050300Z.json` (pulse inbox): assessed APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` as SOUND — doc-only, narrow scope, well-specified. Added to APPROVAL_REQUEST queue (6→7). Pending trust-policy evaluation + Forge dispatch.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+4. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None new this iter. APPROVAL_REQUEST queue now 7. Monday [yellow] DM tomorrow (2026-06-01 UTC) will include `pulse-grule-check-c-canonical-names-001` in queue list. Check VIII/IX fire tomorrow (first run).
+
+**Patterns:**
+- **Beacon turnaround time on G-rule dispatch: ~5 min** (iter 165 dispatch at 05:03Z → Beacon result at 05:08Z). Fast. Consistent with the 20-min turnaround observed on the alert-triage G-rule (iter 160→161).
+- **Check B: 8th consecutive clean.** sync-push-rebase-fallback-001 remains pending defensive hardening; acute error fully resolved.
+- **Check C G-rule chain progressing.** Dispatch (iter 165) → Beacon APPROVAL_REQUEST (this iter, ~5 min) → trust-policy → Forge PR → Merge → Pulse verification (3 clean iters). Pipeline flowing.
+
+**Learned:** Nothing new this iter. Healer-heartbeat cadence remains stable (~30 min). Beacon inter-agent notify turnaround is consistently 5-20 min for doc-fix G-rules.
+
+---
+
+## Iteration 166 — 2026-05-31 05:10 UTC (inter-agent notify — Beacon result)
+
+**Health:** ✅ Nominal — Beacon result received for G-rule dispatch `check-c-service-names-doc-fix-20260531T050300Z`. APPROVAL_REQUEST emitted. Pipeline advancing.
+
+**Received:** Inter-agent notify from Beacon (`intent=result-notification`, `status=SUCCESS`). Task `check-c-service-names-doc-fix-20260531T050300Z` — the Check C service-name doc-fix dispatched in iter 165.
+
+**Beacon output summary:**
+- Bash sandbox broken (session-env path issue); Beacon fell back to hand-typed marker (permitted per its CLAUDE.md).
+- Emitted `APPROVAL_REQUEST` marker: task_id=`pulse-grule-check-c-canonical-names-001`, phase=preflight, task_type=doc-only.
+- Scope: update `runbooks/cycle-prompt.md` § 4.3 to (1) enumerate all 7 canonical service names explicitly in the lead sentence, (2) add a `Stale suffix — do not probe:` note adjacent to the existing decommissioned-units block, (3) add the authoritative lookup command.
+- Trust policy expected to auto-approve (doc-only, narrow scope, single-section change).
+
+**Did:** Journaled notification receipt. No new work generated — Beacon explicitly noted this is a result notification, not a new task request. Trust policy + outbox-notifier will route the APPROVAL_REQUEST to Forge for preflight/build phase.
+
+**Patterns:** Check C G-rule pipeline advancing as expected: iter 162 (calibration finding) → iters 163–165 (3 clean verification iters) → iter 165 (G-rule dispatch to Beacon) → iter 166 (Beacon APPROVAL_REQUEST emitted). Pending: Forge preflight → build → Mirror review → auto-merge. Post-merge: Pulse owns 3 clean Check C verification iters.
+
+**Note:** Beacon's hand-typed marker is output-only (no file write confirmed). If trust policy processor reads from Beacon's session output log, this should flow normally. Monitor next cycle for Forge inbox receipt; escalate if Forge hasn't picked it up within 2 cycles.
+
+---
+
 ## Iteration 165 — 2026-05-31 05:07 UTC (interactive)
 
 **Health:** ✅ Nominal-with-dispatch — 0 new alerts. All mandatory and additive checks clean. Check C G-rule threshold met (3 consecutive clean iters using canonical service names) → doc-fix dispatched to Beacon. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~32 min). Check B: 7th consecutive clean. Tier=1, consecutive_clean=2→0 (tier-reset from dispatch).
