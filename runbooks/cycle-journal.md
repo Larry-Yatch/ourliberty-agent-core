@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 132 — 2026-05-31 00:50 UTC (interactive)
+
+**Health:** ⚠️ Drift — PR #211 (step-a-rotation) still CONFLICTING/OPEN but rebase now APPROVED by Larry (00:43Z). Forge running `extend-thresholds-per-agent-overrides` task (00:47:15Z start, Check III threshold overrides). Two APPROVAL_REQUESTs resolved this iter. Meaningful forward progress vs prior carry-forward iters.
+
+**Triage:** Check 0 — larry-alerts.jsonl at 1053 lines (unchanged from iter 131 watermark). 0 new alerts. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl: 1053 lines, same as iter 131. No new healer alerts, no new escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry 00:27:13Z (Beacon result notification for cycle-fix-pr211-rebase). No new WARN/ERROR entries. inbox-watcher.log last actionable entry 00:47:15Z (forge task start, expected). No WARN/ERROR spikes. ✅
+
+- **(Check 2) Telegram sweep: ⚠️ → resolved.** Two Larry approvals post-iter-131:
+  - 18:41:46 MDT: `approve threshold-update-2026-05-31` → Beacon-bot flagged "real conflict in this proposal — threshold-update path can't handle cleanly; refetched" → Larry replied "Yes" at 18:45:24 MDT → Beacon adapted to `extend-thresholds-per-agent-overrides` approach → Forge task dispatched, IN FLIGHT at 00:47:15Z.
+  - 18:43:21 MDT: `approve pr211-rebase-step-a-rotation-001` → Beacon-bot: "Marker emitted. PR #211 is CONFLICTING/DIRTY — rebase task instructs Forge to fetch main, rebase forge/step-a-rotation" + "approval DMed for pr211-rebase-step-a-rotation-001" at 00:45:15Z.
+  Both directives tracked and in-flight. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ PR #211 carry-forward — rebase approved, pending Forge dispatch.** PR #211 still CONFLICTING/OPEN (mergeStateStatus=DIRTY). Larry approved pr211-rebase-step-a-rotation-001; Beacon-bot emitted approval marker at 00:43-00:45Z. No new Forge task for rebase visible in forge inbox yet (Forge currently running `extend-thresholds-per-agent-overrides`; pr211 rebase may dispatch after or concurrently). Carry-forward, active resolution in progress. ⚠️
+
+- **(Check 4) Pending Larry directives: 3 items (reduced from 4). ⚠️**
+  - RESOLVED: `pr211-rebase-step-a-rotation-001` — approved 00:43Z. Beacon processing.
+  - RESOLVED: `threshold-update-2026-05-31` — approved 00:41Z, Forge task in-flight.
+  - **sync-push-rebase-fallback-001** (iter 118) — still pending Larry. Monday [yellow] DM 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — still pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — still pending Larry. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** 6/6 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer). heal-stale-daemon-code-cooldowns.json: 0 active cooldowns. No new stale-code events. inbox-watcher rc=-1 G-rule still at 2/3 (no new occurrence). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean. HEAD=afac1a6 "Pulse cycle 20260531T004344Z" (iter 131 auto-commit). ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (17th occurrence).** sync.json: status=error 00:09:55Z "Auto-commit push failed; rolled back", commit=45efeaf7. Same root cause: sync_agent_core.sh:161 bare-push. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** All 6 services active. forge-bot running `extend-thresholds-per-agent-overrides` (active=1/10 per forge.log 00:47Z). ✅
+
+- **(Check D) Inboxes: ✅ Nominal.** Forge inbox: `extend-thresholds-per-agent-overrides.json` present (in-flight task, inbox-watcher started 00:47:15Z; file stays during execution). Beacon/mirror/pulse inboxes: empty. All normal. ✅
+
+- **(Check E) PRs: ⚠️ PR #211 CONFLICTING — rebase in progress.**
+  - ourliberty-agent-core: PR #211 — OPEN, mergeable=CONFLICTING, mergeStateStatus=DIRTY, reviewDecision="", autoMergeRequest=null. Mirror REVIEW_PASS on record. Larry approved pr211-rebase-step-a-rotation-001 at 00:43Z. Beacon-bot "Marker emitted" at 00:45Z. Forge rebase task may dispatch after extend-thresholds task completes or concurrently. ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Idempotency guard holds. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. Threshold-update APPROVED this iter (extend-thresholds-per-agent-overrides task in-flight). ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** 17 entries, 0 overdue, 0 in 60d window. ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. No always-fix conditions triggered (repo clean, services active, no stale inboxes).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:50:02Z.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended (finding: pr211-conflicting-rebase-approved-in-flight, carry-forward).
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None new. Larry already acknowledged both approvals via Telegram. Monday recap DM 2026-06-02 includes remaining 3 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **PR #211 CONFLICTING: 6th consecutive iter (127–132), BUT rebase now approved.** Resolution actively in progress; close when PR merges post-rebase.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No new occurrence.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **sync push failure: 17th occurrence.** No new action.
+- **APPROVAL_REQUEST queue: 4 → 3 items this iter.** pr211-rebase and threshold-update both approved and in-flight. Positive.
+
+**Learned:**
+- When Larry approves a threshold-update shortcut and Beacon flags a "conflict in the proposal," Larry's "Yes" confirms the adapted approach. Beacon renamed from a simple value-replace to a `extend-thresholds-per-agent-overrides` task — likely implementing per-agent override schema instead of modifying global thresholds directly. This is consistent with the Check III proposals requiring surgical config changes.
+- Beacon-bot "Marker emitted" for pr211-rebase means the approval shortcut was processed and an approval marker written. The rebase task may dispatch to Forge after the concurrent extend-thresholds task is dispatched/in-flight. Watch next iter for the pr211 rebase Forge task.
+- APPROVAL_REQUEST queue movement this iter (4→3) is the first reduction in several iters. System is unblocking.
+
+---
+
 ## Iteration 131 — 2026-05-31 00:42 UTC (interactive)
 
 **Health:** ⚠️ Drift — PR #211 (step-a-rotation) CONFLICTING/UNKNOWN, APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` pending Larry response (idx=1052 delivered 00:35:52Z). Pure carry-forward. 0 new alerts. All 6 services active. All inboxes empty.

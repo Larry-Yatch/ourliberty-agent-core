@@ -6,16 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~00:42Z UTC (Iter 131)
+## Status snapshot — updated 2026-05-31 ~00:50Z UTC (Iter 132)
 
-**System: ⚠️ Drift.** Iter 131 findings: pure carry-forward. PR #211 (step-a-rotation) still CONFLICTING/UNKNOWN (5th consecutive iter: 127–131). APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` pending Larry (idx=1052 delivered 00:35:52Z); no response yet. All 6 services active. All inboxes empty. 0 new alerts. Sync push failure 16th occurrence (carry-forward). APPROVAL_REQUEST queue: 4 items unchanged. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+**System: ⚠️ Drift (improving).** Iter 132 findings: major forward progress. Larry approved `pr211-rebase-step-a-rotation-001` at 00:43Z (Beacon-bot "Marker emitted"; Forge rebase task pending dispatch) AND `threshold-update-2026-05-31` at 00:41Z (Beacon adapted to `extend-thresholds-per-agent-overrides`; Forge task IN FLIGHT at 00:47:15Z). APPROVAL_REQUEST queue: 4→3 (pr211-rebase and threshold-update both approved/in-flight). PR #211 still CONFLICTING/OPEN. Sync push failure 17th occurrence (carry-forward). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
-- PR #211 CONFLICTING: 5th consecutive iter (127–131). Waiting on Larry APPROVAL_REQUEST approval.
-- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 131).
-- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 130).
-- inbox-watcher rc=-1: 2/3 (no new occurrence iter 130).
-- APPROVAL_REQUEST queue (4): pr211-rebase-step-a-rotation-001 (highest priority), sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
+- PR #211 CONFLICTING: 6th consecutive iter (127–132). Rebase NOW APPROVED by Larry. Beacon-bot "Marker emitted" at 00:45Z. Forge rebase task may dispatch after extend-thresholds completes. Close when PR merges.
+- Forge task `extend-thresholds-per-agent-overrides` IN FLIGHT (00:47:15Z start). First Check III threshold implementation in production. Close when PR merges.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 132).
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 132).
+- inbox-watcher rc=-1: 2/3 (no new occurrence iter 132).
+- APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
 
 ## Status snapshot — updated 2026-05-31 ~00:31Z UTC (Iter 129)
 
