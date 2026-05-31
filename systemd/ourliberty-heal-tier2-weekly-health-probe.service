@@ -1,5 +1,5 @@
 [Unit]
-Description=Ourliberty Tier 2 Weekly Health Probe — cheap Haiku probe of Tier 2 OAuth, DMs on failure (claude-quota-fixes-v2, 2026-05-27)
+Description=Ourliberty Tier 2 Health Probe — cheap Haiku probe of Tier 2 OAuth (6h cadence, keep-alive + liveness; rate-limit-resilience step A, 2026-05-30)
 Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_tier2_weekly_health_probe.py
 After=network-online.target
 Wants=network-online.target

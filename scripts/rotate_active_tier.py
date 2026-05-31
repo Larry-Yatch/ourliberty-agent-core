@@ -166,6 +166,40 @@ def _emit_event(action, from_tier, to_tier, trigger, rolling_5h_tokens,
         pass
 
 
+def _dm_auth_blocked(held_tier, blocked_tier, logger=None):
+    """DM Larry that the scheduler refused to flip into ``blocked_tier``
+    because its OAuth credentials failed the pre-engage auth gate. Points
+    at the Tier 2 restore runbook (auth_401 with both tiers in scope, the
+    Tier 2 runbook covers either direction). Best-effort: a failed import
+    or a cooldown-suppressed alert never wedges the tick.
+    """
+    try:
+        sys.path.insert(0, str(SCRIPT_DIR))
+        import larry_alerts as la  # noqa: E402
+    except Exception:
+        return
+    try:
+        la.append_alert(
+            source='rotate-active-tier',
+            severity='warning',
+            message=(
+                f'Rotation auth gate blocked the flip into {blocked_tier}: '
+                f'{blocked_tier} OAuth credentials are missing, expired, or '
+                f'unverifiable. Held on {held_tier}; the scheduler will '
+                f'retry the flip on the next window after the operator '
+                f're-auths.'
+            ),
+            subject=f'rotation_auth_gate_blocked:{blocked_tier}',
+            suggested_action=(
+                'Re-auth the blocked tier: '
+                'docs/runbooks/restore-larry-personal-claude-oauth-tier2.md.'
+            ),
+        )
+    except Exception:
+        if logger is not None:
+            logger.warning('rotation auth-blocked DM failed (suppressed)')
+
+
 def _logger():
     logger = logging.getLogger('rotate_active_tier')
     if logger.handlers:
@@ -413,6 +447,40 @@ def tick(now=None, models_file=None, logger=None):
             # crash between writes leaves state in an intermediate-but-safe
             # shape (the gate is still closed until set_draining lands).
             next_tier = _other_tier(tier)
+            # Pre-engage auth gate (Step A rotation fix): refuse to flip into
+            # a tier whose OAuth credentials are expired or unverifiable.
+            # The 2026-05-29 storm root cause was the scheduler flipping to
+            # Tier 2 with a silently-expired token; every dispatch then
+            # auth_401-stormed for the full window. Hold the current tier
+            # instead — re-pin a fresh window so we don't immediately re-enter
+            # drain on the next tick — and DM Larry pointing at the Tier 2
+            # restore runbook.
+            if not active_tier.tier_auth_ok(next_tier, now=now):
+                cur_window_min = _window_for(tier, cfg)
+                active_tier.set_draining(False)
+                active_tier.set_next_switch_due(
+                    now + timedelta(minutes=cur_window_min),
+                )
+                _emit_event(
+                    action='auth-blocked',
+                    from_tier=tier,
+                    to_tier=next_tier,
+                    trigger='target_auth_check_failed',
+                    rolling_5h_tokens=usage,
+                    threshold=threshold,
+                    drained_after_sec=(now - drain_start).total_seconds(),
+                    now=now,
+                )
+                _dm_auth_blocked(tier, next_tier, logger=logger)
+                result = {
+                    'action': 'auth-blocked',
+                    'from_tier': tier,
+                    'to_tier': next_tier,
+                    'held_tier': tier,
+                    'next_switch_due_minutes': cur_window_min,
+                }
+                logger.warning('rotation auth-blocked: ' + json.dumps(result))
+                return result
             active_tier.set_tier(next_tier)
             window_min = _window_for(next_tier, cfg)
             active_tier.set_next_switch_due(now + timedelta(minutes=window_min))

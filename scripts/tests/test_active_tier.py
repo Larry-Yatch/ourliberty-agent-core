@@ -339,5 +339,184 @@ class ActiveTierCooldownTest(unittest.TestCase):
         self.assertIsNone(active_tier.read()['next_switch_due'])
 
 
+class AuthCooldownTest(unittest.TestCase):
+    """Step A rotation fix: ``set_cooldown(kind='auth_401')`` parks a tier
+    on a fixed 30-min window without consuming the rate-limit backoff
+    counter. The 2026-05-29 storm proved an auth-401 with no cooldown
+    storms; this branch is the circuit-breaker."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        import os
+        self._prev = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+
+    def tearDown(self):
+        import os
+        if self._prev is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev
+        self.tmp.cleanup()
+
+    def test_auth_401_kind_uses_fixed_30min_window(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        until_iso = active_tier.set_cooldown(
+            'tier2',
+            raw_excerpt='Invalid authentication credentials',
+            now=now,
+            kind='auth_401',
+        )
+        # Fixed 30-min cooldown; the auth-401 message body is ignored on
+        # purpose — auth messages don't carry a reset time.
+        from datetime import datetime as _dt
+        until_dt = _dt.fromisoformat(until_iso)
+        self.assertEqual(until_dt - now, timedelta(minutes=30))
+
+    def test_auth_401_does_not_touch_rate_limit_backoff_counter(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        # Seed the rate-limit backoff for tier2 with two unparseable
+        # rate_limits → counter at 2.
+        active_tier.set_cooldown('tier2', raw_excerpt='nope', now=now)
+        active_tier.set_cooldown('tier2', raw_excerpt='nope', now=now)
+        self.assertEqual(active_tier.read()['cooldown_backoff']['tier2'], 2)
+        # An auth_401 cooldown must NOT consume or reset that counter —
+        # auth + rate-limit streaks are independent signals.
+        active_tier.set_cooldown('tier2', raw_excerpt='auth',
+                                 now=now, kind='auth_401')
+        self.assertEqual(active_tier.read()['cooldown_backoff']['tier2'], 2)
+
+    def test_auth_401_overwrites_existing_rate_limit_cooldown(self):
+        # If a tier was rate-limited and now also fails auth, the auth
+        # cooldown overwrites (last writer wins). This is intentional:
+        # auth_401 means the operator must re-auth; the rate-limit timer
+        # is moot until that happens.
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        active_tier.set_cooldown('tier2', raw_excerpt='resets 3pm', now=now)
+        active_tier.set_cooldown('tier2', raw_excerpt='auth',
+                                 now=now, kind='auth_401')
+        state = active_tier.read()
+        from datetime import datetime as _dt, timedelta
+        until_dt = _dt.fromisoformat(state['cooldowns']['tier2'])
+        self.assertEqual(until_dt - now, timedelta(minutes=30))
+
+    def test_auth_401_rejects_invalid_tier(self):
+        with self.assertRaises(ValueError):
+            active_tier.set_cooldown('bogus', kind='auth_401')
+
+
+class TierAuthOkTest(unittest.TestCase):
+    """Step A rotation fix: pre-engage auth gate's expiry check.
+
+    `tier_auth_ok` reads the on-disk OAuth credentials file and returns
+    True iff `claudeAiOauth.expiresAt` is at least 10 min in the future.
+    Tests swap the tier homes to tmp dirs so we don't depend on the dev
+    box's real credentials."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        # Stand up a fake home pair under the tmp dir and redirect
+        # active_tier's module-level constants. Tests restore them in
+        # tearDown so the rest of the suite sees the real production paths.
+        self._prev_tier1_home = active_tier.TIER1_HOME
+        self._prev_tier2_home = active_tier.TIER2_HOME
+        self.t1_home = self.root / 'tier1-home'
+        self.t2_home = self.root / 'tier2-home'
+        self.t1_home.mkdir(parents=True)
+        self.t2_home.mkdir(parents=True)
+        active_tier.TIER1_HOME = str(self.t1_home)
+        active_tier.TIER2_HOME = str(self.t2_home)
+
+    def tearDown(self):
+        active_tier.TIER1_HOME = self._prev_tier1_home
+        active_tier.TIER2_HOME = self._prev_tier2_home
+        self.tmp.cleanup()
+
+    def _write_creds(self, home_path, expires_at_ms):
+        creds_dir = home_path / '.claude'
+        creds_dir.mkdir(parents=True, exist_ok=True)
+        (creds_dir / '.credentials.json').write_text(json.dumps({
+            'claudeAiOauth': {
+                'accessToken': 'tok',
+                'refreshToken': 'rtok',
+                'expiresAt': expires_at_ms,
+                'scopes': [],
+                'subscriptionType': 'max',
+            },
+        }))
+
+    def _ms(self, dt):
+        from datetime import timezone
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp() * 1000)
+
+    def test_future_expiry_is_ok(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_creds(self.t2_home,
+                          self._ms(now + timedelta(hours=8)))
+        self.assertTrue(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_already_expired_is_not_ok(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_creds(self.t2_home,
+                          self._ms(now - timedelta(minutes=1)))
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_expiring_inside_lead_margin_is_not_ok(self):
+        # _AUTH_EXPIRY_MIN_LEAD is 10 min; an expiry 5 min out leaves no
+        # headroom for the CLI's auto-refresh and must NOT pass the gate.
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_creds(self.t2_home,
+                          self._ms(now + timedelta(minutes=5)))
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_missing_credentials_file_is_not_ok(self):
+        # No file → not auth-ok. A target tier the runner can't even read
+        # the credentials of must never be trusted as a switch target.
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_corrupt_credentials_file_is_not_ok(self):
+        creds = self.t2_home / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        creds.write_text('{not valid json')
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_missing_claudeAiOauth_block_is_not_ok(self):
+        creds = self.t1_home / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        creds.write_text(json.dumps({'other_key': 'value'}))
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self.assertFalse(active_tier.tier_auth_ok('tier1', now=now))
+
+    def test_missing_expiresAt_is_not_ok(self):
+        creds = self.t1_home / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        creds.write_text(json.dumps({
+            'claudeAiOauth': {'accessToken': 'tok'},
+        }))
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self.assertFalse(active_tier.tier_auth_ok('tier1', now=now))
+
+    def test_invalid_tier_returns_false(self):
+        # No exception — defensive shape. A bogus tier value must never
+        # promote into a "this target is fine" branch.
+        self.assertFalse(active_tier.tier_auth_ok('tier-bogus'))
+
+
 if __name__ == '__main__':
     unittest.main()

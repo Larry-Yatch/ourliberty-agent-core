@@ -979,8 +979,22 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                         result.stdout, result.stderr,
                     )
                     if failure_type:
+                        # Resolve the actual failing tier from active-tier
+                        # state — the legacy log token hardcoded "tier1" but
+                        # under rotation the primary subprocess could be on
+                        # either tier, and incident triage needs the real
+                        # account. Falls back to 'tier1' on any read error
+                        # (same posture as the ledger account field below).
+                        try:
+                            active_tier_name = (
+                                active_tier.read().get('tier') or 'tier1'
+                            )
+                        except Exception:
+                            active_tier_name = 'tier1'
                         log(agent_id,
-                            'TIER1_FAILURE_DETECTED type=' + failure_type +
+                            'TIER_FAILURE_DETECTED tier=' +
+                            active_tier_name +
+                            ' type=' + failure_type +
                             ' stdout=' + repr((result.stdout or '')[:300]) +
                             ' stderr=' + repr((result.stderr or '')[:300]),
                             'WARN')
@@ -1034,6 +1048,26 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     active_tier.read()['tier'],
                                     raw_excerpt=(result.stdout or '') +
                                     '\n' + (result.stderr or ''),
+                                )
+                            except Exception:
+                                pass
+                        elif failure_type == 'auth_401':
+                            # Step A rotation fix: park the failing tier on
+                            # auth_401 so a single bad token cannot storm.
+                            # Without this branch, a tier with an expired
+                            # token stays the active tier for its whole
+                            # window and every dispatch repeats
+                            # auth_401 → fallback (~every 90s). The
+                            # cooldown is a fixed 30-min window (auth
+                            # messages don't carry a reset time); the
+                            # watcher's drain gate skips this tier until
+                            # the operator re-auths.
+                            try:
+                                active_tier.set_cooldown(
+                                    active_tier.read()['tier'],
+                                    raw_excerpt=(result.stdout or '') +
+                                    '\n' + (result.stderr or ''),
+                                    kind='auth_401',
                                 )
                             except Exception:
                                 pass

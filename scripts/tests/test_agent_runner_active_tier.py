@@ -299,5 +299,333 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
         self.assertIn('account-bound', output)
 
 
+class AuthCircuitBreakerTest(unittest.TestCase):
+    """Step A rotation fix: a primary-tier auth_401 must park the active
+    tier via set_cooldown(kind='auth_401') so a single bad token cannot
+    storm. Pre-fix, auth_401 only triggered the fallback leg and never
+    cooled down the bad tier — every dispatch in the window repeated the
+    failure (~every 90s) until rotation was disabled."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        import os
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        self.workdir = self.root / 'work'
+        self.workdir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        import os
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
+        self.tmp.cleanup()
+
+    def _write_state(self, tier):
+        path = self.root / 'blackboard' / 'active-tier.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'tier': tier}))
+
+    def test_auth_401_on_primary_sets_cooldown_on_active_tier(self):
+        # State is tier1; the primary subprocess returns an auth_401.
+        # Expect: active_tier.set_cooldown(<active tier>, kind='auth_401')
+        # is called BEFORE the Tier 2 fallback fires.
+        self._write_state('tier1')
+        proc = _FakeProc(
+            1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        set_cooldown_calls = []
+
+        def fake_set_cooldown(tier, raw_excerpt='', now=None,
+                              kind='rate_limit'):
+            set_cooldown_calls.append(
+                {'tier': tier, 'kind': kind},
+            )
+
+        def fake_popen(cmd, **kwargs):
+            return proc
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='',
+            )
+
+        patches = [
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=fake_run),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+            mock.patch.object(active_tier, 'set_cooldown',
+                              side_effect=fake_set_cooldown),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            timeout=60,
+        )
+        # The active tier (tier1) gets parked with kind=auth_401.
+        auth_calls = [c for c in set_cooldown_calls
+                      if c['kind'] == 'auth_401']
+        self.assertEqual(len(auth_calls), 1)
+        self.assertEqual(auth_calls[0]['tier'], 'tier1')
+
+    def test_auth_401_on_tier2_when_active(self):
+        # Mirror direction: state=tier2, primary auth_401 → tier2 parks.
+        self._write_state('tier2')
+        proc = _FakeProc(
+            1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        set_cooldown_calls = []
+
+        def fake_set_cooldown(tier, raw_excerpt='', now=None,
+                              kind='rate_limit'):
+            set_cooldown_calls.append(
+                {'tier': tier, 'kind': kind},
+            )
+
+        def fake_popen(cmd, **kwargs):
+            return proc
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='',
+            )
+
+        patches = [
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=fake_run),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+            mock.patch.object(active_tier, 'set_cooldown',
+                              side_effect=fake_set_cooldown),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            timeout=60,
+        )
+        auth_calls = [c for c in set_cooldown_calls
+                      if c['kind'] == 'auth_401']
+        self.assertEqual(len(auth_calls), 1)
+        self.assertEqual(auth_calls[0]['tier'], 'tier2')
+
+    def test_rate_limit_still_uses_default_kind(self):
+        # Regression guard: rate_limit must keep landing as kind='rate_limit'
+        # (default), not the auth_401 branch.
+        self._write_state('tier1')
+        proc = _FakeProc(
+            1,
+            stdout="You've hit your limit · resets 11:30am",
+            stderr='',
+        )
+        set_cooldown_calls = []
+
+        def fake_set_cooldown(tier, raw_excerpt='', now=None,
+                              kind='rate_limit'):
+            set_cooldown_calls.append(
+                {'tier': tier, 'kind': kind},
+            )
+
+        def fake_popen(cmd, **kwargs):
+            return proc
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='',
+            )
+
+        patches = [
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=fake_run),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+            mock.patch.object(active_tier, 'set_cooldown',
+                              side_effect=fake_set_cooldown),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            timeout=60,
+        )
+        kinds = {c['kind'] for c in set_cooldown_calls}
+        # rate_limit path must NOT silently route through auth_401.
+        self.assertNotIn('auth_401', kinds)
+
+
+class TierFailureLogTaggingTest(unittest.TestCase):
+    """Step A rotation fix: the failure log line must carry the actual
+    failing tier name. Pre-fix, the legacy `TIER1_FAILURE_DETECTED` token
+    hardcoded `tier1` even when the call ran on Tier 2 under rotation —
+    incident triage couldn't tell which account actually failed."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        import os
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
+        self.workdir = self.root / 'work'
+        self.workdir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        import os
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
+        self.tmp.cleanup()
+
+    def _write_state(self, tier):
+        path = self.root / 'blackboard' / 'active-tier.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'tier': tier}))
+
+    def _run_with_failure(self, active_tier_name):
+        self._write_state(active_tier_name)
+        proc = _FakeProc(
+            1,
+            stdout='Invalid authentication credentials',
+            stderr='',
+        )
+        log_lines = []
+
+        def fake_log(agent_id, message, level='INFO'):
+            log_lines.append({'level': level, 'message': message})
+
+        def fake_popen(cmd, **kwargs):
+            return proc
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(
+                returncode=0, stdout=_ok_response(), stderr='',
+            )
+
+        patches = [
+            mock.patch.object(ar, 'get_manager',
+                              return_value=mock.Mock(
+                                  get_token=lambda: ('tok', 'acct1'),
+                                  check_for_rate_limit=lambda _o: False,
+                                  detect_cap_in_output=lambda _o: False,
+                                  report_rate_limit=lambda *a, **k: None,
+                                  report_success=lambda *a, **k: None,
+                              )),
+            mock.patch.object(ar, 'get_guard', return_value=_NoopGuard()),
+            mock.patch('agent_runner.subprocess.Popen',
+                       side_effect=fake_popen),
+            mock.patch('agent_runner.subprocess.run',
+                       side_effect=fake_run),
+            mock.patch.object(ar, 'tier2_available', return_value=True),
+            mock.patch.object(ar, '_dm_tier2_unavailable'),
+            mock.patch.object(ar, '_mark_paused_on_tier1'),
+            mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
+            mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
+            mock.patch('agent_runner.time.sleep'),
+            mock.patch.object(active_tier, 'set_cooldown'),
+            mock.patch.object(ar, 'log', side_effect=fake_log),
+        ]
+        for p in patches:
+            p.start()
+        self.addCleanup(lambda: [p.stop() for p in patches])
+
+        ar.run_claude(
+            agent_id='forge',
+            prompt='hello',
+            working_dir=str(self.workdir),
+            timeout=60,
+        )
+        return log_lines
+
+    def test_failure_log_names_tier1_when_active(self):
+        lines = self._run_with_failure('tier1')
+        detection_lines = [
+            l for l in lines
+            if 'TIER_FAILURE_DETECTED' in l['message']
+        ]
+        self.assertEqual(len(detection_lines), 1)
+        self.assertIn('tier=tier1', detection_lines[0]['message'])
+
+    def test_failure_log_names_tier2_when_active(self):
+        # The pre-fix log token hardcoded "tier1" even when state=tier2;
+        # this is the regression guard that the rename actually plumbs
+        # through the real failing tier.
+        lines = self._run_with_failure('tier2')
+        detection_lines = [
+            l for l in lines
+            if 'TIER_FAILURE_DETECTED' in l['message']
+        ]
+        self.assertEqual(len(detection_lines), 1)
+        self.assertIn('tier=tier2', detection_lines[0]['message'])
+
+
 if __name__ == '__main__':
     unittest.main()

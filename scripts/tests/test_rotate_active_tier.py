@@ -71,6 +71,32 @@ _BASE_ROTATION = {
 _DEFAULT_LOAD_TOKENS = 8_000_000
 
 
+class _AuthOkPatcher:
+    """Swap `active_tier.tier_auth_ok` for a dict-backed stub during a test.
+
+    The real implementation reads ``.credentials.json`` from the on-disk
+    tier home dirs; tests must not depend on the dev box's actual
+    credential state. The stub keeps a single shared dict so the test can
+    flip a tier's auth result mid-fixture (e.g., the auth-gate path that
+    fires on the SECOND tick after the operator re-auths)."""
+
+    def __init__(self, mapping):
+        self._mapping = mapping
+        self._prev = None
+
+    def start(self):
+        self._prev = active_tier.tier_auth_ok
+
+        def _stub(tier, now=None):
+            return bool(self._mapping.get(tier, True))
+
+        active_tier.tier_auth_ok = _stub
+
+    def stop(self):
+        if self._prev is not None:
+            active_tier.tier_auth_ok = self._prev
+
+
 class RotateTickBaseTest(unittest.TestCase):
     """Shared fixture: redirect ~/agents, pre-build a models file, and seed
     costs.jsonl so the § 6.4 load gate engages by default."""
@@ -88,8 +114,16 @@ class RotateTickBaseTest(unittest.TestCase):
         self.models_file = self.root / 'config' / 'agent-models.json'
         _write_models_file(self.models_file, dict(_BASE_ROTATION))
         self._set_load_tokens(_DEFAULT_LOAD_TOKENS)
+        # Step A auth gate: pin the default to "auth-ok" so the legacy flip
+        # tests don't accidentally exercise the gate's hold-and-DM branch
+        # against the dev box's real credential files. Tests that exercise
+        # the gate itself override via `self._set_auth_ok(...)`.
+        self._auth_ok_map = {'tier1': True, 'tier2': True}
+        self._auth_patcher = _AuthOkPatcher(self._auth_ok_map)
+        self._auth_patcher.start()
 
     def tearDown(self):
+        self._auth_patcher.stop()
         if self._prev is None:
             os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
         else:
@@ -98,6 +132,12 @@ class RotateTickBaseTest(unittest.TestCase):
         # modules don't see our tmp-rooted COSTS_FILE.
         importlib.reload(heal_claude_max_burn_rate)
         self.tmp.cleanup()
+
+    def _set_auth_ok(self, *, tier1=True, tier2=True):
+        """Override the auth-gate result for the legacy `tier_auth_ok` shim.
+        Tests that exercise the auth-blocked branch flip one side False."""
+        self._auth_ok_map['tier1'] = tier1
+        self._auth_ok_map['tier2'] = tier2
 
     def _set_load_tokens(self, total_tokens):
         """Write a single costs.jsonl record with `total_tokens` quota-
@@ -557,6 +597,91 @@ class RotationEventsTest(RotateTickBaseTest):
         self.assertEqual(ev['trigger'], 'load_gate_above_engage')
         # No drain on an engage event.
         self.assertIsNone(ev['drained_after_sec'])
+
+
+class PreEngageAuthGateTest(RotateTickBaseTest):
+    """Step A rotation fix: refuse to flip into a tier whose OAuth
+    credentials are missing, expired, or unverifiable.
+
+    The 2026-05-29 storm root cause was the scheduler flipping into Tier 2
+    with a silently-expired token; every dispatch in the active-tier window
+    then auth_401-stormed for the full window. The gate is the structural
+    fix: it never trusts a target it can't verify.
+    """
+
+    def _events_lines(self):
+        path = self.root / 'blackboard' / 'rotation-events.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines()
+                if line.strip()]
+
+    def test_flip_blocked_when_target_tier_auth_fails(self):
+        # Drain-complete state heading into tier2, but tier2 fails the auth
+        # gate → no tier flip, draining cleared, fresh tier1 window pinned.
+        now = datetime(2026, 5, 28, 14, 30, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        self._set_auth_ok(tier1=True, tier2=False)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'auth-blocked')
+        self.assertEqual(result['from_tier'], 'tier1')
+        self.assertEqual(result['to_tier'], 'tier2')
+        self.assertEqual(result['held_tier'], 'tier1')
+        # Held tier1 window (120m by default), not the tier2 window.
+        self.assertEqual(result['next_switch_due_minutes'], 120)
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertFalse(state['draining'])
+        # Fresh deadline pinned for the current tier.
+        self.assertEqual(state['next_switch_due'],
+                         '2026-05-28T16:30:00+00:00')
+
+    def test_flip_blocked_emits_auth_blocked_event(self):
+        # The rotation-events.jsonl gains one auth-blocked record with the
+        # locked schema. Future Pulse Check needs this to correlate
+        # auth-gate blocks against ground-truth auth-401 events.
+        now = datetime(2026, 5, 28, 14, 30, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        self._set_auth_ok(tier1=True, tier2=False)
+        rotate_active_tier.tick(now=now, models_file=self.models_file)
+        events = [e for e in self._events_lines()
+                  if e['action'] == 'auth-blocked']
+        self.assertEqual(len(events), 1)
+        ev = events[0]
+        self.assertEqual(ev['from_tier'], 'tier1')
+        self.assertEqual(ev['to_tier'], 'tier2')
+        self.assertEqual(ev['trigger'], 'target_auth_check_failed')
+        self.assertEqual(ev['drained_after_sec'], 1800)
+
+    def test_flip_proceeds_after_operator_reauth(self):
+        # Two ticks. First: tier2 auth fails → blocked + held on tier1 with
+        # a fresh window. Second: operator re-auths (auth_ok flips True),
+        # the held window elapses, drain re-opens, and the flip lands.
+        first_now = datetime(2026, 5, 28, 14, 30, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00',
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        self._set_auth_ok(tier1=True, tier2=False)
+        first = rotate_active_tier.tick(now=first_now,
+                                        models_file=self.models_file)
+        self.assertEqual(first['action'], 'auth-blocked')
+        # Operator re-auths Tier 2 + the held tier1 window elapses.
+        self._set_auth_ok(tier1=True, tier2=True)
+        # Trigger drain again: window elapses → set draining=True.
+        elapsed_now = first_now + timedelta(minutes=121)
+        drain_again = rotate_active_tier.tick(now=elapsed_now,
+                                              models_file=self.models_file)
+        self.assertEqual(drain_again['action'], 'drain-started')
+        # Final tick: now drain-complete, auth_ok=True → flip lands.
+        third_now = elapsed_now + timedelta(minutes=1)
+        third = rotate_active_tier.tick(now=third_now,
+                                        models_file=self.models_file)
+        self.assertEqual(third['action'], 'flipped')
+        self.assertEqual(third['to_tier'], 'tier2')
 
 
 class ConfigSchemaTest(unittest.TestCase):

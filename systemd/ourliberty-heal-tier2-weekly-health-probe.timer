@@ -1,10 +1,14 @@
 [Unit]
-Description=Run heal_tier2_weekly_health_probe every Sunday at 06:00 MDT / 12:00 UTC (claude-quota-fixes-v2, 2026-05-27)
+Description=Run heal_tier2_weekly_health_probe every 6h for Tier 2 token keep-alive + liveness (rate-limit-resilience step A, 2026-05-30)
 
 [Timer]
-# Sunday 06:00 MDT = 12:00 UTC. If the system was off when the timer
-# would have fired, Persistent=true catches up on next boot.
-OnCalendar=Sun *-*-* 12:00:00 UTC
+# 4x daily — 00:00 / 06:00 / 12:00 / 18:00 UTC. The original weekly cadence
+# only detected credential rot; it could not keep the Tier 2 OAuth token
+# warm (~14h lifetime, refreshes on use). Running every 6h fires the probe
+# inside the token's lifetime so the CLI's auto-refresh exercises the
+# refresh token before it expires. Persistent=true catches up on next boot
+# if the system was off when the timer would have fired.
+OnCalendar=*-*-* 00,06,12,18:00:00 UTC
 Unit=ourliberty-heal-tier2-weekly-health-probe.service
 Persistent=true
 
