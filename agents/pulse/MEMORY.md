@@ -6,18 +6,19 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~04:31Z UTC (Iter 160)
+## Status snapshot — updated 2026-05-31 ~04:50Z UTC (Iter 162 — full cycle check)
 
-**System: ✅ Nominal-with-dispatch — G-rule escalation on alert-triage.json.** Iter 160 findings: 0 new alerts (watermark 1077 unchanged). All mandatory checks nominal. G-rule DISPATCHED: alert-triage.json missing through 2 confirmed automated cycles (abb8f73 04:11Z, 34e1094 04:17Z per cycle.log) — root cause: automated sessions don't invoke alert_triage_state.py. Dispatch `alert-triage-missing-g-rule-20260531T042500Z.json` sent to Beacon. 7/7 services active. 0 open PRs. All inboxes empty. Check B 3rd consecutive clean. PRIME DIRECTIVE ledger: intervention row appended. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal — All checks clean. Calibration finding on Check C service names (see below).** Iter 161 (automated) handled Beacon inter-agent notify for G-rule dispatch: APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (larry_alerts line 1078, delivered at 04:35:29Z UTC). 7/7 services active (canonical names). 0 open PRs. All inboxes clean. Check B 4th consecutive clean. Healer heartbeat 04:35:17Z UTC. APPROVAL_REQUEST queue: 6. Alert watermark: 1078. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
-- **alert-triage.json MISSING: G-RULE DISPATCHED.** 2/2 automated cycles without recreation (abb8f73 04:11Z, 34e1074 04:17Z confirmed by cycle.log). Root cause: run_cycle.sh wrapper doesn't invoke alert_triage_state.py. Dispatch to Beacon: `alert-triage-missing-g-rule-20260531T042500Z.json`. Close when Forge PR merges + alert-triage.json appears in next automated cycle.
+- **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** Beacon diagnosed root cause (invocation gap in run_cycle.sh + cycle-prompt.md § 3.0). APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (pulse-escalations.json id=74). Close when Larry approves, Forge PR merges, + alert-triage.json appears in next automated cycle.
+- **NEW calibration: Check C service-name suffix.** Canonical service names are `ourliberty-*-bot` (e.g., `ourliberty-beacon-bot`), NOT `ourliberty-*-telegram-bot`. Old/deprecated `-telegram-bot` entries exist in systemd but are inactive. Always check canonical names via `systemctl list-units --type=service --all | grep ourliberty` or the cooldowns.json. 1st observation (iter 162). Watch threshold=3 for G-rule → dispatch doc-fix to Beacon.
 - **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z (2 residual). Rate limit reset 11:30am MDT today. Monday DM will include trend assessment. Close when no heal-claude-max-burn-rate alerts in 24h post-reset.
 - **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
-- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001 (NEW), sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
 - **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Rate limit cleared 11:30am MDT. Close when Larry installs via SSH.
-- **Check B CLEAN: 3rd consecutive.** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 18 iters (143–160). Heartbeat fresh (04:05:16Z UTC). Verification: 2026-06-07.
+- **Check B CLEAN: 4th consecutive (iters 159–162).** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 20 iters (143–162). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
@@ -288,6 +289,8 @@
 - **heal-pipeline-stall-state.json GONE (iter 116, 2026-05-30). CONFIRMED.** The monolithic state file is gone; healer uses `~/agents/state/alert-cooldown/` (individual files per cooldown key). Check 3 future scans: `ls ~/agents/state/alert-cooldown/warning/heal-pipeline-stall*`. Iter 117: no active stall cooldown files for heal-pipeline-stall. All prior stalls resolved. Rate_limit cooldown files still in alert-cooldown/warning/ for agent-runner-{beacon,forge,mirror,pulse} — known snoozed state.
 
 - **heal-droplet-git-drift (new healer, 1st observation, iter 117 2026-05-30).** Fires when droplet main is N+ commits behind origin/main (threshold > 2 per alert message). At 22:38:26Z, fired because the iter 116 wrapper hadn't pushed yet. Resolved within 53 seconds (wrapper pushed 4a3b4b8 at 22:39:19Z). Calibration issue: healer fires during the post-journal/pre-push window of every cycle. If recurs consistently, propose a debounce fix. Watch threshold=3 for G-rule.
+
+- **Check C service-name suffix false-positive (1st observation, iter 162, 2026-05-31).** Wrong names: `ourliberty-beacon-telegram-bot`, `ourliberty-forge-telegram-bot`, etc. (show inactive/dead, Result=success). Canonical names: `ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`. The `-telegram-bot` suffixed entries are old/deprecated registrations in systemd. Always use canonical names for `systemctl is-active` checks. Source of truth: `systemctl list-units --type=service --all | grep ourliberty | grep 'bot'` or the healer's cooldowns.json. Watch threshold=3 for G-rule → dispatch doc-fix to Beacon updating cycle-prompt.md § 4.3 with explicit service names.
 
 - **All-bot log-silence false positive (confirmed iter 2, generalized from iter 1 beacon-only).** Check C threshold (>30m log silence → ask-then-do) fires on idle Telegram polling periods for ALL bots (beacon, forge, mirror, pulse). None of the bots log anything when no user messages arrive. Observed silence times: beacon 77m, forge 47m, mirror 45m, pulse 31m — all units were systemctl active. Do not escalate for log silence unless the systemd unit is also non-active or there's error-spam in the last visible log lines. Confirmed again iter 3 (silence 4h30m–5h18m, all 4 units active, no errors).
 
