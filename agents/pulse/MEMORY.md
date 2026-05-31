@@ -6,16 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~22:16Z UTC (Iter 252 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~22:21Z UTC (Iter 253 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 22:06:01Z UTC (~10 min old). Healer heartbeat **NEW TICK 22:07:45Z UTC** (~8 min old — healer active). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). Forty-second consecutive nominal observation iter today (iters 211–252); no new findings.
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 22:06:01Z UTC (~15 min old). Healer heartbeat 22:07:45Z UTC (~13 min old — healer active, no new tick since iter 252). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). Forty-third consecutive nominal observation iter today (iters 211–253); no new findings.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
-- **Check VIII/IX FIRST FIRING IN ~2.2h (2026-06-01 UTC ≈ 00:00Z = Sunday evening MDT).** Both analyzers first-ever run. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (~1.73h out).** Scope: Tier 2 OAuth ELEVATED (active stalls; Beacon notify stalled) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + pulse-grule-prompt-template-001 (F24 fix, doc-only, APPROVAL_REQUEST #8).
+- **Check VIII/IX FIRST FIRING IN ~1.65h (2026-06-01 UTC ≈ 00:00Z = Sunday evening MDT).** Both analyzers first-ever run. Monitor for unexpected output or errors.
+- **Monday [yellow] DM: 2026-06-01 UTC (~1.65h out).** Scope: Tier 2 OAuth ELEVATED (active stalls; Beacon notify stalled) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + pulse-grule-prompt-template-001 (F24 fix, doc-only, APPROVAL_REQUEST #8).
 - **APPROVAL_REQUEST queue (8):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001, **pulse-grule-prompt-template-001 (doc-only, cycle-prompt.md § 17 G-rule subsection, fixes F24 empty-prompt recurrence)**.
 - **deploy-notifier cooldown GC gap — BEACON CORRECTED DIAGNOSIS (2nd investigation).** 106 files stable (unchanged iters 211-246). Root cause: `deploy_notifier.py:490` embeds per-Vercel-uid in subject; no GC after cooldown expires. APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — Forge to add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py`. Awaiting Larry approval.
 - **F24 EMPTY-PROMPT BUG — BEACON INVESTIGATION COMPLETE.** Two root causes confirmed: (1) missing `prompt` field; (2) wrong source key `pulse-g-rule`. APPROVAL_REQUEST `pulse-grule-prompt-template-001` produced. **Workaround in place: always include `"prompt"` (≥100 chars) + always use `source: "pulse"` in every dispatch envelope.**
