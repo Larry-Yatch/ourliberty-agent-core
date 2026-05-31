@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 128 — 2026-05-31 00:24 UTC (interactive)
+
+**Health:** ⚠️ Drift — PR #211 (step-a-rotation) still CONFLICTING (Mirror REVIEW_PASS, mergeable=CONFLICTING). Dispatched Forge rebase to Beacon this iter per iter 127 rule. heal-pipeline-stall confirmed stall at 00:20:43Z. New alert class: pipeline-stall healer "369 min" duration calculation bug (1st observation). Sync push failure carry-forward (13th occurrence). All 6 services active. All inboxes empty.
+
+**Triage:** Check 0 — alert-triage.json absent (PR-β not deployed). Manual scan: 4 new alerts at 00:20:43Z since iter 127 watermark (00:18:49Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: 4 new alerts.**
+  - 00:20:43Z `heal-pipeline-stall` — `pipeline-stall:mirror-pass-unmerged:PR#211` — Mirror PASSED PR #211 but still OPEN. Auto-merge never fired (correct — PR is CONFLICTING, outbox-notifier correctly skipped auto-merge). **route-to-Beacon:** dispatch Forge rebase per iter 127 rule. ⚠️ Note: healer claims Mirror PASSED "369 min ago" — wrong; actual Mirror PASS was at 00:10:57Z (~13 min prior). Substrate calculation bug (G-rule 1/3). Tier 1 action.
+  - 00:20:43Z `heal-pipeline-stall` — `pipeline-stall:tier2-fallback-skipped-rate_limit:forge` — known pattern → Tier 3 (silence). ✅
+  - 00:20:43Z `heal-pipeline-stall` — `pipeline-stall:tier2-fallback-skipped-auth_401:forge` — known pattern → Tier 3 (silence). ✅
+  - 00:20:43Z `heal-pipeline-stall` — `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` — known pattern → Tier 3 (silence). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: last entry 18:10:57 MDT (00:10:57Z UTC) — WARN AUTO_MERGE_SKIPPED_CONFLICTING for PR #211 (single occurrence; expected). No new entries since. inbox-watcher.log: silent (inboxes empty, expected). No WARN/ERROR spikes above threshold. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 18:15:40 MDT (00:15:40Z UTC) — alert idx=1047 delivered (auto-merge-conflict:PR#211). No new Larry directives detected in last 4h. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ PR #211 stall confirmed.** heal-pipeline-stall alert at 00:20:43Z: PR #211 Mirror PASS, still OPEN, no AUTO_MERGE event. All inboxes empty (no active Forge tasks). No other stalls. ⚠️ Action: Forge rebase dispatched via Beacon.
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94)
+  - stuck-cycle timeout guard (iter 43)
+  - Monday [yellow] DM: 2026-06-02. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code-cooldowns.json: all services last restarted 23:35Z–00:05Z (iter 123/127 batch). No new stale-code events since 00:05Z. G-rule for inbox-watcher rc=-1 still at 2/3 (no new rc=-1 occurrence this iter). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean. Recent commits: 5ed38e5 (iter 127 auto-commit "Pulse cycle 20260531T002032Z"). No new PRs merged since iter 127. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (13th occurrence).**
+  - sync.json: status=error 00:09:55Z "Auto-commit push failed; rolled back", commit=45efeaf7. Same root cause: sync_agent_core.sh:161 bare-push. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer all active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** All inboxes empty (beacon envelope written by Pulse this iter, not pre-existing task). ✅
+
+- **(Check E) PRs: ⚠️ PR #211 CONFLICTING.**
+  - ourliberty-agent-core: PR #211 "fix(rotation): step A — auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 keep-alive" — OPEN, mergeable=CONFLICTING, reviewDecision="", autoMergeRequest=null. Mirror REVIEW_PASS at 00:10:57Z. Age ~36 min. **Action taken this iter: Forge rebase dispatched to Beacon.** ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126 (week 2026-05-25, idempotency guard held iter 127). Not firing this iter. ✅
+- **(Check III):** Fired iter 126 (first run). Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. **Route-to-Beacon action:** Wrote dispatch envelope `cycle-fix-pr211-rebase-20260531T002409Z.json` to `~/agents/inboxes/beacon/`. Instructs Beacon to dispatch Forge to rebase `forge/step-a-rotation` onto `origin/main` and force-push. Rebase command: `gh pr checkout 211 --repo Larry-Yatch/ourliberty-agent-core && git fetch origin && git rebase origin/main && git push --force-with-lease`. Per iter 127 commitment.
+3. Called `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:25:50Z.
+4. Called `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended.
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None new. Larry already DM'd by outbox-notifier at 00:15:40Z (auto-merge-conflict PR #211). Beacon dispatch written to relay to Forge. APPROVAL_REQUEST queue (3) unchanged.
+
+**Patterns:**
+- **PR #211 CONFLICTING: 2nd consecutive iter (127, 128).** Same shape as PR #210 (iters 121–122). Pattern: CONFLICTING post-Mirror-REVIEW_PASS requires Forge rebase; auto-merge chain cannot proceed without it. Dispatch sent this iter per iter 127 rule.
+- **heal-pipeline-stall "369 min" duration bug (1st observation).** Mirror PASS was at 00:10:57Z; stall alert at 00:20:43Z claims "369 min ago." The healer may be using PR creation timestamp or an unrelated chain_events reference instead of the mirror_marker_visible event timestamp. G-rule at 1/3.
+- **heal-pr-auto-merge blind to CONFLICTING (iter 127: 1st; this iter: 2nd).** Healer reports "no mirror-passed failures" despite CONFLICTING PR #211 persisting. G-rule at 2/3. If occurs again → dispatch to Beacon (healer substrate expansion for CONFLICTING detection).
+- **Sync push failure: 13th occurrence.** APPROVAL_REQUEST pending. No new action this iter.
+- **inbox-watcher rc=-1: still 2/3 toward G-rule.** No new occurrence.
+
+**Learned:**
+- heal-pipeline-stall's "mirror-pass-unmerged" alert fires when Mirror PASS is recorded but no AUTO_MERGE event follows. For CONFLICTING PRs, AUTO_MERGE is correctly skipped (not a failure) — but the healer flags it as stale anyway. The healer doesn't distinguish "PR CONFLICTING, can't merge" from "PR clean+green, merge fell over." The duration bug (369 min) may be the healer computing from chain_events.session_start for the Mirror review session rather than from the mirror_marker_visible event. Both the duration bug and the false-positive on CONFLICTING PRs are substrate gaps worth a G-rule dispatch if they recur.
+
+---
+
 ## Iteration 127 — 2026-05-31 00:18 UTC (interactive)
 
 **Health:** ⚠️ Drift-watch — PR #211 (step-a-rotation) CONFLICTING post-Mirror-REVIEW_PASS (00:10:57Z); Larry DM'd rebase command by outbox-notifier. Giving Larry response window before dispatching Forge rebase via Beacon. All 6 services active. Sync push failure carry-forward (12th+ occurrence). Check I + Check III already fired this Sunday (iter 126), idempotency guards holding.

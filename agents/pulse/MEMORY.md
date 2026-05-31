@@ -6,11 +6,14 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~00:18Z UTC (Iter 127)
+## Status snapshot — updated 2026-05-31 ~00:25Z UTC (Iter 128)
 
-**System: ⚠️ Drift-watch.** Iter 127 findings: PR #211 (step-a-rotation) CONFLICTING post-Mirror-REVIEW_PASS (00:10:57Z). outbox-notifier DM'd Larry rebase command. Giving Larry response window (<30 min since DM); if unresolved next iter → dispatch Forge rebase via Beacon. Check I + III already fired iter 126 (idempotency guards holding). All 6 services active. Sync push failure 12th+ occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+**System: ⚠️ Drift.** Iter 128 findings: PR #211 (step-a-rotation) still CONFLICTING (Mirror REVIEW_PASS at 00:10:57Z, Larry DM'd at 00:15:40Z). Dispatched Forge rebase to Beacon at 00:24Z (envelope: cycle-fix-pr211-rebase-20260531T002409Z.json). heal-pipeline-stall confirmed stall at 00:20:43Z (new watch: healer "369 min" duration bug — G-rule 1/3). All 6 services active. Sync push failure 13th occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
 
-**New watch item:** heal-pr-auto-merge healer reports "no mirror-passed failures" despite CONFLICTING PR #211. Substrate may not cover CONFLICTING detection. 1st observation; G-rule at 1/3.
+**Watch items updated:**
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 1/3→2/3 (iters 127, 128). If next iter still blind → dispatch to Beacon.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (1st observation, iter 128).
+- inbox-watcher rc=-1: still 2/3 (no new occurrence this iter).
 
 ## Status snapshot — updated 2026-05-31 ~00:08Z UTC (Iter 126)
 
@@ -102,9 +105,11 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 ## Pending watch items (not yet patterns / pending resolution)
 
-- **2026-05-31 (iter 127) — PR #211 (step-a-rotation) CONFLICTING, Mirror REVIEW_PASS.** outbox-notifier DM'd Larry rebase command at 00:10:57Z. Larry response window open (<30 min from detection). If unresolved next iter → dispatch Forge rebase to Beacon. Close when PR merges.
+- **2026-05-31 (iters 127–128) — PR #211 (step-a-rotation) CONFLICTING, Mirror REVIEW_PASS.** outbox-notifier DM'd Larry rebase command at 00:10:57Z. No Larry response. Iter 128 dispatched Forge rebase to Beacon (envelope: cycle-fix-pr211-rebase-20260531T002409Z.json, 00:24Z). Close when PR merges.
 
-- **2026-05-31 (iter 127) — heal-pr-auto-merge healer blind to CONFLICTING state (1st observation).** Healer reports "no mirror-passed failures in last 24h" at 00:14:18Z despite PR #211 being CONFLICTING since 00:10:57Z. Healer appears to check for failed `gh pr merge` commands, not for conflicting-mergeable PR state. G-rule at 1/3. Watch: if 3rd instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
+- **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
+
+- **2026-05-31 (iter 128) — heal-pipeline-stall "369 min" duration calculation bug (1st observation).** At 00:20:43Z, healer claimed Mirror PASSED PR #211 "369 min ago" — actual Mirror PASS was at 00:10:57Z (~13 min prior). Healer may be using PR creation timestamp or chain_events.session_start for Mirror's review session instead of the mirror_marker_visible event. G-rule at 1/3. Watch: if 2 more instances → dispatch to Beacon (propose fix to healer's duration calculation for "mirror-pass-unmerged" alert).
 
 - **2026-05-29 (iter 102) — Tier 2 rate_limit: forge + beacon-bot hitting Tier 1 rate_limit with Tier 2 fallback skipped.** `heal-pipeline-stall` fired 3 pairs (forge + beacon-bot) at 17:22/18:44/20:03Z May 29. Root cause: Tier 1 hit rate_limit on --resume sessions; Tier 2 fallback skipped because session IDs are account-bound. Positive signal (iter 119, 23:04Z May 30): beacon-bot process Tier 2 USED for notification delivery (not account-bound session). Two distinct Tier 2 paths: (1) agent-runner --resume sessions = account-bound = SKIPPED; (2) bot process fallback for alert delivery = USED. Fix still needed: provision/re-provision Tier 2 OAuth per `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Check I Monday 2026-06-01 will capture rate-limit picture. Close when no further SKIPPED alerts for agent-runner sessions.
 
