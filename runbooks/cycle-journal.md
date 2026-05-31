@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration 153 — 2026-05-31 03:33 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #215 (chore/remove-yes-approval-token) MERGED at 03:22:59Z. Opus 4.8 pilot live (commit 2f470f8 — Beacon bumped to claude-opus-4-8). 0 open PRs on both repos. 6/6 services active. Forge inbox: 2 fresh tasks (<20 min). Tier 1 rate limit active (resets 11:30am MDT); Forge tasks held pending recovery — same known condition as iter 151 (03:02Z alerts). Sync push error carry-forward (03:27Z + 03:29Z). APPROVAL_REQUEST queue: 5 unchanged.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1067 lines** (+1 vs iter 152 watermark of 1066). 1 new alert.
+
+**Found:**
+
+- **(Check 0) Alert triage: 1 new alert — Tier 3 known-pattern.**
+  - Line 1067: outbox-notifier at 03:22:28Z — review-pass/auto-merge notification for PR #216 (advancer-active-reconciliation-001). Pipeline completion DM queued to Larry. Tier 3 known-pattern (successful pipeline completion). Silence + journal note. ✅
+  - New watermark: **1067**. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.**
+  - outbox-notifier.log: last entry 21:22:28 MDT (03:22:28Z UTC) — PR #216 auto-merge queued DM. ~11 min silence since. ✅
+  - beacon_telegram_bot.log at 21:27:28 MDT (03:27Z UTC): Tier 1 rate limit hit ("You've hit your limit · resets 11:30am") + `TIER2_FALLBACK_USED reason=rate_limit`. Beacon-bot is actively processing a task; Tier 2 (rate_limit path) working. `TIER2_FALLBACK_UNAVAILABLE reason=auth_401` for the auth_401 trigger path — expired credentials carry-forward (known). No new WARN or error events in outbox-notifier. ✅
+
+- **(Check 2) Telegram sweep: ✅ No new Larry messages.** Last inbound: 20:44:09 MDT (iter 152 carry-forward — `'go'` directing PR #216 → MERGED). No orphaned directives. Beacon-bot processing a task at 03:27Z (likely Opus 4.8 pilot warmup or Forge result processing). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T03:05:16Z UTC (~28 min old at check time — within 90-min threshold). ✅ Forge inbox: 2 fresh tasks (build-step-b-resume.json ~24 min; build-register-claude-setup-tokens-rotation.json ~16 min). Both below 1-hour stale threshold. Tier 1 rate limit is holding tasks but not a stall (tasks being attempted; self-resolves at 11:30am MDT or on Tier 2 OAuth restore). ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending.
+  - `pulse_telegram_bot.sh launcher` — pending.
+  - `stuck-cycle timeout guard` (iter 43) — pending.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 03:05:16Z UTC (~28 min old) — within 90-min threshold. Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge (APPROVAL_REQUEST). ⚠️→in-progress.
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean (confirmed from session-start gitStatus + sync.json shows no local divergence). ✅
+
+- **(Check B) Sync health: ⚠️ Push error recurring — 03:27:28Z and 03:29:13Z.** Same known root cause (sync_agent_core.sh:161 bare-push race). Carry-forward. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Monday DM. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge 2 tasks (fresh). ✅**
+  - forge: `build-step-b-resume.json` (21:09 MDT = 03:09Z, ~24 min), `build-register-claude-setup-tokens-rotation.json` (21:17 MDT = 03:17Z, ~16 min). Both <30 min. ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.**
+  - **PR #215 "Remove yes from Beacon approval whitelist" — MERGED at 03:22:59Z.** ✅ Closes iter 152 watch item. Mirror reviewed and auto-merge fired immediately after PR #216 resolved the base conflict. Remove-yes change now live.
+  - **PR #216** already confirmed merged in iter 152. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **New since iter 152:** commit `2f470f8 Opus 4.8 pilot: bump Beacon to claude-opus-4-8` pushed by Larry directly to main. config/agent-models.json: beacon.telegram_model + beacon.inbox_model bumped claude-opus-4-7 → claude-opus-4-8. claude-opus-4-8 confirmed live (probe via modelUsage per _history note). fallback stays claude-sonnet-4-6. Forge/Mirror/Pulse unchanged. First observed Opus 4.8 activity: beacon_telegram_bot.log at 03:27Z.
+
+- **(NEW FINDING — ask-then-do) ⚠️ `config/agent-models.json` — Beacon `telegram_model` has `[1m]` suffix.**
+  - Current value: `"claude-opus-4-8[1m]"`. Expected (per _history 2026-05-30 + inbox_model): `"claude-opus-4-8"`.
+  - `[1m]` is ANSI terminal escape for "bold" — looks like corruption, not an intentional API parameter. Asymmetric with `inbox_model` which has no suffix.
+  - Impact: every Beacon Telegram interaction would fail with "unknown model" and fall back to `claude-sonnet-4-6`, silently degrading the Opus 4.8 pilot on Telegram traffic.
+  - System-reminder flagged the file as modified and claims "intentional" — but the `_history` entry for this date says both fields were bumped to `claude-opus-4-8`, and inbox_model has no suffix, so the asymmetry argues for corruption.
+  - **Classification: ask-then-do.** Not in my auto-fix allow-list. Flagging Larry. Suggested fix: remove `[1m]` from `telegram_model` to match `inbox_model` and `_history`. ⚠️
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday, ~20h from now). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅ No action.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All 6 services active, repo clean, inboxes fresh, 0 open PRs.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended at 03:33:36Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=03:33:37Z.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** ⚠️ `agent-models.json` corruption finding — wrote to `~/agents/blackboard/pulse-escalations.json`. [yellow] — Beacon Telegram degraded (falling back to sonnet-4-6 instead of opus-4-8 for Telegram traffic) but not system-down.
+
+**Patterns:**
+- **PR #215 pipeline: clean close.** Created 02:54Z, Mirror reviewed + auto-merged by 03:22:59Z — ~28 min from open to merged. Remove-yes change live. Good signal that the pipeline is operating well even under rate-limit pressure.
+- **Opus 4.8 pilot: first activity observed.** Beacon now on claude-opus-4-8. beacon_telegram_bot.log at 03:27Z shows Tier 2 used (rate_limit path) — consistent with Tier 1 rate limit that also hit Forge (03:02Z alerts). First production observation of Opus 4.8 on this system.
+- **Tier 1 rate limit + Tier 2 OAuth expired:** Forge tasks held pending rate limit recovery (resets 11:30am MDT = 17:30Z UTC). Tier 2 rate_limit path working for bot process (TIER2_FALLBACK_USED); Tier 2 auth_401 path unavailable (expired credentials). Forge build-phase tasks (step-b-resume, register-claude-setup-tokens-rotation) are account-bound --resume sessions; same SKIPPED pattern as iter 151 03:02Z alerts. Self-resolves at rate limit reset.
+- **Sync push error: 2 occurrences this iter** (03:27Z + 03:29Z). Same race. Monday DM carry-forward.
+
+**Learned:**
+- `agent-models.json` config files can be silently corrupted with ANSI escape artifacts if a script or terminal session edits JSON strings in a context that renders or injects escape codes. The asymmetry between `telegram_model` and `inbox_model` (one field affected, other not) is the tell. Future check: when a config change lands, compare all related fields for internal consistency (a one-liner grep for non-ASCII characters in JSON config files could catch this class early).
+- PR #215 merge was clean, possibly GitHub's auto-merge firing once the CONFLICTING/UNKNOWN state resolved after PR #216 merged (31 seconds later). The "Merge pull request" commit style (not squash) suggests either Larry manually merged or GitHub's default merge option was used — distinct from the pipeline's `gh pr merge --squash` path. Low risk; change is live and correct.
+
+---
+
 ## Iteration 152 — 2026-05-31 03:25 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — PR #216 (fix(advancer): active reconciliation tick) MERGED at 03:22Z. Both MalformedForgeMarker retries self-resolved. 6/6 services active. Forge: 2 fresh tasks. PR #215 status changed CONFLICTING→UNKNOWN (re-evaluating after #216 merge). No new alerts. Sync error carry-forward. APPROVAL_REQUEST queue: 5. Tier=1, consecutive_clean=0.

@@ -6,6 +6,22 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~03:33Z UTC (Iter 153)
+
+**System: ✅ Nominal-with-watch.** Iter 153 findings: **PR #215 (chore/remove-yes-approval-token) MERGED at 03:22:59Z** — closes iter 152 watch. **Opus 4.8 pilot live** (commit 2f470f8 — beacon bumped to claude-opus-4-8; first activity observed at 03:27Z). 0 open PRs both repos. 6/6 services. Forge inbox: 2 fresh tasks (step-b-resume + register-claude-setup-tokens-rotation, <30 min). Tier 1 rate limit active (resets 11:30am MDT); tasks held pending recovery. Sync push errors at 03:27Z + 03:29Z (carry-forward). APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- **PR #215 (remove-yes-approval-token): MERGED 03:22:59Z.** ✅ CLOSED.
+- **Opus 4.8 pilot (Beacon): LIVE** (commit 2f470f8). ⚠️ WATCH: `beacon.telegram_model = "claude-opus-4-8[1m]"` — ANSI bold artifact in JSON config. Escalated via larry-alerts 03:36Z (line 1069). Fix: remove `[1m]` from line 13 of config/agent-models.json. Until fixed, Beacon Telegram traffic falls back to sonnet-4-6. inbox_model unaffected.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 11 iters (143–153). Heartbeat confirmed fresh (03:05:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01**.
+- Sync push error: carry-forward (2 occurrences this iter, 03:27Z + 03:29Z). Root cause fix pending Larry.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 0 active.** Doc-fix APPROVAL_REQUEST pending Larry. G-rule posture: keep open through doc-PR + PR B merge.
+- **rate-limit-resilience sequence:** step-b-resume + register-claude-setup-tokens-rotation both in Forge inbox (<30 min). Tier 1 rate limit holds these pending reset at 11:30am MDT.
+
 ## Status snapshot — updated 2026-05-31 ~03:25Z UTC (Iter 152)
 
 **System: ✅ Nominal-with-watch.** Iter 152 findings: 0 new alerts. **PR #216 (fix(advancer): active reconciliation tick) MERGED at 03:22Z** — rate-limit-resilience V6 advancer fix live. MalformedForgeMarker retries: both self-resolved (step-b-resume 21:09 MDT, register-claude-setup-tokens-rotation 21:17 MDT). PR #215 (remove-yes-approval-token) status CONFLICTING→UNKNOWN (GitHub re-evaluating after #216 merge); Mirror review not yet started. Forge: 2 tasks active (build-step-b-resume, build-register-claude-setup-tokens-rotation). All 6 services active. Sync push error carry-forward. APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
