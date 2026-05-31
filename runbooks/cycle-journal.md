@@ -4,6 +4,94 @@
 
 ---
 
+## Iteration 126 — 2026-05-31 00:02 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #212 (harden-systemd-timer-recovery) MERGED ~00:05Z, closing the iter 122 watch item. PR #211 (step-a-rotation) open, Mirror review queued. Check I + Check III both fired (first Sunday UTC crossing, 2026-05-31). All 6 services active. Sync push failure carry-forward unchanged.
+
+**Triage:** Check 0 — alert-triage.json absent (PR-β not deployed). Manual scan: larry-alerts.jsonl most recent entry 23:35:45Z (heal-stale-daemon-code from iter 123, all in cooldown ≥29 min old). No new unclaimed alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts. ✅** Larry-alerts.jsonl last entry 23:35:45Z. All known patterns: tier2-fallback-skipped, rotate-active-tier auth blocked, heal-stale-daemon-code cooldowns. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier last entry 18:00:12Z (harden-systemd-timer-recovery build dispatch). No WARN/ERROR spikes. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. ✅
+
+- **(Check 3) Pipeline state: ✅ Nominal.**
+  - heal-pipeline-stall cooldowns (47 min old): tier2-fallback-skipped rate_limit/auth_401 — known Tier 2 OAuth pattern. No new stall signals. ✅
+  - forge/build-step-a-rotation.json: still in inbox; PR #211 opened 23:47:53Z (~17 min ago). Post-PR marker writing; archive expected next cycle. Watch-only. ✅
+  - PR #212 MERGED ~00:05Z (harden-systemd-timer-recovery). ✅
+
+- **(Check 4) Pending Larry directives: 3 unchanged. ✅**
+  - sync-push-rebase-fallback-001 (iter 118, APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94)
+  - stuck-cycle timeout guard (iter 43)
+  - [yellow] Monday DM: 2026-06-02 (June 2, next Monday). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code cooldowns: auto-restarted entries ≥29 min old (iter 123 batch). inbox-watcher ActiveEnterTimestamp=23:36:45Z, active. auto-restart-failed (rc=-1) cooldown 29 min old — 2nd occurrence from iter 123, no new rc=-1. G-rule still at 2/3. heal-stale-daemon-code-cooldowns.json absent (file missing — cooldown state is in alert-cooldown/ directory per iter 116 refactor; check-5 substrate confirmed via those files). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean, ahead=0, behind=0. HEAD=9165175 (iter 125). ✅
+  - Concurrent automated cycle: PID 2569241 alive (lock mtime 23:57:47Z, age ~10 min). Likely wrapper in post-commit push-retry. Not yet at 30-min override threshold. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (11th+ occurrence).**
+  - sync.json: status=error 23:59:15Z "Auto-commit push failed; rolled back". Age=1 min (not stale). Same root cause: bare-push in sync_agent_core.sh:161. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅**
+
+- **(Check D) Inboxes: nominal. ✅**
+  - beacon: notify-step-a-rotation (ack-proceed)
+  - forge: build-step-a-rotation (post-PR phase)
+  - mirror: review-step-a-rotation + review-harden-systemd-timer-recovery (second may be stale — PR #212 already merged)
+  - pulse: 0 tasks. 0 stale tasks (all < 60 min). ✅
+
+- **(Check E) PRs: ✅ Nominal.**
+  - PR #211 (step-a-rotation): OPEN, reviewDecision="", age ~17 min. Under 30-min threshold. ✅
+  - PR #212 (harden-systemd-timer-recovery): MERGED ~00:05Z. **CLOSES iter 122 watch item.** ✅
+
+- **(Check H) Forge digest:** Shipped: PR #212. Open: PR #211 (<30 min). ✅
+
+- **Check I (Sunday 2026-05-31 UTC):**
+  - fired_at: 00:04:14Z. week_ending: 2026-05-25. Sidecar refreshed (1.4s).
+  - $251.49/week (+117% vs prior). 0 anomalies. retry_overhead: $5.50 (2.19%).
+  - high-repeat: smoke-5a-pf-no-marker × 3 (forge).
+  - Proposals: 1 — [medium] template/fast-path for `smoke-5a-pf-no-marker`.
+  - auto-dispatches: 0 (medium effort). Journal write: **SKIPPED** (idempotency guard hit: week 2026-05-25 block already present — correct behavior). DM queued. ✅
+
+- **Check III (first run ever, 2026-05-31):**
+  - as_of: 00:04:40Z. lookback=30d. 4 proposals (ALL high-attention, >50% delta):
+    1. **beacon _default** n=289: current=900s → proposed=2147s (+139%, p90=2147s). Threshold too tight.
+    2. **forge _default** n=167: current=900s → proposed=3436s (+282%, p90=3436s). Significantly too tight — forge builds often run 19–57 min.
+    3. **mirror _default** n=62: current=1500s → proposed=488s (-67%, p90=488s). Too loose — mirror sessions typically ~8 min.
+    4. **pulse _default** n=28: current=900s → proposed=262s (-71%, p90=262s). Too loose.
+  - DM queued. Artifact: pulse-check-iii-2026-05-31.json. No auto-apply per discipline.
+
+- **Credential rotations: nominal.** 0 overdue, 0 upcoming within 60d. Background: 4 credential-registry-drift MISSING entries in cooldown (SUPABASE_ACCESS_TOKEN/DB_PASSWORD age=4.3d; TELEGRAM_ALLOWED_CHAT_IDS/CHAT_ID_LARRY age=10.8d) — pre-existing, not new this iter. ✅
+
+**Did:**
+1. Read continuity: MEMORY.md, last journal entries, cycle-tier.json.
+2. Ran all checks (0, 1–5, A–E, H, credential rotations, Check I, Check III).
+3. No always-fix conditions triggered.
+4. Ran pulse_check_i.py (Sunday gate) → artifact written, DM queued.
+5. Ran pulse_check_iii.py (first run, Sunday gate) → 4 proposals written, DM queued.
+6. Tier: 1, consecutive_clean=0 (Check B non-empty carry-forward).
+7. Wrote journal entry + updating MEMORY.md.
+
+**Escalated:** None new. Check I + Check III DMs queued via larry_alerts. APPROVAL_REQUEST queue (3) unchanged.
+
+**Forge:** 1 merged (PR #212). 1 open (PR #211, <30 min). ✅
+
+**Patterns:**
+- **Sync push failure 11th+ occurrence.** APPROVAL_REQUEST pending. No new action.
+- **inbox-watcher rc=-1: 2/3 toward G-rule.** No new occurrence this iter.
+- **Check III first run: 4 high-attention proposals.** Beacon/forge thresholds significantly too tight; mirror/pulse too loose. Queued for Larry review.
+
+**Learned:**
+- Check III p90 data confirms stuck-detection is generating false positives for beacon/forge (threshold 900s, but p90=2147/3436s) and delayed detection for mirror/pulse (threshold 1500/900s, p90=488/262s). The data is meaningful; proposals are sound.
+- MEMORY.md "Checks I/III fire Sunday 2026-06-01" was a date-label error. June 1 = Monday. First Sunday by UTC = May 31. Gate fired correctly. Correcting in MEMORY.md.
+
+---
+
 ## Iteration 125 — 2026-05-30 ~23:56 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — system building normally. PR #211 (forge/step-a-rotation) opened 23:47:53Z, step-a-rotation task completed 23:50:55Z ($0.24, 40s), harden-systemd-timer-recovery in progress via resume (23:50:56Z). All 6 services active. No new escalation-worthy findings. Carry-forwards from prior iters unchanged.

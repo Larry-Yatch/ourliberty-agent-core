@@ -6,11 +6,11 @@
 
 ---
 
-## Status snapshot — updated 2026-05-30 ~23:56Z UTC (Iter 125)
+## Status snapshot — updated 2026-05-31 ~00:08Z UTC (Iter 126)
 
-**System: ✅ Nominal-with-watch.** Iter 125 findings: PR #211 (fix(rotation): step-a-rotation) opened 23:47:53Z — step-a-rotation task completed 23:50:55Z ($0.24, 40s), harden-systemd-timer-recovery in progress (resume 764f42af, 23:50:56Z). No new escalation-worthy findings. Sync push failure 10th occurrence at 23:47:14Z (carry-forward). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Monday DM 2026-06-01. Checks I/III fire Sunday 2026-06-01. All 6 services active. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 126 findings: PR #212 (harden-systemd-timer-recovery) MERGED ~00:05Z — closes iter 122 watch item. PR #211 (step-a-rotation) open, Mirror review queued. Check I fired (Sun UTC, week 2026-05-25, $251.49/wk, 1 proposal: smoke-5a-pf-no-marker template [medium], DM queued). **Check III FIRST RUN** (4 high-attention proposals: beacon/forge thresholds too tight +139%/+282%; mirror/pulse too loose -67%/-71%; DM queued). Sync push failure 11th+ occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged. Next Monday [yellow] DM: 2026-06-02. All 6 services active. Tier=1, consecutive_clean=0. Correction: MEMORY.md "Checks I/III fire Sunday 2026-06-01" was a date-label error — June 1 = Monday; first Sunday UTC = May 31. Both fired correctly today.
 
-## Status snapshot — updated 2026-05-30 ~23:48Z UTC (Iter 124)
+## Status snapshot — updated 2026-05-30 ~23:48Z UTC (Iter 124 — see Iter 126 for current state)
 
 **System: ⚠️ Drift (improving).** Iter 124 findings: PR #210 (fix(auth): wire dispatches) MERGED 23:43Z — carry-forward from iters 121–123 CLOSED. inbox-watcher running fresh code (PID 2554803, 23:36:45Z restart via systemd RestartSec) — stale dispatch_validator issue from iter 120 SELF-RESOLVED. Always-fix: agent-core fast-forwarded 89ecbea→1a8d539 (4 commits). Check B sync push failure (9th occurrence, carry-forward APPROVAL_REQUEST pending). Forge: step-a-rotation in-flight, harden-systemd-timer-recovery queued. 34 larry-reject-*.json in beacon/.invalid/ still need Larry re-deposit auth. Tier=1, consecutive_clean=0. Monday DM queue: 3 APPROVAL_REQUESTs (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard).
 
@@ -102,7 +102,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 - **CLOSED 2026-05-30 (iter 124) — PR #210 (fix(auth): wire dispatches to long-lived setup-tokens) MERGED.** Forge rebased (4e581e3), Mirror reviewed and passed (23:43:03Z, $0.69), auto-merge fired, PR merged at 23:43Z. CONFLICTING status from iters 121–122 fully resolved. agent_runner.py + test_agent_runner_setup_token_auth.py now live.
 
-- **2026-05-30 (iter 122) — harden-systemd-timer-recovery dispatched to Forge.** Beacon dispatched fix for today's cycle.timer infinity-trap incident (timer ActiveState=active but NextElapseUSecMonotonic=infinity → fires once and then never again). Task in forge/harden-systemd-timer-recovery.json: (A) heal_stale_daemon_code.auto_restart_unit() gets daemon-reload before restart; (B) heal_systemd_install_drift.py gains stuck-timer detector. Normal pipeline task, not a Pulse escalation. Close when Forge PR merges.
+- **CLOSED 2026-05-31 (iter 126) — harden-systemd-timer-recovery MERGED.** PR #212 merged ~00:05Z. (A) daemon-reload before auto-restart; (B) stuck-timer detector in heal_systemd_install_drift.py. Mirror reviewed and auto-merged in <5 min post-creation. New code live when heal-stale-daemon-code next restarts its own service.
 
 - **2026-05-30 (iters 120–124) — dashboard-dispatch-source-blocked: inbox-watcher SELF-RESTARTED with fresh code.** PR #207 fixed ALLOWED_SOURCES. inbox-watcher restarted by systemd RestartSec at 23:36:45Z (after healer rc=-1 at 23:35:45Z). New PID 2554803 loaded fresh dispatch_validator.py. Stale-code issue closed. **Remaining open:** 34 `larry-reject-*.json` still in beacon/.invalid/ — need Larry to re-deposit (ask-then-do, pending). Close when Larry re-deposits or explicitly defers.
 
@@ -124,7 +124,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 - **2026-05-24 — SUPABASE_SERVICE_ROLE_KEY added to rotation registry (90d cadence, due 2026-08-22).** First 90d rotation credential in the registry. Will enter the 60d notification window on 2026-06-23. Also added: SUPABASE_URL (revocation_only) and SUPABASE_ANON_KEY (revocation_only). E4.0a Supabase credential discipline landed via PR #78.
 
-- **2026-05-26 — Check III analyzer shipped (PR #112).** `scripts/pulse_check_iii.py` is now live. Fires first on next Sunday (2026-06-01) since no prior artifact exists in `~/agents/blackboard/pulse-check-iii/`. Requires 30 days of `chain_events` data in Supabase for meaningful signal; buckets with <10 observations skip. Output: `~/agents/blackboard/pulse-threshold-proposals.json` + `append_alert` DM. No auto-apply — Pulse proposes, Larry approves, Beacon→Forge PR chain applies.
+- **2026-05-26 — Check III analyzer shipped (PR #112). FIRST RUN: 2026-05-31 (iter 126).** `scripts/pulse_check_iii.py` fired Sunday 2026-05-31T00:04:40Z. 4 high-attention proposals (all >50% delta, n≥28 per bucket): beacon _default 900s→2147s (+139%); forge _default 900s→3436s (+282%); mirror _default 1500s→488s (-67%); pulse _default 900s→262s (-71%). DM queued. Artifact: pulse-check-iii-2026-05-31.json. No auto-apply — Larry approves, Beacon→Forge config PR. Next run: Sunday 2026-06-07 (14d from today). Key insight: false-positive stuck alerts likely firing for beacon/forge (threshold too tight vs. p90 session durations); mirror/pulse detection is delayed (threshold too loose).
 
 - **2026-05-29 — Check IX analyzer shipped (PR #179).** `scripts/pulse_check_ix.py` is now live. Fires Monday-only, alongside Check I + Check VIII. First firing: 2026-06-01. Scans 4 operator-friction signals (catch-me-up gap, time-to-action gap, alert-ignored repeats, out-of-chain rescue burden) and registers drafting missions via POST /api/system/missions/new when thresholds crossed. No DM — registered missions surface through the standard +New mission Telegram flow. Larry approves/rejects on kanban.
 
