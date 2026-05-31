@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 148 — 2026-05-31 02:37 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 3 carry-forward; tier2-verifier-probe-001 now dispatched to Forge ✅) and Check 5 (cooldowns file ~2h32m old; heartbeat fresh 2 min; Forge substrate-swap APPROVAL_REQUEST pending trust-policy). 0 open PRs on both repos (13th consecutive PR-clear iter). All 6 services active. Forge inbox: 1 task (tier2-verifier-probe-001.json, just dispatched). sync.json: no-change (02:04:38Z). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (unchanged from iter 147 watermark). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl count unchanged at 1056. Last entry remains 2026-05-31T01:02:05Z (PR #211 merge DM). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry: 2026-05-30 20:01:23 MDT (02:01:23Z UTC) — unchanged. All INFO; no WARN/ERROR. beacon_telegram_bot.log: TIER2_FALLBACK entries at 19:00–19:01 MDT are prior-session test artifacts (known, from beacon log). No new error spam. ✅
+
+- **(Check 2) Telegram sweep: ✅ New activity resolved by Beacon.**
+  - **20:30:04 MDT — Larry sent 'go':** Beacon processed → `tier2-verifier-probe-001` approved and dispatched to `/home/larry/agents/inboxes/forge/tier2-verifier-probe-001.json`. APPROVAL_REQUEST queue reduced from 4 → 3.
+  - **20:34:46 MDT — Larry asked:** "Where are we with our rate limit rotation resilience multi-step mission?"
+  - **20:35:51 MDT — Beacon replied:** "Mission `rate-limit-resilience` — in_flight. Sequence file: `rate-limit-resilience-...`"
+  - No pending directives from Larry requiring Pulse action. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning/: 297 files (unchanged from iters 144–147). No new cooldown entries. Healer heartbeat: 2026-05-31T02:35:16Z UTC (2 min old at check time — well within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: 3 items. ⚠️ (carry-forward; one resolved)**
+  - **tier2-verifier-probe-001: RESOLVED.** Larry approved at 20:30 MDT; dispatched to Forge inbox. Forge task now in-flight (task age <10 min, not stale). ✅
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: **2026-06-01**.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+
+- **(Check 5) Stale daemon: ⚠️ in-progress — trust-policy dispatch still pending.** heal-stale-daemon-code-cooldowns.json mtime: 2026-05-31T00:05:15Z UTC (~2h32m old — same as prior iters). Heartbeat: 2026-05-31T02:35:16Z UTC (2 min old) — healer confirmed healthy. APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced by Beacon (iter 143); trust-policy → Forge dispatch not yet materialized (Forge inbox only has tier2-verifier-probe-001). No new action this iter. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus (start): branch=main, clean, HEAD=79b2924 "Pulse cycle 20260531T023259Z" (iter 147 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ 13th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T02:04:38Z (~33 min ago, within 2h threshold). Race-condition root cause (sync-push-rebase-fallback-001) still unfixed; APPROVAL_REQUEST pending Monday DM. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge has 1 task (fresh). ✅** `tier2-verifier-probe-001.json` dispatched 20:30 MDT; age <10 min; not stale. beacon/mirror/pulse — 0 tasks each. ✅
+
+- **(Check E) PRs: ✅ PR-clear holds (13th consecutive iter).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126 (Sunday 2026-05-31 UTC). Idempotency guard active. Next: 2026-06-07. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-01 UTC. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean, services active, no stale PRs).
+3. No new dispatches — tier2-verifier-probe-001 was dispatched by Beacon (not Pulse); all other threads carry forward.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-148-check2-new-activity-tier2-probe-dispatched"}'` → row appended at 2026-05-31T02:37:30Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T02:37:31Z.
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. Beacon already handled Larry's 'go' approval and rate-limit-resilience question.
+
+**Patterns:**
+- **APPROVAL_REQUEST queue: 3 items** (4→3; tier2-verifier-probe-001 resolved). Monday [yellow] DM: 2026-06-01.
+- **Sync push error: 13th consecutive clean cycle.** Root cause fix pending Larry. Active risk low.
+- **13th consecutive PR-clear iter.** Both repos 0 open PRs.
+- **Check 5 permanent fix in motion:** heartbeat fresh (02:35:16Z UTC). Trust-policy → Forge still pending (one task ahead: tier2-verifier-probe-001). Verification: 2026-06-07.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+
+**Learned:**
+- tier2-verifier-probe-001 pattern resolved: Larry authorized, Beacon dispatched to Forge, APPROVAL_REQUEST queue drops to 3. The 4-item queue that persisted iters 139–147 is now the 3-item carry-forward set (sync-push, pulse-bot-launcher, stuck-cycle-timeout).
+- Healer heartbeat updated at 02:35:16Z UTC — 30-min cadence confirmed (prior heartbeat 02:05:15Z; delta 30:01). Healer is running punctually.
+- Forge inbox is not empty this iter (tier2-verifier-probe-001 in-flight). If trust-policy auto-dispatches `fix-check5-heartbeat-substrate-001` to Forge before tier2-verifier-probe-001 clears, Forge inbox would have 2 tasks simultaneously — both within normal throughput.
+
+---
+
 ## Iteration 147 — 2026-05-31 02:31 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file ~2h26m old; heartbeat fresh 26 min; Forge substrate-swap PR pending trust-policy dispatch). 0 open PRs on both repos (12th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 12th consecutive clean sync). Healer heartbeat: 2026-05-31T02:05:15Z UTC. Tier=1, consecutive_clean=0.
