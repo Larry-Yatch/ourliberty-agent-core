@@ -60,7 +60,10 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'dispatch-sentinel.log'
 ALERTS_LOG = AGENTS_ROOT / 'blackboard' / 'sentinel-alerts.jsonl'
 LEASES_DIR = AGENTS_ROOT / 'state' / 'dispatch-leases'
 IN_FLIGHT_DIR = AGENTS_ROOT / 'state' / 'in-flight'
-AGENT_MODELS_FILE = AGENTS_ROOT / 'config' / 'agent-models.json'
+# Source-of-truth git copy (~/agent-core/config), NOT AGENTS_ROOT/config
+# (~/agents) which is a hand-synced runtime copy that drifts stale.
+# Matches inbox_watcher._MODELS_CONFIG_PATH so all consumers read one file.
+AGENT_MODELS_FILE = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
 
 MONITORED_AGENTS = ['beacon', 'forge', 'mirror', 'pulse']
 
