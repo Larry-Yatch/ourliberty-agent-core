@@ -8,7 +8,7 @@ via Claude Code's --resume by storing the session id keyed on chat id.
 
 Phase D3 (commit 3) added the approval gate. The bot now intercepts:
 
-  - User messages matching approve / yes / go / ok / ship it (exact, strict
+  - User messages matching approve / go / ok / ship it (exact, strict
     whitelist) → resolve most-recent pending approval, dispatch via
     safe_write_inbox, confirm to Larry. NO forward to Beacon.
   - User messages prefixed `modify: ...` or `reject: ...` → resolve as

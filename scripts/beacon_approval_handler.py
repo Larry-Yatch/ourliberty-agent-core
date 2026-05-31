@@ -83,7 +83,7 @@ HISTORY_CAP = 1000
 # to fire. Ambiguous text — "approve if it's safe", "yes, but..." — does
 # NOT fire approval; it bounces back to Beacon for clarification.
 APPROVE_TOKENS = {
-    'approve', 'yes', 'go', 'ok', 'okay', 'ship', 'ship it',
+    'approve', 'go', 'ok', 'okay', 'ship', 'ship it',
 }
 
 # Modify / reject use a prefix grammar — the rest of the message is the
@@ -537,7 +537,7 @@ def record_reminder_sent(
 APPROVAL_FOOTER = (
     '\n\n'
     'Reply to approve:\n'
-    '  • approve / yes / go / ok / ship it\n\n'
+    '  • approve / go / ok / ship it\n\n'
     'To adjust:\n'
     '  • modify: <what to change>\n'
     '  • reject: <why>\n\n'
@@ -607,7 +607,7 @@ def format_bounce(reason: str = '') -> str:
     if reason:
         msg += f' ({reason})'
     msg += (
-        ' Use exactly one of: approve / yes / go / ok / ship it. '
+        ' Use exactly one of: approve / go / ok / ship it. '
         'For changes: modify: <what>. For rejection: reject: <why>.'
     )
     return msg
