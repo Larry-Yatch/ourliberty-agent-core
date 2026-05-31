@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 146 — 2026-05-31 02:27 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file ~2h19m old; heartbeat fresh 19 min; Forge substrate-swap PR pending trust-policy dispatch). 0 open PRs on both repos (11th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 11th consecutive clean sync). Healer heartbeat: 02:05:15Z UTC. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (unchanged from iter 145 watermark). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl count unchanged at 1056. Last entry 2026-05-31T01:02:05Z (PR #211 merge DM). No new alerts since iter 145. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry: 2026-05-30 20:01:23 MDT (02:01:23 UTC) — same as iter 145. All INFO; no WARN/ERROR. beacon_telegram_bot.log: TIER2_FALLBACK entries at 19:01 MDT are known prior-session artifacts. No new error spam. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last Larry inbound: 19:30:12 MDT (01:30:12 UTC) — "Display 1 and 2" (unchanged since iters 139–145). Last outbound: 19:33:22 MDT tier2-verifier-probe-001 DM. No new directives. Larry indicated he was away from computer at 19:27 MDT. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning/: 297 files (unchanged from iter 145 count — no new cooldown entries). Heal-pipeline-stall entries all part of the known stale set (real-clr, real-loop, envelope-id, notify-t-pf, t-19-revision match fixture patterns; chain-discipline/build-sequence/oauth entries are pre-existing carry-forward from May 26–30). Healer heartbeat: 2026-05-31T02:05:15Z UTC (19 min old at check time). ✅
+
+- **(Check 4) Pending Larry directives: 4 items. ⚠️ (all carry-forward from iter 145)**
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: **2026-06-01** (next automated cycle post 00:00 UTC).
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+  - **tier2-verifier-probe-001** (iter 139) — Beacon DM'd Larry 19:33Z MDT (01:33Z UTC). Larry was away from keyboard. Still pending Larry's `approve tier2-verifier-probe-001` reply. ⚠️
+
+- **(Check 5) Stale daemon: ⚠️ in-progress — trust-policy dispatch pending (same as iter 145).** heal-stale-daemon-code-cooldowns.json mtime: 2026-05-31T00:05:15Z UTC (~2h22m old at check time, over 60-min spec threshold). Heartbeat: 2026-05-31T02:05:15Z UTC (19 min old) — healer confirmed healthy. Forge inbox empty; trust-policy has not yet dispatched the APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` doc-only PR. No new action this iter. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean, up to date with origin/main. HEAD=19ca6ba "Pulse cycle 20260531T022243Z" (iter 145 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ 11th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T02:04:38Z (~23 min ago, within 2h threshold). Race-condition root cause (sync-push-rebase-fallback-001) still unfixed; APPROVAL_REQUEST pending Monday DM. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon/forge/mirror/pulse — 0 tasks each. ✅
+
+- **(Check E) PRs: ✅ PR-clear holds (11th consecutive iter).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126 (Sunday 2026-05-31). Idempotency guard active. Next: 2026-06-07. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-01. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean, services active, inboxes empty, no stale PRs).
+3. No new dispatches — all active threads carry forward unchanged from iter 145.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-146-nominal-all-carry-forward"}'` → row appended at 2026-05-31T02:27:09Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T02:27:10Z.
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. System steady-state; no new signals since iter 145. Monday [yellow] DM 2026-06-01 will recap all 4 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **APPROVAL_REQUEST queue: 4 items unchanged.** Monday [yellow] DM: 2026-06-01 (correct date).
+- **Sync push error: 11th consecutive clean cycle.** Root cause fix pending Larry. Active risk remains low.
+- **11th consecutive PR-clear iter.** Both repos 0 open PRs.
+- **Check 5 permanent fix in motion:** heartbeat confirmed fresh (19 min old). Forge trust-policy dispatch still pending. Verification: 2026-06-07.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+
+**Learned:**
+- alert-cooldown/warning/ count held at 297 across iters 145→146 (no new cooldown files added in the 5-min window). This confirms the healer's pipeline-stall logic found nothing new to fire on. The stale entries are genuinely dormant.
+- Trust-policy dispatch for APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` has not materialized after ~25 minutes since Beacon produced it (iter 143, 02:01Z). Trust-policy may require a Larry `approve fix-check5-heartbeat-substrate-001` Telegram command rather than auto-approving. Not yet a pattern — first direct observation.
+
+---
+
 ## Iteration 145 — 2026-05-31 02:19 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >134 min old; Beacon substrate fix pending trust-policy dispatch). 0 open PRs on both repos (10th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 10th consecutive clean sync). Healer heartbeat fresh: 02:05:15Z UTC. Tier=1, consecutive_clean=0.
