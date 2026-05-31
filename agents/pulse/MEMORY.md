@@ -6,18 +6,18 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~17:25Z UTC (Iter 213 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~17:27Z UTC (Iter 214 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 17:06:00Z UTC (on cadence). Healer heartbeat 17:07:21Z UTC. 7/7 services active. 0 open PRs. Forge inbox: 0 active tasks. Alert watermark: **1085** (0 new alerts). APPROVAL_REQUEST queue: 8 (unchanged). **NEW: PR #223 MERGED (feat(healer): auto-remediate install-drift missing-install case, 17:18:50Z UTC). Install-drift G-rule CLOSED.**
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 17:06:00Z UTC (on cadence). Healer heartbeat 17:07:21Z UTC. 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (1 new Tier-3 alert — PR #223 review-pass, journaled only). APPROVAL_REQUEST queue: 8 (unchanged). Nominal observation iter; no new findings.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
-- **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. No new stalls since iter 195. Forge executed install-drift-auto-remediation-001 on Tier 1 (Sonnet) — rate-limit resilience working. Beacon notify stalled in inbox (informational; PR #223 already merged). Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
+- **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
-- **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Scope: Tier 2 OAuth ELEVATED (active stalls; Beacon notify stalled) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + pulse-grule-prompt-template-001 (F24 fix, doc-only, APPROVAL_REQUEST #8). REMOVED: install-drift Forge task (PR #223 MERGED).
+- **Check VIII/IX FIRST FIRING TONIGHT (2026-06-01 UTC = Sunday evening MDT).** Both analyzers first-ever run. Monitor for unexpected output or errors.
+- **Monday [yellow] DM: 2026-06-01 UTC (TONIGHT MDT).** Scope: Tier 2 OAuth ELEVATED (active stalls; Beacon notify stalled) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + pulse-grule-prompt-template-001 (F24 fix, doc-only, APPROVAL_REQUEST #8).
 - **APPROVAL_REQUEST queue (8):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001, **pulse-grule-prompt-template-001 (doc-only, cycle-prompt.md § 17 G-rule subsection, fixes F24 empty-prompt recurrence)**.
-- **deploy-notifier cooldown GC gap — BEACON CORRECTED DIAGNOSIS (2nd investigation).** 106 files at iter 213 check (stable). Root cause: `deploy_notifier.py:490` embeds per-Vercel-uid in subject; no GC after cooldown expires. APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — Forge to add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py`. Awaiting Larry approval.
+- **deploy-notifier cooldown GC gap — BEACON CORRECTED DIAGNOSIS (2nd investigation).** 106 files stable (unchanged iters 211-214). Root cause: `deploy_notifier.py:490` embeds per-Vercel-uid in subject; no GC after cooldown expires. APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — Forge to add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py`. Awaiting Larry approval.
 - **F24 EMPTY-PROMPT BUG — BEACON INVESTIGATION COMPLETE.** Two root causes confirmed: (1) missing `prompt` field; (2) wrong source key `pulse-g-rule`. APPROVAL_REQUEST `pulse-grule-prompt-template-001` produced. **Workaround in place: always include `"prompt"` (≥100 chars) + always use `source: "pulse"` in every dispatch envelope.**
 
 ---
