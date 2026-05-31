@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 204 — 2026-05-31 16:07 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **2 new alerts delivered to Larry.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1085 lines** (up from 1083 at iter 203). **2 new alerts.** Both from `heal-systemd-install-drift` at 16:00:20Z UTC; beacon-bot delivered via Telegram at 16:02:51Z UTC.
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new alerts — known carry-forward.** Watermark: 1083 → **1085**.
+  - `install-drift:ourliberty-heal-resume-paused-on-tier1.service` (ts: 16:00:20Z UTC) — healer re-detected service not installed under `/etc/systemd/system/`. Same drift as APPROVAL_REQUEST carry-forward since iter 158.
+  - `install-drift:ourliberty-heal-resume-paused-on-tier1.timer` (ts: 16:00:20Z UTC) — healer re-detected timer not installed. Same drift.
+  - Both delivered to Larry via Telegram (beacon-bot idx=1083/1084 at 10:02:51 MDT = 16:02:51Z UTC). ⚠️ (ask-then-do, already escalated)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon-bot activity: idx=1084 (install-drift:ourliberty-heal-resume-paused-on-tier1.timer) at 10:02:51 MDT (16:02:51Z UTC) — the new install-drift alerts. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged from iter 203: `tier2-fallback-skipped-auth_401:forge` (May 31 07:59), `tier2-fallback-skipped-rate_limit:beacon-bot` (May 31 07:59), `tier2-fallback-skipped-rate_limit:forge` (May 31 07:59), `tier2-fallback-skipped-auth_401:beacon-bot` (May 28 22:57), `rotate-active-tier:rotation_auth_gate_blocked:tier2` (May 31 07:48). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items: `pulse-grule-check-c-canonical-names-001`, `alert-triage-persistence-invocation-001`, `forge-claude-md-preflight-self-check-bullet-001`, **Tier 2 OAuth restore (ELEVATED)**, **`sync-push-rebase-fallback-001` (ELEVATED)**, `pulse_telegram_bot.sh launcher`, `stuck-cycle timeout guard`. Carry-forward (iter 158): Install heal-resume-paused-on-tier1.service + .timer. Note: heal-systemd-install-drift now emitting fresh Telegram alerts for the same install (Larry received at 16:02:51Z UTC). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T16:07:21.179034Z UTC** — updated this cycle (was 15:37:20Z at iter 203; now advanced exactly 30 min, confirming healer on cadence). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=cdc58b5 "Pulse cycle 20260531T160000Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: `{"last_sync": "2026-05-31T15:07:43Z", "status": "no-change", "commit": "be7ddde"}`. Last sync ~60 min old; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** forge, beacon, mirror, pulse, build_sequence_advancer — 0 active tasks. ourliberty-agent-core: 0 PRs. ourliberty-dashboard: 0 PRs. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Sunday UTC → Monday-only gate, skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3 — the new install-drift alerts are re-fires of the same PR #219 drift, not new drifts; counter unchanged), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. No auto-fix needed this iter.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=16:07:58Z UTC.
+4. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=1, iter=204, intervention_id=iter204-carry-forward-stalls-plus-install-drift-alerts`.
+5. Wrote journal entry.
+
+**Escalated:** None new. The 2 install-drift alerts were already delivered to Larry by the beacon-bot at 16:02:51Z UTC. Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope unchanged; install-drift re-alerts add no new items to the queue.
+
+**Patterns:**
+- System stable-degraded at Tier 1. Active signals: Tier 2 OAuth stalls (carry-forward) + install-drift re-alerts (carry-forward, now with fresh Telegram delivery).
+- **heal-systemd-install-drift re-firing for heal-resume-paused-on-tier1.service/.timer.** Healer correctly and persistently detecting the uninstalled service/timer from PR #219. Larry received fresh Telegram alerts this cycle. APPROVAL_REQUEST carry-forward (iter 158) is the action gate.
+- **Healer heartbeat:** Updated 15:37:20Z → 16:07:21Z this cycle (exactly 30 min). Healer on cadence. ✅
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+
+**Learned:** Nothing structurally new. install-drift alerts are correctly looping back through the system (healer → alerts → Telegram → Larry). Action gate is Larry's APPROVAL_REQUEST for the install dance. Monday 2026-06-01 is the next action gate.
+
+---
+
 ## Iteration 203 — 2026-05-31 15:59 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty.
