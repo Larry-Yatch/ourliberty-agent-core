@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 251 — 2026-05-31 22:07 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired). 7/7 services active. 0 open PRs. 0 active inbox tasks. **0 new alerts.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1086 lines** (unchanged from iter 250 watermark of 1086). **0 new alerts.** alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). Nominal. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1086 (unchanged). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery `notification idx=1085` at 17:23Z UTC May 31 (unchanged). Last Larry message: `'Go'` at 2026-05-31T13:44Z UTC. No new Larry directives. No agent distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** 309 total alert-cooldown/warning/ files (unchanged). 106 deploy-notifier prefix files (unchanged). 38 heal-pipeline-stall prefix files (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged).** No new Larry directives since 13:44Z May 31. **Monday [yellow] DM fires in ~1.9h** (first automated cycle on/after 2026-06-01 00:00Z UTC). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T21:37:45Z UTC** — ~30 min old at check time (22:07Z). Within 90-min threshold. No new tick since iter 247; healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=1e60e13 "Pulse cycle 20260531T220341Z" (wrapper auto-commit of iter 250), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: last_sync=2026-05-31T22:06:01Z, status=no-change. ~1 min old at check time (22:07Z); well within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse, build_sequence_advancer): 0 active tasks. ourliberty-agent-core: 0 open PRs. ✅
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. All other scheduled credentials due 2027. ✅
+
+- **Deploy-notifier cooldown file count: 106** (unchanged). Alert-cooldown/warning/ total 309 files. APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json on disk; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json on disk; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate → skip (UTC May 31, 22:07Z). **First firing in ~1.9h** (first automated cycle on/after 2026-06-01 00:00Z UTC). ⚠️
+
+- **G-rule watch items:** No new occurrences. heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), cycle.timer stuck (1/3). F24 empty-prompt: APPROVAL_REQUEST `pulse-grule-prompt-template-001` pending (item #8). All stable. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E, H) + credential rotations + periodic check gates.
+2. No auto-fix needed this iter. All findings carry-forward from iter 250.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 251` → `{"ts": "2026-05-31T22:07:13.296775+00:00", "iter": 251, "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=22:07:14Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All active issues are carry-forward. **Monday [yellow] DM fires in ~1.9h** (first automated cycle on/after 2026-06-01 00:00Z UTC). Scope: Tier 2 OAuth ELEVATED (active stalls) + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + APPROVAL_REQUEST queue 8.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new findings this iter. Forty-first consecutive nominal observation iter today (iters 211–251).
+- Healer heartbeat at 21:37:45Z UTC (unchanged from iter 247; no new tick since). ~30 min old at check time; still within 90-min threshold. Healer alive.
+- All 8 APPROVAL_REQUEST items unchanged. Monday DM is the next action gate (~1.9h).
+- Check VIII/IX first firing on the first automated cycle on/after 2026-06-01 00:00Z UTC.
+- sync.json refreshed to 22:06:01Z UTC (new sync since iter 250's 21:06:01Z value — clean sync completed).
+
+**Learned:** Nominal observation iter. No new interventions or escalations. sync.json advanced to 22:06:01Z (hourly sync running normally). System state otherwise unchanged from iter 250. Monday [yellow] DM scope locked.
+
+---
+
 ## Iteration 250 — 2026-05-31 22:02 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired). 7/7 services active. 0 open PRs. 0 active inbox tasks. **0 new alerts.**
