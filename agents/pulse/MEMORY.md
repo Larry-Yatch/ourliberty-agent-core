@@ -6,17 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~15:07Z UTC (Iter 195 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~15:13Z UTC (Iter 196 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json error is a **stale artifact** — repo is actually in sync (local HEAD = remote HEAD = be7ddde). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: 1083 (unchanged). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json error **CLEARED** at iter 196 — now shows `no-change` at 15:07Z UTC. Healer heartbeat **resumed** (15:07:20Z, no longer static). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: 1083 (unchanged). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
-- **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
-- **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. NOTE: sync.json still shows error from that failure, but repo is actually in sync — confirmed by stale-sync auto-fix at iter 195 (sync_agent_core.sh: no changes needed, local = remote).
+- **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
+- **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note.
-- **Healer heartbeat static.** 14:37:20Z UTC across iters 193–195 (3 consecutive). 29 min old at iter 195 check; within 90-min threshold. Escalation trigger: if still static AND >60 min old at next check (~15:37:20Z UTC).
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
 
 ---
