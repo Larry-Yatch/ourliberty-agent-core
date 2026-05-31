@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 155 — 2026-05-31 03:51 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — **PR #218 (register-claude-setup-tokens-rotation) MERGED 03:45:53Z UTC.** 0 open PRs on both repos. build-fix-rotation-gate-setup-token-aware dispatched to Forge (03:43Z UTC, fresh). New alert: heal-claude-max-burn-rate (83% of 5h token gate, 105 rate-limit events/2h) — Tier 4 informational, fix pipeline active. 6/6 services active. alert-triage.json still MISSING (second consecutive observation). Check B sync push error carry-forward. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1070 lines** (+1 vs iter 154 watermark of 1069). alert-triage.json MISSING (second observation — journal-recorded watermark used). 1 new alert.
+
+**Found:**
+
+- **(Check 0) Alert triage: 1 new alert — Tier 4 (novel, not in known-patterns).**
+  - Line 1070: `heal-claude-max-burn-rate` 03:45:39Z UTC — "Trailing 5h quota pace at 83% of token gate (8,295,983/10,000,000 tokens). Recent rate-limit events (trailing 2h): 105."
+  - Subject: `claude_max_5h_burn_threshold_breached`. NOT in alert-translations.json known-patterns (empty/no match). First observed from this source.
+  - Context: "Pace indicator only" per the alert body. rate-limit-resilience sequence actively progressing — fix-rotation-gate-setup-token-aware currently in Forge build (dispatched 03:43Z UTC). The 105 rate-limit events/2h explain the ongoing TIER2_FALLBACK patterns in bot logs.
+  - Classification: **Tier 4 informational.** No immediate dispatchable action (fix is in Forge build). Adding to Monday [yellow] DM queue. No immediate DM — fix pipeline active; nothing Larry can do today that Forge isn't already doing.
+  - New watermark: **1070**. alert-triage.json state file: MISSING second iteration. Per MEMORY.md discipline: "if still missing after 2 automated cycles → escalate." This is 2 interactive cycles — watching. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.**
+  - outbox-notifier.log: clean progression: MalformedForgeMarker on fix-rotation-gate-setup-token-aware retry 1/3 at 21:42:14 MDT → self-resolved 21:43:09 MDT (proceed marker classified, build-phase dispatched to Forge). PR #218 Mirror REVIEW_PASS → AUTO_MERGE at 21:45:53 MDT. All INFO after that. No above-threshold WARN patterns. ✅
+  - beacon_telegram_bot.log: TIER2_FALLBACK_SKIPPED/USED patterns at 21:47 MDT — consistent with 105 rate-limit events/2h context. Both rate_limit and auth_401 paths observed; rate_limit Tier 2 working for bot process. Not above 5/h threshold. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No Larry directives in recent bot logs. Last inbound: `'go'` 20:44:09 MDT (iter 152/153 carry-forward — resolved by PR #216 merge). No orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T03:35:16Z UTC (~16 min old at check time, within 90-min threshold). ✅ No active pipeline-stall cooldown files from today. Forge inbox: `build-fix-rotation-gate-setup-token-aware.json` (dispatched 03:43Z UTC — 8 min old, not a stall). ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending.
+  - `pulse_telegram_bot.sh launcher` — pending.
+  - `stuck-cycle timeout guard` (iter 43) — pending.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ carry-forward. New addition: heal-claude-max-burn-rate alert context.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 03:35:16Z UTC (~16 min old) — within 90-min threshold. Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge (APPROVAL_REQUEST). ⚠️→in-progress.
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (confirmed from session-start gitStatus). ✅
+
+- **(Check B) Sync health: ⚠️ Push error carry-forward.** sync.json: status=error "Auto-commit push failed; rolled back", commit 6d580ecc. Known race condition (sync-push-rebase-fallback-001 pending Larry). ⚠️ carry-forward.
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge 1 task (fresh). ✅**
+  - forge: `build-fix-rotation-gate-setup-token-aware.json` (dispatched 03:43Z UTC, 8 min old). Fresh. ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.**
+  - **PR #218 "chore(creds): register Claude Code setup-tokens in rotation registry" — MERGED 03:45:53Z UTC.** ✅ Mirror REVIEW_PASS → AUTO_MERGE in ~5 min from open. Closes iter 154 watch item. rate-limit-resilience-001 register step complete.
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅ No action.
+- **MalformedForgeMarker G-rule:** fix-rotation-gate-setup-token-aware retry 1/3 self-resolved (03:43Z UTC). Post-dispatch counter: +1 self-resolved occurrence since Beacon's APPROVAL_REQUEST. G-rule posture unchanged (doc-fix `forge-claude-md-preflight-self-check-bullet-001` pending Larry; will escalate if ≥3 non-self-resolving after doc-fix lands).
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All 6 services active, repo clean, inboxes fresh, 0 open PRs.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-155-check-b-sync-push-carry-forward-check0-burn-rate-alert"}'` → row appended at 03:51:19Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=03:51:20Z.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None immediate. heal-claude-max-burn-rate [yellow] added to Monday DM queue (fix pipeline active; no emergency action needed today).
+
+**Patterns:**
+- **PR #218 pipeline: textbook execution.** Forge build → PR #218 → Mirror REVIEW_PASS → AUTO_MERGE in ~5 min. register-claude-setup-tokens-rotation now live. Pipeline operating smoothly.
+- **rate-limit-resilience sequence: 3/4 steps complete.** step-a (PR #211) + step-b (PR #217) + register-claude-setup-tokens-rotation (PR #218) all merged. fix-rotation-gate-setup-token-aware currently in Forge build. Sequence nearly complete.
+- **heal-claude-max-burn-rate first observation.** 83% of 5h token gate (8.3M/10M), 105 rate-limit events/2h. This is the quantified burn context that explains the TIER2_FALLBACK_SKIPPED alerts from prior iters. The fix-rotation-gate-setup-token-aware task is the correct systemic response.
+- **MalformedForgeMarker pattern post-G-rule: all self-resolving.** Third instance since Beacon's APPROVAL_REQUEST (step-b-resume, register-claude-setup-tokens-rotation, fix-rotation-gate-setup-token-aware — all retry 1/3 → resolved <90s). Pattern: Forge's preflight sometimes needs a retry but recovers quickly. The doc-fix is still the right permanent action; severity is low.
+- **alert-triage.json: 2nd consecutive observation missing.** Expected to self-recreate on automated cycle. MEMORY.md watch condition is "2 automated cycles." Interactive cycles don't count; watch on next automated cycle check.
+
+**Learned:**
+- `heal-claude-max-burn-rate` healer fires when 5h token pace breaches the gate. The 105 rate-limit events/2h is the operational impact metric — explains why Forge/Beacon tasks are slow. Once fix-rotation-gate-setup-token-aware lands, rotation logic should reduce the rate-limit frequency.
+- PR #218 AUTO_MERGE pipeline completed in ~5 min end-to-end (dispatch → Mirror review → AUTO_MERGE). Strong signal of pipeline health even under rate-limit pressure.
+
+---
+
 ## Iteration 154 — 2026-05-31 03:44 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — PR #217 (step-b-resume) MERGED at 03:39:39Z. PR #218 (register-claude-setup-tokens-rotation) OPENED, Mirror reviewing. Beacon-bot stale alert self-resolved (service restarted at 03:35:18Z, 2s after healer fired). iter 153 `[1m]` escalation confirmed false positive (intentional per pilot step 2 history). 6/6 services active. 0 alerts requiring action. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.

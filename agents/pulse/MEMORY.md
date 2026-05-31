@@ -6,6 +6,24 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~03:51Z UTC (Iter 155)
+
+**System: ✅ Nominal-with-watch.** Iter 155 findings: **PR #218 (register-claude-setup-tokens-rotation) MERGED 03:45:53Z UTC** — rate-limit-resilience-001 register step complete. 0 open PRs. build-fix-rotation-gate-setup-token-aware dispatched to Forge (03:43Z UTC, fresh). New alert: `heal-claude-max-burn-rate` (83% of 5h token gate, 105 rate-limit events/2h) — Tier 4 informational, added to Monday DM queue. 6/6 services active. alert-triage.json MISSING (2nd consecutive observation). Check B sync push error carry-forward. APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- **PR #218 (register-claude-setup-tokens-rotation): MERGED 03:45:53Z UTC.** ✅ CLOSED.
+- **rate-limit-resilience sequence:** step-a + step-b + register-claude-setup-tokens-rotation all MERGED. **fix-rotation-gate-setup-token-aware in Forge build** (dispatched 03:43Z UTC). Next: build → PR → Mirror → AUTO_MERGE.
+- **heal-claude-max-burn-rate (NEW watch).** 83% of 5h token gate (8.3M/10M), 105 rate-limit events/2h at 03:45Z UTC. "Pace indicator only." Fix pipeline (fix-rotation-gate-setup-token-aware) is the systemic response. Added to Monday [yellow] DM queue 2026-06-01. Close when fix lands and rate-limit frequency drops.
+- **alert-triage.json MISSING: 2nd consecutive observation (iters 154, 155).** MEMORY.md watch condition: "after 2 automated cycles → escalate." Both observations are interactive; watch on next automated cycle.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 13 iters (143–155). Heartbeat fresh (03:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01** (now includes burn-rate context).
+- Sync push error: carry-forward. Root cause fix pending Larry.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 3 self-resolved (step-b-resume, register-claude-setup-tokens-rotation, fix-rotation-gate-setup-token-aware — all retry 1/3, all resolved <90s).** Doc-fix APPROVAL_REQUEST pending Larry. G-rule posture: keep open through doc-PR + PR B merge.
+- **iter 153 `[1m]` escalation: RETRACTED.** Confirmed intentional — `_history` is authoritative. ✅ CLOSED.
+
 ## Status snapshot — updated 2026-05-31 ~03:44Z UTC (Iter 154)
 
 **System: ✅ Nominal-with-watch.** Iter 154 findings: **PR #217 (step-b-resume) MERGED 03:39:39Z** — rate-limit-resilience-001 step-b live. **PR #218 (register-claude-setup-tokens-rotation) OPEN**, MERGEABLE, Mirror reviewing (dispatched 03:40:54Z). **Iter 153 `[1m]` escalation RETRACTED** — confirmed intentional (1M-context window for Beacon Telegram per pilot step 2; `_history` is authoritative). Beacon-bot stale alert self-resolved (service restarted 03:35:18Z, 2s after healer fired). 6/6 services active. Forge inbox: 2 tasks (build-register archiving, fix-rotation-gate-setup-token-aware 7 min). APPROVAL_REQUEST queue: 5 unchanged. Sync push error carry-forward. Tier=1, consecutive_clean=0.
