@@ -6,15 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~12:26Z UTC (Iter 183 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~13:00Z UTC (Iter 184 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 10→11.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 12:07Z UTC). Check B 25th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
+**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 11→12.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 12:37Z UTC). Check B 26th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078. Larry inquired 12:52Z UTC about approvals; Beacon informed him of threshold-update-2026-05-31 (still applied: false).
 
 **Watch items:**
-- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=11 (floor; no further de-escalation; counter continues for audit).
+- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=12 (floor; no further de-escalation; counter continues for audit).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note + Tier 3 cadence context.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
+- **threshold-update-2026-05-31:** applied=false. Larry inquired 12:52Z; Beacon informed. Pending explicit `approve` command. Monday DM will resurface.
 
 ---
 
@@ -31,6 +32,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - **heal-pipeline-stall-state.json GONE (iter 116, 2026-05-30). CONFIRMED.** Healer uses `~/agents/state/alert-cooldown/` (individual files per cooldown key). Check 3 future scans: `ls ~/agents/state/alert-cooldown/warning/heal-pipeline-stall*`. Rate_limit cooldown files still in alert-cooldown/warning/ — known snoozed state.
 
 - **heal-droplet-git-drift (1st observation, iter 117 2026-05-30).** Fires when droplet main is N+ commits behind origin/main. Calibration issue: healer fires during the post-journal/pre-push window of every cycle. Watch threshold=3 for G-rule.
+
+- **heal-pipeline-stall-state.json format oscillation (1st observation, iters 182→183→184, 2026-05-31).** Format cycles: stalls=[] (iter 182) → MISSING (iter 183) → cooldown-dict (iter 184). May reflect healer code update or race condition with run_cycle.sh. Watch threshold=3 for G-rule dispatch to Beacon.
 
 - **Check C service-name suffix false-positive (iter 162). G-rule DISPATCHED iter 165.** Canonical names: `ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`, `ourliberty-inbox-watcher`, `ourliberty-cycle.timer`, `ourliberty-outbox-notifier`. Doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` in pipeline. Close when Forge PR merges cycle-prompt.md § 4.3 update.
 
