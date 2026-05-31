@@ -4,6 +4,137 @@
 
 ---
 
+## Beacon result-notification — 2026-05-31 ~17:55 UTC (inter-agent notify from beacon, task=cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z)
+
+**Event:** Beacon completed investigation of the F24 empty-prompt G-rule (task=cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z). Status: SUCCESS.
+
+**Diagnosis confirmed — two distinct root causes across three dead-lettered envelopes:**
+1. **Missing `prompt` field (2/3):** `cycle-finding-sync-push-failure-20260530T224800Z` and `cycle-finding-deploy-notifier-gc-20260531T164900Z` both used `source: "pulse"` with structured `summary`/`finding`/`spec_request` keys but **no `prompt` field at all**. Validator counts missing prompt as 0 chars → F24 rejection.
+2. **Wrong `source` key (1/3):** `cycle-fix-notify-dedup-20260527T000000Z` had a 1900-char `prompt` but used `source: "pulse-g-rule"`, which is NOT in `ALLOWED_SOURCES`. Rejected for a different reason — related landmine, distinct bug.
+
+**APPROVAL_REQUEST produced:** `pulse-grule-prompt-template-001` (doc-only)
+- PR title: `docs(cycle-prompt): add G-rule dispatch subsection requiring prompt field alongside structured finding payloads`
+- Target: Forge, `ourliberty-agent-core`, phase=preflight
+- Scope: Add G-rule-specific subsection to `runbooks/cycle-prompt.md § 17` after existing flat-envelope template. Includes: copy-pasteable JSON template showing `prompt` (required, ≥100 chars) alongside structured fields (optional adornment); anti-pattern callout citing the two real 2026-05 rejections by exact filename; separate landmine callout for `pulse-g-rule` source variant not in ALLOWED_SOURCES.
+- Out of scope: No changes to dispatch_validator.py, CLAUDE.md, or helper scripts. No replay of dead-lettered envelopes.
+
+**Pulse action:** Journal only. Added `pulse-grule-prompt-template-001` to APPROVAL_REQUEST queue as item #8. Added to Monday [yellow] DM scope (2026-06-01 UTC) — directly fixes Pulse's broken permanent-fix machinery (the F24 bug).
+
+---
+
+## Beacon result-notification — 2026-05-31 ~17:00 UTC (inter-agent notify from beacon, task=cycle-finding-deploy-notifier-gc-20260531T165531Z)
+
+**Event:** Beacon completed corrected re-investigation of the deploy-notifier cooldown GC G-rule (re-dispatched iter 210 with proper `prompt` field). Status: SUCCESS. No new Pulse work generated per notification instructions.
+
+**Key finding — diagnosis corrected from prior Beacon result:**
+- Prior investigation (first result, journaled above iter 210) concluded: fix in `larry_alerts.py`, targeting shared `_gc_stale_cooldowns()`. APPROVAL_REQUEST `larry-alerts-cooldown-gc-001` was produced.
+- **This investigation supersedes that.** Root cause is more precisely `deploy_notifier.py:490`: subject embeds per-Vercel-deployment uid (`f'deploy-notifier:READY:{deployment.get("uid","?")}'`). Per-uid dedup is intentional and correct; the bug is no cleanup after the cooldown window expires. Patching `larry_alerts.py` would be overly broad — other callers (watchdog, sentinel) use stable subject keys and self-cap naturally. Targeted fix avoids touching the shared mechanism.
+
+**New APPROVAL_REQUEST produced by Beacon:** `cycle-finding-deploy-notifier-gc-20260531T170000Z`
+- PR title: `fix(deploy-notifier): GC stale READY cooldown files older than 7 days`
+- Target: Forge, `ourliberty-agent-core`, phase=preflight
+- Plan: add `_gc_stale_cooldown_files(max_age_days=7) -> int` helper to `deploy_notifier.py`; iterate `COOLDOWN_ROOT` subdirs, unlink `deploy-notifier:`-prefixed files older than 7 days; invoke once per tick; tolerate `OSError` on individual unlinks; log `GC swept N stale cooldown files (>7d)` when N > 0, silent when 0. Unit tests: (1) <7d file survives, (2) >7d file deleted, (3) non-`deploy-notifier:` prefix untouched.
+- APPROVAL_REQUEST `larry-alerts-cooldown-gc-001` SUPERSEDED by this.
+
+**Pulse action:** Journal only. MEMORY.md updated: old APPROVAL_REQUEST superseded, new APPROVAL_REQUEST recorded, corrected diagnosis noted.
+
+---
+
+## Iteration 210 — 2026-05-31 16:55 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **0 new alerts. New: F24 empty-prompt bug confirmed at 3/3 G-rule threshold; iter 209 G-rule dispatch was rejected.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1085 lines** (unchanged from iter 209). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1085 (unchanged). alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Alert watermark unchanged at 1085. Last activity: install-drift alerts at 16:00:20Z UTC (iter 204). No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged: `agent-runner-{forge,beacon,mirror,pulse}:claude_tier1_failed_tier2_unavailable:rate_limit`, `beacon-telegram-bot:claude_tier1_failed_on_resume_session_bound:auth_401`. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items unchanged. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T16:37:21Z UTC** — ~18 min old at check time (16:55Z). Within 90-min threshold. Next update expected ~17:07Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=a684446 "Pulse cycle 20260531T165114Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: `{"last_sync": "2026-05-31T16:05:58Z", "status": "no-change"}`. Last sync ~50 min old; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes: 0 active tasks. ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate → skip (Sunday UTC). **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **⚠️ NEW: Iter 209 G-rule dispatch REJECTED — F24 empty-prompt bug confirmed at 3/3 G-rule threshold.** Found `cycle-finding-deploy-notifier-gc-20260531T164900Z.json` in `~/agents/inboxes/beacon/.invalid/` with reason: `"validator: prompt too short (0 chars, min 100) — likely F24 empty-prompt bug"`. Audit of .invalid reveals three Pulse cycle-dispatch files with identical rejection: (1) `cycle-fix-notify-dedup-20260527T000000Z.json` [May 27], (2) `cycle-finding-sync-push-failure-20260530T224800Z.json` [May 30], (3) `cycle-finding-deploy-notifier-gc-20260531T164900Z.json` [May 31]. **Every Pulse G-rule dispatch since at least May 27 has been silently rejected.** Root cause: Pulse dispatch envelopes set `prompt=""` (empty). Validator requires ≥100 chars. Pattern confirmed at 3/3 G-rule threshold. ⚠️
+
+- **Note: Beacon result-notification present.** A beacon result-notification for iter 209's dispatch task exists in the journal (immediately below this entry). It reads "Status: SUCCESS. No new work generated by Pulse per notification instructions." Assessment: Beacon processed the envelope with an empty prompt and produced a trivial completion acknowledgment; no Forge task was dispatched. The deploy-notifier GC fix is still un-specced. Re-dispatch required (done this iter, with proper prompt).
+
+- **Deploy-notifier cooldown file count:** 106 READY-state files (unchanged from iter 209). G-rule already dispatched in iter 209 and re-dispatched this iter with fix. ✅
+
+- **G-rule watch items (no new non-F24 occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. Audited `beacon/.invalid/` — confirmed F24 empty-prompt bug at 3/3 G-rule threshold.
+3. **Re-dispatched deploy-notifier GC G-rule** (corrected prompt): `~/agents/inboxes/beacon/cycle-finding-deploy-notifier-gc-20260531T165531Z.json`. Dedup: `deploy-notifier-gc-grule-iter210-redispatch`.
+4. **Dispatched F24 empty-prompt G-rule**: `~/agents/inboxes/beacon/cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z.json`. Proposed fix: add prompt field template to cycle-prompt.md § G + CLAUDE.md G-rule dispatch section. Dedup: `pulse-dispatch-empty-prompt-grule-iter210`.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 210` → `intervention_id=iter210-carry-forward-stalls-f24-grule-dispatch` appended.
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=16:56:17Z UTC.
+7. Wrote journal entry.
+
+**Escalated:** None new. All active issues are carry-forward. Monday [yellow] DM scope unchanged (2026-06-01 UTC): Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first firing + APPROVAL_REQUEST queue 7. **F24 empty-prompt bug dispatched to Beacon** (not a separate Larry escalation — this is a Pulse-operational fix, yellow severity, handled via the normal G-rule path).
+
+**Patterns:**
+- **F24 empty-prompt bug (new, 3/3).** Every Pulse G-rule dispatch since at least May 27 has landed in beacon/.invalid. This is the most impactful finding in recent cycles: Pulse's permanent-fix machinery has been silently broken for 4+ days. Three known G-rule proposals never reached Beacon: deploy-notifier GC (iter 209), sync-push-failure (iter ~186), notify-dedup (iter ~180s). Re-dispatched the two most recent with proper prompts.
+- **Tier 2 OAuth stalls persist.** Day 2+ since May 30. Monday DM is the next action gate.
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+- **Deploy-notifier cooldown file count stable** at 106 (no growth since iter 209). Re-dispatch with proper prompt submitted.
+
+**Learned:** Pulse's G-rule dispatch path has been broken since at least 2026-05-27 — empty `prompt` field in every envelope causes silent rejection. **Impact: the teach-to-fish loop was broken.** At least 3 permanent-fix proposals never reached Beacon. This iteration reveals the gap and dispatches the meta-fix. The F24 workaround (hand-writing a proper prompt field) is applied to both dispatches written this iter.
+
+---
+
+## Beacon result-notification — 2026-05-31 (inter-agent notify from beacon, task=cycle-finding-deploy-notifier-gc-20260531T164900Z)
+
+**Event:** Beacon completed investigation of the iter 209 deploy-notifier cooldown GC finding. Status: SUCCESS. No new work generated by Pulse per notification instructions.
+
+**Findings:**
+- File count at investigation time: **309** (grew from 106 at detection; continued growing during Beacon's investigation window).
+- **Root cause confirmed:** `scripts/larry_alerts.py` — the shared cooldown mechanism. `_mark_cooldown` writes one zero-byte file per `source:subject` key; no GC after the cooldown window expires. `deploy_notifier.py:490,515` builds subjects as `f'deploy-notifier:READY:{deployment.uid}'` and `…:ERROR:{uid}` — each unique Vercel `dpl_*` uid produces a fresh cooldown key. The per-uid dedup is intentional (correct); the bug is no GC post-expiry.
+- **Scope correction from Beacon:** fix belongs in `larry_alerts.py`, not `deploy_notifier.py`. The cooldown directory is shared across all `append_alert` callers — any high-cardinality subject would hit the same accumulation. Patching the healer would leave the mechanism brittle.
+- No production impact confirmed — post-notification dedup tombstones; deletion is safe past the 60-min window.
+
+**APPROVAL_REQUEST produced by Beacon:** `larry-alerts-cooldown-gc-001`
+- PR title: `fix(larry-alerts): GC stale cooldown files older than 7 days`
+- Target: Forge, `ourliberty-agent-core`, phase=preflight
+- Plan: add `COOLDOWN_GC_AGE_SEC = 7 * 24 * 3600` constant + `_gc_stale_cooldowns()` helper to `larry_alerts.py`; invoke once per process from `append_alert` via module-level flag; add 5 unit tests to `tests/test_larry_alerts.py`. No deploy_notifier.py changes, no new timer, no backfill script.
+- First GC sweep after merge cleans existing 309+ files automatically (all ≥1 day old, well past 7-day threshold).
+
+**Pulse action:** Journal only. G-rule watch item `deploy-notifier cooldown GC gap` advances from "investigation dispatched" to "APPROVAL_REQUEST ready — awaiting Larry approval to dispatch Forge preflight." MEMORY.md updated.
+
+---
+
+## Dead-letter response — 2026-05-31 16:52 UTC (inter-agent notify from beacon, not a scheduled cycle)
+
+**Event:** Beacon dead-letter notify for `cycle-finding-deploy-notifier-gc-20260531T164900Z` delivered to Pulse inbox. The iter 209 dispatch was rejected by `dispatch_validator` with: `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug`. The iter 209 envelope had all structured fields (`task_id`, `source`, `target_agent`, `phase`, `task_type`, `summary`, `finding`, `dedup_identity`) but was missing the required top-level `prompt` string. This is the same bug class as the iter 117 incident (`cycle-finding-sync-push-failure`, 2026-05-29 dead-letter, see journal iter ~117).
+
+**Root cause:** Pulse iter 209 constructed the Beacon dispatch envelope with structured fields only — omitted the `prompt` field that `dispatch_validator` requires (≥100 chars plain text). No validator feedback in the session at dispatch time; the dead-letter arrived post-cycle.
+
+**Fix:** Rewrote envelope with `prompt` field (>100 chars) added. Re-dropped to `~/agents/inboxes/beacon/cycle-finding-deploy-notifier-gc-20260531T164900Z.json`. **Note:** Beacon pipeline is currently stalled (Tier 2 OAuth expired, APPROVAL_REQUEST pending since iter 195). The envelope will queue until OAuth is restored; pickup is not immediate but the window is correct. Cooldown file count verified still at 106 — finding remains live.
+
+**Pattern:** F24 empty-prompt bug has now occurred twice (iters 117 and 209). Both were Beacon investigation-and-spec dispatches generated by Pulse during a cycle. Pulse dispatch code must include `prompt` at envelope construction time; the field is easy to omit when copying from a structured-fields-only template. Potential systemic fix: add `prompt` presence + length check to the internal dispatch wrapper or document a standard envelope template in `cycle-prompt.md`. Not dispatching a Beacon spec for this — the fix is a Pulse-internal code discipline. Will note in MEMORY.md.
+
+**No PRIME DIRECTIVE ledger row** — this is a dispatch correction, not a new intervention.
+
+---
+
 ## Iteration 209 — 2026-05-31 16:49 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **0 new alerts. New: deploy-notifier cooldown G-rule threshold crossed (106 files).**

@@ -6,18 +6,19 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~16:49Z UTC (Iter 209 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~16:55Z UTC (Iter 210 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat **on cadence** (16:37:21Z, ~9 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty (1 new Beacon dispatch this iter). Alert watermark: **1085** (0 new alerts this cycle). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat 16:37:21Z UTC (~18 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty (2 Beacon dispatches written this iter). Alert watermark: **1085** (0 new alerts). APPROVAL_REQUEST queue: 7 (carry-forward, 2 items elevated) + 2 new pending from iter 210 dispatches.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note + fresh install-drift re-alerts for heal-resume-paused-on-tier1.
+- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note + fresh install-drift re-alerts for heal-resume-paused-on-tier1 + **F24 empty-prompt bug (all G-rule dispatches since May 27 silently rejected — fix dispatched to Beacon).**
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158; fresh Telegram alerts delivered iter 204 at 16:02:51Z UTC).
-- **deploy-notifier cooldown GC gap — G-RULE DISPATCHED iter 209.** 106 READY-state files (was ~28 iter 208). Crossed 50-file threshold. Dispatch: `~/agents/inboxes/beacon/cycle-finding-deploy-notifier-gc-20260531T164900Z.json`. Fix: add time-based GC sweep for READY cooldown files older than 7 days.
+- **deploy-notifier cooldown GC gap — BEACON CORRECTED DIAGNOSIS (2nd investigation).** 309+ files at investigation time (was 106 iter 209, ~28 iter 208). Root cause: `deploy_notifier.py:490` embeds per-Vercel-uid in subject (`f'deploy-notifier:READY:{uid}'`); no GC after cooldown expires. APPROVAL_REQUEST `larry-alerts-cooldown-gc-001` (fix in `larry_alerts.py`) SUPERSEDED. New APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — Forge to add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py` (piggybacked on 2-min tick). Awaiting Larry approval.
+- **F24 EMPTY-PROMPT BUG — G-RULE DISPATCHED iter 210 (3/3 threshold).** Three Pulse G-rule dispatch envelopes in beacon/.invalid with rejection "prompt too short (0 chars, min 100)": cycle-fix-notify-dedup-20260527T000000Z (May 27), cycle-finding-sync-push-failure-20260530T224800Z (May 30), cycle-finding-deploy-notifier-gc-20260531T164900Z (May 31). All G-rule dispatches since ≥ May 27 were silently rejected — teach-to-fish loop was broken. Dispatch: `cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z.json` → beacon inbox. Fix: add prompt field template (≥100 chars) to cycle-prompt.md § G + CLAUDE.md. **Workaround applied iter 210: include `"prompt"` field with full task description in every dispatch envelope.**
 - **Trust-policy revert** (e1489a8): Non-Pulse commit appeared on main after automated cycle 89395c0. Reverts temporary rate-limit-resilience-001 auto-approve carve-out. EXPECTED — work complete per iter 158.
 
 ---
@@ -46,6 +47,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 
 - **Dispatch source discipline.** Pulse G-rule dispatches must use `source="pulse"` (canonical). `"pulse-g-rule"` is NOT in ALLOWED_SOURCES — validator silently rejects it. Observed iter 91 false dispatch. All future G-rule dispatches: use `source="pulse"`.
 
+- **F24 empty-prompt bug (RECURRING — iters 117 and 209).** `dispatch_validator` requires a top-level `prompt` string field (≥100 chars plain text) in every Beacon dispatch envelope. Pulse twice omitted this field when constructing structured-field-only envelopes (task_id, source, target_agent, summary, finding, etc.) — resulting in dead-letter notification post-cycle. Fix pattern: always include `"prompt": "<≥100 char plain text describing the task for Beacon>"` as a top-level field in every dispatch. The `prompt` field is what the Beacon agent reads as its instruction; the structured fields are metadata only.
+
 ---
 
 ## Open pending watch items (APPROVAL_REQUEST + G-rule)
@@ -57,7 +60,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - `systemd install-drift`: G-rule 1/3 (iter 158 — PR #219 shipped unit files without install dance). Next 2 → dispatch to Beacon for Forge PR template checklist update.
 - `cycle.timer stuck pattern`: G-rule 1/3 (iter 158 — both cycle.timer + heal-systemd-install-drift.timer infinity-trap simultaneously). Watch 14d.
 - `MalformedForgeMarker G-rule`: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved. Doc-fix APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. G-rule stays open until doc-PR merges.
-- `deploy-notifier cooldown GC gap`: DISPATCHED (iter 209). 106 READY-state files crossed 50-file threshold. Envelope: `cycle-finding-deploy-notifier-gc-20260531T164900Z.json`. Watch: close when Forge PR adds GC sweep and file count stabilizes.
+- `deploy-notifier cooldown GC gap`: CORRECTED INVESTIGATION COMPLETE (iter 210 re-dispatch → Beacon 2nd result). 309+ files. Root cause: `deploy_notifier.py:490` per-uid subject embedding + no GC. Old APPROVAL_REQUEST `larry-alerts-cooldown-gc-001` SUPERSEDED. New APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — fix in `deploy_notifier.py` piggyback tick. Watch: close when Forge PR merges and file count stabilizes.
+- `F24 empty-prompt bug (Pulse dispatch)`: DISPATCHED iter 210 (3/3 threshold). Three Pulse G-rule envelopes rejected with "prompt too short (0 chars, min 100)". Dispatch: `cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z.json` → beacon inbox. Fix: add prompt field template to cycle-prompt.md § G + CLAUDE.md. Workaround: hand-write prompt field ≥100 chars in all dispatches until fix lands.
 
 **APPROVAL_REQUEST items (Larry-gate):**
 - `pulse-grule-check-c-canonical-names-001` — Beacon APPROVAL_REQUEST for doc-fix to cycle-prompt.md § 4.3 (canonical service names). Trust-policy → Forge pending.
@@ -67,6 +71,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - `stuck-cycle timeout guard` — CYCLE_TIMEOUT_SEC=1800 + timeout wrapper in run_cycle.sh. Multiple occurrences across cycle history. Pending Larry (iter 43).
 - `Tier 2 OAuth restore` — tier2-verifier-probe-001 REJECTED (iter 149); Forge confirmed expired OAuth ~10:39Z May 30. Runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md.
 - `forge-claude-md-preflight-self-check-bullet-001` — doc-only: pre-emit self-check bullet in Forge CLAUDE.md Preflight discipline. Beacon dispatched after G-rule 3/3.
+- ~~`larry-alerts-cooldown-gc-001`~~ — SUPERSEDED. Beacon 2nd investigation corrected target to `deploy_notifier.py`. See new APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` below.
+- `cycle-finding-deploy-notifier-gc-20260531T170000Z` — fix(deploy-notifier): add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py`, invoked per tick, scoped to `deploy-notifier:` prefix only. Target: Forge preflight phase. Awaiting Larry approval.
 
 **Carry-forward ask-then-do:**
 - `heal-resume-paused-on-tier1 NOT INSTALLED` (iter 158). PR #219 shipped ourliberty-heal-resume-paused-on-tier1.service + .timer but install dance not performed. Without install, paused-on-tier1 tasks won't auto-resume. Action: SSH + sudo cp + daemon-reload + enable --now.
