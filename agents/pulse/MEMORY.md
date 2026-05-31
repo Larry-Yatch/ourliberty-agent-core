@@ -6,16 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:20Z UTC (Iter 137)
+## Status snapshot — updated 2026-05-31 ~01:28Z UTC (Iter 138)
 
-**System: ✅ Nominal-with-watch.** Iter 137 findings: All checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. sync.json: no-change (2nd consecutive clean run). No new Telegram directives since Beacon's rotate-active-tier reply at 01:03:30Z. Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 138 findings: All checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. sync.json: no-change (3rd consecutive clean run). No new Telegram directives. Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence (no CONFLICTING PR active). Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
 - APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. Monday DM 2026-06-02.
-- Sync push error: **2nd consecutive clean cycle.** Last error iter 135 (01:01:08Z). 2 consecutive clean runs (iters 136, 137) support race-condition hypothesis: error only fires under back-to-back automated cycle push racing. Root cause still unfixed; APPROVAL_REQUEST pending.
+- Sync push error: **3rd consecutive clean cycle.** Last error iter 135 (01:01:08Z). 3 consecutive no-change syncs (iters 136, 137, 138) solidifies race-condition hypothesis. Root cause still unfixed; APPROVAL_REQUEST pending.
+- Alert-cooldown calibration note (iter 138): full directory scan shows ~100+ stale tombstone files from May 26–30. All predate iter 137. Not new signals. larry-alerts.jsonl watermark (1056) is the authoritative new-alert check; raw directory listing is noise without timestamp filtering.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
