@@ -100,6 +100,17 @@ GH_PR_VIEW_TIMEOUT_SEC = 30
 # layer headroom but don't let one slow query stall the tick.
 SUPABASE_TIMEOUT_SEC = 15
 
+# Bounded `gh pr list` timeout for the active-reconciliation pass.
+# Tighter than `gh pr view` because the list call queries every active
+# sequence's repo on every tick; we'd rather skip reconciliation for one
+# tick than wedge the daemon.
+GH_PR_LIST_TIMEOUT_SEC = 10
+
+# How many recently-merged PRs to scan per repo per tick for the
+# reconciliation pass. 20 covers ~a week of typical velocity; bump if
+# silent-misses go undetected past the lookback window.
+RECONCILE_PR_LOOKBACK = 20
+
 # Repo scripts dir on sys.path so sibling imports (larry_alerts,
 # build_sequence_validator) resolve cleanly when invoked by systemd.
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -857,6 +868,184 @@ def _process_active_sequence(
             )
 
 
+# -------------------- active reconciliation (V6 silent-miss backstop) --------------------
+
+
+def _gh_list_merged_prs(repo: str) -> Optional[list[dict[str, Any]]]:
+    """Return the list of recently-merged PRs for `repo`, or None on
+    failure (gh missing, auth missing, timeout, non-zero rc, bad JSON).
+
+    None vs []: None means "couldn't query" (caller should skip
+    reconciliation for this repo this tick); [] means "queried OK, no
+    merged PRs in the lookback window." The two cases differ in whether
+    we'd consider this a soft failure or a confident no-match."""
+    if not repo:
+        return None
+    try:
+        proc = subprocess.run(
+            [
+                'gh', 'pr', 'list', '--repo', repo,
+                '--state', 'merged', '--limit', str(RECONCILE_PR_LOOKBACK),
+                '--json', 'number,url,title,headRefName,mergedAt',
+            ],
+            capture_output=True, text=True, timeout=GH_PR_LIST_TIMEOUT_SEC,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, list):
+        return None
+    return data
+
+
+def _match_pr_for_step(
+    step_id: str, pr_url: Optional[str], merged_prs: list[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
+    """Find a merged PR that identifies as this step. Precedence:
+      1. exact pr_url match (only when the step has pr_url populated)
+      2. headRefName == f'forge/{step_id}' (Forge worktree convention)
+      3. step_id substring in title (kebab-case is unambiguous)
+
+    Returns the first match found at the highest-precedence tier, or
+    None if no PR matches by any signal."""
+    if pr_url:
+        for pr in merged_prs:
+            if pr.get('url') == pr_url:
+                return pr
+    expected_branch = f'forge/{step_id}'
+    for pr in merged_prs:
+        if pr.get('headRefName') == expected_branch:
+            return pr
+    for pr in merged_prs:
+        title = pr.get('title') or ''
+        if step_id in title:
+            return pr
+    return None
+
+
+def _reconcile_dispatched_steps(
+    sequence: dict[str, Any], logger: logging.Logger,
+    _repo_cache: Optional[dict[str, Optional[list[dict[str, Any]]]]] = None,
+) -> int:
+    """Active reconciliation pass — backstop for the V6 notifier hook.
+
+    The notifier's apply_step_merged call looks up "which step does this
+    task_id belong to" by exact task_id match. When work spans rebase /
+    rescue / revision dispatches, the auto-merge fires under a derivative
+    task_id (e.g. `pr211-rebase-step-a-rotation-001` instead of
+    `seq-...-step-a-rotation`); exact-match fails; the sequence step
+    strands in `dispatched`. Two incidents in 36 hours (2026-05-29
+    operator-ux-rollout/step-rescue-runbook; 2026-05-31
+    rate-limit-resilience-001/step-a-rotation) required manual operator
+    unstick.
+
+    This reconciler runs every tick BEFORE _process_active_sequence's
+    dispatch logic. For each step still in `dispatched`, it queries
+    `gh pr list --state merged` for the step's target_repo and identity-
+    matches via pr_url → branch → title-substring. On a confident match,
+    it fires apply_step_merged (which is idempotent) and counts the
+    reconciliation. Returns the count for this sequence.
+
+    Failure mode: gh missing / timeout / network → log + return 0. The
+    rest of the tick continues normally (stale-but-running > stopped).
+
+    Args:
+        sequence: parsed sequence dict (one active sequence).
+        logger: shared logger for INFO on reconcile fires + WARN on gh
+            failures.
+        _repo_cache: optional mapping `target_repo -> list-or-None`. When
+            multiple steps in the same sequence target the same repo,
+            cache the gh result so we don't issue N calls. Caller passes
+            a dict that survives the per-sequence pass; if omitted the
+            cache is per-call (still correct, just less efficient).
+    """
+    if _repo_cache is None:
+        _repo_cache = {}
+    seq_id = sequence.get('seq_id')
+    if not isinstance(seq_id, str):
+        return 0
+    steps = sequence.get('steps') or []
+    reconciled = 0
+    matched_step_ids: list[str] = []
+    matched_prs_in_pass: dict[str, str] = {}  # pr_url -> step_id (collision detect)
+
+    try:
+        import sequence_shortcut_helpers as ssh  # noqa: E402
+    except Exception as e:
+        logger.info(
+            f'reconcile: sequence_shortcut_helpers unavailable '
+            f'({type(e).__name__}: {e}); skipping pass'
+        )
+        return 0
+
+    for step in steps:
+        if step.get('status') != 'dispatched':
+            continue
+        step_id = step.get('step_id')
+        if not isinstance(step_id, str):
+            continue
+        target_repo = step.get('target_repo')
+        if not isinstance(target_repo, str) or not target_repo:
+            continue
+        # Per-repo lookup with per-pass cache.
+        if target_repo not in _repo_cache:
+            merged_prs = _gh_list_merged_prs(target_repo)
+            if merged_prs is None:
+                logger.warning(
+                    f'reconcile: gh pr list failed for repo={target_repo}; '
+                    f'skipping reconciliation for steps in this repo this tick'
+                )
+            _repo_cache[target_repo] = merged_prs
+        merged_prs = _repo_cache[target_repo]
+        if merged_prs is None:
+            continue  # gh failure already logged; soft-fail.
+        match = _match_pr_for_step(step_id, step.get('pr_url'), merged_prs)
+        if match is None:
+            continue
+        pr_url = match.get('url') or ''
+        merged_at = match.get('mergedAt') or datetime.now(timezone.utc).isoformat()
+        # Collision check: same merged PR shouldn't claim two steps in
+        # the same sequence. Flag + skip the second; the first wins.
+        prior_step = matched_prs_in_pass.get(pr_url)
+        if prior_step is not None:
+            logger.warning(
+                f'reconcile: PR {pr_url} matched multiple steps in '
+                f'{seq_id}: {prior_step} (kept) and {step_id} (skipped). '
+                f'Inspect step identity signals.'
+            )
+            continue
+        matched_prs_in_pass[pr_url] = step_id
+        try:
+            result = ssh.apply_step_merged(
+                seq_id=seq_id,
+                step_id=step_id,
+                pr_url=pr_url,
+                merged_at=merged_at,
+                actor='advancer-reconcile',
+            )
+        except Exception as e:
+            logger.error(
+                f'reconcile: apply_step_merged raised for '
+                f'{seq_id}/{step_id}: {type(e).__name__}: {e}'
+            )
+            continue
+        if getattr(result, 'applied', False):
+            reconciled += 1
+            matched_step_ids.append(step_id)
+
+    if reconciled > 0:
+        logger.info(
+            f'reconcile: sequence={seq_id} reconciled_steps={reconciled} '
+            f'step_ids={matched_step_ids}'
+        )
+    return reconciled
+
+
 # -------------------- tick --------------------
 
 
@@ -887,6 +1076,7 @@ def tick(now: Optional[datetime] = None) -> int:
         )
     seen_files = 0
     processed = 0
+    reconciled_total = 0
     for path in _iter_sequence_files():
         seen_files += 1
         seq, err = _read_sequence(path)
@@ -899,6 +1089,26 @@ def tick(now: Optional[datetime] = None) -> int:
             continue
         if seq.get('status') != 'active':
             continue
+        # Active reconciliation pass: backstop the V6 notifier hook for
+        # silent-misses where the auto-merge fired under a derivative
+        # task_id (rebase / rescue / revision) that doesn't exact-match
+        # the step. Runs BEFORE _process_active_sequence so apply_step_merged's
+        # disk write is visible when the dispatch loop computes `merged_ids`
+        # for downstream-dep satisfaction on the same tick.
+        try:
+            reconciled_here = _reconcile_dispatched_steps(seq, logger)
+            reconciled_total += reconciled_here
+            # apply_step_merged wrote to disk; re-read so the in-memory
+            # copy matches before we hand it to _process_active_sequence.
+            if reconciled_here > 0:
+                refreshed, _ = _read_sequence(path)
+                if refreshed is not None:
+                    seq = refreshed
+        except Exception as e:
+            logger.error(
+                f'reconcile: unexpected error for {path.name}: '
+                f'{type(e).__name__}: {e}'
+            )
         try:
             _process_active_sequence(path, seq, supabase_client, now, logger)
             processed += 1
@@ -924,7 +1134,10 @@ def tick(now: Optional[datetime] = None) -> int:
                 subject=f'sequence-tick-error:{path.name}',
                 severity='warning',
             )
-    logger.info(f'tick: files={seen_files} processed={processed}')
+    logger.info(
+        f'tick: files={seen_files} processed={processed} '
+        f'reconciled_steps={reconciled_total}'
+    )
     return 0
 
 
