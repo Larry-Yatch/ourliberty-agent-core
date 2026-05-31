@@ -1238,5 +1238,97 @@ class SharedLibWatchlistTests(_IsolatedAgentsRoot):
             self.assertEqual(m_watch.call_count, 1)
 
 
+class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
+    """Regression on the 2026-05-30 timer-infinity-trap incident.
+
+    `systemctl restart` alone doesn't re-parse the unit file, so a timer
+    whose unit file changed pre-restart comes back up with stale config
+    and falls into the `NextElapseUSecRealtime`-empty + `Monotonic=infinity`
+    trap. auto_restart_unit() therefore daemon-reloads first; a failed
+    reload is WARN-logged but must NEVER block the restart.
+    """
+
+    def _make_completed(self, rc=0, stderr=''):
+        cp = mock.MagicMock()
+        cp.returncode = rc
+        cp.stderr = stderr
+        return cp
+
+    def test_daemon_reload_runs_before_restart(self):
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(list(cmd))
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(
+            calls[0],
+            ['sudo', '-n', 'systemctl', 'daemon-reload'],
+        )
+        self.assertEqual(
+            calls[1],
+            ['sudo', '-n', 'systemctl', 'restart', 'ourliberty-cycle.timer'],
+        )
+        self.assertEqual((rc, stderr), (0, ''))
+
+    def test_daemon_reload_failure_does_not_block_restart(self):
+        # Load-bearing: reload rc != 0 is logged WARN and we CONTINUE to the
+        # restart. A stale-but-running daemon is better than a stopped daemon.
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(list(cmd))
+            if cmd[3] == 'daemon-reload':
+                return self._make_completed(rc=5, stderr='reload broke')
+            return self._make_completed(rc=0, stderr='')
+
+        log_lines: list[tuple[str, str]] = []
+
+        def fake_log(msg, level='INFO'):
+            log_lines.append((level, msg))
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, 'log', side_effect=fake_log):
+            rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
+
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][3], 'restart')
+        self.assertEqual((rc, stderr), (0, ''))
+        warn_lines = [m for lvl, m in log_lines if lvl == 'WARN']
+        self.assertTrue(
+            any('daemon-reload' in m for m in warn_lines),
+            f'expected a WARN log mentioning daemon-reload, got {log_lines!r}',
+        )
+
+    def test_restart_failure_returned_after_successful_reload(self):
+        # The (rc, stderr) contract returns the RESTART outcome, never the
+        # reload outcome.
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == 'daemon-reload':
+                return self._make_completed(rc=0, stderr='')
+            return self._make_completed(rc=1, stderr='Unit not found  ')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-bogus.service')
+
+        self.assertEqual(rc, 1)
+        self.assertEqual(stderr, 'Unit not found')
+
+    def test_daemon_reload_timeout_does_not_block_restart(self):
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == 'daemon-reload':
+                raise h.subprocess.TimeoutExpired(cmd=cmd, timeout=30)
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
+
+        self.assertEqual((rc, stderr), (0, ''))
+
+
 if __name__ == '__main__':
     unittest.main()
