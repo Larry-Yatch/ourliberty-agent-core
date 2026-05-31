@@ -1,0 +1,5 @@
+{
+  "$schema_version": 1,
+  "_doc": "Allowlist of healer remediation classes permitted to take privileged self-healing action (sudo). A class self-remediates only if listed here AND the healer's enable flag is set AND the kill-switch file is absent. Notify-after: every self-heal emits a notification to Larry. Seeded with install-drift + stuck-timer, both activated immediately per operator decision 2026-05-31.",
+  "classes": ["install-drift", "stuck-timer"]
+}

@@ -133,6 +133,12 @@ class DedupTest(_IsolatedAgentsRoot):
 
 
 class OrchestrationTest(_IsolatedAgentsRoot):
+    """Live + dry-run regression suite covering the *alert-only* missing-install
+    behavior. Allowlist is pointed at a nonexistent path so
+    `_remediation_allowed('install-drift')` fails safe, keeping these tests as
+    the regression guard for the not-allowlisted code path.
+    """
+
     def setUp(self):
         super().setUp()
         self._dm_calls: list[dict] = []
@@ -147,6 +153,13 @@ class OrchestrationTest(_IsolatedAgentsRoot):
         self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
         self._dm_patch.start()
         self.addCleanup(self._dm_patch.stop)
+
+        self._allowlist_patch = mock.patch.object(
+            h, 'ALLOWLIST_FILE',
+            Path(self._isolated_tmp) / 'no-such-allowlist.json',
+        )
+        self._allowlist_patch.start()
+        self.addCleanup(self._allowlist_patch.stop)
 
     def test_dry_run_with_drift_sends_one_activation_dm(self):
         with tempfile.TemporaryDirectory() as td:
@@ -597,6 +610,369 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
                 )
             self.assertEqual(counts['stuck_timer'], 2)
             self.assertEqual(counts['timer_healed'], 1)
+
+
+def _write_allowlist(td: Path, classes) -> Path:
+    p = td / 'auto-remediation-allowlist.json'
+    p.write_text(_json_dump({'classes': classes}))
+    return p
+
+
+def _json_dump(obj) -> str:
+    import json as _json
+    return _json.dumps(obj)
+
+
+class RemediationAllowlistTest(_IsolatedAgentsRoot):
+    """Allowlist gate: allowed / not-listed / missing-file / malformed -> last
+    two fail safe. Loader must never raise.
+    """
+
+    def test_allowed_when_class_listed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = _write_allowlist(
+                Path(td), ['install-drift', 'stuck-timer'],
+            )
+            with mock.patch.object(h, 'ALLOWLIST_FILE', p):
+                self.assertTrue(h._remediation_allowed('install-drift'))
+
+    def test_not_allowed_when_class_not_listed(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = _write_allowlist(Path(td), ['stuck-timer'])
+            with mock.patch.object(h, 'ALLOWLIST_FILE', p):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+    def test_missing_file_fails_safe(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'does-not-exist.json'
+            with mock.patch.object(h, 'ALLOWLIST_FILE', p):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+    def test_malformed_json_fails_safe(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'broken.json'
+            p.write_text('{ this is not json')
+            with mock.patch.object(h, 'ALLOWLIST_FILE', p):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+    def test_unexpected_shape_fails_safe(self):
+        with tempfile.TemporaryDirectory() as td:
+            top_is_list = Path(td) / 'list.json'
+            top_is_list.write_text('["install-drift"]')
+            with mock.patch.object(h, 'ALLOWLIST_FILE', top_is_list):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+            classes_not_list = Path(td) / 'shape.json'
+            classes_not_list.write_text(
+                _json_dump({'classes': 'install-drift'}),
+            )
+            with mock.patch.object(h, 'ALLOWLIST_FILE', classes_not_list):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+            classes_mixed = Path(td) / 'mixed.json'
+            classes_mixed.write_text(
+                _json_dump({'classes': ['install-drift', 7]}),
+            )
+            with mock.patch.object(h, 'ALLOWLIST_FILE', classes_mixed):
+                self.assertFalse(h._remediation_allowed('install-drift'))
+
+
+class RemediateMissingInstallTest(_IsolatedAgentsRoot):
+    """`_remediate_missing_install` shell-out sequence — fully mocked.
+    .timer = cp + daemon-reload + enable --now + verify; .service = cp +
+    daemon-reload (no enable, no verify).
+    """
+
+    def _fake_runs_record(self, plan):
+        """plan: callable(cmd) -> MagicMock(returncode, stderr, stdout)."""
+        ran: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            ran.append(list(cmd))
+            return plan(list(cmd))
+        return ran, fake_run
+
+    def test_timer_success_path(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        healed_props = {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': 'Sat 2026-05-31 18:00:00 MDT',
+            'NextElapseUSecMonotonic': '5h',
+            'LastTriggerUSec': '',
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=healed_props):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertEqual(rc, 0)
+        self.assertEqual(stderr, '')
+        # cp, daemon-reload, enable --now (post-verify uses _systemctl_show
+        # which is mocked separately, no extra subprocess.run).
+        self.assertEqual(len(ran), 3)
+        self.assertEqual(ran[0][:3], ['sudo', '-n', 'cp'])
+        self.assertEqual(
+            ran[1], ['sudo', '-n', 'systemctl', 'daemon-reload'],
+        )
+        self.assertEqual(
+            ran[2],
+            ['sudo', '-n', 'systemctl', 'enable', '--now', 'foo.timer'],
+        )
+
+    def test_service_skips_enable(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value={}):
+            rc, stderr = h._remediate_missing_install('foo.service')
+        self.assertEqual(rc, 0)
+        # cp + daemon-reload only — no enable line for a .service.
+        self.assertEqual(len(ran), 2)
+        self.assertEqual(ran[0][:3], ['sudo', '-n', 'cp'])
+        self.assertEqual(
+            ran[1], ['sudo', '-n', 'systemctl', 'daemon-reload'],
+        )
+        for cmd in ran:
+            self.assertNotIn('enable', cmd)
+
+    def test_cp_failure_returns_nonzero(self):
+        def plan(cmd):
+            if cmd[2] == 'cp':
+                return mock.MagicMock(
+                    returncode=1, stdout='', stderr='permission denied',
+                )
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('cp failed', stderr)
+        # Stops after cp — daemon-reload never reached.
+        self.assertEqual(len(ran), 1)
+
+    def test_daemon_reload_failure_returns_nonzero(self):
+        def plan(cmd):
+            if cmd[2] == 'cp':
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+            if cmd[3] == 'daemon-reload':
+                return mock.MagicMock(
+                    returncode=1, stdout='', stderr='bus is down',
+                )
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('daemon-reload failed', stderr)
+
+    def test_enable_failure_returns_nonzero(self):
+        def plan(cmd):
+            if 'enable' in cmd:
+                return mock.MagicMock(
+                    returncode=1, stdout='', stderr='masked',
+                )
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('enable --now failed', stderr)
+
+    def test_verify_failure_returns_nonzero(self):
+        # cp / reload / enable all succeed, but the post-enable systemctl-show
+        # comes back with ActiveState != active.
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        bad_props = {
+            'ActiveState': 'failed',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': '',
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=bad_props):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('verify failed', stderr)
+
+    def test_verify_empty_next_fire_returns_nonzero(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        partial = {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': '5h',
+            'LastTriggerUSec': '',
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=partial):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('verify failed', stderr)
+
+
+class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
+    """`run_once()` missing-install loop, allowlist-active path: remediate-then-
+    notify on success, fallback alert on failure, .timer-vs-.service enable
+    difference, dry-run unchanged.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._dm_calls: list[dict] = []
+
+        def fake_dm(message, subject, suggested_action, severity='warning'):
+            self._dm_calls.append({
+                'message': message, 'subject': subject,
+                'suggested_action': suggested_action, 'severity': severity,
+            })
+            return True
+
+        self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
+        self._dm_patch.start()
+        self.addCleanup(self._dm_patch.stop)
+
+        self._allowlist_path = _write_allowlist(
+            Path(self._isolated_tmp), ['install-drift', 'stuck-timer'],
+        )
+        self._allowlist_patch = mock.patch.object(
+            h, 'ALLOWLIST_FILE', self._allowlist_path,
+        )
+        self._allowlist_patch.start()
+        self.addCleanup(self._allowlist_patch.stop)
+
+    def _patch_show(self, props):
+        return mock.patch.object(h, '_systemctl_show', return_value=props)
+
+    def test_remediate_success_emits_healed_dm_and_increments_count(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['ourliberty-x.timer'])
+            i = _make_installed(Path(td), [])
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            healed_props = {
+                'ActiveState': 'active',
+                'NextElapseUSecRealtime': 'Sun 2026-05-31 18:00:00 MDT',
+                'NextElapseUSecMonotonic': '5h',
+                'LastTriggerUSec': '',
+            }
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                    self._patch_show(healed_props):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,
+                )
+
+        self.assertEqual(counts['missing_install'], 1)
+        self.assertEqual(counts['install_healed'], 1)
+        self.assertEqual(counts['dm_sent'], 1)
+        # Exactly one DM, the healed one — no manual-dance alert.
+        self.assertEqual(len(self._dm_calls), 1)
+        dm = self._dm_calls[0]
+        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        self.assertIn('Auto-installed', dm['message'])
+        self.assertIn('Sun 2026-05-31 18:00:00 MDT', dm['message'])
+        self.assertIn('systemctl status', dm['suggested_action'])
+        # Manual-dance phrasing must NOT be present.
+        self.assertNotIn('ssh larry@', dm['suggested_action'])
+
+    def test_remediate_failure_falls_back_to_manual_dance_alert(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['ourliberty-x.timer'])
+            i = _make_installed(Path(td), [])
+
+            def fake_run(cmd, **kwargs):
+                # cp succeeds; daemon-reload fails.
+                if cmd[2] == 'cp':
+                    return mock.MagicMock(returncode=0, stdout='', stderr='')
+                if cmd[3] == 'daemon-reload':
+                    return mock.MagicMock(
+                        returncode=1, stdout='', stderr='bus down',
+                    )
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,
+                )
+
+        self.assertEqual(counts['install_healed'], 0)
+        self.assertEqual(counts['dm_sent'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        dm = self._dm_calls[0]
+        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        # Manual-dance fallback: cp + daemon-reload + enable --now in suggested.
+        self.assertIn('cp', dm['suggested_action'])
+        self.assertIn('daemon-reload', dm['suggested_action'])
+        self.assertIn('enable --now', dm['suggested_action'])
+
+    def test_timer_enable_line_present_service_not(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), [
+                'svc.service', 'svc.timer',
+            ])
+            i = _make_installed(Path(td), [])
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            healed_props = {
+                'ActiveState': 'active',
+                'NextElapseUSecRealtime': 'Sun 2026-05-31 18:00:00 MDT',
+                'NextElapseUSecMonotonic': '5h',
+                'LastTriggerUSec': '',
+            }
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                    self._patch_show(healed_props):
+                h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,
+                )
+
+        enable_cmds = [c for c in ran if 'enable' in c]
+        self.assertEqual(len(enable_cmds), 1)
+        self.assertIn('svc.timer', enable_cmds[0])
+        self.assertNotIn('svc.service', enable_cmds[0])
+
+    def test_dry_run_unchanged_no_remediation_shell_out(self):
+        # With allowlist active, dry-run must still emit a single activation
+        # DM and never shell out. (Remediation only fires in live mode.)
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), ['a.timer', 'b.service'])
+            i = _make_installed(Path(td), [])
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=True,
+                )
+        self.assertEqual(counts['missing_install'], 2)
+        self.assertEqual(counts['install_healed'], 0)
+        self.assertEqual(counts['dm_sent'], 1)
+        self.assertEqual(
+            self._dm_calls[0]['subject'],
+            'install-drift-healer: activate to receive missing-install alerts',
+        )
+        self.assertEqual(ran, [])
 
 
 if __name__ == '__main__':
