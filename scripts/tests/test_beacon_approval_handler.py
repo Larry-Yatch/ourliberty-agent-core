@@ -34,7 +34,7 @@ class ParseUserReplyTest(unittest.TestCase):
     """Strict whitelist on positive confirmation; prefix grammar on modify/reject."""
 
     def test_approve_tokens_fire(self):
-        for token in ['approve', 'Approve', 'APPROVE', 'yes', 'go', 'ok', 'okay', 'ship', 'ship it', '  yes  ']:
+        for token in ['approve', 'Approve', 'APPROVE', 'go', 'ok', 'okay', 'ship', 'ship it']:
             r = ah.parse_user_reply(token)
             self.assertEqual(r['action'], 'approve', f'token={token!r} should approve')
 
@@ -43,6 +43,7 @@ class ParseUserReplyTest(unittest.TestCase):
             'looks good, approve',           # extra context
             'approve if it is safe',
             'yes please',
+            'yes',                           # bare yes now reserved for general use
             'yeah',
             'do it',
             'sounds approved',
@@ -397,7 +398,7 @@ class DmFormatterTest(unittest.TestCase):
         msg = ah.format_approval_dm(entry)
         self.assertIn('t-1', msg)
         self.assertIn('Enable watchdog timer', msg)
-        self.assertIn('approve / yes / go / ok / ship it', msg)
+        self.assertIn('approve / go / ok / ship it', msg)
         self.assertIn('modify:', msg)
         self.assertIn('reject:', msg)
         self.assertIn('ourliberty-agent-core', msg)
@@ -410,7 +411,7 @@ class DmFormatterTest(unittest.TestCase):
 
     def test_bounce_includes_grammar(self):
         msg = ah.format_bounce()
-        self.assertIn('approve / yes / go / ok / ship it', msg)
+        self.assertIn('approve / go / ok / ship it', msg)
 
 
 class DispatchApprovedTest(unittest.TestCase):
