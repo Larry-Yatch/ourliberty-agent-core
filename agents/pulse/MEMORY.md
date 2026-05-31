@@ -6,6 +6,17 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~00:38Z UTC (Iter 130)
+
+**System: ⚠️ Drift.** Iter 130 findings: pure carry-forward. PR #211 (step-a-rotation) still CONFLICTING/UNKNOWN (4th consecutive iter: 127–130). APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` delivered to Larry (idx=1052, 00:35:52Z); no response yet. All 6 services active. All inboxes empty. 0 new alerts. Sync push failure 15th occurrence (carry-forward). APPROVAL_REQUEST queue: 4 items unchanged. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- PR #211 CONFLICTING: 4th consecutive iter (127, 128, 129, 130). Waiting on Larry APPROVAL_REQUEST approval.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 130).
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 130).
+- inbox-watcher rc=-1: 2/3 (no new occurrence iter 130).
+- APPROVAL_REQUEST queue (4): pr211-rebase-step-a-rotation-001 (highest priority), sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
+
 ## Status snapshot — updated 2026-05-31 ~00:31Z UTC (Iter 129)
 
 **System: ⚠️ Drift.** Iter 129 findings: PR #211 (step-a-rotation) CONFLICTING — Beacon processed iter 128 dispatch; created APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` (Forge rebase, mechanical, Mirror REVIEW_PASS preserved). **Note: Beacon did NOT dispatch to Forge directly — APPROVAL_REQUEST is pending Larry authorization.** Escalated via larry_alerts idx=1052 (queued for bot delivery). Sync push failure 14th occurrence (carry-forward). APPROVAL_REQUEST queue: 4 items (3 prior + pr211-rebase new). All 6 services active. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
