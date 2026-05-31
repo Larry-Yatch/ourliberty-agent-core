@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration 186 — 2026-05-31 14:04 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier-reset Tier 3→1. Active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). Sync push error materialized once (rolled back, state intact). PR #220 threshold-update-2026-05-31 MERGED ✅. 7/7 services active. 0 open PRs. All inboxes empty.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1083 lines** (was 1078; 5 new). alert-triage.json MISSING (APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). 4 non-trivial alerts claimed + 1 review-pass notification.
+
+**Found:**
+
+- **(Check 0) 5 new alerts since watermark 1078:**
+  1. `rotate-active-tier` (13:48:58Z UTC) — "Rotation auth gate blocked flip into tier2: tier2 OAuth credentials missing/expired/unverifiable." Subject: `rotation_auth_gate_blocked:tier2`. → **Tier 2 guarded (credential category)**. Root cause: same as APPROVAL_REQUEST `Tier 2 OAuth restore`. Outbox-notifier delivered to Telegram at 13:51Z UTC. No new dispatch — existing APPROVAL_REQUEST covers fix.
+  2–4. `heal-pipeline-stall` ×3 (13:59:36Z UTC) — forge (rate_limit), forge (auth_401), beacon-bot (rate_limit) all "Tier 2 fallback skipped (paused_on_tier1)." Telegram log confirms: `missing credentials file` at `/home/larry/.claude-larry-personal`. Outbox-notifier delivered to Telegram at 14:01Z UTC. **Root cause: Tier 2 OAuth expired.** No new dispatch — same APPROVAL_REQUEST. Active operational impact: tasks paused for forge + beacon-bot.
+  5. `outbox-notifier` (14:00:09Z UTC) — **review-pass: PR #220 (threshold-update-2026-05-31) AUTO-MERGED + branch deleted. ✅ CLOSED.** Mirror PASS; all 4 bucket thresholds live (forge 900→3436, mirror 1500→488, beacon 900→2147, pulse 900→262). Removing from Monday DM watch. Tier 3 alert (positive routine event).
+  - Tier-reset: YES (Tier 2 alerts + active stalls).
+
+- **(Check 1) Log noise: ✅ Nominal.** No new WARN signatures in journalctl window. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry inbound directives since iter 185. Outbox-notifier auto-delivered all 5 new alerts to Larry's Telegram by 14:02Z UTC — no orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS.** heal-pipeline-stall-state.json shows fresh cooldown entries at 13:59:36Z UTC:
+  - `tier2_fallback:forge:SKIPPED:rate_limit` — forge task paused_on_tier1
+  - `tier2_fallback:forge:SKIPPED:auth_401` — forge task paused_on_tier1
+  - `tier2_fallback:beacon-bot:SKIPPED:rate_limit` — beacon-bot task paused_on_tier1
+  - Root cause: `/home/larry/.claude-larry-personal` credentials file missing (confirmed in bot log). **Fix: Tier 2 OAuth restore per `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.**
+  - All 2099-snoozed entries are known historical. Expired entries (mirror_pass_unmerged:step-a-rotation at 00:20Z, others from May 26-29) are stale/resolved. Tier-reset: YES.
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 — Tier 2 OAuth ELEVATED.** Larry's "approve threshold-update-2026-05-31" was resolved (Beacon + Mirror + auto-merge, now COMPLETE). APPROVAL_REQUEST queue unchanged at 7; threshold-update closes but was not in the queue.
+  - **ELEVATED: `Tier 2 OAuth restore`** — was "pending Larry" in queue; now causing ACTIVE pipeline stalls for forge + beacon-bot. Operational impact confirmed. Runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
+  - `pulse-grule-check-c-canonical-names-001` — Beacon doc-fix, trust-policy → Forge pending.
+  - `alert-triage-persistence-invocation-001` — pending Larry approval.
+  - `forge-claude-md-preflight-self-check-bullet-001` — pending Larry.
+  - `sync-push-rebase-fallback-001` — **ELEVATED**: see Check B below.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry (iter 43).
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer.
+  - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated urgency: Tier 2 OAuth + sync error. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code.heartbeat: 2026-05-31T13:37:19Z UTC (~27 min old at check time, within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=ba62c23 "Pulse cycle 20260531T133404Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ⚠️ PUSH ERROR — sync-push-rebase-fallback-001 MATERIALIZED.** agent-core-sync.json at 13:50:29Z UTC: `{"status": "error", "message": "Auto-commit push failed; rolled back", "commit": "068569572b0bb574ca942fff91dd0490897bfecc"}`. The bare-push-no-rebase-fallback risk from `sync-push-rebase-fallback-001` (APPROVAL_REQUEST) fired for the first time. Rollback left state clean (session-start confirms HEAD=ba62c23). Last successful sync: ~13:05:57Z UTC (~58 min ago; within 2h threshold). No auto-fix triggered (2h threshold not exceeded). **This elevates `sync-push-rebase-fallback-001` from "defensive hardening" to "confirmed failure mode."** Include in Monday DM. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D) Inboxes: ✅ All empty.** forge, beacon, mirror, pulse — 0 active tasks. (forge/.hold: `marker-error-desired-state-reconciler-1.json` — fixture-pattern hold, expected.) ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** PR #220 (threshold-update-2026-05-31) just auto-merged. No others. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate — today is Sunday → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. ✅
+
+- **G-rule watch items:** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). No new occurrences. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. Tier-reset: Tier 3 → Tier 1 (consecutive_clean reset to 0). `cycle_tier_state.py record --checks-clean false`.
+3. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=1, iter=186, intervention_id=iter186-tier-reset-stalls-sync-error`.
+4. Updated MEMORY.md status snapshot.
+5. Wrote journal entry.
+
+**Escalated:** No immediate DM (outbox-notifier already delivered all 5 alerts to Larry's Telegram by 14:02Z UTC). Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope updated:
+- Tier 2 OAuth restore ELEVATED (active pipeline stalls for forge + beacon-bot; fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`)
+- sync-push-rebase-fallback-001 ELEVATED (confirmed failure once at 13:50Z; fix: rebase fallback in sync_agent_core.sh:161)
+- threshold-update-2026-05-31 CLOSED (PR #220 merged ✅)
+- Check VIII/IX first firing TOMORROW
+- APPROVAL_REQUEST queue still 7
+
+**Patterns:**
+- **Tier 2 OAuth expired ≥24h (since May 30).** Active stalls accumulating. Rotate → `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
+- **sync-push-rebase-fallback-001 confirmed.** No longer theoretical. First observed failure at 13:50:29Z UTC. Approve the defensive hardening PR.
+- **threshold-update-2026-05-31 COMPLETE.** Check III output now live. Watch: first Check III verification cycle 2026-06-07.
+- **Check VIII/IX first firing TOMORROW.** Monitor for errors.
+
+**Learned:** sync-push-rebase-fallback-001 materialized today — the APPROVAL_REQUEST is now justified by observed failure, not just theoretical risk. This strengthens the case for Larry's approval on Monday. Tier 2 OAuth stalls are the most pressing operational issue; the system degrades gracefully but tasks accumulate in paused_on_tier1 state.
+
+---
+
 ## Iteration 185 — 2026-05-31 13:32 UTC (interactive)
 
 **Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 13:07Z UTC). Check B: 27th consecutive clean. **Tier 3, consecutive_clean 12→13.**
