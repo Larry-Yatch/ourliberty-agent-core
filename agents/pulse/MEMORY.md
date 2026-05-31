@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~16:22Z UTC (Iter 206 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~16:28Z UTC (Iter 207 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat **on cadence** (16:07:21Z, ~10 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1085** (0 new alerts this cycle). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat **on cadence** (16:07:21Z, ~21 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1085** (0 new alerts this cycle). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
