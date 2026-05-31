@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 159 — 2026-05-31 04:16 UTC (interactive)
+
+**Health:** ✅ Nominal — First clean iter since iter 158. All checks nominal. 2 new Tier-3 known-pattern alerts (pipeline-stall:tier2-fallback-skipped-rate_limit forge+beacon-bot, 04:06Z). 6/6 services active. 0 open PRs. All inboxes empty. Check B: CLEAN (sync.json no-change at 04:04:39Z, no push error). APPROVAL_REQUEST queue: 5 unchanged + heal-resume-paused-on-tier1 install carry-forward (iter 158). Monday [yellow] DM 2026-06-01. Tier=1, consecutive_clean=1.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1077 lines** (+2 vs iter 158 watermark 1075). alert-triage.json MISSING (6th consecutive observation; 1 confirmed automated cycle without recreation — abb8f73 at 04:11Z). 2 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new alerts — both Tier-3 known-pattern.**
+  - Line 1076: `heal-pipeline-stall` 04:06:51Z — `pipeline-stall:tier2-fallback-skipped-rate_limit:forge`. Tier 1 rate_limit on resume session → paused_on_tier1. **Tier 3.** Same pattern as prior iters; root cause (Tier 2 OAuth expired) already in APPROVAL_REQUEST queue + Monday DM 2026-06-01. Silence + log. ✅
+  - Line 1077: `heal-pipeline-stall` 04:06:51Z — `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot`. Same pattern. **Tier 3.** Silence + log. ✅
+  - New watermark: **1077**. No tier-reset (Tier-3 per spec § 3.0). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last activity 22:00:13 MDT (PR #219 AUTO_MERGE — rate-limit-resilience-001 COMPLETE). No WARN/ERROR since 22:00:13 MDT. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last entries 22:10:40–22:10:41 MDT (alert deliveries idx=1075–1076). No Larry directives. No orphaned messages. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat (heal-stale-daemon-code-cooldowns.json): mtime 2026-05-31T03:35Z UTC (~41 min old, within 90-min threshold). ✅ Alert-cooldown/warning/: all carry-forwards (agent-runner rate_limit ×4, beacon-telegram-bot auth_401, build-sequence-advancer pulse-upgrade-001-complete, deploy-notifier READY ×multiple). No new active stall. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook (docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` (iter 43) — pending Larry.
+  - **[yellow] carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer on droplet (SSH + sudo cp + daemon-reload + enable --now).
+  - **Monday [yellow] DM: 2026-06-01** (burn-rate context + install-drift items). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat mtime 03:35Z UTC (~41 min old, within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (session-start gitStatus). Latest commit: abb8f73 "Pulse cycle 20260531T041141Z" (automated cycle post-iter-158). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T04:04:39Z, commit=f3825cc. No push error. 2nd consecutive clean Check B. APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Larry as defensive hardening; immediate error remains resolved. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — all empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: skip (check-i-2026-05-31.json exists; idempotency guard). ✅ | Check III: next 2026-06-07. ✅ | Check VIII/IX: next 2026-06-01 (Monday UTC). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **MalformedForgeMarker G-rule:** No new occurrence this iter. Doc-fix (forge-claude-md-preflight-self-check-bullet-001) pending Larry. G-rule posture unchanged.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All services active, repo clean, 0 open PRs, inboxes empty.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1, last_signal_at=04:09:03Z (unchanged — clean iter doesn't update signal timestamp). ✅
+4. No PRIME DIRECTIVE ledger row — Tier-3 alerts only; no intervention or systemic_fix this iter.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. All open items in Monday [yellow] DM queue 2026-06-01. No new escalations this iter.
+
+**Patterns:**
+- **Check B: 2nd consecutive clean.** iter 158 self-resolved; iter 159 confirms. The sync-push-rebase-fallback-001 defensive fix still warrants implementation, but the acute error is gone. Watch: if push error recurs on next cycle with a journal commit to push, that's the 3rd pattern occurrence → dispatch.
+- **pipeline-stall:tier2-fallback-skipped-rate_limit: 2 more instances.** Forge + beacon-bot at 04:06Z UTC. Pattern stable — root cause is Tier 2 OAuth expired. Rate limit resets 11:30am MDT today. heal-resume-paused-on-tier1 install (pending Larry) would auto-resume these tasks. Without install: tasks sit paused until rate limit clears.
+- **alert-triage.json MISSING: 1/2 confirmed automated cycles without recreation.** abb8f73 (04:11Z) is the first confirmed automated cycle post-cycle.timer fix that didn't recreate the file. If the next automated cycle also fails to recreate → dispatch to Forge to investigate. Condition: 2/2 automated cycles = escalate.
+- **rate-limit-resilience-001 post-merge watch.** All 4 PRs live since 04:00:13Z UTC. First metric cycle: 2 paused_on_tier1 alerts fired at 04:06Z (residual rate-limit activity from in-flight sessions). Expected: burn rate should drop measurably over the next 24h as the new token-gate logic activates for fresh sessions.
+
+**Learned:** Nothing new this iter. Carry-forward state stable. First clean iter after the rate-limit-resilience-001 sequence completion.
+
+---
+
 ## Iteration 158 — 2026-05-31 04:09 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — PR #219 MERGED (rate-limit-resilience-001 sequence COMPLETE). ourliberty-cycle.timer was STUCK (auto-healed at 04:00:21Z — root cause of cycle.last-output.json missing iters 156–157). NEW: heal-resume-paused-on-tier1 service/timer NOT INSTALLED (ask-then-do Larry). 5 new alerts, 2 ask-then-do, 2 auto-healed, 1 known-pattern. 6/6 services active. 0 open PRs. All inboxes empty. Sync clean. APPROVAL_REQUEST queue: 5 unchanged (Monday DM 2026-06-01). Tier=1, consecutive_clean=0.

@@ -6,6 +6,25 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~04:16Z UTC (Iter 159)
+
+**System: ✅ Nominal — first clean iter post rate-limit-resilience-001 completion.** Iter 159 findings: 2 Tier-3 known-pattern alerts (pipeline-stall:tier2-fallback-skipped-rate_limit forge+beacon-bot, 04:06Z — residual rate-limit activity from in-flight sessions). All checks nominal. 6/6 services active. 0 open PRs. All inboxes empty. Check B CLEAN (sync no-change 04:04:39Z, no push error — 2nd consecutive clean). alert-triage.json MISSING: 1/2 confirmed automated cycles without recreation (abb8f73 at 04:11Z — escalate if 2nd automated cycle also misses). Tier=1, consecutive_clean=1. No new escalations.
+
+**Watch items updated:**
+- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. First post-merge cycle shows 2 residual paused_on_tier1 alerts at 04:06Z. Watch: heal-claude-max-burn-rate frequency drop in next 24h (Monday DM if no improvement). Tier=1 rate_limit cadence: resets 11:30am MDT today.
+- **heal-claude-max-burn-rate:** Fix pipeline complete. Watch for frequency drop Monday 2026-06-01.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward from iter 158. Paused_on_tier1 tasks (04:06Z) won't auto-resume without install. Rate limit clears 11:30am MDT today.
+- **alert-triage.json MISSING: 1/2 automated cycles.** abb8f73 (04:11Z) is 1st confirmed cycle post-timer-fix without recreation. If 2nd automated cycle also fails → dispatch to Forge.
+- **Check B CLEAN: 2nd consecutive.** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 17 iters (143–159). Heartbeat fresh (03:35:16Z UTC). Verification: 2026-06-07.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix pending Larry. G-rule posture unchanged.
+- **systemd install-drift G-rule: 1/3.** No new instance this iter.
+- **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
+
 ## Status snapshot — updated 2026-05-31 ~04:09Z UTC (Iter 158)
 
 **System: ✅ Nominal-with-watch.** Iter 158 findings: **PR #219 MERGED 04:00:13Z — rate-limit-resilience-001 sequence COMPLETE (all 4 PRs live).** ourliberty-cycle.timer WAS STUCK (auto-healed 04:00:21Z by heal-systemd-install-drift — root cause of cycle.last-output.json missing iters 156-157, CLOSED). NEW: heal-resume-paused-on-tier1.service + .timer NOT INSTALLED on droplet (ask-then-do Larry). 5 new alerts triaged. 6/6 services active. 0 open PRs. All inboxes empty. sync.json no-change (04:04:39Z). alert-triage.json MISSING (5th obs — expect recreation on next automated cycle now that timer fixed). APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
