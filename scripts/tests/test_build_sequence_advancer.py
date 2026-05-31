@@ -106,7 +106,7 @@ class _AdvancerHarness(unittest.TestCase):
         # re-resolve to the tmpdir.
         for mod in (
             'build_sequence_advancer', 'build_sequence_validator',
-            'safe_write_inbox',
+            'safe_write_inbox', 'sequence_shortcut_helpers',
         ):
             sys.modules.pop(mod, None)
         import build_sequence_advancer as bsa  # noqa: E402
@@ -186,6 +186,10 @@ class _AdvancerHarness(unittest.TestCase):
         # patched chain_event_* lambdas above are what actually drive
         # behavior.
         self.bsa._connect_supabase = lambda: object()
+        # Default reconciler to "no merged PRs in any repo" so tests that
+        # don't care about reconciliation don't fire real `gh` subprocess
+        # calls. TestActiveReconciliation overrides this per-test.
+        self.bsa._gh_list_merged_prs = lambda repo: []
 
 
 class TestActivationGate(_AdvancerHarness):
@@ -721,6 +725,298 @@ class TestDispatchFailureRecovery(_AdvancerHarness):
             ),
         )
         self.assertIn('beta', seq_after_t2['current_steps'])
+
+
+class TestActiveReconciliation(_AdvancerHarness):
+    """Active reconciliation pass — backstop for the V6 notifier hook.
+
+    The notifier looks up "which step does this task_id belong to" by
+    exact task_id match; under rebase / rescue / revision dispatches the
+    auto-merge fires under a derivative task_id and the step strands in
+    `dispatched`. This pass identity-matches dispatched steps against
+    merged PRs (pr_url → branch → title-substring) and fires
+    apply_step_merged on the match."""
+
+    def _patch_gh_pr_list(self, prs_by_repo):
+        """Stub _gh_list_merged_prs to return the given mapping (or None
+        for repos where reconciliation should soft-fail)."""
+        def _fake_list(repo):
+            return prs_by_repo.get(repo)
+        self.bsa._gh_list_merged_prs = _fake_list
+
+    def test_reconcile_matches_by_pr_url(self):
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-foo', status='dispatched',
+                    pr_url='https://github.com/x/y/pull/42',
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-foo'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 42,
+                    'url': 'https://github.com/x/y/pull/42',
+                    'title': 'unrelated title',
+                    'headRefName': 'unrelated/branch',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(step['pr_url'], 'https://github.com/x/y/pull/42')
+        events = [(e['event'], e.get('actor')) for e in seq2['audit_log']]
+        self.assertIn(('step-merged', 'advancer-reconcile'), events)
+
+    def test_reconcile_matches_by_branch_name(self):
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-foo', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-foo'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 99,
+                    'url': 'https://github.com/x/y/pull/99',
+                    'title': 'rebase: thing',
+                    'headRefName': 'forge/step-foo',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'merged')
+        self.assertEqual(step['pr_url'], 'https://github.com/x/y/pull/99')
+
+    def test_reconcile_matches_by_title_substring(self):
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-bar', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-bar'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 100,
+                    'url': 'https://github.com/x/y/pull/100',
+                    'title': 'fix(thing) — step-bar work',
+                    'headRefName': 'pr100-rebase-step-bar-001',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'step-bar')
+        self.assertEqual(step['status'], 'merged')
+
+    def test_reconcile_no_match_no_op(self):
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-baz', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-baz'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 101,
+                    'url': 'https://github.com/x/y/pull/101',
+                    'title': 'unrelated',
+                    'headRefName': 'forge/something-else',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        rc = self.bsa.tick()
+        self.assertEqual(rc, 0)
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'step-baz')
+        self.assertEqual(step['status'], 'dispatched')
+        events = [e['event'] for e in seq2['audit_log']]
+        self.assertNotIn('step-merged', events)
+
+    def test_reconcile_skips_already_merged_steps(self):
+        # Reconciler iterates only `dispatched` steps; merged steps are
+        # not even considered. Asserts the source-of-truth filter, not
+        # apply_step_merged's own idempotence (which is also true).
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-foo', status='merged',
+                    pr_url='https://github.com/x/y/pull/42',
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=[],
+        )
+        seq['steps'][0]['merged_at'] = '2026-05-30T00:30:00+00:00'
+        # Sequence already had its completion event, mark as complete so
+        # the tick is a true no-op (no sequence-complete DM either).
+        seq['status'] = 'complete'
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        calls = {'n': 0}
+
+        def _counting_list(repo):
+            calls['n'] += 1
+            return [
+                {
+                    'number': 42,
+                    'url': 'https://github.com/x/y/pull/42',
+                    'title': 'step-foo',
+                    'headRefName': 'forge/step-foo',
+                    'mergedAt': '2026-05-30T00:30:00Z',
+                },
+            ]
+        self.bsa._gh_list_merged_prs = _counting_list
+        self.bsa.tick()
+        # Sequence is `complete` so the tick skipped it before even
+        # entering reconcile — gh_list shouldn't have been queried.
+        self.assertEqual(calls['n'], 0)
+        seq2 = self._read_sequence('seq-001')
+        # No new step-merged audit entry (the only `step-merged` would be
+        # from a re-fire of apply_step_merged, which the reconciler must
+        # never trigger on a non-dispatched step).
+        events = [e for e in seq2['audit_log'] if e.get('event') == 'step-merged']
+        self.assertEqual(events, [])
+
+    def test_reconcile_handles_gh_failure_gracefully(self):
+        # When gh returns None (timeout / non-zero rc / missing), the
+        # reconciler logs WARN and continues; the rest of the tick runs.
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-foo', status='dispatched',
+                    pr_url='https://github.com/x/y/pull/42',
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-foo'],
+        )
+        self._write_sequence(seq)
+        # Gate path: chain says merged + gh says merged → existing flow
+        # would advance. We need to confirm that even though gh-list
+        # fails, the rest of the tick still works.
+        self._patch_gates(chain_merged=True, gh_merged=True)
+        self._patch_gh_pr_list({})  # repo missing → None
+        rc = self.bsa.tick()
+        self.assertEqual(rc, 0)
+        seq2 = self._read_sequence('seq-001')
+        # The existing belt-and-suspenders gate (not the reconciler)
+        # advanced the step — proves the rest of the tick continued
+        # despite the gh-list failure.
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'step-foo')
+        self.assertEqual(step['status'], 'merged')
+
+    def test_reconcile_then_dispatch_downstream_same_tick(self):
+        # End-to-end: step-A is silent-missed (dispatched but merged
+        # under a different task_id). Reconcile fires apply_step_merged
+        # for step-A; THEN dispatch logic sees step-B's deps satisfied
+        # and dispatches it on the SAME tick. This proves the
+        # reconcile-before-dispatch ordering.
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-a', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+                _make_step('step-b', deps=['step-a'], status='pending'),
+            ],
+            current_steps=['step-a'],
+        )
+        self._write_sequence(seq)
+        # Belt-and-suspenders gate would NOT advance step-a (chain
+        # missing the task_id signal — the whole point of the silent-
+        # miss shape). Reconciler is the ONLY path that can advance it.
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 211,
+                    'url': 'https://github.com/x/y/pull/211',
+                    'title': 'rebase under different task_id',
+                    'headRefName': 'forge/step-a',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step_a = next(s for s in seq2['steps'] if s['step_id'] == 'step-a')
+        step_b = next(s for s in seq2['steps'] if s['step_id'] == 'step-b')
+        self.assertEqual(step_a['status'], 'merged')
+        # The key assertion: step-b dispatches on the SAME tick because
+        # the reconciler's apply_step_merged write to disk is visible to
+        # _process_active_sequence's `merged_ids` calculation.
+        self.assertEqual(step_b['status'], 'dispatched')
+        self.assertIn('step-b', seq2['current_steps'])
+        self.assertEqual(len(self.dispatched_envelopes), 1)
+        self.assertEqual(
+            self.dispatched_envelopes[0]['task_id'],
+            'seq-seq-001-step-step-b',
+        )
+
+    def test_reconcile_caches_gh_call_per_repo(self):
+        # Two dispatched steps in the same repo → one gh call, not two.
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'step-x', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+                _make_step(
+                    'step-y', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['step-x', 'step-y'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        calls = {'n': 0}
+
+        def _counting_list(repo):
+            calls['n'] += 1
+            return []  # no merges → no reconcile fires, but still 1 call
+
+        self.bsa._gh_list_merged_prs = _counting_list
+        self.bsa.tick()
+        self.assertEqual(calls['n'], 1)
 
 
 if __name__ == '__main__':
