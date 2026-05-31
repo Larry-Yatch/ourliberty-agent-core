@@ -6,17 +6,19 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~02:37Z UTC (Iter 148)
+## Status snapshot — updated 2026-05-31 ~02:44Z UTC (Iter 149)
 
-**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 148 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 3 carry-forward; tier2-verifier-probe-001 resolved ✅) and Check 5 (cooldowns ~2h32m old; heartbeat fresh 2 min; trust-policy → Forge dispatch still pending). 0 open PRs (13th consecutive PR-clear iter). All 6 services active. Forge inbox: 1 task (tier2-verifier-probe-001.json, in-flight). sync.json: no-change (02:04:38Z, 13th consecutive clean sync). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + Tier 2 OAuth expired.** Iter 149 findings: Check 0 new alert — tier2-verifier-probe-001 REJECTED by Forge at 02:39Z. Root cause: Tier 2 OAuth token expired ~16h ago (confirmed by Forge preflight reading credentials JSON). All other checks clean. 0 open PRs (14th consecutive PR-clear iter). All 6 services active. Forge inbox: 2 fresh tasks (pm-dashboard build + step-b-resume). Beacon inbox: empty. sync.json: no-change (02:04:38Z, 14th consecutive clean sync). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending (Forge inbox has tier2-verifier-probe-001 ahead of it).** 6 iters (143–148) with no trust-policy dispatch materialized in Forge inbox. Heartbeat confirmed fresh (02:35:16Z UTC, 30-min cadence holding). Verification: 2026-06-07.
-- **APPROVAL_REQUEST queue (3):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. Monday [yellow] DM: **2026-06-01**. *(tier2-verifier-probe-001 RESOLVED — Larry approved 20:30 MDT, dispatched to Forge.)*
-- Sync push error: **13th consecutive clean cycle.** Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 7 iters (143–149) with no trust-policy dispatch materialized. Heartbeat confirmed fresh (02:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (4):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (NEW — tier2-verifier-probe-001 REJECTED; root cause = expired OAuth; runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md)**. Monday [yellow] DM: **2026-06-01**.
+- Sync push error: **14th consecutive clean cycle.** Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- **MalformedForgeMarker preflight pattern: 2/3 G-rule observations** (both self-resolved same session). Watch.
+- **rate-limit-resilience sequence:** step B in Forge's inbox (step-b-resume.json, headless-approval-request, dispatched 20:41:27 MDT). Actively progressing.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
@@ -174,7 +176,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 - **2026-05-31 (iter 128) — heal-pipeline-stall "369 min" duration calculation bug (1st observation).** At 00:20:43Z, healer claimed Mirror PASSED PR #211 "369 min ago" — actual Mirror PASS was at 00:10:57Z (~13 min prior). Healer may be using PR creation timestamp or chain_events.session_start for Mirror's review session instead of the mirror_marker_visible event. G-rule at 1/3. Watch: if 2 more instances → dispatch to Beacon (propose fix to healer's duration calculation for "mirror-pass-unmerged" alert).
 
-- **2026-05-29 (iter 102) — Tier 2 rate_limit: forge + beacon-bot hitting Tier 1 rate_limit with Tier 2 fallback skipped.** `heal-pipeline-stall` fired 3 pairs (forge + beacon-bot) at 17:22/18:44/20:03Z May 29. Root cause: Tier 1 hit rate_limit on --resume sessions; Tier 2 fallback skipped because session IDs are account-bound. Positive signal (iter 119, 23:04Z May 30): beacon-bot process Tier 2 USED for notification delivery (not account-bound session). Two distinct Tier 2 paths: (1) agent-runner --resume sessions = account-bound = SKIPPED; (2) bot process fallback for alert delivery = USED. Fix still needed: provision/re-provision Tier 2 OAuth per `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Check I Monday 2026-06-01 will capture rate-limit picture. Close when no further SKIPPED alerts for agent-runner sessions.
+- **2026-05-29 (iter 102) — Tier 2 rate_limit: LIKELY ROOT CAUSE CONFIRMED (iter 149).** `heal-pipeline-stall` fired 3 pairs (forge + beacon-bot) at 17:22/18:44/20:03Z May 29. Tier 2 fallback SKIPPED for agent-runner --resume sessions. **Iter 149 finding:** tier2-verifier-probe-001 REJECTED by Forge (02:39Z May 31); Forge preflight confirmed Tier 2 OAuth token expired ~16h ago (expired ~10:39Z May 30). Expired credential is the likely root cause of Tier 2 SKIPPED alerts. Fix: Larry runs `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Added to Monday [yellow] DM 2026-06-01. Close when OAuth restored and no further SKIPPED alerts for agent-runner sessions.
 
 - **2026-05-30 (iters 117–119) — Sync "Auto-commit push failed; rolled back" — ROOT CAUSE CONFIRMED, APPROVAL_REQUEST PENDING.** 5 occurrences: iters 102, 114, 117, 118 (22:52:42Z), 119 (23:03:17Z). Root cause confirmed by Beacon at 22:55Z: `sync_agent_core.sh:161` bare-pushes `git push -q origin main 2>/dev/null` with no rebase fallback and swallowed stderr. `run_cycle.sh:190` uses `push_with_rebase` helper that handles non-FF races. Fix: source `_lib_push_with_rebase.sh` in `sync_agent_core.sh` + `run_ledger.sh`, replace bare pushes with `push_with_rebase`. APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending Larry authorization to dispatch to Forge. Close when Forge PR merges and sync.json shows status=success on auto-commit path.
 

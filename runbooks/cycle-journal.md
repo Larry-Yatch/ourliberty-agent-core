@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration 149 — 2026-05-31 02:44 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — new finding: **Tier 2 OAuth token confirmed expired ~16h ago** (tier2-verifier-probe-001 REJECTED by Forge at 02:39Z; root cause surfaced at preflight). All other checks clean. 0 open PRs (14th consecutive PR-clear iter). All 6 services active. Forge inbox: 2 fresh tasks (pm-dashboard build + step-b-resume rate-limit-resilience). Beacon inbox: empty (seq task processed). sync.json: no-change (02:04:38Z). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1057 lines** (+1 vs iter 148 watermark of 1056). 1 new alert.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 2 OAuth expired.**
+  - Line 1057: `{ts: 2026-05-31T02:39:37Z, source: outbox-notifier, kind: notification, intent: reject, task_id: tier2-verifier-probe-001}` — Forge REJECTED `tier2-verifier-probe-001` at preflight.
+  - **Root cause (from rejection message):** Tier 2 OAuth token expired ~16h ago (per credentials JSON at preflight time). Spec premise was wrong — no remote auth shell-out exists in `active_tier.tier_auth_ok`; the auth check is local credential reads. The probe was unnecessary; diagnosis is complete via preflight.
+  - **Classification:** Tier 2 (guarded — credential restoration required). Ask-then-do. Larry was already DM'd by outbox-notifier at 02:39:37Z.
+  - **Implication:** This likely explains the `tier2-fallback-skipped:rate_limit` alerts from MEMORY.md (iters 102, 119). The OAuth token was already expired when those events fired. The d711143 "temporary trust carve-out" may have been masking the expired-OAuth root cause.
+  - **Next step:** Larry runs `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. No Pulse dispatch until authorized. ⚠️→ask-then-do
+
+- **(Check 1) Log noise: ✅ Nominal.**
+  - outbox-notifier.log last entry: 20:41:27 MDT — `headless-approval-request dispatched forge <- beacon (task=step-b-resume)`. Clean INFO.
+  - Two WARNs noted but self-resolved within the same session:
+    - 20:37:46 MDT: `MalformedForgeMarker: clarify_request marker has invalid JSON` (tier2-verifier-probe-001, retry 1/3) — session continued; clarify_request classified at 20:38:26Z. Resolved.
+    - 20:40:37 MDT: `MalformedForgeMarker: phase=preflight requires ONE marker block` (pm-dashboard-past-due-flag, retry 1/3) — session continued; proceed marker classified at 20:41:17Z. Resolved.
+  - Both are routine retry-within-tolerance events per WARN-vs-INFO calibration. No threshold breach (2 WARNs/24h, far below 5/h). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal — rate-limit-resilience sequence progressing.**
+  - Larry's last inbound: 20:34:46 MDT "Where are we with rate-limit-resilience mission?" — Beacon answered (in_flight, seq file current).
+  - Larry's 'go' at 20:30 MDT dispatched tier2-verifier-probe-001 to Forge → REJECTED → root cause found (see Check 0).
+  - Sequence active: Beacon processed `seq-rate-limit-resilience-001-step-step-b-resume.json` at ~20:40 MDT and dispatched `step-b-resume.json` (headless-approval-request) to Forge at 20:41:27 MDT.
+  - No orphaned Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.**
+  - Healer heartbeat: 2026-05-31T02:35:16Z UTC (8 min old at check time — within 90-min threshold). ✅
+  - Forge inbox: 2 fresh tasks (<3 min old) — `build-pm-dashboard-past-due-flag.json` (build phase, ~2 min) and `step-b-resume.json` (headless-approval-request, ~1 min). Both active sequences progressing normally.
+  - Beacon inbox: empty (rate-limit-resilience seq file processed). ✅
+  - No stall signals. ✅
+
+- **(Check 4) Pending Larry directives: 3 carry-forward + 1 new. ⚠️**
+  - **NEW: Tier 2 OAuth expired** — tier2-verifier-probe-001 REJECTED (02:39Z). Root cause confirmed. Runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Add to Monday DM.
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: **2026-06-01**.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+  - Monday [yellow] DM 2026-06-01: 4 items (3 carry-forward + Tier 2 OAuth restore). ⚠️
+
+- **(Check 5) Stale daemon: ⚠️ in-progress — same state as iter 148.** heal-stale-daemon-code-cooldowns.json mtime: 2026-05-31T00:05:15Z UTC (~2h39m old). Per current spec threshold (>60 min → ask-then-do) still triggers, but heartbeat confirmed fresh: 2026-05-31T02:35:16Z UTC (8 min old). APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` still pending trust-policy → Forge dispatch. Forge currently has 2 active tasks ahead of it. No new action this iter. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean, HEAD=origin/main=93fb21f "Pulse cycle 20260531T023848Z". ✅
+
+- **(Check B) Sync health: ✅ 14th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T02:04:38Z (~39 min ago, within 2h threshold). Race-condition root cause (sync-push-rebase-fallback-001) still unfixed; APPROVAL_REQUEST pending Monday DM. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge has 2 fresh tasks. ✅**
+  - beacon: empty ✅
+  - forge: 2 tasks — `build-pm-dashboard-past-due-flag.json` (~2 min old) and `step-b-resume.json` (~1 min old). Both fresh, not stale. ✅
+  - mirror: empty ✅
+  - pulse: empty ✅
+
+- **(Check E) PRs: ✅ PR-clear holds (14th consecutive iter).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126 (Sunday 2026-05-31 UTC). Idempotency guard active. Next: 2026-06-07. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-01 UTC. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean, services active, no stale tasks, no stale PRs).
+3. No new dispatches — tier2-verifier-probe rejection is credential-adjacent (Tier 2 guarded); awaiting Larry authorization before any corrective dispatch.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-149-check0-tier2-oauth-expired-root-cause-found"}'` → row appended at 2026-05-31T02:44:16Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T02:44:17Z.
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None new. Larry was already DM'd at 02:39:37Z by outbox-notifier re: tier2-verifier-probe-001 rejection. Monday [yellow] DM 2026-06-01 will include Tier 2 OAuth restore item + 3 carry-forward APPROVAL_REQUESTs.
+
+**Patterns:**
+- **APPROVAL_REQUEST queue: 3 carry-forward + 1 new (Tier 2 OAuth restore).** Monday [yellow] DM: 2026-06-01.
+- **Sync push error: 14th consecutive clean cycle.** Root cause fix pending Larry. Active risk low.
+- **14th consecutive PR-clear iter.** Both repos 0 open PRs.
+- **Check 5 permanent fix in motion:** heartbeat fresh (02:35:16Z). Trust-policy → Forge still pending (2 tasks ahead). Verification: 2026-06-07.
+- **Tier 2 OAuth expired (root cause confirmed):** tier2-verifier-probe-001 rejection surfaced expired credential. Connects to iters 102/119 rate-limit SKIPPED watch item. Runbook available; Larry authorization needed.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **MalformedForgeMarker preflight pattern:** 2 occurrences this iter (tier2-verifier-probe-001 + pm-dashboard-past-due-flag), both self-resolved. Not at G-rule threshold (3). Watch.
+
+**Learned:**
+- Tier 2 OAuth expiry confirmed as likely root cause of the `tier2-fallback-skipped:rate_limit` alerts from iters 102/119. The d711143 trust carve-out may have been treating a symptom (Tier 1 rate-limit) without fixing the underlying cause (expired Tier 2 credential). Once Larry runs the restore runbook, Tier 2 fallback should activate for both bot-process and agent-runner paths.
+- rate-limit-resilience sequence (step B) is actively progressing: Beacon processed the seq file and dispatched step-b-resume to Forge at 20:41:27 MDT. Both pm-dashboard-past-due-flag and rate-limit-resilience are in Forge's inbox concurrently — normal throughput.
+- MalformedForgeMarker on both tasks in the same window (both retry-1/3, both self-resolved) — pattern worth watching at G-rule threshold 3.
+
+---
+
 ## Iteration 148 — 2026-05-31 02:37 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — all checks clean except Check 4 (APPROVAL_REQUEST queue: 3 carry-forward; tier2-verifier-probe-001 now dispatched to Forge ✅) and Check 5 (cooldowns file ~2h32m old; heartbeat fresh 2 min; Forge substrate-swap APPROVAL_REQUEST pending trust-policy). 0 open PRs on both repos (13th consecutive PR-clear iter). All 6 services active. Forge inbox: 1 task (tier2-verifier-probe-001.json, just dispatched). sync.json: no-change (02:04:38Z). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
