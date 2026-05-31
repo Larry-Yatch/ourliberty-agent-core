@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 157 — 2026-05-31 04:00 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — 0 new alerts, PR #219 (fix-rotation-gate-setup-token-aware) OPEN MERGEABLE Mirror reviewing (fresh), MalformedMirrorMarker retry 1/3 at 03:59Z (self-resolving, consistent with established pattern). 6/6 services active. APPROVAL_REQUEST queue: 5 (Monday DM 2026-06-01). Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1070 lines** (unchanged from iter 156 watermark 1070). alert-triage.json still MISSING (4th consecutive interactive observation). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1070. Lines 1068–1070 same as iter 156 (still-stale-after-restart:beacon-bot, agent-models-telegram-model-corruption:beacon, claude_max_5h_burn_threshold_breached). All previously triaged. alert-triage.json MISSING — 4th consecutive interactive observation. Escalation gate remains "2 automated cycles"; cycle.last-output.json is now MISSING (was 0 bytes in iter 156 — status degraded). Next verified automated cycle will determine whether to escalate. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry 21:59:14 MDT (03:59:14Z UTC): `[WARN] MalformedMirrorMarker: fix-rotation-gate-setup-token-aware.json — retry 1/3`. Same self-resolving class as MalformedForgeMarker. Trigger: bare `REVIEW_PASS` keyword without `=== REVIEW_PASS ===` delimiter block. Not above 5/h threshold; single occurrence on fresh task. ✅ inbox-watcher.log: silent (no output). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon_telegram_bot.log activity: 21:54–21:56 MDT (03:54–03:56Z UTC) — Tier 1 rate-limit cycling. No Larry directives. No orphaned messages. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T03:35:16Z UTC (~25 min old at check time, within 90-min threshold). ✅ heal-pipeline-stall cooldown files: all suppressed entries are known carry-forwards (fixture-pattern items, tier2-fallback series, stale task_ids). No new active stall. PR #219 (fix-rotation-gate-setup-token-aware) MERGEABLE, Mirror retry 1/3 in-flight — fresh, not a stall. ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook (docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` (iter 43) — pending Larry.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️ carry-forward (includes burn-rate context from iter 155).
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 2026-05-31T03:35:16Z UTC (~25 min old, within 90-min threshold). All 6 services systemctl active. Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge trust-policy dispatch. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (session-start gitStatus confirms). Latest commit: f134385 "Pulse cycle 20260531T035808Z" (iter 156). ✅
+
+- **(Check B) Sync health: ⚠️ Push error carry-forward.** sync.json: status=error, commit=e3ede336. Known race condition. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Mirror 1 task (fresh). Forge/Beacon/Pulse empty. ✅**
+  - mirror: `review-fix-rotation-gate-setup-token-aware.json` (created 21:57:34 MDT = 03:57:34Z UTC, ~3 min old). MalformedMirrorMarker retry 1/3 dispatched; Mirror will pick up. Fresh. ✅
+  - forge: empty (build-fix-rotation-gate-setup-token-aware completed → PR #219). ✅
+  - beacon/pulse: empty. ✅
+
+- **(Check E) PRs: ⚠️ PR #219 open (fresh, Mirror retry in-flight).**
+  - **PR #219 "fix(active_tier): tier_auth_ok mirrors dispatch auth precedence"** — OPEN, MERGEABLE, reviewDecision="", autoMergeRequest=null. Created 03:57:17Z UTC (~3 min at check time). Mirror review dispatched 03:57:34Z; MalformedMirrorMarker retry 1/3 at 03:59:14Z (self-resolving within session per established pattern). Below 30-min always-fix threshold. Watch. ⚠️→normal-pipeline.
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard, fires today). ✅ | Check III next 2026-06-07. ✅ | Check VIII/IX next 2026-06-01 (Monday). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **MalformedForgeMarker G-rule:** No new occurrence this iter. Post-dispatch counter unchanged. Doc-fix (forge-claude-md-preflight-self-check-bullet-001) pending Larry. G-rule posture unchanged.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. PR #219 fresh (under 30-min threshold).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-157-checkb-sync-push-carry-forward"}'` → row appended at 04:00:33Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:00:35Z.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. All findings carry-forward to Monday [yellow] DM 2026-06-01.
+
+**Patterns:**
+- **MalformedMirrorMarker (fix-rotation-gate-setup-token-aware retry 1/3).** 1st observation for Mirror on this task. Same self-resolving behavior as MalformedForgeMarker. Neither pattern has triggered a non-self-resolving escalation since the G-rule doc-fix was dispatched (iter 150). MalformedMarker pattern (both Forge + Mirror) likely stems from the same upstream prompt-discipline gap; doc-fix for Forge CLAUDE.md preflight pending Larry. Mirror's instance may warrant a parallel Mirror CLAUDE.md bullet — note if recurs.
+- **cycle.last-output.json: MISSING.** Was 0 bytes at iter 156, now absent (stat returns missing). Watch: if 3+ consecutive automated cycles produce missing or 0-byte output file → dispatch to Forge to investigate run_cycle.sh output capture. This is 2nd observation (iter 156: 0 bytes; iter 157: missing).
+- **alert-triage.json: MISSING (4th interactive observation).** Escalation gate is "2 automated cycles." cycle.last-output.json being MISSING makes the last automated cycle unverifiable. Watch on next confirmed automated cycle.
+- **fix-rotation-gate-setup-token-aware pipeline: final step in progress.** Forge build complete → PR #219 opened 03:57:17Z → Mirror reviewing (retry 1/3 resolving). Rate-limit-resilience-001 sequence: 4/4 steps in final review. Rate limit resets 11:30am MDT (17:30Z UTC); Mirror review should complete before reset given self-resolving retry pattern.
+
+**Learned:** Nothing new this iter. MalformedMirrorMarker matches the established self-resolving pattern for both agent types.
+
+---
+
 ## Iteration 156 — 2026-05-31 03:54 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — 0 new alerts, 0 open PRs, 6/6 services active. Forge building fix-rotation-gate-setup-token-aware.json (dispatched iter 155, 11 min old, actively processing). Rate-limit cycling continues (expected; fix pipeline in Forge). APPROVAL_REQUEST queue: 5 unchanged (Monday DM 2026-06-01). Check B sync push error carry-forward. Tier=1, consecutive_clean=0.
