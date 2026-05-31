@@ -6,21 +6,20 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~03:17Z UTC (Iter 151)
+## Status snapshot — updated 2026-05-31 ~03:25Z UTC (Iter 152)
 
-**System: ✅ Nominal-with-watch.** Iter 151 findings: 3 new alerts all Tier 3 (2× tier2-fallback-skipped carry-forward, 1× heal-stale-daemon-code auto-restarted beacon-bot ✅). Beacon processed iter 150 MalformedForgeMarker G-rule dispatch: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` (doc-only Forge CLAUDE.md self-check bullet). **APPROVAL_REQUEST queue: 5 (was 4).** PR #215 (remove-yes-approval-token) still open, Mirror review pending. Forge: 3 active tasks (build-advancer-active-reconciliation-001, build-step-b-resume, marker-error-register-claude-setup-tokens-rotation-1). Sync push failure recurred (carry-forward). All 6 services active. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 152 findings: 0 new alerts. **PR #216 (fix(advancer): active reconciliation tick) MERGED at 03:22Z** — rate-limit-resilience V6 advancer fix live. MalformedForgeMarker retries: both self-resolved (step-b-resume 21:09 MDT, register-claude-setup-tokens-rotation 21:17 MDT). PR #215 (remove-yes-approval-token) status CONFLICTING→UNKNOWN (GitHub re-evaluating after #216 merge); Mirror review not yet started. Forge: 2 tasks active (build-step-b-resume, build-register-claude-setup-tokens-rotation). All 6 services active. Sync push error carry-forward. APPROVAL_REQUEST queue: 5 unchanged. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 9 iters (143–151). Heartbeat confirmed fresh (03:05:16Z UTC). Verification: 2026-06-07.
-- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, **forge-claude-md-preflight-self-check-bullet-001 (NEW — Beacon G-rule response; doc-only preflight self-check bullet for Forge CLAUDE.md)**. Monday [yellow] DM: **2026-06-01**.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 10 iters (143–152). Heartbeat confirmed fresh (03:05:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. Monday [yellow] DM: **2026-06-01**.
 - Sync push error: carry-forward. Root cause fix (sync-push-rebase-fallback-001) pending Larry. Active risk low.
-- **PR #215 (remove-yes-approval-token) OPEN.** UNKNOWN mergeable, no Mirror review yet. Monitor Check E.
-- **MalformedForgeMarker G-rule: DISPATCHED (iter 150).** Beacon response: preflight discipline drift. APPROVAL_REQUEST produced. G-rule posture: keep open through doc-PR + PR B merge. Post-dispatch counter: 2/3 (step-b-resume resolved, register-claude-setup-tokens-rotation at retry 1/3).
-- **heal-stale-daemon-code auto-restarted beacon-bot at 03:05Z** (204.8 min code gap). Healer working as designed. Beacon-bot fresh code now live.
-- **rate-limit-resilience sequence:** step-b-resume build-phase dispatched (21:09 MDT); advancer-active-reconciliation-001 build-phase dispatched (21:06 MDT). Active.
+- **PR #215 (remove-yes-approval-token) OPEN.** UNKNOWN mergeable (re-evaluating), reviewDecision="", no Mirror review yet. Mirror will process asynchronously. Watch Check E.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 0 active** (both retry-1/3 instances self-resolved iters 151–152). Doc-fix APPROVAL_REQUEST pending Larry. G-rule posture: keep open through doc-PR + PR B merge.
+- **rate-limit-resilience sequence: advancer-active-reconciliation-001 CLOSED (PR #216 merged).** step-b-resume build-phase in Forge inbox. register-claude-setup-tokens-rotation build-phase in Forge inbox.
 
 ## Status snapshot — updated 2026-05-31 ~03:11Z UTC (Iter 150)
 

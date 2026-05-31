@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 152 — 2026-05-31 03:25 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #216 (fix(advancer): active reconciliation tick) MERGED at 03:22Z. Both MalformedForgeMarker retries self-resolved. 6/6 services active. Forge: 2 fresh tasks. PR #215 status changed CONFLICTING→UNKNOWN (re-evaluating after #216 merge). No new alerts. Sync error carry-forward. APPROVAL_REQUEST queue: 5. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1066 lines** (no change from iter 151 watermark of 1066). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark held at 1066. ✅
+
+- **(Check 1) Log noise: ✅ Nominal — all retries self-resolved.**
+  - 21:08:13 MDT: MalformedForgeMarker on `register-claude-setup-tokens-rotation` retry 1/3 → self-resolved 21:17:49 MDT (proceed marker classified, build-phase dispatched). Carry-over from iter 151 — same-session resolution.
+  - 21:09:33 MDT: `step-b-resume` proceed marker classified, build-phase dispatched. ✅
+  - 21:17:09 MDT: `advancer-active-reconciliation-001` build-phase complete → PR #216 created → Mirror review dispatched. ✅
+  - 21:22:25 MDT: Mirror REVIEW_PASS on `advancer-active-reconciliation-001`. ✅
+  - 21:22:28 MDT: **AUTO_MERGE PR #216 `outcome=merged (--squash --delete-branch)`.** ✅ Full pipeline completion.
+  - MalformedForgeMarker G-rule post-dispatch: both retry-1/3 instances self-resolved (step-b-resume 21:09, register-claude-setup-tokens-rotation 21:17). Counter since Beacon's APPROVAL_REQUEST: 0 active. Posture unchanged.
+
+- **(Check 2) Telegram sweep: ✅ No new Larry messages.** Last inbound: `'go'` at 20:44:09 MDT = 02:44 UTC. Directive tracked by PR #216 → MERGED. No orphaned directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T03:05:16Z UTC (~20 min old, within 90-min threshold). ✅ Mirror inbox empty (review-advancer archived after REVIEW_PASS 21:22Z). Forge: 2 fresh tasks (<15 min at check time). No stall signals. ✅
+
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged from iter 151).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending.
+  - `pulse_telegram_bot.sh launcher` — pending.
+  - `stuck-cycle timeout guard` (iter 43) — pending.
+  - Monday [yellow] DM: **2026-06-01**. ⚠️ carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 03:05:16Z UTC (~20 min old) → within 90-min threshold. Substrate fix (fix-check5-heartbeat-substrate-001) pending Forge (APPROVAL_REQUEST). ⚠️→in-progress.
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main. Local SHA=origin SHA=c65b4f416b. No ahead/behind. Clean. ✅
+
+- **(Check B) Sync health: ⚠️ Carry-forward — push error at 03:19:56Z.** `status=error "Auto-commit push failed; rolled back"` — known race condition (sync-push-rebase-fallback-001 pending Larry). Sync is fresh (5 min old at check time), not stale. ⚠️ carry-forward.
+
+- **(Check C) Agent liveness: 6/6 active. ✅**
+
+- **(Check D) Inboxes: Forge 2 tasks (fresh). ✅**
+  - `build-step-b-resume.json` (21:09 MDT), `build-register-claude-setup-tokens-rotation.json` (21:17 MDT). Both <15 min at check time. ✅
+  - beacon/mirror/pulse: empty. ✅
+
+- **(Check E) PRs: ⚠️ PR #215 open (no Mirror review yet, >30 min).**
+  - PR #216 **MERGED** at 03:22:28Z (fix(advancer): active reconciliation tick — self-heal V6 silent-misses). ✅ Closes rate-limit-resilience advancer watch.
+  - PR #215 "Remove yes from Beacon approval whitelist" — mergeable changed CONFLICTING→UNKNOWN (GitHub re-evaluating after #216 merge), reviewDecision="", autoMergeRequest=null. Created 02:54:30Z (~31 min at check time). No Mirror review yet. ⚠️ **>30 min threshold, but not clean+green (no REVIEW_PASS, UNKNOWN mergeable). Always-fix `enable-pr-auto-merge` does NOT apply here — requires APPROVED+MERGEABLE. Watch.**
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Periodic checks:** Check I skip — check-i-2026-05-31.json exists (idempotency guard) ✅ | Check III next 2026-06-07 ✅ | Check VIII/IX next 2026-06-01 (Monday) ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅ No action.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered. All 6 services active, repo clean, inboxes fresh, no clean+green stale PRs.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended at 03:25:26Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=03:25:30Z.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None new. All active findings carry-forward to Monday [yellow] DM 2026-06-01 (5 APPROVAL_REQUESTs).
+
+**Patterns:**
+- **PR #216 pipeline: textbook execution.** Forge build → PR created → Mirror REVIEW_PASS (~5 min) → AUTO_MERGE. rate-limit-resilience V6 advancer fix (active reconciliation tick) now live.
+- **MalformedForgeMarker G-rule: post-dispatch stabilizing.** Both instances since Beacon's APPROVAL_REQUEST self-resolved in same session. Doc-fix pending Larry approval still the correct pending action.
+- **PR #215 approaching Mirror queue.** UNKNOWN mergeable post-#216-merge; Mirror will need to review (no CONFLICTING block for Mirror). Watch next iter for review initiation.
+
+**Learned:**
+- PR mergeable status is dynamic: CONFLICTING → UNKNOWN after a conflicting PR merges. GitHub re-evaluates base-to-head diff. Next iter will confirm MERGEABLE or residual conflict.
+- advancer-active-reconciliation-001 confirmed first production deployment of the active reconciliation tick pattern for V6 silent-miss self-healing.
+
+---
+
 ## Iteration 151 — 2026-05-31 03:17 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — 3 new alerts (all Tier 3 known-pattern: 2× tier2-fallback-skipped, 1× healer auto-restart). Beacon processed iter 150 G-rule dispatch; APPROVAL_REQUEST queue grows to 5. PR #215 aging (no Mirror review yet, <30 min threshold). Forge: 3 fresh tasks in flight. Beacon-bot auto-restarted by healer at 03:05Z (fresh code now live). 6/6 services active. Tier=1, consecutive_clean=0.
