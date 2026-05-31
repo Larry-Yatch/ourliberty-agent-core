@@ -95,6 +95,12 @@ class TestCurrentThresholdLookup(unittest.TestCase):
             '_default': 900,
             'feature-development': 1800,
         },
+        'beacon_overrides_seconds': {
+            '_default': 900,
+        },
+        'pulse_overrides_seconds': {
+            '_default': 900,
+        },
     }
 
     def test_mirror_specific(self):
@@ -143,6 +149,64 @@ class TestCurrentThresholdLookup(unittest.TestCase):
     def test_empty_config_returns_none(self):
         self.assertIsNone(
             p3.current_threshold_for_bucket({}, 'forge', '_default'))
+
+    def test_beacon_default_override_returns_beacon_value(self):
+        config = {
+            'session_duration_seconds_default': 900,
+            'beacon_overrides_seconds': {'_default': 2147},
+        }
+        self.assertEqual(
+            p3.current_threshold_for_bucket(config, 'beacon', '_default'),
+            2147,
+        )
+
+    def test_beacon_task_type_override_returns_that_value(self):
+        config = {
+            'session_duration_seconds_default': 900,
+            'beacon_overrides_seconds': {'feature-development': 1800},
+        }
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                config, 'beacon', 'feature-development'),
+            1800,
+        )
+
+    def test_beacon_fallback_to_default_when_no_override(self):
+        config = {'session_duration_seconds_default': 900}
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                config, 'beacon', 'feature-development'),
+            900,
+        )
+
+    def test_pulse_default_override_returns_pulse_value(self):
+        config = {
+            'session_duration_seconds_default': 900,
+            'pulse_overrides_seconds': {'_default': 262},
+        }
+        self.assertEqual(
+            p3.current_threshold_for_bucket(config, 'pulse', '_default'),
+            262,
+        )
+
+    def test_pulse_task_type_override_returns_that_value(self):
+        config = {
+            'session_duration_seconds_default': 900,
+            'pulse_overrides_seconds': {'feature-development': 1800},
+        }
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                config, 'pulse', 'feature-development'),
+            1800,
+        )
+
+    def test_pulse_fallback_to_default_when_no_override(self):
+        config = {'session_duration_seconds_default': 900}
+        self.assertEqual(
+            p3.current_threshold_for_bucket(
+                config, 'pulse', 'feature-development'),
+            900,
+        )
 
 
 class TestProposeThreshold(unittest.TestCase):

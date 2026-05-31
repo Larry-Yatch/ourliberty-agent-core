@@ -167,9 +167,10 @@ def current_threshold_for_bucket(
 ) -> Optional[int]:
     """Look up the current threshold for an (agent, task_type) pair.
 
-    Schema follows config/system_tab_thresholds.json from PR-C. Mirror
-    and Forge each have task_type-keyed overrides maps; other agents
-    share the global session_duration_seconds_default.
+    Schema follows config/system_tab_thresholds.json from PR-C. Mirror,
+    Forge, Beacon, and Pulse each have task_type-keyed overrides maps;
+    agents not in the override map fall through to
+    session_duration_seconds_default.
     """
     if agent == 'mirror':
         overrides = config.get('mirror_review_overrides_seconds') or {}
@@ -179,6 +180,18 @@ def current_threshold_for_bucket(
             return int(overrides['_default'])
     elif agent == 'forge':
         overrides = config.get('forge_overrides_seconds') or {}
+        if task_type in overrides:
+            return int(overrides[task_type])
+        if '_default' in overrides:
+            return int(overrides['_default'])
+    elif agent == 'beacon':
+        overrides = config.get('beacon_overrides_seconds') or {}
+        if task_type in overrides:
+            return int(overrides[task_type])
+        if '_default' in overrides:
+            return int(overrides['_default'])
+    elif agent == 'pulse':
+        overrides = config.get('pulse_overrides_seconds') or {}
         if task_type in overrides:
             return int(overrides[task_type])
         if '_default' in overrides:
