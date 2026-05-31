@@ -6,18 +6,18 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~04:53Z UTC (Iter 163 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~05:00Z UTC (Iter 164 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~18 min). Check B 5th consecutive clean. Tier=1, consecutive_clean=1. APPROVAL_REQUEST queue: 6 (unchanged from iter 162). Alert watermark: 1078.
+**System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~25 min). Check B 6th consecutive clean. Tier=1, consecutive_clean=2. APPROVAL_REQUEST queue: 6 (unchanged from iter 163). Alert watermark: 1078.
 
 **Watch items updated:**
 - **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** Beacon diagnosed root cause (invocation gap in run_cycle.sh + cycle-prompt.md § 3.0). APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (pulse-escalations.json id=74). Close when Larry approves, Forge PR merges, + alert-triage.json appears in next automated cycle.
-- **Check C calibration: 2nd clean iter using canonical service names.** `ourliberty-*-bot` confirmed correct. Watch threshold=3 for G-rule. 1st good iter (163).
+- **Check C calibration: 2nd clean iter using canonical service names.** `ourliberty-*-bot` confirmed correct. Watch threshold=3 for G-rule. 2nd good iter (163, 164). 1 more clean → dispatch doc-fix to Beacon.
 - **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z. Rate limit reset 11:30am MDT today. Monday DM will include trend assessment. Close when no heal-claude-max-burn-rate alerts in 24h post-reset.
 - **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
 - **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
 - **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Close when Larry installs via SSH.
-- **Check B CLEAN: 5th consecutive (iters 159–163).** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
+- **Check B CLEAN: 6th consecutive (iters 159–164).** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
 - **Healer state file >60m: trust-policy dispatch to Forge still pending.** 21 iters (143–163). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.

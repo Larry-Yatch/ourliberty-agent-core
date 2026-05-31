@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 164 — 2026-05-31 05:00 UTC (interactive)
+
+**Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~25 min). Check B: 6th consecutive clean. Tier=1, consecutive_clean=1→2.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1078 lines** (unchanged from iter 163 watermark). alert-triage.json STILL MISSING (APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry approval). 0 new alerts. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1078. No activity since 04:35:29Z UTC (iter 163's own DM delivery confirmation). ✅
+
+- **(Check 0) alert-triage.json MISSING: carry-forward.** APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry. No new action. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: no WARN/ERROR since 04:00:13Z UTC (MalformedMirrorMarker self-resolved, already counted in post-dispatch counter=4). Last INFO entry: 04:33:45Z UTC (pulse←beacon notify for alert-triage G-rule result). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 04:35:54Z UTC (alert idx=1077, iter 163's own DM). No Larry directives. No orphaned messages. No agent distress. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat 04:35:17Z UTC (~25 min old, within 90-min threshold). forge-no-pr cooldown entries (build-sequence-orchestrator, chain-discipline-gap, chain-discipline-marker-parser) confirmed 3+ days old (created 2026-05-28 11:31 MDT) — old snoozed alerts, not active stalls. No new stall conditions. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 6 (unchanged).** No new items this iter.
+  - `alert-triage-persistence-invocation-001` — wire alert_triage_state.py into Check 0 (pending Larry approval).
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending Larry.
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry (iter 43).
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 04:35:17Z UTC, within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree. HEAD=ec32084 "Pulse cycle 20260531T045523Z" (automated cycle 04:55Z — ran clean, committed cycle-actions.jsonl, no journal entry written). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T04:04:39Z UTC (~56 min old, within 2h threshold). 6th consecutive clean Check B. sync-push-rebase-fallback-001 still pending Larry as defensive hardening. ✅
+
+- **(Check C) Agent liveness: 7/7 active. ✅** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — all empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard fires. Next: week 2026-06-01. ✅ | Check III: next 2026-06-07. ✅ | Check VIII/IX: Monday UTC 2026-06-01. ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **G-rule watch items (no new occurrences this iter):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending Larry), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + day-gated check skips.
+2. Confirmed forge-no-pr cooldown entries are 3+ days old — not active stalls, known snoozed patterns.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2.
+4. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. APPROVAL_REQUEST queue unchanged at 6. Monday [yellow] DM still 2026-06-01.
+
+**Patterns:**
+- **Check B: 6th consecutive clean.** sync-push-rebase-fallback-001 remains pending as defensive hardening only.
+- **Check C calibration: 2nd clean iter using canonical service names.** 7/7 active. (1 more clean → G-rule watch threshold=3 met; will dispatch doc-fix to Beacon.)
+
+**Learned:** Automated cycle at ec32084 (04:55Z) ran without writing a journal entry. Wrapper committed some operational file(s) (likely cycle-actions.jsonl from iter 163). No cycle conflict with this interactive session.
+
+---
+
 ## Iteration 163 — 2026-05-31 04:53 UTC (interactive)
 
 **Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~18 min). Check B: 5th consecutive clean. Tier=1, consecutive_clean=0→1.
