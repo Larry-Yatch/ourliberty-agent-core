@@ -28,17 +28,6 @@
     "default_action": "force_ask",
     "rules": [
         {
-            "source": "beacon",
-            "target": "forge",
-            "task_type": "feature-development",
-            "repos": [
-                "ourliberty-agent-core"
-            ],
-            "file_patterns": [],
-            "action": "auto_approve",
-            "_note": "TEMPORARY 2026-05-30: narrow carve-out for build sequence rate-limit-resilience-001 unattended overnight run. Auto-approves beacon->forge feature-development dispatches in ourliberty-agent-core so the orchestrator advances without per-step approval while Larry sleeps. Mirror still reviews every PR; chain auto-pauses + DMs on failure. REVERT this rule after the sequence reaches status=complete."
-        },
-        {
             "source": "pulse-auto-dispatch",
             "target": "*",
             "action": "force_ask",
