@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration 198 — 2026-05-31 15:26 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1083 lines** (unchanged from iter 197). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1083 (unchanged since iter 193). Beacon-bot log confirmed: last delivered idx=1082 at 08:01:48 MDT (14:01:48Z UTC), review-pass notification for PR #220 (threshold-update). No new Larry directives. No new alerts. alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon bot log — last activity idx=1082 at 08:01:48 MDT (14:01:48Z UTC), unchanged from iters 193–197. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged from iter 197: `heal-pipeline-stall:pipeline-stall:tier2-fallback-skipped-auth_401:forge`, `tier2-fallback-skipped-rate_limit:beacon-bot`, `tier2-fallback-skipped-rate_limit:forge`, `tier2-fallback-unavailable-auth_401:beacon-bot`, `rotate-active-tier:rotation_auth_gate_blocked:tier2`. All dated May 31 07:48–07:59 MDT (13:48–13:59Z UTC). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+  - *New observation:* `heal-systemd-install-drift:install-drift:ourliberty-heal-tier2-weekly-health-probe.service/.timer` cooldown files dated May 28 22:00 MDT. Service ran today at 06:00 MDT (12:00 UTC) — inactive/dead post-run is correct for a oneshot. Timer is `enabled` and active (next: 2026-06-07 06:00 MDT). Healer flagging `disabled; preset: enabled` on the service unit is a **likely false-positive** — for timer-driven oneshot services, only the timer needs to be enabled. Service ran successfully. Not incrementing systemd-install-drift G-rule. Noting as potential healer-calibration candidate.
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items: `pulse-grule-check-c-canonical-names-001`, `alert-triage-persistence-invocation-001`, `forge-claude-md-preflight-self-check-bullet-001`, **Tier 2 OAuth restore (ELEVATED)**, **`sync-push-rebase-fallback-001` (ELEVATED)**, `pulse_telegram_bot.sh launcher`, `stuck-cycle timeout guard`. Carry-forward (iter 158): Install heal-resume-paused-on-tier1.service + .timer. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T15:07:20.919274Z UTC** — ~19 min old at check time (~15:26Z). Healer cadence 30 min; next update expected ~15:37Z UTC. Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=c82dc08 "Pulse cycle 20260531T152246Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: `{"last_sync": "2026-05-31T15:07:43Z", "status": "no-change", "commit": "be7ddde"}`. Last sync ~19 min old; well within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** forge, beacon, mirror, pulse — 0 active tasks. ourliberty-agent-core: 0 PRs. ourliberty-dashboard: 0 PRs. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Sunday → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. No auto-fix needed this iter.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=15:26:49Z UTC.
+4. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=1, iter=198, intervention_id=iter198-carry-forward-stalls`.
+5. Wrote journal entry.
+
+**Escalated:** None. All active issues are carry-forward from iters 186–197. Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope unchanged: Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first firing + APPROVAL_REQUEST queue 7.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new findings this iter. All active signals identical to iter 197.
+- **`ourliberty-heal-tier2-weekly-health-probe`** ran today at 06:00 MDT (12:00 UTC). Service is inactive/dead post-run (correct). Timer fires next 2026-06-07. The probe is specifically designed to DM on Tier 2 OAuth failure — its 12:00 UTC run should have appended a DM to larry-alerts.jsonl, but the alert watermark is unchanged at 1083 (same since iter 193 at 14:51Z). This means the probe ran BEFORE the 13:59Z entries that pushed the watermark to 1083, so its output is already captured. Consistent with probe timing (12:00Z < 13:59Z).
+- **Tier 2 OAuth stalls persist.** Day 2+ since May 30 first observation. Monday DM is the next action gate.
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+- **Healer heartbeat:** 15:07:20Z, ~19 min old at check time. Within 90-min threshold. Next update expected ~15:37Z UTC.
+
+**Learned:** The `ourliberty-heal-tier2-weekly-health-probe` service ran at 12:00 UTC today and its alert output is captured in the existing 1083-line watermark. The heal-systemd-install-drift healer may have a false-positive on timer-driven oneshot services (`disabled; preset: enabled` is correct for service units paired with an enabled timer). Worth watching for another occurrence before proposing a healer fix.
+
+---
+
 ## Iteration 197 — 2026-05-31 15:20 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty.
