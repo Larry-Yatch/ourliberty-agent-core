@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~14:51Z UTC (Iter 193 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~14:57Z UTC (Iter 194 — interactive, full cycle)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync push error carry-forward (no new sync errors). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: 1083 (unchanged). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
@@ -16,8 +16,8 @@
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. No longer theoretical. Approve the defensive hardening fix.
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync error confirmation + Check VIII/IX first-firing note.
-- **~~Healer heartbeat static~~** — RESOLVED iter 192. Healer wrote fresh heartbeat at 14:37:20Z (between iters 191 and 192). No structural concern.
-- **Sync approaching 2h threshold.** Last successful sync ~13:05:57Z UTC (~105 min elapsed at iter 193 check). ~15 min until stale-sync auto-fix triggers (~15:06Z UTC). Note: given sync-push-rebase-fallback-001, auto-fix will likely fail again.
+- **Healer heartbeat static.** 14:37:20Z UTC across iters 193 + 194 (2 consecutive). 19 min old at iter 194 check; within 90-min threshold. Escalation trigger: if still static AND >60 min old at next check (~15:37Z UTC).
+- **Sync near 2h threshold.** Last successful sync ~13:05:57Z UTC (~111 min at iter 194 check). ~9 min until trigger (~15:06Z UTC). Note: given sync-push-rebase-fallback-001, auto-fix will likely fail again.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
 
 ---
