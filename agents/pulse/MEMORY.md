@@ -6,13 +6,13 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~23:15Z UTC (Iter 259 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~23:42Z UTC (Iter 263 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **NEW: ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 23:06:01Z UTC (~9 min old). Healer heartbeat 23:07:46Z UTC (NEW tick; ~7 min old). 7/7 services report active (timer unit stuck). 0 open PRs. All inboxes empty. Alert watermark: **1087** (+1 stuck-timer alert, outbox-notifier delivered). APPROVAL_REQUEST queue: 8 (unchanged). Monday [yellow] DM pre-fired (stuck timer blocks Monday automated cycle).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 23:06:01Z UTC (~36 min old at iter 263). Healer heartbeat 23:38:19Z UTC (new tick, +30 min from prior 23:07:46Z; healthy cadence). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1088** (unchanged since iter 262). APPROVAL_REQUEST queue: 8 (unchanged). Monday [yellow] DM pre-fired at iter 259. ~18 min until June 1 00:00Z UTC at iter 263 check time.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer).
-- **CYCLE.TIMER STUCK (NEW — iter 259).** NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity. Automated cycles stopped. Recovery (Larry must run): `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`. G-rule **2/3** (iter 158 first obs, iter 259 second obs). heal-systemd-install-drift alerted at 23:06:16Z; outbox-notifier delivered at 23:06:31Z. Monday [yellow] DM pre-fired (scope below).
+- **CYCLE.TIMER STUCK (iter 259 first detection this occurrence).** NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity. Automated cycles stopped. Recovery (Larry must run): `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`. G-rule **2/3** (iter 158 first obs, iter 259 second obs). heal-systemd-install-drift alerted at 23:06:16Z; outbox-notifier delivered at 23:06:31Z. Monday [yellow] DM pre-fired (scope below).
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
 - **Check VIII/IX FIRST FIRING BLOCKED** — cycle.timer stuck. Will fire on first clean automated cycle after timer recovery (2026-06-01 UTC).
