@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~20:22Z UTC (Iter 236 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~20:31Z UTC (Iter 237 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 20:06:01Z UTC (~16 min old). Healer heartbeat 20:07:38Z UTC (~14 min). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). Twenty-sixth consecutive nominal observation iter today (iters 211–236); no new findings.
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 20:06:01Z UTC (~25 min old). Healer heartbeat 20:07:38Z UTC (~24 min). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). Twenty-seventh consecutive nominal observation iter today (iters 211–237); no new findings.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
