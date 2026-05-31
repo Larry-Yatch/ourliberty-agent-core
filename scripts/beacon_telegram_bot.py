@@ -74,6 +74,24 @@ if not ALLOWED:
 
 BEACON_DIR = Path.home() / "agent-core" / "agents" / "beacon"
 
+# Beacon chat model. Single source of truth is config/agent-models.json
+# (beacon.telegram_model) — the same file inbox_watcher reads via a
+# __file__-relative path. The pinned fallback keeps the 1M context window
+# Beacon chat depends on for long spec sessions.
+_MODELS_CONFIG_PATH = _SCRIPT_DIR.parent / "config" / "agent-models.json"
+_DEFAULT_TELEGRAM_MODEL = "claude-opus-4-8[1m]"
+
+
+def _beacon_telegram_model() -> str:
+    try:
+        cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+        m = cfg.get("agents", {}).get("beacon", {}).get("telegram_model")
+        if m:
+            return m
+    except Exception:
+        pass
+    return _DEFAULT_TELEGRAM_MODEL
+
 
 def resolve_log_dir() -> Path:
     """Return the directory this module writes its log file to.
@@ -390,7 +408,7 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
     after the 2026-05-26/27 incident — the cross-account session failure
     mode is real and identical to the agent_runner.py case.
     """
-    cmd = [CLAUDE_BIN, "--print", "--output-format", "json"]
+    cmd = [CLAUDE_BIN, "--print", "--output-format", "json", "--model", _beacon_telegram_model()]
     if session_id:
         cmd += ["--resume", session_id]
     cmd += [prompt]

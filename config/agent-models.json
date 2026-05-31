@@ -10,7 +10,7 @@
     "beacon": {
       "name": "Beacon",
       "role": "Strategy / Architect",
-      "telegram_model": "claude-opus-4-8",
+      "telegram_model": "claude-opus-4-8[1m]",
       "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "note": "Opus everywhere — spec authoring is judgment-heavy and the spec is the contract. Don't economize. PILOT 2026-05-30: first agent on claude-opus-4-8 (see _history). fallback stays sonnet for graceful degradation."
@@ -169,6 +169,11 @@
     {
       "date": "2026-05-30",
       "change": "Opus 4.8 pilot: beacon.telegram_model + beacon.inbox_model bumped claude-opus-4-7 -> claude-opus-4-8. Beacon chosen as the single pilot agent — Larry-facing (quality observed directly), already Opus-everywhere (clean 4.7->4.8 bump, no Sonnet->Opus jump), and off the auto-merge chain (spec authoring is Larry-reviewed, a regression can't silently ship code). fallback_model left at claude-sonnet-4-6. Forge/Mirror/Pulse unchanged pending pilot observation. claude-opus-4-8 confirmed live on the droplet OAuth Max account 2026-05-30 (served a probe via modelUsage). Revert = flip both keys back to claude-opus-4-7; config is read live per call, no daemon restart needed either way.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-05-30",
+      "change": "Pilot step 2: beacon.telegram_model refined claude-opus-4-8 -> claude-opus-4-8[1m] to preserve the 1M-context window Beacon chat ran on before (the CLI default was claude-opus-4-7[1m]); plain claude-opus-4-8 is 200k. inbox_model stays plain claude-opus-4-8 (200k, matching its prior tier). Also wired scripts/beacon_telegram_bot.py: the bespoke bot previously passed no --model and silently used the CLI default, so telegram_model was a dead field. call_beacon now reads telegram_model from this file (config/agent-models.json, __file__-relative, same source inbox_watcher uses) and passes --model. Requires a beacon-bot restart to take effect.",
       "author": "Claude (via Larry's session)"
     }
   ]
