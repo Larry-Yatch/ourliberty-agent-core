@@ -4,96 +4,191 @@
 
 ---
 
-## Iteration 150 — 2026-05-31 02:52 UTC (interactive)
+## Iteration 151 — 2026-05-31 03:17 UTC (interactive)
 
-**Health:** ✅ Nominal-with-watch — active pipeline progress since iter 149. 3 new deploy-notifier alerts (Tier 3 silenced), dashboard PR #29 opened with Mirror review in-flight, 3 tasks across Forge + Mirror inboxes (all fresh). Carry-forwards: Check 4 (4 APPROVAL_REQUESTs pending Monday DM), Check 5 (heartbeat fresh, substrate fix pending trust-policy). 0 open agent-core PRs (15th consecutive). 6/6 services active. Tier=1, consecutive_clean=0.
+**Health:** ✅ Nominal-with-watch — 3 new alerts (all Tier 3 known-pattern: 2× tier2-fallback-skipped, 1× healer auto-restart). Beacon processed iter 150 G-rule dispatch; APPROVAL_REQUEST queue grows to 5. PR #215 aging (no Mirror review yet, <30 min threshold). Forge: 3 fresh tasks in flight. Beacon-bot auto-restarted by healer at 03:05Z (fresh code now live). 6/6 services active. Tier=1, consecutive_clean=0.
 
-**Triage:** Check 0 — larry-alerts.jsonl: **1060 lines** (+3 vs iter 149 watermark of 1057). 3 new alerts, all deploy-notifier:READY.
+**Triage:** Check 0 — larry-alerts.jsonl: **1066 lines** (+3 vs iter 150 watermark of 1063). 3 new alerts.
 
 **Found:**
 
-- **(Check 0) Alert triage: ✅ 3 new alerts — all Tier 3 (deploy-notifier:READY, known-pattern).**
-  - Line 1058 (02:41:24Z): `deploy-notifier:READY:dpl_4EAU4eF8xn9aBoEPLUz1riiKUznb` — Vercel preview, branch forge/pm-dashboard-past-due-flag, PR unknown.
-  - Line 1059 (02:47:52Z): `deploy-notifier:READY:dpl_AdJJfUvyETHnrAHGFVKcJe7pXyYD` — Vercel preview, branch forge/pm-dashboard-past-due-flag, PR #29.
-  - Line 1060 (02:49:59Z): `deploy-notifier:READY:dpl_7qHmT2GP84Lob861YPmKjrzsTNFg` — Vercel preview, branch mirror/pm-dashboard-past-due-flag (Mirror review worktree).
-  - Classification: Tier 3 (known-pattern — deploy-notifier:READY events are expected pipeline activity; Vercel deploys on every branch push). No DM, no dispatch. Journal-only. ✅
+- **(Check 0) Alert triage: 3 new alerts — all Tier 3 known-pattern.**
+  - Line 1064: `heal-pipeline-stall` 03:02Z — forge `tier2-fallback-skipped-rate_limit`. Same root cause as iters 102/119/149 (Tier 2 OAuth expired). Tier 3 known-pattern. Larry already DM'd; Monday queue.
+  - Line 1065: `heal-pipeline-stall` 03:02Z — beacon-bot `tier2-fallback-skipped-rate_limit`. Same pattern. Tier 3.
+  - Line 1066: `heal-stale-daemon-code` 03:05Z — `auto-restarted ourliberty-beacon-bot.service` (script mtime 204.8 min newer than active-since; new code now live). Per WARN-vs-INFO calibration: successful enforcement event — healer worked as designed. Tier 3. INFO-level.
+  - New watermark: **1066**. ✅
 
-- **(Check 1) Log noise: ✅ Nominal.**
-  - outbox-notifier.log last entry: 20:41:27 MDT (02:41:27Z) — headless-approval-request dispatched step-b-resume. No new WARN/ERROR since iter 149.
-  - 2 WARNs from prev session (MalformedForgeMarker x2 at 20:37 and 20:40 MDT) carry-forward from iter 149 — both self-resolved within that session. No new WARN/ERROR this iter. ✅
+- **(Check 1) Log noise: ✅ Nominal with 2 retries in tolerance.**
+  - 21:04:18 MDT: MalformedForgeMarker on `step-b-resume` retry 1/3 → resolved 21:09:33 MDT (proceed marker classified, build-phase dispatched). Self-resolved. ✅
+  - 21:08:13 MDT: MalformedForgeMarker on `register-claude-setup-tokens-rotation` retry 1/3 → marker-error in forge inbox (pending Forge session). Retry within tolerance; not above threshold.
+  - 21:13:24 MDT: Beacon processed iter 150 G-rule dispatch → notified Pulse. Pulse inbox notification archived (beacon-bot processed and archived by 21:15 MDT). ✅
+  - G-rule counter reset after iter 150 dispatch. New count since dispatch: 2 (step-b-resume resolved, register-claude-setup-tokens-rotation pending). Not at new threshold (3). ✅
 
-- **(Check 2) Telegram sweep: ✅ Active pipeline activity resolved by Beacon — no orphaned directives.**
-  - 20:37:08 MDT — Larry: "Yes apply it now" → Beacon confirmed step-a-rotation already merged (PR #211, iter 135).
-  - 20:39:10 MDT — Larry: "If this has shown up twice, this stoppage has shown up twice. Do we need to put something in place to fix it?" → Beacon confirmed pattern, proposed permanent fix (advancer-active-reconciliation-001: three-signal PR identity match for sequence advancer reconciliation).
-  - 20:42:01 MDT — Larry: "I approve you sending the marker" → Beacon sent marker.
-  - 20:44:09 MDT — `advancer-active-reconciliation-001` dispatched to Forge inbox (Larry-approved). APPROVAL_REQUEST queue: still 4 (this was a new APPROVAL_REQUEST processed and resolved in the same session; not a carry-forward).
-  - 20:44:09 MDT → 20:47:28 MDT — Forge built pm-dashboard-past-due-flag, PR #29 opened on dashboard, Mirror review task dispatched.
-  - No pending Larry directives. ✅
+- **(Check 2) Telegram sweep: ✅ No new Larry messages.** Last inbound: 20:34:46 MDT (iter 149 carry-forward). Beacon-bot restarted at 21:05 MDT with fresh code. No orphaned directives. ✅
 
-- **(Check 3) Pipeline stall: ✅ Nominal.**
-  - alert-cooldown/warning/: 299 files (297→298→299 with 2 new deploy-notifier files; all expected).
-  - Healer heartbeat: 2026-05-30 20:35:16 MDT (02:35:16Z UTC) — ~17 min old at check time. Within 90-min threshold. ✅
-  - heal-stale-daemon-code-cooldowns.json mtime: 2026-05-30 18:05:15 MDT (00:05:15Z) — same as iter 149. No new restart events.
-  - No active pipeline stall signals. ✅
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T03:05:16Z UTC (fresh at check time, ~12 min old). 305 alert-cooldown files (stable). Forge actively processing 3 tasks. No stall signals. ✅
 
-- **(Check 4) Pending Larry directives: 4 items. ⚠️ (carry-forward — no change)**
-  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: **2026-06-01**.
-  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
-  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
-  - **Tier 2 OAuth restore** (iter 149) — root cause confirmed, runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Monday [yellow] DM: **2026-06-01**.
+- **(Check 4) Pending Larry directives: ⚠️ APPROVAL_REQUEST queue now 5 (was 4 — +1 from Beacon G-rule response).**
+  - **NEW: `forge-claude-md-preflight-self-check-bullet-001`** — doc-only Forge CLAUDE.md PR (preflight discipline drift; Beacon G-rule response). Monday DM.
+  - **Tier 2 OAuth restore** (iter 149) — pending runbook.
+  - **sync-push-rebase-fallback-001** (iter 118) — pending.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending.
+  - **stuck-cycle timeout guard** (iter 43) — pending.
+  - Monday [yellow] DM: **2026-06-01** (5 items). ⚠️
 
-- **(Check 5) Stale daemon: ⚠️ in-progress — same state as iter 149.**
-  - heal-stale-daemon-code-cooldowns.json: 00:05:15Z (~2h47m old). Under current spec (>60 min → ask-then-do) still triggers.
-  - Heartbeat: 02:35:16Z UTC (17 min old) — healer confirmed healthy. No new action. APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` pending trust-policy → Forge dispatch. ⚠️→in-progress
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 03:05:16Z UTC (within 90-min threshold). Beacon-bot auto-restarted by heal-stale-daemon-code at same timestamp — healer acted, no Pulse escalation needed. Substrate fix (fix-check5-heartbeat-substrate-001) still pending Forge. ⚠️→in-progress
 
-- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean, HEAD=0e46851 "Pulse cycle 20260531T024559Z". ✅
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. (Potentially 1 commit ahead of origin due to sync push failure carry-forward — see Check B.) ✅
 
-- **(Check B) Sync health: ✅ 15th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T02:04:38Z (~47 min ago, within 2h threshold). sync-push-rebase-fallback-001 pending. ✅
+- **(Check B) Sync health: ⚠️ Push failure at 03:14:31Z.** status=error "Auto-commit push failed; rolled back" — known race condition (sync-push-rebase-fallback-001 pending Larry). Carry-forward. ⚠️
 
-- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. Beacon-bot fresh restart at 03:05Z. ✅
 
-- **(Check D) Inboxes: 3 fresh tasks across Forge + Mirror. ✅**
-  - beacon: `notify-pm-dashboard-past-due-flag.json` (build ack, routing notification) ✅
-  - forge: `step-b-resume.json` (02:41:27Z, ~11 min old) + `advancer-active-reconciliation-001.json` (02:44:09Z, ~8 min old). Both fresh. ✅
-  - mirror: `review-pm-dashboard-past-due-flag.json` (02:47:28Z, ~5 min old). Fresh. ✅
-  - pulse: empty ✅
-  - No stale tasks (stale threshold = 1 hour). ✅
+- **(Check D) Inboxes: Forge 3 tasks (all fresh). ✅**
+  - forge: `build-advancer-active-reconciliation-001.json` (21:06 MDT), `build-step-b-resume.json` (21:09 MDT), `marker-error-register-claude-setup-tokens-rotation-1.json` (21:08 MDT). All <15 min. ✅
+  - beacon/mirror/pulse: empty. ✅ (Pulse notification archived — Beacon G-rule result processed.)
 
-- **(Check E) PRs: ✅ agent-core PR-clear (15th). dashboard PR #29 in-flight (Mirror review dispatched).**
-  - ourliberty-agent-core: 0 open PRs. ✅
-  - ourliberty-dashboard: PR #29 "feat(dashboard): past-due flag on project rows" — MERGEABLE, reviewDecision="" — Mirror review dispatched 02:47:28Z (~5 min ago). Not stale (30-min threshold). Mirror review in-flight. ✅
+- **(Check E) PRs: ⚠️ PR #215 open (awaiting Mirror review).**
+  - ourliberty-agent-core: PR #215 "Remove yes from Beacon approval whitelist" — UNKNOWN mergeable, reviewDecision="", autoMergeRequest=null. Created 02:54:30Z (~23 min old at check time). Still <30 min threshold. Watch. ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
 
-- **(Check I):** Fired iter 126 (Sunday 2026-05-31 UTC). Idempotency guard active. Next: 2026-06-07. ✅
-- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
-- **Check VIII/IX:** Monday-only. Today UTC = Sunday 2026-05-31. Next: 2026-06-01 UTC. ✅
-- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~22 days). ✅
+- **Periodic checks:** Check I next 2026-06-07 ✅ | Check III next 2026-06-07 ✅ | Check VIII/IX next 2026-06-01 (Monday) ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window 2026-06-23 (~23 days). ✅
 
 **Did:**
 1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
-2. No always-fix conditions triggered (repo clean, services active, no stale tasks, no stale PRs).
-3. No new dispatches — advancer-active-reconciliation-001 was dispatched by Beacon-bot (not Pulse); all other threads carry forward.
-4. `cycle_prime_ledger.py append_action --tier 1 --kind intervention --payload '{"intervention_id": "iter-150-nominal-pipeline-progressing"}'` → row appended.
-5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (Check 4 + Check 5 still non-clean).
-6. Wrote journal entry. MEMORY.md status snapshot updated.
+2. No always-fix conditions triggered (repo clean, services 6/6, no stale tasks, PR #215 still within 30-min window).
+3. Read Beacon G-rule response from journal notification entry: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` produced. Added to Monday DM queue.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-151-check-b-sync-push-failure-carry-forward"}'` → row appended at 2026-05-31T03:17:33Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+6. Wrote journal entry. MEMORY.md status snapshot update below.
 
-**Escalated:** None. All new activity was Larry-authorized through Beacon-bot. Deploy-notifier alerts are Tier 3 (known-pattern silenced). Monday [yellow] DM 2026-06-01 carries all 4 APPROVAL_REQUESTs.
+**Escalated:** None new. All active findings carry-forward to Monday [yellow] DM 2026-06-01 (5 APPROVAL_REQUESTs).
 
 **Patterns:**
-- **advancer-active-reconciliation-001 dispatched (permanent fix in motion).** Larry recognized the sequence-advancer PR reconciliation failure as a recurring pattern (2 incidents) and authorized Beacon to dispatch to Forge. Teach-to-fish discipline working. ✅
-- **pm-dashboard-past-due-flag pipeline active.** Build complete → PR #29 open → Mirror review in-flight → Vercel preview live (3 deploys: forge worktree x2, mirror worktree x1). Normal throughput.
-- **APPROVAL_REQUEST queue: 4 items unchanged.** Monday [yellow] DM: 2026-06-01.
-- **Sync push error: 15th consecutive clean cycle.** Root cause fix pending Larry. Active risk low.
-- **15th consecutive agent-core PR-clear iter.** Both agent-core and dashboard moving forward.
-- **Check 5 permanent fix in motion:** heartbeat fresh (17 min old). Trust-policy → Forge still pending. Verification: 2026-06-07.
+- **Beacon G-rule response (iter 150 dispatch):** Beacon correctly rejected PR B as root cause; identified preflight discipline drift. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` produced. G-rule posture: keep open through doc-PR + PR B merge; if "none found" ≥3× post-merge, escalate as instruction-drift needing runtime fix.
+- **heal-stale-daemon-code correctly auto-restarted beacon-bot.** 204.8-min code gap detected and remediated without Pulse involvement. Healer working as designed.
+- **tier2-fallback-skipped-rate_limit: 2 more occurrences (03:02Z).** Same root cause (expired Tier 2 OAuth). Monday DM carry-forward.
+- **MalformedForgeMarker post-G-rule: 2 events (step-b-resume resolved, register-claude-setup-tokens-rotation pending).** Both retry 1/3, within tolerance. New G-rule counter: 2/3.
+- **APPROVAL_REQUEST queue: 5 items.** Monday [yellow] DM 2026-06-01.
+- **PR #215 pipeline: normal lag.** No Mirror review yet; expected (Mirror picks up asynchronously).
+- **Sync push error: carry-forward.** sync-push-rebase-fallback-001 pending Larry.
+
+**Learned:**
+- Beacon's G-rule analysis is high-quality: distinguished "none found" (discipline drift) from "JSON-parse error" (truncation). The proposed fix (one pre-emit self-check bullet in CLAUDE.md) is minimal and well-scoped. Good dispatch → good response.
+- heal-stale-daemon-code auto-restart works correctly for beacon-bot too, not just other services. First time I've observed it trigger on beacon-bot specifically.
+
+---
+
+## Notification — 2026-05-31 ~03:12Z UTC (result from Beacon)
+
+**Source:** Beacon inter-agent result — task `malformed-forge-marker-preflight-g-rule-20260531T030158Z` (iter 150 G-rule dispatch). STATUS=SUCCESS.
+
+**Beacon's disposition:**
+- Hypothesis (a) — PR B (step-b-resume, BUILD-phase rate-limit-resilience) **rejected** as the systemic fix. Dominant "none found" shape is preflight discipline drift, not truncation. Truncation produces JSON-parse errors (minority shape); "none found" is Forge completing analysis and forgetting to close with the marker block.
+- Hypothesis (b) — doc PR **accepted**. Beacon dispatched APPROVAL_REQUEST for a doc-only Forge CLAUDE.md change: add one pre-emit self-check bullet to the Preflight discipline section with an Enforcement: line pointing at the existing L113 strict-mode gate.
+- Hypothesis (c) — allowlist/acceptance **rejected**. 173 lifetime marker errors at ~$0.50–1.50 each is real tax.
+- G-rule posture: **keep open** through both the doc-PR merge AND PR B merge. If post-both-merges the "none found" shape recurs ≥3× in a 1-hour window, escalate as instruction-drift needing a runtime fix (e.g., notifier injects a "did you emit the marker?" checkpoint turn).
+
+**APPROVAL_REQUEST produced:**
+- `task_id: forge-claude-md-preflight-self-check-bullet-001`
+- doc-only PR to `agents/forge/CLAUDE.md` — one bullet, pre-emit self-check framing, Enforcement: line
+- Added to APPROVAL_REQUEST queue (now 5 items). Monday [yellow] DM: 2026-06-01.
+
+**Action taken:** Journaled. MEMORY.md status snapshot updated with new APPROVAL_REQUEST and revised G-rule posture. No always-fix triggered (awaiting Larry authorization on the APPROVAL_REQUEST; Forge preflight is the next step in that chain).
+
+---
+
+## Iteration 150 — 2026-05-31 03:01 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — PR #29 merged (pm-dashboard-past-due-flag ✅), PR #214 merged (reenable-rotation ✅), PR #215 opened (remove-yes-approval-token, awaiting Mirror review). Sync push failure recurred (1st after 14-clean streak). G-rule met: MalformedForgeMarker 3/3. Automated iter 150 at 02:52Z ran but was blocked at auto-commit (repo on branch chore/remove-yes-approval-token); wrapper auto-restored main at 03:00:03Z. 6/6 services active. Forge inbox: 3 fresh tasks. Tier=1, consecutive_clean=0.
+
+**Note:** Automated cycle at 02:52:52Z was blocked (repo on non-main branch); `run_cycle.sh` auto-restored main at 03:00:03Z and logged to cycle-actions.jsonl. Prime ledger shows "iter-150-nominal-pipeline-progressing" from that partial run. This entry covers the full interactive cycle.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1063 lines** (+6 vs iter 149 watermark of 1057). 6 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 6 new alerts.**
+  - Lines 1058–1061: `deploy-notifier` × 4 — Vercel preview builds for `forge/pm-dashboard-past-due-flag` (02:41Z), PR #29 preview (02:47Z), `mirror/pm-dashboard-past-due-flag` (02:49Z), `main` after merge (02:52Z). Routine deploy pipeline completing for pm-dashboard-past-due-flag. Tier 3 — journal only, no action.
+  - Line 1062: `pulse-cycle` 02:52:52Z — "Pulse cycle on branch chore/remove-yes-approval-token with uncommitted changes; refusing to auto-commit cycle journal." Automated cycle correctly blocked. **Wrapper auto-restored main at 03:00:03Z** (cycle-actions.jsonl entry: `auto-restored-main-from-chore/remove-yes-approval-token`). Self-corrected operational anomaly. No escalation.
+  - Line 1063: `rotate-active-tier` 02:58:23Z — Tier 2 OAuth blocked (carry-forward from iter 149). Tier 3 — journal only.
+  - New watermark: 1063. ✅
+
+- **(Check 1) Log noise: ✅ Nominal with 1 active retry.**
+  - outbox-notifier.log last entries: `[20:49:58 MDT] AUTO_MERGE task=pm-dashboard-past-due-flag pr=…/pull/29 outcome=merged (--squash --delete-branch)` → PR #29 MERGED. Then `[21:04:18 MDT] MalformedForgeMarker on step-b-resume retry 1/3` (preflight, no marker block found). Retry issued; Forge is actively processing. Routine retry-within-tolerance per WARN-vs-INFO calibration. ✅
+
+- **(Check 2) Telegram sweep: ✅ No unhandled directives.**
+  - beacon_telegram_bot.log shows Tier 2 fallback activity (rate_limit, auth_401) from Forge bot processing current inbox tasks at ~03:02–03:03Z UTC. All consistent with known Tier 2 OAuth expired issue. No new Larry messages since 20:34:46 MDT (iter 149 carry-forward). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.**
+  - Healer heartbeat: 2026-05-31T02:35:16Z UTC (26 min old — within 90-min threshold). ✅
+  - alert-cooldown/warning/: 302 files (+5 vs iter 149's 297). No new threshold-breach signals. ✅
+  - Forge actively processing: bot log entries at 03:02–03:03Z UTC confirm active session. ✅
+
+- **(Check 4) Pending Larry directives: 4 carry-forward. ⚠️**
+  - **Tier 2 OAuth restore** (iter 149) — pending. Add to Monday [yellow] DM.
+  - **sync-push-rebase-fallback-001** (iter 118) — pending.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending.
+  - **stuck-cycle timeout guard** (iter 43) — pending.
+  - Monday [yellow] DM: **2026-06-01**. ⚠️
+
+- **(Check 5) Stale daemon: ⚠️ in-progress — substrate fix still pending.**
+  - Heartbeat: 02:35:16Z UTC (26 min old) — within 90-min threshold. ✅ healer confirmed healthy.
+  - heal-stale-daemon-code-cooldowns.json mtime: 2026-05-31T00:05:15Z UTC (~3h old). Current code threshold (>60 min) still triggers; heartbeat substrate fix (fix-check5-heartbeat-substrate-001) pending trust-policy → Forge dispatch. No new action. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal (wrapper auto-restored).**
+  - Branch: main ✅ (restored from chore/remove-yes-approval-token at 03:00:03Z by run_cycle.sh).
+  - Working tree: M runbooks/cycle-actions.jsonl — wrapper's auto-restore event (expected Pulse operational dirt; wrapper will commit post-cycle). ✅
+
+- **(Check B) Sync health: ⚠️ Push failure recurred (1st after 14-clean streak).**
+  - sync.json at 02:59:49Z: status=error "Auto-commit push failed; rolled back" — same root cause (sync_agent_core.sh:161 bare push). 14-clean streak broken; this is occurrence #N+1 of the known race.
+  - sync.json at 03:02:13Z: status=error "Uncommitted changes in working tree" — caused by M cycle-actions.jsonl during this interactive cycle. Expected; self-resolves after wrapper commits.
+  - APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Monday DM. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: Forge 3 tasks (all fresh). ✅**
+  - forge: `advancer-active-reconciliation-001.json` (May 30 20:44 MDT, ~18 min), `register-claude-setup-tokens-rotation.json` (May 30 20:52 MDT, ~9 min), `step-b-resume.json` (May 30 20:41 MDT, ~20 min). All <30 min. ✅
+  - beacon/mirror/pulse: empty ✅
+
+- **(Check E) PRs: ⚠️ PR #215 open (new, not yet reviewed).**
+  - ourliberty-agent-core: PR #215 "Remove yes from Beacon approval whitelist" — MERGEABLE, reviewDecision="", autoMergeRequest=null. Created 02:54:30Z (7 min old at cycle start). <30 min, no always-fix. Mirror should pick it up. Monitoring. ⚠️ (watch)
+  - ourliberty-dashboard: 0 open PRs (PR #29 merged 02:50:02Z). ✅
+
+- **(Check I):** Fired iter 126 (2026-05-31 UTC). Idempotency guard active. Next: 2026-06-07. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-01 UTC. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean-enough, services 6/6, no stale tasks or PRs).
+3. **G-rule dispatch (MalformedForgeMarker 3/3):** Wrote `malformed-forge-marker-preflight-g-rule-20260531T030158Z.json` to Beacon inbox. Proposed: investigate whether rate-limit-resilience PR B is the systemic fix, or whether Forge CLAUDE.md preflight section needs strengthening.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-150-check-b-sync-push-failure-recurred-post-14-clean"}'` and `--kind systemic_fix --payload '{"intervention_id": "iter-150-g-rule-malformed-forge-marker-dispatched-to-beacon"}'` → rows appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None new. G-rule dispatch to Beacon inbox (non-DM; Beacon will process and respond). Monday [yellow] DM 2026-06-01: 4 APPROVAL_REQUESTs (Tier 2 OAuth restore + 3 carry-forward).
+
+**Patterns:**
+- **PR #29 (pm-dashboard-past-due-flag) MERGED** at 02:50:02Z. ✅ Build → Vercel → Mirror REVIEW_PASS → auto-merge. Clean pipeline.
+- **PR #214 (chore/reenable-rotation) MERGED** — account rotation re-enabled. ✅
+- **PR #215 (remove-yes-approval-token) OPENED** at 02:54:30Z. Awaiting Mirror review. Monitor Check E.
+- **Sync push failure: 14-clean streak broken** (02:59Z recurrence). Root cause fix pending Larry (APPROVAL_REQUEST sync-push-rebase-fallback-001).
+- **G-rule MalformedForgeMarker: 3/3 → dispatched to Beacon.** Pattern: 3 events in 1 hour, all self-resolved. Beacon to determine if PR B (rate-limit-resilience) is the systemic fix.
+- **Automated cycle auto-restored:** run_cycle.sh correctly detected wrong-branch state and restored main at 03:00:03Z. First confirmed activation of the auto-restore logic. No escalation needed.
+- **APPROVAL_REQUEST queue: 4 carry-forward.** Monday [yellow] DM: 2026-06-01.
+- **Check 5 permanent fix in motion:** trust-policy → Forge still pending. Verification: 2026-06-07.
 - **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
 - **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
 - **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
-- **MalformedForgeMarker preflight: 2 occurrences in iter 149 session.** No new occurrences this iter. Not at G-rule threshold (3). Watch.
+- **Tier 2 OAuth expired: carry-forward.** Forge bot hitting TIER2_FALLBACK_FAILED/UNAVAILABLE on active tasks. Monday DM: restore runbook.
 
 **Learned:**
-- Larry directly named the sequence-advancer stoppage as a recurring pattern requiring a permanent fix (2 incidents). Beacon responded with advancer-active-reconciliation-001 (three-signal PR identity match: pr_url → branch-name → title-substring). This fix is now in Forge's inbox. If it lands, the sequence advancer's pattern-failure-on-PR-url-mismatch is permanently remediated — one fewer manual intervention class.
-- Three Vercel deploys for a single PR is now the observed pattern: (1) initial forge-branch deploy on build-phase dispatch, (2) Vercel re-deploy when PR is opened with PR number resolved, (3) mirror-branch deploy when Mirror runs its review in a worktree. Expected behavior; Tier 3 classification is correct.
-- deploy-notifier:READY events are not in the APPROVAL_REQUEST queue and don't block pipelines; they're status signals. Cooldown files for them accumulate indefinitely (no TTL cleanup). Not a problem at current scale (~3 per dashboard build) but worth noting for future Check IV allowlist hygiene.
+- run_cycle.sh auto-restore logic (added during some prior PR) correctly activated when the automated timer cycle ran with the repo on `chore/remove-yes-approval-token`. The wrapper logged the restore to cycle-actions.jsonl, blocked the journal commit, and left the auto-restore event as uncommitted dirt — which is the correct behavior. No human action was required. First observed activation; good signal that the guard works.
+- MalformedForgeMarker at retry 1/3 is self-healing but occurred 3× in 1h across different tasks. Likely correlates with rate-limit stress (all 3 tasks were touched during the period Forge bot shows Tier 2 fallback failures). PR B (rate-limit-resilience step-b-resume) may be the real systemic fix.
+- PR #29 pipeline was clean end-to-end: Forge built → Vercel preview → Mirror REVIEW_PASS → auto-merge → dashboard main deploy. No Pulse intervention needed. ✅
 
 ---
 
