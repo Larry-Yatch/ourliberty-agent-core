@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~02:04Z UTC (Iter 143)
+## Status snapshot — updated 2026-05-31 ~02:12Z UTC (Iter 144)
 
-**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 143 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >60m; G-rule dispatch already processed by Beacon this session). 0 open PRs (8th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (8th consecutive clean sync). larry-reject count: 17 actual (34 files = 17×2 .json+.reason pairs; unchanged). Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 144 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >60m; Beacon architectural correction confirmed, Forge PR pending trust-policy dispatch). 0 open PRs (9th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 9th consecutive clean sync). larry-reject count: 17 actual (34 files = 17×2 .json+.reason pairs; unchanged). Healer heartbeat fresh: 02:05:15Z UTC. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
