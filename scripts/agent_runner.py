@@ -106,20 +106,12 @@ TIER2_HOME = '/home/larry/.claude-larry-personal'
 # byte-for-byte, so this change is a no-op if the tokens aren't provisioned.
 # NEVER log token values; only the auth-source label ('setup_token' vs
 # 'credentials_json') is safe to surface.
-_SETUP_TOKEN_ENV_BY_TIER = {
-    'tier1': 'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
-    'tier2': 'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
-}
-
-
-def _setup_token_for_tier(tier_name):
-    """Return the long-lived setup-token for ``tier_name`` or None if
-    unconfigured. Empty string counts as unset so a presence check is
-    equivalent to a usability check. Token values must never be logged."""
-    env_name = _SETUP_TOKEN_ENV_BY_TIER.get(tier_name)
-    if not env_name:
-        return None
-    return os.environ.get(env_name) or None
+#
+# The tier->env-var mapping + per-tier accessor now live in ``active_tier``
+# as a single source of truth — ``tier_auth_ok`` (the rotation pre-engage
+# gate) mirrors this precedence so the gate verifies the same auth source
+# a dispatch would actually use. Reference them via the module to avoid
+# duplicate copies that could drift.
 
 
 def _apply_tier_auth(env_dict, tier_name, default_token):
@@ -133,7 +125,7 @@ def _apply_tier_auth(env_dict, tier_name, default_token):
     ``default_token`` (the token-manager value) when no setup-token is
     configured for the tier, preserving the historical HOME-swap behavior.
     """
-    setup_token = _setup_token_for_tier(tier_name)
+    setup_token = active_tier._setup_token_for_tier(tier_name)
     if setup_token:
         env_dict['CLAUDE_CODE_OAUTH_TOKEN'] = setup_token
         return 'setup_token'

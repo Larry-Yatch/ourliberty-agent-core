@@ -410,14 +410,23 @@ class AuthCooldownTest(unittest.TestCase):
 
 
 class TierAuthOkTest(unittest.TestCase):
-    """Step A rotation fix: pre-engage auth gate's expiry check.
+    """Step A rotation fix + 2026-05-30 setup-token-awareness: pre-engage
+    auth gate.
 
-    `tier_auth_ok` reads the on-disk OAuth credentials file and returns
-    True iff `claudeAiOauth.expiresAt` is at least 10 min in the future.
-    Tests swap the tier homes to tmp dirs so we don't depend on the dev
-    box's real credentials."""
+    ``tier_auth_ok`` mirrors ``agent_runner._apply_tier_auth`` precedence:
+    if a tier's setup-token env var (CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2})
+    is non-empty, the gate returns True (that token is the live dispatch
+    auth — presence is the signal). Only when the setup-token is
+    unconfigured does the gate fall back to the legacy
+    ``credentials.json.claudeAiOauth.expiresAt`` >= 10-min-future check.
+
+    The existing legacy-fallback test cases below run with setup-token
+    env cleared in setUp so they continue to exercise the credentials.json
+    path byte-for-byte. New ``SetupTokenShortCircuit*`` cases at the end
+    cover the post-fix short-circuit precedence."""
 
     def setUp(self):
+        import os
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         # Stand up a fake home pair under the tmp dir and redirect
@@ -431,10 +440,26 @@ class TierAuthOkTest(unittest.TestCase):
         self.t2_home.mkdir(parents=True)
         active_tier.TIER1_HOME = str(self.t1_home)
         active_tier.TIER2_HOME = str(self.t2_home)
+        # Clear setup-token env vars so the existing legacy cases below
+        # exercise the credentials.json fallback unchanged. Tests that
+        # need a setup-token set it explicitly via os.environ; tearDown
+        # restores any prior real value so the dev box's tokens aren't
+        # clobbered.
+        self._prev_t1 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER1', None)
+        self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
 
     def tearDown(self):
+        import os
         active_tier.TIER1_HOME = self._prev_tier1_home
         active_tier.TIER2_HOME = self._prev_tier2_home
+        for name, prev in (
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
+            ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
+        ):
+            if prev is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = prev
         self.tmp.cleanup()
 
     def _write_creds(self, home_path, expires_at_ms):
@@ -516,6 +541,62 @@ class TierAuthOkTest(unittest.TestCase):
         # No exception — defensive shape. A bogus tier value must never
         # promote into a "this target is fine" branch.
         self.assertFalse(active_tier.tier_auth_ok('tier-bogus'))
+
+    # ---- setup-token short-circuit (2026-05-30) -----------------------
+
+    def test_setup_token_present_short_circuits_with_no_credentials_file(self):
+        # The credentials.json was never created for tier2 — under legacy
+        # semantics this would be False. With a setup-token configured,
+        # the gate must return True because the setup-token is the live
+        # dispatch auth (presence = usability per agent_runner contract).
+        import os
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-ant-tier2-token-fake'
+        self.assertTrue(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_setup_token_present_short_circuits_with_expired_credentials(self):
+        # The exact 2026-05-30 false-block shape: tier2's credentials.json
+        # has lapsed (the setup-token path no longer exercises/refreshes
+        # it) but the setup-token itself is still valid. The gate must
+        # NOT false-block the flip.
+        import os
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_creds(
+            self.t2_home, self._ms(now - timedelta(hours=16)),
+        )
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-ant-tier2-token-fake'
+        self.assertTrue(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_empty_setup_token_falls_back_to_credentials_check(self):
+        # Empty string is misconfiguration, not an override — must be
+        # treated as unset so the legacy expiresAt check runs. With an
+        # expired credentials.json and an empty setup-token, the gate
+        # returns False (preserving the defensive "can't verify → False"
+        # posture).
+        import os
+        from datetime import datetime, timezone, timedelta
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        self._write_creds(
+            self.t2_home, self._ms(now - timedelta(minutes=1)),
+        )
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = ''
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+
+    def test_setup_token_scoped_per_tier(self):
+        # Tier1's setup-token presence must NOT promote tier2 to auth-ok.
+        # The env-var mapping is per-tier; cross-tier leak would let a
+        # tier1-only deployment falsely greenlight a tier2 flip.
+        import os
+        from datetime import datetime, timezone
+        now = datetime(2026, 5, 30, 12, 0, 0, tzinfo=timezone.utc)
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = 'sk-ant-tier1-token-fake'
+        # tier2 has no setup-token AND no credentials.json — legacy path
+        # returns False, and the tier1 token must not bleed across.
+        self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
+        # Symmetric: tier1 IS auth-ok via its own setup-token.
+        self.assertTrue(active_tier.tier_auth_ok('tier1', now=now))
 
 
 if __name__ == '__main__':
