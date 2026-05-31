@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 211 — 2026-05-31 17:07 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **0 new alerts. New: PR #221 merged — heal-resume-paused-on-tier1 timer re-installed (closes iter-158 carry-forward).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1085 lines** (unchanged from iter 210). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1085 (unchanged). alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Alert watermark unchanged at 1085. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged: `agent-runner-{forge,beacon,mirror,pulse}:claude_tier1_failed_tier2_unavailable:rate_limit`, `beacon-telegram-bot:claude_tier1_failed_on_resume_session_bound:auth_401`. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). 8 APPROVAL_REQUEST items unchanged. Carry-forward ask-then-do heal-resume-paused-on-tier1 install: **CLOSED** (see PR #221 below). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T16:37:21Z UTC** — ~30 min old at check time (17:07Z). Within 90-min threshold. Next update expected ~17:07Z UTC (at cadence boundary now). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=e65ed39 "Pulse cycle 20260531T170228Z", branch=main, clean tree. New commits since iter 210: bb28df3 "fix(healer): auto-resume timer uses OnCalendar instead of OnUnitActiveSec" + 20d1f14 "Merge pull request #221" + e65ed39 "Pulse cycle 20260531T170228Z" (auto-commit from prior automated cycle). ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: `{"last_sync": "2026-05-31T16:05:58Z", "status": "no-change"}`. Last sync ~59 min old; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes: 0 active tasks. ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Sunday gate → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Deploy-notifier cooldown file count:** 106 READY-state files (unchanged from iter 210). G-rule dispatched (iter 210), APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+- **✅ NEW: PR #221 MERGED — heal-resume-paused-on-tier1 timer re-installed (iter-158 carry-forward CLOSED).** PR #221 "fix(healer): auto-resume timer uses OnCalendar (silent-death hardening)" merged at 2026-05-31T16:52:45Z UTC. Changes: switched `ourliberty-heal-resume-paused-on-tier1.timer` from `OnUnitActiveSec=10min` to `OnCalendar=*:0/10` + `Persistent=true`. PR body confirms "Re-installed live." Verification: `systemctl is-active ourliberty-heal-resume-paused-on-tier1.timer` → **active**, `systemctl show` → `ActiveState=active, SubState=waiting, NextElapseUSecRealtime=Sun 2026-05-31 11:10:04 MDT (17:10:04Z UTC)`. Timer enabled+active with a real NextElapse. **CLOSES** carry-forward ask-then-do "heal-resume-paused-on-tier1 NOT INSTALLED" from iter 158. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. Verified PR #221 install: heal-resume-paused-on-tier1.timer active, enabled, NextElapse 17:10Z UTC.
+3. Closed carry-forward ask-then-do: heal-resume-paused-on-tier1 NOT INSTALLED → RESOLVED.
+4. No auto-fix needed this iter.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 211` → `{"ts": "2026-05-31T17:07:10Z", "iter": 211, "tier": 1, "kind": "intervention"}` appended. (Note: intervention_id="" — script did not auto-generate; non-blocking, same as known iters 205-206 anomaly.)
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=17:07:11Z UTC.
+7. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. All active issues are carry-forward. Monday [yellow] DM scope for 2026-06-01 UTC updated: remove heal-resume install-drift (resolved). Remaining scope: Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first-firing results + APPROVAL_REQUEST queue 8.
+
+**Patterns:**
+- System stable-degraded at Tier 1. One new signal: PR #221 resolved the long-running heal-resume-paused-on-tier1 install issue.
+- **Tier 2 OAuth stalls persist.** Day 2+ since May 30. Monday DM is the next action gate.
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+
+**Learned:** PR #221 closed the oldest open carry-forward item (iter 158, heal-resume-paused-on-tier1 NOT INSTALLED). The timer is now live with OnCalendar — it will attempt to auto-resume paused_on_tier1 tasks every 10 min. With Tier 2 OAuth still expired, the service will likely fire and re-detect the stall, but it won't loop-fail — the OnCalendar + Persistent=true pattern guarantees it keeps trying rather than going dormant.
+
+---
+
 ## Beacon result-notification — 2026-05-31 ~17:55 UTC (inter-agent notify from beacon, task=cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z)
 
 **Event:** Beacon completed investigation of the F24 empty-prompt G-rule (task=cycle-finding-pulse-dispatch-empty-prompt-20260531T165531Z). Status: SUCCESS.

@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~16:55Z UTC (Iter 210 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~17:07Z UTC (Iter 211 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat 16:37:21Z UTC (~18 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty (2 Beacon dispatches written this iter). Alert watermark: **1085** (0 new alerts). APPROVAL_REQUEST queue: 7 (carry-forward, 2 items elevated) + 2 new pending from iter 210 dispatches.
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat 16:37:21Z UTC (~30 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1085** (0 new alerts). APPROVAL_REQUEST queue: 8 (unchanged).
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
-- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note + fresh install-drift re-alerts for heal-resume-paused-on-tier1 + pulse-grule-prompt-template-001 (F24 fix, doc-only, low-risk, APPROVAL_REQUEST #8).
-- **APPROVAL_REQUEST queue (8):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001, **pulse-grule-prompt-template-001 (NEW — doc-only, cycle-prompt.md § 17 G-rule subsection, fixes F24 empty-prompt recurrence)**. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158; fresh Telegram alerts delivered iter 204 at 16:02:51Z UTC).
+- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note + pulse-grule-prompt-template-001 (F24 fix, doc-only, low-risk, APPROVAL_REQUEST #8). (heal-resume install-drift REMOVED — resolved by PR #221.)
+- **APPROVAL_REQUEST queue (8):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001, **pulse-grule-prompt-template-001 (NEW — doc-only, cycle-prompt.md § 17 G-rule subsection, fixes F24 empty-prompt recurrence)**.
 - **deploy-notifier cooldown GC gap — BEACON CORRECTED DIAGNOSIS (2nd investigation).** 309+ files at investigation time (was 106 iter 209, ~28 iter 208). Root cause: `deploy_notifier.py:490` embeds per-Vercel-uid in subject (`f'deploy-notifier:READY:{uid}'`); no GC after cooldown expires. APPROVAL_REQUEST `larry-alerts-cooldown-gc-001` (fix in `larry_alerts.py`) SUPERSEDED. New APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` — Forge to add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py` (piggybacked on 2-min tick). Awaiting Larry approval.
 - **F24 EMPTY-PROMPT BUG — BEACON INVESTIGATION COMPLETE (2026-05-31 ~17:55Z).** Two root causes confirmed: (1) missing `prompt` field in structured envelopes (`cycle-finding-sync-push-failure-20260530T224800Z`, `cycle-finding-deploy-notifier-gc-20260531T164900Z`); (2) wrong source key `pulse-g-rule` not in ALLOWED_SOURCES (`cycle-fix-notify-dedup-20260527T000000Z`). APPROVAL_REQUEST `pulse-grule-prompt-template-001` produced — doc-only fix adding G-rule subsection to cycle-prompt.md § 17. **Workaround in place: always include `"prompt"` (≥100 chars) + always use `source: "pulse"` in every dispatch envelope.**
 - **Trust-policy revert** (e1489a8): Non-Pulse commit appeared on main after automated cycle 89395c0. Reverts temporary rate-limit-resilience-001 auto-approve carve-out. EXPECTED — work complete per iter 158.
@@ -75,7 +75,7 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - `cycle-finding-deploy-notifier-gc-20260531T170000Z` — fix(deploy-notifier): add `_gc_stale_cooldown_files(max_age_days=7)` to `deploy_notifier.py`, invoked per tick, scoped to `deploy-notifier:` prefix only. Target: Forge preflight phase. Awaiting Larry approval.
 
 **Carry-forward ask-then-do:**
-- `heal-resume-paused-on-tier1 NOT INSTALLED` (iter 158). PR #219 shipped ourliberty-heal-resume-paused-on-tier1.service + .timer but install dance not performed. Without install, paused-on-tier1 tasks won't auto-resume. Action: SSH + sudo cp + daemon-reload + enable --now.
+- ~~`heal-resume-paused-on-tier1 NOT INSTALLED`~~ — **CLOSED iter 211.** PR #221 "fix(healer): auto-resume timer uses OnCalendar" merged 2026-05-31T16:52Z; body confirms "Re-installed live." Timer verified active, NextElapse 17:10Z UTC, enabled+waiting.
 
 **Verification pending:**
 - `Check 5 healer substrate fix` (iters 142-143). Beacon: use `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (90-min threshold). Forge task pending trust-policy dispatch. Verification: 2026-06-07.
@@ -101,6 +101,7 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - **2026-05-26 — Check III analyzer shipped (PR #112).** First run iter 126. Next run 2026-06-07.
 - **2026-05-29 — Check IX analyzer shipped (PR #179).** First firing 2026-06-01 (Monday-only). Scans 4 operator-friction signals.
 - **2026-05-30 (iter 124) — PR #210 fix(auth): wire dispatches MERGED.** long-lived setup-tokens path live.
+- **2026-05-31 (iter 211) — PR #221 fix(healer): auto-resume timer OnCalendar MERGED.** heal-resume-paused-on-tier1.timer switched from OnUnitActiveSec (silent-death risk) to OnCalendar=*:0/10 + Persistent=true; re-installed live. Timer active+waiting, fires every 10 min.
 - **2026-05-30 (iter 115) — Check I journal idempotency fixed.** Commit 64fdcfb. Idempotency guard + auto-commit on actual write.
 
 ---
