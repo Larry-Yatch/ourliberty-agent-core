@@ -6,6 +6,17 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~00:31Z UTC (Iter 129)
+
+**System: ⚠️ Drift.** Iter 129 findings: PR #211 (step-a-rotation) CONFLICTING — Beacon processed iter 128 dispatch; created APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` (Forge rebase, mechanical, Mirror REVIEW_PASS preserved). **Note: Beacon did NOT dispatch to Forge directly — APPROVAL_REQUEST is pending Larry authorization.** Escalated via larry_alerts idx=1052 (queued for bot delivery). Sync push failure 14th occurrence (carry-forward). APPROVAL_REQUEST queue: 4 items (3 prior + pr211-rebase new). All 6 services active. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- PR #211 CONFLICTING: 3rd consecutive iter (127, 128, 129). Waiting on Larry APPROVAL_REQUEST approval. Close when Forge rebase merges.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (iters 127, 128 — no new occurrence iter 129). Next instance → dispatch to Beacon.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 129).
+- inbox-watcher rc=-1: 2/3 (no new occurrence).
+- APPROVAL_REQUEST queue (4): pr211-rebase-step-a-rotation-001 (NEW, highest priority — mechanical merge unlock), sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
+
 ## Status snapshot — updated 2026-05-31 ~00:25Z UTC (Iter 128)
 
 **System: ⚠️ Drift.** Iter 128 findings: PR #211 (step-a-rotation) still CONFLICTING (Mirror REVIEW_PASS at 00:10:57Z, Larry DM'd at 00:15:40Z). Dispatched Forge rebase to Beacon at 00:24Z (envelope: cycle-fix-pr211-rebase-20260531T002409Z.json). heal-pipeline-stall confirmed stall at 00:20:43Z (new watch: healer "369 min" duration bug — G-rule 1/3). All 6 services active. Sync push failure 13th occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged. Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
@@ -105,7 +116,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 ## Pending watch items (not yet patterns / pending resolution)
 
-- **2026-05-31 (iters 127–128) — PR #211 (step-a-rotation) CONFLICTING, Mirror REVIEW_PASS.** outbox-notifier DM'd Larry rebase command at 00:10:57Z. No Larry response. Iter 128 dispatched Forge rebase to Beacon (envelope: cycle-fix-pr211-rebase-20260531T002409Z.json, 00:24Z). Close when PR merges.
+- **2026-05-31 (iters 127–129) — PR #211 (step-a-rotation) CONFLICTING, APPROVAL_REQUEST pending.** outbox-notifier DM'd Larry rebase command 00:10:57Z. Iter 128 dispatched to Beacon. Beacon confirmed CONFLICTING, created APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` (Forge rebase preflight). **Task NOT dispatched to Forge yet — requires Larry `approve pr211-rebase-step-a-rotation-001` on Telegram.** Iter 129 escalated via larry_alerts (idx=1052 queued). Close when PR merges.
 
 - **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
 

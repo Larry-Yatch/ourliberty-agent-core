@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 129 — 2026-05-31 00:31 UTC (interactive)
+
+**Health:** ⚠️ Drift — PR #211 (step-a-rotation) CONFLICTING, Beacon APPROVAL_REQUEST pending Larry authorization. Beacon processed iter 128 dispatch; created `pr211-rebase-step-a-rotation-001` (Forge rebase preflight, awaiting Larry approval). All 6 services active. Sync push failure carry-forward (14th occurrence).
+
+**Triage:** Check 0 — alert-triage.json absent (PR-β not deployed). 0 new alerts in larry-alerts.jsonl since iter 128 watermark (00:25:50Z). Pulse inbox had 1 Beacon result notification (archived by inbox-watcher before iter start).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts since iter 128.** Pulse inbox `notify-cycle-fix-pr211-rebase-20260531T002409Z.json` archived by inbox-watcher; processed this iter (see Check D). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry 00:27:13Z — "notified pulse <- beacon (beacon-result, depth=1)". No WARN/ERROR spikes. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last delivery idx=1051 at 00:25:47Z (pipeline-stall tier2-fallback batch from iter 128). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ PR #211 still blocked.** Beacon processed iter 128 dispatch; created APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` (phase=preflight). Forge inbox empty — task not dispatched yet; awaiting Larry authorization. Escalated via larry_alerts (idx=1052 queued). ⚠️
+
+- **(Check 4) Pending Larry directives: 4 items (1 new).** ⚠️
+  - **NEW: pr211-rebase-step-a-rotation-001** — Forge rebase of forge/step-a-rotation onto origin/main; mechanical conflict resolution only; Mirror REVIEW_PASS preserved. Approve: `approve pr211-rebase-step-a-rotation-001` on Telegram.
+  - sync-push-rebase-fallback-001 (iter 118, APPROVAL_REQUEST)
+  - pulse_telegram_bot.sh launcher (iter 94)
+  - stuck-cycle timeout guard (iter 43)
+  - Monday [yellow] DM recap: 2026-06-02. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** 6/6 active. No new stale-code events since iter 128 (last: 00:05:15Z, pulse-bot). inbox-watcher rc=-1 G-rule still 2/3. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, clean. HEAD=0cc7cc5 "Pulse cycle 20260531T002742Z" (iter 128 autocommit). No new merges since iter 128. ✅
+
+- **(Check B) Sync health: ⚠️ carry-forward (14th occurrence).** sync.json: status=error 00:09:55Z "Auto-commit push failed; rolled back", commit=45efeaf7. Same root cause: sync_agent_core.sh:161 bare-push. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer. ✅
+
+- **(Check D) Inboxes: all empty. ✅** Pulse inbox Beacon result notification archived by inbox-watcher. Content: APPROVAL_REQUEST for PR #211 rebase — processed this iter, escalated via larry_alerts. ✅
+
+- **(Check E) PRs: ⚠️ PR #211 CONFLICTING/UNKNOWN.**
+  - ourliberty-agent-core: PR #211 (step-a-rotation) — OPEN, mergeable=UNKNOWN (GitHub recomputing), reviewDecision="", autoMergeRequest=null. Mirror REVIEW_PASS 00:10:57Z. Beacon APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` pending Larry. Escalated (larry_alerts idx=1052 queued). ⚠️
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Not firing this iter. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. **Escalated:** `larry_alerts.append_alert` — subject=approval-request:pr211-rebase-step-a-rotation-001 (idx=1052 queued; bot delivers on next sweep). APPROVAL_REQUEST queue: 3→4 items.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:31:53Z.
+4. Prime ledger: appended intervention row `pr211-rebase-approval-request-iter-129`.
+5. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` → larry_alerts idx=1052 queued. Approve `approve pr211-rebase-step-a-rotation-001` on Telegram → Beacon dispatches to Forge → rebase + force-with-lease push → auto-merge unblocked. APPROVAL_REQUEST queue unchanged for the other 3 items; Monday DM recap 2026-06-02.
+
+**Patterns:**
+- **PR #211 CONFLICTING: 3rd consecutive iter (127, 128, 129).** Waiting on Larry APPROVAL_REQUEST approval.
+- **APPROVAL_REQUEST queue at 4 items.** Most-actionable new item: pr211-rebase-step-a-rotation-001 (mechanical, lowest risk in queue).
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No new occurrence.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **sync push failure: 14th occurrence.** No new action.
+- **inbox-watcher rc=-1: 2/3 toward G-rule.** No new occurrence.
+
+**Learned:**
+- Beacon's APPROVAL_REQUEST for the rebase arrives via the Pulse inbox notification path (depth=1 notify). It does NOT auto-dispatch to Forge — requires Larry's explicit approval. The inter-cycle journal notation at the top of this file (written by inbox-watcher) says "Beacon dispatched Forge" — slightly imprecise; Beacon drafted and requested approval. Forge inbox is empty, confirming no dispatch yet.
+
+---
+
+## Inter-cycle notification — 2026-05-31 ~00:24Z UTC (Beacon result-notification)
+
+**Source:** beacon | task=cycle-fix-pr211-rebase-20260531T002409Z | status=SUCCESS
+
+**Summary:** Beacon confirmed PR #211 ground truth (OPEN, mergeable=CONFLICTING, mergeStateStatus=DIRTY, head=forge/step-a-rotation). Forge inbox was clean. Beacon dispatched Forge rebase preflight task (task_id=pr211-rebase-step-a-rotation-001, phase=preflight). Forge will: gh pr checkout 211, fetch origin, rebase origin/main, push --force-with-lease. Substantive-change guard included: if rebase conflict is non-mechanical, Forge will abort and emit CLARIFY_REQUEST.
+
+**Disposition:** Logged. No new work. Forge rebase preflight now in-flight. Watch for outbox-notifier AUTO_MERGE or Forge CLARIFY_REQUEST/REJECT in next cycle.
+
+---
+
 ## Iteration 128 — 2026-05-31 00:24 UTC (interactive)
 
 **Health:** ⚠️ Drift — PR #211 (step-a-rotation) still CONFLICTING (Mirror REVIEW_PASS, mergeable=CONFLICTING). Dispatched Forge rebase to Beacon this iter per iter 127 rule. heal-pipeline-stall confirmed stall at 00:20:43Z. New alert class: pipeline-stall healer "369 min" duration calculation bug (1st observation). Sync push failure carry-forward (13th occurrence). All 6 services active. All inboxes empty.
