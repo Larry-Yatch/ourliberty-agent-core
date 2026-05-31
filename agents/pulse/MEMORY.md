@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~00:55Z UTC (Iter 133)
+## Status snapshot — updated 2026-05-31 ~01:01Z UTC (Iter 134)
 
-**System: ⚠️ Drift (improving).** Iter 133 findings: Two tasks simultaneously in-flight — PR #213 (extend-thresholds-per-agent-overrides: CLEAN/MERGEABLE, Mirror review task in Mirror inbox at 18:52:25Z) and PR #211 rebase build (build-pr211-rebase-step-a-rotation-001.json in Forge inbox at 18:53:25Z). MalformedForgeMarker on pr211-rebase preflight (1st obs, G-rule 1/3) — self-healed within 65s via retry. No new alerts (1053 lines unchanged). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Sync push failure 17th occurrence (carry-forward). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+**System: ⚠️ Drift (resolving).** Iter 134 findings: PR #213 (extend-thresholds-per-agent-overrides) **MERGED** at 00:57:10Z — Check III threshold implementation complete (beacon _default→2147s, pulse _default→262s live). PR #211 Forge rebase completed ($2.11); Mirror review dispatched at 18:56:45Z and in-flight (Mirror inbox: review-pr211-rebase-step-a-rotation-001.json). Sync push failure 18th occurrence (00:56:29Z, carry-forward). APPROVAL_REQUEST queue: 3 unchanged. larry-alerts: 1054 lines (+1 vs iter 133). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
-- PR #211 CONFLICTING: 7th consecutive iter (127–133). Rebase build NOW IN FLIGHT (Forge). Close when rebase PR merges.
-- PR #213 (extend-thresholds): CLEAN/MERGEABLE, Mirror review in-flight. Expected to auto-merge after Mirror PASS. New positive item.
-- MalformedForgeMarker on pr211-rebase preflight: G-rule 1/3 (1st observation, iter 133). Self-healed via retry.
-- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 133).
-- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 133).
-- inbox-watcher rc=-1: G-rule 2/3 (no new occurrence iter 133).
+- PR #213 (extend-thresholds): **MERGED** at 00:57:10Z. ✅ CLOSED.
+- PR #211 CONFLICTING: 8th consecutive iter (127–134). Mirror review now in-flight. Close when Mirror PASS + auto-merge fires.
+- MalformedForgeMarker on pr211-rebase preflight: G-rule 1/3 (1st observation, iter 133). No new occurrence iter 134.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 134).
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 134).
+- inbox-watcher rc=-1: G-rule 2/3 (no new occurrence iter 134).
 - APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
 
 ## Status snapshot — updated 2026-05-31 ~00:50Z UTC (Iter 132)
@@ -141,7 +141,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 ## Pending watch items (not yet patterns / pending resolution)
 
-- **2026-05-31 (iters 127–129) — PR #211 (step-a-rotation) CONFLICTING, APPROVAL_REQUEST pending.** outbox-notifier DM'd Larry rebase command 00:10:57Z. Iter 128 dispatched to Beacon. Beacon confirmed CONFLICTING, created APPROVAL_REQUEST `pr211-rebase-step-a-rotation-001` (Forge rebase preflight). **Task NOT dispatched to Forge yet — requires Larry `approve pr211-rebase-step-a-rotation-001` on Telegram.** Iter 129 escalated via larry_alerts (idx=1052 queued). Close when PR merges.
+- **2026-05-31 (iters 127–134) — PR #211 (step-a-rotation) CONFLICTING → rebase completed, Mirror in-flight.** Larry approved rebase (iter 132, 18:43Z MDT). Forge rebase task completed (18:56:45Z, $2.11). Mirror review dispatched and in-flight (mirror inbox: review-pr211-rebase-step-a-rotation-001.json). mergeStateStatus=UNKNOWN (GitHub recomputing post-force-push). Close when Mirror PASS + auto-merge fires.
 
 - **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
 
@@ -175,7 +175,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 - **2026-05-24 — SUPABASE_SERVICE_ROLE_KEY added to rotation registry (90d cadence, due 2026-08-22).** First 90d rotation credential in the registry. Will enter the 60d notification window on 2026-06-23. Also added: SUPABASE_URL (revocation_only) and SUPABASE_ANON_KEY (revocation_only). E4.0a Supabase credential discipline landed via PR #78.
 
-- **2026-05-26 — Check III analyzer shipped (PR #112). FIRST RUN: 2026-05-31 (iter 126).** `scripts/pulse_check_iii.py` fired Sunday 2026-05-31T00:04:40Z. 4 high-attention proposals (all >50% delta, n≥28 per bucket): beacon _default 900s→2147s (+139%); forge _default 900s→3436s (+282%); mirror _default 1500s→488s (-67%); pulse _default 900s→262s (-71%). DM queued. Artifact: pulse-check-iii-2026-05-31.json. No auto-apply — Larry approves, Beacon→Forge config PR. Next run: Sunday 2026-06-07 (14d from today). Key insight: false-positive stuck alerts likely firing for beacon/forge (threshold too tight vs. p90 session durations); mirror/pulse detection is delayed (threshold too loose).
+- **2026-05-26 — Check III analyzer shipped (PR #112). FIRST RUN: 2026-05-31 (iter 126).** `scripts/pulse_check_iii.py` fired Sunday 2026-05-31T00:04:40Z. 4 high-attention proposals. Larry approved `threshold-update-2026-05-31` at 00:41Z (iter 132); Beacon adapted to `extend-thresholds-per-agent-overrides` approach; **PR #213 MERGED iter 134 (01:01Z)** — per-agent overrides for beacon (_default→2147s) and pulse (_default→262s) now live. forge + mirror overrides deferred (not in PR #213 scope). Next Check III run: Sunday 2026-06-07.
 
 - **2026-05-29 — Check IX analyzer shipped (PR #179).** `scripts/pulse_check_ix.py` is now live. Fires Monday-only, alongside Check I + Check VIII. First firing: 2026-06-01. Scans 4 operator-friction signals (catch-me-up gap, time-to-action gap, alert-ignored repeats, out-of-chain rescue burden) and registers drafting missions via POST /api/system/missions/new when thresholds crossed. No DM — registered missions surface through the standard +New mission Telegram flow. Larry approves/rejects on kanban.
 

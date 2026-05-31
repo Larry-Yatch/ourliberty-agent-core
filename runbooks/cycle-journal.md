@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 134 — 2026-05-31 01:01 UTC (interactive)
+
+**Health:** ⚠️ Drift (resolving) — PR #213 (extend-thresholds-per-agent-overrides) **MERGED** at 00:57:10Z. PR #211 Forge rebase **completed**; Mirror review dispatched and in-flight. Two major carry-forward items closed this iter. Remaining open: sync push failure (carry-forward), PR #211 pending Mirror verdict.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1054 lines** (was 1053 at iter 133 watermark). 1 new entry.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 1 new entry — both nominal.** New entries since iter 133 watermark:
+  - **rotate-active-tier Tier 2 OAuth block** (00:55:45Z) — known pattern (Tier 2 OAuth unavailable, MEMORY.md watch, same as every prior occurrence). Tier-3 known-pattern → log only, no DM. ✅
+  - **outbox-notifier review-pass + auto-merge for PR #213** (00:57:10Z) — Mirror PASS on `extend-thresholds-per-agent-overrides`, AUTO_MERGE fired, PR #213 merged. POSITIVE notification. Nominal. ✅
+
+- **(Check 1) Log noise: ✅ Nominal — positive activity only.** outbox-notifier.log entries since iter 133 (18:52–18:57 MDT / 00:52–00:57Z):
+  - 18:53:25Z: Forge ack-proceed for `pr211-rebase-step-a-rotation-001`; build-phase dispatched. INFO. ✅
+  - 18:56:45Z: Forge rebase complete → Mirror review dispatched (`review-pr211-rebase-step-a-rotation-001.json`), PR #211 mirror-review cost=$2.11 (within cap). INFO. ✅
+  - 18:57:05Z: Mirror REVIEW_PASS for `extend-thresholds-per-agent-overrides`. INFO. ✅
+  - 18:57:07Z: AUTO_MERGE_DEFERRED_UNKNOWN (mergeable=UNKNOWN; retry queued). INFO. ✅
+  - 18:57:10Z: AUTO_MERGE outcome=merged for PR #213. INFO. ✅
+  No WARN/ERROR entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives since iter 133 (last directive: 18:43–18:47 MDT, pr211-rebase + threshold-update approvals, both actioned). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ → Resolving. PR #211 rebase complete; Mirror in-flight.** PR #211 (step-a-rotation): mergeStateStatus=UNKNOWN (GitHub recomputing after Forge force-push), reviewDecision="". Mirror inbox: `review-pr211-rebase-step-a-rotation-001.json` present and active (task dispatched 18:56:45Z, Mirror processing). Rebase cost so far: $2.11 (cap=$50). No new heal-pipeline-stall alerts since iter 128. Active resolution path: Mirror review → auto-merge. ⚠️ (resolving)
+
+- **(Check 4) Pending Larry directives: 3 items (unchanged). ⚠️**
+  - **sync-push-rebase-fallback-001** (iter 118) — still pending Larry. Monday [yellow] DM 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — still pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — still pending Larry. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** All 6/6 services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer). heal-stale-daemon-code-cooldowns.json: 4 snoozed rate_limit entries (known), 1 auth_401 session-bound entry (known). No new restart failures. inbox-watcher rc=-1 G-rule at 2/3, no new occurrence. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, up to date with origin/main, clean. HEAD=caae5ba "feat(thresholds): per-agent overrides for beacon + pulse (unblocks Check III default-bucket conflicts) (#213)" — PR #213 merge commit now on local main. ✅
+
+- **(Check B) Sync health: ⚠️ NEW occurrence — 18th.** sync.json: status=error, last_sync=2026-05-31T00:56:29Z, commit=7fdb411000fd (new hash, distinct from iter 133's 45efeaf7). Root cause unchanged: sync_agent_core.sh:161 bare-push fails when run_cycle.sh wrapper already pushed. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: ✅ Nominal (active task, not stale).** Mirror: `review-pr211-rebase-step-a-rotation-001.json` (active, dispatched 18:56:45Z, Mirror in-flight — not stale). Beacon/forge/pulse: empty. ✅
+
+- **(Check E) PRs: ⚠️ → Improving.**
+  - ourliberty-agent-core PR #213 (extend-thresholds-per-agent-overrides): **MERGED** at 00:57:10Z. Mirror PASS, auto-merge fired. **Watch item CLOSED.** ✅
+  - ourliberty-agent-core PR #211 (step-a-rotation): OPEN, mergeStateStatus=UNKNOWN (post-rebase GitHub recompute), Mirror review in-flight. First active resolution path since iter 127. ⚠️ (resolving)
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Idempotency guard holds. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. Threshold implementation PR #213 MERGED this iter — Check III proposal fully executed. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~24 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. No always-fix conditions triggered (repo up to date, services active, no stale inboxes, no PRs needing auto-merge nudge).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T01:01:25Z.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → row appended (finding: pr211-mirror-review-in-flight-pr213-merged, carry-forward, positive=pr213-merged+pr211-rebase-complete).
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None. All active threads have live resolution paths. PR #211 Mirror review in-flight, expected to auto-merge on PASS. No new Larry action required this iter.
+
+**Patterns:**
+- **PR #211 CONFLICTING: 8th consecutive iter (127–134), BUT Mirror review now in-flight.** First active resolution step in Mirror since iter 127. Expected to close next iter on Mirror PASS + auto-merge.
+- **PR #213 MERGED — Check III threshold overrides live.** per-agent overrides for beacon + pulse (beacon _default 900s→2147s, pulse _default 900s→262s per Check III proposals). First concrete Check III proposal execution complete. Positive.
+- **MalformedForgeMarker on pr211-rebase preflight: G-rule 1/3.** No new occurrence this iter.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No new occurrence this iter.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence this iter.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence this iter.
+- **Sync push failure: 18th occurrence.** Monday [yellow] recap DM 2026-06-02.
+
+**Learned:**
+- PR #213 auto-merge path worked cleanly: Mirror PASS → AUTO_MERGE_DEFERRED_UNKNOWN (GitHub mergeable=UNKNOWN transient) → retry → AUTO_MERGE merged. The deferred-unknown retry path is functional.
+- PR #211 rebase cost=$2.11 for the Forge build phase (preflight + rebase + force-push). Mirror review cap=$50.00. On-track within budget.
+- Two simultaneous in-flight tasks (Mirror reviewing PR #211 rebase, PR #213 now merged) resolved cleanly with no inbox collisions.
+
+---
+
 ## Iteration 133 — 2026-05-31 00:55 UTC (interactive)
 
 **Health:** ⚠️ Drift (improving) — PR #211 rebase build phase in Forge inbox; PR #213 (extend-thresholds) CLEAN/MERGEABLE in Mirror review. Meaningful forward movement since iter 132. No new escalations.
