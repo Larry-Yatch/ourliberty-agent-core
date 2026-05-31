@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 165 — 2026-05-31 05:07 UTC (interactive)
+
+**Health:** ✅ Nominal-with-dispatch — 0 new alerts. All mandatory and additive checks clean. Check C G-rule threshold met (3 consecutive clean iters using canonical service names) → doc-fix dispatched to Beacon. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~32 min). Check B: 7th consecutive clean. Tier=1, consecutive_clean=2→0 (tier-reset from dispatch).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1078 lines** (unchanged from iter 164 watermark). alert-triage.json STILL MISSING (APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry approval). 0 new alerts. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1078. Last alert at 04:35:54Z UTC (iter 163's own DM delivery confirmation). ✅
+
+- **(Check 0) alert-triage.json MISSING: carry-forward.** APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry. No new action. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: last WARN 22:00 MDT (04:00:13Z UTC) — MalformedMirrorMarker for fix-rotation-gate-setup-token-aware (retry 1/3, self-resolved 04:00:09Z, already in post-dispatch counter=4). Last INFO: 04:33:45Z UTC (pulse←beacon notify). No new WARNs. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 22:35:54 MDT (04:35:54Z UTC) — alert idx=1077 delivered. No Larry directives. No orphaned messages. No agent distress. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat 04:35:17Z UTC (~32 min old, within 90-min threshold). alert-cooldown entries all known snoozed patterns: heal-build-sequence-advancer-heartbeat stale (mtime 2026-05-27, 4d old), heal-chain-event-shipper-heartbeat stale (mtime 2026-05-26, 5d old), forge-no-pr entries (mtime 2026-05-28, 3d old), agent-runner rate_limit ×4 (carry-forward), heal-claude-max-burn-rate (carry-forward, Monday watch). No new active stall. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 6 (unchanged).** No new items this iter.
+  - `alert-triage-persistence-invocation-001` — wire alert_triage_state.py into Check 0 (pending Larry approval).
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook.
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry (iter 43).
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 04:35:17Z UTC (~32 min old), within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree. HEAD=origin/main=be2ef72 "Pulse cycle 20260531T050103Z" (automated cycle 05:01Z — ran clean). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T04:04:39Z UTC (~1h02m old, within 2h threshold). 7th consecutive clean Check B. sync-push-rebase-fallback-001 still pending Larry as defensive hardening. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active + G-rule threshold met → dispatch.**
+  - ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+  - **3rd consecutive clean iter using canonical names (iters 163, 164, 165) — G-rule threshold=3 reached.** Dispatched `check-c-service-names-doc-fix-20260531T050300Z.json` to Beacon: update cycle-prompt.md § 4.3 to explicitly enumerate the 7 canonical service names + note the deprecated `-telegram-bot` suffix. ⚠️→dispatched
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — confirmed empty. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard fires. Next: week 2026-06-01. ✅ | Check III: next 2026-06-07. ✅ | Check VIII/IX: Monday UTC 2026-06-01. ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **G-rule watch items (no new occurrences this iter):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending Larry), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + day-gated check skips.
+2. Check C G-rule dispatch: wrote `check-c-service-names-doc-fix-20260531T050300Z.json` to ~/agents/inboxes/beacon/ — Beacon to propose cycle-prompt.md § 4.3 doc-fix (enumerate 7 canonical service names, note deprecated `-telegram-bot` suffix).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 165 --payload {"intervention_id": "iter165-check-c-service-names-g-rule-dispatch"}` → logged.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. G-rule dispatch to Beacon only (low-priority doc-fix, no Larry DM needed). APPROVAL_REQUEST queue unchanged at 6. Monday [yellow] DM still 2026-06-01.
+
+**Patterns:**
+- **Check C G-rule DISPATCHED (iter 165).** 3 consecutive clean iters (163, 164, 165) with canonical service names confirmed — dispatched doc-fix to Beacon. Close when Beacon proposes PR and Forge merges it. Pattern: calibration error (wrong `-telegram-bot` suffix) from iter 162 → 3 clean verification iters → systemic doc-fix dispatched. Teach-to-fish complete.
+- **Check B: 7th consecutive clean.** sync-push-rebase-fallback-001 remains pending defensive hardening.
+- **heal-build-sequence-advancer-heartbeat and heal-chain-event-shipper-heartbeat:** cooldown entries are 4-5 days old. Not active stalls. These healers may be monitoring dormant services; no escalation needed but worth noting the volume of old stale-heartbeat entries.
+
+**Learned:** inbox-watcher.log file is missing on disk (LOG_MISSING) but service is active (confirmed systemctl + journald entries show last successful task at 04:36Z UTC). The log file may be writing to a different path. Check journald `journalctl -u ourliberty-inbox-watcher` for inbox-watcher output instead of looking for a log file. Not a bug; calibration note for future Check C log-scans.
+
+---
+
 ## Iteration 164 — 2026-05-31 05:00 UTC (interactive)
 
 **Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~25 min). Check B: 6th consecutive clean. Tier=1, consecutive_clean=1→2.

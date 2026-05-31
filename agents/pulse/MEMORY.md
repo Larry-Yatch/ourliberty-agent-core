@@ -6,6 +6,28 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~05:07Z UTC (Iter 165 — interactive, full cycle)
+
+**System: ✅ Nominal-with-dispatch — All checks clean + Check C G-rule dispatch.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~32 min). Check B 7th consecutive clean. Tier=1, consecutive_clean=0 (tier-reset from dispatch). APPROVAL_REQUEST queue: 6 (unchanged). Alert watermark: 1078.
+
+**Watch items updated:**
+- **Check C G-rule DISPATCHED (iter 165).** 3 consecutive clean iters (163, 164, 165) using canonical service names → doc-fix dispatched to Beacon (`check-c-service-names-doc-fix-20260531T050300Z.json`). Update cycle-prompt.md § 4.3: enumerate 7 canonical names + note deprecated `-telegram-bot` suffix. Close when Forge PR merges.
+- **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** Beacon diagnosed root cause (invocation gap in run_cycle.sh + cycle-prompt.md § 3.0). APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (pulse-escalations.json id=74). Close when Larry approves, Forge PR merges, + alert-triage.json appears in next automated cycle.
+- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z. Rate limit reset 11:30am MDT today. Monday DM will include trend assessment.
+- **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
+- **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Close when Larry installs via SSH.
+- **Check B CLEAN: 7th consecutive (iters 159–165).** sync-push-rebase-fallback-001 still pending as defensive fix.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 22 iters (143–165). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix pending Larry. G-rule posture unchanged.
+- **systemd install-drift G-rule: 1/3.** No new instance this iter.
+- **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
+- **deploy-notifier READY cooldowns: 309 entries in alert-cooldown/warning/.** Snoozed Vercel deploy notifications. No action required.
+- **inbox-watcher.log file MISSING on disk** (calibration note, iter 165). Service is active; use `journalctl -u ourliberty-inbox-watcher` for log access. Not a bug.
+
 ## Status snapshot — updated 2026-05-31 ~05:00Z UTC (Iter 164 — interactive, full cycle)
 
 **System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~25 min). Check B 6th consecutive clean. Tier=1, consecutive_clean=2. APPROVAL_REQUEST queue: 6 (unchanged from iter 163). Alert watermark: 1078.
@@ -291,7 +313,9 @@
 
 - **heal-droplet-git-drift (new healer, 1st observation, iter 117 2026-05-30).** Fires when droplet main is N+ commits behind origin/main (threshold > 2 per alert message). At 22:38:26Z, fired because the iter 116 wrapper hadn't pushed yet. Resolved within 53 seconds (wrapper pushed 4a3b4b8 at 22:39:19Z). Calibration issue: healer fires during the post-journal/pre-push window of every cycle. If recurs consistently, propose a debounce fix. Watch threshold=3 for G-rule.
 
-- **Check C service-name suffix false-positive (1st observation, iter 162, 2026-05-31).** Wrong names: `ourliberty-beacon-telegram-bot`, `ourliberty-forge-telegram-bot`, etc. (show inactive/dead, Result=success). Canonical names: `ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`. The `-telegram-bot` suffixed entries are old/deprecated registrations in systemd. Always use canonical names for `systemctl is-active` checks. Source of truth: `systemctl list-units --type=service --all | grep ourliberty | grep 'bot'` or the healer's cooldowns.json. Watch threshold=3 for G-rule → dispatch doc-fix to Beacon updating cycle-prompt.md § 4.3 with explicit service names.
+- **Check C service-name suffix false-positive (iter 162, 2026-05-31). G-rule DISPATCHED iter 165.** Wrong names: `ourliberty-beacon-telegram-bot`, etc. Canonical names: `ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`, `ourliberty-inbox-watcher`, `ourliberty-cycle.timer`, `ourliberty-outbox-notifier`. 3 clean iters (163, 164, 165) confirmed canonical names stable → dispatched `check-c-service-names-doc-fix-20260531T050300Z.json` to Beacon. Close when Forge PR merges cycle-prompt.md § 4.3 update.
+
+- **inbox-watcher.log file MISSING on disk (calibration note, iter 165, 2026-05-31).** `~/agents/logs/inbox-watcher.log` does not exist. Service is active (confirmed systemctl). Inbox-watcher writes to journald only. Use `journalctl -u ourliberty-inbox-watcher` to read its logs, not a file path. Future Check C log-silence checks for inbox-watcher must use journald, not file stat.
 
 - **All-bot log-silence false positive (confirmed iter 2, generalized from iter 1 beacon-only).** Check C threshold (>30m log silence → ask-then-do) fires on idle Telegram polling periods for ALL bots (beacon, forge, mirror, pulse). None of the bots log anything when no user messages arrive. Observed silence times: beacon 77m, forge 47m, mirror 45m, pulse 31m — all units were systemctl active. Do not escalate for log silence unless the systemd unit is also non-active or there's error-spam in the last visible log lines. Confirmed again iter 3 (silence 4h30m–5h18m, all 4 units active, no errors).
 
