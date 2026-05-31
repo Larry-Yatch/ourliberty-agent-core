@@ -6,6 +6,17 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~06:52Z UTC (Iter 173 — interactive, full cycle)
+
+**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 0→1.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 06:35:34Z UTC (~17 min). Check B 15th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
+
+**Watch items updated:**
+- **TIER 3 ACTIVE.** 30-min cadence (de-escalated from Tier 2 iter 172). consecutive_clean=1.
+- **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
+- **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note + Tier 3 cadence context.
+- **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
+- All other watch items: unchanged from iter 172.
+
 ## Status snapshot — updated 2026-05-31 ~06:22Z UTC (Iter 172 — interactive, full cycle)
 
 **System: ✅ Nominal — All checks clean. Tier 2→3 de-escalation (consecutive_clean 2→3). Now Tier 3, 30-min cadence.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 06:05:20Z UTC (~17 min). Check B 14th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
