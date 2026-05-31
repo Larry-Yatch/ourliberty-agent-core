@@ -1,0 +1,28 @@
+[Unit]
+Description=Self-healing healer — auto-resume tasks paused_on_tier1 once the tier cooldown clears (rate-limit-resilience step B)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_resume_paused_on_tier1.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Activation gate. Default OFF until verified live (same posture as
+# heal-pr-auto-merge per phase-e-plan). When unset or != "true", the
+# healer runs in DRY-RUN mode — it scans, logs candidates, and DMs Larry
+# one-time activation instructions, but does NOT call safe_write_inbox.
+# To activate after verification:
+#   sudo systemctl edit ourliberty-heal-resume-paused-on-tier1.service
+# then add a line in the [Service] section:
+#   Environment="OURLIBERTY_AUTORESUME_ENABLED=true"
+# then `sudo systemctl restart ourliberty-heal-resume-paused-on-tier1.timer`.
+Environment="OURLIBERTY_AUTORESUME_ENABLED=false"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_resume_paused_on_tier1.py
+TimeoutStartSec=120
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-resume-paused-on-tier1

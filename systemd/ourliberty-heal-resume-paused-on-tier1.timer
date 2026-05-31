@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_resume_paused_on_tier1 every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-resume-paused-on-tier1.service
+
+[Install]
+WantedBy=timers.target
