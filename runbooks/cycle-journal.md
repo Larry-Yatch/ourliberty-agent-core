@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 195 — 2026-05-31 15:07 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). Sync.json error status stale — actual sync clean. 7/7 services active. 0 open PRs. All inboxes empty.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1083 lines** (unchanged from iter 194). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1083 (unchanged since iter 193). No new alerts since iter 186 last cluster. alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** journalctl ourliberty-*.service --since 30min --priority warning: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon bot log — last activity idx=1082 at 08:01:48 MDT (14:01:48Z UTC), unchanged from iters 187–194. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward).** Cooldown files at `~/agents/state/alert-cooldown/warning/`: `tier2-fallback-skipped-auth_401:forge` (07:59 MDT = 13:59Z UTC), `tier2-fallback-skipped-rate_limit:beacon-bot` (13:59Z), `tier2-fallback-skipped-rate_limit:forge` (13:59Z) — all unchanged from iter 194. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. No new dispatch. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items:
+  - `pulse-grule-check-c-canonical-names-001` — Beacon doc-fix, trust-policy → Forge pending.
+  - `alert-triage-persistence-invocation-001` — pending Larry approval.
+  - `forge-claude-md-preflight-self-check-bullet-001` — pending Larry.
+  - **Tier 2 OAuth restore** — ELEVATED (active pipeline stalls; runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`).
+  - **`sync-push-rebase-fallback-001`** — ELEVATED (confirmed failure at 13:50:29Z UTC).
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry.
+  - Carry-forward (iter 158): Install heal-resume-paused-on-tier1.service + .timer.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T14:37:20.667219Z UTC** (~29 min old at check time, within 90-min threshold). Static for 3rd consecutive iter (193, 194, 195). Escalation trigger: if still static AND >60 min old at next check (~15:37:20Z UTC). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=be7ddde "Pulse cycle 20260531T145921Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ AUTO-FIX FIRED — CLEAN RESULT.** Last successful sync ~13:05:57Z UTC; elapsed ~121 min at check time (2h threshold = 15:05:57Z). Triggered `sync_agent_core.sh`. Result: **no changes detected — local HEAD be7ddde == remote HEAD; repo already in sync.** Sync.json status=error (from 13:50:29Z push failure) is a **stale artifact** — subsequent automated cycles have pushed successfully (latest: be7ddde at 14:59:21Z). Actual sync state: clean. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D) Inboxes: ✅ All empty.** forge, beacon, mirror, pulse — 0 active tasks. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate — today is Sunday → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. ✅
+
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. **Auto-fix `trigger-stale-sync`:** `bash ~/agent-core/scripts/sync_agent_core.sh` — result: no changes needed, local = remote. Logged to `cycle-actions.jsonl`.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=15:08:11Z UTC.
+4. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=1, iter=195, intervention_id=iter195-carry-forward-stalls`.
+5. Wrote journal entry.
+
+**Escalated:** None. All active issues are carry-forward from iters 186–194. Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope unchanged: Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first firing + APPROVAL_REQUEST queue 7.
+
+**Patterns:**
+- **Sync.json error status is stale.** sync.json shows error from 13:50:29Z but repo is actually in sync (local HEAD = remote HEAD = be7ddde). The error record reflects a push failure from earlier today that was subsequently resolved by the automated wrapper. The stale error status will persist until the next actual sync write. No action needed; this is a known sync.json freshness limitation.
+- **Healer heartbeat static at 14:37:20Z UTC** for 3rd consecutive iter (193, 194, 195). 29 min old at check; within 90-min threshold. Escalation trigger: 15:37:20Z UTC if still static AND >60 min old.
+- **Tier 2 OAuth stalls persist** (>30h since May 30 first observation). Forge + beacon-bot tasks remain paused_on_tier1. Monday DM is the next action gate.
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+
+**Learned:** Sync.json error status lags behind actual sync state — the wrapper auto-commit push can succeed in subsequent cycles without updating the JSON back to success. This explains the persistent "sync error" carry-forward across iters 186–195 while the repo itself is in sync. The stale-sync auto-fix resolution confirms the system is not actually broken on sync; only the OAuth and APPROVAL_REQUEST items are genuine blockers.
+
+---
+
 ## Iteration 194 — 2026-05-31 14:57 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired) + sync-push error (known). 7/7 services active. 0 open PRs. All inboxes empty.
