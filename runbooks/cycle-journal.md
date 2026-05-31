@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 136 — 2026-05-31 01:15 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — all checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. **Notable: sync.json shows status=no-change at 01:04:36Z — first clean sync result since the error pattern began (19th occurrence at iter 135 was the last error; this iter's sync ran clean).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (unchanged from iter 135 watermark). 0 new entries.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl count unchanged at 1056. No new entries since iter 135 (01:02:05Z). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry at 01:02:05Z (PR #211 merge completion DM queued). No new WARN/ERROR entries after that. Last known events (18:57Z, 19:02Z) were all INFO/positive workflow completions from iters 133–135. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last entry at 01:03:30Z: notification idx=1055 delivered. Last Larry directive: 19:01:44Z "Is there a reason we are getting this error repeatedly? rotate-active-tier" → Beacon replied 19:03:29Z. No new directives since. No untracked orphan actions. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning: 4 agent-runner rate_limit cooldown files (known/snoozed, Tier 2 OAuth), beacon-telegram-bot auth_401 (known), build-sequence-advancer sequence-complete (resolved), deploy-notifier READY files (routine). All heal-* entries predate iter 135 (oldest: May 24; most recent: May 30 18:20 MDT = 00:20Z). No new pipeline stall or healer events since iter 135. ✅
+
+- **(Check 4) Pending Larry directives: 3 items, unchanged. ⚠️ (carry-forward)**
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code-cooldowns.json: all services restart_fails=0. Last alerts for outbox-notifier and beacon-bot from May 26 (old). inbox-watcher: last_alert=n/a, restart_fails=0 in the json (rc=-1 tracked in alert-cooldown directory). G-rule 2/3 for inbox-watcher rc=-1, no new occurrence this iter. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean, HEAD=551487d "Pulse cycle 20260531T011015Z" — the automated cycle that ran at 01:10:15Z between iter 135 and this session. ✅
+
+- **(Check B) Sync health: ✅ Improved (but root cause unfixed).** sync.json: status=no-change, last_sync=2026-05-31T01:04:36Z, commit=1a90e19. **No error this cycle.** The sync ran at 01:04:36Z between the 1a90e19 and 551487d cycle commits and found nothing to do. The 19th error occurrence at iter 135 (01:01:08Z) is the last recorded; this sync run was clean. Root cause (sync_agent_core.sh:161 bare-push) still unfixed; APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Larry. Monday [yellow] DM: 2026-06-02. Marking as ⚠️ carry-forward but no new occurrence this iter. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon/forge/mirror/pulse — all empty. ✅
+
+- **(Check E) PRs: ✅ PR-clear state holds.**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126 (this Sunday). Idempotency guard holds for week 2026-05-25. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. No always-fix conditions triggered (repo clean and at origin, services active, inboxes empty, no stale PRs).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T01:15:10Z. (Check 4 pending queue keeps tier at 1.)
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-136-nominal-carry-forward-approval-queue"}'` → row appended.
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** None. All active threads unchanged from iter 135. Sync.json shows clean this cycle (improved). Monday DM 2026-06-02 recap includes all 3 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **Sync push error: no new occurrence this iter.** Last error at iter 135 (01:01:08Z). This cycle's sync showed no-change. Pattern may be self-resolving when cycle runs find nothing to sync (no race condition). Root cause still unfixed; G-rule counter unchanged.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR to test against.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **APPROVAL_REQUEST queue: 3 items unchanged.** Monday DM 2026-06-02.
+
+**Learned:**
+- sync.json status=no-change occurs when sync_agent_core.sh finds no dirty Pulse-owned files to auto-commit (run_cycle.sh already pushed them). The recurring error pattern only fires on the race-condition path (sync runs while wrapper is mid-push). This suggests the error frequency may correlate with cycle density — back-to-back iters (like the active PR resolution sprint of iters 127–135) create more race opportunities than quiet iters.
+
+---
+
 ## Iteration 135 — 2026-05-31 01:08 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — **PR #211 MERGED at 01:02:05Z**; 8-iter carry-forward CLOSED. 0 open PRs on both repos (first PR-clear state since iter 127). All 6 services active, all inboxes empty. Only continuing ⚠️ items are known carry-forwards: sync push failure (19th occurrence, APPROVAL_REQUEST pending) and 3-item APPROVAL_REQUEST queue unchanged.

@@ -6,6 +6,17 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~01:15Z UTC (Iter 136)
+
+**System: ✅ Nominal-with-watch.** Iter 136 findings: All checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. **Notable: sync.json shows status=no-change at 01:04:36Z — no new sync push error this cycle (last error was iter 135 at 01:01:08Z).** Root cause fix (sync-push-rebase-fallback-001) still pending Larry. APPROVAL_REQUEST queue: 3 unchanged. No new Telegram directives since Beacon's rotate-active-tier reply at 01:03:30Z. Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence (no CONFLICTING PR active). Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. Monday DM 2026-06-02.
+- Sync push error: No new occurrence this iter. Last error iter 135 (01:01:08Z). Pattern may self-resolve at low-density cycle times. Root cause still unfixed.
+
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
 **System: ✅ Nominal-with-watch.** Iter 135 findings: **PR #211 (step-a-rotation) MERGED at 01:02:05Z** — 8-iter carry-forward (iters 127–135) CLOSED. PR #213 (extend-thresholds) already confirmed merged at iter 134. **0 open PRs on both repos — first PR-clear state since iter 127.** All 6 services active, all inboxes empty. Sync push failure 19th occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Larry asked Beacon about rotate-active-tier error at 01:01Z; Beacon replied. Next Monday [yellow] DM: 2026-06-02 (include plain-language explanation of rotate-active-tier noise until Tier 2 OAuth re-provisioned). Tier=1, consecutive_clean=0.
