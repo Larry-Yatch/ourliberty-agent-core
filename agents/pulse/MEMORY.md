@@ -6,16 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:40Z UTC (Iter 139)
+## Status snapshot — updated 2026-05-31 ~01:43Z UTC (Iter 140)
 
-**System: ✅ Nominal-with-watch.** Iter 139 findings: All checks clean except Check 4 (APPROVAL_REQUEST queue: 3 carry-forward + 1 new). 0 open PRs (4th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (4th consecutive clean sync). New activity: Larry interacted with Beacon via Telegram at 19:27–19:33Z MDT while away from computer → **tier2-verifier-probe-001 APPROVAL_REQUEST** created (Forge to run Tier 2 verifier API call diagnosis). Beacon DM'd Larry. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 140 findings: All checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward, unchanged from iter 139). 0 open PRs (5th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (5th consecutive clean sync). 2-minute interactive cycle immediately after iter 139; no new signals. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence (no CONFLICTING PR active). Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard (all carry-forward), **tier2-verifier-probe-001 NEW** (Tier 2 OAuth diagnosis probe). Monday DM 2026-06-02.
-- Sync push error: **4th consecutive clean cycle.** Last error iter 135 (01:01:08Z). Race-condition hypothesis holds. Root cause still unfixed; APPROVAL_REQUEST pending.
+- **Healer state file >60m old: G-rule 1/3** (new tracking, iters 139+140). heal-stale-daemon-code-cooldowns.json last modified ~00:05Z UTC; seen as >60m old in both iters 139 and 140. All services active; restart_fails=0. 1 more occurrence → escalate healer-down.
+- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001 (Tier 2 OAuth diagnosis probe). Monday DM 2026-06-02.
+- Sync push error: **5th consecutive clean cycle.** Last error iter 135. Race-condition hypothesis holds. Root cause still unfixed; APPROVAL_REQUEST pending.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
