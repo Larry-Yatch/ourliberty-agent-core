@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~15:20Z UTC (Iter 197 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~15:30Z UTC (Iter 199 — interactive, full cycle)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json error **CLEARED** at iter 196 — now shows `no-change` at 15:07Z UTC. Healer heartbeat **resumed** (15:07:20Z, no longer static). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: 1083 (unchanged). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
