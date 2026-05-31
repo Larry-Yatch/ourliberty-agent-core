@@ -34,6 +34,10 @@ STATE_FILE = AGENTS_ROOT / 'state' / 'heal-systemd-install-drift.json'
 
 REPO_SYSTEMD_DIR = Path(__file__).resolve().parent.parent / 'systemd'
 INSTALLED_SYSTEMD_DIR = Path('/etc/systemd/system')
+ALLOWLIST_FILE = (
+    Path(__file__).resolve().parent.parent
+    / 'config' / 'auto-remediation-allowlist.json'
+)
 
 ENV_HEALER_ENABLED = 'OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED'
 
@@ -312,6 +316,132 @@ def _heal_stuck_timer(unit: str) -> tuple[int, str]:
         return -1, 'sudo or systemctl not found in PATH'
 
 
+# -------------------- remediation allowlist --------------------
+
+def _remediation_allowed(class_name: str) -> bool:
+    """Return True iff `class_name` is listed in the allowlist config.
+
+    Fail safe: missing file, JSON parse error, or unexpected shape returns
+    False and WARN-logs. Never raises. This is the third gate stacked on
+    top of the kill-switch file and the OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED
+    env flag — all three must pass before a class takes privileged action.
+    """
+    try:
+        raw = ALLOWLIST_FILE.read_text()
+    except FileNotFoundError:
+        log(
+            f'auto-remediation allowlist missing at {ALLOWLIST_FILE}; '
+            f'class {class_name!r} not allowed',
+            'WARN',
+        )
+        return False
+    except OSError as e:
+        log(
+            f'auto-remediation allowlist read error: {type(e).__name__}: {e}; '
+            f'class {class_name!r} not allowed',
+            'WARN',
+        )
+        return False
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        log(
+            f'auto-remediation allowlist malformed JSON: {e}; '
+            f'class {class_name!r} not allowed',
+            'WARN',
+        )
+        return False
+    if not isinstance(data, dict):
+        log(
+            f'auto-remediation allowlist top-level not an object; '
+            f'class {class_name!r} not allowed',
+            'WARN',
+        )
+        return False
+    classes = data.get('classes')
+    if not isinstance(classes, list) or not all(
+        isinstance(c, str) for c in classes
+    ):
+        log(
+            f'auto-remediation allowlist "classes" missing or not a list of '
+            f'strings; class {class_name!r} not allowed',
+            'WARN',
+        )
+        return False
+    return class_name in classes
+
+
+# -------------------- missing-install remediation --------------------
+
+def _remediate_missing_install(unit: str) -> tuple[int, str]:
+    """cp the repo unit file into /etc/systemd/system, daemon-reload, and
+    enable --now if it's a timer. Returns (rc, stderr); never raises.
+
+    For a .timer we verify after by re-reading systemctl show and confirming
+    ActiveState=active + NextElapseUSecRealtime populated; verification
+    failure flips rc non-zero so the caller falls back to the manual-dance
+    alert. A .service is intentionally not enabled directly — it is
+    activated by its sibling timer.
+    """
+    src = REPO_SYSTEMD_DIR / unit
+    try:
+        cp_result = subprocess.run(
+            ['sudo', '-n', 'cp', str(src), str(INSTALLED_SYSTEMD_DIR) + '/'],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return -1, f'cp {unit} timed out after {RESTART_TIMEOUT_S}s'
+    except FileNotFoundError:
+        return -1, 'sudo or cp not found in PATH'
+    if cp_result.returncode != 0:
+        return cp_result.returncode, (
+            f'cp failed: {(cp_result.stderr or "").strip()}'
+        )
+
+    try:
+        reload_result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'daemon-reload'],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return -1, f'daemon-reload after cp of {unit} timed out'
+    except FileNotFoundError:
+        return -1, 'sudo or systemctl not found in PATH'
+    if reload_result.returncode != 0:
+        return reload_result.returncode, (
+            f'daemon-reload failed: {(reload_result.stderr or "").strip()}'
+        )
+
+    if unit.endswith('.timer'):
+        try:
+            enable_result = subprocess.run(
+                ['sudo', '-n', 'systemctl', 'enable', '--now', unit],
+                capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired:
+            return -1, f'enable --now {unit} timed out'
+        except FileNotFoundError:
+            return -1, 'sudo or systemctl not found in PATH'
+        if enable_result.returncode != 0:
+            return enable_result.returncode, (
+                f'enable --now failed: '
+                f'{(enable_result.stderr or "").strip()}'
+            )
+        # Verify the timer actually came up.
+        post = _systemctl_show(unit) or {}
+        if post.get('ActiveState') != 'active':
+            return -1, (
+                f'post-enable verify failed: ActiveState='
+                f'{post.get("ActiveState")!r}'
+            )
+        if not post.get('NextElapseUSecRealtime'):
+            return -1, (
+                'post-enable verify failed: NextElapseUSecRealtime empty'
+            )
+
+    return 0, ''
+
+
 # -------------------- DM rendering --------------------
 
 def _render_stuck_timer_heal(unit: str, next_fire: str) -> tuple[str, str, str]:
@@ -342,6 +472,22 @@ def _render_stuck_timer_dry_run(unit: str) -> tuple[str, str, str]:
         f'Then verify: '
         f'`systemctl show {unit} --property=NextElapseUSecRealtime`.'
     )
+    return message, subject, suggested
+
+
+def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
+    is_timer = unit.endswith('.timer')
+    enable_phrase = (
+        'enabled --now' if is_timer
+        else 'left to its sibling timer to activate'
+    )
+    message = (
+        f'Auto-installed `{unit}` — it was shipped in the repo but missing '
+        f'from /etc/systemd/system/. Installed, daemon-reloaded, and '
+        f'{enable_phrase}. Next fire: {next_fire}.'
+    )
+    subject = f'install-drift:{unit}'
+    suggested = f'Verify on the droplet: `systemctl status {unit}`.'
     return message, subject, suggested
 
 
@@ -402,6 +548,7 @@ def run_once(
         'missing_install': 0, 'dm_sent': 0,
         'dm_suppressed_dedup': 0, 'reconciled_gc': 0,
         'stuck_timer': 0, 'timer_healed': 0,
+        'install_healed': 0,
     }
     if kill_switch_active():
         log(f'KILL_SWITCH active at {KILL_SWITCH}; exiting cleanly')
@@ -440,6 +587,27 @@ def run_once(
             log(f'DRY-RUN install drift: {unit} (suppressed; activate via '
                 f'{ENV_HEALER_ENABLED}=true)')
             continue
+
+        if _remediation_allowed('install-drift'):
+            rc, stderr = _remediate_missing_install(unit)
+            if rc == 0:
+                post = _systemctl_show(unit) or {}
+                next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
+                counts['install_healed'] += 1
+                msg, subj, sug = _render_install_healed(unit, next_fire)
+                ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+                if ok:
+                    counts['dm_sent'] += 1
+                    _record_dm(state, unit, now=now)
+                    log(f'auto-installed {unit} next_fire={next_fire!r}')
+                else:
+                    log(f'DM append suppressed for healed install {unit}', 'WARN')
+                continue
+            log(
+                f'auto-install of {unit} failed rc={rc} stderr={stderr!r}; '
+                f'falling back to manual-dance alert',
+                'WARN',
+            )
 
         msg, subj, sug = _render_missing_install(unit)
         ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
