@@ -6,16 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~13:00Z UTC (Iter 184 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~13:32Z UTC (Iter 185 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 11→12.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 12:37Z UTC). Check B 26th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078. Larry inquired 12:52Z UTC about approvals; Beacon informed him of threshold-update-2026-05-31 (still applied: false).
+**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 12→13.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 13:07Z UTC). Check B 27th consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078. **threshold-update-2026-05-31 APPROVED by Larry at 13:04Z UTC; Beacon dispatched config-only PR at 13:06Z UTC. In flight.**
 
 **Watch items:**
-- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=12 (floor; no further de-escalation; counter continues for audit).
+- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=13 (floor; no further de-escalation; counter continues for audit).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note + Tier 3 cadence context.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
-- **threshold-update-2026-05-31:** applied=false. Larry inquired 12:52Z; Beacon informed. Pending explicit `approve` command. Monday DM will resurface.
+- **threshold-update-2026-05-31:** APPROVED 13:04Z UTC; Beacon dispatched config-only PR 13:06Z UTC. Watch for Mirror PASS + merge + Beacon flip of `applied: true`. If merged before Monday, remove from Monday DM watch.
 
 ---
 

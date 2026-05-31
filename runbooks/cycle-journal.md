@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 185 — 2026-05-31 13:32 UTC (interactive)
+
+**Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 13:07Z UTC). Check B: 27th consecutive clean. **Tier 3, consecutive_clean 12→13.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1078 lines** (unchanged from iter 184 watermark). alert-triage.json MISSING (APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry). 0 new alerts. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1078 (unchanged). Last alert idx=1077 at 04:35:54Z UTC (iter 166 APPROVAL_REQUEST DM). No new healer or process alerts since iter 184. ✅
+
+- **(Check 0) alert-triage.json MISSING: carry-forward.** APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending Larry approval. No new action. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** journalctl ourliberty-*.service --since 30m --priority warning: NO entries. No new WARN signatures. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal with significant note.** **NEW POST-ITER-184:** Larry sent "approve threshold-update-2026-05-31" at 07:04:58-0600 MDT (= 13:04:58Z UTC). Beacon replied at 07:06:01-0600 MDT (= 13:06:01Z UTC): "Threshold-apply dispatched (config-only, all 4 buckets). After Mirror REVIEW_PASS + merge, I'll flip the check-iii-2026..." — directive is NOT orphaned; Beacon handled it. **threshold-update-2026-05-31 is now dispatched, in flight.** Last Larry directive is tracked. No untracked directives remain. No agent distress. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall-state.json present with cooldown dict format. All non-2099 cooldown entries are expired timestamps (oldest active non-2099: tier2_fallback entries from 04:06Z UTC, now 9+ hours ago and expired). No active stalls visible. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** Larry's "approve threshold-update-2026-05-31" at 13:04Z UTC handled by Beacon — NOT a queue item, tracked separately. APPROVAL_REQUEST queue unchanged at 7. Monday [yellow] DM **TOMORROW (2026-06-01 UTC)**. All 7 items carry-forward.
+  - `pulse-grule-check-c-canonical-names-001` — Beacon doc-fix APPROVAL_REQUEST, trust-policy → Forge pending.
+  - `alert-triage-persistence-invocation-001` — pending Larry approval.
+  - `forge-claude-md-preflight-self-check-bullet-001` — pending Larry.
+  - Tier 2 OAuth restore — pending Larry (runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` — pending Larry (iter 43).
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer.
+  - **Monday [yellow] DM: 2026-06-01 UTC — TOMORROW.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code.heartbeat: 2026-05-31T13:07:15Z UTC (~25 min old at check time, within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree. Session-start gitStatus HEAD=09da3f0 "Pulse cycle 20260531T130158Z". ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T13:05:57Z UTC (~27 min old, within 2h threshold). **27th consecutive clean Check B.** sync-push-rebase-fallback-001 still pending Larry as defensive hardening. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. G-rule doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` in pipeline. ✅
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — 0 tasks (excluding .archive/.hold). ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. threshold-update-2026-05-31 dispatch in flight (no PR opened yet; expected within Forge's next cycle). ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. Next fresh run: 2026-06-02 (Mon). ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate — today is Sunday → skip. **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d out); outside 60d window. ✅
+- **G-rule watch items (no new occurrences):** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix APPROVAL_REQUEST pending), systemd install-drift (1/3), cycle.timer stuck (1/3). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=13. Tier 3 is the floor; consecutive count continues for audit.
+3. Appended PRIME DIRECTIVE ledger row: `kind=intervention, tier=3, iter=185, intervention_id=iter185-nominal-tier3-consecutive13`.
+4. Updated MEMORY.md status snapshot.
+5. Wrote journal entry.
+
+**Escalated:** None. APPROVAL_REQUEST queue unchanged at 7. Monday [yellow] DM TOMORROW (2026-06-01 UTC) will include full queue list + Check VIII/IX first-firing note + Tier 3 cadence context.
+
+**Patterns:**
+- **Tier 3, consecutive_clean=13.** System at Tier 3 stable (the floor; consecutive count continues for audit purposes).
+- **Check B: 27th consecutive clean.** sync-push-rebase-fallback-001 remains pending defensive hardening only.
+- **threshold-update-2026-05-31 APPROVED AND DISPATCHED.** Larry approved at 13:04Z UTC; Beacon confirmed dispatch at 13:06Z UTC. Config-only PR in flight. Watch for Mirror PASS + merge + Beacon flip of `applied: true` in next 1-2 cycles. This closes the watch item from MEMORY.md.
+- **Check VIII/IX first firing TOMORROW (2026-06-01 UTC).** Both analyzers run for the first time. Monitor for unexpected output or errors.
+- **APPROVAL_REQUEST queue stable at 7.** Monday DM TOMORROW will surface the full list.
+
+**Learned:** threshold-update-2026-05-31 approved and dispatched after iter 184 closed. The Monday DM watch-item for it can be downgraded — if the PR merges before Monday, it won't need resurface. All other patterns unchanged.
+
+---
+
 ## Iteration 184 — 2026-05-31 13:00 UTC (interactive)
 
 **Health:** ✅ Nominal — All mandatory and additive checks clean. 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat fresh (stale-daemon 12:37Z UTC). Check B: 26th consecutive clean. **Tier 3, consecutive_clean 11→12.**
