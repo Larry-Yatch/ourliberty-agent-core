@@ -6,25 +6,26 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~04:50Z UTC (Iter 162 — full cycle check)
+## Status snapshot — updated 2026-05-31 ~04:53Z UTC (Iter 163 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean. Calibration finding on Check C service names (see below).** Iter 161 (automated) handled Beacon inter-agent notify for G-rule dispatch: APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (larry_alerts line 1078, delivered at 04:35:29Z UTC). 7/7 services active (canonical names). 0 open PRs. All inboxes clean. Check B 4th consecutive clean. Healer heartbeat 04:35:17Z UTC. APPROVAL_REQUEST queue: 6. Alert watermark: 1078. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active (canonical names). 0 open PRs. All inboxes empty. Healer heartbeat 04:35:17Z UTC (~18 min). Check B 5th consecutive clean. Tier=1, consecutive_clean=1. APPROVAL_REQUEST queue: 6 (unchanged from iter 162). Alert watermark: 1078.
 
 **Watch items updated:**
 - **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** Beacon diagnosed root cause (invocation gap in run_cycle.sh + cycle-prompt.md § 3.0). APPROVAL_REQUEST `alert-triage-persistence-invocation-001` routed to Larry (pulse-escalations.json id=74). Close when Larry approves, Forge PR merges, + alert-triage.json appears in next automated cycle.
-- **NEW calibration: Check C service-name suffix.** Canonical service names are `ourliberty-*-bot` (e.g., `ourliberty-beacon-bot`), NOT `ourliberty-*-telegram-bot`. Old/deprecated `-telegram-bot` entries exist in systemd but are inactive. Always check canonical names via `systemctl list-units --type=service --all | grep ourliberty` or the cooldowns.json. 1st observation (iter 162). Watch threshold=3 for G-rule → dispatch doc-fix to Beacon.
-- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z (2 residual). Rate limit reset 11:30am MDT today. Monday DM will include trend assessment. Close when no heal-claude-max-burn-rate alerts in 24h post-reset.
+- **Check C calibration: 2nd clean iter using canonical service names.** `ourliberty-*-bot` confirmed correct. Watch threshold=3 for G-rule. 1st good iter (163).
+- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z. Rate limit reset 11:30am MDT today. Monday DM will include trend assessment. Close when no heal-claude-max-burn-rate alerts in 24h post-reset.
 - **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
-- **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001 (NEW), sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
-- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Rate limit cleared 11:30am MDT. Close when Larry installs via SSH.
-- **Check B CLEAN: 4th consecutive (iters 159–162).** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 20 iters (143–162). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (6):** alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Close when Larry installs via SSH.
+- **Check B CLEAN: 5th consecutive (iters 159–163).** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 21 iters (143–163). Heartbeat fresh (04:35:17Z UTC). Verification: 2026-06-07.
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
 - **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix pending Larry. G-rule posture unchanged.
 - **systemd install-drift G-rule: 1/3.** No new instance this iter.
 - **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
+- **deploy-notifier READY cooldowns: 309 entries in alert-cooldown/warning/.** Snoozed Vercel deploy notifications. No action required but volume is notable.
 
 ## Status snapshot — updated 2026-05-31 ~04:16Z UTC (Iter 159)
 
