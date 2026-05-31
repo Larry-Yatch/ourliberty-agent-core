@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:51Z UTC (Iter 141)
+## Status snapshot — updated 2026-05-31 ~01:57Z UTC (Iter 142)
 
-**System: ✅ Nominal-with-watch.** Iter 141 findings: All checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (G-rule 2/3, 3rd consecutive observation). 0 open PRs (6th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (6th consecutive clean sync). larry-reject count: 17 (down from 34 — partial cleanup). Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + G-rule dispatch.** Iter 142 findings: Check 5 G-rule 3/3 reached → dispatched `cycle-fix-check5-healer-liveness-20260531T015606Z.json` to Beacon. All other checks clean. 0 open PRs (7th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (7th consecutive clean sync). larry-reject count: 17 (unchanged). Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m old: G-rule 2/3** (iters 139+140=1/3, iter 141=2/3). heal-stale-daemon-code-cooldowns.json last modified 00:05:15Z UTC (104m old at check time). Benign interpretation: healer only writes on restart events; last restarts 23:35Z+00:05Z, no code changes since. Calibration note: prior "restart_fails=0" claims were schema misreads (field does not exist; actual fields: last_restart_ts, last_alert_ts). **Next occurrence → dispatch to Beacon: propose Check 5 healer process liveness check.**
+- **Healer state file >60m old: G-rule 3/3 → DISPATCHED to Beacon (iter 142).** cycle-fix-check5-healer-liveness-20260531T015606Z.json written to Beacon inbox. Proposes replacing file-age threshold with healer timer liveness check. Verification window: 2026-06-07. Watch: Beacon processes and either produces spec-update or APPROVAL_REQUEST.
 - APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001. Monday DM 2026-06-02.
-- Sync push error: **6th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- Sync push error: **7th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
@@ -167,6 +167,8 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 ## Pending watch items (not yet patterns / pending resolution)
 
 - **CLOSED 2026-05-31 (iter 135) — PR #211 (step-a-rotation) MERGED at 01:02:05Z.** Larry approved rebase (iter 132). Forge rebased ($2.11). Mirror PASS (01:02:00Z). AUTO_MERGE fired. Branch deleted. Step A rotation hardening (auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 probe 6h cadence, 88 unit tests) now live.
+
+- **2026-05-31 (iter 142) — Check 5 healer liveness (G-rule 3/3): Beacon dispatch sent.** cycle-fix-check5-healer-liveness-20260531T015606Z.json written to Beacon inbox. Pattern: 4 consecutive iters (139–142) with cooldowns file >60m old but all 6 services active. Root cause: healer is event-driven (writes on restart events), not heartbeat-driven. Proposed fix: replace file-age threshold with `systemctl is-active ourliberty-heal-stale-daemon-code.timer`. Verification: 2026-06-07.
 
 - **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
 
