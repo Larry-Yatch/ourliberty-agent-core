@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~23:42Z UTC (Iter 263 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~23:47Z UTC (Iter 264 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 23:06:01Z UTC (~36 min old at iter 263). Healer heartbeat 23:38:19Z UTC (new tick, +30 min from prior 23:07:46Z; healthy cadence). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1088** (unchanged since iter 262). APPROVAL_REQUEST queue: 8 (unchanged). Monday [yellow] DM pre-fired at iter 259. ~18 min until June 1 00:00Z UTC at iter 263 check time.
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 23:06:01Z UTC (~40 min old at iter 264). Healer heartbeat 23:38:19Z UTC (same tick as iter 263; ~9 min old at iter 264 check time; healthy). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1088** (unchanged since iter 262). APPROVAL_REQUEST queue: 8 (unchanged). Monday [yellow] DM pre-fired at iter 259. ~13 min until June 1 00:00Z UTC at iter 264 check time.
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer).
