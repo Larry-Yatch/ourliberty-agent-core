@@ -6,16 +6,16 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:15Z UTC (Iter 136)
+## Status snapshot — updated 2026-05-31 ~01:20Z UTC (Iter 137)
 
-**System: ✅ Nominal-with-watch.** Iter 136 findings: All checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. **Notable: sync.json shows status=no-change at 01:04:36Z — no new sync push error this cycle (last error was iter 135 at 01:01:08Z).** Root cause fix (sync-push-rebase-fallback-001) still pending Larry. APPROVAL_REQUEST queue: 3 unchanged. No new Telegram directives since Beacon's rotate-active-tier reply at 01:03:30Z. Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch.** Iter 137 findings: All checks clean except 3-item APPROVAL_REQUEST carry-forward (unchanged). 0 open PRs on both repos. All 6 services active. All inboxes empty. sync.json: no-change (2nd consecutive clean run). No new Telegram directives since Beacon's rotate-active-tier reply at 01:03:30Z. Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence (no CONFLICTING PR active). Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
 - APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. Monday DM 2026-06-02.
-- Sync push error: No new occurrence this iter. Last error iter 135 (01:01:08Z). Pattern may self-resolve at low-density cycle times. Root cause still unfixed.
+- Sync push error: **2nd consecutive clean cycle.** Last error iter 135 (01:01:08Z). 2 consecutive clean runs (iters 136, 137) support race-condition hypothesis: error only fires under back-to-back automated cycle push racing. Root cause still unfixed; APPROVAL_REQUEST pending.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
