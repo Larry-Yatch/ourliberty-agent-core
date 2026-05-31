@@ -274,9 +274,18 @@ def tier2_available():
     return Path(TIER2_HOME, '.claude', '.credentials.json').exists()
 
 
-def _mark_paused_on_tier1(task_stem, failure_type):
+def _mark_paused_on_tier1(task_stem, failure_type, agent_id=None, tier=None):
     """Write a sentinel in the in-flight state file so heal_pipeline_stall's
-    Check 8 can detect resume-tasks paused on Tier 1 quota/auth failure.
+    Check 8 can detect resume-tasks paused on Tier 1 quota/auth failure,
+    and so `heal_resume_paused_on_tier1` can auto-resume the task once the
+    tier cooldown window clears.
+
+    The single caller (`run_claude`) hits this *after* `_unregister_in_flight`
+    has already wiped the file, so the marker lands in an otherwise-empty
+    JSON. `agent_id` and `tier` are recorded so the auto-resume healer can
+    deterministically locate the archived envelope and check the right tier's
+    cooldown without scanning every agent's `.archive/`. Both default to None
+    for backwards-compatibility with older callers / tests.
 
     Failure is non-fatal; the DM via larry_alerts is the primary signal
     (this is defense-in-depth state for the healer to surface if Larry
@@ -290,10 +299,15 @@ def _mark_paused_on_tier1(task_stem, failure_type):
             data = json.loads(target.read_text()) if target.exists() else {}
         except (OSError, json.JSONDecodeError):
             data = {}
-        data['paused_on_tier1'] = {
+        marker = {
             'failure_type': failure_type,
             'at': datetime.now(timezone.utc).isoformat(),
         }
+        if agent_id:
+            marker['agent_id'] = agent_id
+        if tier:
+            marker['tier'] = tier
+        data['paused_on_tier1'] = marker
         target.write_text(json.dumps(data, indent=2))
     except OSError:
         pass
@@ -1082,7 +1096,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 'TIER2_FALLBACK_SKIPPED reason=' + failure_type +
                                 ' cause=resume_session_account_bound',
                                 'WARN')
-                            _mark_paused_on_tier1(task_stem, failure_type)
+                            _mark_paused_on_tier1(
+                                task_stem, failure_type,
+                                agent_id=agent_id,
+                                tier=active_tier_name,
+                            )
                             _dm_tier2_unavailable(
                                 failure_type, task_stem, agent_id, session_id,
                             )
