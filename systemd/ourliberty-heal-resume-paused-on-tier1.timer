@@ -2,8 +2,14 @@
 Description=Run heal_resume_paused_on_tier1 every 10 minutes
 
 [Timer]
+# OnCalendar (wall-clock) rather than OnUnitActiveSec so the timer cannot
+# silently die with NextElapse=infinity if a run is ever missed/interrupted
+# (the OnUnitActiveSec failure mode). OnBootSec gives a first run shortly
+# after boot; Persistent=true catches up a missed run on next boot.
 OnBootSec=5min
-OnUnitActiveSec=10min
+OnCalendar=*:0/10
+Persistent=true
+RandomizedDelaySec=30s
 Unit=ourliberty-heal-resume-paused-on-tier1.service
 
 [Install]
