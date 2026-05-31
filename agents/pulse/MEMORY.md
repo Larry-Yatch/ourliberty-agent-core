@@ -6,6 +6,19 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
+
+**System: ✅ Nominal-with-watch.** Iter 135 findings: **PR #211 (step-a-rotation) MERGED at 01:02:05Z** — 8-iter carry-forward (iters 127–135) CLOSED. PR #213 (extend-thresholds) already confirmed merged at iter 134. **0 open PRs on both repos — first PR-clear state since iter 127.** All 6 services active, all inboxes empty. Sync push failure 19th occurrence (carry-forward). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Larry asked Beacon about rotate-active-tier error at 01:01Z; Beacon replied. Next Monday [yellow] DM: 2026-06-02 (include plain-language explanation of rotate-active-tier noise until Tier 2 OAuth re-provisioned). Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- PR #211 (step-a-rotation): **MERGED** at 01:02:05Z. ✅ CLOSED.
+- PR #213 (extend-thresholds): Confirmed merged iter 134. ✅ CLOSED.
+- MalformedForgeMarker on pr211-rebase preflight: G-rule 1/3 (no new occurrence iter 135). Watch.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 135; no active CONFLICTING PR to test against).
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 135).
+- inbox-watcher rc=-1: G-rule 2/3 (no new occurrence iter 135).
+- APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard. Monday DM 2026-06-02.
+
 ## Status snapshot — updated 2026-05-31 ~01:01Z UTC (Iter 134)
 
 **System: ⚠️ Drift (resolving).** Iter 134 findings: PR #213 (extend-thresholds-per-agent-overrides) **MERGED** at 00:57:10Z — Check III threshold implementation complete (beacon _default→2147s, pulse _default→262s live). PR #211 Forge rebase completed ($2.11); Mirror review dispatched at 18:56:45Z and in-flight (Mirror inbox: review-pr211-rebase-step-a-rotation-001.json). Sync push failure 18th occurrence (00:56:29Z, carry-forward). APPROVAL_REQUEST queue: 3 unchanged. larry-alerts: 1054 lines (+1 vs iter 133). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
@@ -141,7 +154,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 ## Pending watch items (not yet patterns / pending resolution)
 
-- **2026-05-31 (iters 127–134) — PR #211 (step-a-rotation) CONFLICTING → rebase completed, Mirror in-flight.** Larry approved rebase (iter 132, 18:43Z MDT). Forge rebase task completed (18:56:45Z, $2.11). Mirror review dispatched and in-flight (mirror inbox: review-pr211-rebase-step-a-rotation-001.json). mergeStateStatus=UNKNOWN (GitHub recomputing post-force-push). Close when Mirror PASS + auto-merge fires.
+- **CLOSED 2026-05-31 (iter 135) — PR #211 (step-a-rotation) MERGED at 01:02:05Z.** Larry approved rebase (iter 132). Forge rebased ($2.11). Mirror PASS (01:02:00Z). AUTO_MERGE fired. Branch deleted. Step A rotation hardening (auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 probe 6h cadence, 88 unit tests) now live.
 
 - **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
 

@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 135 — 2026-05-31 01:08 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — **PR #211 MERGED at 01:02:05Z**; 8-iter carry-forward CLOSED. 0 open PRs on both repos (first PR-clear state since iter 127). All 6 services active, all inboxes empty. Only continuing ⚠️ items are known carry-forwards: sync push failure (19th occurrence, APPROVAL_REQUEST pending) and 3-item APPROVAL_REQUEST queue unchanged.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (was 1054 at iter 134 watermark). 2 new entries, both Tier 3 known-patterns.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 2 new entries, both nominal.**
+  - Line 1055 (00:57:10Z): outbox-notifier review-pass for PR #213 (extend-thresholds) — may have been counted at iter 134 watermark; positive workflow completion, Tier 3. ✅
+  - Line 1056 (01:02:05Z): outbox-notifier review-pass for PR #211 (pr211-rebase-step-a-rotation-001) — Mirror PASS, AUTO_MERGE merged, branch deleted. **MAJOR POSITIVE.** Tier 3 known-pattern. ✅
+  No escalations; no new dispatches needed.
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entries (after iter 134):
+  - 19:02:00Z: Mirror review_pass marker classified for pr211-rebase-step-a-rotation-001 (INFO). ✅
+  - 19:02:05Z: AUTO_MERGE pr211-rebase-step-a-rotation-001 pr=#211 outcome=merged. INFO. ✅
+  - 19:02:05Z: Completion DM queued for Larry (intent=review-pass, idx=1055 delivered 19:03:30Z). INFO. ✅
+  No WARN/ERROR entries since iter 133's MalformedForgeMarker (18:50:39Z, self-healed). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal with note.** 19:01:44Z: Larry asked Beacon "Is there a reason we are getting this error repeatedly? ⚠ rotate-active-tier [rotation_auth_gate_blocked:tier2] Rotati…". 19:03:29Z: Beacon replied explaining expected behavior + something to fix (message truncated in log). Root cause is the known Tier 2 OAuth provisioning issue; APPROVAL_REQUEST for Tier 2 OAuth re-auth is already pending as background work. No untracked orphan directive. Beacon handled the question; action path is already in the queue. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning directory contents: 4 agent-runner rate_limit cooldown files (known snoozed, Tier 2 OAuth issue), beacon-telegram-bot auth_401 (known), build-sequence-advancer sequence-complete (stale/resolved), deploy-notifier READY files (routine). No active pipeline-stall entries. ✅
+
+- **(Check 4) Pending Larry directives: 3 items, unchanged. ⚠️ (carry-forward)**
+  - **sync-push-rebase-fallback-001** (iter 118) — still pending Larry. Monday [yellow] DM recap: 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — still pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — still pending Larry. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code-cooldowns.json: all services show recent restarts (~00:55Z for beacon/forge/mirror/inbox-watcher, ~01:25Z for pulse-bot). No new last_alert_ts entries for any service (last alerts from May 25-26, long ago). No stale-daemon events. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean. HEAD=1a90e19 "Pulse cycle 20260531T010330Z" — includes both PR #211 (825423d fix(rotation): step A) and PR #213 (caae5ba feat(thresholds)) merge commits. Local = origin. ✅
+
+- **(Check B) Sync health: ⚠️ 19th occurrence (carry-forward).** sync.json: status=error, last_sync=2026-05-31T01:01:08Z, commit=391f3f83. Same root cause: sync_agent_core.sh:161 bare-push. APPROVAL_REQUEST sync-push-rebase-fallback-001 pending Larry. Monday [yellow] DM 2026-06-02. ⚠️
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon/forge/mirror/pulse — all empty. ✅
+
+- **(Check E) PRs: ✅ MILESTONE — 0 open PRs.**
+  - ourliberty-agent-core: **0 open PRs.** PR #211 auto-merged at 01:02:05Z; PR #213 merged at 00:57:10Z. Both confirmed. First PR-clear state since iter 126. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Idempotency guard holds. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations).
+2. No always-fix conditions triggered (repo clean and at origin, services active, inboxes empty, no stale PRs).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T01:08:34Z. (Check B sync error + Check 4 pending queue keep tier at 1.)
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "pr211-merged-zero-prs-milestone-iter-135"}'` → row appended.
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** None. All active threads have live resolution paths or are in the Monday DM queue. PR #211 and #213 both fully merged; no new Larry action required this iter. Larry's Telegram question about rotate-active-tier was answered by Beacon at 01:03:29Z; underlying fix remains in the APPROVAL_REQUEST queue for Monday.
+
+**Patterns:**
+- **PR #211 CONFLICTING: CLOSED.** 8 consecutive iters (127–135) resolved. Mirror passed, auto-merged at 01:02:05Z. Step A rotation hardening (auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 keep-alive, 88 unit tests) now live.
+- **Check III threshold implementation complete.** PR #213 (per-agent overrides: beacon _default→2147s, pulse _default→262s) merged iter 134. PR #211 (step-a-rotation code) merged this iter. Both Check III proposals executed and live.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No new occurrence this iter. PR #211 cleared so no active CONFLICTING to test against. Pattern still worth dispatching if 3rd instance occurs.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **Sync push failure: 19th occurrence.** Monday [yellow] recap 2026-06-02.
+
+**Learned:**
+- The auto-merge retry path for CONFLICTING→rebased PRs works end-to-end: Forge force-pushed, Mirror classified review_pass via session log scan (not via GitHub reviewDecision), outbox-notifier fired AUTO_MERGE, PR merged. Full pipeline from rebase-approval (Larry at iter 132) to merge (iter 135) = 6 iters, ~27 min. Healthy throughput.
+- Larry's Telegram question about rotate-active-tier (19:01:44Z) signals that the rotate-active-tier Tier 2 block is noisy enough to prompt a direct question. The Monday [yellow] DM on 2026-06-02 should include a plain-language explanation of when this will stop firing (after Tier 2 OAuth re-provisioning).
+
+---
+
 ## Iteration 134 — 2026-05-31 01:01 UTC (interactive)
 
 **Health:** ⚠️ Drift (resolving) — PR #213 (extend-thresholds-per-agent-overrides) **MERGED** at 00:57:10Z. PR #211 Forge rebase **completed**; Mirror review dispatched and in-flight. Two major carry-forward items closed this iter. Remaining open: sync push failure (carry-forward), PR #211 pending Mirror verdict.
