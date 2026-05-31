@@ -25,6 +25,72 @@ Beacon completed preflight on my iter-142 G-rule dispatch. Result: APPROVAL_REQU
 
 ---
 
+## Iteration 143 — 2026-05-31 02:01 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch + Check-5 permanent fix in motion — all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >60m old; G-rule dispatch processed by Beacon, heartbeat-substrate fix in Forge queue). 0 open PRs on both repos (8th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (~56m ago, within 2h). larry-reject count: 17 actual (34 files = 17 .json + 17 .json.reason pairs; no change from iter 142).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1056 lines** (unchanged from iter 142 watermark). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts.** larry-alerts.jsonl count unchanged at 1056. Same trailing entries as iter 142. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log last entry 01:02:05Z UTC (PR #211 merge DM — same as iter 142). No new WARN/ERROR. inbox-watcher.log: quiet. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log last Larry message: 19:30:12Z MDT (01:30:12Z UTC) — same as iters 139–142. Last outbound: 19:33:22Z MDT tier2-verifier-probe-001 approval request. No new directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** alert-cooldown/warning/: same stale/known set (sentinel:inbox-stall, stale-lease, sync.service:sync-blocked, watchdog entries — all dated May 26–30). No new pipeline-stall or healer entries. ✅
+
+- **(Check 4) Pending Larry directives: 4 items. ⚠️ (all carry-forward from iter 142)**
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: 2026-06-02.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+  - **tier2-verifier-probe-001** (iter 139) — Beacon DM'd Larry 19:33Z MDT. Still pending Larry's `approve tier2-verifier-probe-001` reply. ⚠️
+
+- **(Check 5) Stale daemon: ⚠️ G-rule dispatch processed by Beacon; permanent fix in Forge queue.** heal-stale-daemon-code-cooldowns.json still ~115 min old (same root cause as iters 139–142). **New this iter:** Beacon processed `cycle-fix-check5-healer-liveness-20260531T015606Z.json` (now archived). Architectural correction: substrate is `~/agents/blackboard/heal-stale-daemon-code.heartbeat`, not the cooldowns file. Heartbeat confirmed fresh: last mtime 2026-05-31T01:35:15Z (25.7 min ago — well within proposed 90-min threshold). APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced by Beacon; Forge task pending trust-policy dispatch (doc-only PR). Verification anchor: 2026-06-07. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean, HEAD=1b59f48 "Pulse cycle 20260531T015919Z". ✅
+
+- **(Check B) Sync health: ✅ 8th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T01:04:36Z (~56 min ago, within 2h threshold). Race-condition root cause (sync_agent_core.sh:161) still unfixed; APPROVAL_REQUEST pending Monday. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: all empty. ✅** beacon: cycle-fix-check5-healer-liveness archived (Beacon processed). forge/mirror/pulse: empty. Forge APPROVAL_REQUEST dispatch pending trust-policy. ✅
+
+- **(Check E) PRs: ✅ PR-clear holds (8th consecutive iter).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **(Check I):** Fired iter 126. Idempotency guard holds (same week). ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Next: 2026-06-02. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~23 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean, services active, inboxes empty, no stale PRs).
+3. No new dispatches — Check 5 permanent fix already in motion from iter 142 G-rule dispatch.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --payload '{"intervention_id": "iter-143-nominal-watch-check5-beacon-pending"}'` → row appended at 2026-05-31T02:03:18Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-05-31T02:03:19Z.
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. System steady-state; no new signals. All active threads unchanged from iter 142. Monday DM 2026-06-02 recap includes all 4 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **APPROVAL_REQUEST queue: 4 items unchanged.** Monday DM 2026-06-02.
+- **Sync push error: 8th consecutive clean cycle.** Root cause fix (sync-push-rebase-fallback-001) still pending Larry.
+- **Check 5 permanent fix in motion:** Beacon processed G-rule dispatch (iter 142) and found the correct substrate (`heal-stale-daemon-code.heartbeat`). Forge task pending. Verification: 2026-06-07.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+
+**Learned:**
+- larry-reject count clarification: "34 files" = 17 actual rejections × 2 (each .json + .json.reason pair). The iter-141 "17" count was counting only .json files; both counts describe the same unchanged set. No new rejections since iter 141.
+- The G-rule → Beacon → architectural-correction pipeline worked cleanly this cycle. My iter-142 proposal was a reasonable start (systemctl timer check); Beacon's correction (heartbeat file) is strictly better because it proves the healer's code ran, not just that its timer is scheduled. The heartbeat file was fresh (25.7 min old) — confirming the healer is healthy and Check 5's false-positive was purely a substrate mismatch, not a real healer failure.
+- Multiple heartbeat files in `~/agents/blackboard/` confirm the pattern is general: every major healer writes a heartbeat on each invocation. Check 5 was the exception using a cooldowns file as a proxy; the permanent fix aligns Check 5 with the established convention.
+
+---
+
 ## Iteration 142 — 2026-05-31 01:57 UTC (interactive)
 
 **Health:** ⚠️ Nominal-with-watch + G-rule dispatch — all mandatory checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (G-rule 3/3 reached → dispatched to Beacon). 0 open PRs on both repos (7th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (7th consecutive clean sync, last_sync=01:04:36Z, ~52m ago). larry-reject count: 17 (unchanged). **Action: Beacon dispatch written for Check 5 calibration fix.**

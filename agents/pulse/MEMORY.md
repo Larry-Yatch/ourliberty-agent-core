@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~01:57Z UTC (Iter 142)
+## Status snapshot — updated 2026-05-31 ~02:04Z UTC (Iter 143)
 
-**System: ✅ Nominal-with-watch + G-rule dispatch.** Iter 142 findings: Check 5 G-rule 3/3 reached → dispatched `cycle-fix-check5-healer-liveness-20260531T015606Z.json` to Beacon. All other checks clean. 0 open PRs (7th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (7th consecutive clean sync). larry-reject count: 17 (unchanged). Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 143 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >60m; G-rule dispatch already processed by Beacon this session). 0 open PRs (8th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (8th consecutive clean sync). larry-reject count: 17 actual (34 files = 17×2 .json+.reason pairs; unchanged). Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m old: G-rule 3/3 → DISPATCHED to Beacon (iter 142).** cycle-fix-check5-healer-liveness-20260531T015606Z.json written to Beacon inbox. Proposes replacing file-age threshold with healer timer liveness check. Verification window: 2026-06-07. Watch: Beacon processes and either produces spec-update or APPROVAL_REQUEST.
+- **Healer state file >60m: G-rule dispatch PROCESSED by Beacon (iter 143).** Beacon found correct substrate: `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (written on every healer invocation, not just restarts). Heartbeat mtime 01:35:15Z UTC = 25.7 min old (fresh). APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced; Forge task pending trust-policy dispatch. New threshold: 90 min. Scope: doc-only cycle-prompt.md edits (§ 3.5 substrate swap + § 17 glossary). Verification: 2026-06-07.
 - APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001. Monday DM 2026-06-02.
-- Sync push error: **7th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- Sync push error: **8th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
@@ -168,7 +168,7 @@ Pulse's own G-rule dispatches should always use `source="pulse"` (canonical). Th
 
 - **CLOSED 2026-05-31 (iter 135) — PR #211 (step-a-rotation) MERGED at 01:02:05Z.** Larry approved rebase (iter 132). Forge rebased ($2.11). Mirror PASS (01:02:00Z). AUTO_MERGE fired. Branch deleted. Step A rotation hardening (auth gate, auth_401 circuit-breaker, tier-aware logs, Tier 2 probe 6h cadence, 88 unit tests) now live.
 
-- **2026-05-31 (iter 142) — Check 5 healer liveness (G-rule 3/3): Beacon dispatch sent.** cycle-fix-check5-healer-liveness-20260531T015606Z.json written to Beacon inbox. Pattern: 4 consecutive iters (139–142) with cooldowns file >60m old but all 6 services active. Root cause: healer is event-driven (writes on restart events), not heartbeat-driven. Proposed fix: replace file-age threshold with `systemctl is-active ourliberty-heal-stale-daemon-code.timer`. Verification: 2026-06-07.
+- **2026-05-31 (iters 142–143) — Check 5 healer substrate fix: Beacon processed, Forge task pending.** G-rule dispatch (iter 142) processed by Beacon within the same session (iter 143). Beacon's architectural correction: use `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (written on every healer invocation) instead of the cooldowns file (written only on restart events). New threshold: 90 min (3× 30-min cadence). Heartbeat confirmed fresh at iter 143: mtime 01:35:15Z UTC (25.7 min old). APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced; Forge task pending trust-policy dispatch. Scope: doc-only cycle-prompt.md edits (§ 3.5 substrate + threshold swap; § 17 glossary). Verification: 2026-06-07. Close when Forge PR merges and Check 5 reads heartbeat without false-positive.
 
 - **2026-05-31 (iters 127–128) — heal-pr-auto-merge healer blind to CONFLICTING state (G-rule 2/3).** Healer reported "no mirror-passed failures" in both iters 127 and 128 despite PR #211 being CONFLICTING. G-rule at 2/3. Next instance → dispatch to Beacon (propose healer substrate expansion to also detect CONFLICTING PRs post-Mirror-PASS).
 
