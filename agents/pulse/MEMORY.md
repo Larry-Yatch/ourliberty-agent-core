@@ -6,6 +6,22 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~03:11Z UTC (Iter 150)
+
+**System: ✅ Nominal-with-watch + Tier 2 OAuth expired.** Iter 150 findings: **PR #29 (pm-dashboard-past-due-flag) MERGED 02:50Z** (auto-merge after Mirror REVIEW_PASS). **PR #214 (chore/reenable-rotation) MERGED** (rotation re-enabled). **PR #215 (remove-yes-approval-token) OPENED 02:54Z** (MERGEABLE, awaiting Mirror review). Sync push failure recurred at 02:59Z (14-clean streak broken; carry-forward root cause). **G-rule MalformedForgeMarker 3/3 dispatched to Beacon** (`malformed-forge-marker-preflight-g-rule-20260531T030158Z.json`). Automated cycle at 02:52Z blocked on wrong branch; wrapper auto-restored main at 03:00:03Z (first confirmed activation of auto-restore logic). All 6 services active. Forge inbox: 3 tasks (advancer-active-reconciliation-001, register-claude-setup-tokens-rotation, step-b-resume — all fresh). Beacon inbox: 1 new task (G-rule dispatch). Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 8 iters (143–150). Heartbeat confirmed fresh (02:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (4):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore** (tier2-verifier-probe-001 REJECTED; runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md). Monday [yellow] DM: **2026-06-01**.
+- Sync push error: **14-clean streak broken at 02:59Z.** Root cause fix (sync-push-rebase-fallback-001) pending Larry. Active risk low.
+- **PR #215 (remove-yes-approval-token) OPEN.** MERGEABLE, no review. Mirror should pick up. Watch Check E.
+- **MalformedForgeMarker G-rule: 3/3 DISPATCHED.** Beacon to determine if rate-limit-resilience PR B is the systemic fix. Verify post-PR-B merge.
+- **Automated cycle auto-restore: first activation.** run_cycle.sh correctly detected and restored wrong-branch state. No escalation needed.
+- **rate-limit-resilience sequence:** step-b-resume in Forge inbox (MalformedForgeMarker retry 1/3 at 03:04Z — likely self-resolving). Also: advancer-active-reconciliation-001 (reconciliation fix for build_sequence_advancer) + register-claude-setup-tokens-rotation (post-PR-214 setup-tokens registration) both in Forge inbox.
+
 ## Status snapshot — updated 2026-05-31 ~02:44Z UTC (Iter 149)
 
 **System: ✅ Nominal-with-watch + Tier 2 OAuth expired.** Iter 149 findings: Check 0 new alert — tier2-verifier-probe-001 REJECTED by Forge at 02:39Z. Root cause: Tier 2 OAuth token expired ~16h ago (confirmed by Forge preflight reading credentials JSON). All other checks clean. 0 open PRs (14th consecutive PR-clear iter). All 6 services active. Forge inbox: 2 fresh tasks (pm-dashboard build + step-b-resume). Beacon inbox: empty. sync.json: no-change (02:04:38Z, 14th consecutive clean sync). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
