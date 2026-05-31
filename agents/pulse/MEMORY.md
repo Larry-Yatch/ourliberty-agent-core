@@ -6,19 +6,20 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~02:44Z UTC (Iter 149)
+## Status snapshot — updated 2026-05-31 ~02:52Z UTC (Iter 150)
 
-**System: ✅ Nominal-with-watch + Tier 2 OAuth expired.** Iter 149 findings: Check 0 new alert — tier2-verifier-probe-001 REJECTED by Forge at 02:39Z. Root cause: Tier 2 OAuth token expired ~16h ago (confirmed by Forge preflight reading credentials JSON). All other checks clean. 0 open PRs (14th consecutive PR-clear iter). All 6 services active. Forge inbox: 2 fresh tasks (pm-dashboard build + step-b-resume). Beacon inbox: empty. sync.json: no-change (02:04:38Z, 14th consecutive clean sync). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + Tier 2 OAuth expired.** Iter 150 findings: 3 new deploy-notifier:READY alerts (Tier 3 silenced — Vercel builds for pm-dashboard-past-due-flag). Active pipeline: pm-dashboard-past-due-flag build complete → PR #29 on dashboard MERGEABLE with Mirror review in-flight. Forge inbox: step-b-resume (rate-limit-resilience seq step B, headless-approval-request) + advancer-active-reconciliation-001 (NEW: Larry-approved permanent fix for sequence advancer PR reconciliation pattern — Larry named the 2-incident recurring stoppage and authorized Beacon to dispatch to Forge). Mirror inbox: review-pm-dashboard-past-due-flag.json (fresh 5 min). 0 open agent-core PRs (15th consecutive). sync.json: no-change (02:04:38Z, 15th consecutive clean sync). Healer heartbeat: 02:35:16Z UTC (~17 min old). Tier=1, consecutive_clean=0.
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 7 iters (143–149) with no trust-policy dispatch materialized. Heartbeat confirmed fresh (02:35:16Z UTC). Verification: 2026-06-07.
-- **APPROVAL_REQUEST queue (4):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (NEW — tier2-verifier-probe-001 REJECTED; root cause = expired OAuth; runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md)**. Monday [yellow] DM: **2026-06-01**.
-- Sync push error: **14th consecutive clean cycle.** Root cause fix (sync-push-rebase-fallback-001) pending Larry.
-- **MalformedForgeMarker preflight pattern: 2/3 G-rule observations** (both self-resolved same session). Watch.
-- **rate-limit-resilience sequence:** step B in Forge's inbox (step-b-resume.json, headless-approval-request, dispatched 20:41:27 MDT). Actively progressing.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 8 iters (143–150) with no trust-policy dispatch materialized. Heartbeat confirmed fresh (02:35:16Z UTC). Verification: 2026-06-07.
+- **APPROVAL_REQUEST queue (4):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore (runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md). Monday [yellow] DM: **2026-06-01**.
+- Sync push error: **15th consecutive clean cycle.** Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- **MalformedForgeMarker preflight pattern: 2/3 G-rule observations** (both self-resolved same session). No new occurrence iter 150. Watch.
+- **rate-limit-resilience sequence:** step B (step-b-resume.json) in Forge inbox. advancer-active-reconciliation-001 also in Forge inbox (permanent fix for advancer PR reconciliation, Larry-approved). Actively progressing.
+- **advancer-active-reconciliation-001 (NEW — permanent fix in motion):** Larry identified sequence-advancer PR-URL-mismatch stoppage as 2-incident pattern. Beacon dispatched to Forge at 20:44:09 MDT. Teach-to-fish discipline working. Close when Forge PR merges.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 

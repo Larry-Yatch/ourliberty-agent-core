@@ -4,6 +4,99 @@
 
 ---
 
+## Iteration 150 — 2026-05-31 02:52 UTC (interactive)
+
+**Health:** ✅ Nominal-with-watch — active pipeline progress since iter 149. 3 new deploy-notifier alerts (Tier 3 silenced), dashboard PR #29 opened with Mirror review in-flight, 3 tasks across Forge + Mirror inboxes (all fresh). Carry-forwards: Check 4 (4 APPROVAL_REQUESTs pending Monday DM), Check 5 (heartbeat fresh, substrate fix pending trust-policy). 0 open agent-core PRs (15th consecutive). 6/6 services active. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1060 lines** (+3 vs iter 149 watermark of 1057). 3 new alerts, all deploy-notifier:READY.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 3 new alerts — all Tier 3 (deploy-notifier:READY, known-pattern).**
+  - Line 1058 (02:41:24Z): `deploy-notifier:READY:dpl_4EAU4eF8xn9aBoEPLUz1riiKUznb` — Vercel preview, branch forge/pm-dashboard-past-due-flag, PR unknown.
+  - Line 1059 (02:47:52Z): `deploy-notifier:READY:dpl_AdJJfUvyETHnrAHGFVKcJe7pXyYD` — Vercel preview, branch forge/pm-dashboard-past-due-flag, PR #29.
+  - Line 1060 (02:49:59Z): `deploy-notifier:READY:dpl_7qHmT2GP84Lob861YPmKjrzsTNFg` — Vercel preview, branch mirror/pm-dashboard-past-due-flag (Mirror review worktree).
+  - Classification: Tier 3 (known-pattern — deploy-notifier:READY events are expected pipeline activity; Vercel deploys on every branch push). No DM, no dispatch. Journal-only. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.**
+  - outbox-notifier.log last entry: 20:41:27 MDT (02:41:27Z) — headless-approval-request dispatched step-b-resume. No new WARN/ERROR since iter 149.
+  - 2 WARNs from prev session (MalformedForgeMarker x2 at 20:37 and 20:40 MDT) carry-forward from iter 149 — both self-resolved within that session. No new WARN/ERROR this iter. ✅
+
+- **(Check 2) Telegram sweep: ✅ Active pipeline activity resolved by Beacon — no orphaned directives.**
+  - 20:37:08 MDT — Larry: "Yes apply it now" → Beacon confirmed step-a-rotation already merged (PR #211, iter 135).
+  - 20:39:10 MDT — Larry: "If this has shown up twice, this stoppage has shown up twice. Do we need to put something in place to fix it?" → Beacon confirmed pattern, proposed permanent fix (advancer-active-reconciliation-001: three-signal PR identity match for sequence advancer reconciliation).
+  - 20:42:01 MDT — Larry: "I approve you sending the marker" → Beacon sent marker.
+  - 20:44:09 MDT — `advancer-active-reconciliation-001` dispatched to Forge inbox (Larry-approved). APPROVAL_REQUEST queue: still 4 (this was a new APPROVAL_REQUEST processed and resolved in the same session; not a carry-forward).
+  - 20:44:09 MDT → 20:47:28 MDT — Forge built pm-dashboard-past-due-flag, PR #29 opened on dashboard, Mirror review task dispatched.
+  - No pending Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.**
+  - alert-cooldown/warning/: 299 files (297→298→299 with 2 new deploy-notifier files; all expected).
+  - Healer heartbeat: 2026-05-30 20:35:16 MDT (02:35:16Z UTC) — ~17 min old at check time. Within 90-min threshold. ✅
+  - heal-stale-daemon-code-cooldowns.json mtime: 2026-05-30 18:05:15 MDT (00:05:15Z) — same as iter 149. No new restart events.
+  - No active pipeline stall signals. ✅
+
+- **(Check 4) Pending Larry directives: 4 items. ⚠️ (carry-forward — no change)**
+  - **sync-push-rebase-fallback-001** (iter 118) — pending Larry. Monday [yellow] DM: **2026-06-01**.
+  - **pulse_telegram_bot.sh launcher** (iter 94) — pending Larry.
+  - **stuck-cycle timeout guard** (iter 43) — pending Larry.
+  - **Tier 2 OAuth restore** (iter 149) — root cause confirmed, runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. Monday [yellow] DM: **2026-06-01**.
+
+- **(Check 5) Stale daemon: ⚠️ in-progress — same state as iter 149.**
+  - heal-stale-daemon-code-cooldowns.json: 00:05:15Z (~2h47m old). Under current spec (>60 min → ask-then-do) still triggers.
+  - Heartbeat: 02:35:16Z UTC (17 min old) — healer confirmed healthy. No new action. APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` pending trust-policy → Forge dispatch. ⚠️→in-progress
+
+- **(Check A) Source repo: ✅ Nominal.** Session gitStatus: branch=main, clean, HEAD=0e46851 "Pulse cycle 20260531T024559Z". ✅
+
+- **(Check B) Sync health: ✅ 15th consecutive clean.** sync.json: status=no-change, last_sync=2026-05-31T02:04:38Z (~47 min ago, within 2h threshold). sync-push-rebase-fallback-001 pending. ✅
+
+- **(Check C) Agent liveness: 6/6 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer — all systemctl active. ✅
+
+- **(Check D) Inboxes: 3 fresh tasks across Forge + Mirror. ✅**
+  - beacon: `notify-pm-dashboard-past-due-flag.json` (build ack, routing notification) ✅
+  - forge: `step-b-resume.json` (02:41:27Z, ~11 min old) + `advancer-active-reconciliation-001.json` (02:44:09Z, ~8 min old). Both fresh. ✅
+  - mirror: `review-pm-dashboard-past-due-flag.json` (02:47:28Z, ~5 min old). Fresh. ✅
+  - pulse: empty ✅
+  - No stale tasks (stale threshold = 1 hour). ✅
+
+- **(Check E) PRs: ✅ agent-core PR-clear (15th). dashboard PR #29 in-flight (Mirror review dispatched).**
+  - ourliberty-agent-core: 0 open PRs. ✅
+  - ourliberty-dashboard: PR #29 "feat(dashboard): past-due flag on project rows" — MERGEABLE, reviewDecision="" — Mirror review dispatched 02:47:28Z (~5 min ago). Not stale (30-min threshold). Mirror review in-flight. ✅
+
+- **(Check I):** Fired iter 126 (Sunday 2026-05-31 UTC). Idempotency guard active. Next: 2026-06-07. ✅
+- **(Check III):** Fired iter 126. Next: 2026-06-07. ✅
+- **Check VIII/IX:** Monday-only. Today UTC = Sunday 2026-05-31. Next: 2026-06-01 UTC. ✅
+- **Credential rotations: nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window begins 2026-06-23 (~22 days). ✅
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. No always-fix conditions triggered (repo clean, services active, no stale tasks, no stale PRs).
+3. No new dispatches — advancer-active-reconciliation-001 was dispatched by Beacon-bot (not Pulse); all other threads carry forward.
+4. `cycle_prime_ledger.py append_action --tier 1 --kind intervention --payload '{"intervention_id": "iter-150-nominal-pipeline-progressing"}'` → row appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (Check 4 + Check 5 still non-clean).
+6. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** None. All new activity was Larry-authorized through Beacon-bot. Deploy-notifier alerts are Tier 3 (known-pattern silenced). Monday [yellow] DM 2026-06-01 carries all 4 APPROVAL_REQUESTs.
+
+**Patterns:**
+- **advancer-active-reconciliation-001 dispatched (permanent fix in motion).** Larry recognized the sequence-advancer PR reconciliation failure as a recurring pattern (2 incidents) and authorized Beacon to dispatch to Forge. Teach-to-fish discipline working. ✅
+- **pm-dashboard-past-due-flag pipeline active.** Build complete → PR #29 open → Mirror review in-flight → Vercel preview live (3 deploys: forge worktree x2, mirror worktree x1). Normal throughput.
+- **APPROVAL_REQUEST queue: 4 items unchanged.** Monday [yellow] DM: 2026-06-01.
+- **Sync push error: 15th consecutive clean cycle.** Root cause fix pending Larry. Active risk low.
+- **15th consecutive agent-core PR-clear iter.** Both agent-core and dashboard moving forward.
+- **Check 5 permanent fix in motion:** heartbeat fresh (17 min old). Trust-policy → Forge still pending. Verification: 2026-06-07.
+- **inbox-watcher rc=-1: G-rule 2/3.** No new occurrence.
+- **heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3.** No active CONFLICTING PR.
+- **heal-pipeline-stall "369 min" duration bug: G-rule 1/3.** No new occurrence.
+- **MalformedForgeMarker preflight: 2 occurrences in iter 149 session.** No new occurrences this iter. Not at G-rule threshold (3). Watch.
+
+**Learned:**
+- Larry directly named the sequence-advancer stoppage as a recurring pattern requiring a permanent fix (2 incidents). Beacon responded with advancer-active-reconciliation-001 (three-signal PR identity match: pr_url → branch-name → title-substring). This fix is now in Forge's inbox. If it lands, the sequence advancer's pattern-failure-on-PR-url-mismatch is permanently remediated — one fewer manual intervention class.
+- Three Vercel deploys for a single PR is now the observed pattern: (1) initial forge-branch deploy on build-phase dispatch, (2) Vercel re-deploy when PR is opened with PR number resolved, (3) mirror-branch deploy when Mirror runs its review in a worktree. Expected behavior; Tier 3 classification is correct.
+- deploy-notifier:READY events are not in the APPROVAL_REQUEST queue and don't block pipelines; they're status signals. Cooldown files for them accumulate indefinitely (no TTL cleanup). Not a problem at current scale (~3 per dashboard build) but worth noting for future Check IV allowlist hygiene.
+
+---
+
 ## Iteration 149 — 2026-05-31 02:44 UTC (interactive)
 
 **Health:** ✅ Nominal-with-watch — new finding: **Tier 2 OAuth token confirmed expired ~16h ago** (tier2-verifier-probe-001 REJECTED by Forge at 02:39Z; root cause surfaced at preflight). All other checks clean. 0 open PRs (14th consecutive PR-clear iter). All 6 services active. Forge inbox: 2 fresh tasks (pm-dashboard build + step-b-resume rate-limit-resilience). Beacon inbox: empty (seq task processed). sync.json: no-change (02:04:38Z). Healer heartbeat: 02:35:16Z UTC. Tier=1, consecutive_clean=0.
