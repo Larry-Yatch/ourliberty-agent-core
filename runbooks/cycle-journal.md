@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 160 — 2026-05-31 04:25 UTC (interactive)
+
+**Health:** ✅ Nominal-with-dispatch — 0 new alerts. All mandatory checks nominal. G-rule escalation: alert-triage.json missing through 2 confirmed automated cycles (abb8f73 04:11Z, 34e1074 04:17Z) — threshold met, dispatch sent to Beacon. 7/7 services active. 0 open PRs. All inboxes empty. Check B: 3rd consecutive clean. APPROVAL_REQUEST queue: 5 + heal-resume-paused-on-tier1 install carry-forward. Monday [yellow] DM 2026-06-01. Tier=1, consecutive_clean=0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1077 lines** (unchanged from iter 159 watermark 1077). alert-triage.json MISSING (7th consecutive observation; 2 confirmed automated cycles without recreation — threshold met, dispatching). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1077. outbox-notifier.log last entry 22:00:13 MDT (04:00:13Z UTC) — PR #219 AUTO_MERGE. beacon_telegram_bot.log last entry 22:10:41 MDT — alert idx=1076 delivery. No new activity since. ✅
+
+- **(Check 0 — G-rule) alert-triage.json MISSING: 2/2 automated cycles — ESCALATION THRESHOLD MET.**
+  - cycle.log confirms: cycle 1 (04:05Z-04:11Z → abb8f73), cycle 2 (04:11Z-04:17Z → 34e1074). Both completed, cost logged, commit+push succeeded. Neither recreated alert-triage.json.
+  - Root cause hypothesis: automated Pulse sessions (claude --print) handle Check 0 as reasoning/journal output only — they don't invoke alert_triage_state.py as a subprocess. Permissions are NOT the issue (`Write(/home/larry/agents/**)` allowed in global settings.json). Invocation is the gap.
+  - G-rule action: dispatched `alert-triage-missing-g-rule-20260531T042500Z.json` to ~/agents/inboxes/beacon/. ⚠️→dispatched
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: no WARN/ERROR after 22:00:13 MDT (04:00:13Z UTC, PR #219 AUTO_MERGE). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 22:10:41 MDT (04:10:41Z UTC) — alert idx=1076 delivery. No Larry directives. No orphaned messages. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 2026-05-31T04:05:16Z UTC (~20 min at check time, within 90-min threshold). No new active stall cooldown files beyond known carry-forward patterns. ✅
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 5 (unchanged).**
+  - `forge-claude-md-preflight-self-check-bullet-001` — doc-only Forge CLAUDE.md PR.
+  - Tier 2 OAuth restore — pending runbook (docs/runbooks/restore-larry-personal-claude-oauth-tier2.md).
+  - `sync-push-rebase-fallback-001` — pending Larry.
+  - `pulse_telegram_bot.sh launcher` — pending Larry.
+  - `stuck-cycle timeout guard` (iter 43) — pending Larry.
+  - **Carry-forward (iter 158):** Install heal-resume-paused-on-tier1.service + .timer on droplet.
+  - **Monday [yellow] DM: 2026-06-01.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 04:05:16Z UTC, within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean tree (session-start gitStatus). Latest commit: 34e1074 "Pulse cycle 20260531T041757Z" (2nd automated cycle post-timer-fix). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-05-31T04:04:39Z UTC. Within 2h threshold. 3rd consecutive clean Check B. APPROVAL_REQUEST sync-push-rebase-fallback-001 still pending Larry as defensive hardening; immediate error remains resolved. ✅
+
+- **(Check C) Agent liveness: 7/7 active. ✅** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer, outbox-notifier — all confirmed active via `systemctl is-active`. ✅
+
+- **(Check D) Inboxes: All empty. ✅** forge, beacon, mirror, pulse — confirmed empty via glob (no active .json files outside .archive/.invalid). ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. Confirmed via `gh pr list`. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; skip (fires week 2026-06-01). ✅ | Check III: next 2026-06-07. ✅ | Check VIII/IX: next 2026-06-01 (Monday UTC). ✅
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22; 60d window opens 2026-06-23 (~23 days). ✅
+- **MalformedForgeMarker G-rule:** No new occurrence. Doc-fix (forge-claude-md-preflight-self-check-bullet-001) pending Larry. Posture unchanged.
+
+**Did:**
+1. Ran all checks (0, 1–5, A–E, credential rotations, day-gated checks).
+2. G-rule dispatch: wrote `alert-triage-missing-g-rule-20260531T042500Z.json` to ~/agents/inboxes/beacon/ — investigation of why automated Pulse cycles don't recreate alert-triage.json.
+3. `cycle_prime_ledger.py append_action tier=1 kind=intervention` → intervention row for alert-triage G-rule dispatch.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** G-rule dispatch to Beacon (alert-triage-missing-g-rule-20260531T042500Z.json). No new Larry DMs — all APPROVAL_REQUEST items already in Monday [yellow] DM queue 2026-06-01.
+
+**Patterns:**
+- **alert-triage.json MISSING: 2/2 confirmed automated cycles (G-rule DISPATCHED).** cycle.log provides ground truth: both abb8f73 and 34e1074 cycles completed successfully but didn't write alert-triage.json. Root cause: automated sessions don't invoke alert_triage_state.py. Fix shape: code change to run_cycle.sh wrapper (preferred) or cycle-prompt.md § 3.0 (fallback). Dispatched to Beacon for design + Forge implementation.
+- **Check B: 3rd consecutive clean.** sync-push-rebase-fallback-001 still pending as defensive hardening, but acute error continues resolved.
+- **rate-limit-resilience-001 post-merge watch.** No new burn-rate alerts since PR #219 merged at 04:00Z. Rate limit reset at 11:30am MDT today. Monday DM will include trend assessment.
+- **cycle.log confirms 3 automated cycles since timer fix.** 04:02Z (f3825cc), 04:11Z (abb8f73), 04:17Z (34e1074). Current session (04:18Z+) is the 4th fire — interactive. Automated cadence is running cleanly; only alert-triage.json state maintenance is missing.
+
+**Learned:** alert-triage.json requires explicit invocation of alert_triage_state.py — Claude session reasoning is insufficient. The run_cycle.sh wrapper (which already handles auto-commit, cost logging, and lock management) is the right place for this call. This is a low-complexity code gap, not a design issue.
+
+---
+
 ## Iteration 159 — 2026-05-31 04:16 UTC (interactive)
 
 **Health:** ✅ Nominal — First clean iter since iter 158. All checks nominal. 2 new Tier-3 known-pattern alerts (pipeline-stall:tier2-fallback-skipped-rate_limit forge+beacon-bot, 04:06Z). 6/6 services active. 0 open PRs. All inboxes empty. Check B: CLEAN (sync.json no-change at 04:04:39Z, no push error). APPROVAL_REQUEST queue: 5 unchanged + heal-resume-paused-on-tier1 install carry-forward (iter 158). Monday [yellow] DM 2026-06-01. Tier=1, consecutive_clean=1.

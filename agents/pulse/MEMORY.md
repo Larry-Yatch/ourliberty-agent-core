@@ -6,6 +6,25 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~04:31Z UTC (Iter 160)
+
+**System: ✅ Nominal-with-dispatch — G-rule escalation on alert-triage.json.** Iter 160 findings: 0 new alerts (watermark 1077 unchanged). All mandatory checks nominal. G-rule DISPATCHED: alert-triage.json missing through 2 confirmed automated cycles (abb8f73 04:11Z, 34e1094 04:17Z per cycle.log) — root cause: automated sessions don't invoke alert_triage_state.py. Dispatch `alert-triage-missing-g-rule-20260531T042500Z.json` sent to Beacon. 7/7 services active. 0 open PRs. All inboxes empty. Check B 3rd consecutive clean. PRIME DIRECTIVE ledger: intervention row appended. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- **alert-triage.json MISSING: G-RULE DISPATCHED.** 2/2 automated cycles without recreation (abb8f73 04:11Z, 34e1074 04:17Z confirmed by cycle.log). Root cause: run_cycle.sh wrapper doesn't invoke alert_triage_state.py. Dispatch to Beacon: `alert-triage-missing-g-rule-20260531T042500Z.json`. Close when Forge PR merges + alert-triage.json appears in next automated cycle.
+- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z (2 residual). Rate limit reset 11:30am MDT today. Monday DM will include trend assessment. Close when no heal-claude-max-burn-rate alerts in 24h post-reset.
+- **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
+- **APPROVAL_REQUEST queue (5):** sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01**.
+- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Rate limit cleared 11:30am MDT. Close when Larry installs via SSH.
+- **Check B CLEAN: 3rd consecutive.** sync-push-rebase-fallback-001 still pending as defensive fix; immediate error resolved.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 18 iters (143–160). Heartbeat fresh (04:05:16Z UTC). Verification: 2026-06-07.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix pending Larry. G-rule posture unchanged.
+- **systemd install-drift G-rule: 1/3.** No new instance this iter.
+- **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
+
 ## Status snapshot — updated 2026-05-31 ~04:16Z UTC (Iter 159)
 
 **System: ✅ Nominal — first clean iter post rate-limit-resilience-001 completion.** Iter 159 findings: 2 Tier-3 known-pattern alerts (pipeline-stall:tier2-fallback-skipped-rate_limit forge+beacon-bot, 04:06Z — residual rate-limit activity from in-flight sessions). All checks nominal. 6/6 services active. 0 open PRs. All inboxes empty. Check B CLEAN (sync no-change 04:04:39Z, no push error — 2nd consecutive clean). alert-triage.json MISSING: 1/2 confirmed automated cycles without recreation (abb8f73 at 04:11Z — escalate if 2nd automated cycle also misses). Tier=1, consecutive_clean=1. No new escalations.
