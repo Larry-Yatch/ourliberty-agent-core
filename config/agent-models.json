@@ -86,7 +86,7 @@
     "_note": "Rolling 5h quota-consuming token ceiling for the Tier 1 Claude Max account. heal_claude_max_burn_rate.py DMs Larry once when the summed costs.jsonl input+output+cache_creation tokens in the trailing 5h window crosses 80% of this. Read at every healer tick (15 min). Re-based 2026-05-28 from the prior $60 dollar threshold (max_5h_spend_threshold_usd) — we run OAuth Max with no per-token billing, so dollar sums were imputed-not-real and false-alarmed every ~15 min on 2026-05-27 while real Anthropic usage sat at 31% session / 59% weekly. The 10M seed is a starting point: it sits above the 2026-05-27 false-alarm period's peak rolling-5h volume (~9.7M tokens) and below historical peak burn (~14M). Don't hand-tune; scripts/pulse_check_viii.py runs weekly against anthropic-quota-events.jsonl and proposes raise/lower/deprecate adjustments via the precision/recall loop (doctrine #48). cache_read is intentionally excluded — it's the largely-free cached re-read and would inflate the signal 10-100x. V1 limitation: costs.jsonl has no per-account field so the sum includes Tier 2 fallback usage — in steady state Tier 2 is rare and the inflation is conservative (alerts slightly early, not late)."
   },
   "rotation": {
-    "enabled": false,
+    "enabled": true,
     "tier1_window_minutes": 120,
     "tier2_window_minutes": 60,
     "max_drain_minutes": 45,
