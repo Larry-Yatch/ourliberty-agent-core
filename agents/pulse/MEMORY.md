@@ -6,19 +6,19 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~10:08Z UTC (Iter 179 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~10:42Z UTC (Iter 180 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 6→7.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeats fresh (pipeline-stall 09:59Z, stale-daemon 09:36Z). Check B 21st consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
+**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 7→8.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeats fresh (pipeline-stall 10:30Z, stale-daemon 10:36Z). Check B 22nd consecutive clean. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
 
 **Watch items:**
-- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=7 (floor; no further de-escalation; counter continues for audit).
+- **TIER 3 ACTIVE.** 30-min cadence. consecutive_clean=8 (floor; no further de-escalation; counter continues for audit).
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Full APPROVAL_REQUEST queue + Check VIII/IX first-firing note + Tier 3 cadence context.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158).
 
-## Status snapshot — updated 2026-05-31 ~09:33Z UTC (Iter 178 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~10:08Z UTC (Iter 179 — interactive, full cycle)
 
-**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 5→6.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeats fresh. Check B 20th consecutive clean. APPROVAL_REQUEST queue: 7. Alert watermark: 1078.
+**System: ✅ Nominal — All checks clean. Tier 3, consecutive_clean 6→7.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeats fresh. Check B 21st consecutive clean. APPROVAL_REQUEST queue: 7. Alert watermark: 1078.
 
 ---
 
