@@ -6,17 +6,17 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~02:12Z UTC (Iter 144)
+## Status snapshot — updated 2026-05-31 ~02:19Z UTC (Iter 145)
 
-**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 144 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >60m; Beacon architectural correction confirmed, Forge PR pending trust-policy dispatch). 0 open PRs (9th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 9th consecutive clean sync). larry-reject count: 17 actual (34 files = 17×2 .json+.reason pairs; unchanged). Healer heartbeat fresh: 02:05:15Z UTC. Tier=1, consecutive_clean=0.
+**System: ✅ Nominal-with-watch + Check-5 fix in motion.** Iter 145 findings: all checks clean except Check 4 (APPROVAL_REQUEST queue: 4 carry-forward) and Check 5 (cooldowns file >134 min old; trust-policy → Forge dispatch still pending). 0 open PRs (10th consecutive PR-clear iter). All 6 services active. All inboxes empty. sync.json: no-change (02:04:38Z, 10th consecutive clean sync). Healer heartbeat fresh: 02:05:15Z UTC. Tier=1, consecutive_clean=0. Date correction: Monday DM = 2026-06-01 (prior iters 121–144 erroneously wrote 2026-06-02; June 1 is the correct next Monday).
 
 **Watch items updated:**
 - heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
 - heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
 - inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
-- **Healer state file >60m: G-rule dispatch PROCESSED by Beacon (iter 143).** Beacon found correct substrate: `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (written on every healer invocation, not just restarts). Heartbeat mtime 01:35:15Z UTC = 25.7 min old (fresh). APPROVAL_REQUEST `fix-check5-heartbeat-substrate-001` produced; Forge task pending trust-policy dispatch. New threshold: 90 min. Scope: doc-only cycle-prompt.md edits (§ 3.5 substrate swap + § 17 glossary). Verification: 2026-06-07.
-- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001. Monday DM 2026-06-02.
-- Sync push error: **8th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
+- **Healer state file >60m: G-rule dispatch PROCESSED by Beacon (iter 143).** Correct substrate confirmed: `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (written on every healer invocation). Heartbeat at 02:05:15Z UTC = fresh (14 min old at iter 145 check time). Outbox-notifier confirmed delivery of Beacon result at 02:01:23Z UTC. Trust-policy → Forge dispatch still pending (Forge inbox empty). New threshold: 90 min. Scope: doc-only cycle-prompt.md edits (§ 3.5 + § 17). Verification: 2026-06-07.
+- APPROVAL_REQUEST queue (4): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, tier2-verifier-probe-001. Monday [yellow] DM: **2026-06-01** (corrected).
+- Sync push error: **10th consecutive clean cycle.** Race-condition hypothesis holds. Root cause fix (sync-push-rebase-fallback-001) pending Larry.
 
 ## Status snapshot — updated 2026-05-31 ~01:08Z UTC (Iter 135)
 
