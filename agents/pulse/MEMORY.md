@@ -6,6 +6,30 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~05:17Z UTC (Iter 167 — interactive, full cycle)
+
+**System: ✅ Nominal — All checks clean.** 0 new alerts. 7/7 services active. 0 open PRs. All inboxes empty. Healer heartbeat 05:05:17Z UTC (~12 min). Check B 9th consecutive clean. Tier=1, consecutive_clean=1. APPROVAL_REQUEST queue: 7 (unchanged). Alert watermark: 1078.
+
+**Watch items updated:**
+- **Check C G-rule chain: APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` pending trust-policy → Forge.** Beacon processed iter 165 dispatch. No new movement this iter.
+- **alert-triage.json MISSING: APPROVAL_REQUEST PENDING LARRY.** `alert-triage-persistence-invocation-001` (iter 160 G-rule → iter 161 Beacon diagnosis → APPROVAL_REQUEST). Pending Larry approval.
+- **rate-limit-resilience-001: COMPLETE.** All 4 PRs live. No new burn-rate alerts since 04:06Z.
+- **heal-claude-max-burn-rate:** Watch for frequency drop Monday 2026-06-01.
+- **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, Tier 2 OAuth restore, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward). Monday [yellow] DM: **2026-06-01 UTC (TOMORROW)**.
+- **heal-resume-paused-on-tier1 NOT INSTALLED:** Carry-forward iter 158. Close when Larry installs via SSH.
+- **Check B CLEAN: 9th consecutive (iters 159–167).** sync-push-rebase-fallback-001 still pending as defensive fix.
+- **Healer state file >60m: trust-policy dispatch to Forge still pending.** 24 iters (143–167). Heartbeat fresh (05:05:17Z UTC). Verification: 2026-06-07.
+- **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Monitor for unexpected output or errors.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3. No new occurrence. Watch.
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3. No new occurrence. Watch.
+- inbox-watcher rc=-1: G-rule 2/3. No new occurrence. Watch.
+- **MalformedForgeMarker G-rule: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved.** Doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` in pipeline. G-rule posture unchanged.
+- **systemd install-drift G-rule: 1/3.** No new instance this iter.
+- **ourliberty-cycle.timer stuck pattern: 1/3.** No new instance this iter.
+- **deploy-notifier READY cooldowns: 309+ entries in alert-cooldown/warning/.** Snoozed Vercel deploy notifications. No action required.
+- **inbox-watcher.log file MISSING on disk** (calibration note, iter 165). Service is active; use `journalctl -u ourliberty-inbox-watcher` for log access. Not a bug.
+- **pulse-rotation-window-dms.json MISSING** (calibration note, iter 167). Dedup state file for credential rotation DMs not yet created. Non-issue; will be created on first rotation DM.
+
 ## Status snapshot — updated 2026-05-31 ~05:10Z UTC (Iter 166 — interactive, full cycle)
 
 **System: ✅ Nominal — All checks clean. Beacon result received: APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` (doc-fix for cycle-prompt.md § 4.3).** 0 new system alerts. 7/7 services active. 0 open PRs. All inboxes processed. Healer heartbeat 05:05:17Z UTC (~5 min). Check B 8th consecutive clean. Tier=1, consecutive_clean=1. APPROVAL_REQUEST queue: 7 (+1 this iter). Alert watermark: 1078.
