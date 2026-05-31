@@ -6,6 +6,19 @@
 
 ---
 
+## Status snapshot — updated 2026-05-31 ~00:55Z UTC (Iter 133)
+
+**System: ⚠️ Drift (improving).** Iter 133 findings: Two tasks simultaneously in-flight — PR #213 (extend-thresholds-per-agent-overrides: CLEAN/MERGEABLE, Mirror review task in Mirror inbox at 18:52:25Z) and PR #211 rebase build (build-pr211-rebase-step-a-rotation-001.json in Forge inbox at 18:53:25Z). MalformedForgeMarker on pr211-rebase preflight (1st obs, G-rule 1/3) — self-healed within 65s via retry. No new alerts (1053 lines unchanged). APPROVAL_REQUEST queue: 3 unchanged (sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard). Sync push failure 17th occurrence (carry-forward). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
+
+**Watch items updated:**
+- PR #211 CONFLICTING: 7th consecutive iter (127–133). Rebase build NOW IN FLIGHT (Forge). Close when rebase PR merges.
+- PR #213 (extend-thresholds): CLEAN/MERGEABLE, Mirror review in-flight. Expected to auto-merge after Mirror PASS. New positive item.
+- MalformedForgeMarker on pr211-rebase preflight: G-rule 1/3 (1st observation, iter 133). Self-healed via retry.
+- heal-pr-auto-merge blind to CONFLICTING: G-rule 2/3 (no new occurrence iter 133).
+- heal-pipeline-stall "369 min" duration bug: G-rule 1/3 (no new occurrence iter 133).
+- inbox-watcher rc=-1: G-rule 2/3 (no new occurrence iter 133).
+- APPROVAL_REQUEST queue (3): sync-push-rebase-fallback-001, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard.
+
 ## Status snapshot — updated 2026-05-31 ~00:50Z UTC (Iter 132)
 
 **System: ⚠️ Drift (improving).** Iter 132 findings: major forward progress. Larry approved `pr211-rebase-step-a-rotation-001` at 00:43Z (Beacon-bot "Marker emitted"; Forge rebase task pending dispatch) AND `threshold-update-2026-05-31` at 00:41Z (Beacon adapted to `extend-thresholds-per-agent-overrides`; Forge task IN FLIGHT at 00:47:15Z). APPROVAL_REQUEST queue: 4→3 (pr211-rebase and threshold-update both approved/in-flight). PR #211 still CONFLICTING/OPEN. Sync push failure 17th occurrence (carry-forward). Next Monday [yellow] DM: 2026-06-02. Tier=1, consecutive_clean=0.
