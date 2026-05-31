@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~17:39Z UTC (Iter 216 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~17:48Z UTC (Iter 217 — interactive, full cycle)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (Tier 2 OAuth expired). Sync.json: `no-change` at 17:06:00Z UTC (on cadence). Healer heartbeat 17:37:22Z UTC. 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1086** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). Nominal observation iter; no new findings.
 
