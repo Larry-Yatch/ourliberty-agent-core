@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-05-31 ~16:38Z UTC (Iter 208 — interactive, full cycle)
+## Status snapshot — updated 2026-05-31 ~16:49Z UTC (Iter 209 — interactive, full cycle)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat **on cadence** (16:07:21Z, ~31 min old at check time — at boundary). 7/7 services active. 0 open PRs. All inboxes empty. Alert watermark: **1085** (0 new alerts this cycle). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward).** Active pipeline stalls (forge + beacon-bot, root cause: Tier 2 OAuth expired). Sync.json: `no-change` at 16:05:58Z UTC (on cadence). Healer heartbeat **on cadence** (16:37:21Z, ~9 min old at check time). 7/7 services active. 0 open PRs. All inboxes empty (1 new Beacon dispatch this iter). Alert watermark: **1085** (0 new alerts this cycle). APPROVAL_REQUEST queue: 7 (unchanged, 2 items elevated).
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls).
@@ -17,7 +17,8 @@
 - **Check VIII/IX FIRST FIRING TOMORROW (2026-06-01 UTC).** Both analyzers first-ever run. Monitor for unexpected output or errors.
 - **Monday [yellow] DM: 2026-06-01 UTC (TOMORROW).** Elevated scope: Tier 2 OAuth active stalls + sync-push-rebase-fallback-001 + Check VIII/IX first-firing note + fresh install-drift re-alerts for heal-resume-paused-on-tier1.
 - **APPROVAL_REQUEST queue (7):** pulse-grule-check-c-canonical-names-001, alert-triage-persistence-invocation-001, **sync-push-rebase-fallback-001 (ELEVATED — confirmed failure)**, pulse_telegram_bot.sh launcher, stuck-cycle timeout guard, **Tier 2 OAuth restore (ELEVATED — active stalls)**, forge-claude-md-preflight-self-check-bullet-001. + heal-resume-paused-on-tier1 install (ask-then-do carry-forward iter 158; fresh Telegram alerts delivered iter 204 at 16:02:51Z UTC).
-- **deploy-notifier cooldown file accumulation (1st observation, iter 208).** ~28 READY-state files in `~/agents/state/alert-cooldown/warning/`. Expected completed-deployment state, not stalls. Watch: if count >50, suspect GC gap in deploy-notifier healer → dispatch to Beacon.
+- **deploy-notifier cooldown GC gap — G-RULE DISPATCHED iter 209.** 106 READY-state files (was ~28 iter 208). Crossed 50-file threshold. Dispatch: `~/agents/inboxes/beacon/cycle-finding-deploy-notifier-gc-20260531T164900Z.json`. Fix: add time-based GC sweep for READY cooldown files older than 7 days.
+- **Trust-policy revert** (e1489a8): Non-Pulse commit appeared on main after automated cycle 89395c0. Reverts temporary rate-limit-resilience-001 auto-approve carve-out. EXPECTED — work complete per iter 158.
 
 ---
 
@@ -56,6 +57,7 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - `systemd install-drift`: G-rule 1/3 (iter 158 — PR #219 shipped unit files without install dance). Next 2 → dispatch to Beacon for Forge PR template checklist update.
 - `cycle.timer stuck pattern`: G-rule 1/3 (iter 158 — both cycle.timer + heal-systemd-install-drift.timer infinity-trap simultaneously). Watch 14d.
 - `MalformedForgeMarker G-rule`: DISPATCHED (iter 150). Post-dispatch counter: 4 self-resolved. Doc-fix APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. G-rule stays open until doc-PR merges.
+- `deploy-notifier cooldown GC gap`: DISPATCHED (iter 209). 106 READY-state files crossed 50-file threshold. Envelope: `cycle-finding-deploy-notifier-gc-20260531T164900Z.json`. Watch: close when Forge PR adds GC sweep and file count stabilizes.
 
 **APPROVAL_REQUEST items (Larry-gate):**
 - `pulse-grule-check-c-canonical-names-001` — Beacon APPROVAL_REQUEST for doc-fix to cycle-prompt.md § 4.3 (canonical service names). Trust-policy → Forge pending.

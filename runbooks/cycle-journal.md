@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration 209 — 2026-05-31 16:49 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **0 new alerts. New: deploy-notifier cooldown G-rule threshold crossed (106 files).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1085 lines** (unchanged from iter 208). **0 new alerts.** Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark at 1085 (unchanged). alert-triage.json MISSING (known; APPROVAL_REQUEST `alert-triage-persistence-invocation-001` pending). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon-bot activity: idx=1084 (install-drift:ourliberty-heal-resume-paused-on-tier1.timer) at 16:02:51Z UTC — same as iter 208. No new Larry directives. No new agent distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Cooldown files unchanged: `agent-runner-{forge,beacon,mirror,pulse}:claude_tier1_failed_tier2_unavailable:rate_limit`, `beacon-telegram-bot:claude_tier1_failed_on_resume_session_bound:auth_401`. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 7 (unchanged carry-forward).** No new Larry directives. Monday [yellow] DM TOMORROW (2026-06-01 UTC). Same 7 items unchanged. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T16:37:21.676136Z UTC** — ~9 min old at check time (16:46Z). Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=e1489a8 "chore(trust-policy): revert temporary rate-limit-resilience-001 auto-approve carve-out", branch=main, clean tree. **Note:** Non-Pulse commit appeared on main after automated cycle 89395c0 (16:39:55Z). Commit reverts the now-unneeded temporary auto-approve carve-out for rate-limit-resilience-001 (COMPLETE per MEMORY.md iter 158). Expected cleanup. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `~/agents/blackboard/agent-core-sync.json`: `{"last_sync": "2026-05-31T16:05:58Z", "status": "no-change"}`. Last sync ~40 min old; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-cycle.timer, ourliberty-outbox-notifier — all active. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All inboxes: 0 active tasks. ourliberty-agent-core: 0 open PRs. ✅
+
+- **Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~83d); outside 60d window. ✅
+
+- **Periodic checks:** Check I: check-i-2026-05-31.json exists; idempotency guard → skip. ✅ | Check III: check-iii-2026-05-31.json exists; next 2026-06-07. ✅ | Check VIII/IX: Monday-only gate → skip (Sunday UTC). **First firing TOMORROW 2026-06-01 UTC.** ⚠️
+
+- **G-rule watch items:** heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3), MalformedForgeMarker post-dispatch (4 self-resolved, doc-fix pending), systemd install-drift (1/3), cycle.timer stuck (1/3). No new occurrences. ✅
+
+- **⚠️ NEW: Deploy-notifier cooldown file accumulation — G-RULE THRESHOLD CROSSED.** 106 READY-state files in `~/agents/state/alert-cooldown/warning/deploy-notifier:deploy-notifier:READY:dpl_*`. Iter 208 first observation: ~28 files (threshold: 50). Iter 209: 106 files — threshold crossed. Pattern: no GC in deploy-notifier healer for completed-deployment cooldown entries (dpl_* files accumulate unboundedly). Not stalls; expected READY state. But unbounded growth indicates a GC gap. **Dispatched to Beacon** (G-rule route-to-beacon). ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates.
+2. **G-rule dispatch**: wrote `~/agents/inboxes/beacon/cycle-finding-deploy-notifier-gc-20260531T164900Z.json` (deploy-notifier cooldown GC gap, 106 files crossed 50-file threshold). Proposed fix: add time-based GC sweep to deploy-notifier healer for READY-state cooldown files older than 7 days.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 209` → `intervention_id=iter209-carry-forward-stalls-deploy-notifier-grule` appended to `~/agents/blackboard/cycle-prime-ledger.jsonl`.
+4. Wrote journal entry.
+
+**Escalated:** None new. All active issues are carry-forward from iters 186–208. Monday [yellow] DM (2026-06-01 UTC, TOMORROW) scope unchanged: Tier 2 OAuth ELEVATED + sync-push-rebase-fallback-001 ELEVATED + Check VIII/IX first firing + APPROVAL_REQUEST queue 7.
+
+**Patterns:**
+- System stable-degraded at Tier 1. One new signal: deploy-notifier cooldown file accumulation crossed the G-rule threshold.
+- **Deploy-notifier cooldown GC gap.** 106 files vs ~28 at iter 208 — nearly 4× growth in one cycle window (~8 min). Rate of growth suggests the deploy-notifier fires frequently (likely polling Vercel's API) and each unique dpl_* ID gets a permanent cooldown file. Fix is small: add a cleanup loop to the healer. Dispatched to Beacon.
+- **Trust-policy revert commit** (e1489a8) appeared on main after automated cycle 89395c0. Reverts the temporary rate-limit-resilience-001 auto-approve carve-out; this work is COMPLETE (MEMORY.md). Expected cleanup; no action needed.
+- **Tier 2 OAuth stalls persist.** Day 2+ since May 30. Monday DM is the next action gate.
+- **Check VIII/IX first firing TOMORROW 2026-06-01 UTC.** Monitor for unexpected output or errors.
+
+**Learned:** Deploy-notifier healer has no GC for old READY-state cooldown files — pattern confirmed in two observations (iters 208, 209). G-rule threshold reached; dispatched to Beacon for a Forge code fix.
+
+---
+
 ## Iteration 208 — 2026-05-31 16:38 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (forge + beacon-bot, Tier 2 OAuth expired). 7/7 services active. 0 open PRs. All inboxes empty. **0 new alerts.**
