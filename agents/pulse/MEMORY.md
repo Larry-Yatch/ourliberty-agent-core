@@ -6,12 +6,12 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~08:08Z UTC (Iter 340 — interactive)
+## Status snapshot — updated 2026-06-01 ~08:22Z UTC (Iter 342 — interactive)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **PRs #226 + #227 MERGED (iter 305):** stuck-timer fixes. **PR #228 MERGED (iter 306):** "feat(medic): scaffold alert-operator (PR1 escalate-only)" — Medic workstream PR1 complete. **PR #229 MERGED (iter 306):** "fix/alert-translations-6-missing" — 6 healer alert translations added to config/alert-translations.json. Sync.json: **RECOVERED** — status=no-change, last_sync=2026-06-01T07:06:17Z (~60 min old at iter 340). SYNC-PUSH-REBASE-FALLBACK-001 single occurrence at 04:39:20Z has NOT recurred (16+ consecutive clean iters). Healer heartbeat **07:39:16Z UTC** (27 min old at iter 340 check; within 90-min threshold; next expected ~08:09Z). 7/7 services active. Alert watermark: **1102** (unchanged iters 329–340: 0 new alerts). Cooldown/warning: **316** files (unchanged). Pipeline-stall prefix: **38** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).** **alert-triage.json missing on disk** (INFO; no functional impact). Forge inbox: 0 tasks; 0 open PRs — idle, awaiting Medic PR2 dispatch from Beacon. Automated cycles running (HEAD=db2a3c9 "Pulse cycle 20260601T080305Z"). **Medic-dispatcher 10th run CONFIRMED COMPLETED (~08:02:35Z UTC, ~6 min — short-run, lighter than prior ~10-11 min); 11th run STARTED** (PID 2863732, started 08:02:35Z UTC, ~3.8 min elapsed at iter 340 check, timer cadence *:00/3:00). **Cooldown-file saturation risk (35+ consecutive iters stable at 316):** if Tier 2 OAuth stall not resolved in next 24–48h, cooldown slots may mask new stall events. Monitor.
 
 **Watch items:**
-- **TIER 1 ACTIVE.** consecutive_clean=0 (active stalls: Tier 2 OAuth). Sync RECOVERED (no-change/clean; ~60 min old at iter 340; within 2h threshold). Healer heartbeat 07:39:16Z UTC (FRESH — 27 min old at check; next ~08:09Z). Medic-dispatcher 11th run in progress (PID 2863732, started 08:02:35Z UTC; timer *:00/3:00).
+- **TIER 1 ACTIVE.** consecutive_clean=0 (active stalls: Tier 2 OAuth). Sync RECOVERED (no-change/clean; ~16 min old at iter 342; within 2h threshold). Healer heartbeat 08:09:16Z UTC (FRESH — 13 min old at check; next ~08:39Z). Medic-dispatcher 12th run in progress (PID 2865824, started 08:14:03Z UTC; ~8 min elapsed; timer *:00/3:00).
 - **daemon-reload triggers cycle.timer stuck (G-rule 1/3).** At 06:00:20Z UTC (iter 317), healer auto-healed cycle.timer stuck-timer event after medic-dispatcher daemon-reload. This is a post-PR#225 recurrence — NOT the original OnUnitActiveSec trap. Likely a transient state during daemon-reload. If 2 more occurrences: dispatch to Beacon to investigate whether install-drift healer should explicitly restart ourliberty-cycle.timer after daemon-reload.
 - ~~**CYCLE.TIMER STUCK**~~ — **RESOLVED. PR #225 merged.** Timer now `OnCalendar=*:0/5, Persistent=true`. Automated cycles resumed. G-rule 2/3 → **SYSTEMIC FIX LANDED (iter 304)**. Closed.
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. New alerts 1094–1096 at 04:27Z confirm still active. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
@@ -45,6 +45,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - **Check C service-name suffix false-positive (iter 162). G-rule DISPATCHED iter 165.** Canonical names: `ourliberty-beacon-bot`, `ourliberty-forge-bot`, `ourliberty-mirror-bot`, `ourliberty-pulse-bot`, `ourliberty-inbox-watcher`, `ourliberty-cycle.timer`, `ourliberty-outbox-notifier`. Doc-fix APPROVAL_REQUEST `pulse-grule-check-c-canonical-names-001` in pipeline. Close when Forge PR merges cycle-prompt.md § 4.3 update.
 
 - **inbox-watcher.log file MISSING on disk (iter 165).** Service is active. Inbox-watcher writes to journald only. Use `journalctl -u ourliberty-inbox-watcher` to read its logs, not a file path.
+
+- **larry-alerts.jsonl path (confirmed iter 342).** File is at `~/agents/blackboard/larry-alerts.jsonl`, NOT `~/agents/larry-alerts.jsonl`. Check 0 commands must use the blackboard path. Using the wrong path silently fails (exit code 1, no output).
 
 - **Stale imported-module gap (1st observation, iter 120).** heal-stale-daemon-code tracks main-script mtime but not imported Python module mtimes. inbox-watcher loaded stale dispatch_validator.py for ~40 min post-update. Watch threshold=3.
 
