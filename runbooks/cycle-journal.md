@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 443 — 2026-06-01 23:41 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1126** (1 new alert since iter 442). **PR #235 MERGED** ✅ (Medic PR2 — "feat(medic): PR2 reversible act-then-notify (restart-daemon + retrigger-inbox)"). PR #237 OPEN (config: add tier2-fallback-skipped FYI alert translations, under 30-min gate). Forge inbox: 1 (`build-build-check-x-chain-quality-regression-001.json` — Check X build phase). Healer heartbeat: 2026-06-01T23:13:19Z (~28 min old; FRESH). 7/7 services active.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1126 lines** (was 1125 at iter 442). 1 new alert at line 1126: outbox-notifier review-pass notification for PR #235 (Mirror approved, auto-merge fired). **Tier 3** (known pattern — review-pass + auto-merge notifications are expected system behavior per D3.5 5d). Watermark → 1126. Journal note only; no DM.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1 new alert (line 1126): outbox-notifier review-pass notification — "Mirror approved PR #235 on task `medic-reversible-handlers-001`. Auto-merged + branch deleted." Tier 3 (known pattern). Watermark advances 1125 → 1126. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No new directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **293** total (unchanged from iter 442). Heal-pipeline-stall keyed files: **27** (unchanged from iter 442). No new stall events since iter 442. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Active Forge build.** Forge inbox: **1** — `build-build-check-x-chain-quality-regression-001.json` (Check X implementation build phase; received after Beacon processed Forge's preflight ack-proceed). Beacon inbox: **0** (all 3 notify files cleared). **PR #237 OPEN** — "config: add tier2-fallback-skipped FYI alert translations" — MERGEABLE, no Mirror review, created 23:37:27Z (~3 min old at start of check; under 30-min gate). PR #235 MERGED ✅. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **2026-06-01T23:13:19Z** — ~28 min old at 23:41Z. FRESH — well within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. HEAD=91085ff (iter 442 auto-commit at 23:36:34Z). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 (carry-forward).** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-01T23:28:30Z. Same carry-forward condition from iter 440 (re-escalated idx=1125). 2h threshold not crossed (~73 min ago). APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending. No new DM this iter (last escalation idx=1125 at iter 440; no recurrence since). ⚠️ Carry-forward.
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Active.** Forge inbox: 1 (Check X build phase). PR #237 OPEN (newly opened by Forge, under 30-min gate; Mirror review pending). See Check 4. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge building Check X. No runaway process. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d). CLAUDE_MAX_OAUTH stale/expired (carry-forward — Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** All Monday checks fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **67th iter in series (377–443)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (PR #237 under 30-min gate; pipeline stall carry-forward; sync error carry-forward but repo current).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T23:41:00Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T23:41:01Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 already escalated at iter 440 (idx=1125); no new recurrence this iter.
+
+**Patterns:**
+- **PR #235 MERGED** — Medic PR2 ("feat(medic): PR2 reversible act-then-notify (restart-daemon + retrigger-inbox)") complete. Mirror approved; auto-merge fired automatically. Major milestone: Medic now has reversible act-then-notify behavior (restart-daemon + retrigger-inbox). APPROVAL_REQUEST `medic-reversible-handlers-001` closes with this merge.
+- **Check X chain progressing.** Forge processed the Check X brief (`build-check-x-chain-quality-regression-001.json`), Beacon routed the build phase to Forge as `build-build-check-x-chain-quality-regression-001.json`. Forge is building. Expect a PR to open within the next 1–2 iters.
+- **PR #237 opened by Forge** (alert translations config fix). Under 30-min gate at check time. Mirror should auto-pick-up for review within the next iter.
+- Cooldown files: 293 total, 27 pipeline-stall — unchanged from iter 442. Natural expiry appears to have plateaued temporarily; check next iter.
+- Stale daemon heartbeat: 28 min old at check time. Next healer sweep expected around 23:43Z — should produce a fresh heartbeat before or during next iter.
+
+**Learned:** Nothing new. Beacon inbox clears quickly once notifies land (all 3 notify files from iter 442's dispatches were processed by the time of this check). Check X task renaming pattern: outbox-notifier prepends `build-` when Beacon dispatches the build phase, producing `build-build-<slug>` task_ids — this is expected naming convention, not a duplicate.
+
+---
+
 ## Iteration 442 — 2026-06-01 23:33 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (unchanged — 0 new alerts since iter 441). Sync: **⚠️ ERROR** — "Auto-commit push failed; rolled back" at 23:28:30Z (SYNC-PUSH-REBASE-FALLBACK-001 — 8th total / 2nd post-clear). Repo state clean (HEAD=433c285, main branch). PR #235 OPEN (~18 min old, mergeable=UNKNOWN, Mirror review pending). Forge inbox: **1** (`build-check-x-chain-quality-regression-001.json` — Check X build task from Beacon). Beacon inbox: 0. Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~20 min old at check time; FRESH). 7/7 services active.
@@ -56,6 +112,16 @@
 - PR #235 approaching 30-min gate. On next iter: check mergeable state + Mirror review status.
 
 **Learned:** Nothing new. SYNC-PUSH-REBASE-FALLBACK-001 behavior fully consistent with prior occurrences. Pattern established: fires whenever a PR merges between cycle local-commit and push attempt. The only durable fix is the pending APPROVAL_REQUEST.
+
+---
+
+## Notification — 2026-06-01 (inter-agent | from=beacon | task=build-alert-translations-tier2-skipped-001 | status=SUCCESS)
+
+**Type:** Beacon build-phase result — Forge dispatch confirmed.
+
+**Summary:** Beacon confirms `alert-translations-tier2-skipped-001` dispatched to Forge inbox as `doc-only` config PR. Task: add `pipeline-stall:tier2-fallback-skipped-rate_limit` and `pipeline-stall:tier2-fallback-skipped-auth_401` (both INFO/FYI, Tier 3) to `config/alert-translations.json` under the `heal-pipeline-stall` source object. Two base keys cover all agent-variant subjects via strip-segment lookup_rule. Full Forge spec delivered in APPROVAL_REQUEST body. Chain: Forge builds PR → Mirror reviews → auto-merges. APPROVAL_REQUEST `alert-translations-tier2-skipped-subjects-001` closes on merge.
+
+**Status:** No new work. Iter 442 (23:33Z) showed Forge inbox=1 for `build-check-x-chain-quality-regression-001` — alert-translations task likely already picked up by Forge before iter 442 ran.
 
 ---
 
