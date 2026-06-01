@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 301 — 2026-06-01 04:08 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks. **Notable new: healer auto-healed 3 stuck timers at 04:00Z UTC (PR #223 first confirmed production firing).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1093 lines** (was 1090 at iter 300 watermark). **3 new alerts (idxs 1091–1093)** — all from `heal-systemd-install-drift` at 2026-06-01T04:00Z UTC. ⚠️ (auto-healer activity, not a new failure).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts since iter 300.** idxs 1091–1093: `heal-systemd-install-drift` service auto-healed 3 stuck timers — `ourliberty-build-sequence-advancer.timer`, `ourliberty-deploy-notifier.timer`, `ourliberty-heal-systemd-install-drift.timer` — each with the infinity-trap (`NextElapseUSecRealtime` empty + `NextElapseUSecMonotonic=infinity`). Heal executed via daemon-reload + restart. Post-heal verification: all 3 confirmed `ActiveState=active`, `SubState=waiting`, `NextElapseUSecMonotonic=finite` (3w+ monotonic, not infinity). **Heal effective.** ✅ (healer working as designed per PR #223). `ourliberty-cycle.timer` was NOT healed (not in auto-remediation allowlist). ⚠️ (carry-forward, needs Larry manual intervention).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: `-- No entries --`. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** New alerts (idxs 1091–1093) written at 04:00:33–04:00:34Z UTC; Beacon's 5-min sweep should have picked them up by check time. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **314** (+2 from iter 300's 312). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. cycle.timer: `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity` — confirmed still stuck. NOT healed by heal-systemd-install-drift (not in its allowlist). G-rule **2/3**. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T03:38:49Z UTC** — ~29 min old at check time (04:08Z). Within 90-min threshold. Next tick expected ~04:08Z UTC (imminent). Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=370b369 "Pulse cycle 20260601T035821Z" (wrapper auto-commit of iter 300), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ FRESHLY SYNCED.** `agent-core-sync.json`: last_sync=2026-06-01T04:06:16Z — ticked on schedule (hourly, prev 03:06:15Z). status=no-change, commit=370b369. ✅
+
+- **(Check C) Agent liveness: ✅ 6/6 non-timer active; ⚠️ cycle.timer STUCK (carry-forward).** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier — all `active`. ourliberty-cycle.timer: `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity` — still stuck (G-rule 2/3, same continuous stuck state since iter 259). ⚠️ (known)
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse): 0 active tasks. ourliberty-agent-core: 0 open PRs. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. All others due 2027. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Sentinels on disk. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. ✅
+
+- **G-rule watch items:** cycle.timer stuck: G-rule **2/3** (same continuous stuck state). heal-pr-auto-merge blind to CONFLICTING (2/3), inbox-watcher rc=-1 (2/3), heal-pipeline-stall "369 min" bug (1/3). MalformedForgeMarker doc-fix pending. F24 empty-prompt APPROVAL_REQUEST #8 pending. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday/14d idempotency, skipped).
+2. No always-allowed auto-fixes triggered (healer handled stuck timers autonomously before this cycle ran).
+3. Verified healer auto-heal effectiveness: all 3 timers confirmed healed (SubState=waiting, Monotonic finite).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T04:08:07.073768+00:00", "tier": 1, "kind": "intervention"}` appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:08:08Z UTC.
+6. Wrote journal entry.
+
+**Escalated:** None new. All active issues carry-forward from iter 300.
+
+**Patterns:**
+- **PR #223 FIRST PRODUCTION FIRING CONFIRMED.** heal-systemd-install-drift auto-healed 3 stuck timers (build-sequence-advancer, deploy-notifier, heal-systemd-install-drift.timer itself) at 04:00Z UTC. Heals verified effective. This is the systemic fix for install-drift working as designed.
+- **ourliberty-cycle.timer NOT in auto-remediation scope.** Remains stuck since iter 259. Healer cannot fix it; requires Larry manual action: `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`. G-rule 2/3.
+- Alert-cooldown total 314 (+2 from 312). Non-pipeline-stall increase consistent with healer self-logging cooldowns.
+- Healer heartbeat: 03:38:49Z (~29 min old; next tick expected 04:08Z UTC — imminent).
+- Sync: freshly ticked 04:06:16Z UTC (on schedule). ✅
+- APPROVAL_REQUEST queue: 8 (unchanged). Larry's attention needed: Tier 2 OAuth restore (active stalls), cycle.timer recovery.
+
+**Learned:** PR #223 auto-remediation confirmed working in production — healer caught and fixed 3 stuck timers autonomously within this cycle window. The fix boundary is important: `ourliberty-cycle.timer` is explicitly NOT in the allowlist, preserving the requirement for Larry manual intervention. The infinity-trap for non-cycle timers appears to be a recurring condition (healer needed to heal them today), suggesting OnBootSec/OnActiveSec timers are susceptible to this trap on droplet restarts. Watch: if these 3 timers get stuck again next restart → propose expanding auto-remediation to cover them explicitly in the allowlist config.
+
+---
+
 ## Iteration 300 — 2026-06-01 03:57 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
