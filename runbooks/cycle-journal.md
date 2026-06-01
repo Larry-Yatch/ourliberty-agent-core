@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration 444 — 2026-06-01 23:47 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1126** (unchanged — 0 new alerts since iter 443). **PR #237 MERGED** ✅ (23:43:26Z — "config: add tier2-fallback-skipped FYI alert translations"). Forge inbox: 1 (Check X build, ~9 min old). Sync: ⚠️ ERROR at 23:42:45Z (SYNC-PUSH-REBASE-FALLBACK-001 — 9th total / 3rd post-clear; repo recovered via wrapper push a818f02 at 23:44:19Z). Healer heartbeat: 23:43:37Z (FRESH). 7/7 services active.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1126 lines** (unchanged). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts. Watermark stable at 1126. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1. No new directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **293** total (unchanged from iter 443). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Active Forge build.** Forge inbox: **1** — `build-build-check-x-chain-quality-regression-001.json` (dispatched ~23:38:43Z, ~9 min old; under 2h threshold). Beacon inbox: **0**. **PR #237 MERGED ✅** at 23:43:26Z ("config: add tier2-fallback-skipped FYI alert translations") — new since iter 443. 0 open PRs. ⚠️ (active build)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **23:43:37Z** — FRESH (~4 min old at check time). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. HEAD=a818f02 ("Pulse cycle 20260601T234419Z", iter 443 auto-commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 RECURRED — 9th total / 3rd post-clear.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-01T23:42:45Z, commit=b3aaad09. Wrapper successfully recovered: a818f02 pushed at 23:44:19Z; repo current. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + elevated (iter 440). No new DM — last sent iter 440 (idx=1125, ~28 min ago); same carry-forward. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Forge inbox: 1 (Check X build, < 2h). 0 open PRs. PR #237 auto-merged — auto-merge path working normally. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge active (Check X build). No runaway process. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** All Monday checks fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **68th iter in series (377–444)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (Forge build active + legitimate; sync error but repo current; no auto-merge candidates).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T23:47:55Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T23:47:56Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. SYNC-PUSH-REBASE-FALLBACK-001 9th occurrence — no new DM (APPROVAL_REQUEST elevated iter 440, idx=1125, ~28 min ago; same carry-forward). Tier 2 OAuth stall (APPROVAL_REQUEST pending, carry-forward).
+
+**Patterns:**
+- **PR #237 MERGED ✅** — "config: add tier2-fallback-skipped FYI alert translations" (23:43:26Z, auto-merged). Two Tier 3 translations now live: `pipeline-stall:tier2-fallback-skipped-rate_limit` and `pipeline-stall:tier2-fallback-skipped-auth_401` (strip-segment lookup covers all agent variants). APPROVAL_REQUEST `alert-translations-tier2-skipped-subjects-001` CLOSES. Future Check 0 scans will silence these subjects via the known-pattern allowlist.
+- **SYNC-PUSH-REBASE-FALLBACK-001 9th total / 3rd post-clear.** Pattern: fires on every push-race window — sync_agent_core.sh and the wrapper's auto-commit both push within seconds of each other during active Forge build days. The next PR merge (Check X build imminent) will likely trigger a 10th occurrence. APPROVAL_REQUEST must ship before that.
+- **Forge building Check X.** Task dispatched 23:38:43Z (~9 min before this iter). No PR yet — expected; build typically takes ~15–30 min for a new check. Next iter: check if PR opened.
+- **Cooldown files plateau: 293/27** — unchanged across both iters 443 and 444. Natural expiry appears paused. May reflect the Tier 2 OAuth stall generating cooldown entries at the same rate as expiry.
+
+**Learned:** Nothing new.
+
+---
+
 ## Iteration 443 — 2026-06-01 23:41 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1126** (1 new alert since iter 442). **PR #235 MERGED** ✅ (Medic PR2 — "feat(medic): PR2 reversible act-then-notify (restart-daemon + retrigger-inbox)"). PR #237 OPEN (config: add tier2-fallback-skipped FYI alert translations, under 30-min gate). Forge inbox: 1 (`build-build-check-x-chain-quality-regression-001.json` — Check X build phase). Healer heartbeat: 2026-06-01T23:13:19Z (~28 min old; FRESH). 7/7 services active.
