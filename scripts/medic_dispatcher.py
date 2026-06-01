@@ -516,10 +516,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         log('WARN', 'batch write failed; not advancing offset, not invoking operator')
         return 1
 
+    # PR2 no-double-record guard: snapshot which fingerprints already have an
+    # 'acted' ledger record BEFORE the operator runs. medic_actions.py writes
+    # its authoritative 'acted' record at action time; any fingerprint that
+    # becomes acted during this run must NOT also get an 'escalated' record
+    # from the dispatcher below (no double-recording for that fingerprint+run).
+    acted_before = medic_ledger.acted_fingerprints()
+
     log('INFO', f'invoking run_medic.sh with batch={batch_path.name} '
                 f'count={len(batch)}')
     rc = _invoke_operator(batch_path)
     log('INFO', f'run_medic.sh returned rc={rc}')
+
+    newly_acted = medic_ledger.acted_fingerprints() - acted_before
 
     # Advance offset past everything we consumed, regardless of operator
     # exit code -- the ledger fingerprint dedup (PR2) handles re-trips,
@@ -527,12 +536,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     if last_consumed_idx is not None:
         _advance_offset(last_consumed_idx + 1)
 
-    # PR1 escalate-only: record one ledger entry per owned alert as
-    # outcome=escalated. PR2 will distinguish acted vs escalated based
-    # on the operator's actual output. Attempt = prior_attempts + 1 so
-    # the one-action-per-fingerprint guard PR2 ships has the data.
+    # Record one ledger entry per owned alert as outcome=escalated -- EXCEPT
+    # any fingerprint medic_actions.py recorded as acted during this run (its
+    # action-time record is authoritative; the dispatcher must not duplicate
+    # or overwrite it). Attempt = prior_attempts + 1 so the
+    # one-action-per-fingerprint guard has the data.
     for entry in batch:
         fp = entry['fingerprint']
+        if fp in newly_acted:
+            log('INFO', f'fingerprint {fp} recorded as acted by medic_actions '
+                        'this run; skipping dispatcher post-record')
+            continue
         attempt = int(entry.get('prior_attempts', 0)) + 1
         medic_ledger.append_record(
             source=entry.get('source'),
@@ -540,7 +554,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             classification=entry['owned_class']['action_tier_hint'],
             outcome='escalated',
             attempt=attempt,
-            notes=f'PR1 escalate-only; batch={batch_path.name}',
+            notes=f'escalated (not acted this run); batch={batch_path.name}',
         )
 
     return 0 if rc == 0 else 1

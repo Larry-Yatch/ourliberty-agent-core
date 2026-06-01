@@ -542,6 +542,38 @@ class LedgerRecordingTest(_IsolatedDispatcher):
             self.assertEqual(r['outcome'], 'escalated')
             self.assertEqual(r['attempt'], 1)
 
+    def test_no_double_record_when_operator_acted(self) -> None:
+        # PR2 invariant: if medic_actions.py records an 'acted' entry for a
+        # fingerprint DURING this run, the dispatcher must NOT also append an
+        # 'escalated' entry for it. Simulate the operator acting by having the
+        # mocked _invoke_operator write the acted record itself.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),   # operator will "act"
+            _alert('heal-pipeline-stall', 'pipeline-stall:xyz'),  # escalate
+        ])
+        acted_fp = 'sentinel:inbox-stall:agent-a'
+
+        def _fake_operator(_batch_path):
+            medic_ledger.append_record(
+                'sentinel', 'inbox-stall:agent-a', 'reversible', 'acted', 1,
+                notes='acted by medic_actions this run')
+            return 0
+
+        with mock.patch.object(medic_dispatcher, '_invoke_operator',
+                               side_effect=_fake_operator):
+            medic_dispatcher.main([])
+
+        recs = medic_ledger.read_recent(50)
+        by_fp = {}
+        for r in recs:
+            by_fp.setdefault(r['fingerprint'], []).append(r['outcome'])
+        # The acted fingerprint has exactly ONE record (the acted one) -- the
+        # dispatcher skipped its post-record.
+        self.assertEqual(by_fp[acted_fp], ['acted'])
+        # The non-acted owned alert still gets its escalated record.
+        self.assertEqual(by_fp['heal-pipeline-stall:pipeline-stall:xyz'],
+                         ['escalated'])
+
     def test_attempt_counter_increments_on_recurrence(self) -> None:
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
