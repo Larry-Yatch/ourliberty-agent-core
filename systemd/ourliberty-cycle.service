@@ -5,7 +5,15 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+# Type=simple (not oneshot) so systemd marks the unit started the instant
+# run_cycle.sh launches, letting the 5-min ourliberty-cycle.timer re-arm its
+# next fire immediately. A oneshot stays "activating" for the entire run, so a
+# cycle that runs longer than the 5-min timer interval wedged the timer into
+# the NextElapse=infinity trap (NextElapseUSecRealtime empty), halting all
+# automated cycles until a manual daemon-reload+restart (incident 2026-05-31).
+# Overlap between runs is still prevented by the concurrency lock in
+# run_cycle.sh, so simple does not risk double-firing a cycle.
+Type=simple
 User=larry
 Group=larry
 WorkingDirectory=/home/larry/agent-core/agents/pulse
@@ -16,11 +24,12 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # Wrapper script handles concurrency lock + invokes claude with /cycle
 ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_cycle.sh
 
-# Bumped 2026-05-28 — 7-day trend showed cycles climbing 3m→10m as corpus grew
-# (chain-events + journal + archive); 5 timeouts in 7d (12%). α₁ will add
-# 5 new checks. 1200s gives ~50% headroom; per-check budget is a separate
-# design call in the α₁ brief.
-TimeoutStartSec=1200
+# RuntimeMaxSec caps a hung cycle at 20 min (SIGTERM then SIGKILL). This
+# replaces the former TimeoutStartSec=1200, which is meaningless under
+# Type=simple (the unit is considered started immediately). 7-day trend showed
+# cycles climbing 3m->10m as the corpus grew (chain-events + journal +
+# archive); 5 timeouts in 7d (12%). 1200s gives ~50% headroom.
+RuntimeMaxSec=1200
 
 StandardOutput=journal
 StandardError=journal
