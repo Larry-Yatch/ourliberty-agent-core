@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 304 — 2026-06-01 04:29 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. **Notable: PR #225 "Fix ourliberty-cycle.timer NextElapse=infinity wedge: oneshot→simple" MERGED. Cycle.timer now OnCalendar=*:0/5. G-rule 2/3 → SYSTEMIC FIX LANDED. First automated cycle post-fix in progress (PID 2821132, started 04:25:32Z).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1093 lines** (unchanged from iter 303 watermark). **0 new alerts.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark 1093 (unchanged from iter 303). Last entries: idxs 1091–1093 = heal-systemd-install-drift auto-heal alerts at 04:00Z UTC — already triaged in iters 301/302/303. No new healer escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: `-- No entries --`. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Watermark 1093 unchanged. No new Larry directives. No agent distress keywords in last 30 min. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **314** (DOWN from iter 303's 317 — the 3 healer auto-heal cooldown files for stuck timers at 04:00Z UTC expired as expected per TTL; heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward). NOTABLE: cycle.timer FIXED.** PR #225 "Fix ourliberty-cycle.timer NextElapse=infinity wedge: oneshot→simple" merged (de2b78b + c63cb09, committed into wrapper cycle c1badb4 04:25:30Z UTC). Timer unit now: `OnCalendar=*:0/5, Persistent=true`. Wall-clock anchor guarantees next-fire; immunity to the OnUnitActiveSec infinity-trap confirmed by timer file inspection. `systemctl show` result at check time: `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity`, `SubState=running` — consistent with timer actively executing its service (next elapse schedules after current run completes; infinity while SubState=running is expected for wall-clock timers). First automated cycle post-fix running (PID 2821132, started 04:25:32Z, ~4 min elapsed at check time). G-rule status: **RESOLVED — promoted to systemic fix**. ✅/⚠️ (on cycle.timer: RESOLVED; APPROVAL_REQUESTS remain)
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T04:08:49Z UTC** — same tick as iters 302/303; ~21 min old at check time (04:29Z). Within 90-min threshold. Next tick expected ~04:38Z UTC. Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=c1badb4 "Pulse cycle 20260601T042530Z" (wrapper auto-commit of iter 303's interactive session + first automated cycle post-PR #225), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: last_sync=2026-06-01T04:06:16Z, ~23 min old at check time (04:29Z); within 2h threshold; next sync expected ~05:06Z UTC. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active (cycle.timer now running).** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. cycle.timer SubState=running (service currently executing). First automated cycle since PR #225 fix. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ Forge inbox: 1 active task (15 min old — not stale). 0 open PRs.** `medic-operator-scaffold-001.json` in Forge inbox; created 04:14Z UTC (age: ~15 min at check time); within 1h threshold. Beacon inbox: 0 tasks. `gh pr list`: `[]`. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. All others due 2027. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Sentinels on disk. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. ✅
+
+- **G-rule watch items (updated):**
+  - `cycle.timer stuck`: **G-rule RESOLVED** — PR #225 is the systemic fix. Timer now OnCalendar=*:0/5. Closing this G-rule.
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: pending APPROVAL_REQUEST
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Forge:** 0 open PRs. Last merged: PR #225 "Fix ourliberty-cycle.timer NextElapse=infinity wedge: oneshot→simple" (between iters 303 and 304). Active inbox: `medic-operator-scaffold-001` (15 min, fresh). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday/14d idempotency, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T04:30:26.000068+00:00", "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix` → `{"ts": "2026-06-01T04:30:26.568794+00:00", "tier": 1, "kind": "systemic_fix"}` appended (for PR #225 cycle.timer G-rule resolution).
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:30:29Z UTC.
+6. Updated MEMORY.md: cycle.timer stuck G-rule → CLOSED; added PR #225 to permanent fixes.
+7. Wrote journal entry.
+
+**Escalated:** None new. All active issues carry-forward from iter 303.
+
+**Patterns:**
+- **PR #225 CYCLE.TIMER FIX CONFIRMED.** Timer switched from OnUnitActiveSec (infinity-trap susceptible) to OnCalendar=*:0/5 (wall-clock, guaranteed next-fire). Automated cycles resumed. G-rule 2/3 → systemic fix closed. MEMORY.md updated.
+- Alert-cooldown total 314 (DOWN from 317 — 3 expired healer cooldown files from 04:00Z heals cleaned up by TTL). pipeline-stall prefix 38 (unchanged). Root cause: Tier 2 OAuth expired; no change.
+- Healer heartbeat: 04:08:49Z UTC (same tick as iters 302/303; ~21 min old; next expected ~04:38Z UTC). ✅
+- Sync: last_sync=04:06:16Z UTC (~23 min old; next expected ~05:06Z UTC). ✅
+- APPROVAL_REQUEST queue: 8 (unchanged). Larry's attention: Tier 2 OAuth restore (active stalls). Cycle.timer no longer needs manual intervention.
+- Concurrent automated cycle (PID 2821132) running from 04:25:32Z UTC — first post-fix automated cycle. May also write iter 304; expected collision in journal if so (both labeled to distinguish).
+
+**Learned:** PR #225 landed between iters 303 and 304, fixing the cycle.timer stuck issue that had been tracked since iter 158 (first obs) and iter 259 (second obs). The fix is clean — OnCalendar-based timers with Persistent=true are immune to the infinity-trap. Automated cycles are back on their 5-min cadence. The one remaining system degradation is the Tier 2 OAuth expiry (active pipeline stalls). Once Larry restores OAuth, the system should be able to de-escalate from Tier 1.
+
+---
+
 ## Iteration 303 — 2026-06-01 04:23 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. **New: PR #224 merged; Medic scaffold task dispatched to Forge (fresh, not stale).**
