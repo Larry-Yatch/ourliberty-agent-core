@@ -2,8 +2,8 @@
 Description=Run build_sequence_advancer every 5 minutes (E-orchestrator PR-S2)
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=5min
+OnCalendar=*:0/5
+Persistent=true
 Unit=ourliberty-build-sequence-advancer.service
 
 [Install]
