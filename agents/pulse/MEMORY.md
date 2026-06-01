@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~02:47Z UTC (Iter 289 — interactive)
+## Status snapshot — updated 2026-06-01 ~03:01Z UTC (Iter 291 — interactive)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **02:06:15Z UTC** (on schedule; next ~03:06Z). Healer heartbeat **2026-06-01T02:38:36Z UTC** (NEW TICK at iter 288; ~4 min old; ~30 min gap from prior tick; healer alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **02:06:15Z UTC** (on schedule; next ~03:06Z). Healer heartbeat **2026-06-01T02:38:36Z UTC** (~23 min old at iter 291; next expected ~03:08Z; alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`; stable 10 consecutive iters). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer).
