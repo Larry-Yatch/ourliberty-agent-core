@@ -186,5 +186,53 @@
       "plain_language_summary": "ourliberty-sync ran with REQUIRE_QUIESCENCE=1 and the strict-quiescence wait exceeded its timeout; sync rolled back. A non-quiescent agent kept the tree from being safely swapped.",
       "recommended_action": "ssh ourliberty-vm, `cd ~/agent-core && python3 scripts/await_quiescence.py` to identify the busy agent(s). Resolve before the next sync tick (or let sync run without REQUIRE_QUIESCENCE if soft-quiescence is acceptable)."
     }
+  },
+  "cycle-tier-state": {
+    "cycle-tier-corrupted": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The cycle-tier state file was missing or had an invalid schema, so the system reset it to the Tier 1 defaults and kept running. Nothing is stuck, but a recurrence means something keeps corrupting that file.",
+      "recommended_action": "One-off: no action needed, it self-recovered. If it recurs, inspect ~/agents/state/cycle-tier.json by hand for what is writing bad data."
+    }
+  },
+  "pulse-check-iv": {
+    "check-iv-update-": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The weekly marker-drift check found Mirror's marker shape is drifting often enough to propose tightening enforcement (prompt re-emphasis or a hard validator gate). This is a proposal awaiting your call, not a failure.",
+      "recommended_action": "Review the proposal and reply `approve check-iv-update-<date>` or `reject check-iv-update-<date> <reason>` on Telegram. No action keeps the current enforcement unchanged."
+    }
+  },
+  "pulse-check-v": {
+    "check-v-update-": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The Tier-1 action-template trust check proposes changes to the guard list: graduating templates that have earned trust, or adding ones that triggered a correction. This is a proposal awaiting your call, not a failure.",
+      "recommended_action": "Review the proposals and reply `approve check-v-update-<date>` or `reject check-v-update-<date> <reason>` on Telegram. No action leaves the guard list as-is."
+    }
+  },
+  "pulse-check-vi": {
+    "check-vi-update-": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The PRIME DIRECTIVE posture check proposes tuning the verification-pending handling (auto-promote window or stuck-forever thresholds) based on the last 30 days. This is a proposal awaiting your call, not a failure.",
+      "recommended_action": "Review the proposals and reply `approve check-vi-update-<date>` or `reject check-vi-update-<date> <reason>` on Telegram. No action leaves the current posture unchanged."
+    }
+  },
+  "pulse-check-vii": {
+    "check-vii-update-": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The cost-ceiling check proposes tuning the spend-escalation thresholds based on recent escalation-response history. This is a proposal awaiting your call, not a failure.",
+      "recommended_action": "Review the proposals and reply `approve check-vii-update-<date>` or `reject check-vii-update-<date> <reason>` on Telegram. No action leaves the current thresholds unchanged."
+    }
+  },
+  "rotate-active-tier": {
+    "rotation_auth_gate_blocked": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The scheduler tried to rotate the active Claude account into the next tier but that tier's OAuth credentials are missing, expired, or unverifiable, so it held on the current tier. The chain still moves on the held tier; it will retry the flip after you re-auth.",
+      "recommended_action": "Re-auth the blocked tier so the next rotation window can flip. Runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+    }
   }
 }
