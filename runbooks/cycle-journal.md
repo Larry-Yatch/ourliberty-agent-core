@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 374 — 2026-06-01 11:44 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1112** (+1 new: rotation_auth_gate_blocked:tier2, carry-forward). Healer heartbeat: **11:40:05Z UTC** (JUST FIRED — ~4 min old; 30-min cadence confirmed; next expected ~12:10Z UTC). Sync: **error** at 11:37:14Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 4th occurrence; commit 02c4da4 rolled back. Source repo: HEAD=140cfd6 "Pulse cycle 20260601T113504Z", branch=main, clean (session start). 7/7 core services active. **NEW: PR #231 OPEN** (feat(medic): wire real rate-window gauge and per-session timeout; created 11:39:53Z UTC). **Forge marker-error retry 1/3** for medic-hardening-ratewindow-timeout-001. rotation-gate-dm-isolation-001 dispatched to Forge.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1112 lines** (+1 from 1111). New alert: idx=1111 `rotation_auth_gate_blocked:tier2` from `rotate-active-tier` at 11:33:01Z UTC (Tier 2 OAuth stall, carry-forward). Watermark: 1112.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ +1 new alert (carry-forward stall).** idx=1111: `rotation_auth_gate_blocked:tier2` from `rotate-active-tier` at 11:33:01Z UTC. Message: rotation auth gate blocked tier2 flip — OAuth expired. Recurring pattern (same root cause: Tier 2 OAuth stall). APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. Watermark updated to 1112. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → No entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last delivery: idx=1110 at 10:03:00Z UTC (Medic 20th run diagnoses). No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, stable).** `~/agents/state/alert-cooldown/warning/`: **316** (was 316, unchanged — 1 file expired since iter 373's 316; net flat). heal-pipeline-stall prefix: **37** (was 37, unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ NEW — Forge marker-error retry + rotation-gate dispatched.** No new Larry directives. Beacon inbox: 0. APPROVAL_REQUEST queue 8 carry-forward.
+  - `marker-error-medic-hardening-ratewindow-timeout-001-1.json` in Forge inbox: Forge opened PR #231 but preflight phase emitted no valid marker block (retry 1 of 3). outbox-notifier redelivered. Forge needs to re-read CLAUDE.md preflight discipline and re-emit PROCEED marker.
+  - `rotation-gate-dm-isolation-001.json`: dispatched by inbox-watcher (file disappeared between ls and cat). Now ACTIVE in Forge.
+  - PR #231 OPEN: "feat(medic): wire real rate-window gauge and per-session timeout" — MERGEABLE, no review decision yet, created 11:39:53Z UTC (~5 min old at check; well within 30-min threshold). Awaiting Mirror review. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal — JUST FIRED.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T11:40:05Z UTC — ~4 min old at check. Confirms 30-min cadence (11:10:04Z → 11:40:05Z = 30m01s; on schedule). Next expected ~12:10Z UTC. ✅
+
+- **(Check A) Source repo: ⚠️ Sync error noted.** gitStatus at session start: HEAD=140cfd6 "Pulse cycle 20260601T113504Z", branch=main, clean. sync.json shows commit 02c4da4 was created and rolled back at 11:37:14Z UTC (push failed). Unable to run live git status without approval; using session-start context. Working-copy discipline appears intact (tree was clean). See Check B for sync error details. ⚠️
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 4th occurrence.** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `commit=02c4da4`, `last_sync=2026-06-01T11:37:14Z`. This is the 4th occurrence of SYNC-PUSH-REBASE-FALLBACK-001 (prior: 3 occurrences up to iter 306). MEMORY.md note: "[yellow] DM to Larry on next occurrence." Action: [yellow] escalation sent to larry_alerts (append_alert result=True) and pulse-escalations.json. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains in pipeline queue. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `inactive` (expected — 20th run complete; timer active). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Forge active (2 tasks) + PR #231 open.** Forge inbox: marker-error retry pending + rotation-gate dispatched. PR #231 open (5 min old, within threshold). ⚠️ (watch-only; no action needed yet)
+
+- **(Check F) Cost/quota: ✅ Nominal.** medic-hardening-ratewindow-timeout-001 completed (PR opened); now in marker-error retry (cheap re-emit). rotation-gate-dm-isolation-001 just dispatched. No active Medic run. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266. check-i-2026-06-01.json sentinel confirmed. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items:**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 — no change.
+  - `MalformedForgeMarker`: G-rule already DISPATCHED (iter 150), APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending. New instance (medic-hardening-ratewindow-timeout-001 marker-error) noted — retry 1/3 in progress.
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. [yellow] escalation sent: SYNC-PUSH-REBASE-FALLBACK-001 4th occurrence — `larry_alerts.append_alert('pulse', 'warning', ...)` → True; pulse-escalations.json entry 76 written.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T11:44:55Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T11:44:56Z UTC. ✅
+6. Wrote journal entry.
+
+**Escalated:**
+- **[yellow] SYNC-PUSH-REBASE-FALLBACK-001 4th occurrence** (2026-06-01T11:37:14Z). DM queued via larry_alerts, pulse-escalations.json entry 76. Suggested action: approve `sync-push-rebase-fallback-001` APPROVAL_REQUEST.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: 4th occurrence. Prior 3 all before/at iter 306. Gap of 60+ iters of clean syncs, now recurrence at iter 374. The APPROVAL_REQUEST has been pending since iter 306 — this recurrence makes the defensive hardening more urgent.
+- PR #231 opened: Forge completed `medic-hardening-ratewindow-timeout-001` (rate-window gauge + session timeout). Work produced despite marker-error. Marker-error retry 1/3 in Forge inbox. MalformedForgeMarker G-rule doc-fix (APPROVAL_REQUEST #7) still pending — this is its latest exemplar.
+- Alert idx=1111: rotation_auth_gate_blocked:tier2 confirms Tier 2 OAuth stall active. Rotation now auto-alerting on every blocked tier2 flip. One more recurring signal from the same root cause.
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 returned after 60+ clean iters. The push failure is intermittent, not correlated with a specific trigger (PR merges, concurrent activity). Forge continues to produce work (PR #231 opened) despite marker-error; the marker discipline is the gap, not the build itself.
+
+---
+
 ## Iteration 373 — 2026-06-01 11:32 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1111** (unchanged, 0 new alerts). Healer heartbeat: **11:10:04Z UTC** (~22 min old; within threshold; next expected ~11:40Z). Sync: **11:06:26Z UTC** (~26 min old; within 2h threshold). Source repo: HEAD=4315cb8 "Pulse cycle 20260601T112250Z", branch=main, clean. 7/7 core services active. Medic-dispatcher: inactive (expected — 20th run complete; timer active). **NEW: 2 Forge tasks in-flight (both arrived post-iter-372, both Beacon-dispatched, non-fixture).**
