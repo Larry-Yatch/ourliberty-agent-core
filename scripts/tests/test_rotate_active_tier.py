@@ -684,6 +684,59 @@ class PreEngageAuthGateTest(RotateTickBaseTest):
         self.assertEqual(third['to_tier'], 'tier2')
 
 
+class DmAuthBlockedServiceGateTest(unittest.TestCase):
+    """The rotation_auth_gate_blocked DM must only fire when invoked from
+    the systemd unit (which sets OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE=true).
+
+    Manual / agent CLI runs of `rotate_active_tier.py --once` probe the
+    auth gate as a side effect — without this gate they DM Larry on every
+    such probe, drowning out the genuine "operator must re-auth" signal.
+    The in-process auth-blocked event + held-window logic is unaffected;
+    only the la.append_alert call is suppressed.
+    """
+
+    def setUp(self):
+        self._prev_env = os.environ.pop(
+            'OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE', None,
+        )
+        self._calls = []
+        sys.path.insert(0, str(_REPO_SCRIPTS))
+        import larry_alerts as la
+        self._la = la
+        self._prev_append = la.append_alert
+        la.append_alert = lambda **kw: self._calls.append(kw)
+
+    def tearDown(self):
+        self._la.append_alert = self._prev_append
+        if self._prev_env is None:
+            os.environ.pop('OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE', None)
+        else:
+            os.environ['OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE'] = (
+                self._prev_env
+            )
+
+    def test_no_sentinel_suppresses_dm(self):
+        rotate_active_tier._dm_auth_blocked('tier1', 'tier2')
+        self.assertEqual(self._calls, [])
+
+    def test_sentinel_set_fires_dm(self):
+        os.environ['OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE'] = 'true'
+        rotate_active_tier._dm_auth_blocked('tier1', 'tier2')
+        self.assertEqual(len(self._calls), 1)
+        kw = self._calls[0]
+        self.assertEqual(kw['subject'], 'rotation_auth_gate_blocked:tier2')
+        self.assertEqual(kw['severity'], 'warning')
+        self.assertEqual(kw['source'], 'rotate-active-tier')
+
+    def test_sentinel_non_true_value_suppresses_dm(self):
+        # Only the exact string "true" enables the DM. A leftover "1" or
+        # "yes" from a misconfigured EnvironmentFile must not accidentally
+        # re-open the gate — the systemd unit is the only blessed source.
+        os.environ['OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE'] = '1'
+        rotate_active_tier._dm_auth_blocked('tier1', 'tier2')
+        self.assertEqual(self._calls, [])
+
+
 class ConfigSchemaTest(unittest.TestCase):
     """The stale dollar keys engage_5h_spend_usd / disengage_5h_spend_usd
     must be gone from the shipped rotation block — PR #184 retired

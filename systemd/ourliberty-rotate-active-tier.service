@@ -12,6 +12,12 @@ Group=larry
 EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Service-only sentinel — `_dm_auth_blocked` in rotate_active_tier.py
+# checks this env var before firing the rotation_auth_gate_blocked DM, so
+# manual / agent CLI invocations of the script (which lack this env) can
+# probe the auth gate without paging Larry. Only the systemd unit sets
+# it; nothing else should.
+Environment="OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE=true"
 # Activation gate is the in-config `rotation.enabled` flag, not an
 # environment variable — the script reads config/agent-models.json on
 # every tick and force-tier1's when enabled=false. So the service can
