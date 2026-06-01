@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 440 — 2026-06-01 23:17 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (new: 3 alerts at 23:14Z + 1 Pulse escalation at 23:17Z). Sync: **⚠️ ERROR** — "Auto-commit push failed; rolled back" at 23:13:29Z (SYNC-PUSH-REBASE-FALLBACK-001 RECURRED — first recurrence since self-clear at iter 378). Repo state clean (gitStatus confirmed). PR #234: **MERGED** ✅. PR #235 OPEN (Forge Medic PR2, awaiting Mirror review). Forge inbox: 1 (`build-medic-reversible-handlers-001.json` — active build phase). Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~4 min old at check time; FRESH).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1124 lines** before this iter (was 1121 at iter 439 watermark). 3 new alerts at lines 1122-1124, all at 2026-06-01T23:14:09Z from `heal-pipeline-stall`:
+- `pipeline-stall:tier2-fallback-skipped-rate_limit:forge`
+- `pipeline-stall:tier2-fallback-skipped-auth_401:forge`
+- `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot`
+
+Classification: **Tier 4** (subjects not in alert-translations.json — `tier2-fallback-skipped-*` verb not present; existing entries use `failed-*` and `unavailable-*`). Root cause: same known Tier 2 OAuth stall. APPROVAL_REQUEST already open and DM sent at iter 376. No re-DM for same root cause. Dispatched to Beacon to add missing subject entries.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts — Tier 4 (unmatched subjects, known root cause).** Subjects `tier2-fallback-skipped-*` not in allowlist. Same Tier 2 OAuth stall. DM already sent iter 376. Dispatched Beacon envelope `alert-translations-tier2-skipped-subjects-001.json` to add entries. Watermark advances to 1125. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since "30 minutes ago" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session, chat_id=7998341473). No new directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, depth unchanged).** alert-cooldown/warning/: **309** total (was 318 — decreased by 9 via natural expiry). Heal-pipeline-stall keyed files: **36** (was 37 — decreased by 1). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. New pipeline-stall alerts at 23:14Z confirm stall still active. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Active Forge build.** Forge inbox: **1** — `build-medic-reversible-handlers-001.json` (build phase task, dispatched by outbox-notifier, session_id=dcf5b212). Beacon inbox: **1** (just dispatched `alert-translations-tier2-skipped-subjects-001.json`). **PR #235 OPEN** — "feat(medic): PR2 reversible act-then-notify (restart-daemon + retrigger-inbox)" — created by Forge, mergeable=UNKNOWN (GitHub check pending), reviewDecision="" (Mirror review not yet started). PR #234 **MERGED** ✅ (no longer in open PR list; commit d984d56 in repo). PR #235 is newly opened — NOT stale (<30 min). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **2026-06-01T23:13:19Z UTC** — ~4 min old at check time. FRESH — well within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean (gitStatus at session start; most recent commit d984d56=Merge PR #234). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 RECURRED.** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `last_sync=2026-06-01T23:13:29Z`. Push failed because PR #234 merged between local cycle auto-commit (23:09Z) and push attempt (23:13Z), creating a race. Rollback succeeded — repo state clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open as defensive hardening. Last occurrence: iter 376 (11:55:54Z). **63 clean iters before this recurrence.** [yellow] escalation appended to larry-alerts.jsonl (idx=1125). ⚠️ `ask-then-do` — re-escalating per MEMORY.md "if error recurs, re-escalate to Larry."
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Active.** Forge inbox: **1** (build phase active). PR #235 OPEN (newly opened, Mirror review pending). See Check 4. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge build active (PR #235 just opened). No cost alarm. No runaway process detected. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d, outside 60d window). CLAUDE_MAX_OAUTH stale/expired (carry-forward — active Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items:** All 7 items stable. No new occurrences from the 3 new pipeline-stall alerts (those are Tier 2 OAuth stall — not a new G-rule advance). Steady-state degraded hold: **64th iter in series** with 0 new G-rule advances. Note: SYNC-PUSH-REBASE-FALLBACK-001 recurrence is NOT a new G-rule (it's an existing APPROVAL_REQUEST); it's an ask-then-do escalation.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: claimed 3 new alerts (lines 1122-1124); classified Tier 4 (novel subjects, known root cause); dispatched Beacon envelope `alert-translations-tier2-skipped-subjects-001.json` to add missing allowlist entries.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK-001 recurred — appended [yellow] escalation to larry-alerts.jsonl (idx=1125) per MEMORY.md "if error recurs, re-escalate."
+4. PR #234 MERGED observed — no action needed; commit d984d56 in repo.
+5. PR #235 OPEN observed — newly opened by Forge (Medic PR2); not stale; no action.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T23:17:29Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T23:17:29Z. ✅
+8. Wrote journal entry.
+
+**Escalated:**
+- **[yellow] SYNC-PUSH-REBASE-FALLBACK-001 recurred** (idx=1125) — larry-alerts.jsonl. First recurrence since self-clear at iter 378 (63 clean iters). APPROVAL_REQUEST still open. Recommend prioritizing the defensive hardening PR.
+- **Beacon dispatch** `alert-translations-tier2-skipped-subjects-001.json` — add `tier2-fallback-skipped-*` subject entries to config/alert-translations.json (2 base entries cover 3+ alert variants).
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001 confirmed as RECURRING pattern, not a one-time event. 6 occurrences before self-clear (iter 376), now 1st recurrence (iter 440). The PR #234 merge created the same push-race as before. APPROVAL_REQUEST `sync-push-rebase-fallback-001` (defensive hardening: add rebase fallback to sync_agent_core.sh:161) should be promoted to urgent — this will keep recurring on every PR merge day.
+- PR #234 merged + PR #235 opened in the same ~10-minute window — Forge is active and moving.
+- Cooldown files: 309 (was 318 at iter 439 — 9 files expired). Pipeline-stall prefix: 36 (was 37 — 1 expired). Stall depth is slowly decreasing via natural cooldown expiry, but root cause (Tier 2 OAuth) still active.
+- 3 new `tier2-fallback-skipped-*` subject variants not in allowlist — this is the second gap (PR #229 added 6 entries; these 3 subjects were generated by a different code path triggered in the current Forge run). Pattern: alert-translations.json tends to lag behind new healer code paths.
+
+**Learned:** The SYNC-PUSH-REBASE-FALLBACK-001 push race is NOT self-resolving long-term — it recurs predictably whenever a PR merges between a cycle's local commit and push attempt. The self-clear at iter 378 was a quiet-period artifact (no PRs merging), not a fix. The `sync-push-rebase-fallback-001` APPROVAL_REQUEST should be promoted to elevated priority (was marked "acute risk resolved, defensive hardening" — that framing is now incorrect; this is a recurring operational finding).
+
+---
+
 ## Iteration 439 — 2026-06-01 23:07 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1121** (unchanged — 0 new alerts since iter 438). Sync: **fresh** — status=no-change, last_sync=2026-06-01T22:08:16Z (~59 min old; below 2h threshold). Source repo: branch=main, clean. 7/7 core services active. Forge inbox: **1** (new: `medic-reversible-handlers-001.json`). Beacon inbox: 0. **PR #234 OPEN** (new, created 23:02Z, <5 min old). Healer heartbeat: **2026-06-01T22:43:12Z UTC** (~24 min old at check time; FRESH — within 90-min threshold).
