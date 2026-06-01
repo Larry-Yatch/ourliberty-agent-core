@@ -1,0 +1,21 @@
+{
+  "$schema_version": "1",
+  "_doc": "Action-type -> tier map for Medic's dial-4 reversibility gate. The Medic operator (agents/medic/CLAUDE.md) classifies each owned alert into an action_type (e.g. restart-daemon, retrigger-watcher, redispatch-chain-leg, rotate-credential, edit-config). The tier here decides what Medic does: 'reversible' -> PR2 will act + notify; 'privileged' -> PR2/PR3 will emit append_approval_request whose payload IS the command (Larry replies 'go' and the existing approval gate runs it); 'judgment' -> escalate diagnose-only. PR1 ships this map as DATA only; the act-branch that consumes it is stubbed -- every owned alert results in an escalation. Loader is fail safe: missing or malformed file is treated as empty; unknown action_types resolve to 'judgment' (the safest default).",
+  "default_tier": "judgment",
+  "tiers": {
+    "restart-daemon": "reversible",
+    "retrigger-watcher": "reversible",
+    "retrigger-inbox": "reversible",
+    "kick-stuck-timer": "reversible",
+    "clear-stale-lock": "reversible",
+    "redispatch-chain-leg": "reversible",
+    "rotate-credential": "privileged",
+    "force-git-op": "privileged",
+    "delete-file": "privileged",
+    "edit-config": "privileged",
+    "edit-systemd-unit": "privileged",
+    "drop-from-queue": "privileged",
+    "diagnose-only": "judgment",
+    "unknown": "judgment"
+  }
+}

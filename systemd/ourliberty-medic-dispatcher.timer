@@ -1,0 +1,20 @@
+[Unit]
+Description=Run the Ourliberty Medic dispatcher every 3 minutes (self-gates; most ticks no-op)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/medic-operator-brief.md
+
+[Timer]
+# OnCalendar (perpetual-timer hardening; same posture as ourliberty-cycle.timer).
+# Fires at minutes 0, 3, 6, 9, ... within every hour. The dispatcher itself
+# is the rate gate: it scans Medic's own offset, returns in milliseconds if
+# nothing qualifies, and only spins the Claude operator when there is a
+# qualifying batch.
+OnCalendar=*:0/3
+Persistent=true
+# Modest jitter so we don't lock-step with the 5-min cycle timer or the
+# 15-min healer timers.
+RandomizedDelaySec=30s
+AccuracySec=15s
+Unit=ourliberty-medic-dispatcher.service
+
+[Install]
+WantedBy=timers.target

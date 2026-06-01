@@ -1,0 +1,31 @@
+{
+  "$schema_version": "1",
+  "_doc": "Medic-owned alert classes. Each entry names a (source, subject_prefix) pair the Medic operator consumes from ~/agents/blackboard/larry-alerts.jsonl; alerts that do NOT match any entry are left untouched for Beacon's existing DM path (Medic never swallows alerts it does not own). The action_tier hint biases the operator's classifier toward reversible (PR2 will act + notify) vs privileged (PR2/PR3 will emit approval_request) vs judgment (escalate diagnose-only). PR1 ships escalate-only -- every owned alert becomes a diagnosis + recommended-command notification or an approval-request when the recommended fix is privileged; no remediation action runs. Loader is fail safe: missing or malformed file is treated as empty (no alerts owned).",
+  "owned_classes": [
+    {
+      "source": "sentinel",
+      "subject_prefix": "inbox-stall",
+      "action_tier_hint": "reversible",
+      "_doc": "Inbox-stall: a queued task aged past its watchdog threshold. Reversible remediation is to re-trigger the watcher; PR2 wires the actual restart."
+    },
+    {
+      "source": "watchdog",
+      "subject_prefix": "",
+      "severity": "critical",
+      "action_tier_hint": "reversible",
+      "_doc": "Watchdog critical: a daemon under watchdog supervision crossed its silent threshold. Empty subject_prefix matches any subject; severity gate restricts to critical. Reversible remediation is daemon restart; PR2 wires it."
+    },
+    {
+      "source": "heal-pipeline-stall",
+      "subject_prefix": "pipeline-stall",
+      "action_tier_hint": "judgment",
+      "_doc": "Pipeline / chain-stall: the headless-handoff gap (forge built but no PR, Mirror PASS but PR still open, etc.). Re-dispatching a stalled chain leg is reversible in principle but requires the correct session_id/source/reply_chat_id -- the manual bridge. PR3 wires it. For PR1 + PR2 these are diagnose-only escalations."
+    },
+    {
+      "source": "heal-stale-daemon-code",
+      "subject_prefix": "auto-restart-failed",
+      "action_tier_hint": "judgment",
+      "_doc": "auto-restart-FAILED from the stale-daemon healer: the healer tried to restart a daemon and the restart itself failed. Recovery requires diagnosing why the restart failed (missing binary, env-var rot, journal noise) before any re-try. Diagnose-only in PR1."
+    }
+  ]
+}

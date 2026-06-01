@@ -1,0 +1,47 @@
+[Unit]
+Description=Ourliberty Medic Dispatcher -- cheap trigger for the Medic alert-operator (PR1 escalate-only)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/medic-operator-brief.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="AGENT=medic"
+# Enable-flag defaults to ON (ships active). To pause Medic without disabling
+# the timer, either touch ~/agents/medic.disabled, touch ~/agents/healers.disabled,
+# or `systemctl edit` this unit and set OURLIBERTY_MEDIC_ENABLED=0.
+Environment="OURLIBERTY_MEDIC_ENABLED=1"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/medic_dispatcher.py
+
+TimeoutStartSec=1500
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-medic-dispatcher
+
+# Memory cap: the dispatcher itself is tiny (just gates + queue scan).
+# The Claude operator it invokes runs as a child of run_medic.sh and
+# inherits this cap; sonnet-4-6 fits comfortably under 2G.
+MemoryMax=2G
+TasksMax=64
+
+# Hardening (mirrors ourliberty-cycle.service).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
