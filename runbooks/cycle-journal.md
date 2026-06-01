@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 288 — 2026-06-01 02:42 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1090 lines** (unchanged from iter 287 watermark). **0 new alerts.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark 1090 (unchanged from iter 287). Last entry: idx=1090, Check I DM at 00:08Z UTC June 1. No new healer escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: NO entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal (carry-forward).** beacon_telegram_bot.log: last deliveries idx=1088-1089 (Monday DM + Check I at ~00:12Z UTC June 1; unchanged). forge_telegram_bot.log: last entry 2026-05-30T17:35:14 MDT (forge-bot restart; old 502/timeout errors from May 28 not recent). No new Larry directives. No agent distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **312** (unchanged; `ls | wc -l`). heal-pipeline-stall prefix: **38** (unchanged). deploy-notifier prefix: **106** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. cycle.timer: `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity` — confirmed still stuck. G-rule **2/3**. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — NEW TICK.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T02:38:36Z UTC** — advanced from 02:08:34Z (iter 287 reading). ~30 min gap; on schedule. ~4 min old at check time (02:42Z). Within 90-min threshold. Healer alive and ticking. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=383a7b3 "Pulse cycle 20260601T023808Z" (wrapper auto-commit of iter 287), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: last_sync=2026-06-01T02:06:15Z, status=no-change, commit=e94832f. ~36 min old at check time (02:42Z); within 2h threshold. Next sync expected ~03:06Z UTC. ✅
+
+- **(Check C) Agent liveness: ✅ 6/6 non-timer active; ⚠️ cycle.timer STUCK (carry-forward).** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier — all `active`. ourliberty-cycle.timer: `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity` — confirmed still stuck. G-rule **2/3** (no new occurrence this iter; same continuous stuck state since iter 259). ⚠️ (known)
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse): 0 active tasks. ourliberty-agent-core: 0 open PRs. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. All others due 2027. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Sentinels on disk. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. ✅
+
+- **G-rule watch items:** cycle.timer stuck: G-rule **2/3** (no new occurrence). All others stable: heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3). MalformedForgeMarker doc-fix pending. F24 empty-prompt APPROVAL_REQUEST #8 pending. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday/14d idempotency, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T02:42:22.199124+00:00", "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:42:22Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All active issues carry-forward from iter 287.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new findings this iter. No change from iter 287.
+- Alert-cooldown total 312 (unchanged). No new healer alerts.
+- Healer heartbeat: NEW TICK 02:38:36Z UTC (advanced from 02:08:34Z; 30-min gap; on schedule). ✅
+- Sync: last_sync=02:06:15Z (on hourly schedule; next expected ~03:06Z UTC). ✅
+- cycle.timer G-rule: 2/3. One more distinct occurrence → dispatch to Beacon.
+- APPROVAL_REQUEST queue: 8 (unchanged). Larry's attention needed: Tier 2 OAuth restore (active stalls), cycle.timer recovery (`sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`).
+- Check IX: no sentinel written at first firing (iter 266 — script fataled on port 8001). Retry 2026-06-08; will fail again unless dashboard API restored.
+
+**Learned:** Nominal observation iter. System stable-degraded; no drift from iter 287. Positive signal: healer heartbeat ticked on schedule (02:08:34Z → 02:38:36Z; ~30 min gap). Both known degradations (Tier 2 OAuth + cycle.timer stuck) unchanged; both awaiting Larry action.
+
+---
+
 ## Iteration 287 — 2026-06-01 02:36 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity). 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
