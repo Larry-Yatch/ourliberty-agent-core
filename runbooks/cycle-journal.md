@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 361 — 2026-06-01 10:08 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). **NEW:** 3 Medic alerts (idx=1108–1110) delivered to Larry via Telegram at 10:07Z UTC — all diagnose-only for the 2026-05-30 inbox-watcher outage. Alert watermark advances 1108 → 1111. Medic 20th run confirmed COMPLETE (service now inactive). Healer heartbeat: 09:39:17Z UTC (~29 min old at check; FRESH; within 90-min threshold). Sync: 09:06:18Z UTC (~62 min old; within 2h threshold; aging — next sync expected ~10:06–10:30Z). Source repo: HEAD=c1ab73d "Pulse cycle 20260601T100424Z", branch=main, clean. 7/7 core services active.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1111 lines** (was 1108 at iter 360; 3 new Medic alerts). Outbox-notifier delivered all 3 at 10:07Z UTC.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new Medic alerts (idx=1108–1110), diagnose-only, all delivered.**
+  - **idx=1108:** `medic` diagnosis: `watchdog/ourliberty-inbox-watcher CRITICAL` — inbox-watcher was down ~11.5h on 2026-05-30 (09:00Z to 20:35 MDT, 28 prior escalations). Service is currently RUNNING (PID 2611673, active since 2026-05-30T02:35Z). No immediate action needed. Root cause: auto-restart failed rc=5 (unit not found — systemd hadn't loaded unit file). Medic recommends: audit stale-daemon healer for daemon-reload guard before restart. **Structural fix candidate.**
+  - **idx=1109:** `medic` diagnosis: `heal-stale-daemon-code/auto-restart-failed:ourliberty-inbox-watcher.service` — stale-daemon healer called restart before daemon-reload, got rc=5. Service self-recovered. Best guess: PR #212 added daemon-reload for timer recovery but stale-daemon healer lacks same guard. Medic recommends: confirm stale-daemon healer runs daemon-reload before restart; if absent, dispatch Forge task. **Same structural fix as idx=1108.**
+  - **idx=1110:** `medic` diagnosis: `heal-pipeline-stall/pipeline-stall:forge-no-pr:real-clr` — stall no longer active (was during inbox-watcher outage window). Medic best guess: real-clr is a fixture-dispatch test task (real- prefix family per PR #204). No action. Informational.
+  - **Classification (all 3):** `medic` source NOT in alert-translations.json → Tier 4 (novel template, manual judgment applied). Assessment: diagnose-only, service recovered, no immediate remediation. G-rule watch started for structural fix. No DM from Pulse (all 3 already delivered to Larry's Telegram by outbox-notifier at 10:07Z UTC; Larry has the diagnoses).
+  - **New G-rule: `stale-daemon-healer missing daemon-reload guard before restart`** — 1/3 (first observation, iter 361). Alerts 1108+1109 independently diagnose the same root cause. If this pattern recurs twice more (next time inbox-watcher or another unit requires restart), dispatch to Beacon: "stale-daemon healer should run `daemon-reload` before `systemctl restart <unit>` per the PR #212 pattern already applied to the timer recovery path."
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal — new deliveries noted.** Outbox-notifier delivered idx=1108–1110 at 04:07Z MDT (10:07Z UTC). Last delivery: idx=1110. No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress keywords from Larry. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** `~/agents/state/alert-cooldown/warning/`: **317** (unchanged from iters 347–360). heal-pipeline-stall prefix: **38** (unchanged, stable 55+ consecutive iters). Medic alert idx=1110 confirms real-clr stall resolved (historical). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Beacon inbox: 0 active. Forge inbox: 0 active. 0 open PRs. APPROVAL_REQUEST queue 8 carry-forward. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal — FRESH.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T09:39:17Z UTC — ~29 min old at check. Within 90-min threshold. Next expected ~10:09Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus: HEAD=c1ab73d "Pulse cycle 20260601T100424Z", branch=main, clean. Automated cycles running. ✅
+
+- **(Check B) Sync health: ✅ Nominal — aging.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T09:06:18Z UTC — ~62 min old at check. Within 2h threshold; next sync expected ~10:06–10:30Z UTC. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active. Medic 20th run CONFIRMED COMPLETE.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: **`inactive`** (20th run confirmed complete; ~18 min duration — matches 16th run's 17.6 min baseline, confirms sub-10-min cluster runs 17–19 was transient). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Beacon inbox: 0 active. Forge inbox: 0 active. 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Medic 20th run confirmed complete (~18 min; consistent with 16th run baseline). No cost alarm. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. check-i-2026-06-01.json sentinel confirmed. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items:**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - **NEW: `stale-daemon-healer missing daemon-reload guard before restart`**: **1/3** (first observation this iter; Medic 20th run idx=1108+1109 diagnoses).
+  - MalformedForgeMarker doc-fix APPROVAL_REQUEST pending — no change.
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Applied Check 0 Tier-4 judgment: 3 Medic alerts (idx=1108–1110) classified diagnose-only / historical / service-recovered. G-rule 1/3 started for stale-daemon-healer daemon-reload guard gap.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T10:08:47Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T10:08:47Z UTC.
+6. Wrote journal entry.
+
+**Escalated:** None new from Pulse. Outbox-notifier delivered idx=1108–1110 to Larry's Telegram at 10:07Z UTC (Medic 20th run diagnoses). All carry-forward APPROVAL_REQUESTs unchanged.
+
+**Patterns:**
+- **Medic 20th run CONFIRMED ~18 min (COMPLETE).** Pattern closed: sub-10-min cluster (runs 17–19: 6.7, 8.7, 9.1 min) was transient — low-stall-backlog period. Run 20 at ~18 min returns to the 16th run's 17.6 min baseline. Check III 2026-06-14 will assess full 20-run distribution.
+- **Stale-daemon-healer daemon-reload guard gap (NEW G-rule 1/3).** Medic independently diagnosed from two angles (alerts 1108+1109). The gap: stale-daemon healer calls `systemctl restart` without preceding `daemon-reload`. PR #212 added this guard for timer recovery; stale-daemon healer lacks it. If 2 more observations: dispatch to Beacon.
+- Healer heartbeat: 09:39:17Z UTC (~29 min; FRESH; next ~10:09Z UTC).
+- Sync: 09:06:18Z (~62 min; aging; next ~10:06–10:30Z UTC).
+- Cooldown files: 317 (unchanged, 55+ consecutive iters). Pipeline-stall prefix: 38 (stable). Tier 2 OAuth stall depth holding flat.
+- Alert watermark: 1111 (was 1108). 3 new Medic diagnoses delivered.
+
+**Learned:** Stale-daemon healer lacks the same daemon-reload-before-restart guard that PR #212 added to the timer recovery path. Two independent Medic diagnoses (alerts 1108+1109) confirm the same root cause for the 2026-05-30 inbox-watcher 11.5h outage. G-rule 1/3 started. At 3/3, dispatch to Beacon: "add `daemon-reload` before `systemctl restart` in stale-daemon healer script, per PR #212 pattern."
+
+---
+
 ## Iteration 360 — 2026-06-01 10:01 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 20th run still in progress: PID 2880046, started 09:44:12Z UTC; **~17 min elapsed at 10:01Z check** — now matching 16th run's 17.6 min baseline. Sub-10-min cluster from runs 17–19 (6.7, 8.7, 9.1 min) confirmed transient. Healer heartbeat: 09:39:17Z UTC (~22 min old; FRESH; within 90-min threshold). Sync: 09:06:18Z UTC (~55 min old; within 2h threshold; aging — next sync expected ~10:06–10:30Z). Source repo: HEAD=f9d9399 "Pulse cycle 20260601T095913Z", branch=main, clean. Automated cycles running on schedule.
