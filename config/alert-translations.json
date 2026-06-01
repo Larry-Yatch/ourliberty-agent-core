@@ -61,6 +61,12 @@
       "tier": "NOW",
       "plain_language_summary": "A systemd unit is shipped in the repo's `systemd/` directory but is NOT installed at /etc/systemd/system/. The unit isn't running on this droplet — whatever the unit does (a daemon, a timer, a healer) is silently absent.",
       "recommended_action": "Run `sudo cp systemd/<unit-name> /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now <unit-name>` from the repo root. Verify with `systemctl status <unit-name>`. Runbook: runbooks/heal-systemd-install-drift.md."
+    },
+    "stuck-timer": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A relative (monotonic) systemd timer lost its next-fire anchor — `NextElapseUSecMonotonic` went to `infinity`, meaning it would never fire again — and the healer auto-recovered it with a daemon-reload + restart. This typically happens when a daemon-reload catches an `OnUnitActiveSec` timer mid-cycle. Self-healed; no action needed unless the same timer trips repeatedly.",
+      "recommended_action": "None required — already auto-healed and re-armed. If a specific timer trips this repeatedly, convert it from `OnUnitActiveSec` to `OnCalendar` in systemd/<name>.timer (absolute schedules populate `NextElapseUSecRealtime` and cannot lose their anchor). Verify: `systemctl show <unit> --property=NextElapseUSecRealtime`. Runbook: runbooks/heal-systemd-install-drift.md."
     }
   },
   "heal-credential-registry-drift": {
