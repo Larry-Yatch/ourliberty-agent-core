@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 375 — 2026-06-01 11:52 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1114** (+2 new: idx=1112 Pulse sync warning self-generated, idx=1113 PR #231 Mirror PASS + auto-merged). Sync: **error** at 11:48:28Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 **5th occurrence** (commit d47e3f3 rolled back). Source repo: HEAD=78683c4 "Pulse cycle 20260601T114814Z", branch=main, clean. 7/7 core services active. **PR #231 MERGED** (feat(medic): wire real rate-window gauge and per-session timeout; auto-merged ~11:46Z UTC). **Forge rotation-gate-dm-isolation-001 COMPLETED** at 11:50:55Z UTC ($1.0132; tier2 fallback used). Forge inbox now empty.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1114 lines** (+2 since iter 374's watermark of 1112). New alerts:
+- idx=1112: source=pulse, severity=warning, subject=sync-push-rebase-fallback-001:4th-occurrence — **Tier 3 silence** (self-generated; already escalated at iter 374; no further DM needed). ✅
+- idx=1113: source=outbox-notifier, kind=notification, intent=review-pass — Mirror approved PR #231 on task `medic-hardening-ratewindow-timeout-001`; auto-merged + branch deleted. **Tier 3 silence** (known-pattern: successful merge notification). ✅
+Watermark updated: 1114.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 2 Tier-3 silences, 0 DMs.** idx=1112 self-generated Pulse sync warning (already escalated). idx=1113 Mirror PASS + auto-merge PR #231 (known-pattern). Both silenced per allowlist discipline. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → No entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last delivery: idx=1113 (outbox-notifier, Mirror PASS PR #231). No new Larry directives since iter 374 carry-forward. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, minor uptick).** `~/agents/state/alert-cooldown/warning/`: **317** (was 316 at iter 374, +1 — one new cooldown file; NOT in heal-pipeline-stall prefix). Pipeline-stall prefix: **37** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal — Forge inbox cleared.** Forge completed `rotation-gate-dm-isolation-001` at 11:50:55Z UTC ($1.0132). Initial attempt: auth_401 on tier1 session-resume (resume=sess-abc..., account-bound). Forge used TIER2_FALLBACK successfully (account=oauth). Forge inbox: **0** (task processed). Beacon inbox: **0**. **0 open PRs** (PR #231 auto-merged). APPROVAL_REQUEST queue 8 carry-forward. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T11:40:05Z UTC — ~12 min old at check. Next expected ~12:10Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus at session start: HEAD=78683c4 "Pulse cycle 20260601T114814Z", branch=main, clean. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 5th occurrence.** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `commit=d47e3f3`, `last_sync=2026-06-01T11:48:28Z`. This is the 5th occurrence. 4th occurrence (commit 02c4da4) was at 11:37:14Z UTC (iter 374). Two failures 11 minutes apart — intermittent push failure persisting. [yellow] DM already sent at iter 374 (idx=1112). Not re-DM'ing (Larry notified; noise floor concern). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains in queue — urgency elevated by rapid recurrence. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `inactive` (expected; timer active). ✅
+
+- **(Check E) Inboxes + PRs: ✅ All clear.** Forge inbox: **0** (rotation-gate processed). Beacon inbox: **0**. **0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge rotation-gate: $1.0132 (tier2 fallback run). No active Medic run. No cost alarm. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. All idempotency guards active. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items (unchanged):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 — no change.
+  - `MalformedForgeMarker`: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending. (PR #231's marker-error moot now that task completed.)
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Notable events:**
+- **PR #231 MERGED** (~11:46:36Z UTC). Mirror review: "Diff matches spec: `_rate_window_ok()` consults real `heal_claude_max_burn_rate.recent_rate_limit_event_count()` and `active_tier.cooldown_until()` with fail-open warn-log on errors, configurable threshold via `OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS` (default 2); defer path returns 0 before any offset read/write so owned alerts retry next tick. `run_medic.sh` wraps claude --print in `timeout $CLAUDE_TIMEOUT` (default 10m, `MEDIC_CLAUDE_TIMEOUT` override); exit 124 propagates and EXIT trap releases the lock. Tests pass (49 medic + 5 timeout)." Task `medic-hardening-ratewindow-timeout-001` **CLOSED — systemic fix live.**
+- **Forge rotation-gate-dm-isolation-001 COMPLETED** at 11:50:55Z UTC. Used tier2 fallback after initial auth_401 on tier1 session-resume (account-bound). PR may follow from outbox-notifier.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Check 0: silenced 2 Tier-3 alerts (idx=1112 self-generated, idx=1113 Mirror PASS). Watermark advanced to 1114.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T11:51:51Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T11:52:28Z. ✅
+6. Updated MEMORY.md (PR #231 merged; rotation-gate completed; watermark 1114; sync 5th occurrence).
+7. Wrote journal entry.
+
+**Escalated:** None new. Larry already notified [yellow] for sync at iter 374. 5th occurrence noted in journal only.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: 5th occurrence in rapid succession (11:37Z + 11:48Z = two failures in 11 minutes). The gap between 4th and 5th (11 minutes) is shorter than earlier gaps. APPROVAL_REQUEST `sync-push-rebase-fallback-001` (rebase fallback in sync_agent_core.sh:161) urgency now elevated. If a 6th occurrence fires before Larry approves, consider re-DM.
+- Forge tier2 fallback on rotation-gate: auth_401 on tier1 session-resume, then `TIER2_FALLBACK_USED` successfully. This is the first confirmed observation of Forge falling back to tier2 and succeeding on a fresh (non-OAuth-expired) path despite Tier 2 OAuth stall. The `account=oauth` on the successful completion (sid=83cca788) suggests the rotation-gate task used the personal Claude Max OAuth, which IS active for forge-bot sessions even if the tier2-probe is expired. This resolves the earlier concern about Tier 2 OAuth stall blocking Forge.
+- Cooldown files: +1 (317). Not in pipeline-stall category. May be heal-claude-max-burn-rate or another healer responding to the rotation-gate auth_401 event. No pattern yet (below G-rule threshold).
+
+**Learned:** PR #231 confirms Medic's rate-window gate and session timeout hardening are live. Forge can recover from tier1 auth_401 via tier2 fallback for fresh sessions (rotation-gate), even during the Tier 2 OAuth stall period affecting credential-rotation-triggered builds. The stall primarily affects tasks that require resuming an account-bound previous Claude session.
+
+---
+
 ## Iteration 374 — 2026-06-01 11:44 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1112** (+1 new: rotation_auth_gate_blocked:tier2, carry-forward). Healer heartbeat: **11:40:05Z UTC** (JUST FIRED — ~4 min old; 30-min cadence confirmed; next expected ~12:10Z UTC). Sync: **error** at 11:37:14Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 4th occurrence; commit 02c4da4 rolled back. Source repo: HEAD=140cfd6 "Pulse cycle 20260601T113504Z", branch=main, clean (session start). 7/7 core services active. **NEW: PR #231 OPEN** (feat(medic): wire real rate-window gauge and per-session timeout; created 11:39:53Z UTC). **Forge marker-error retry 1/3** for medic-hardening-ratewindow-timeout-001. rotation-gate-dm-isolation-001 dispatched to Forge.
