@@ -6,12 +6,12 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~03:47Z UTC (Iter 298 — interactive)
+## Status snapshot — updated 2026-06-01 ~03:51Z UTC (Iter 299 — interactive)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **03:06:15Z UTC** (hourly schedule on time; ~41 min old at iter 298 check time). Healer heartbeat **2026-06-01T03:38:49Z UTC** (same tick as iter 297; ~9 min old at iter 298 check time; next expected ~04:08Z UTC; alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`; stable **17 consecutive iters**, iters 281–298). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **03:06:15Z UTC** (hourly schedule on time; ~45 min old at iter 299 check time; next ~04:06Z UTC). Healer heartbeat **2026-06-01T03:38:49Z UTC** (same tick as iter 298; ~12 min old at iter 299 check time; next expected ~04:08Z UTC; alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`; stable **18 consecutive iters**, iters 281–299). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).** **alert-triage.json missing on disk** (INFO; watermark tracked via journal continuity; no functional impact).
 
 **Watch items:**
-- **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer).
+- **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer). Next sync ~04:06Z UTC; next healer tick ~04:08Z UTC.
 - **CYCLE.TIMER STUCK (iter 259 first detection this occurrence).** NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity. Automated cycles stopped. Recovery (Larry must run): `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cycle.timer`. G-rule **2/3** (iter 158 first obs, iter 259 second obs). One more occurrence → dispatch to Beacon.
 - **TIER 2 OAUTH EXPIRED (ELEVATED — ACTIVE STALLS).** forge + beacon-bot tasks paused_on_tier1 since 13:59Z UTC May 30. No new stalls since iter 195. Fix: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.
 - **SYNC-PUSH-REBASE-FALLBACK-001 CONFIRMED.** Materialized at 13:50:29Z UTC. Approve the defensive hardening fix. sync.json error now CLEARED (iter 196 confirmed clean sync state).
