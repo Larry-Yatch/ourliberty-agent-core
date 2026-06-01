@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~03:51Z UTC (Iter 299 — interactive)
+## Status snapshot — updated 2026-06-01 ~03:57Z UTC (Iter 300 — interactive)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **03:06:15Z UTC** (hourly schedule on time; ~45 min old at iter 299 check time; next ~04:06Z UTC). Healer heartbeat **2026-06-01T03:38:49Z UTC** (same tick as iter 298; ~12 min old at iter 299 check time; next expected ~04:08Z UTC; alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`; stable **18 consecutive iters**, iters 281–299). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).** **alert-triage.json missing on disk** (INFO; watermark tracked via journal continuity; no functional impact).
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at **03:06:15Z UTC** (hourly schedule on time; ~45 min old at iter 299 check time; next ~04:06Z UTC). Healer heartbeat **2026-06-01T03:38:49Z UTC** (same tick as iter 298; ~12 min old at iter 299 check time; next expected ~04:08Z UTC; alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; cooldown/warning: **312** files per `ls | wc -l`; stable **19 consecutive iters**, iters 281–300). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).** **alert-triage.json missing on disk** (INFO; watermark tracked via journal continuity; no functional impact).
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer). Next sync ~04:06Z UTC; next healer tick ~04:08Z UTC.
