@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~04:48Z UTC (Iter 307 — interactive)
+## Status snapshot — updated 2026-06-01 ~05:01Z UTC (Iter 309 — interactive)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **PRs #226 + #227 MERGED (iter 305):** stuck-timer fixes. **PR #228 MERGED (iter 306):** "feat(medic): scaffold alert-operator (PR1 escalate-only)" — Medic workstream PR1 complete. **PR #229 MERGED (iter 306):** "fix/alert-translations-6-missing" — 6 healer alert translations added to config/alert-translations.json. Sync.json: **ERROR** "Auto-commit push failed; rolled back" at **04:39:20Z UTC** (SYNC-PUSH-REBASE-FALLBACK-001 **3rd confirmed occurrence** — no new firing in iter 307; next sync ~05:09Z UTC). Healer heartbeat **2026-06-01T04:38:49Z UTC**. 7/7 services active. Alert watermark: **1098** (iter 307: +2 new, both Tier 3 known-patterns: PR #228 review-pass idx=1096, beacon-bot rate_limit idx=1097). Cooldown/warning: **314** files (unchanged). Pipeline-stall prefix: **38** (unchanged). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).** **alert-triage.json missing on disk** (INFO; no functional impact). Forge inbox: 0 tasks; 0 open PRs — idle, awaiting Medic PR2 dispatch from Beacon.
 
