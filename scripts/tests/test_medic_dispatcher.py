@@ -127,8 +127,24 @@ class _IsolatedDispatcher(unittest.TestCase):
         # Sanity-check paths picked up the env override.
         self.assertTrue(str(medic_dispatcher.AGENTS_ROOT).startswith(self._tmpdir))
         self.assertTrue(str(medic_dispatcher.REPO_DIR).startswith(self._tmpdir))
+        # The rate-window gauges read live state (heal_claude_max_burn_rate
+        # reads ~/agents/blackboard/anthropic-quota-events.jsonl;
+        # active_tier reads ~/agents/blackboard/active-tier.json which is
+        # NOT environment-isolated). Default both shims to a "cool window"
+        # response so legacy tests stay deterministic regardless of the
+        # host's real OAuth tier state. Tests that exercise the gauge
+        # logic itself override these patchers.
+        self._cool_event_patch = mock.patch.object(
+            medic_dispatcher, '_recent_rate_limit_events', return_value=0)
+        self._cool_cooldown_patch = mock.patch.object(
+            medic_dispatcher, '_active_tier_in_rate_limit_cooldown',
+            return_value=False)
+        self._cool_event_patch.start()
+        self._cool_cooldown_patch.start()
 
     def tearDown(self) -> None:
+        self._cool_event_patch.stop()
+        self._cool_cooldown_patch.stop()
         for k, v in self._env_snapshot.items():
             if v is None:
                 os.environ.pop(k, None)
@@ -302,6 +318,138 @@ class GateTest(_IsolatedDispatcher):
         invoke.assert_not_called()
         # Deferred -- offset must NOT have advanced.
         self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+
+class RateWindowGaugeTest(_IsolatedDispatcher):
+    """End-to-end behavior of _rate_window_ok() against the two real
+    gauges: heal_claude_max_burn_rate.recent_rate_limit_event_count and
+    active_tier.cooldown_until. Both gauges are patched at the shim
+    layer (_recent_rate_limit_events / _active_tier_in_rate_limit_cooldown)
+    so the test never touches the real ledger or active-tier state.
+    """
+
+    def test_cool_window_proceeds_to_normal_path(self) -> None:
+        # No events, no cooldown -> normal escalate path runs. The
+        # _IsolatedDispatcher setUp defaults the shims to cool, so this
+        # test verifies the inherited fixture wiring matches expectations.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with self._patch_invoke() as invoke:
+            rc = medic_dispatcher.main([])
+        self.assertEqual(rc, 0)
+        invoke.assert_called_once()
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
+    def test_hot_event_count_defers(self) -> None:
+        # Event count over the default threshold -> defer. No batch,
+        # no operator invocation, offset unchanged.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        events_over = medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS + 1
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=events_over), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=False), \
+                self._patch_invoke() as invoke:
+            rc = medic_dispatcher.main([])
+        self.assertEqual(rc, 0)
+        invoke.assert_not_called()
+        # Unprocessed owned alert must be retried next tick.
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_event_count_at_threshold_does_not_defer(self) -> None:
+        # Boundary: events == threshold should NOT defer (we defer on
+        # strict >); confirms threshold semantics.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        at_threshold = medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=at_threshold), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=False), \
+                self._patch_invoke() as invoke:
+            medic_dispatcher.main([])
+        invoke.assert_called_once()
+
+    def test_active_tier_cooldown_defers(self) -> None:
+        # No 429 events but a tier cooldown is active -> defer.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=0), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=True), \
+                self._patch_invoke() as invoke:
+            rc = medic_dispatcher.main([])
+        self.assertEqual(rc, 0)
+        invoke.assert_not_called()
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_event_gauge_raises_fails_open(self) -> None:
+        # A broken gauge must NOT permanently silence Medic: the
+        # per-session timeout + lock are the real blast-radius bound.
+        # Event shim raises -> _rate_window_ok() returns True (fail open).
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               side_effect=RuntimeError('gauge boom')), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=False), \
+                self._patch_invoke() as invoke:
+            rc = medic_dispatcher.main([])
+        # Fail-open: gauge raise must NOT block dispatch.
+        self.assertEqual(rc, 0)
+        invoke.assert_called_once()
+        # The gauge raised before _active_tier_in_rate_limit_cooldown got a
+        # chance to run; the function returned True directly. Sanity-check
+        # the helper in isolation too.
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               side_effect=RuntimeError('gauge boom')):
+            self.assertTrue(medic_dispatcher._rate_window_ok())
+
+    def test_active_tier_gauge_raises_fails_open(self) -> None:
+        # Same fail-open contract for the active-tier gauge.
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=0), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  side_effect=OSError('cooldown read boom')):
+            self.assertTrue(medic_dispatcher._rate_window_ok())
+
+    def test_threshold_env_override(self) -> None:
+        # Setting OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS=0 makes any
+        # nonzero event count a defer.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with mock.patch.dict(os.environ,
+                             {medic_dispatcher.RATE_WINDOW_MAX_EVENTS_ENV_VAR:
+                                  '0'}), \
+                mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                                  return_value=1), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=False), \
+                self._patch_invoke() as invoke:
+            medic_dispatcher.main([])
+        invoke.assert_not_called()
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_threshold_env_malformed_uses_default(self) -> None:
+        with mock.patch.dict(os.environ,
+                             {medic_dispatcher.RATE_WINDOW_MAX_EVENTS_ENV_VAR:
+                                  'not-an-int'}):
+            self.assertEqual(medic_dispatcher._rate_window_max_events(),
+                             medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS)
 
 
 class EmptyBatchFastExitTest(_IsolatedDispatcher):
