@@ -186,6 +186,39 @@ The `sync-deploy-targets` script reconciles `config/deploy_targets.json` against
 
 The `deploy-notifier` script polls Vercel's `GET /v6/deployments?state=READY,ERROR` every 2 min, filters by the GitHub repos in `config/deploy_targets.json`, and DMs Larry via the shared `larry_alerts` queue. READY → `warning`-severity DM with the preview URL. ERROR → `critical`-severity DM with the inspect link. BUILDING / QUEUED / INITIALIZING / CANCELED are skipped silently. Per-target `branch_filter` (null = match all branches; glob like `forge/*` for feature-branch-only) gates which deployments surface. PR number comes from `deployment.meta.githubPrId` first; falls back to `gh pr list --head <branch> --repo <repo>`; renders `PR #(unknown)` if both miss. Dedup is keyed by `<uid>:<state>` so a deployment that transitions READY → ERROR re-DMs; the same uid+state pair is never re-DMed. State file at `~/agents/state/deploy-notifier.json` capped at the 1000 most-recent entries (FIFO prune). Activation env var: `OURLIBERTY_DEPLOY_NOTIFIER_ENABLED=true` per the service file's commented activation snippet — default dry-run logs `would-DM` lines and fires a one-time activation prompt on first real event. Vercel auth failures (401/403) emit a `critical` `INFRASTRUCTURE_ALERT` throttled to one DM per 24 h; the unit exits non-zero so systemd surfaces transient errors via its retry path. Empty `deploy_targets` array → no API call, no DM, clean exit (`E2.3` lands the first real target).
 
+### Medic dispatcher (auto-remediation step B, PR1)
+
+`scripts/medic_dispatcher.py` is the cheap non-Claude trigger for the Medic alert-operator. It runs every 3 min (per the timer below), reads the non-allowlisted tail of `~/agents/blackboard/larry-alerts.jsonl` via Medic's own offset at `~/agents/state/medic-alerts-offset.txt` (never touches Beacon's offset), filters to owned classes per `config/medic-owned-classes.json`, and gates on `OURLIBERTY_MEDIC_ENABLED` + `~/agents/medic.disabled` + `~/agents/healers.disabled` + a stubbed rolling-5h rate-window check (real wiring lands in PR2 -- the stub logs a WARN every tick). If any owned alert qualifies, it writes a batch file under `~/agents/state/medic-batches/` and invokes `scripts/run_medic.sh`, which spins the Medic Claude operator in `agents/medic/`. Otherwise it advances the offset past unowned alerts and exits in milliseconds.
+
+PR1 ships **escalate-only**: the operator classifies each owned alert (reversible / privileged / judgment per `config/medic-action-policy.json`) and writes one of:
+- a diagnosis + recommended-command notification via `scripts/larry_alerts.py append_notification`,
+- or an approval-request via `scripts/larry_alerts.py append_approval_request` when the recommended fix is privileged.
+
+The act-branch is stubbed -- no `systemctl restart`, no re-dispatch writes, no file mutations. PR2 wires the reversible-action handlers (daemon restart + inbox re-trigger); PR3 wires the chain-bridge handler + approval-executor; PR4 wires Pulse Check observability + self-tuning.
+
+```bash
+# Install
+sudo cp ~/agent-core/systemd/ourliberty-medic-dispatcher.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-medic-dispatcher.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable + start. Ships active by default via the service file's
+# Environment=OURLIBERTY_MEDIC_ENABLED=1 line.
+sudo systemctl enable --now ourliberty-medic-dispatcher.timer
+
+# Confirm
+systemctl list-timers ourliberty-medic-dispatcher.timer
+journalctl -u ourliberty-medic-dispatcher.service -n 50 --no-pager
+
+# Kill switches (in priority order):
+# 1. Touch ~/agents/healers.disabled -- blanket switch for all healers + daemons.
+# 2. Touch ~/agents/medic.disabled -- Medic-specific; lets Pulse + healers keep running.
+# 3. sudo systemctl edit ourliberty-medic-dispatcher.service and set
+#    OURLIBERTY_MEDIC_ENABLED=0; sudo systemctl daemon-reload.
+```
+
+Logs land at `~/agents/logs/medic-dispatcher.log` (dispatcher) and `~/agents/logs/medic.log` (operator wrapper). The handled-ledger at `~/agents/state/medic-handled-ledger.jsonl` is keyed by alert fingerprint (`source:subject`) with an attempt counter -- PR2 will enforce one-action-per-fingerprint based on this data.
+
 ### Dashboard API (E3.1)
 
 `scripts/dashboard_api.py` is a FastAPI service that exposes the agent OS state as 7 read-only GET endpoints (`/health`, `/agents/status`, `/tasks/recent`, `/costs/today`, `/costs/week`, `/cycle-journal/recent`, `/healers/status`) for consumption by the upcoming E3.2 Next.js dashboard. The service binds to `127.0.0.1:8000` — Nginx + Let's Encrypt will front it in E3.3 on `https://api.ourliberty.dev/*`.
