@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 317 — 2026-06-01 06:04 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. **3 new alerts** (larry-alerts.jsonl: 1101, +3 from iter 316 watermark of 1098). All Tier 3 (healer auto-handled at 06:00Z). Active pipeline stalls (Tier 2 OAuth) carry-forward unchanged. Automated cycle running (HEAD=db4fa06 "Pulse cycle 20260601T055841Z" — new commit since iter 316's 6e036c8). Sync: 05:06:16Z (~58 min old, within 2h threshold). Healer heartbeat: 05:39:15Z UTC (~24 min old, within 90-min threshold, next expected ~06:09Z UTC).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1101 lines** (was 1098). **3 new alerts**, all Tier 3 known-patterns:
+1. `install-drift:ourliberty-medic-dispatcher.service` at 06:00:16Z — healer auto-installed medic-dispatcher.service (missing from /etc/systemd/system/). Known-pattern: install-drift auto-remediation per PR #223 / config/auto-remediation-allowlist.json. ✅ Tier 3 → resolved.
+2. `install-drift:ourliberty-medic-dispatcher.timer` at 06:00:18Z — healer auto-installed medic-dispatcher.timer, enabled --now. First fire: 06:03:03Z UTC (already occurred; service ran and is inactive/complete). ✅ Tier 3 → resolved.
+3. `stuck-timer:ourliberty-cycle.timer` at 06:00:20Z — healer detected `NextElapseUSecRealtime empty + NextElapseUSecMonotonic=infinity` on cycle.timer and auto-healed (daemon-reload + restart). Timer currently: active, NextElapseUSecRealtime=06:05 UTC (healer fix held). **Notable: this is the first post-PR#225 stuck-timer occurrence; likely triggered by the daemon-reload during medic-dispatcher install.** ✅ Tier 3 → resolved. G-rule 1/3 for new sub-pattern "daemon-reload triggers cycle.timer stuck despite OnCalendar fix."
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts, all Tier 3 known-patterns.** Watermark 1098 → 1101. See Triage above. No Pulse dispatch, no DM. Journal note only per Tier 3 protocol. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon_telegram_bot.log delivery: idx=1097 at 22:44:34 MDT (05/31) — carry-forward from iter 307. No new Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, +2 cooldown files).** `~/agents/state/alert-cooldown/warning/`: **316** (+2 from iter 316's 314 — likely medic install and stuck-timer handling). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T05:39:15Z UTC — ~24 min old at check time (06:04Z). Within 90-min threshold. Same tick as iters 314–316; next expected ~06:09Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=db4fa06 "Pulse cycle 20260601T055841Z", branch=main, clean tree. New commit since iter 316's 6e036c8 confirms automated cycles running. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T05:06:16Z — ~58 min old at check time. Within 2h threshold. SYNC-PUSH-REBASE-FALLBACK-001 has not recurred (11+ consecutive clean sync cycles). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ Nominal.** Forge inbox: 0 tasks. Beacon inbox: 0 tasks. 0 open PRs. System idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items:**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+  - **NEW: `daemon-reload triggers cycle.timer stuck despite OnCalendar (post-PR#225)`: 1/3** — first observation 06:00:20Z UTC; healer auto-healed; watch for pattern.
+
+**Medic-dispatcher operational status:** PR #228 Medic scaffold went live — both `ourliberty-medic-dispatcher.service` and `.timer` auto-installed by the healer at 06:00Z. Timer fired at 06:03:03Z UTC (first run). Service is inactive (completed first run or waiting for timer activation). The healer's auto-remediation-allowlist correctly handled the new units without Pulse intervention. Medic workstream is now operational at the service level.
+
+**Forge:** 0 open PRs. 0 inbox tasks. Idle. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (all 3 new alerts were Tier 3 — healer already handled them).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` appended (ts: 2026-06-01T06:04:33Z).
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=06:04:34Z UTC.
+5. Wrote journal entry. Watermark advanced to 1101.
+
+**Escalated:** None new. All carry-forward. No new dispatches needed.
+
+**Patterns:**
+- Medic-dispatcher units (PR #228 Medic PR1 scaffold) became operationally active via the install-drift healer at 06:00Z. This is the expected path for new systemd units: ship in repo → healer detects and installs → timer activates. Working as designed.
+- cycle.timer stuck ONCE more at 06:00:20Z (post-PR#225). Healer auto-healed. Likely triggered by daemon-reload during medic install. G-rule 1/3 for this new sub-pattern. **Not a regression to the original OnUnitActiveSec trap** — this is a daemon-reload side effect. If it recurs 2 more times, dispatch to Beacon: "investigate whether install-drift healer should explicitly restart ourliberty-cycle.timer after daemon-reload to prevent transient stuck-timer during medic/service installs."
+- Cooldown file count: 316 (+2 from 314). Stable rate of growth, not accelerating. Root cause still Tier 2 OAuth.
+
+**Learned:** Medic-dispatcher units live-deployed via the install-drift auto-remediation path (as expected). The daemon-reload that occurs during new-unit installs can transiently trigger the OnCalendar cycle.timer stuck signature — worth watching over next 2 occurrences to determine if a targeted fix is warranted.
+
+---
+
 ## Iteration 316 — 2026-06-01 05:57 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward only: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. No new alerts. No new PRs. Automated cycle confirmed running (HEAD=6e036c8 "Pulse cycle 20260601T054922Z" — new commit since iter 315's 9c5c60a). Sync: last_sync=05:06:16Z UTC (no-change, ~50 min old, within 2h threshold). Healer heartbeat: 05:39:15Z UTC (~17 min old, within 90-min threshold, next expected ~06:09Z UTC).
