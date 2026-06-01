@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 354 — 2026-06-01 09:26 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 17th run in progress (PID 2875923, started 09:19:44Z UTC, ~6 min elapsed at check; CPU 34.551s ≈ 5.75 CPU-s/min — converging from 6.7→5.1→4.0 prior profile; within expected range; memory 174.5M). Healer heartbeat: 09:09:16Z UTC (~17 min old at check; within 90-min threshold). Sync: 09:06:18Z UTC (~20 min old; within 2h threshold). Source repo: HEAD=5517009 "Pulse cycle 20260601T092332Z", branch=main, clean.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1108 lines** (unchanged from iters 347–353). Watermark stable at 1108. No new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1108. Last delivery: idx=1107 at 08:46:55Z UTC (Pulse iter 346 escalation DM). alert-triage.json: missing (INFO; known, no functional impact). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1107 at 08:46:55Z UTC (unchanged from iters 347–353 — Pulse iter 346 escalation DM). No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** `~/agents/state/alert-cooldown/warning/`: **317** (unchanged from iters 347–353). heal-pipeline-stall prefix: **38** (unchanged, stable 48+ consecutive iters). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Beacon inbox: 0. Forge inbox: 0. 0 open PRs. APPROVAL_REQUEST queue 8 carry-forward. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal — WITHIN THRESHOLD.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T09:09:16Z UTC — ~17 min old at check. Well within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=5517009 "Pulse cycle 20260601T092332Z", branch=main, clean. Automated cycles running on schedule (multiple commits since iter 353). ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T09:06:18Z UTC — ~20 min old at check. Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active + Medic 17th run in progress.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `activating` (17th run, PID 2875923, started 09:19:44Z UTC; ~6 min elapsed; CPU 34.551s ≈ 5.75 CPU-s/min — converging from prior 6.7→5.1→4.0 profile; within tolerance; memory 174.5M). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Beacon inbox: 0. Forge inbox: 0. 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ℹ️ Medic 17th run ~6 min elapsed — CPU 34.551s ≈ 5.75 CPU-s/min (consistent with the convergence profile seen in the 16th run: 6.7→5.1→4.0 CPU-s/min over 4→12→14 min). Expected completion ~09:31–09:33Z. 16th run final duration was ~17.6 min. If 17th run also exceeds 15 min, flag potential regime change.** ℹ️
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. check-i-2026-06-01.json sentinel present. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged from iter 353):** `heal-pr-auto-merge blind to CONFLICTING` 2/3; `inbox-watcher rc=-1` 2/3; `heal-pipeline-stall "369 min" bug` 1/3; `daemon-reload triggers cycle.timer stuck` 1/3; MalformedForgeMarker doc-fix APPROVAL_REQUEST pending; F24 empty-prompt APPROVAL_REQUEST #8 pending.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T09:26:34Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T09:26:47Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All carry-forward.
+
+**Patterns:**
+- Medic 17th run (PID 2875923, started 09:19:44Z UTC): ~6 min elapsed, CPU 5.75 CPU-s/min. CPU profile convergence consistent with 16th run pattern; on track for completion ~09:31–09:33Z. If duration exceeds 15 min again, that's 2 consecutive runs > 15 min — a potential regime change worth noting for Check III 2026-06-14.
+- Healer heartbeat: 09:09:16Z UTC (~17 min old; within threshold; next expected ~09:39Z UTC).
+- Sync: 09:06:18Z (~20 min old; within threshold; next expected ~10:06Z).
+- Automated cycle cadence nominal: HEAD=5517009 at 09:23:32Z confirms multiple commits since iter 353. run_cycle.sh on schedule.
+- Cooldown files: 317 (unchanged, 48+ consecutive iters). Pipeline-stall prefix: 38 (stable). Tier 2 OAuth stall depth holding flat.
+
+**Learned:** No new learnings this iter. System state fully consistent with iter 353 carry-forward. Medic 17th run tracking as expected based on 16th run profile.
+
+---
+
 ## Iteration 353 — 2026-06-01 09:22 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 16th run **COMPLETED** (~09:19:44Z UTC — duration ~17.6 min, slightly over expected 11–13 min but within tolerance; converging CPU profile per iter 352). Medic 17th run started 09:19:44Z UTC (PID 2875923, timer *:00/3:00). Healer heartbeat: 09:09:16Z UTC (~13 min old at check; within 90-min threshold). Sync: 09:06:18Z UTC (~16 min old; very fresh). Source repo: HEAD=2986d48 "Pulse cycle 20260601T091735Z", branch=main, clean.
