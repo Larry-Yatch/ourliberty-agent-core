@@ -1,0 +1,303 @@
+"""Tests for scripts/medic_actions.py (PR2 reversible-action handlers).
+
+Verbatim coverage of the PR2 acceptance list:
+
+  - target NOT in allowlist -> refuse, outcome='skipped', NO subprocess,
+    not-permitted result.
+  - recurrence: a prior outcome='acted' ledger record for the fingerprint
+    -> refuse, no subprocess, already-acted result.
+  - any of the three gates set/off -> refuse, no subprocess.
+  - restart success: allowlisted + gates ok + no prior act; mocked restart
+    returns 0 and is-active='active' -> action runs, verify passes, ledger
+    gets outcome='acted', success result.
+  - verify fails: restart returns 0 but is-active != 'active' -> FAILURE
+    result (not success), surfaced. Plus restart-error (non-zero rc).
+  - privileged/judgment action types never reach restart_daemon /
+    retrigger_inbox (the CLI rejects them; no subprocess).
+  - malformed / missing config/medic-reversible-targets.json -> empty
+    allowlist, every target refused, never raises.
+
+ALL subprocess / systemctl / sudo / file IO is isolated: the two
+subprocess shims (_run_restart / _is_active) are patched, and the ledger
+path is redirected to a tmp OURLIBERTY_AGENTS_ROOT. The tests never run a
+real systemctl, never touch the real ledger, never touch real systemd.
+"""
+
+from __future__ import annotations
+
+import importlib
+import json
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+import medic_actions  # noqa: E402
+import medic_ledger  # noqa: E402
+
+# An allowlisted unit + a fingerprint the operator would pass in.
+ALLOWED_DAEMON = 'ourliberty-inbox-watcher.service'
+ALLOWED_OUTBOX = 'ourliberty-outbox-notifier.service'
+ALERT_FP = 'watchdog:ourliberty-inbox-watcher.service'
+
+
+def _seed_targets(repo_dir: Path,
+                  restart_units=(ALLOWED_DAEMON, ALLOWED_OUTBOX),
+                  retrigger_targets=(ALLOWED_DAEMON,)) -> None:
+    cfg_dir = repo_dir / 'config'
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    (cfg_dir / 'medic-reversible-targets.json').write_text(json.dumps({
+        '$schema_version': '1',
+        'restart_daemon_units': list(restart_units),
+        'retrigger_inbox_targets': list(retrigger_targets),
+    }))
+
+
+class _IsolatedActions(unittest.TestCase):
+    """Redirect OURLIBERTY_AGENTS_ROOT + OURLIBERTY_REPO_DIR to tmp dirs and
+    reload the modules so their constants pick up the override. Enable flag
+    on by default; kill switches absent by default."""
+
+    def setUp(self) -> None:
+        self._tmpdir = tempfile.mkdtemp(prefix='medic-actions-')
+        self.agents_root = Path(self._tmpdir) / 'agents'
+        self.repo_dir = Path(self._tmpdir) / 'agent-core'
+        for sub in ('logs', 'state'):
+            (self.agents_root / sub).mkdir(parents=True, exist_ok=True)
+        _seed_targets(self.repo_dir)
+        self._env_snapshot = {
+            'OURLIBERTY_AGENTS_ROOT': os.environ.get('OURLIBERTY_AGENTS_ROOT'),
+            'OURLIBERTY_REPO_DIR': os.environ.get('OURLIBERTY_REPO_DIR'),
+            'OURLIBERTY_MEDIC_ENABLED': os.environ.get('OURLIBERTY_MEDIC_ENABLED'),
+        }
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.agents_root)
+        os.environ['OURLIBERTY_REPO_DIR'] = str(self.repo_dir)
+        os.environ['OURLIBERTY_MEDIC_ENABLED'] = '1'
+        importlib.reload(medic_ledger)
+        importlib.reload(medic_actions)
+        # Re-reload so medic_actions binds the freshly-reloaded ledger module.
+        importlib.reload(medic_actions)
+        self.assertTrue(str(medic_actions.AGENTS_ROOT).startswith(self._tmpdir))
+        self.assertTrue(str(medic_actions.REPO_DIR).startswith(self._tmpdir))
+
+    def tearDown(self) -> None:
+        for k, v in self._env_snapshot.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        importlib.reload(medic_ledger)
+        importlib.reload(medic_actions)
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def _patch_subprocess(self, rc: int = 0, active: str = 'active'):
+        """Patch both shims; return (restart_mock, isactive_mock) context."""
+        return (
+            mock.patch.object(medic_actions, '_run_restart', return_value=rc),
+            mock.patch.object(medic_actions, '_is_active', return_value=active),
+        )
+
+    def _ledger_records(self) -> list:
+        return medic_ledger.read_recent(100)
+
+
+class AllowlistTest(_IsolatedActions):
+    def test_target_not_in_allowlist_is_refused(self) -> None:
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(
+                'ourliberty-not-a-real-unit.service', ALERT_FP, attempt=1)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['outcome'], 'skipped')
+        self.assertEqual(res['reason'], 'not-permitted')
+        # No subprocess invoked.
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+        # Recorded as skipped (no 'acted' record).
+        recs = self._ledger_records()
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]['outcome'], 'skipped')
+
+    def test_retrigger_target_not_in_allowlist_is_refused(self) -> None:
+        # The outbox notifier is allowed for restart-daemon but NOT in the
+        # retrigger_inbox allowlist -> retrigger must refuse it.
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.retrigger_inbox(ALLOWED_OUTBOX, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        restart_m.assert_not_called()
+
+
+class RecurrenceGateTest(_IsolatedActions):
+    def test_prior_acted_record_blocks_second_action(self) -> None:
+        # Seed an 'acted' record whose fingerprint matches what the handler
+        # will look up (handler keys on the passed-in fingerprint string).
+        src, subj = medic_actions._fp_parts(ALERT_FP)
+        medic_ledger.append_record(
+            source=src, subject=subj, classification='reversible',
+            outcome='acted', attempt=1, notes='prior act')
+        self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'already-acted')
+        self.assertEqual(res['outcome'], 'skipped')
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+
+
+class GateTest(_IsolatedActions):
+    def test_enable_flag_off_refuses(self) -> None:
+        os.environ['OURLIBERTY_MEDIC_ENABLED'] = '0'
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'gate-enable-flag-off')
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+
+    def test_medic_kill_switch_refuses(self) -> None:
+        medic_actions.MEDIC_KILL_SWITCH.parent.mkdir(parents=True,
+                                                     exist_ok=True)
+        medic_actions.MEDIC_KILL_SWITCH.touch()
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'gate-medic-kill-switch')
+        restart_m.assert_not_called()
+
+    def test_healers_kill_switch_refuses(self) -> None:
+        medic_actions.HEALERS_KILL_SWITCH.parent.mkdir(parents=True,
+                                                       exist_ok=True)
+        medic_actions.HEALERS_KILL_SWITCH.touch()
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.retrigger_inbox(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'gate-healers-kill-switch')
+        restart_m.assert_not_called()
+
+
+class RestartSuccessTest(_IsolatedActions):
+    def test_restart_daemon_success_records_acted(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP,
+                                               attempt=1)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['outcome'], 'acted')
+        self.assertEqual(res['reason'], 'acted')
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+        active_m.assert_called_once_with(ALLOWED_DAEMON)
+        recs = self._ledger_records()
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]['outcome'], 'acted')
+        self.assertEqual(recs[0]['classification'], 'reversible')
+        # The acted record's fingerprint matches the alert fingerprint so the
+        # recurrence gate + dispatcher dedup line up.
+        self.assertEqual(recs[0]['fingerprint'], ALERT_FP)
+        self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+
+    def test_retrigger_inbox_success(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.retrigger_inbox(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['action'], 'retrigger-inbox')
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+
+class VerifyFailureTest(_IsolatedActions):
+    def test_restart_zero_but_not_active_is_failure(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=0, active='failed')
+        with restart_p, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'verify-failed')
+        # An action WAS attempted on the system -> recorded acted so the
+        # recurrence gate is armed (no retry loop).
+        self.assertEqual(res['outcome'], 'acted')
+        self.assertIn('failed', res['detail'])
+        self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+
+    def test_restart_nonzero_rc_is_failure(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=1, active='active')
+        with restart_p, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'restart-error')
+
+
+class UnsupportedActionTest(_IsolatedActions):
+    def test_privileged_action_type_never_reaches_handler(self) -> None:
+        with mock.patch.object(medic_actions, '_run_restart') as restart_m, \
+                mock.patch.object(medic_actions, '_is_active') as active_m, \
+                mock.patch('sys.stdout'):
+            rc = medic_actions._main(
+                ['rotate-credential', '--target', ALLOWED_DAEMON,
+                 '--fingerprint', ALERT_FP])
+        self.assertEqual(rc, 1)
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+
+    def test_judgment_action_type_never_reaches_handler(self) -> None:
+        with mock.patch.object(medic_actions, '_run_restart') as restart_m, \
+                mock.patch.object(medic_actions, '_is_active'), \
+                mock.patch('sys.stdout'):
+            rc = medic_actions._main(
+                ['diagnose-only', '--target', ALLOWED_DAEMON])
+        self.assertEqual(rc, 1)
+        restart_m.assert_not_called()
+
+    def test_cli_restart_daemon_success_exits_zero(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p, active_p, mock.patch('sys.stdout'):
+            rc = medic_actions._main(
+                ['restart-daemon', '--unit', ALLOWED_DAEMON,
+                 '--fingerprint', ALERT_FP, '--attempt', '1'])
+        self.assertEqual(rc, 0)
+
+
+class ConfigFailSafeTest(_IsolatedActions):
+    def test_missing_config_means_empty_allowlist(self) -> None:
+        (self.repo_dir / 'config' / 'medic-reversible-targets.json').unlink()
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        # Empty allowlist -> even a normally-allowed unit is refused.
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        restart_m.assert_not_called()
+
+    def test_malformed_config_means_empty_allowlist(self) -> None:
+        (self.repo_dir / 'config' / 'medic-reversible-targets.json').write_text(
+            '{not valid json')
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            # Must not raise.
+            res = medic_actions.retrigger_inbox(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        restart_m.assert_not_called()
+
+    def test_config_root_not_object_is_empty_allowlist(self) -> None:
+        (self.repo_dir / 'config' / 'medic-reversible-targets.json').write_text(
+            json.dumps([1, 2, 3]))
+        loaded = medic_actions._load_reversible_targets()
+        self.assertEqual(loaded['restart_daemon_units'], [])
+        self.assertEqual(loaded['retrigger_inbox_targets'], [])
+
+
+if __name__ == '__main__':
+    unittest.main()

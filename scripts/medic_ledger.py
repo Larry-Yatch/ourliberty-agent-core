@@ -122,6 +122,39 @@ def attempt_count(fp: str) -> int:
     return count
 
 
+def has_acted(fp: str) -> bool:
+    """True if any prior record for this fingerprint has outcome 'acted'.
+
+    Backs two PR2 guards: medic_actions.py's hard one-action-per-fingerprint
+    gate (refuse a second mutating action on a fingerprint Medic already
+    acted on) and the dispatcher's no-double-record guard. Fail safe:
+    missing / malformed file -> False.
+    """
+    if not isinstance(fp, str) or not fp:
+        return False
+    for rec in _iter_records():
+        if rec.get('fingerprint') == fp and rec.get('outcome') == 'acted':
+            return True
+    return False
+
+
+def acted_fingerprints() -> set:
+    """Set of fingerprints with at least one outcome='acted' record.
+
+    The dispatcher snapshots this before/after the operator runs so it can
+    skip its own post-record for any fingerprint medic_actions.py recorded
+    as acted during the same run (the action-time record is authoritative).
+    Fail safe: missing / malformed file -> empty set.
+    """
+    out: set = set()
+    for rec in _iter_records():
+        if rec.get('outcome') == 'acted':
+            fp = rec.get('fingerprint')
+            if isinstance(fp, str) and fp:
+                out.add(fp)
+    return out
+
+
 def append_record(
     source: Optional[str],
     subject: Optional[str],

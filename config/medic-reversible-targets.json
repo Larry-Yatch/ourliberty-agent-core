@@ -1,0 +1,11 @@
+{
+  "$schema_version": "1",
+  "_doc": "Fail-safe allowlist for Medic's PR2 reversible action handlers in scripts/medic_actions.py. This is the ONLY set of targets Medic may mutate; a target not listed here is REFUSED and Medic escalates a diagnose-only report instead of acting on an arbitrary unit. restart_daemon_units: the watchdog-supervised daemon units Medic may restart via 'sudo -n systemctl restart <unit>' -- mirrors scripts/watchdog.py AUTO_RESTART_SERVICES, the only units the watchdog itself auto-restarts. retrigger_inbox_targets: the inbox-stall remediation target -- the existing re-trigger mechanism in this repo IS restarting the inbox-watcher (scripts/watchdog.py check_inbox_watcher), so a stalled inbox is re-triggered by restarting ourliberty-inbox-watcher.service. Seeded conservatively. Missing or malformed file is treated as an EMPTY allowlist -- Medic can act on nothing -- fail safe, never raises. Unit names carry the full .service suffix.",
+  "restart_daemon_units": [
+    "ourliberty-inbox-watcher.service",
+    "ourliberty-outbox-notifier.service"
+  ],
+  "retrigger_inbox_targets": [
+    "ourliberty-inbox-watcher.service"
+  ]
+}
