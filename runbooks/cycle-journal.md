@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 311 — 2026-06-01 05:17 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward only: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. No new alerts, no new PRs. Automated cycles confirmed running (HEAD=02b44b4 "Pulse cycle 20260601T051327Z" — new commit since iter 310's 051f8cc). Sync recovered (no-change, last_sync=05:06:16Z). Healer heartbeat within threshold.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1098 lines** (unchanged from iter 310 watermark). **0 new alerts.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark 1098 (unchanged from iter 310). Last entries at idxs 1096–1097 are carry-forward Tier 3 known-patterns already triaged in iters 306–307. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: `-- No entries --`. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon_telegram_bot.log delivery: idx=1096 (review-pass 22:44 MDT) + idx=1097 (pipeline-stall 22:44 MDT) — carry-forward from iter 306–307. Tier 2 OAuth failure entries at 22:38–22:39Z MDT are known carry-forward. No new Larry directives. No new agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** alert-cooldown/warning/: **314** (unchanged). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T05:09:06Z UTC** — ~8 min old at check time (~05:17Z). Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=02b44b4 "Pulse cycle 20260601T051327Z", branch=main, clean tree. New commit since iter 310 (051f8cc) — confirms at least one clean automated cycle ran since iter 310. ✅
+
+- **(Check B) Sync health: ✅ Nominal (recovered).** `agent-core-sync.json`: status=no-change, message="Already up to date at 051f8cc…", last_sync=2026-06-01T05:06:16Z — ~11 min old at check time. SYNC-PUSH-REBASE-FALLBACK-001 has NOT recurred since its 04:39:20Z occurrence (iter 306). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains in queue as defensive hardening only. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ Nominal.** Forge inbox: 0 tasks. Beacon inbox: 0 tasks. 0 open PRs. System idle, awaiting Medic PR2 dispatch from Beacon. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired iter 266. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Forge:** 0 open PRs. 0 inbox tasks. Idle — awaiting Medic PR2 or next Beacon dispatch. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` appended (`ts: 2026-06-01T05:16:53Z`).
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=05:16:51Z UTC.
+5. Wrote journal entry. Watermark unchanged at 1098.
+
+**Escalated:** None new. All carry-forward. No new dispatches needed.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: 5 consecutive clean sync cycles since 04:39:20Z occurrence (iters 308–311). Pattern appears non-recurring. Carry-forward APPROVAL_REQUEST remains as defensive hardening.
+- Automated cycles confirmed running cleanly (HEAD advanced 051f8cc → 02b44b4 since iter 310).
+- Healer heartbeat same tick (05:09:06Z) as iters 309–310 — healer appears to be in a quiet sweep cycle. Still within 90-min threshold.
+- System fully idle between Medic workstream PRs. All bots active, inboxes empty, no open PRs.
+- Tier 2 OAuth expiry remains the sole active root cause. 314/38 stall-cooldown depth unchanged across iters 305–311 (6+ consecutive iters stable).
+
+**Learned:** Nothing new. Steady-state degraded: Tier 2 OAuth is the sole active root cause. All other subsystems nominal. Healer heartbeat consistent — 05:09:06Z unchanged across iters 309, 310, 311 (within threshold but no new tick observed; acceptable given ~7-8 min elapsed since last tick).
+
+---
+
 ## Iteration 310 — 2026-06-01 05:11 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. **Notable: SYNC-PUSH-REBASE-FALLBACK-001 CLEARED — sync.json shows no-change/clean at 05:06:16Z; the 04:39:20Z error has not recurred. Healer heartbeat ticked 05:09:06Z.**
