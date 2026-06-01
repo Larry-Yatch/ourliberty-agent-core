@@ -4,6 +4,46 @@
 
 ---
 
+## Iteration 422 — 2026-06-01 20:56 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1121** (unchanged — 0 new alerts since iter 421). Sync: **fresh** — status=no-change, last_sync=2026-06-01T20:07:46Z (~48 min old; within 2h threshold). Source repo: branch=main, clean. 7/7 core services active. Forge inbox: 0. Beacon inbox: 0. 0 open PRs. Healer heartbeat: **2026-06-01T20:42:35Z UTC** (~13.6 min old; FRESH).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1121 lines** (unchanged from iter 421 watermark 1121). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1121. alert-triage.json missing on disk (INFO; no functional impact — known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No new directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, stable).** alert-cooldown/warning/: **318** total (unchanged). Heal-pipeline-stall keyed files: **37** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** APPROVAL_REQUEST queue: 8 (unchanged). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **2026-06-01T20:42:35Z UTC** — ~13.6 min old. FRESH — within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean (gitStatus). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Fresh.** `agent-core-sync.json`: `status=no-change`, `last_sync=2026-06-01T20:07:46Z` (~48 min old; below 2h threshold). No last_error. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ All clear.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No active Forge build. No cost alarm. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d, outside 60d window). CLAUDE_MAX_OAUTH stale/expired (carry-forward — active Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅
+
+- **G-rule watch items (unchanged from iter 421):** All 7 items stable. No new occurrences. Steady-state degraded hold: **46 consecutive iters (377–422)** with 0 new escalations and 0 new G-rule advances.
+
+**Did:** Nothing. No new action triggers. Ledger row appended (iter 422, tier 1, kind=intervention, carry-forward Tier 2 OAuth stall).
+
+**Learned:** System functionally stable at Tier 1 under the OAuth stall carry-forward. No new signals since iter 421.
+
+---
+
 ## Iteration 421 — 2026-06-01 20:51 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1121** (unchanged — 0 new alerts since iter 420). Sync: **fresh** — status=no-change, last_sync=2026-06-01T20:07:46Z (~44 min old at check 20:51Z; within 2h threshold). Source repo: branch=main, clean (session-start gitStatus). 7/7 core services active. Forge inbox: 0. Beacon inbox: 0. 0 open PRs. Healer heartbeat: **2026-06-01T20:42:35Z UTC** (~9 min old at check 20:51Z; FRESH — within 90-min threshold).
