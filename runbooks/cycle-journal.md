@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration 305 — 2026-06-01 04:37 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. **Notable: PRs #226 + #227 merged (stuck-timer fixes); PR #228 opened (medic-operator-scaffold-001 build complete, Mirror reviewing); Sync error at 04:31Z (SYNC-PUSH-REBASE-FALLBACK-001 confirmed again).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1096 lines** (was 1093 at iter 304 watermark). **3 new alerts (idxs 1094–1096).** Known-pattern / carry-forward.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts (known patterns, no new escalation).** Watermark 1093→1096. New alerts:
+  - idx 1094: `heal-pipeline-stall` at 04:27:07Z — Forge Tier 2 fallback skipped (rate_limit); `pipeline-stall:tier2-fallback-skipped-rate_limit:forge`
+  - idx 1095: `heal-pipeline-stall` at 04:27:07Z — Forge Tier 2 fallback skipped (auth_401); `pipeline-stall:tier2-fallback-skipped-auth_401:forge`
+  - idx 1096: `rotate-active-tier` at 04:27:46Z — rotation auth gate blocked, held on tier1 (Tier 2 OAuth missing/expired)
+  - Cooldown files created at 22:27 for all three. All are carry-forward known patterns (same Tier 2 OAuth expired root cause tracking since iter 195). Journal note only; no new dispatch. ⚠️ (known-pattern carry-forward)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since 30min`: `-- No entries --`. Recent log activity is healthy pipeline execution (see Check D/E below). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Alert watermark 1096. New alerts 1094–1096 delivered via Beacon's 5-min alert sweep. No new Larry directives in recent logs. Forge/Mirror active on medic-operator-scaffold-001 pipeline (automated, not distress). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change in count).** Alert-cooldown/warning/ total: **314** (unchanged). heal-pipeline-stall prefix: **38** (unchanged). New alerts 1094–1095 are new instances of the same rate_limit/auth_401 Tier 2 OAuth failure for Forge. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. All 8 items unchanged since iter 304. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `heal-stale-daemon-code.heartbeat`: **2026-06-01T04:08:49Z UTC** — same tick as iter 304; ~29 min old at check time (~04:37Z). Within 90-min threshold. Next tick expected ~04:38Z UTC (imminent). Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=fd1663c "Pulse cycle 20260601T043345Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC ERROR.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", commit=59bbfc7f, last_sync=2026-06-01T04:31:13Z. This is the **SYNC-PUSH-REBASE-FALLBACK-001 pattern confirmed again** (originally materialized iter 117; APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending Larry for defensive hardening fix in `sync_agent_core.sh:161`). The rollback means local state should be consistent. Session-start tree is clean. Escalation already exists; no new dispatch needed. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. cycle.timer SubState=running (automated cycle started 22:33:47Z local, currently executing — NextElapseUSecMonotonic=infinity while SubState=running is EXPECTED per post-PR #225 behavior). ✅
+
+- **(Check D / E) Inboxes + PRs: ⚠️ PR #228 open (fresh, Mirror reviewing).** 
+  - Forge inbox: 0 tasks (medic-operator-scaffold-001 completed + archived).
+  - Beacon inbox: 0 tasks.
+  - Mirror inbox: 1 active task (`review-medic-operator-scaffold-001.json`, just dispatched at 04:34:49Z — fresh, NOT stale).
+  - **PR #228** "feat(medic): scaffold alert-operator (PR1 escalate-only)" — open, mergeable=UNKNOWN (freshly opened at ~04:34Z), reviewDecision="", Mirror review in progress. NOT stale (< 30 min). ✅/⚠️ (open but expected and fresh)
+  - Notable pipeline activity in last 30 min: medic-operator-scaffold-001 Forge phase completed successfully (04:34:19Z, 55s, $0.31); build-phase resumed + completed (04:34:45Z, 20s, $0.10); PR #228 opened; mirror-review dispatched. Healthy pipeline progression. ✅
+
+- **(Check A addendum — NEW MERGES since iter 304):** Session-start gitStatus shows commits:
+  - fd1663c "Pulse cycle 20260601T043345Z" (wrapper auto-commit, HEAD)
+  - 7a35888 "Merge pull request #227 from Larry-Yatch/fix/oncalendar-timers-and-stuck-timer-translation"
+  - 8fe7bef "Fix stuck-timer alert leak + immunize 3 timers from monotonic infinity trap"
+  - 2d43c82 "Merge pull request #226 from Larry-Yatch/fix/stuck-timer-heal-decouple"
+  - a092125 "Decouple stuck-timer heal from DM cooldown in install-drift healer"
+  - **PRs #226 + #227 merged between iter 304 and this session.** These are stuck-timer fixes: PR #226 decoupled stuck-timer heal from DM cooldown; PR #227 fixed stuck-timer alert leak and immunized 3 timers from the infinity trap. Both appear to be from the ongoing stuck-timer / install-drift healer workstream.
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Sentinels on disk. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. ✅
+
+- **G-rule watch items (unchanged):**
+  - `cycle.timer stuck`: **CLOSED** (PR #225, iter 304). ✅
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Forge:** PR #228 "feat(medic): scaffold alert-operator" open, Mirror reviewing. medic-operator-scaffold-001 build phase COMPLETE. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday/14d idempotency, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T04:37:11.418514+00:00", "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:37:14Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. Sync error (SYNC-PUSH-REBASE-FALLBACK-001) confirmed again — carry-forward APPROVAL_REQUEST remains open; no new dispatch.
+
+**Patterns:**
+- **Sync error recurrence.** SYNC-PUSH-REBASE-FALLBACK-001 materialized again at 04:31:13Z (previously confirmed iter 117, thought-resolved). The defensive hardening APPROVAL_REQUEST (`sync-push-rebase-fallback-001`) pending Larry is now more urgent — this is the 2nd confirmed in-production occurrence.
+- **Medic workstream progressing.** PR #228 "feat(medic): scaffold alert-operator (PR1 escalate-only)" opened, Mirror reviewing. Build phase cost: ~$0.41 total. On track.
+- **PRs #226 + #227 merged (stuck-timer fixes).** Two additional stuck-timer hardening PRs landed between iter 304 and this session. Confirms active stuck-timer hardening workstream in flight.
+- **Alert-cooldown total 314 (unchanged), pipeline-stall prefix 38 (unchanged).** No escalation in stall count. Tier 2 OAuth expiry root cause unchanged.
+- **Healer heartbeat:** 04:08:49Z UTC (same tick as iter 304; ~29 min old; next expected ~04:38Z UTC — imminent). ✅
+- **cycle.timer SubState=running** — automated cycle currently executing (started 22:33:47Z local). ✅
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 confirmed second in-production occurrence (04:31:13Z). The APPROVAL_REQUEST for defensive hardening (`sync-push-rebase-fallback-001`) is now more load-bearing than it was when first filed at iter 117. Should surface to Larry in next escalation update. PRs #226 and #227 are new stuck-timer fixes that were not in MEMORY.md — updating.
+
+---
+
 ## Iteration 304 — 2026-06-01 04:29 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. **Notable: PR #225 "Fix ourliberty-cycle.timer NextElapse=infinity wedge: oneshot→simple" MERGED. Cycle.timer now OnCalendar=*:0/5. G-rule 2/3 → SYSTEMIC FIX LANDED. First automated cycle post-fix in progress (PID 2821132, started 04:25:32Z).**
