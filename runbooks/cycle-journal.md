@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 284 — 2026-06-01 02:19 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1090 lines** (unchanged from iter 283 watermark). **0 new alerts.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark at 1090 (unchanged from iter 283). Last entry: idx=1090, Check I DM at 00:08Z UTC June 1. No new healer escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal (carry-forward).** Alert watermark unchanged at 1090. Last Larry message: `'Go'` at 13:44Z UTC May 31 (unchanged). beacon_telegram_bot.log last substantive entries from 23:06Z UTC May 31 (~80 min before iter). No new directives. No agent distress keywords in last 4h. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **315** via `ls -la | wc -l` (includes 1 header line; actual file count ~314; prior iters reported 312 via `ls | wc -l` — +2 net new files from known Monday-DM sentinels: `pulse:check-i-2026-06-01`, `ledger:weekly-2026-06-01`, `pulse:monday-dm:2026-06-01-stuck-timer`). heal-pipeline-stall prefix: **38** (unchanged). deploy-notifier prefix: **106** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. pulse-escalations.json: 929 lines, 3 items with explicit `status: open` (last: Check IX FATAL iter 266). cycle.timer still stuck (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity — confirmed this iter). Known APPROVAL_REQUEST items unchanged. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T02:08:34Z UTC** — same tick as iter 283; ~11 min old at check time (02:19Z). Within 90-min threshold. Next tick expected ~02:38Z UTC. Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=f56ddad "Pulse cycle 20260601T021235Z" (wrapper auto-commit of iter 283), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: last_sync=2026-06-01T02:06:15Z, status=no-change, commit=e94832f. ~13 min old at check time (02:19Z); within 2h threshold. Next sync expected ~03:06Z UTC. ✅
+
+- **(Check C) Agent liveness: ✅ 6/6 non-timer active; ⚠️ cycle.timer STUCK (carry-forward).** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier — all `active`. ourliberty-cycle.timer: confirmed `NextElapseUSecRealtime=` (empty), `NextElapseUSecMonotonic=infinity` — still stuck. G-rule **2/3** (no new occurrence this iter; same continuous stuck state since iter 259). ⚠️ (known)
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse): 0 active tasks. ourliberty-agent-core: 0 open PRs. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. All others due 2027. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Sentinels on disk (`check-i-2026-06-01.json` confirmed). Idempotency guards skip re-run. ✅
+
+- **G-rule watch items:** cycle.timer stuck: G-rule **2/3** (no new occurrence). All others stable: heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3). MalformedForgeMarker post-dispatch (doc-fix pending). F24 empty-prompt APPROVAL_REQUEST #8 pending. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday idempotency, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 284` → `{"ts": "2026-06-01T02:20:01.018079+00:00", "iter": 284, "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:20:01Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All active issues carry-forward from iter 283.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new findings this iter. No change from iter 283.
+- Alert-cooldown total ~314 (minor measurement delta vs prior 312 — counting methodology shift `ls -la | wc -l` vs `ls | wc -l`; heal-pipeline-stall=38 and deploy-notifier=106 both unchanged; no new stall events).
+- Healer heartbeat: 2026-06-01T02:08:34Z UTC (same tick as iter 283; ~11 min old; next tick expected ~02:38Z). ✅
+- Sync: last_sync=02:06:15Z (on hourly schedule; next expected ~03:06Z UTC). ✅
+- cycle.timer G-rule: 2/3. One more distinct occurrence → dispatch to Beacon.
+- APPROVAL_REQUEST queue: 8 (unchanged). Larry's attention needed, especially: Tier 2 OAuth restore (active stalls), cycle.timer recovery.
+- Check IX note: no sentinel written at first firing (iter 266 — script fataled). Will retry 2026-06-08; will fail again unless dashboard API (port 8001) restored before then.
+
+**Learned:** Nominal observation iter. System stable-degraded; no drift from iter 283. Cooldown count measurement delta (312→315 via new counting method) explained by header-line inclusion and 2 known Monday-DM sentinels not previously counted — not a new incident.
+
+---
+
 ## Iteration 283 — 2026-06-01 02:11 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
