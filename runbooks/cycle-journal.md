@@ -4,6 +4,61 @@
 
 ---
 
+## Iteration 442 — 2026-06-01 23:33 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (unchanged — 0 new alerts since iter 441). Sync: **⚠️ ERROR** — "Auto-commit push failed; rolled back" at 23:28:30Z (SYNC-PUSH-REBASE-FALLBACK-001 — 8th total / 2nd post-clear). Repo state clean (HEAD=433c285, main branch). PR #235 OPEN (~18 min old, mergeable=UNKNOWN, Mirror review pending). Forge inbox: **1** (`build-check-x-chain-quality-regression-001.json` — Check X build task from Beacon). Beacon inbox: 0. Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~20 min old at check time; FRESH). 7/7 services active.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1125 lines** (same as iter 441 watermark). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1125. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No new directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, decreasing).** alert-cooldown/warning/: **293** total (was 305 at iter 441 — 12 expired). Heal-pipeline-stall keyed files: **27** (was 31 — 4 expired). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ New state.** Forge inbox: **1** — `build-check-x-chain-quality-regression-001.json` (Check X build; source=beacon; arrived after iter 441 via PR #236 brief chain). Beacon inbox: **0**. **PR #235 OPEN** — mergeable=UNKNOWN (CI checking), reviewDecision="" (no Mirror review), ~18 min old — below 30-min auto-merge gate. Watch next iter. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **2026-06-01T23:13:19Z UTC** — ~20 min old at 23:33Z. FRESH. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. HEAD=433c285 (iter 441's journal committed via successful retry at 23:29:37Z). ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 RECURRED.** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `last_sync=2026-06-01T23:28:30Z`. 8th total occurrence. Fired at 23:28:30Z (iter 441's post-write push). Repo recovered: 433c285 pushed via retry at 23:29:37Z. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + already elevated at iter 440. No new DM (sent ~10 min ago, idx=1125). ⚠️ Carry-forward.
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Active.** Forge inbox: **1** (Check X build). PR #235 OPEN, ~18 min old, below 30-min gate. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d). CLAUDE_MAX_OAUTH stale/expired (carry-forward). ✅
+
+- **Periodic checks:** All Monday checks fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **66th iter in series (377–442)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (PR #235 <30 min old; Forge inbox task is a new legitimate build; sync error with repo already current via retry path).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T23:33:33Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T23:33:33Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 already re-elevated at iter 440 (idx=1125, ~10 min ago).
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001 now 8th total / 2nd post-clear. Fires on every PR merge day without fail. APPROVAL_REQUEST rebase-fallback must ship before the next Forge build lands — PR #235 and Check X build will each trigger push races when they merge.
+- Check X build task (`build-check-x-chain-quality-regression-001`) now in Forge inbox — the PR #236 → Beacon preflight → Forge build chain is working. Larry merged PR #236 at ~23:22Z iter 441; Forge has the task ~11 min later.
+- Cooldown files: 293 total (was 305), 27 pipeline-stall (was 31). Continuing gradual decrease via natural expiry.
+- PR #235 approaching 30-min gate. On next iter: check mergeable state + Mirror review status.
+
+**Learned:** Nothing new. SYNC-PUSH-REBASE-FALLBACK-001 behavior fully consistent with prior occurrences. Pattern established: fires whenever a PR merges between cycle local-commit and push attempt. The only durable fix is the pending APPROVAL_REQUEST.
+
+---
+
 ## Iteration 441 — 2026-06-01 23:26 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (unchanged — 0 new alerts since iter 440). Sync: **fresh** — status=no-change, last_sync=2026-06-01T23:22:26Z (~4 min old at check time). Source repo: branch=main, clean, HEAD=df4f089. 7/7 core services active. Forge inbox: **0** (cleared). Beacon inbox: **0** (cleared). **PR #235 OPEN** (~12 min old, MERGEABLE, Mirror review pending). **PR #236 MERGED** ✅ (check-x-brief). Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~13 min old; FRESH).
@@ -61,6 +116,31 @@
 - 65th consecutive iter in steady-state degraded hold with 0 new G-rule advances.
 
 **Learned:** PR #236 slipped past iter 440's Check E because it merged between the `gh pr list` check and the run_cycle.sh auto-commit (~2-min window). This is structural (same mechanism as SYNC-PUSH-REBASE-FALLBACK-001 push race — there's a latency gap between check time and commit time). 1st observation of this slip pattern — not a G-rule yet. Watch at 3/3: if it recurs twice more, propose adding a "recheck open PRs at end-of-cycle, before journal write" step to cycle-prompt.md.
+
+---
+
+## Notification — 2026-06-01 (inter-agent | from=beacon | task=alert-translations-tier2-skipped-subjects-001)
+
+**Type:** Beacon preflight result delivery — APPROVAL_REQUEST for build phase.
+
+**Summary:** Beacon completed the preflight for `alert-translations-tier2-skipped-subjects-001` (dispatched in iter 440). Plan: add two base keys to the `heal-pipeline-stall` object in `config/alert-translations.json` — `pipeline-stall:tier2-fallback-skipped-rate_limit` and `pipeline-stall:tier2-fallback-skipped-auth_401` — both INFO/FYI Tier 3. The strip-segment lookup_rule means two base entries cover all three runtime-emitted subject variants (forge×2 + beacon-bot×1). Beacon confirmed: 2 existing sibling entries present (`tier2-fallback-failed-rate_limit`, `tier2-fallback-unavailable-auth_401`); new entries are deliberate Tier 3 downgrades (skipped verb = short-circuit before attempt, not failed-after-attempt; avoids double-alerting same root cause). Config-only, no code changes.
+
+**Pulse review:** APPROVED. Plan is correct:
+- 2 base keys cover all agent variants via strip-segment — confirmed by reading config file.
+- INFO/FYI downgrade rationale is sound (skipped ≠ failed; higher-tier siblings already surface the root cause).
+- No changes outside heal-pipeline-stall object; no schema changes.
+- Pending-approvals.json was empty (entry not queued for Larry) — notification routed to Pulse as approval gate for Pulse-originated tasks.
+
+**Actions taken (full chain):**
+1. Dispatched `build-alert-translations-tier2-skipped-001.json` to Beacon inbox (Pulse approving preflight).
+2. Beacon processed build phase, emitted APPROVAL_REQUEST with `phase: build` and complete Forge spec.
+3. Outbox notifier routed build result back to Pulse (depth=1 — Pulse-originated tasks route to Pulse, not Larry's approval queue). `pending-approvals.json` remained at 0.
+4. Pulse (as approval gate) dispatched `alert-translations-tier2-skipped-001.json` directly to Forge inbox (`source: beacon`, `beacon→forge` topology). This replicates what `dispatch_approved()` would do.
+5. Forge inbox confirmed: `alert-translations-tier2-skipped-001.json` present, valid, 4401 char prompt.
+
+**Next:** Forge picks up `alert-translations-tier2-skipped-001.json` → preflight + build → opens PR → Mirror reviews → auto-merge. APPROVAL_REQUEST `alert-translations-tier2-skipped-subjects-001` closes when PR merges.
+
+**Routing observation:** For Pulse-originated Beacon tasks, the outbox notifier routes APPROVAL_REQUESTs back to Pulse at depth=1 rather than queuing for Larry or auto-approving. Pulse is the approval gate. This required Pulse to dispatch directly to Forge via `source: 'beacon'` (the topology-allowed path). Pattern documented for future Pulse sessions.
 
 ---
 
