@@ -104,7 +104,7 @@ Force-promotes to Tier 3 regardless of the consecutive_clean count. Use when Lar
 
 If ANY of the 5 mandatory checks (§ 3) returns non-empty results, this iter forces immediate Tier 1. Any finding may emit a `tier-reset` side-effect — same taxonomy as the existing nominal/always-fix/ask-then-do/never-auto/route classification (a finding can be both `always-fix` AND `tier-reset`; the auto-fix executes and the tier resets to 1 in the same iter).
 
-De-escalation only happens after 3 consecutive iters at the current tier return clean across all 5 mandatory checks AND the additive checks in § 4. The conditional/periodic checks in § 5 (Check I, Check VIII, Check IX) do NOT gate tier de-escalation — they're additive observation surfaces, not cadence drivers.
+De-escalation only happens after 3 consecutive iters at the current tier return clean across all 5 mandatory checks AND the additive checks in § 4. The conditional/periodic checks in § 5 (Check I, Check VIII, Check IX, Check X) do NOT gate tier de-escalation — they're additive observation surfaces, not cadence drivers.
 
 ### 3. The MANDATORY 5 checks (every iter, in order)
 
@@ -599,6 +599,42 @@ Behaviors you can rely on:
 | Tue–Sun (non-firing day) | Don't invoke | Journal nothing for Check IX |
 
 **False-positive discipline (Mirror review focus):** Check IX never auto-promotes a drafting mission to `ready` — Larry's manual review on the kanban is the human gate. A false-positive signal lands as a drafting card and Larry rejects it; no chain dispatch fires until promotion. The signal thresholds are deliberately conservative starting points; Check III's self-tuning (per spec § 8) will revise once 8 cycles of data are accumulated.
+
+#### 5.3a Check X — Chain-quality regression watch (Mondays)
+
+Check X fires on **Mondays only**, alongside Check I + Check VIII + Check IX. It watches the Forge/Mirror auto-merge chain for a QUALITY regression since a model/prompt cutover (default `cutover_date` 2026-06-01, the Opus 4.8 Forge/Mirror roll-forward in PR #233). A same-family model bump doesn't show in routine chat — it shows on hard build/review tasks — so this is the objective early-warning, not a vibes check. It compares a trailing 28d window against the 28d baseline immediately before the cutover and DMs Larry only when a regression is suspected. Read-only analyzer; it NEVER edits config. Brief: `docs/check-x-chain-quality-regression-brief.md`. Config: `config/agent-models.json:check_x_regression`.
+
+```
+Trigger conditions:
+  • Today is Monday (UTC weekday == 0), AND
+  • EMERGENCY_HALT not present, AND
+  • Sentinel ~/agents/blackboard/pulse-check-x-proposals/check-x-<this-week-Monday>.json
+    is missing (the analyzer's own same-week gate handles re-runs).
+
+If any condition fails on a Monday, journal a one-line skip note and proceed.
+On non-Monday cycles, skip silently.
+```
+
+**Mechanism:** invoke the deterministic analyzer rather than re-implementing the logic inline. It reads `clarify_request` rows from `chain_events` (Forge only) plus the local `~/agents/blackboard/costs.jsonl` for the Forge build-work task universe, computes two active relative-increase metrics per window (clarify-rounds-per-task and a revision-rounds-per-task proxy), and fires only when a configured threshold is breached AND both windows clear `min_tasks_per_window` (default 8 — below that it logs `insufficient_signal` and stays silent rather than crying wolf on thin data). Two further metrics (Mirror PASS/REVISION/ESCALATE mix) are DEFERRED: their config keys are retained but the data isn't in `chain_events` yet, so the analyzer renders them deferred in the artifact and skips them in firing. The analyzer requires `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (already on the droplet); the supabase SDK is lazy-imported.
+
+```bash
+python3 /home/larry/agent-core/scripts/pulse_check_x.py
+```
+
+The analyzer writes the cycle artifact (full metric table for both windows + outcome + breached thresholds) to `~/agents/blackboard/pulse-check-x-proposals/check-x-<week-Monday>.json` (the sentinel-cum-artifact). It DMs Larry via `scripts/larry_alerts.append_alert` (`source='pulse-check-x'`, severity `warning`) ONLY when the outcome is `regression_suspected` — the DM is plain-language and states explicitly that the finding is CORRELATIONAL, not proven cause. No auto-action: Larry reviews the recent Forge/Mirror PRs and, if confirmed, reverts the affected agent to `claude-opus-4-7` himself.
+
+Behaviors you can rely on:
+
+| Scenario | Analyzer behavior | Your action |
+|---|---|---|
+| Monday + sentinel missing, a threshold breaches with ≥ min_tasks in both windows | Writes artifact + DMs `regression_suspected` digest | Note Check X fired + breached metric in journal |
+| Monday + sentinel missing, no threshold breaches | Writes artifact (`outcome: none`), no DM | Note Check X quiet in journal |
+| Monday + sentinel missing, either window below min_tasks | Writes artifact (`outcome: insufficient_signal`), no DM | Note Check X insufficient signal, no DM |
+| Monday + sentinel exists for this week's Monday | Skips silently (analyzer's own same-week gate) | No journal note needed |
+| EMERGENCY_HALT tripped | Don't invoke | Same as other checks |
+| Tue–Sun (non-firing day) | Don't invoke | Journal nothing for Check X |
+
+**Scope discipline (Mirror review focus):** Check X is observability only (dial-3) — it proposes, Larry disposes; there is no auto-revert and no config write. The thresholds are conservative starting points tuned in `check_x_regression`; re-point `cutover_date` for any future model/prompt change to re-baseline.
 
 #### 5.4 Self-optimizing Check family overview (Checks III, IV, V, VI, VII)
 

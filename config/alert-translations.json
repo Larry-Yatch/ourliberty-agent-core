@@ -260,5 +260,13 @@
       "plain_language_summary": "The marker precision/recall floor check could not auto-propose because both precision and recall fell below their floors this week, so it needs you to read the artifact and decide whether to raise, lower, or hold.",
       "recommended_action": "Read the week's artifact and decide manually whether to raise, lower, or hold the floors. No automated proposal applies here."
     }
+  },
+  "pulse-check-x": {
+    "check-x-regression": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The weekly chain-quality watch found that since the last model/prompt cutover, the Forge/Mirror build chain has gotten measurably harder on at least one quality signal (Forge needs more clarification rounds per task, or more build/revision rounds per task). This is CORRELATIONAL — the cutover happens to coincide with the rise; it is not proven cause. It is a heads-up awaiting your call, not an automated change.",
+      "recommended_action": "Review the recent Forge/Mirror PRs from the trailing window (the DM names the metric and shows the before -> after numbers). If the regression looks real, revert the affected agent to claude-opus-4-7 by flipping its routing value in config/agent-models.json and restarting the inbox-watcher (it caches config at startup, inbox_watcher.py:778). No automated action is taken; the full metric table is in ~/agents/blackboard/pulse-check-x-proposals/check-x-<Monday>.json."
+    }
   }
 }
