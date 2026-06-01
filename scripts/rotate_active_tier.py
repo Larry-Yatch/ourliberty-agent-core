@@ -172,7 +172,21 @@ def _dm_auth_blocked(held_tier, blocked_tier, logger=None):
     at the Tier 2 restore runbook (auth_401 with both tiers in scope, the
     Tier 2 runbook covers either direction). Best-effort: a failed import
     or a cooldown-suppressed alert never wedges the tick.
+
+    Gated on the ``OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE=true`` sentinel
+    set only by ``systemd/ourliberty-rotate-active-tier.service`` — manual
+    / agent CLI invocations probing the auth gate must not page Larry. The
+    in-process auth-blocked event + held-window logic still runs; only the
+    DM is suppressed.
     """
+    if os.environ.get('OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE') != 'true':
+        if logger is not None:
+            logger.info(
+                'rotation auth-blocked DM suppressed: '
+                'OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE sentinel not set '
+                '(non-systemd invocation)'
+            )
+        return
     try:
         sys.path.insert(0, str(SCRIPT_DIR))
         import larry_alerts as la  # noqa: E402
