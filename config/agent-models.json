@@ -3,7 +3,7 @@
   "description": "Per-agent model routing. Telegram chat uses telegram_model; inbox/work tasks use inbox_model; if a call fails, fallback_model is tried. Pinned explicitly to model IDs to avoid alias ambiguity.",
   "default": {
     "telegram_model": "claude-sonnet-4-6",
-    "inbox_model": "claude-opus-4-7",
+    "inbox_model": "claude-opus-4-8",
     "fallback_model": "claude-sonnet-4-6"
   },
   "agents": {
@@ -19,7 +19,7 @@
       "name": "Forge",
       "role": "Engineering / Builder",
       "telegram_model": "claude-sonnet-4-6",
-      "inbox_model": "claude-opus-4-7",
+      "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
       "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
@@ -29,7 +29,7 @@
       "name": "Mirror",
       "role": "Adversarial Review",
       "telegram_model": "claude-sonnet-4-6",
-      "inbox_model": "claude-opus-4-7",
+      "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
       "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard"],
@@ -40,7 +40,7 @@
       "role": "Self-healing Observer / /cycle",
       "telegram_model": "claude-sonnet-4-6",
       "inbox_model": "claude-sonnet-4-6",
-      "fallback_model": "claude-opus-4-7",
+      "fallback_model": "claude-opus-4-8",
       "note": "Sonnet for routine cycles (cheap polling). Pulse can self-escalate to Opus when investigating a recurring pattern. Default cycle frequency starts at 30 min; tune as we earn trust."
     },
     "aide": {
@@ -48,7 +48,7 @@
       "role": "Executive Assistant (Phase E)",
       "telegram_model": "claude-sonnet-4-6",
       "inbox_model": "claude-sonnet-4-6",
-      "fallback_model": "claude-opus-4-7",
+      "fallback_model": "claude-opus-4-8",
       "note": "EA tasks are mostly mechanical (drafting emails, scheduling, calendar holds). Sonnet handles them well. Opus reserved for ambiguous prioritization calls.",
       "status": "planned"
     },
@@ -56,7 +56,7 @@
       "name": "Scout",
       "role": "Researcher (Phase 2)",
       "telegram_model": "claude-sonnet-4-6",
-      "inbox_model": "claude-opus-4-7",
+      "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "note": "Sonnet for chat / Q&A. Opus for actual deep research (competitive analysis, technical deep-dives). Scout's output quality matters — research that misleads is worse than no research.",
       "status": "planned"
@@ -65,7 +65,7 @@
       "name": "Compass",
       "role": "Planner / Dispatcher (Phase 2)",
       "telegram_model": "claude-sonnet-4-6",
-      "inbox_model": "claude-opus-4-7",
+      "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "note": "Sequencing across multiple in-flight projects is judgment work. Opus default.",
       "status": "planned"
@@ -174,6 +174,11 @@
     {
       "date": "2026-05-30",
       "change": "Pilot step 2: beacon.telegram_model refined claude-opus-4-8 -> claude-opus-4-8[1m] to preserve the 1M-context window Beacon chat ran on before (the CLI default was claude-opus-4-7[1m]); plain claude-opus-4-8 is 200k. inbox_model stays plain claude-opus-4-8 (200k, matching its prior tier). Also wired scripts/beacon_telegram_bot.py: the bespoke bot previously passed no --model and silently used the CLI default, so telegram_model was a dead field. call_beacon now reads telegram_model from this file (config/agent-models.json, __file__-relative, same source inbox_watcher uses) and passes --model. Requires a beacon-bot restart to take effect.",
+      "author": "Claude (via Larry's session)"
+    },
+    {
+      "date": "2026-06-01",
+      "change": "Opus 4.8 fleet roll-forward (post-Beacon-pilot). Remaining claude-opus-4-7 ROUTING values -> claude-opus-4-8: default.inbox_model, forge.inbox_model, mirror.inbox_model, pulse.fallback_model, aide.fallback_model, scout.inbox_model, compass.inbox_model. Beacon already on 4.8 (pilot). Sonnet chat/routine models unchanged. Larry's call: roll forward on the no-regression basis (a same-family 4.7->4.8 bump shows on hard tasks, not routine chat; Beacon ran clean ~2 days). Forge/Mirror (auto-merge chain) to be watched via objective chain metrics (CLARIFY rounds / revision counts / Mirror PASS-vs-ESCALATE rates), not vibes. Requires inbox-watcher restart: load_models() runs once at daemon startup (inbox_watcher.py:778), so the in-memory config is fixed until restart. _history/_note prose mentions of claude-opus-4-7 intentionally left as historical record.",
       "author": "Claude (via Larry's session)"
     }
   ]
