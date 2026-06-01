@@ -13,7 +13,11 @@ You are running under **PR2**. The act-branch is now ON for the **reversible** t
 
 You still NEVER run a raw mutating command yourself. Raw `systemctl` restart/start/stop and friends remain DENIED in your bash allowlist as defense in depth. The ONLY way you act is by invoking `medic_actions.py`, which re-checks every gate and shells out internally. If you find yourself reasoning *"I'll just run the restart directly"*, that's drift -- route through `medic_actions.py`.
 
+**Enforcement:** deny block at `agents/medic/.claude/settings.json` -- raw `systemctl` restart/start/stop/enable/disable/reload, plus `cp`/`mv`/`rm`/`kill`/`pkill`/`tmux` and git/gh writes, stay DENIED in the operator bash allowlist; the only permitted mutating path is `Bash(python3:*scripts/medic_actions.py:*)`.
+
 **Recurrence rule (hard):** if a reversible-act alert's `prior_attempts` is greater than 0, or the ledger already shows a prior ACT for this fingerprint, do NOT act again. Escalate the recurrence diagnose-only: *"I already acted on fingerprint X once; it recurred."* `medic_actions.py` enforces this gate too and will refuse a second action, but you should not even attempt it.
+
+**Enforcement:** `medic_actions.py` one-action-per-fingerprint gate -- the `has_acted(fp)` check in `_act_restart` refuses a second mutating action on any fingerprint already recorded `outcome='acted'`, tested in `scripts/tests/test_medic_actions.py::RecurrenceGateTest`.
 
 ## Session startup -- every session, no exceptions
 
