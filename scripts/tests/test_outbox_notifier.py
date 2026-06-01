@@ -241,11 +241,11 @@ class ProcessOutboxTest(unittest.TestCase):
 
     def test_failed_result_still_notifies_with_failed_framing(self):
         outbox = _good_outbox(
-            agent='beacon', source='pulse', task_id='real-fail',
+            agent='beacon', source='pulse', task_id='prod-fail',
             exit_code=-1, error='claude timed out after 3 attempts',
             result='',
         )
-        f = self._write_outbox('beacon', 'real-fail.json', outbox)
+        f = self._write_outbox('beacon', 'prod-fail.json', outbox)
 
         result = on.process_outbox(f)
         self.assertEqual(result, 'notified')
@@ -483,7 +483,7 @@ class BuildNotifyPromptTest(unittest.TestCase):
         prompt = on.build_notify_prompt(
             intent='result-notification',
             sender='forge',
-            task_id='real-fail',
+            task_id='prod-fail',
             success=False,
             output='',
             error='claude timed out after 3 attempts',
@@ -2088,17 +2088,17 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         # Only PROCEED triggers build phase. CLARIFY/REJECT do not.
         marker = (
             '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "real-clr", "question": "Which file?"}\n'
+            '{"task_id": "prod-clr", "question": "Which file?"}\n'
             '=== END_CLARIFY_REQUEST ==='
         )
         outbox = _good_outbox(
-            agent='forge', source='beacon', task_id='real-clr',
+            agent='forge', source='beacon', task_id='prod-clr',
             claude_session_id='sess-clr',
             clarification_count=0, max_clarifications=3,
             target_repo='ourliberty-agent-core',
             result=f'Need more info.\n\n{marker}',
         )
-        f = self._write_outbox('forge', 'real-clr.json', outbox)
+        f = self._write_outbox('forge', 'prod-clr.json', outbox)
 
         on.process_outbox(f)
 
@@ -6405,7 +6405,7 @@ class AlreadyMergedResumeTest(unittest.TestCase):
         decision = {
             'intent': 'review-pass',
             'payload': {
-                'task_id': 'real-fail',
+                'task_id': 'prod-fail',
                 'pr_url': self.PR_URL,
                 'summary': 'A summary',
             },
