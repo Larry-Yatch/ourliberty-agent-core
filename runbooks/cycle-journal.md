@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 373 — 2026-06-01 11:32 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1111** (unchanged, 0 new alerts). Healer heartbeat: **11:10:04Z UTC** (~22 min old; within threshold; next expected ~11:40Z). Sync: **11:06:26Z UTC** (~26 min old; within 2h threshold). Source repo: HEAD=4315cb8 "Pulse cycle 20260601T112250Z", branch=main, clean. 7/7 core services active. Medic-dispatcher: inactive (expected — 20th run complete; timer active). **NEW: 2 Forge tasks in-flight (both arrived post-iter-372, both Beacon-dispatched, non-fixture).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1111 lines** (unchanged from iter 372). Watermark stable. 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1111. Last delivery: idx=1110 at 10:03:00Z UTC (Medic 20th run diagnoses). alert-triage.json: missing (INFO; known, no functional impact). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → No entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last delivery: idx=1110 at 10:03:00Z UTC. No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, minor expiry).** `~/agents/state/alert-cooldown/warning/`: **316** (was 317; -1 from natural expiry). heal-pipeline-stall prefix: **37** (was 38; -1 from natural expiry). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Beacon inbox: 0. Forge inbox: **2 tasks (NEW, both fresh, non-stale)**. 0 open PRs. APPROVAL_REQUEST queue 8 carry-forward. ✅
+  - `medic-hardening-ratewindow-timeout-001`: ACTIVE — Forge worktree created 11:24:16Z UTC, running claude-opus-4-7, timeout=4h. Task: Medic reliability hardening (rate-window gate + per-session timeout). Source: beacon.
+  - `rotation-gate-dm-isolation-001`: QUEUED — arrived 11:29:21Z UTC (~3 min ago at check time), not yet dispatched by inbox-watcher. Task: Fix rotation_auth_gate_blocked DM test-isolation leak. Source: beacon.
+  Both tasks passed fixture-pattern allowlist check: no match on prefix patterns (`zz-fixture-`, `t-`, etc.) or exact patterns. Legitimate builds. Not stale (well within 1h threshold). No action needed.
+
+- **(Check 5) Stale daemon: ✅ Nominal — FRESH.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T11:10:04Z UTC — ~22 min old at check. Within 90-min threshold. Next expected ~11:40Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus context: HEAD=4315cb8 "Pulse cycle 20260601T112250Z", branch=main, clean. Automated cycles advancing on schedule. ✅
+
+- **(Check B) Sync health: ✅ Nominal — FRESH.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T11:06:26Z UTC — ~26 min old at check. Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `inactive` (expected — 20th run complete; timer active). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Forge inbox: 2 tasks (both fresh, < 10 min old, in-flight — see Check 4 detail). Beacon inbox: 0. 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge task `medic-hardening-ratewindow-timeout-001` started at 11:24:16Z (~8 min into run at check time). Under 10-min cost watch threshold. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. check-i-2026-06-01.json sentinel confirmed. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged from iter 372):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 (iter 361) — no change.
+  - MalformedForgeMarker doc-fix APPROVAL_REQUEST pending — no change.
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Verified 2 new Forge inbox tasks against fixture-pattern allowlist: both are legitimate Beacon dispatches.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T11:33:09Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T11:33:10Z UTC. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. All carry-forward.
+
+**Patterns:**
+- Two new Forge tasks appeared since iter 372: `medic-hardening-ratewindow-timeout-001` (running) and `rotation-gate-dm-isolation-001` (queued). Both are the Beacon-dispatched Medic hardening workstream. Consistent with the "idle, awaiting Medic PR2 dispatch from Beacon" state noted in MEMORY.md — Beacon has now dispatched. Forge is active again after extended idle period.
+- Cooldown files: 316 (was 317, -1). Pipeline-stall prefix: 37 (was 38, -1). Natural expiry; not a structural change. Tier 2 OAuth stall root cause unchanged.
+- Healer heartbeat stable at 30-min cadence. Sync healthy. Automated cycle cadence nominal.
+
+**Learned:** Forge is no longer idle — two Medic hardening tasks dispatched by Beacon post-iter-372. `medic-hardening-ratewindow-timeout-001` (rate-window gate + session timeout) is active in worktree; `rotation-gate-dm-isolation-001` (DM test-isolation leak) is queued.
+
+---
+
 ## Iteration 372 — 2026-06-01 11:21 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1111** (stable, 0 new alerts). Healer heartbeat: **11:10:04Z UTC** (~11 min old; FRESH; next expected ~11:40Z). Sync: **11:06:26Z UTC** (~15 min old; FRESH). Source repo: HEAD=eefd0ca "Pulse cycle 20260601T111810Z", branch=main, clean. 7/7 core services active. Medic-dispatcher: inactive (expected — 20th run complete; timer active).
