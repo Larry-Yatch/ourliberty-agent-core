@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 307 — 2026-06-01 04:48 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); SYNC-PUSH-REBASE-FALLBACK-001 (same occurrence, no new firing); APPROVAL_REQUEST queue 8. No new PRs opened or merged.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1098 lines** (was 1096 at iter 306 watermark). **2 new entries (idxs 1096–1097), both Tier 3 known-patterns.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 2 new entries, both Tier 3 known-patterns.** Watermark 1096→1098. New entries:
+  - idx=1096: outbox-notifier, review-pass for PR #228 (medic-operator-scaffold-001, 04:40:38Z). Informational notification; Tier 3 known-pattern. ✅
+  - idx=1097: heal-pipeline-stall, beacon-bot Tier 2 fallback skipped (rate_limit, 04:42:28Z). Same Tier 2 OAuth expired root cause tracked since iter 195. Tier 3 known-pattern. ✅
+  - No Tier 1, 2, or 4 alerts. No dispatch. No DM.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: `-- No entries --`. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last beacon_telegram_bot.log entries: idx=1096 review-pass delivered at 22:44Z MDT + idx=1097 pipeline-stall alert delivered at 22:44Z MDT. No new Larry directives. No agent distress keywords. Carry-forward Tier 2 fallback entries at 22:38-22:39 MDT are known. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** Alert-cooldown/warning/: **314** (unchanged from iter 306). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick.** `heal-stale-daemon-code.heartbeat`: **2026-06-01T04:38:49Z UTC** — ~9 min old at check time (~04:48Z). Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=8abdf7c "Pulse cycle 20260601T044326Z", branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC ERROR (carry-forward — same occurrence as iter 306).** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-01T04:39:20Z — **same status as iter 306** (no new sync attempt yet; ~9 min old; next sync expected ~05:09Z UTC). The SYNC-PUSH-REBASE-FALLBACK-001 pattern. Local tree clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending Larry. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. cycle.timer SubState=running, NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity — EXPECTED per post-PR #225 behavior while service is executing. ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ Nominal.** Forge inbox: 0 tasks. Beacon inbox: 0 tasks. Mirror inbox: 0 tasks. `gh pr list`: `[]`. 0 open PRs. System idle, awaiting next Beacon dispatch for Medic workstream PR2. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired iter 266. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Forge:** 0 open PRs. 0 inbox tasks. Idle — awaiting next Beacon dispatch (Medic PR2 or other). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T04:48:01Z", "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:48:02Z UTC.
+5. Wrote journal entry. Watermark advanced to 1098.
+
+**Escalated:** None new. All carry-forward. No new dispatches needed.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: same occurrence from 04:39:20Z, no new firing this iter. Next sync expected ~05:09Z UTC — will report in next automated cycle.
+- Forge inbox empty, all bots active, no open PRs. System in a clean idle state between Medic workstream PRs.
+- Alert count 314/38 unchanged (Tier 2 OAuth pipeline stalls frozen in place). No escalation in stall depth.
+- New alert idx=1097 (beacon-bot rate_limit) confirms Tier 2 OAuth issue persists and continues generating stall alerts on beacon-bot as well as forge.
+
+**Learned:** Nothing new. Steady-state degraded: Tier 2 OAuth is the sole active root cause. All other subsystems nominal.
+
+---
+
 ## Iteration 306 — 2026-06-01 04:41 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); SYNC-PUSH-REBASE-FALLBACK-001 again; APPROVAL_REQUEST queue 8. **Notable: PR #228 "feat(medic): scaffold alert-operator (PR1 escalate-only)" MERGED. PR #229 "fix/alert-translations-6-missing" MERGED (between iter 305 and 306). Medic workstream PR1 complete.**
