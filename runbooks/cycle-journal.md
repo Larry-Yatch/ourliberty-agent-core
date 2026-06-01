@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 306 — 2026-06-01 04:41 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); SYNC-PUSH-REBASE-FALLBACK-001 again; APPROVAL_REQUEST queue 8. **Notable: PR #228 "feat(medic): scaffold alert-operator (PR1 escalate-only)" MERGED. PR #229 "fix/alert-translations-6-missing" MERGED (between iter 305 and 306). Medic workstream PR1 complete.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1096 lines** (watermark unchanged from iter 305). **0 new alerts.** ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark 1096 (unchanged from iter 305). Last entries at idxs 1094–1096 are the same Tier 2 OAuth carry-forward alerts from 04:27Z (already triaged iter 305). No new healer escalations. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: `-- No entries --`. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. No agent distress keywords in beacon_telegram_bot.log. Recent log entries are TIER2_FALLBACK_ATTEMPT/UNAVAILABLE lines (22:38-22:39 MDT = carry-forward, already known). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** alert-cooldown/warning/: **314** (unchanged from iter 305). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged, carry-forward).** No new Larry directives. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — fresh tick.** `heal-stale-daemon-code.heartbeat`: **2026-06-01T04:38:49Z** — ~3 min old at check time (~04:41Z). Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=80928b7 "Pulse cycle 20260601T043919Z", branch=main, clean tree. Notable new commits since iter 305 (fd1663c): d71681d "Add translations for 6 pre-existing healer alerts" + 9749cdd "Merge pull request #229 from Larry-Yatch/fix/alert-translations-6-missing" + 80928b7 "Pulse cycle 20260601T043919Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC ERROR — SYNC-PUSH-REBASE-FALLBACK-001 (3rd confirmed occurrence).** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", commit=18a2a5a4, last_sync=2026-06-01T04:39:20Z. **This is the 3rd confirmed in-production occurrence** (iter 117 first, iter 305 second, now iter 306). APPROVAL_REQUEST `sync-push-rebase-fallback-001` pending Larry — urgency elevated. Local tree is clean (rollback confirmed). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** `systemctl is-active`: ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. cycle.timer SubState=running (automated cycle executing — NextElapseUSecMonotonic=infinity while SubState=running is EXPECTED per post-PR #225 behavior). ✅
+
+- **(Check D / E) Inboxes + PRs: ✅ Nominal — PR #228 MERGED.** Forge inbox: 0 tasks. Beacon inbox: 0 tasks. Mirror inbox: 0 tasks (review-medic-operator-scaffold-001 archived — Mirror completed its review between iters 305 and 306). `gh pr list`: **PR #228 state=MERGED** ("feat(medic): scaffold alert-operator (PR1 escalate-only)"). Medic workstream PR1 complete. 0 open PRs. ✅
+
+- **(Check A addendum — new merges since iter 305):**
+  - d71681d + PR #229 "fix/alert-translations-6-missing": added translations for 6 pre-existing healer alerts. Relevant to config/alert-translations.json (Tier 3 known-pattern allowlist for Check 0). ✅
+  - PR #228 "feat(medic): scaffold alert-operator (PR1 escalate-only)": MERGED. Medic alert-operator scaffold complete (PR1 of workstream). Mirror reviewed and approved. Build cost from iter 305: ~$0.41. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired in iter 266. Check III last ran 2026-05-31; next run 2026-06-14. All idempotency guards active. ✅
+
+- **G-rule watch items (unchanged):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Forge:** 0 open PRs. Last merged: PR #228 "feat(medic): scaffold alert-operator (PR1 escalate-only)". Forge inbox: 0 tasks (awaiting next dispatch from Beacon). ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations + periodic check gates (all gated by Monday/14d idempotency, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → `{"ts": "2026-06-01T04:41:51Z", "tier": 1, "kind": "intervention"}` appended.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:41:52Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. SYNC-PUSH-REBASE-FALLBACK-001 is 3rd confirmed occurrence — carry-forward APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open; urgency elevated but no new dispatch (existing APPROVAL_REQUEST covers it).
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001: 3rd confirmed in-production occurrence** (04:39:20Z). Pattern: iter 117 (first), iter 305 (second), iter 306 (third). The APPROVAL_REQUEST for defensive hardening of sync_agent_core.sh:161 is increasingly load-bearing. Consider flagging to Larry as [yellow] given 3-occurrence threshold.
+- **Medic workstream PR1 COMPLETE.** PR #228 merged; Mirror reviewed between iters 305 and 306. Forge inbox cleared. System ready for Medic PR2 when Beacon dispatches.
+- **PR #229 alert-translations fix.** 6 healer alert translations added to config/alert-translations.json. May reduce Tier 4 novel-alert firing rate in future cycles (more patterns covered by Tier 3 allowlist).
+- Alert-cooldown total 314 (unchanged), pipeline-stall prefix 38 (unchanged). Root cause: Tier 2 OAuth expiry unchanged.
+- Healer heartbeat: 04:38:49Z (~3 min old; within threshold). ✅
+- cycle.timer SubState=running — automated cycle active. ✅
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 now at 3 confirmed occurrences. G-rule discipline: if this fires again it warrants a [yellow] DM to Larry referencing the pending APPROVAL_REQUEST. PR #229 adds alert translations — good signal that the healer alert-translation coverage is being actively maintained.
+
+---
+
 ## Iteration 305 — 2026-06-01 04:37 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. **Notable: PRs #226 + #227 merged (stuck-timer fixes); PR #228 opened (medic-operator-scaffold-001 build complete, Mirror reviewing); Sync error at 04:31Z (SYNC-PUSH-REBASE-FALLBACK-001 confirmed again).**
