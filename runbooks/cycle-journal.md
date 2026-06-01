@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 346 — 2026-06-01 08:44 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 13th run completed (~08:36–08:38Z UTC, ~11–13 min — normal profile); 5 diagnostic alerts produced (classified below). Medic 14th run started (PID 2869597, `activating` at check). Healer heartbeat: 08:39:16Z UTC (~5 min old at check; fresh). Sync: 08:06:18Z UTC (~38 min old; within 2h threshold). Source repo: HEAD=1a99a2d "Pulse cycle 20260601T083756Z", branch=main, clean.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1107 lines** (was 1102 at iter 345, +5 new). Watermark advances to 1107.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 5 new Medic diagnostic alerts (1 Tier 2 guarded, 4 Tier 3-equivalent resolved/carry-forward).**
+  - **idx=1102** (`source: medic`, `intent: medic-diagnosis`) — `bots:pulse:down` (Medic 13th batch, 17 instances). Medic confirms: ourliberty-pulse-bot ACTIVE since 2026-05-30T18:05 MDT (35+ hrs). Stale May 29 window alert, fully resolved. **Classification: Tier 3-equivalent (resolved; confirmed active in Check C this iter). Journal note only.**
+  - **idx=1103** (`source: medic`, `intent: medic-diagnosis`) — `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` (4 instances, escalation attempt 5). Medic: backlog self-cleared; root cause = Tier 2 OAuth expired. Same as carry-forward APPROVAL_REQUEST queue item #6. **Classification: Tier 3-equivalent (known carry-forward). Journal note only.**
+  - **idx=1104** (`source: medic`, `intent: medic-diagnosis`) — `pipeline-stall:tier2-fallback-skipped-rate_limit:forge` (3 instances, escalation attempt 2). Same diagnosis — Tier 2 OAuth expired (confirmed probe 2026-05-31T02:37Z: expiresAt=2026-05-30T10:52Z). Side note: `tier2-verifier-probe-001` appearing as FORGE_NO_PR_SKIP in pipeline-stall log since 2026-05-31T20:40Z — possible task lifecycle issue, suggest review/close. **Classification: Tier 3-equivalent (known carry-forward). Journal note only.**
+  - **idx=1105** (`source: medic`, `kind: approval_request`, `approval_id: medic-tier2auth401-beaconbot-20260529T045737Z`) — Tier 2 OAuth credential rotation request. Medic confirms: both beacon-bot and forge auth_401 failures; fix requires interactive re-auth at keyboard; runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. **Classification: Tier 2 (guarded — credential rotation). DM sent to Larry via larry_alerts.py. Not auto-dispatching. Tier-reset.**
+  - **idx=1106** (`source: medic`, `intent: medic-diagnosis`) — `pipeline-stall:mirror-pass-unmerged:PR#183` (first escalation). Medic diagnoses: PR #183 MERGED 2026-05-29T14:23:57Z (~8h after alert fired). Alert trigger was Mirror PASS without auto-merge for 367+ min. **Classification: Tier 3-equivalent (stale resolved). Journal note only. G-rule note: 367 min anomaly is same class as `heal-pipeline-stall "369 min" bug` G-rule (1/3 iter 128) — but historical data point from Medic, not a fresh occurrence; G-rule counter unchanged.**
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives since iter 345. Last Larry directive: 2026-05-31T13:44:07Z UTC (carry-forward). No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** `~/agents/state/alert-cooldown/warning/`: **316** (unchanged). heal-pipeline-stall prefix: **38** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Beacon inbox: 0. Forge inbox: 0. 0 open PRs. APPROVAL_REQUEST queue 8 carry-forward (+Medic approval_request medic-tier2auth401-beaconbot = same underlying issue). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal — FRESH.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T08:39:16Z UTC — ~5 min old at check. Within 90-min threshold. Next expected ~09:09Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=1a99a2d "Pulse cycle 20260601T083756Z", branch=main, clean. Automated cycle cadence confirmed. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T08:06:18Z — ~38 min old at check. Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active + Medic 14th run starting.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `activating` (14th run, PID 2869597, just started at ~08:38Z UTC). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Beacon inbox: 0. Forge inbox: 0. 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ℹ️ Medic 14th run just started (activating).** PID 2869597. Expected duration ~10–12 min per prior profile. Consistent with timer cadence *:00/3:00. ℹ️
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. check-i-2026-06-01.json sentinel present. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged except G-rule note above):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 (unchanged)
+  - `inbox-watcher rc=-1`: 2/3 (unchanged)
+  - `heal-pipeline-stall "369 min" bug`: 1/3 (unchanged; PR #183 historical data point same class but not a fresh occurrence)
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 (unchanged)
+  - MalformedForgeMarker doc-fix: APPROVAL_REQUEST pending
+  - F24 empty-prompt APPROVAL_REQUEST #8: pending
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. **Check 0 — Classified 5 Medic alerts** (1 Tier 2 DM sent, 4 Tier 3-equivalent journal-note-only).
+3. Sent [yellow] DM to Larry via `larry_alerts.py append_alert` for Medic approval_request idx=1105 (medic-tier2auth401-beaconbot-20260529T045737Z). Suggested action: run Tier 2 runbook + close tier2-verifier-probe-001 dispatch.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T08:43:57Z.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T08:44:01Z UTC.
+6. Wrote journal entry.
+
+**Escalated:** [yellow] Medic approval_request `medic-tier2auth401-beaconbot-20260529T045737Z` — Tier 2 OAuth credential restore required (interactive keyboard). DM sent via larry_alerts. All other carry-forward escalations unchanged.
+
+**Patterns:**
+- Medic 13th run (PID 2867203, ~11–13 min) produced a diagnostic batch for stale backlog alerts. 4 of 5 alerts were resolved/carry-forward with no new action required. 1 was a formal approval_request for the Tier 2 credential restore — the first Medic-issued approval_request artifact for this issue (prior escalations were via APPROVAL_REQUEST queue item #6).
+- Medic 14th run started immediately after 13th run completed. Timer cadence *:00/3:00 nominal.
+- Pipeline stall depth: 316/38 stable for 41+ consecutive iters. Cooldown-slot saturation risk carries.
+- Healer heartbeat: fresh (08:39:16Z, ~5 min old). Sync: nominal (~38 min old, within 2h).
+- Alert watermark advance: +5 lines in one batch (Medic's 13th run). This is normal Medic batching behavior — not a flood pattern (5 alerts in ~80 seconds; flood threshold is ≥5 in 60 sec).
+
+**Learned:** Medic is now generating formal `approval_request` kind alerts, not just `notification` kind. The `approval_request` from Medic (idx=1105) is the first such artifact from Medic for the Tier 2 OAuth issue. Check 0 classification: Tier 2 (guarded credential) → DM Larry. The `medic` source is not yet in `config/alert-translations.json` — all Medic alerts fall through to manual Check 0 judgment. Consider adding `medic` entries to the allowlist once Medic's steady-state alert shapes are known (after ~10 more runs). G-rule proposal deferred — insufficient data (single batch from a new source).
+
+---
+
 ## Iteration 345 — 2026-06-01 08:36 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic-dispatcher **13th run** still in progress (PID 2867203, started 08:25:05Z UTC, ~11 min elapsed at check; CPU 43.325s ≈ 3.9 CPU-s/min — converging from startup spike, within normal profile). Healer heartbeat: 08:09:16Z UTC (~27 min old; within 90-min threshold). Sync: 08:06:18Z UTC (~30 min old). Source repo: HEAD=f04c3bc "Pulse cycle 20260601T083259Z", clean.
