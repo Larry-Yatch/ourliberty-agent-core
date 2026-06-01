@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 353 — 2026-06-01 09:22 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 16th run **COMPLETED** (~09:19:44Z UTC — duration ~17.6 min, slightly over expected 11–13 min but within tolerance; converging CPU profile per iter 352). Medic 17th run started 09:19:44Z UTC (PID 2875923, timer *:00/3:00). Healer heartbeat: 09:09:16Z UTC (~13 min old at check; within 90-min threshold). Sync: 09:06:18Z UTC (~16 min old; very fresh). Source repo: HEAD=2986d48 "Pulse cycle 20260601T091735Z", branch=main, clean.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1108 lines** (unchanged from iters 347–352). Watermark stable at 1108. No new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1108. Last delivery: idx=1107 at 08:46:55Z UTC (Pulse iter 346 escalation DM). alert-triage.json: missing (INFO; known, no functional impact). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning`: no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1107 at 08:46:55Z UTC (unchanged from iters 347–352 — Pulse iter 346 escalation DM). No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, unchanged).** `~/agents/state/alert-cooldown/warning/`: **317** (unchanged from iters 347–352). heal-pipeline-stall prefix: **38** (unchanged, stable 47+ consecutive iters). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Beacon inbox: 0. Forge inbox: 0. 0 open PRs. APPROVAL_REQUEST queue 8 carry-forward. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal — WITHIN THRESHOLD.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T09:09:16Z UTC — ~13 min old at check. Well within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=2986d48 "Pulse cycle 20260601T091735Z", branch=main, clean. One automated cycle committed since iter 352 (ef2b0fd → 2986d48 at ~09:17:35Z UTC). run_cycle.sh on schedule. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-01T09:06:18Z UTC — ~16 min old at check. Very fresh; well within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active + Medic 17th run just started.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `activating` (17th run, PID 2875923, started 09:19:44Z UTC — just started; 16th run confirmed completed). ourliberty-medic-dispatcher.timer: `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** Beacon inbox: 0. Forge inbox: 0. 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ℹ️ Medic 16th run completed ~09:19:44Z — duration ~17.6 min (above 11–13 min expected; within iter 352 tolerance assessment; CPU was converging at last check). 17th run just started.** ℹ️
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d); outside 60d window. ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) already fired at iter 266. check-i-2026-06-01.json sentinel present. Check III next run 2026-06-14. All idempotency guards active. Skip. ✅
+
+- **G-rule watch items (unchanged from iter 352):** `heal-pr-auto-merge blind to CONFLICTING` 2/3; `inbox-watcher rc=-1` 2/3; `heal-pipeline-stall "369 min" bug` 1/3; `daemon-reload triggers cycle.timer stuck` 1/3; MalformedForgeMarker doc-fix APPROVAL_REQUEST pending; F24 empty-prompt APPROVAL_REQUEST #8 pending.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T09:22:02Z.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T09:22:03Z UTC.
+5. Wrote journal entry.
+
+**Escalated:** None new. All carry-forward.
+
+**Patterns:**
+- Medic 16th run confirmed completed at ~09:19:44Z (duration ~17.6 min). CPU convergence observed across iters 350→352 (6.7 → 5.1 → 4.0 CPU-s/min) consistent with normal run completing slightly over median. No concern. 17th run just started.
+- Healer heartbeat: 09:09:16Z UTC (~13 min old; within threshold). Next expected ~09:39Z UTC.
+- Sync: 09:06:18Z (~16 min old; within threshold). Next expected ~10:06–10:30Z.
+- Automated cycle cadence nominal: 2986d48 at ~09:17:35Z confirms one new commit since iter 352. run_cycle.sh on schedule.
+- Cooldown files: 317 (unchanged). Pipeline-stall prefix: 38 (stable 47+ consecutive iters). Tier 2 OAuth stall depth holding flat.
+
+**Learned:** Medic 16th run final duration confirmed ~17.6 min (longer than prior 11–13 min median). P90 for Medic run duration may be drifting up — worth tracking. If 17th run also exceeds 15 min, that's a new data point suggesting regime change in Medic run times. Watch for Check III 2026-06-14.
+
+---
+
 ## Iteration 352 — 2026-06-01 09:16 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); APPROVAL_REQUEST queue 8. Medic 16th run in progress (PID 2873235, started 09:02:08Z UTC, ~14 min elapsed at check — slightly over expected 11–13 min window; CPU 55.770s ≈ 4.0 CPU-s/min — converging from startup spike, within tolerance). Healer heartbeat: 09:09:16Z UTC (~7 min old at check; fresh). Sync: 09:06:18Z UTC (~10 min old; very fresh). Source repo: HEAD=ef2b0fd "Pulse cycle 20260601T091332Z", branch=main, clean.
