@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 441 — 2026-06-01 23:26 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (unchanged — 0 new alerts since iter 440). Sync: **fresh** — status=no-change, last_sync=2026-06-01T23:22:26Z (~4 min old at check time). Source repo: branch=main, clean, HEAD=df4f089. 7/7 core services active. Forge inbox: **0** (cleared). Beacon inbox: **0** (cleared). **PR #235 OPEN** (~12 min old, MERGEABLE, Mirror review pending). **PR #236 MERGED** ✅ (check-x-brief). Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~13 min old; FRESH).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1125 lines** (same as iter 440 watermark). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1125. alert-triage.json missing on disk (INFO; no functional impact — known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session, chat_id=7998341473). No new directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, slowly decreasing).** alert-cooldown/warning/: **305** total (was 309 at iter 440 — 4 expired). Heal-pipeline-stall keyed files: **31** (was 36 — 5 expired). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ PR #235 open + PR #236 newly observed merged.**
+  Forge inbox: **0** (cleared — Forge picked up `build-medic-reversible-handlers-001.json` from iter 440 dispatch). Beacon inbox: **0** (cleared — Beacon picked up `alert-translations-tier2-skipped-subjects-001.json` from iter 440 dispatch).
+  **PR #235 OPEN** — "feat(medic): PR2 reversible act-then-notify (restart-daemon + retrigger-inbox)" — MERGEABLE (was UNKNOWN at iter 440), reviewDecision="" (Mirror review not started), 12 min old — below 30 min auto-merge gate. Not stale. Watch.
+  **PR #236 MERGED** ✅ — "Add Check X brief: chain-quality regression watch" (commits 1fc4815 + f0788e3, merged at ~23:22Z). Added `docs/check-x-chain-quality-regression-brief.md` (Forge build brief for new Check X). Authored by Larry + Claude Opus 4.8. Commit note states "Dispatched to Forge." Not observed in iter 440 — merged between iter 440's `gh pr list` call and the run_cycle.sh auto-commit (~2-min window). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **2026-06-01T23:13:19Z UTC** — ~13 min old at 23:26Z. FRESH — well within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. HEAD=df4f089 (Pulse cycle 20260601T232404Z). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Fresh.** `agent-core-sync.json`: `status=no-change`, `last_sync=2026-06-01T23:22:26Z` (~4 min old at check time; well below 2h threshold). No last_error. SYNC-PUSH-REBASE-FALLBACK-001: no new recurrence since iter 440 escalation. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #235 open.** Forge inbox: **0**. Beacon inbox: **0**. PR #235: MERGEABLE, no Mirror review yet, 12 min old. Auto-merge gate: < 30 min — skip. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge active (picked up build task). No runaway process detected. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d, outside 60d window). CLAUDE_MAX_OAUTH stale/expired (carry-forward — active Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **65th iter in series (377–441)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (PR #235 <30 min old; inboxes cleared by agents; sync fresh).
+3. Check 0: 0 new alerts (watermark stable at 1125; nothing to triage).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T23:26:55Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T23:26:56Z. ✅
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST pending (re-elevated iter 440).
+
+**Patterns:**
+- Cooldown files continuing slow decrease: 305 total (was 309 iter 440), 31 pipeline-stall (was 36). Root cause active but stall depth decreasing via natural expiry.
+- PR #236 (check-x-brief) merged by Larry at ~23:22Z — brief for Check X (chain-quality regression watch) added to repo. Brief reportedly dispatched to Forge. No Forge inbox task visible yet (may arrive via outbox-notifier after Forge's current build finishes).
+- PR #235 now MERGEABLE (was UNKNOWN iter 440). Forge build for PR #235 is active. Mirror review pending. Watch for auto-merge gate at > 30 min.
+- Both Forge and Beacon inboxes cleared — iter 440 dispatches picked up by agents.
+- 65th consecutive iter in steady-state degraded hold with 0 new G-rule advances.
+
+**Learned:** PR #236 slipped past iter 440's Check E because it merged between the `gh pr list` check and the run_cycle.sh auto-commit (~2-min window). This is structural (same mechanism as SYNC-PUSH-REBASE-FALLBACK-001 push race — there's a latency gap between check time and commit time). 1st observation of this slip pattern — not a G-rule yet. Watch at 3/3: if it recurs twice more, propose adding a "recheck open PRs at end-of-cycle, before journal write" step to cycle-prompt.md.
+
+---
+
 ## Iteration 440 — 2026-06-01 23:17 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1125** (new: 3 alerts at 23:14Z + 1 Pulse escalation at 23:17Z). Sync: **⚠️ ERROR** — "Auto-commit push failed; rolled back" at 23:13:29Z (SYNC-PUSH-REBASE-FALLBACK-001 RECURRED — first recurrence since self-clear at iter 378). Repo state clean (gitStatus confirmed). PR #234: **MERGED** ✅. PR #235 OPEN (Forge Medic PR2, awaiting Mirror review). Forge inbox: 1 (`build-medic-reversible-handlers-001.json` — active build phase). Healer heartbeat: **2026-06-01T23:13:19Z UTC** (~4 min old at check time; FRESH).
