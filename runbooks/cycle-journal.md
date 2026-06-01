@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 266 — 2026-06-01 00:10 UTC (interactive, Monday gate)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks. **New: Check IX FATAL on first firing (dashboard API port 8001 connection refused).**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1090 lines** (was 1088; +2 new: idx=1088 Ledger weekly DM `weekly-2026-06-01`, idx=1089 Check I DM `check-i-2026-06-01`). Both are self-generated periodic check outputs, not healer escalations. New watermark: **1090**. ✅ Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 2 new self-generated alerts.** idx=1088: Ledger weekly (source=ledger, $1,611.38, +540.7% vs prior week). idx=1089: Check I DM (source=pulse, 1 proposal). Both queued by periodic checks just fired this iter. Not healer escalations; no dispatch needed. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --since 30min --priority warning`: **NO entries**. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last Larry message: `'Go'` at 07:44:07-0600 (13:44Z UTC May 31; unchanged). Last delivery: Monday DM idx=1087 at 23:16:36Z UTC (iter 259). No new directives. No agent distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, no change).** Alert-cooldown/warning/ total: **310** (unchanged). heal-pipeline-stall prefix: **38** (unchanged). deploy-notifier prefix: **106** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. No new stalls. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ APPROVAL_REQUEST queue 8 (unchanged).** No new Larry directives since 13:44Z UTC May 31. cycle.timer still stuck. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal — same tick as iters 263–265.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-05-31T23:38:19Z UTC** — same tick; ~32 min old at check time (00:10Z). Within 90-min threshold. Healer alive. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=1857196 "Pulse cycle 20260531T235817Z" (wrapper auto-commit of iter 265), branch=main, clean tree. ✅
+
+- **(Check B) Sync health: ✅ Nominal — FRESH SYNC.** `agent-core-sync.json`: last_sync=2026-06-01T00:06:02Z, status=no-change, commit=185719655464d32a011c39639331dced71ea7332 (matches session-start HEAD). Sync ran on schedule (~00:06Z UTC). ✅
+
+- **(Check C) Agent liveness: ✅ 6/6 non-timer active; ⚠️ cycle.timer STUCK (carry-forward).** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier — all `active`. ourliberty-cycle.timer: NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity — still stuck. G-rule **2/3** (no new occurrence). ⚠️ (known)
+
+- **(Check D / E) Inboxes + PRs: ✅ All empty / 0 open.** All agent inboxes (beacon, forge, mirror, pulse): 0 active tasks. ourliberty-agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~82d); outside 60d window. All others due 2027. ✅
+
+- **Deploy-notifier cooldown file count: 106** (unchanged). Alert-cooldown/warning/ total 310 (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **Check I (Monday 2026-06-01, FIRED — NEW WEEK SIDECAR):** Fired. Ledger sidecar refreshed via `run_ledger.sh`. **Ledger total: $1,611.38 (+540.7% vs May 25 week's $251.49).** No σ anomalies. Retry overhead 0.4% ($5.82). High-repeat: `smoke-5a-pf-no-marker` ×3. Mode: digest. 1 proposal: `[medium]` Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 retries on Forge this week; templating would collapse retry cycles. DM queued (idx=1089). Auto-dispatched: 0 (effort=medium above auto-dispatch threshold). Artifact: `pulse-check-i/check-i-2026-06-01.json`. **Note: spend increase (+540.7%) is a material signal — Ledger DM (idx=1088) already notified Larry. `smoke-5a-pf-no-marker` does not match fixture-pattern allowlist; not suppressed.** ⚠️ notable
+
+- **Check VIII (Monday 2026-06-01, FIRST FIRING):** rule=`insufficient_signal`. precision=0.5, recall=0.004 (very low recall — 247 FN vs 1 TP). Artifact written at `pulse-check-viii-proposals/check-viii-2026-06-01.json`. No DM (insufficient_signal rule → no DM per spec). Very low recall suggests the burn-rate alarm fires much less often than real quota events occur — likely under-alerting. Will improve as 4w data window fills. ✅ (no action required; monitoring)
+
+- **Check IX (Monday 2026-06-01, FIRST FIRING — FATAL):** Exit 1 — `RuntimeError: http GET http://127.0.0.1:8001/api/system/missions failed: [Errno 111] Connection refused`. Dashboard API at port 8001 is not running. Check IX could not run. Sentinel `check-ix-<2026-06-01>.json` was NOT written (script fataled before writing). **New finding — first occurrence.** ⚠️ ask-then-do
+
+- **G-rule watch items:** cycle.timer stuck: G-rule **2/3** (no new occurrence). All others stable: heal-pr-auto-merge blind to CONFLICTING (2/3), heal-pipeline-stall "369 min" bug (1/3), inbox-watcher rc=-1 (2/3). MalformedForgeMarker post-dispatch (doc-fix pending). F24 empty-prompt APPROVAL_REQUEST #8 pending. ✅
+
+**Forge:** 0 open PRs. Last merged: PR #223 "feat(healer): auto-remediate install-drift missing-install case" at 2026-05-31T17:18:51Z. ✅
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–E) + credential rotations.
+2. Ran Monday periodic checks: Check I (fired), Check VIII (insufficient_signal), Check IX (FATAL — dashboard API down).
+3. No always-allowed auto-fixes triggered.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 266` → `{"ts": "2026-06-01T00:10:46.556680+00:00", "iter": 266, "tier": 1, "kind": "intervention"}` appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:10:47Z UTC.
+6. Wrote journal entry.
+
+**Escalated:**
+- New: Check IX FATAL (dashboard API connection refused port 8001). Written to pulse-escalations.json. No separate DM — Ledger DM (idx=1088) and Check I DM (idx=1089) already queued for delivery.
+- Carry-forward: Tier 2 OAuth expired, cycle.timer stuck, APPROVAL_REQUEST queue 8.
+
+**Patterns:**
+- System stable-degraded at Tier 1. No new healer alerts this iter.
+- **Week-over-week spend jump to $1,611.38 (+540.7%)** — material. Ledger DM out. No σ anomalies per Ledger analysis; likely reflects higher interactive-cycle volume across the week (265+ iterations, each burning Opus/Sonnet).
+- Check IX FATAL on first firing: dashboard API not reachable. May be a new service requirement or configuration gap.
+- Check VIII: 0.4% recall — burn-rate alarm is very underactive relative to quota events. No action yet; will improve as data window fills.
+- cycle.timer G-rule: 2/3. One more occurrence → dispatch to Beacon for permanent fix proposal.
+- Healer heartbeat same tick as iters 263–265 (23:38:19Z UTC; ~32 min old at check time; still within threshold).
+
+**Learned:** First Monday June 1 cycle. Check IX fails on first fire (port 8001 not listening). Check VIII insufficient_signal as expected (first-data-month limitation documented in spec). Ledger spend shows +540.7% — likely reflects volume of interactive cycles over the week, not a runaway individual cost.
+
+---
+
 ## Iteration 265 — 2026-05-31 23:56 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Carry-forward: active pipeline stalls (Tier 2 OAuth expired); ourliberty-cycle.timer STUCK. 6/6 non-timer services active. 0 open PRs. 0 active inbox tasks.
@@ -12875,6 +12941,15 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 
 - Ledger total: $251.49; 0 anomaly(ies)
 - Retry overhead: $5.50 (2.2%)
+- High-repeat tasks: `smoke-5a-pf-no-marker`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+**Check I (2026-06-01):**
+
+- Ledger total: $1611.38; 0 anomaly(ies)
+- Retry overhead: $5.82 (0.4%)
 - High-repeat tasks: `smoke-5a-pf-no-marker`×3
 - Mode: digest — 1 proposal(s):
   1. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
