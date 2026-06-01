@@ -53,6 +53,18 @@
       "tier": "NOW",
       "plain_language_summary": "Tier 1 OAuth hit a 401 (expired refresh token) AND the Tier 2 fallback directory at /home/larry/.claude-larry-personal is missing or unprovisioned. The chain is stuck — no working account to retry against.",
       "recommended_action": "Run `python3 scripts/auth_orchestrator.py` to re-authenticate Tier 1, OR `python3 scripts/auth_orchestrator_tier2.py` to provision Tier 2. Full recovery steps: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+    },
+    "pipeline-stall:tier2-fallback-skipped-rate_limit": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Tier 1 hit a rate-limit and the Tier 2 fallback was SKIPPED (short-circuited, not attempted) because Tier 2 OAuth is known-expired or unprovisioned. Same underlying state as tier2-fallback-failed-rate_limit, surfaced before the HOME-swap rather than after a failed attempt. Informational: the task waits for Tier 1s rolling-5h window to reset on its own.",
+      "recommended_action": "None required for the immediate stall — Tier 1 auto-recovers when its rolling-5h reset window cycles. To restore the Tier 2 safety net for next time, re-auth per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. Runbook: runbooks/heal-pipeline-stall.md."
+    },
+    "pipeline-stall:tier2-fallback-skipped-auth_401": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Tier 1 OAuth hit a 401 (expired refresh token) and the Tier 2 fallback was SKIPPED (short-circuited, not attempted) because the Tier 2 directory is missing or unprovisioned. Same root cause as tier2-fallback-unavailable-auth_401, surfaced as a pre-attempt skip rather than an unavailable-after-attempt. Informational; the chain pauses on this task until an account is re-authed.",
+      "recommended_action": "Re-auth Tier 1 via python3 scripts/auth_orchestrator.py, or provision Tier 2 via python3 scripts/auth_orchestrator_tier2.py. Full recovery steps: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
     }
   },
   "heal-systemd-install-drift": {
