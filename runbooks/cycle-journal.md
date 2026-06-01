@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 397 — 2026-06-01 18:03 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1121** (was 1119 — 2 new alerts at 18:00Z UTC). Sync: **stable** — status=no-change, last_sync=2026-06-01T17:07:21Z (~56 min old at check; within 2h threshold). Source repo: HEAD=e2051d8 "Pulse cycle 20260601T175347Z", branch=main, clean. 7/7 core services active. Forge inbox: 0. Beacon inbox: 0. 0 open PRs. Healer heartbeat: **2026-06-01T17:42:11Z UTC** (~21 min old at check ~18:03Z; within 90-min threshold; due ~18:12Z UTC).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1121 lines** (up from 1119 at iter 396 — 2 new alerts). New alerts at lines 1120–1121.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts — both Tier 3 (FYI, auto-healed).** 
+  - Alert 1120: `heal-systemd-install-drift` → stuck timer `ourliberty-build-sequence-advancer.timer` at 18:00:02Z. Recovery: daemon-reload + restart. Next fire: Mon 2026-06-01 12:05:00 MDT. 
+  - Alert 1121: `heal-systemd-install-drift` → stuck timer `ourliberty-heal-systemd-install-drift.timer` at 18:00:05Z. Recovery: daemon-reload + restart. Next fire: Tue 2026-06-02 00:00:00 MDT.
+  - Classification: `stuck-timer` sub-pattern in alert-translations.json → `severity: INFO`, `tier: FYI`. Both timers verified post-heal: `NextElapseUSecRealtime` populated, `NextElapseUSecMonotonic=0`. ✅ No DM; journal only. New watermark: **1121**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: `{7998341473: session_id}` — Larry's session present. Alert watermark unchanged beyond 2 FYI healer events. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, stable).** `~/agents/state/alert-cooldown/warning/`: **318** total (unchanged from iter 396). Heal-pipeline-stall keyed files: **37** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** APPROVAL_REQUEST queue: 8 (unchanged). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **2026-06-01T17:42:11Z UTC** — ~21 min old at check ~18:03Z. Within 90-min threshold; due ~18:12Z UTC. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=e2051d8 "Pulse cycle 20260601T175347Z", branch=main, clean. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Stable.** `agent-core-sync.json`: `status=no-change`, `last_sync=2026-06-01T17:07:21Z` (~56 min old at check; well below 2h threshold), no last_error. SYNC-PUSH-REBASE-FALLBACK-001: no recurrence since 11:55:54Z (iter 376). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open as defensive hardening. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ All clear.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No active Forge build. No cost alarm. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d, outside 60d window). CLAUDE_MAX_OAUTH stale/expired (active Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items:**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 — no change.
+  - `MalformedForgeMarker`: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending — no change.
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+  - **NEW: `remaining-timers-infinity-trap`: 1/3.** `ourliberty-build-sequence-advancer.timer` + `ourliberty-heal-systemd-install-drift.timer` both hit the infinity trap (OnUnitActiveSec losing monotonic anchor) at 18:00Z UTC. These were not immunized by PR #227 (which immunized 3 timers). Healer auto-healed both. alert-translations.json `stuck-timer` FYI classification confirms known pattern. At 3/3: dispatch to Beacon — "enumerate all remaining OnUnitActiveSec timers in systemd/ and convert to OnCalendar per the PR #225/#227 pattern."
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Check 0: 2 new alerts (1120–1121) triaged Tier 3 (FYI). Both verified healed. Watermark updated to 1121.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T18:03:14.650959Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T18:03:15.941457Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 DM already sent at iter 376 (idx=1117+1118); no re-DM (no recurrence through iter 397).
+
+**Patterns:**
+- 21st consecutive iter (377–397) with 0 new escalations, 0 new G-rule advances (existing items). One NEW G-rule item at 1/3: `remaining-timers-infinity-trap`.
+- Two stuck-timer events at 18:00Z — same root cause (OnUnitActiveSec timers not yet converted to OnCalendar). Healer covered them cleanly.
+- Cooldown files: 318 (stable). Pipeline-stall prefix: 37 (stable). Tier 2 OAuth stall active since May 30; no change in depth.
+- Sync stable. SYNC-PUSH-REBASE-FALLBACK-001 holding clear (21 consecutive clean since iter 376).
+- Healer cadence healthy: heartbeat at 17:42:11Z (~21 min old at check). Next due ~18:12Z UTC.
+
+**Learned:** `ourliberty-build-sequence-advancer.timer` and `ourliberty-heal-systemd-install-drift.timer` are not yet converted to OnCalendar. Both susceptible to the infinity trap. PR #227 immunized 3 timers but these were not among them. Tracking as G-rule 1/3 `remaining-timers-infinity-trap` — at 3/3 will dispatch to Beacon for a sweep-and-convert PR.
+
+---
+
 ## Iteration 396 — 2026-06-01 17:52 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1119** (unchanged — 0 new alerts since iter 395). Sync: **stable** — status=no-change, last_sync=2026-06-01T17:07:21Z (~45 min old at check; within 2h threshold), no last_error. Source repo: HEAD=ccf87ee "Pulse cycle 20260601T174920Z", branch=main, clean. 7/7 core services active. Forge inbox: 0. Beacon inbox: 0. 0 open PRs. Healer heartbeat: **2026-06-01T17:42:11Z UTC** (~10 min old at check ~17:52Z; within 90-min threshold; due ~18:12Z UTC).
