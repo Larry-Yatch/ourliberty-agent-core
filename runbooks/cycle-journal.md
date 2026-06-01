@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 376 — 2026-06-01 12:00 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1119** (+5 since iter 375 watermark 1114: idx=1114-1116 pipeline-stall tier2 [Tier 3 silence], idx=1117 Mirror PASS PR #232 [Tier 3 silence], idx=1118 Pulse sync DM [self-generated]). Sync: **error** at 11:55:54Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 **6th occurrence** (commit 071347295c rolled back). Rate accelerating: 3 failures in 18 minutes (11:37, 11:48, 11:55). Source repo: HEAD=2001163 "Pulse cycle 20260601T115515Z", branch=main, clean (session-start). 7/7 core services active. **PR #232 MERGED** (~11:56:33Z UTC — rotation-gate-dm-isolation-001, Mirror auto-merged). Forge inbox: 0. Beacon inbox: 0 (rotation-gate notification processed at 11:55:54Z). [yellow] DM sent to Larry (idx=1117) for 6th occurrence per iter 375 note.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1119 lines** (+5 since iter 375 watermark 1114). New alerts triaged:
+- idx=1114: `pipeline-stall:tier2-fallback-skipped-rate_limit:forge` — **Tier 3 silence** (known pattern: Tier 2 OAuth stall, same root cause escalated iter 374). ✅
+- idx=1115: `pipeline-stall:tier2-fallback-skipped-auth_401:forge` — **Tier 3 silence** (same). ✅
+- idx=1116: `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` — **Tier 3 silence** (same). ✅
+- idx=1117: source=outbox-notifier, Mirror PASS PR #232 rotation-gate-dm-isolation-001 auto-merged — **Tier 3 silence** (known-pattern: successful merge notification). ✅
+- idx=1118: Pulse self-generated [yellow] DM (own escalation, skip). ✅
+Watermark updated: 1119.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 4 Tier-3 silences, 1 self-generated.** 3 pipeline-stall tier2 alerts (known pattern, Tier 2 OAuth stall, root cause unchanged). 1 Mirror PASS PR #232 (known-pattern merge notification). No new dispatches. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → No entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon processed `notify-rotation-gate-dm-isolation-001.json` at 11:55:54Z UTC (hit rate_limit → Tier 2 fallback used; auth_401 Tier 2 unavailable for that code path). No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress beyond known Tier 2 OAuth stall pattern. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, stable).** `~/agents/state/alert-cooldown/warning/`: **317** (unchanged from iter 375). Pipeline-stall prefix: **37** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal — rotation-gate COMPLETE.** No new Larry directives. Forge inbox: **0** (rotation-gate-dm-isolation-001 COMPLETE). Beacon inbox: **0** (notification processed). Open PRs: **0** (PR #232 auto-merged). APPROVAL_REQUEST queue: 8 (unchanged). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T11:40:05Z UTC — ~20 min old at check. Within 90-min threshold. Next expected ~12:10Z UTC. (State file missing per prior record; heartbeat is primary substrate per iter 142-143 calibration.) ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=2001163 "Pulse cycle 20260601T115515Z", branch=main, clean. Post-session-start sync rolled back 071347295c (push failed) — tree restored to clean. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 6th occurrence.** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `commit=071347295c`, `last_sync=2026-06-01T11:55:54Z`. Rate accelerating: 4th at 11:37Z, 5th at 11:48Z, 6th at 11:55Z — **3 failures in 18 minutes**. Iter 375 journal explicitly noted "If a 6th occurrence fires before Larry approves, consider re-DM." [yellow] DM sent (idx=1117, `sync-push-rebase-fallback-001:6th-occurrence-accelerating`). APPROVAL_REQUEST `sync-push-rebase-fallback-001` urgency now ELEVATED. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `inactive` (expected; timer active). ✅
+
+- **(Check E) Inboxes + PRs: ✅ All clear.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Beacon used Tier 2 fallback for rate_limit recovery on rotation-gate notification (~lightweight). No active Forge build. Medic inactive. ✅
+
+- **Credential rotations: ✅ Nominal.** VERCEL_TOKEN due 2027-05-19, GITHUB_GH_OAUTH_TOKEN due 2027-05-08 — well beyond 60d window. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d) — outside 60d window. CLAUDE_MAX_OAUTH confirmed stale/expired (active Tier 2 OAuth stall; APPROVAL_REQUEST pending). ✅ (no new DM trigger)
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266. All idempotency guards active. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items (unchanged):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 — no change. (PR #232 daemon-reload followup note: Mirror noted "useful daemon-reload followup note for the operator" in PR body; Forge was aware of the stale-daemon-healer gap. Watch for whether this manifests as a second G-rule occurrence.)
+  - `MalformedForgeMarker`: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending — no change (PR #232 marker was clean, no new exemplar).
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Notable events:**
+- **PR #232 MERGED** (~11:56:33Z UTC). `rotation-gate-dm-isolation-001` COMPLETE — systemic fix: `_dm_auth_blocked` short-circuits when `OURLIBERTY_ROTATE_ACTIVE_TIER_SERVICE!=true` (sentinel in [Service] block); `DmAuthBlockedServiceGateTest` added. Pre-existing 4 test failures unaffected (test_deploy_notifier, test_log_dir_resolution, test_outbox_notifier, test_sync_agent_core_pulse_runtime — tracked separately). Daemon-reload followup note in PR body (informational; relevant to stale-daemon G-rule watch).
+- **Sync 6th occurrence** (11:55:54Z UTC): fastest recurrence gap yet (7 min after 5th at 11:48Z). Pattern suggests the automated cycle cadence itself is triggering push conflicts every ~5-7 minutes. APPROVAL_REQUEST `sync-push-rebase-fallback-001` is the fix.
+- **Beacon rate-limited at 11:55:54Z UTC** (resets 11:30am local/17:30Z or 18:30Z UTC). Beacon used Tier 2 fallback for rate_limit. auth_401 Tier 2 path unavailable (Tier 2 OAuth stall). Beacon functional for lightweight tasks via Tier 2.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Check 0: silenced 4 Tier-3 alerts (idx=1114-1117) + 1 self-generated (idx=1118). Watermark advanced to 1119.
+4. [yellow] escalation sent: SYNC-PUSH-REBASE-FALLBACK-001 6th occurrence, accelerating — `larry_alerts.append_alert` → idx=1117; written to larry-alerts.jsonl. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T11:59:41Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T11:59:53Z UTC. ✅
+7. Updated MEMORY.md (PR #232 merged; sync 6th occurrence; watermark 1119; Forge idle; Beacon rate-limited/Tier2-fallback).
+8. Wrote journal entry.
+
+**Escalated:**
+- **[yellow] SYNC-PUSH-REBASE-FALLBACK-001 6th occurrence** (2026-06-01T11:55:54Z) — accelerating (3 in 18 min). DM idx=1117. Suggested action: approve `sync-push-rebase-fallback-001` ASAP.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: 6th occurrence. Acceleration pattern confirmed: gap between 5th→6th was 7 minutes (vs. multi-day gaps between earlier occurrences). Cycle cadence (every 5 min) appears to be generating push conflicts at every-other-cycle rate. Root cause hypothesis: each cycle commit lands locally but push fails due to diverged history with origin (possibly origin has newer commits that the local repo hasn't pulled). The fix (rebase fallback) would let the push succeed by first pulling + rebasing the local commit on top of origin. APPROVAL_REQUEST `sync-push-rebase-fallback-001` is urgent.
+- Pipeline stall cooldown: 317 (stable, no expiry/addition this iter). Tier 2 OAuth stall has been active since May 30. No change in stall depth.
+- PR #232 is the 2nd PR merged since iter 375 (PR #231 at iter 375, PR #232 this iter). Both Medic-hardening and rotation-gate fixes shipped. Forge output: 2 PRs in ~15 minutes of elapsed time.
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 acceleration confirms the push failure is cycle-correlated, not random. The automated cycle fires every 5 min; each cycle appends to journal and MEMORY.md; run_cycle.sh tries to commit+push; push fails because origin/main is ahead (origin was ahead after a prior push that wasn't reflected locally). The fix (rebase fallback on push failure) is well-understood — it's just pending Larry's approval gate. Beacon rate-limit (hitting limit, resets ~17-18Z UTC) means Beacon will be lightweight-task-only for several hours; no new Beacon dispatches expected until reset.
+
+---
+
 ## Iteration 375 — 2026-06-01 11:52 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1114** (+2 new: idx=1112 Pulse sync warning self-generated, idx=1113 PR #231 Mirror PASS + auto-merged). Sync: **error** at 11:48:28Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 **5th occurrence** (commit d47e3f3 rolled back). Source repo: HEAD=78683c4 "Pulse cycle 20260601T114814Z", branch=main, clean. 7/7 core services active. **PR #231 MERGED** (feat(medic): wire real rate-window gauge and per-session timeout; auto-merged ~11:46Z UTC). **Forge rotation-gate-dm-isolation-001 COMPLETED** at 11:50:55Z UTC ($1.0132; tier2 fallback used). Forge inbox now empty.
