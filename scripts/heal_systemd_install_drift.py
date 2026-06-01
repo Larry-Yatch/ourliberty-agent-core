@@ -624,9 +624,15 @@ def run_once(
             state['units'].pop(gone, None)
             counts['reconciled_gc'] += 1
 
-    # Stuck-timer pass — independent of the missing-install loop. Cooldown
-    # via the same _should_re_dm helper, but in a separate state bucket so
-    # the two surfaces don't collide on a unit name.
+    # Stuck-timer pass — independent of the missing-install loop. The
+    # _should_re_dm cooldown (separate `stuck_timers` state bucket) throttles
+    # only the NOTIFICATION, never the remediation: in enabled mode we restart
+    # a wedged timer on every detection. The daemon-reload+restart is
+    # idempotent and cheap, and a dead timer must not stay dead just because we
+    # already DM'd about it inside the RE_DM_WINDOW. (Prior bug: the cooldown
+    # gated the heal itself, so a timer still/again stuck on the next 12h tick
+    # was suppressed and left unhealed — the cadence and the window are both
+    # 12h, so this bit routinely.)
     stuck = detect_stuck_timers(installed_dir or INSTALLED_SYSTEMD_DIR)
     counts['stuck_timer'] = len(stuck)
     stuck_live = set()
@@ -635,11 +641,13 @@ def run_once(
         if not isinstance(unit, str):
             continue
         stuck_live.add(unit)
-        if not _should_re_dm(state, unit, now=now, bucket='stuck_timers'):
-            counts['dm_suppressed_dedup'] += 1
-            continue
 
         if dry_run:
+            # Dry-run never restarts, so the cooldown legitimately gates the
+            # advisory DM (its only side effect).
+            if not _should_re_dm(state, unit, now=now, bucket='stuck_timers'):
+                counts['dm_suppressed_dedup'] += 1
+                continue
             msg, subj, sug = _render_stuck_timer_dry_run(unit)
             ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
             if ok:
@@ -650,6 +658,7 @@ def run_once(
                 log(f'DM append suppressed for stuck timer {unit}', 'WARN')
             continue
 
+        # Enabled mode: always remediate on detection.
         rc, stderr = _heal_stuck_timer(unit)
         if rc != 0:
             log(
@@ -661,12 +670,17 @@ def run_once(
         post = _systemctl_show(unit) or {}
         next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
         counts['timer_healed'] += 1
+        log(f'auto-healed stuck timer: {unit} next_fire={next_fire!r}')
+
+        # Throttle only the closure DM, not the heal above.
+        if not _should_re_dm(state, unit, now=now, bucket='stuck_timers'):
+            counts['dm_suppressed_dedup'] += 1
+            continue
         msg, subj, sug = _render_stuck_timer_heal(unit, next_fire)
         ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
         if ok:
             counts['dm_sent'] += 1
             _record_dm(state, unit, now=now, bucket='stuck_timers')
-            log(f'auto-healed stuck timer: {unit} next_fire={next_fire!r}')
         else:
             log(f'DM append suppressed for healed timer {unit}', 'WARN')
 

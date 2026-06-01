@@ -611,6 +611,57 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
             self.assertEqual(counts['stuck_timer'], 2)
             self.assertEqual(counts['timer_healed'], 1)
 
+    def test_enabled_mode_heals_even_when_dm_cooldown_active(self):
+        # Regression: in enabled mode the heal must fire on EVERY detection;
+        # the RE_DM_WINDOW cooldown throttles only the closure DM. Previously
+        # the cooldown gated the heal itself, so a timer still/again stuck on
+        # the next 12h tick was suppressed and left unhealed (cadence == window
+        # == 12h, so this bit routinely).
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), [])
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            stuck_props = {
+                'ActiveState': 'active',
+                'NextElapseUSecRealtime': '',
+                'NextElapseUSecMonotonic': 'infinity',
+                'LastTriggerUSec': '',
+            }
+            state = {'units': {}, 'stuck_timers': {}}
+            now = datetime(2026, 5, 30, 18, 0, tzinfo=timezone.utc)
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            restart_prefix = ['sudo', '-n', 'systemctl', 'restart']
+            with self._stub_show({'ourliberty-cycle.timer': stuck_props}), \
+                    mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                counts1 = h.run_once(
+                    repo_dir=r, installed_dir=i, state=state,
+                    dry_run_override=False, now=now,
+                )
+                dms_after_first = len(self._dm_calls)
+                restarts_after_first = [
+                    c for c in ran if c[:4] == restart_prefix
+                ]
+                # Second tick one hour later — well inside RE_DM_WINDOW (12h).
+                counts2 = h.run_once(
+                    repo_dir=r, installed_dir=i, state=state,
+                    dry_run_override=False,
+                    now=now + timedelta(hours=1),
+                )
+            restarts_total = [c for c in ran if c[:4] == restart_prefix]
+            # First tick: healed and DM'd once.
+            self.assertEqual(counts1['timer_healed'], 1)
+            self.assertEqual(dms_after_first, 1)
+            self.assertEqual(len(restarts_after_first), 1)
+            # Second tick (inside cooldown): healed AGAIN, but no new DM.
+            self.assertEqual(counts2['timer_healed'], 1)
+            self.assertGreaterEqual(counts2['dm_suppressed_dedup'], 1)
+            self.assertEqual(len(self._dm_calls), 1)
+            self.assertEqual(len(restarts_total), 2)
+
 
 def _write_allowlist(td: Path, classes) -> Path:
     p = td / 'auto-remediation-allowlist.json'
