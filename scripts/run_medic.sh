@@ -59,11 +59,23 @@ MEDIC_OUT="${LOG_DIR}/medic.last-output.json"
 MEDIC_OK=0
 PROMPT_BODY="Run the Medic protocol now per the spec in ./CLAUDE.md. The batch of owned alerts is at ${BATCH_PATH}. For each alert: investigate with read-only bash, classify per config/medic-action-policy.json, and emit a diagnosis + recommended command via scripts/larry_alerts.py (append_notification for a diagnosis, or append_approval_request when the recommended fix is privileged). Take NO remediation action -- PR1 is escalate-only."
 
-if claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
+# Per-session timeout. One hung `claude -p` session held the lock ~30 min
+# during the first live hours of Medic; the lock bounded the blast radius
+# but a hung session has no business holding a rate-window slot that long.
+# Configurable via MEDIC_CLAUDE_TIMEOUT (any `timeout(1)` duration string),
+# default 10 minutes. On timeout the EXIT trap above releases the lock.
+CLAUDE_TIMEOUT="${MEDIC_CLAUDE_TIMEOUT:-10m}"
+
+if timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
     log "Medic operator completed successfully"
     MEDIC_OK=1
 else
-    log "Medic operator failed (non-zero exit); see $MEDIC_OUT"
+    CLAUDE_EXIT=$?
+    if [ "$CLAUDE_EXIT" = "124" ]; then
+        log "Medic operator timed out after $CLAUDE_TIMEOUT (timeout exit 124); aborting tick (lock will release via trap)"
+        exit 124
+    fi
+    log "Medic operator failed (exit=$CLAUDE_EXIT); see $MEDIC_OUT"
 fi
 
 # --- cost capture (mirror run_cycle.sh) ---

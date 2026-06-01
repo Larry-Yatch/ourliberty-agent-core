@@ -71,6 +71,26 @@ RUN_MEDIC_TIMEOUT_SEC = 20 * 60
 
 ENABLE_ENV_VAR = 'OURLIBERTY_MEDIC_ENABLED'
 
+# Rate-window gate. When the rolling-5h Tier 1 window is hot the dispatcher
+# defers this tick rather than spinning a Claude session that would compete
+# with Forge / Mirror / Pulse for the same window. "Hot" is detected via two
+# orthogonal signals already maintained elsewhere in the repo:
+#
+#   * `heal_claude_max_burn_rate.recent_rate_limit_event_count()` -- count
+#     of HTTP 429 / rate-limit events recorded in the trailing
+#     RATE_LIMIT_RECENT_HOURS (2h today). When this exceeds the configurable
+#     threshold (env OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS, default 2),
+#     defer.
+#   * `active_tier.cooldown_until(tier)` -- per-tier cooldown set by the
+#     rotation scheduler when a rate_limit fires. If EITHER tier has an
+#     active cooldown, defer.
+#
+# Fail-open: on any read / import error from the gauges, log WARN and return
+# True. A gauge bug must not permanently silence Medic; the per-session
+# timeout in run_medic.sh plus the concurrency lock bound the blast radius.
+RATE_WINDOW_MAX_EVENTS_ENV_VAR = 'OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS'
+DEFAULT_RATE_WINDOW_MAX_EVENTS = 2
+
 # Cap how many alerts go into a single batch. The Medic operator
 # investigates each one with read-only bash + writes an escalation,
 # so a runaway batch (e.g. 500 stalled inboxes after a long outage)
@@ -106,18 +126,74 @@ def _kill_switches_clear() -> bool:
     return not MEDIC_KILL_SWITCH.exists() and not HEALERS_KILL_SWITCH.exists()
 
 
-def _rate_window_ok() -> bool:
-    """Rolling-5h rate-window gate. Defers non-urgent runs so Medic
-    never starves the build pipeline.
+def _rate_window_max_events() -> int:
+    """Resolve the configurable rate-limit-events threshold. Bad/missing
+    env value falls back to the default and WARN-logs."""
+    raw = os.environ.get(RATE_WINDOW_MAX_EVENTS_ENV_VAR, '').strip()
+    if not raw:
+        return DEFAULT_RATE_WINDOW_MAX_EVENTS
+    try:
+        value = int(raw)
+    except ValueError:
+        log('WARN', f'{RATE_WINDOW_MAX_EVENTS_ENV_VAR}={raw!r} not an int; '
+                    f'using default {DEFAULT_RATE_WINDOW_MAX_EVENTS}')
+        return DEFAULT_RATE_WINDOW_MAX_EVENTS
+    if value < 0:
+        log('WARN', f'{RATE_WINDOW_MAX_EVENTS_ENV_VAR}={value} negative; '
+                    f'using default {DEFAULT_RATE_WINDOW_MAX_EVENTS}')
+        return DEFAULT_RATE_WINDOW_MAX_EVENTS
+    return value
 
-    PR1 STUB: returns True. No import-safe boolean helper exists today
-    (scripts/heal_claude_max_burn_rate.py:rolling_5h_token_volume reads
-    the token totals but the saturation decision lives inside that
-    healer's threshold logic and is not separately exposed). Wiring the
-    real check is PR2 scope. WARN-log so the stub is visible in the
-    dispatcher log on every tick.
+
+def _recent_rate_limit_events() -> int:
+    """Read the trailing-window 429 count from the burn-rate healer.
+    Lazy import so dispatcher startup does not depend on the healer
+    module loading; exceptions propagate to the caller (which fails
+    open). Wrapped as a thin shim so tests can patch it cleanly."""
+    import heal_claude_max_burn_rate as _healer
+    return int(_healer.recent_rate_limit_event_count())
+
+
+def _active_tier_in_rate_limit_cooldown() -> bool:
+    """Return True if either OAuth tier has an active rate_limit cooldown.
+    The dispatcher does not need to know which tier the next Medic run
+    will land on -- either tier in cooldown is reason to defer. Lazy
+    import for the same reason as _recent_rate_limit_events()."""
+    import active_tier as _at
+    for tier in ('tier1', 'tier2'):
+        if _at.cooldown_until(tier):
+            return True
+    return False
+
+
+def _rate_window_ok() -> bool:
+    """Rolling rate-limit window gate. Returns False (defer this tick)
+    when recent rate-limit events exceed the configured threshold OR an
+    OAuth tier is in a rate_limit cooldown. Fail-open on gauge error:
+    a broken gauge must not permanently silence Medic; the per-session
+    timeout in run_medic.sh and the lock bound the blast radius.
     """
-    log('WARN', 'rate-window check is stubbed (returns True); PR2 will wire it')
+    threshold = _rate_window_max_events()
+    try:
+        events = _recent_rate_limit_events()
+    except Exception as e:
+        log('WARN', f'rate-window event gauge read failed '
+                    f'({type(e).__name__}: {e}); failing open')
+        return True
+    if events > threshold:
+        log('INFO', f'rate-window hot: {events} recent rate-limit events '
+                    f'> threshold {threshold}; deferring')
+        return False
+    try:
+        in_cooldown = _active_tier_in_rate_limit_cooldown()
+    except Exception as e:
+        log('WARN', f'active-tier cooldown gauge read failed '
+                    f'({type(e).__name__}: {e}); failing open')
+        return True
+    if in_cooldown:
+        log('INFO', 'rate-window hot: an OAuth tier is in rate-limit '
+                    'cooldown; deferring')
+        return False
     return True
 
 
