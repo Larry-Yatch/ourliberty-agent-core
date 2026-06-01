@@ -6,7 +6,7 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~00:17Z UTC (Iter 267 — interactive)
+## Status snapshot — updated 2026-06-01 ~00:31Z UTC (Iter 269 — interactive)
 
 **System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 00:06:02Z UTC (fresh, on schedule). Healer heartbeat **2026-06-01T00:08:20Z UTC** (new tick vs 23:38:19Z UTC in iters 263-266; healer alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; 2 new cooldown sentinels in alert-cooldown/warning/ from Monday check firing — pulse:check-i-2026-06-01 and ledger:weekly-2026-06-01; total 312). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
 
