@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 377 — 2026-06-01 12:06 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1119** (0 new since iter 376 — stable). Sync: **error** carry-forward (SYNC-PUSH-REBASE-FALLBACK-001, 6th occurrence at 11:55:54Z, no 7th occurrence this window). Source repo: HEAD=21aee58 "Pulse cycle 20260601T120318Z", branch=main, clean. 7/7 core services active. Medic-dispatcher.service: inactive (expected; timer active). Forge inbox: 0. Beacon inbox: 0. 0 open PRs.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1119 lines** (unchanged from iter 376 watermark 1119). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** Watermark stable at 1119. Last delivery: idx=1118 at 11:59:35Z UTC (Pulse [yellow] sync DM from iter 376). No unprocessed alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → No entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473). No new Larry directives since carry-forward 2026-05-31T13:44:07Z UTC. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, minor uptick).** `~/agents/state/alert-cooldown/warning/`: **318** (was 317 at iter 376, +1 — new cooldown file NOT in pipeline-stall prefix). Pipeline-stall prefix: **37** (unchanged from iter 376). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Larry directives. Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** APPROVAL_REQUEST queue: 8 (unchanged). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-06-01T11:40:05Z UTC — ~26 min old at check. Next expected ~12:10Z UTC. Within 90-min threshold. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: HEAD=21aee58 "Pulse cycle 20260601T120318Z", branch=main, clean. Automated cycle pushed successfully after iter 376. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — carry-forward (6th occurrence, no 7th).** `agent-core-sync.json`: `status=error`, `message="Auto-commit push failed; rolled back"`, `commit=071347295c`, `last_sync=2026-06-01T11:55:54Z`. Same error record as iter 376 — sync.json not updated since then, indicating sync_agent_core.sh has not re-run (last_sync ~10 min old; well within 2h trigger threshold). No 7th occurrence. Larry DM'd at iter 376 (idx=1117+idx=1118). No re-DM this iter. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ourliberty-medic-dispatcher.service: `inactive` (expected; 20th run complete; timer active). ✅
+
+- **(Check E) Inboxes + PRs: ✅ All clear.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No active Forge build. Medic inactive. No cost alarm. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d, outside 60d window). CLAUDE_MAX_OAUTH stale/expired (active Tier 2 OAuth stall; APPROVAL_REQUEST pending — no new DM trigger). ✅
+
+- **Periodic checks:** Monday June 1 checks (Check I, VIII, IX) fired at iter 266. All idempotency guards active. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch items (unchanged from iter 376):**
+  - `heal-pr-auto-merge blind to CONFLICTING`: 2/3 — no change.
+  - `inbox-watcher rc=-1`: 2/3 — no change.
+  - `heal-pipeline-stall "369 min" bug`: 1/3 — no change.
+  - `daemon-reload triggers cycle.timer stuck (post-PR#225)`: 1/3 — no change.
+  - `stale-daemon-healer missing daemon-reload guard before restart`: 1/3 — no change.
+  - `MalformedForgeMarker`: APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending — no change.
+  - F24 empty-prompt APPROVAL_REQUEST #8 pending — no change.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered.
+3. Check 0: Watermark stable at 1119 (0 new alerts; nothing to triage).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-01T12:06:08Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-01T12:06:08Z UTC. ✅
+6. Updated MEMORY.md (iter 377 snapshot; cooldown files 318; sync carry-forward; no new escalations).
+7. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: SYNC-PUSH-REBASE-FALLBACK-001 (Larry DM'd iter 376, idx=1117+1118); Tier 2 OAuth stall (APPROVAL_REQUEST pending).
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK-001: No 7th occurrence this window. Sync.json unchanged at 11:55:54Z — sync_agent_core.sh has not re-run (last_sync ~10 min old, below 2h auto-trigger threshold). The automated cycle itself pushed 21aee58 successfully; the sync path and the cycle commit path are distinct. The 6th-occurrence DM is the current escalation state.
+- Cooldown files: +1 (318 total; 37 pipeline-stall prefix unchanged). The +1 is a non-pipeline-stall cooldown file — routine healer event, no action needed.
+
+**Learned:** The automated cycle commit/push (run_cycle.sh) and sync_agent_core.sh are independent paths. A successful cycle push (21aee58) does not update sync.json; only sync_agent_core.sh does. The sync error at 11:55:54Z persists in sync.json until the sync script runs again. If the sync script runs soon (within 2h), it will either clear the error (if push succeeds) or produce a 7th occurrence.
+
+---
+
 ## Iteration 376 — 2026-06-01 12:00 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1119** (+5 since iter 375 watermark 1114: idx=1114-1116 pipeline-stall tier2 [Tier 3 silence], idx=1117 Mirror PASS PR #232 [Tier 3 silence], idx=1118 Pulse sync DM [self-generated]). Sync: **error** at 11:55:54Z UTC — SYNC-PUSH-REBASE-FALLBACK-001 **6th occurrence** (commit 071347295c rolled back). Rate accelerating: 3 failures in 18 minutes (11:37, 11:48, 11:55). Source repo: HEAD=2001163 "Pulse cycle 20260601T115515Z", branch=main, clean (session-start). 7/7 core services active. **PR #232 MERGED** (~11:56:33Z UTC — rotation-gate-dm-isolation-001, Mirror auto-merged). Forge inbox: 0. Beacon inbox: 0 (rotation-gate notification processed at 11:55:54Z). [yellow] DM sent to Larry (idx=1117) for 6th occurrence per iter 375 note.
