@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-01 ~00:10Z UTC (Iter 266 — interactive, Monday gate)
+## Status snapshot — updated 2026-06-01 ~00:17Z UTC (Iter 267 — interactive)
 
-**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 00:06:02Z UTC (fresh, on schedule). Healer heartbeat 23:38:19Z UTC (same tick since iter 263; ~32 min old at iter 266 check time; within 90-min threshold). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (idx=1088 Ledger weekly, idx=1089 Check I DM — both self-generated periodic outputs this iter). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
+**System: ⚠️ Degraded — Tier 1, consecutive_clean=0.** Active pipeline stalls (Tier 2 OAuth expired). **ourliberty-cycle.timer STUCK** (NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity; automated cycles stopped). Sync.json: `no-change` at 00:06:02Z UTC (fresh, on schedule). Healer heartbeat **2026-06-01T00:08:20Z UTC** (new tick vs 23:38:19Z UTC in iters 263-266; healer alive). 6/6 non-timer services active. 0 open PRs. All inboxes empty. Alert watermark: **1090** (unchanged; 2 new cooldown sentinels in alert-cooldown/warning/ from Monday check firing — pulse:check-i-2026-06-01 and ledger:weekly-2026-06-01; total 312). APPROVAL_REQUEST queue: 8 (unchanged). **Check IX FATAL on first firing (port 8001 connection refused, iter 266).** Ledger: **$1,611.38/week (+540.7% vs May 25's $251.49).**
 
 **Watch items:**
 - **TIER 1 ACTIVE.** 5-min cadence. consecutive_clean=0 (active stalls + stuck timer).
