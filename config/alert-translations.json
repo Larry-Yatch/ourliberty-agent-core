@@ -196,7 +196,7 @@
     }
   },
   "pulse-check-iv": {
-    "check-iv-update-": {
+    "check-iv-update": {
       "severity": "INFO",
       "tier": "FYI",
       "plain_language_summary": "The weekly marker-drift check found Mirror's marker shape is drifting often enough to propose tightening enforcement (prompt re-emphasis or a hard validator gate). This is a proposal awaiting your call, not a failure.",
@@ -204,7 +204,7 @@
     }
   },
   "pulse-check-v": {
-    "check-v-update-": {
+    "check-v-update": {
       "severity": "INFO",
       "tier": "FYI",
       "plain_language_summary": "The Tier-1 action-template trust check proposes changes to the guard list: graduating templates that have earned trust, or adding ones that triggered a correction. This is a proposal awaiting your call, not a failure.",
@@ -212,7 +212,7 @@
     }
   },
   "pulse-check-vi": {
-    "check-vi-update-": {
+    "check-vi-update": {
       "severity": "INFO",
       "tier": "FYI",
       "plain_language_summary": "The PRIME DIRECTIVE posture check proposes tuning the verification-pending handling (auto-promote window or stuck-forever thresholds) based on the last 30 days. This is a proposal awaiting your call, not a failure.",
@@ -220,7 +220,7 @@
     }
   },
   "pulse-check-vii": {
-    "check-vii-update-": {
+    "check-vii-update": {
       "severity": "INFO",
       "tier": "FYI",
       "plain_language_summary": "The cost-ceiling check proposes tuning the spend-escalation thresholds based on recent escalation-response history. This is a proposal awaiting your call, not a failure.",
@@ -233,6 +233,20 @@
       "tier": "SOON",
       "plain_language_summary": "The scheduler tried to rotate the active Claude account into the next tier but that tier's OAuth credentials are missing, expired, or unverifiable, so it held on the current tier. The chain still moves on the held tier; it will retry the flip after you re-auth.",
       "recommended_action": "Re-auth the blocked tier so the next rotation window can flip. Runbook: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+    }
+  },
+  "pulse-check-viii": {
+    "check-viii-update": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The marker precision/recall floor check proposes raising, lowering, or deprecating a validation threshold based on the last week. A deprecate proposal is the strongest variant. This is a proposal awaiting your call, not a failure.",
+      "recommended_action": "Review the proposal and reply `approve check-viii-update-<date>` or `reject check-viii-update-<date> <reason>` on Telegram. No action leaves the current floors unchanged."
+    },
+    "check-viii-defer": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The marker precision/recall floor check could not auto-propose because both precision and recall fell below their floors this week, so it needs you to read the artifact and decide whether to raise, lower, or hold.",
+      "recommended_action": "Read the week's artifact and decide manually whether to raise, lower, or hold the floors. No automated proposal applies here."
     }
   }
 }

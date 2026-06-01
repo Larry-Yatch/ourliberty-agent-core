@@ -211,7 +211,7 @@ def dm_digest(artifact: dict[str, Any]) -> bool:
             source='pulse-check-iv',
             severity='warning',
             message=body,
-            subject=f'check-iv-update-{date_str}',
+            subject=f'check-iv-update:{date_str}',
             suggested_action=(
                 f'Review artifact at {artifact_path_for_week(artifact["week_anchor"])}; '
                 f'reply `approve check-iv-update-{date_str}` or '

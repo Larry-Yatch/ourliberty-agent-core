@@ -694,14 +694,14 @@ def dm_digest(artifact: dict[str, Any]) -> bool:
     try:
         import larry_alerts as la  # noqa: E402
         if rule == 'defer':
-            subject = f'check-viii-defer-{date_str}'
+            subject = f'check-viii-defer:{date_str}'
             action = (
                 'Manual interpretation needed: precision AND recall both '
                 'below floors this week. Read the artifact and decide '
                 'whether to raise, lower, or hold.'
             )
         else:
-            subject = f'check-viii-update-{date_str}'
+            subject = f'check-viii-update:{date_str}'
             action = (
                 f'Review proposal; reply `approve check-viii-update-'
                 f'{date_str}` on Telegram, or `reject check-viii-update-'

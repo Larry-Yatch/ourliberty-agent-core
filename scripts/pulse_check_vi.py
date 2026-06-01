@@ -408,7 +408,7 @@ def dm_digest(artifact: dict[str, Any]) -> bool:
             source='pulse-check-vi',
             severity='warning',
             message=body,
-            subject=f'check-vi-update-{date_str}',
+            subject=f'check-vi-update:{date_str}',
             suggested_action=(
                 f'Review proposals; reply `approve check-vi-update-{date_str}` or '
                 f'`reject check-vi-update-{date_str} <reason>`.'
