@@ -102,6 +102,16 @@
       "_note": "Used by heal_tier2_weekly_health_probe.py for cheap liveness probes against the Tier 2 OAuth account. Cheapest viable model — probe is intentionally minimal (~$0.001 per run). Pin the latest Haiku id here; the healer falls back to claude-haiku-4-5-20251001 if this block is missing."
     }
   },
+  "check_x_regression": {
+    "cutover_date": "2026-06-01",
+    "window_days": 28,
+    "min_tasks_per_window": 8,
+    "clarify_rate_rel_increase": 0.5,
+    "revision_rounds_rel_increase": 0.5,
+    "escalate_rate_abs_increase": 0.10,
+    "pass_rate_abs_drop": 0.15,
+    "_note": "Pulse Check X (scripts/pulse_check_x.py) — weekly chain-quality regression watch over the Forge/Mirror auto-merge chain. Read-only analyzer; NEVER edits this file. Compares a trailing window (most recent window_days) against a baseline window (window_days immediately before cutover_date) and DMs Larry only when a regression is suspected — he reviews + disposes (no auto-action). cutover_date is the model/prompt change being watched (default 2026-06-01, the Opus 4.8 Forge/Mirror roll-forward); re-point it for any future change. min_tasks_per_window is the anti-cry-wolf floor: below it in EITHER window the cycle logs insufficient_signal and stays silent (Forge/Mirror volume is modest). ACTIVE thresholds (relative increase, trailing vs baseline): clarify_rate_rel_increase and revision_rounds_rel_increase fire a proposal when breached. DATA-AVAILABILITY divergence (preflight CLARIFY, 2026-06-01): clarify_rate_rel_increase is applied to clarify-ROUNDS-per-task (clarify_request chain_events / distinct Forge task), NOT a preflight_clarify RATE — the preflight_proceed/clarify/reject event_types are declared in chain_event_shipper.KNOWN_EVENT_TYPES but no writer emits them yet; the key name is kept for stability. revision_rounds_rel_increase uses a costs.jsonl proxy (Forge build-work dispatches beyond the first, per task_id). DEFERRED thresholds escalate_rate_abs_increase and pass_rate_abs_drop need the Mirror verdict mix (PASS/REVISION/ESCALATE) which is also not yet in chain_events; their keys are retained so reactivation is config-only once a separate emission PR ships, but the analyzer renders them deferred in the artifact and SKIPS them in firing. All four are additive defaults — tune as data accrues."
+  },
   "repo_paths": {
     "ourliberty-agent-core": "/home/larry/agent-core",
     "ourliberty-dashboard": "/home/larry/ourliberty-dashboard"
