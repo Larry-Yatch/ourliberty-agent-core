@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "owner": "promote-alerts",
+    "tweak_via": "edit this file + commit; scripts/promote_alerts.py reads it on the next cycle (no service reload needed). Pulse-Check tunable per approvals-queue-rework.md § 6.",
+    "rationale": "N4 promotion rule (agents/beacon/specs/approvals-queue-rework.md L6 / § 5). Conservative default: an escalation crosses the needs-CEO-attention bar ONLY if it is severity=critical AND has not self-resolved within one Pulse cycle (self_resolve_window_seconds), OR it carries an explicit-for-Larry flag. Everything below the bar stays ops-internal and silent. Default is NOT to promote.",
+    "last_update": "2026-06-02T00:00:00+00:00"
+  },
+  "promotion_enabled": true,
+  "severity_bar": "critical",
+  "self_resolve_window_seconds": 600,
+  "dedup_key_fields": ["dedup_identity", "task_id", "headline", "id"],
+  "explicit_promotion_fields": ["escalate_to_larry", "for_larry"]
+}
