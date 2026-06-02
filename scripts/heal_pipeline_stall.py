@@ -1291,17 +1291,35 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                             f'Tier 1 hit {reason} and Tier 2 OAuth was not '
                             f'provisioned at /home/larry/.claude-larry-personal/.'
                         )
+                        action = (
+                            'Provision Tier 2 OAuth per '
+                            '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md` '
+                            'to restore the fallback safety net.'
+                        )
                     elif outcome == 'FAILED':
                         cause = (
                             f'Tier 1 hit {reason} and the Tier 2 retry also '
                             f'failed (Tier 2 credentials likely lapsed or '
                             f'silently landed in the wrong account).'
                         )
+                        action = (
+                            'Re-provision Tier 2 OAuth per '
+                            '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md` '
+                            '(the fallback was attempted and rejected by the API).'
+                        )
                     else:  # SKIPPED
                         cause = (
                             f'Tier 1 hit {reason} on a --resume session; '
                             f'Tier 2 retry skipped because session IDs are '
                             f'account-bound. Task marked paused_on_tier1.'
+                        )
+                        action = (
+                            'No auth action needed: Tier 2 is healthy and was '
+                            'never contacted. A --resume session is account-bound, '
+                            'so skipping the Tier 2 fallback is correct. '
+                            'heal_resume_paused_on_tier1 re-dispatches the task '
+                            'as fresh once Tier 1 recovers. Re-auth Tier 2 only '
+                            'if a FAILED or UNAVAILABLE variant also appears.'
                         )
                     key = f'tier2_fallback:{agent}:{outcome}:{reason}'
                     alerts.append({
@@ -1314,13 +1332,7 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                             f'pipeline-stall:tier2-fallback-'
                             f'{outcome.lower()}-{reason}:{agent}'
                         ),
-                        'suggested_action': (
-                            'Provision or re-provision Tier 2 OAuth per '
-                            '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. '
-                            'For resume-session SKIPPED, re-dispatch the work '
-                            'as a fresh task once Tier 1 is recovered (the '
-                            'old session ID can\'t be carried across accounts).'
-                        ),
+                        'suggested_action': action,
                     })
         except OSError as e:
             log(f'read {log_path} failed: {e}', 'WARN')
