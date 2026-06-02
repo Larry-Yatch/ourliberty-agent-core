@@ -1526,5 +1526,79 @@ class TestFixtureSkipDurable(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(fixture_dms, [])
 
 
+def _tier2_line(outcome: str, reason: str, minutes_ago: int = 10) -> str:
+    """Build an agent-runner-shape TIER2_FALLBACK_<outcome> log line that the
+    Check 8 regex matches. Production sample shape:
+        [2026-06-01 14:03:11] [forge] [WARN] TIER2_FALLBACK_SKIPPED reason=rate_limit session=--resume task=foo
+    """
+    return (f'[{_ts(minutes_ago)}] [forge] [WARN] '
+            f'TIER2_FALLBACK_{outcome} reason={reason} task=foo')
+
+
+class TestCheckTier2FallbackOutcomes(_TempAgentsRootMixin, unittest.TestCase):
+    """Check 8: SKIPPED is by-design + auto-remediated → log-only (no DM).
+    FAILED / UNAVAILABLE remain actionable → still produce alerts."""
+
+    def _write_forge_log(self, *lines: str) -> None:
+        (self.agents_root / 'logs' / 'forge.log').write_text('\n'.join(lines) + '\n')
+
+    def test_tier2_skipped_is_log_only(self) -> None:
+        self._write_forge_log(_tier2_line('SKIPPED', 'rate_limit'))
+        with patch.object(self.hps, 'log', wraps=self.hps.log) as mock_log:
+            alerts = self.hps.check_tier2_fallback_failures({})
+        # No alert returned → run_once never DMs Larry about it.
+        self.assertEqual(alerts, [])
+        # An INFO log line was emitted instead.
+        info_calls = [
+            c for c in mock_log.call_args_list
+            if 'tier2-fallback SKIPPED (by-design' in c.args[0]
+            and (len(c.args) > 1 and c.args[1] == 'INFO')
+        ]
+        self.assertEqual(len(info_calls), 1)
+        self.assertIn('agent=forge', info_calls[0].args[0])
+        self.assertIn('reason=rate_limit', info_calls[0].args[0])
+        # Cursor advanced → a second scan does not re-process the same line.
+        cursor = self.hps.load_check8_cursor()
+        self.assertIn('forge:SKIPPED:rate_limit', cursor)
+        with patch.object(self.hps, 'log', wraps=self.hps.log) as mock_log2:
+            alerts2 = self.hps.check_tier2_fallback_failures({})
+        self.assertEqual(alerts2, [])
+        reemit = [c for c in mock_log2.call_args_list
+                  if 'tier2-fallback SKIPPED (by-design' in c.args[0]]
+        self.assertEqual(reemit, [])
+
+    def test_tier2_failed_still_alerts(self) -> None:
+        self._write_forge_log(_tier2_line('FAILED', 'rate_limit'))
+        alerts = self.hps.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:tier2-fallback-failed-rate_limit:forge',
+        )
+
+    def test_tier2_unavailable_still_alerts(self) -> None:
+        self._write_forge_log(_tier2_line('UNAVAILABLE', 'auth_401'))
+        alerts = self.hps.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:tier2-fallback-unavailable-auth_401:forge',
+        )
+
+    def test_tier2_mixed_outcomes(self) -> None:
+        self._write_forge_log(
+            _tier2_line('SKIPPED', 'rate_limit'),
+            _tier2_line('FAILED', 'rate_limit'),
+            _tier2_line('UNAVAILABLE', 'auth_401'),
+        )
+        alerts = self.hps.check_tier2_fallback_failures({})
+        subjects = sorted(a['subject'] for a in alerts)
+        self.assertEqual(subjects, [
+            'pipeline-stall:tier2-fallback-failed-rate_limit:forge',
+            'pipeline-stall:tier2-fallback-unavailable-auth_401:forge',
+        ])
+        self.assertFalse(any('skipped' in s for s in subjects))
+
+
 if __name__ == '__main__':
     unittest.main()
