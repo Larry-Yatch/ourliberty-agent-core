@@ -116,6 +116,16 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     'clarify_request',
     'clarify_response',
     'larry_action',
+    # check-x-verdict-emission: Mirror review verdicts, push-emitted by
+    # outbox_notifier at the verdict-classification site (dedicated types
+    # rather than reusing `auto_merge`/`escalation` so a PASS is recorded at
+    # the verdict moment, not at actual merge — a PASS can sit in the auto-
+    # merge queue behind a blocker). The shipper never produces these rows;
+    # the audit healer (heal_chain_event_type_audit.py) reads this same
+    # constant, so listing them here also admits them to the weekly audit.
+    'review_pass',
+    'review_revision',
+    'review_escalate',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

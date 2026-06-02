@@ -19,6 +19,9 @@ Inputs (read-only):
 
   - Supabase `chain_events` rows with `event_type == 'clarify_request'`
     and `agent == 'forge'` over a span covering both comparison windows.
+  - Supabase `chain_events` rows with `event_type` in
+    {review_pass, review_revision, review_escalate} (Mirror verdicts) over
+    the same span, for the verdict-mix thresholds.
   - Local `~/agents/blackboard/costs.jsonl` for the Forge build-work task
     universe and the revision-rounds proxy.
 
@@ -27,39 +30,37 @@ Comparison windows:
   - Baseline = the `window_days` immediately BEFORE `cutover_date`.
   - Trailing = the most recent `window_days` (ending now).
 
-Metrics (Forge build-work tasks only, per window):
+Metrics (per window):
 
   - clarify_rounds_per_task = clarify_request count / distinct Forge task.
   - revision_rounds_per_task = (Forge build-work cost rows - distinct
     Forge tasks) / distinct Forge tasks, i.e. mean dispatches-per-task
-    beyond the first. PROXY (see DATA-AVAILABILITY note below).
+    beyond the first. PROXY.
+  - Mirror verdict mix: pass_rate = review_pass / total verdicts;
+    escalate_rate = review_escalate / total verdicts (per window).
 
-DATA-AVAILABILITY note (preflight finding, CLARIFY 1/3, 2026-06-01):
+VERDICT-MIX status (check-x-verdict-emission, 2026-06-01):
 
-  Two of the brief's four metric groups can't be computed from existing
-  chain_events: Forge `preflight_proceed/clarify/reject` and the Mirror
-  outcome mix (PASS/REVISION/ESCALATE) are declared in
-  `chain_event_shipper.KNOWN_EVENT_TYPES` but NO current writer emits them
-  (outbox_notifier writes only lowercase `marker-notified ... intent=
-  review-*` lines, which the shipper's `parse_log_line` ignores). The only
-  Forge/Mirror chain-quality signals actually in chain_events today are
-  `clarify_request` / `clarify_response` (push-emitted) and `auto_merge`
-  outcome=merged. So:
+  The verdict-mix thresholds `escalate_rate_abs_increase` and
+  `pass_rate_abs_drop` were DEFERRED in v1 because no writer emitted the
+  Mirror outcome mix. They are now ACTIVE: outbox_notifier push-emits
+  `review_pass` / `review_revision` / `review_escalate` chain_events at the
+  verdict-classification site. They are DATA-GATED — a window with fewer than
+  `min_tasks_per_window` Mirror verdicts is treated as insufficient verdict
+  history and the thresholds report status `insufficient_signal` (never fire).
 
-    - `clarify_rate_rel_increase` is applied to clarify-ROUNDS-per-task
-      (brief line 42), NOT the dead preflight_clarify rate. Config key name
-      kept for stability.
-    - `revision_rounds_rel_increase` is applied to the costs.jsonl proxy.
-    - `escalate_rate_abs_increase` and `pass_rate_abs_drop` are DEFERRED:
-      their config keys are retained (reactivation is config-only once a
-      separate emission PR ships Mirror-verdict + preflight_* rows), but
-      they are rendered `{"deferred": true, ...}` in the artifact and are
-      SKIPPED by the firing logic — never half-computed.
+  HONEST LIMITATION: emission started at the merge of the check-x-verdict-
+  emission PR, so the baseline window for the CURRENT 4.8 cutover (before
+  2026-06-01) has NO verdict events. The verdict-mix thresholds therefore
+  CANNOT read the 4.8 transition retroactively — for 4.8 they sit at
+  insufficient_signal. They activate for FUTURE cutovers once verdict history
+  exists on both sides of `cutover_date`. The clarify/revision thresholds
+  remain the 4.8 read (they have pre-cutover history).
 
-  The two active metrics are RELATIVE-increase detectors (trailing vs
-  baseline), so any stable measurement bias (e.g. preflight/clarify
-  resumes sharing a build task_id inflate the revision proxy) cancels;
-  only a genuine post-cutover rise trips a threshold.
+  clarify/revision are RELATIVE-increase detectors (trailing vs baseline),
+  so any stable measurement bias cancels; the verdict-mix thresholds are
+  ABSOLUTE-change detectors on the pass/escalate share. Only a genuine
+  post-cutover shift trips a threshold.
 
 Outputs:
 
@@ -104,15 +105,27 @@ DEFAULT_REVISION_ROUNDS_REL_INCREASE = 0.5
 DEFAULT_ESCALATE_RATE_ABS_INCREASE = 0.10
 DEFAULT_PASS_RATE_ABS_DROP = 0.15
 
-# Active firing thresholds (computable from existing data).
-ACTIVE_THRESHOLDS = ('clarify_rate_rel_increase', 'revision_rounds_rel_increase')
-# Deferred thresholds (need Mirror-verdict + preflight_* emission, not yet
-# shipped to chain_events). Keys retained for config-only reactivation.
-DEFERRED_THRESHOLDS = ('escalate_rate_abs_increase', 'pass_rate_abs_drop')
-DEFERRED_REASON = (
-    'requires Mirror-verdict (PASS/REVISION/ESCALATE) + preflight_* '
-    'emission not yet shipped to chain_events; separate PR'
+# Active firing thresholds. The two verdict-mix thresholds were reactivated by
+# the check-x-verdict-emission PR once outbox_notifier began push-emitting the
+# review_pass/review_revision/review_escalate chain_events.
+ACTIVE_THRESHOLDS = (
+    'clarify_rate_rel_increase',
+    'revision_rounds_rel_increase',
+    'escalate_rate_abs_increase',
+    'pass_rate_abs_drop',
 )
+# No thresholds are deferred anymore. Kept (empty) so the artifact schema's
+# `deferred_thresholds` key and any downstream consumers stay stable.
+DEFERRED_THRESHOLDS: tuple[str, ...] = ()
+# Verdict-mix thresholds carry their own data gate: a window with fewer than
+# `min_tasks_per_window` Mirror verdicts is treated as insufficient verdict
+# history (status `insufficient_signal`) and never fires. HONEST LIMITATION:
+# emission started at the merge of the check-x-verdict-emission PR, so the
+# 4.8-cutover baseline window (before 2026-06-01) has ZERO verdict events and
+# these two thresholds CANNOT read the 4.8 transition retroactively — they
+# activate for FUTURE cutovers once verdict history exists on both sides of
+# cutover_date. The clarify/revision thresholds remain the 4.8 read.
+VERDICT_THRESHOLDS = ('escalate_rate_abs_increase', 'pass_rate_abs_drop')
 
 # costs.jsonl task_types that are NOT Forge build-work (inter-agent legs,
 # retries, merges, fixtures-by-type). A Forge cost row whose task_type is
@@ -124,6 +137,15 @@ EXCLUDED_TASK_TYPES = frozenset({
 
 CLARIFY_EVENT_TYPE = 'clarify_request'
 FORGE_AGENT = 'forge'
+MIRROR_AGENT = 'mirror'
+
+# Mirror verdict chain_event types (emitted by outbox_notifier at the verdict-
+# classification site) → verdict-mix bucket.
+VERDICT_EVENT_TYPES = {
+    'review_pass': 'pass',
+    'review_revision': 'revision',
+    'review_escalate': 'escalate',
+}
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -155,6 +177,15 @@ class ClarifyEvent:
 
 
 @dataclass
+class VerdictEvent:
+    """A Mirror review verdict (PASS/REVISION/ESCALATE) chain_event."""
+    ts: datetime
+    task_id: str
+    verdict: str  # 'pass' | 'revision' | 'escalate'
+    agent: str = MIRROR_AGENT
+
+
+@dataclass
 class CostRow:
     ts: datetime
     task_id: str
@@ -171,6 +202,14 @@ class WindowMetrics:
     clarify_rounds_per_task: Optional[float]
     revision_rows: int
     revision_rounds_per_task: Optional[float]
+    # Mirror verdict mix (check-x-verdict-emission). Rates are None when the
+    # window has zero verdicts (can't divide); verdict_total gates firing.
+    verdict_total: int = 0
+    pass_count: int = 0
+    revision_count: int = 0
+    escalate_count: int = 0
+    pass_rate: Optional[float] = None
+    escalate_rate: Optional[float] = None
 
 
 @dataclass
@@ -179,10 +218,12 @@ class CheckXResult:
     baseline: WindowMetrics
     trailing: WindowMetrics
     breaches: list[dict[str, Any]]     # active thresholds that fired
-    deferred: list[dict[str, Any]]     # deferred thresholds (informational)
+    deferred: list[dict[str, Any]]     # deferred thresholds (now always empty)
     rationale: str
     week_anchor: str
     as_of_iso: str
+    # Per verdict-mix threshold status: fired | clean | insufficient_signal.
+    verdict_thresholds: list[dict[str, Any]] = field(default_factory=list)
     config: dict[str, Any] = field(default_factory=dict)
 
 
@@ -242,16 +283,97 @@ def _rel_increase(baseline: Optional[float], trailing: Optional[float]
     return (trailing - baseline) / baseline
 
 
+def _eval_verdict_thresholds(
+    baseline: WindowMetrics,
+    trailing: WindowMetrics,
+    *,
+    escalate_thr: float,
+    pass_thr: float,
+    min_verdicts: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Evaluate the two verdict-mix thresholds. Returns (breaches, statuses).
+
+    DATA GATE: a window with fewer than `min_verdicts` Mirror verdicts is
+    insufficient verdict history — both thresholds report `insufficient_signal`
+    and never fire. This is the mechanism that keeps the thresholds silent for
+    the 4.8 cutover (its baseline has ZERO verdict events) and until enough
+    history accrues for any future cutover.
+
+    escalate_rate_abs_increase fires on an ABSOLUTE rise in escalate share
+    (trailing - baseline >= threshold). pass_rate_abs_drop fires on an ABSOLUTE
+    fall in pass share (baseline - trailing >= threshold).
+    """
+    gated = (baseline.verdict_total < min_verdicts
+             or trailing.verdict_total < min_verdicts)
+
+    def _status(threshold: str, metric: str,
+                b_rate: Optional[float], t_rate: Optional[float],
+                abs_change: Optional[float], configured_min: float,
+                fired: bool) -> dict[str, Any]:
+        return {
+            'threshold': threshold,
+            'metric': metric,
+            'status': ('insufficient_signal' if gated
+                       else 'fired' if fired else 'clean'),
+            'baseline': b_rate,
+            'trailing': t_rate,
+            'abs_change': abs_change,
+            'configured_min': configured_min,
+            'baseline_verdicts': baseline.verdict_total,
+            'trailing_verdicts': trailing.verdict_total,
+        }
+
+    breaches: list[dict[str, Any]] = []
+    statuses: list[dict[str, Any]] = []
+
+    # escalate_rate_abs_increase
+    esc_change = (None if gated or baseline.escalate_rate is None
+                  or trailing.escalate_rate is None
+                  else trailing.escalate_rate - baseline.escalate_rate)
+    esc_fired = esc_change is not None and esc_change >= escalate_thr
+    statuses.append(_status(
+        'escalate_rate_abs_increase', 'escalate_rate',
+        baseline.escalate_rate, trailing.escalate_rate,
+        esc_change, escalate_thr, esc_fired,
+    ))
+
+    # pass_rate_abs_drop
+    pass_change = (None if gated or baseline.pass_rate is None
+                   or trailing.pass_rate is None
+                   else baseline.pass_rate - trailing.pass_rate)
+    pass_fired = pass_change is not None and pass_change >= pass_thr
+    statuses.append(_status(
+        'pass_rate_abs_drop', 'pass_rate',
+        baseline.pass_rate, trailing.pass_rate,
+        pass_change, pass_thr, pass_fired,
+    ))
+
+    for st in statuses:
+        if st['status'] == 'fired':
+            breaches.append({
+                'threshold': st['threshold'],
+                'metric': st['metric'],
+                'baseline': st['baseline'],
+                'trailing': st['trailing'],
+                'abs_change': st['abs_change'],
+                'configured_min': st['configured_min'],
+            })
+
+    return breaches, statuses
+
+
 def compute_window_metrics(
     label: str,
     clarify_events: list[ClarifyEvent],
     cost_rows: list[CostRow],
+    verdict_events: list[VerdictEvent],
     *,
     start: datetime,
     end: datetime,
 ) -> WindowMetrics:
     """Compute metrics over [start, end). Fixture task_ids already excluded
-    by the loaders / _is_forge_build_work; we re-guard clarify events here."""
+    by the loaders / _is_forge_build_work; we re-guard clarify + verdict
+    events here."""
     build_rows = [
         r for r in cost_rows
         if _is_forge_build_work(r) and start <= r.ts < end
@@ -278,6 +400,23 @@ def compute_window_metrics(
         clarify_rpt = None
         revision_rpt = None
 
+    verdicts = [
+        v for v in verdict_events
+        if v.verdict in ('pass', 'revision', 'escalate')
+        and not is_fixture_task_id(v.task_id)
+        and start <= v.ts < end
+    ]
+    verdict_total = len(verdicts)
+    pass_count = sum(1 for v in verdicts if v.verdict == 'pass')
+    revision_count = sum(1 for v in verdicts if v.verdict == 'revision')
+    escalate_count = sum(1 for v in verdicts if v.verdict == 'escalate')
+    if verdict_total > 0:
+        pass_rate: Optional[float] = pass_count / verdict_total
+        escalate_rate: Optional[float] = escalate_count / verdict_total
+    else:
+        pass_rate = None
+        escalate_rate = None
+
     return WindowMetrics(
         label=label,
         distinct_tasks=distinct_tasks,
@@ -285,6 +424,12 @@ def compute_window_metrics(
         clarify_rounds_per_task=clarify_rpt,
         revision_rows=revision_rows,
         revision_rounds_per_task=revision_rpt,
+        verdict_total=verdict_total,
+        pass_count=pass_count,
+        revision_count=revision_count,
+        escalate_count=escalate_count,
+        pass_rate=pass_rate,
+        escalate_rate=escalate_rate,
     )
 
 
@@ -293,12 +438,20 @@ def run_check(
     clarify_events: list[ClarifyEvent],
     cost_rows: list[CostRow],
     config: dict[str, Any],
+    verdict_events: Optional[list[VerdictEvent]] = None,
     now: Optional[datetime] = None,
 ) -> CheckXResult:
     """Pure-function entry point. Given inputs + a resolved config dict,
-    returns a CheckXResult. Used directly by tests."""
+    returns a CheckXResult. Used directly by tests.
+
+    `verdict_events` defaults to empty: callers (and tests) that don't supply
+    Mirror verdicts get the verdict-mix thresholds gated as insufficient_signal
+    rather than an error — preserving the pre-emission behavior shape.
+    """
     if now is None:
         now = datetime.now(timezone.utc)
+    if verdict_events is None:
+        verdict_events = []
 
     window_days = int(config.get('window_days', DEFAULT_WINDOW_DAYS))
     min_tasks = int(config.get('min_tasks_per_window',
@@ -309,27 +462,39 @@ def run_check(
                                    DEFAULT_CLARIFY_RATE_REL_INCREASE))
     revision_thr = float(config.get('revision_rounds_rel_increase',
                                     DEFAULT_REVISION_ROUNDS_REL_INCREASE))
+    escalate_thr = float(config.get('escalate_rate_abs_increase',
+                                    DEFAULT_ESCALATE_RATE_ABS_INCREASE))
+    pass_thr = float(config.get('pass_rate_abs_drop',
+                                DEFAULT_PASS_RATE_ABS_DROP))
 
     span = timedelta(days=window_days)
     trailing = compute_window_metrics(
-        'trailing', clarify_events, cost_rows,
+        'trailing', clarify_events, cost_rows, verdict_events,
         start=now - span, end=now,
     )
     baseline = compute_window_metrics(
-        'baseline', clarify_events, cost_rows,
+        'baseline', clarify_events, cost_rows, verdict_events,
         start=cutover - span, end=cutover,
     )
 
     week_anchor = iso_week_monday(now.date())
     as_of_iso = now.isoformat()
 
-    deferred = [
-        {'threshold': name, 'deferred': True, 'reason': DEFERRED_REASON,
-         'configured_value': config.get(name)}
-        for name in DEFERRED_THRESHOLDS
-    ]
+    # No deferred thresholds remain (verdict-mix reactivated). Kept empty for
+    # artifact-schema stability.
+    deferred: list[dict[str, Any]] = []
 
-    # Insufficient-signal gate: don't cry wolf on thin data.
+    # Verdict-mix thresholds carry their own per-window verdict-count gate
+    # (min_tasks_per_window), independent of the Forge cost-row volume gate
+    # below. Computed up front so the status is reported even when the overall
+    # check is insufficient_signal.
+    verdict_breaches, verdict_statuses = _eval_verdict_thresholds(
+        baseline, trailing,
+        escalate_thr=escalate_thr, pass_thr=pass_thr,
+        min_verdicts=min_tasks,
+    )
+
+    # Insufficient-signal gate: don't cry wolf on thin Forge build-work volume.
     if baseline.distinct_tasks < min_tasks or trailing.distinct_tasks < min_tasks:
         rationale = (
             f'Insufficient signal: distinct Forge build-work tasks '
@@ -341,7 +506,8 @@ def run_check(
             outcome='insufficient_signal', baseline=baseline,
             trailing=trailing, breaches=[], deferred=deferred,
             rationale=rationale, week_anchor=week_anchor,
-            as_of_iso=as_of_iso, config=dict(config),
+            as_of_iso=as_of_iso, verdict_thresholds=verdict_statuses,
+            config=dict(config),
         )
 
     breaches: list[dict[str, Any]] = []
@@ -370,6 +536,9 @@ def run_check(
             'configured_min': revision_thr,
         })
 
+    # Verdict-mix breaches (gated above) join the active breach list.
+    breaches.extend(verdict_breaches)
+
     if breaches:
         names = ', '.join(b['threshold'] for b in breaches)
         rationale = (
@@ -394,7 +563,8 @@ def run_check(
     return CheckXResult(
         outcome=outcome, baseline=baseline, trailing=trailing,
         breaches=breaches, deferred=deferred, rationale=rationale,
-        week_anchor=week_anchor, as_of_iso=as_of_iso, config=dict(config),
+        week_anchor=week_anchor, as_of_iso=as_of_iso,
+        verdict_thresholds=verdict_statuses, config=dict(config),
     )
 
 
@@ -410,6 +580,12 @@ def _window_dict(m: WindowMetrics) -> dict[str, Any]:
         'clarify_rounds_per_task': _r(m.clarify_rounds_per_task),
         'revision_rows': m.revision_rows,
         'revision_rounds_per_task': _r(m.revision_rounds_per_task),
+        'verdict_total': m.verdict_total,
+        'pass_count': m.pass_count,
+        'revision_count': m.revision_count,
+        'escalate_count': m.escalate_count,
+        'pass_rate': _r(m.pass_rate),
+        'escalate_rate': _r(m.escalate_rate),
     }
 
 
@@ -430,6 +606,7 @@ def build_artifact(result: CheckXResult) -> dict[str, Any]:
         },
         'active_thresholds_breached': result.breaches,
         'deferred_thresholds': result.deferred,
+        'verdict_thresholds': result.verdict_thresholds,
         'rationale': result.rationale,
         'applied': False,
     }
@@ -463,12 +640,24 @@ def format_digest(artifact: dict[str, Any]) -> str:
     ]
     for br in artifact['active_thresholds_breached']:
         metric = br['metric'].replace('_', ' ')
-        pct = br['rel_increase'] * 100
-        lines.append(
-            f'  - {metric}: {_fmt(br["baseline"])} -> '
-            f'{_fmt(br["trailing"])} (+{pct:.0f}%, '
-            f'threshold +{br["configured_min"] * 100:.0f}%)'
-        )
+        if 'rel_increase' in br:
+            # Relative-increase metric (clarify rounds, revision rounds).
+            pct = br['rel_increase'] * 100
+            lines.append(
+                f'  - {metric}: {_fmt(br["baseline"])} -> '
+                f'{_fmt(br["trailing"])} (+{pct:.0f}%, '
+                f'threshold +{br["configured_min"] * 100:.0f}%)'
+            )
+        else:
+            # Absolute-change metric (verdict-mix escalate/pass rate). Shown in
+            # percentage points; pass_rate_abs_drop is a fall, escalate a rise.
+            pp = (br.get('abs_change') or 0.0) * 100
+            arrow = 'drop' if br['threshold'] == 'pass_rate_abs_drop' else 'rise'
+            lines.append(
+                f'  - {metric}: {_fmt(br["baseline"])} -> '
+                f'{_fmt(br["trailing"])} ({pp:.0f}pp {arrow}, '
+                f'threshold {br["configured_min"] * 100:.0f}pp)'
+            )
     lines += [
         '',
         f'Windows compared: the {artifact["window_days"]} days before the '
@@ -477,8 +666,9 @@ def format_digest(artifact: dict[str, Any]) -> str:
         f'(trailing: {t["distinct_tasks"]} tasks).',
         '',
         'This is CORRELATIONAL, not proven cause - the cutover happens to '
-        'coincide with the rise. Two further signals (Mirror pass/revision/'
-        'escalate mix) are not yet measurable and are excluded.',
+        'coincide with the rise. The Mirror verdict-mix signals (pass / '
+        'escalate rate) are evaluated only when both windows have enough '
+        'verdict history; otherwise they are reported as insufficient_signal.',
     ]
     return '\n'.join(lines)
 
@@ -580,6 +770,50 @@ def fetch_clarify_events_from_supabase(
     return out
 
 
+def fetch_verdict_events_from_supabase(
+    client, *, since: datetime,
+) -> list[VerdictEvent]:
+    """Fetch Mirror verdict chain_events (review_pass/revision/escalate).
+
+    Symmetric to fetch_clarify_events_from_supabase. event_type -> verdict
+    bucket via VERDICT_EVENT_TYPES; rows with an unmapped type are skipped.
+    """
+    since_iso = since.isoformat()
+    out: list[VerdictEvent] = []
+    page = 0
+    page_size = 1000
+    types = list(VERDICT_EVENT_TYPES.keys())
+    while True:
+        res = (
+            client.table('chain_events')
+                  .select('event_type,ts,task_id,agent')
+                  .in_('event_type', types)
+                  .gte('ts', since_iso)
+                  .order('ts')
+                  .range(page * page_size, (page + 1) * page_size - 1)
+                  .execute()
+        )
+        rows = getattr(res, 'data', None) or []
+        for row in rows:
+            ts = _parse_ts(row.get('ts'))
+            if ts is None:
+                continue
+            verdict = VERDICT_EVENT_TYPES.get(row.get('event_type') or '')
+            if verdict is None:
+                continue
+            agent = row.get('agent') or ''
+            out.append(VerdictEvent(
+                ts=ts,
+                task_id=row.get('task_id') or '',
+                verdict=verdict,
+                agent=agent if isinstance(agent, str) else '',
+            ))
+        if len(rows) < page_size:
+            break
+        page += 1
+    return out
+
+
 def load_cost_rows(
     costs_path: Path = COSTS_FILE, *, since: datetime,
 ) -> list[CostRow]:
@@ -650,6 +884,31 @@ def _events_from_fixture(raw: dict[str, Any], now: datetime
     return clarify_events, cost_rows
 
 
+def _verdict_events_from_fixture(raw: dict[str, Any], now: datetime
+                                 ) -> list[VerdictEvent]:
+    """Parse the optional `verdict_events` fixture key into VerdictEvents.
+
+    Kept separate from `_events_from_fixture` so the latter's 2-tuple return
+    shape (and its callers/tests) stays stable. Each entry may carry either a
+    `verdict` bucket ('pass'/'revision'/'escalate') or an `event_type`
+    (review_pass/...) which is mapped via VERDICT_EVENT_TYPES.
+    """
+    out: list[VerdictEvent] = []
+    for e in raw.get('verdict_events', []):
+        verdict = e.get('verdict')
+        if verdict is None:
+            verdict = VERDICT_EVENT_TYPES.get(e.get('event_type') or '')
+        if verdict not in ('pass', 'revision', 'escalate'):
+            continue
+        out.append(VerdictEvent(
+            ts=_parse_ts(e.get('ts')) or now,
+            task_id=e.get('task_id', ''),
+            verdict=verdict,
+            agent=e.get('agent', MIRROR_AGENT),
+        ))
+    return out
+
+
 # -------------------- main --------------------
 
 
@@ -680,6 +939,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             if k in raw:
                 config[k] = raw[k]
         clarify_events, cost_rows = _events_from_fixture(raw, now)
+        verdict_events = _verdict_events_from_fixture(raw, now)
     else:
         now = datetime.now(timezone.utc)
         config = load_config()
@@ -705,15 +965,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             client = _connect_supabase()
             clarify_events = fetch_clarify_events_from_supabase(
                 client, since=since)
+            verdict_events = fetch_verdict_events_from_supabase(
+                client, since=since)
         except Exception as e:
-            log(f'cannot fetch clarify_request events: '
+            log(f'cannot fetch chain_events: '
                 f'{type(e).__name__}: {e}', 'ERROR')
             return 1
         cost_rows = load_cost_rows(since=since)
 
     result = run_check(
         clarify_events=clarify_events, cost_rows=cost_rows,
-        config=config, now=now,
+        verdict_events=verdict_events, config=config, now=now,
     )
     artifact = build_artifact(result)
 

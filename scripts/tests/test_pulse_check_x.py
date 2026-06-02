@@ -70,6 +70,19 @@ def _clarifies(prefix, ts, count, n_tasks, *, agent='forge'):
     return rows
 
 
+def _verdicts(prefix, ts, *, n_pass=0, n_revision=0, n_escalate=0):
+    """Synthetic Mirror VerdictEvents: n_pass/n_revision/n_escalate of each."""
+    rows = []
+    i = 0
+    for verdict, n in (('pass', n_pass), ('revision', n_revision),
+                       ('escalate', n_escalate)):
+        for _ in range(n):
+            rows.append(px.VerdictEvent(ts=ts, task_id=f'{prefix}-v{i}',
+                                        verdict=verdict))
+            i += 1
+    return rows
+
+
 class TestCleanRun(unittest.TestCase):
 
     def test_equal_metrics_no_breach(self):
@@ -124,6 +137,92 @@ class TestRevisionBreach(unittest.TestCase):
         self.assertEqual(result.outcome, 'regression_suspected')
         names = [b['threshold'] for b in result.breaches]
         self.assertIn('revision_rounds_rel_increase', names)
+
+
+class TestVerdictMix(unittest.TestCase):
+    """check-x-verdict-emission: reactivated verdict-mix thresholds.
+
+    Both windows carry enough Forge cost-row volume (10 tasks each) to clear
+    the overall insufficient-signal gate; clarify/revision are held flat so any
+    fired breach is attributable to the verdict mix alone.
+    """
+
+    def _flat_costs(self):
+        return (_cost_rows('base', BASELINE_TS, 10)
+                + _cost_rows('trail', TRAILING_TS, 10))
+
+    def test_escalate_rate_abs_increase_fires(self):
+        # baseline esc 0.0 (0/10), trailing esc 0.2 (2/10) => +0.2 >= 0.10.
+        # pass held flat at 0.6 so only escalate fires.
+        verdicts = (
+            _verdicts('base', BASELINE_TS, n_pass=6, n_revision=4)
+            + _verdicts('trail', TRAILING_TS, n_pass=6, n_revision=2,
+                        n_escalate=2))
+        result = px.run_check(clarify_events=[], cost_rows=self._flat_costs(),
+                              verdict_events=verdicts, config=_config(), now=NOW)
+        self.assertEqual(result.outcome, 'regression_suspected')
+        names = [b['threshold'] for b in result.breaches]
+        self.assertIn('escalate_rate_abs_increase', names)
+        self.assertNotIn('pass_rate_abs_drop', names)
+        # Breach dicts use the absolute-change key, not rel_increase.
+        esc = next(b for b in result.breaches
+                   if b['threshold'] == 'escalate_rate_abs_increase')
+        self.assertIn('abs_change', esc)
+        self.assertAlmostEqual(esc['abs_change'], 0.2)
+
+    def test_pass_rate_abs_drop_fires(self):
+        # baseline pass 1.0 (10/10), trailing pass 0.8 (8/10) => drop 0.2 >= 0.15.
+        # escalate held flat at 0.0 so only pass-drop fires.
+        verdicts = (
+            _verdicts('base', BASELINE_TS, n_pass=10)
+            + _verdicts('trail', TRAILING_TS, n_pass=8, n_revision=2))
+        result = px.run_check(clarify_events=[], cost_rows=self._flat_costs(),
+                              verdict_events=verdicts, config=_config(), now=NOW)
+        self.assertEqual(result.outcome, 'regression_suspected')
+        names = [b['threshold'] for b in result.breaches]
+        self.assertIn('pass_rate_abs_drop', names)
+        self.assertNotIn('escalate_rate_abs_increase', names)
+
+    def test_stable_verdict_mix_no_breach(self):
+        verdicts = (
+            _verdicts('base', BASELINE_TS, n_pass=8, n_revision=1, n_escalate=1)
+            + _verdicts('trail', TRAILING_TS, n_pass=8, n_revision=1,
+                        n_escalate=1))
+        result = px.run_check(clarify_events=[], cost_rows=self._flat_costs(),
+                              verdict_events=verdicts, config=_config(), now=NOW)
+        self.assertEqual(result.outcome, 'none')
+        self.assertEqual(result.breaches, [])
+        statuses = {s['threshold']: s for s in result.verdict_thresholds}
+        self.assertEqual(statuses['escalate_rate_abs_increase']['status'],
+                         'clean')
+        self.assertEqual(statuses['pass_rate_abs_drop']['status'], 'clean')
+
+    def test_thin_verdicts_report_insufficient_signal(self):
+        # Forge volume is fine (10 tasks/window), but only 3 verdicts/window
+        # (< min 8) => verdict-mix thresholds gate to insufficient_signal and
+        # never fire, even with a big escalate swing.
+        verdicts = (
+            _verdicts('base', BASELINE_TS, n_pass=3)
+            + _verdicts('trail', TRAILING_TS, n_escalate=3))
+        result = px.run_check(clarify_events=[], cost_rows=self._flat_costs(),
+                              verdict_events=verdicts, config=_config(), now=NOW)
+        self.assertEqual(result.outcome, 'none')
+        statuses = {s['threshold']: s for s in result.verdict_thresholds}
+        self.assertEqual(statuses['escalate_rate_abs_increase']['status'],
+                         'insufficient_signal')
+        self.assertEqual(statuses['pass_rate_abs_drop']['status'],
+                         'insufficient_signal')
+
+    def test_no_verdict_events_is_insufficient_signal(self):
+        # The 4.8-baseline reality: zero verdict events => both thresholds
+        # report insufficient_signal (the HONEST LIMITATION mechanism).
+        result = px.run_check(clarify_events=[], cost_rows=self._flat_costs(),
+                              verdict_events=[], config=_config(), now=NOW)
+        statuses = {s['threshold']: s for s in result.verdict_thresholds}
+        self.assertEqual(statuses['escalate_rate_abs_increase']['status'],
+                         'insufficient_signal')
+        self.assertEqual(statuses['pass_rate_abs_drop']['status'],
+                         'insufficient_signal')
 
 
 class TestInsufficientSignal(unittest.TestCase):

@@ -1759,6 +1759,175 @@ class EmitClarifyRequestChainEventTest(unittest.TestCase):
         self.assertEqual(payload.get('resume_session_id'), '')
 
 
+class EmitPreflightOutcomeChainEventTest(unittest.TestCase):
+    """check-x-verdict-emission: Forge preflight-outcome chain_event emission.
+
+    Sibling to EmitClarifyRequestChainEventTest. Records the preflight OUTCOME
+    mix (proceed/clarify/reject) at the Forge classification site so Check X
+    can read the mix from chain_events.
+    """
+
+    def _capture(self, marker_decision, *, task_id='task-pf-001'):
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_preflight_outcome_chain_event(
+                data={'task_id': task_id},
+                marker_decision=marker_decision,
+                agent='forge',
+            )
+        return captured
+
+    def test_proceed_marker_emits_preflight_proceed(self):
+        captured = self._capture(
+            {'marker_type': 'proceed', 'intent': 'build', 'payload': {}})
+        self.assertEqual(captured.get('event_type'), 'preflight_proceed')
+        self.assertEqual(captured.get('agent'), 'forge')
+        self.assertEqual(captured.get('task_id'), 'task-pf-001')
+        payload = captured.get('payload') or {}
+        self.assertEqual(payload.get('agent'), 'forge')
+        self.assertEqual(payload.get('marker_type'), 'proceed')
+        self.assertEqual(payload.get('intent'), 'build')
+
+    def test_reject_marker_emits_preflight_reject(self):
+        captured = self._capture(
+            {'marker_type': 'reject', 'intent': 'reject', 'payload': {}})
+        self.assertEqual(captured.get('event_type'), 'preflight_reject')
+
+    def test_in_budget_clarify_emits_preflight_clarify(self):
+        captured = self._capture(
+            {'marker_type': 'clarify_request', 'intent': 'clarify',
+             'payload': {}})
+        self.assertEqual(captured.get('event_type'), 'preflight_clarify')
+
+    def test_budget_exhausted_clarify_emits_preflight_reject(self):
+        # A clarify_request that did NOT route as 'clarify' (budget exhausted)
+        # is structurally a reject and is recorded as preflight_reject.
+        captured = self._capture(
+            {'marker_type': 'clarify_request',
+             'intent': 'clarification-exhausted', 'payload': {}})
+        self.assertEqual(captured.get('event_type'), 'preflight_reject')
+
+    def test_unknown_marker_emits_nothing(self):
+        captured = self._capture(
+            {'marker_type': 'something_else', 'intent': 'x', 'payload': {}})
+        self.assertEqual(captured, {})
+
+    def test_does_not_raise_on_emit_failure(self):
+        # Daemon-never-wedge: emit_event raising must not propagate.
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            on._emit_preflight_outcome_chain_event(
+                data={'task_id': 'real-pf'},
+                marker_decision={'marker_type': 'proceed', 'intent': 'build'},
+                agent='forge',
+            )
+
+
+class EmitMirrorVerdictChainEventTest(unittest.TestCase):
+    """check-x-verdict-emission: Mirror verdict chain_event emission.
+
+    Sibling to EmitPreflightOutcomeChainEventTest. Records the Mirror verdict
+    mix (PASS/REVISION/ESCALATE) keyed on the ROUTED intent, so an auto-
+    promoted / budget-exhausted REVISION is recorded as review_escalate.
+    """
+
+    def _capture(self, marker_decision, *, task_id='task-rev-001'):
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _fake_emit):
+            on._emit_mirror_verdict_chain_event(
+                data={'task_id': task_id},
+                marker_decision=marker_decision,
+                agent='mirror',
+            )
+        return captured
+
+    def test_pass_verdict_emits_review_pass(self):
+        captured = self._capture({
+            'marker_type': 'review_pass',
+            'intent': 'review-pass',
+            'payload': {'pr_url': 'https://example/pr/1'},
+        })
+        self.assertEqual(captured.get('event_type'), 'review_pass')
+        self.assertEqual(captured.get('agent'), 'mirror')
+        self.assertEqual(captured.get('task_id'), 'task-rev-001')
+        self.assertEqual(captured.get('pr_url'), 'https://example/pr/1')
+        payload = captured.get('payload') or {}
+        self.assertEqual(payload.get('verdict'), 'pass')
+        self.assertEqual(payload.get('marker_type'), 'review_pass')
+        self.assertFalse(payload.get('auto_promoted'))
+        self.assertFalse(payload.get('budget_exhausted'))
+
+    def test_clean_revision_emits_review_revision(self):
+        captured = self._capture({
+            'marker_type': 'review_revision',
+            'intent': 'review-revision',
+            'payload': {},
+        })
+        self.assertEqual(captured.get('event_type'), 'review_revision')
+        self.assertEqual((captured.get('payload') or {}).get('verdict'),
+                         'revision')
+
+    def test_escalate_verdict_emits_review_escalate(self):
+        captured = self._capture({
+            'marker_type': 'review_escalate',
+            'intent': 'review-escalate',
+            'payload': {},
+        })
+        self.assertEqual(captured.get('event_type'), 'review_escalate')
+
+    def test_auto_promoted_revision_emits_review_escalate(self):
+        # REVISION auto-promoted to ESCALATE (low confidence): routed intent is
+        # review-escalate, so it is recorded as an escalation for the mix.
+        captured = self._capture({
+            'marker_type': 'review_revision',
+            'intent': 'review-escalate',
+            'auto_promoted': True,
+            'payload': {},
+        })
+        self.assertEqual(captured.get('event_type'), 'review_escalate')
+        self.assertTrue((captured.get('payload') or {}).get('auto_promoted'))
+
+    def test_emergency_halt_folds_into_review_escalate(self):
+        captured = self._capture({
+            'marker_type': 'review_emergency_halt',
+            'intent': 'emergency-halt',
+            'payload': {},
+        })
+        self.assertEqual(captured.get('event_type'), 'review_escalate')
+
+    def test_unknown_verdict_emits_nothing(self):
+        captured = self._capture({
+            'marker_type': 'notify',
+            'intent': 'notify',
+            'payload': {},
+        })
+        self.assertEqual(captured, {})
+
+    def test_does_not_raise_on_emit_failure(self):
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            on._emit_mirror_verdict_chain_event(
+                data={'task_id': 'real-rev'},
+                marker_decision={'marker_type': 'review_pass',
+                                 'intent': 'review-pass', 'payload': {}},
+                agent='mirror',
+            )
+
+
 class EmitClarifyResponseChainEventTest(unittest.TestCase):
     """clarify-round-visibility § 6: clarify_response chain_event emission.
 
@@ -6970,6 +7139,29 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
         pr_url, task_id = self._auto_merge_calls[0]
         self.assertEqual(pr_url, PR_URL_FIXTURE)
         self.assertEqual(task_id, 'real-rev')  # the marker fixture's task_id
+
+    def test_auto_merge_fires_even_when_verdict_emit_raises(self):
+        # check-x-verdict-emission ADDITIVE invariant: the review_pass
+        # verdict chain_event is best-effort. If emit_event raises (Supabase
+        # outage), the auto-merge / notify path must still complete unchanged.
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('real-pass.json', body)
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            result = on.process_outbox(f)
+        # Merge still fired despite the emit blowing up.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+        # And the DM still reflects the merged outcome.
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        self.assertIn('Auto-merged + branch deleted', notifications[0]['message'])
 
     def test_auto_merge_skipped_on_review_revision(self):
         body = self._body_with_chat(_mirror_revision_marker(confidence='high'))

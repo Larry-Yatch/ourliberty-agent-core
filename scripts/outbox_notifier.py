@@ -1366,6 +1366,161 @@ def _emit_clarify_response_chain_event(
         )
 
 
+# check-x-verdict-emission: map a classified Forge preflight marker to one of
+# the three preflight_* chain_event types. `preflight_proceed/clarify/reject`
+# already exist in chain_event_shipper.KNOWN_EVENT_TYPES but no writer emitted
+# them; this closes that gap. The budget-exhausted clarify is structurally a
+# reject (routed back via the reject channel), so it maps to preflight_reject —
+# same discipline as the clarify_request emit, which fires only on the in-
+# budget `intent == 'clarify'` path.
+def _preflight_outcome_event_type(marker_decision: dict[str, Any]) -> Optional[str]:
+    marker_type = marker_decision.get('marker_type')
+    if marker_type == 'proceed':
+        return 'preflight_proceed'
+    if marker_type == 'reject':
+        return 'preflight_reject'
+    if marker_type == 'clarify_request':
+        return (
+            'preflight_clarify'
+            if marker_decision.get('intent') == 'clarify'
+            else 'preflight_reject'
+        )
+    return None
+
+
+def _emit_preflight_outcome_chain_event(
+    data: dict[str, Any],
+    marker_decision: dict[str, Any],
+    *,
+    agent: str,
+) -> None:
+    """Push a `preflight_<outcome>` chain_event for a classified Forge marker.
+
+    Sibling to `_emit_clarify_request_chain_event` — fires at the same
+    classification site, immediately after `_classify_forge_marker` succeeds.
+    Records the Forge preflight outcome (proceed / clarify / reject) so Check X
+    and the dashboard can read the preflight-outcome mix from chain_events.
+
+    Payload:
+      - agent: 'forge'
+      - task_id: the dispatch task
+      - marker_type: the raw classified marker_type (forensics)
+      - intent: the routed intent (forensics; e.g. clarification-exhausted)
+
+    Best-effort: chain_event_emit.emit_event logs WARN and returns False on
+    Supabase outage. ADDITIVE — the daemon's marker-routing / notify / build-
+    dispatch path does NOT depend on the row landing, so failure here never
+    blocks, delays, or alters the existing flow. Same daemon-never-wedge
+    invariant as the clarify helpers.
+    """
+    event_type = _preflight_outcome_event_type(marker_decision)
+    if event_type is None:
+        return
+    chain_payload = {
+        'agent': agent,
+        'task_id': data.get('task_id', ''),
+        'marker_type': marker_decision.get('marker_type', ''),
+        'intent': marker_decision.get('intent', ''),
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type=event_type,
+            agent=agent,
+            task_id=data.get('task_id'),
+            payload=chain_payload,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'{event_type} chain_event emit raised unexpectedly for '
+            f'task {data.get("task_id")!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
+# check-x-verdict-emission: map a classified Mirror review marker to one of the
+# three verdict chain_event types, keyed on the ROUTED intent rather than the
+# raw marker_type. This deliberately folds the two REVISION→ESCALATE paths
+# (low-confidence auto-promote and budget-exhaustion) into review_escalate:
+# from the chain's perspective both terminate the self-heal loop and hand off
+# to Beacon, which is the quality signal Check X's escalate_rate watches. A
+# clean in-budget REVISION keeps intent 'review-revision' and is recorded as
+# such. REVIEW_EMERGENCY_HALT (intent not one of the three) is a non-PASS
+# terminal safety trip and folds into review_escalate; the raw marker_type
+# rides in the payload for forensics.
+def _mirror_verdict_event_type(marker_decision: dict[str, Any]) -> Optional[str]:
+    intent = marker_decision.get('intent')
+    if intent == 'review-pass':
+        return 'review_pass'
+    if intent == 'review-revision':
+        return 'review_revision'
+    if intent == 'review-escalate':
+        return 'review_escalate'
+    # Defensive: any other terminal Mirror verdict (e.g. emergency-halt) is a
+    # non-PASS outcome — bucket it as an escalation for the verdict mix.
+    marker_type = marker_decision.get('marker_type')
+    if marker_type in ('review_escalate', 'review_emergency_halt'):
+        return 'review_escalate'
+    return None
+
+
+def _emit_mirror_verdict_chain_event(
+    data: dict[str, Any],
+    marker_decision: dict[str, Any],
+    *,
+    agent: str,
+) -> None:
+    """Push a `review_<verdict>` chain_event for a classified Mirror marker.
+
+    Sibling to `_emit_preflight_outcome_chain_event`. Fires at the Mirror
+    classification site, immediately after `_classify_mirror_marker` succeeds
+    (and the emergency-halt trip), BEFORE the routing / auto-merge block — so a
+    PASS verdict is recorded at the verdict moment even when the subsequent
+    merge is held in the auto-merge queue behind a blocker.
+
+    Payload:
+      - agent: 'mirror'
+      - task_id: the reviewed task
+      - verdict: 'pass' | 'revision' | 'escalate' (the verdict-mix bucket)
+      - marker_type: the raw classified marker_type (forensics)
+      - auto_promoted / budget_exhausted: REVISION→ESCALATE provenance
+      - pr_url: from the marker payload when present
+
+    Best-effort + ADDITIVE: emit_event logs WARN and returns False on Supabase
+    outage; the notify / auto-merge / escalation flow does NOT depend on the
+    row landing, so failure here never blocks, delays, or alters it. Same
+    daemon-never-wedge invariant as the clarify helpers.
+    """
+    event_type = _mirror_verdict_event_type(marker_decision)
+    if event_type is None:
+        return
+    payload = marker_decision.get('payload') or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    chain_payload = {
+        'agent': agent,
+        'task_id': data.get('task_id', ''),
+        'verdict': event_type.split('_', 1)[1],  # pass | revision | escalate
+        'marker_type': marker_decision.get('marker_type', ''),
+        'auto_promoted': bool(marker_decision.get('auto_promoted')),
+        'budget_exhausted': bool(marker_decision.get('budget_exhausted')),
+        'pr_url': payload.get('pr_url', '') or data.get('pr_url', '') or '',
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type=event_type,
+            agent=agent,
+            task_id=data.get('task_id'),
+            payload=chain_payload,
+            pr_url=chain_payload['pr_url'] or None,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'{event_type} chain_event emit raised unexpectedly for '
+            f'task {data.get("task_id")!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Forge outbox for a preflight marker. Returns routing decision or None.
 
@@ -6228,6 +6383,12 @@ def process_outbox(outbox_file: Path) -> str:
         # classified markers.
         if marker_decision and marker_decision.get('intent') == 'clarify':
             _emit_clarify_request_chain_event(data, marker_decision, agent='forge')
+        # check-x-verdict-emission — record the preflight OUTCOME mix
+        # (proceed/clarify/reject) for Check X + the dashboard. Additive +
+        # best-effort; fires for every classified marker (the clarify_request
+        # emit above is narrower — only the in-budget clarify question).
+        if marker_decision:
+            _emit_preflight_outcome_chain_event(data, marker_decision, agent='forge')
 
     # PR-S4 rectification (H1) — Mirror DAG-preflight result handler.
     # Fires BEFORE the regular Mirror marker classifier because DAG
@@ -6274,6 +6435,13 @@ def process_outbox(outbox_file: Path) -> str:
         # the halt was tripped automatically via Shape 9 wording.
         if marker_decision and marker_decision['marker_type'] == 'review_emergency_halt':
             _trip_emergency_halt(data, marker_decision.get('payload') or {})
+        # check-x-verdict-emission — record the Mirror verdict mix
+        # (PASS/REVISION/ESCALATE) for Check X + the dashboard. Placed here
+        # (before the routing/auto-merge block) so a PASS is recorded at the
+        # verdict moment even when the merge is later held in the auto-merge
+        # queue. Additive + best-effort; never blocks the flow below.
+        if marker_decision:
+            _emit_mirror_verdict_chain_event(data, marker_decision, agent='mirror')
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher
