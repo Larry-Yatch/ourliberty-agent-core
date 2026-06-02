@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 591 — 2026-06-02 18:43 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1143** (+1 since iter 590: idx=1143 — `sync-blocked:auto-commit-push-failed` at 18:37:20Z; novel subject, not in allowlist; connected to SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST; no separate DM per actionable-only preference). Sync: ⚠️ ERROR — sync.json `status=error`, 18:37:20Z, "Auto-commit push failed; rolled back to 8dd3f450"; **new variant** of SYNC-PUSH-REBASE-FALLBACK-001 (push rejection vs prior "Wrong branch" shape). Healer heartbeat: **18:17:33Z** (stable; ~25 min old at 18:43Z; FRESH within 90-min threshold). **7/7 services active.** **PR #251 MERGED this iter; PR #252 OPEN.** Forge inbox: **5 files** (build-build-test-suite-green-001 at 17:47Z = ~56 min old; approaching 1h stale; Forge bot active).
+
+**Notable since iter 590 (18:32:24Z automated):**
+- **Sync error shape changed** — "Auto-commit push failed; rolled back to 8dd3f450" vs prior "Wrong branch: chore/foo". Sync service made an auto-commit locally but push was rejected (likely non-FF due to concurrent local commit 94e4987). **15th SYNC-PUSH-REBASE-FALLBACK-001 occurrence.** New alert `sync-blocked:auto-commit-push-failed` (idx=1143) not in alert-translations.json (Tier 4 novel). APPROVAL_REQUEST open; self-recovers on next sync.
+- **1 new cooldown file** — total 113 (was 112 at iter 589/590). Heal-pipeline-stall keyed: 27 (stable).
+- **PR #252 OPEN** — "Add N6 CEO digest generator (daily + weekly)", opened 18:30:20Z; CLEAN/MERGEABLE. 30-min threshold: 19:00:20Z.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1143 lines** (+1 from iter 590). 1 new alert (idx=1143).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel subject, connected to known APPROVAL_REQUEST).** idx=1143: `source=sync.service, subject=sync-blocked:auto-commit-push-failed, ts=18:37:20Z`. Subject NOT in alert-translations.json. Strict Tier 4 (novel). However: same root SYNC-PUSH-REBASE-FALLBACK-001 pattern; APPROVAL_REQUEST `sync-push-rebase-fallback-001` already open and covers this variant. Per Larry's actionable-only preference: no separate DM. Watermark: **1143**. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 18:30:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 18:30:00` → no entries. No Telegram activity. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (+1; was 112). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ build-build-test-suite-green-001.json approaching 1h stale.** build-build-test-suite-green-001 at 17:47Z = ~56 min at 18:43Z (4 min to 1h threshold). Forge bot active; should pick up imminently. marker-error-step-alert-promotion-1 (18:11Z, 32 min), marker-error-step-autoclear-1 (17:58Z, 45 min — retry 1/3), marker-error-step-digest-generator-1 (18:30Z, 13 min — retry 1/3), suppress-by-design (18:18Z, 25 min). Forge bot active. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat stable at **18:17:33Z** (~25 min old at 18:43Z; FRESH within 90-min threshold). No post-sweep WARNs. G-rule at **2/3** holds. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅ Note: local may be 1 commit ahead of origin (94e4987 not yet pushed per sync failure); carry-forward of Check B issue; working tree clean.
+
+- **(Check B) Sync health: ⚠️ ERROR (new variant).** sync.json `status=error`, 18:37:20Z, "Auto-commit push failed; rolled back to 8dd3f450". New SYNC-PUSH-REBASE-FALLBACK-001 variant: push rejected (non-FF) vs prior "Wrong branch" shape. **15th total occurrence** (15/16 PR merge days). Session-start gitStatus confirms main+clean. Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #251 MERGED (always-fix this iter); PR #252 OPEN — 13 min, under threshold.** PR #251 — always-fix applied at 18:42:53Z (commit 507ad8f). PR #252 "Add N6 CEO digest generator (daily + weekly)" — opened 18:30:20Z; CLEAN/MERGEABLE; 30-min threshold at 19:00:20Z. Watch. build-build-test-suite-green-001 approaching 1h stale; Forge bot active. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Heartbeat stable at 18:17:33Z; no new sweep since iter 590. Dispatch plan ready; awaiting next persistent daemon code update.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences.
+  - All other G-rules stable. Steady-state degraded hold: **214th iter in series (377–591)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 1 new alert (idx=1143) `sync-blocked:auto-commit-push-failed` — Tier 4 novel; connected to existing APPROVAL_REQUEST `sync-push-rebase-fallback-001`; no separate DM (Larry's actionable-only preference; self-recovers). Watermark: **1143**.
+3. **Always-fix (enable-pr-auto-merge): PR #251 CLEAN/MERGEABLE, 31 min 55 sec elapsed** → `gh pr merge 251 --auto --squash` → merged at 2026-06-02T18:42:53Z (commit 507ad8f). Sequence `approvals-queue-rework` N4 (step-alert-promotion) complete. Logged to cycle-actions.jsonl. ✅
+4. Check E: PR #252 noted (13 min elapsed, under threshold); watch at 19:00:20Z.
+5. Check E: build-build-test-suite-green-001 at ~56 min; Forge bot active; watch for 1h stale.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:43:44Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:43:48Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 15th occurrence; new push-failure variant noted in journal).
+
+**Patterns:**
+- **214th consecutive degraded-hold iter (377–591).** Sequence `approvals-queue-rework` advancing: N1 (PR #250) merged iter 589; N4 (PR #251) merged this iter; N6 (PR #252) under Mirror review.
+- **SYNC-PUSH-REBASE-FALLBACK-001 variant changed.** Previous shape: "Wrong branch: chore/foo" (sync caught transient Forge branch checkout). New shape: "Auto-commit push failed; rolled back" (sync committed locally but push rejected non-FF). Both caused by same gap: sync_agent_core.sh lacks a rebase-before-push fallback. APPROVAL_REQUEST covers both shapes.
+- **suppress-by-design-tier2-skipped-alerts.json in Forge inbox** — implements Larry's actionable-only alert directive. Once merged, SKIPPED tier2 alerts → INFO only; future cooldown file count for SKIPPED variants drops.
+
+**Learned:** `sync-blocked:auto-commit-push-failed` is a new alert-translations.json gap. Should be added as Tier 3 (self-recovering known-pattern) once systemic fix ships. The push-failure variant differs mechanically from "Wrong branch" but both are covered by the same APPROVAL_REQUEST fix.
+
+---
+
 ## Iteration 589 — 2026-06-02 18:28 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1142** (unchanged — 0 new alerts since iter 588). Sync: ⚠️ ERROR (carry-forward, ADVANCED timestamp) — sync.json `status=error`, 18:25:06Z, "Wrong branch: chore/foo" (was 17:57:15Z at iter 588; another sync attempt fired and failed; same SYNC-PUSH-REBASE-FALLBACK-001 pattern; self-recovers; main+clean confirmed by session-start gitStatus). Healer heartbeat: **18:17:33Z** (ADVANCED from 17:47:21Z at iter 588 — fresh sweep ~30 min after last; no post-sweep WARNs). **7/7 services active.** **1 open PR (#251) — PR #250 MERGED this iter.** Forge inbox: **5 files** (build-build-test-suite-green-001, marker-error-step-autoclear-1, marker-error-step-alert-promotion-1, step-digest-generator, **suppress-by-design-tier2-skipped-alerts.json [NEW]**). Beacon/Mirror inboxes: 0.
