@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration 473 — 2026-06-02 03:36 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (unchanged — 0 new alerts since iter 472). Sync: ✅ Nominal (status=no-change at 03:09:16Z; commit=e63dd6f lags HEAD 3fc04c8 by several wrapper commits — normal inter-cycle state; within 2h threshold). Healer heartbeat: **03:14:39Z** (~22 min old at iter write; FRESH). 7/7 services active. **1 open PR (#242, carry-forward)**. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1133 lines** (unchanged from iter 472 watermark). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1133). Last alerts were idx=1129–1133 (heal-stale-daemon-code auto-restarts + heal-pipeline-stall tier2-fallback-skipped, ts 2026-06-02T00:44–00:51Z — prior cycles, already claimed). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format confirmed). Larry's last substantive message: resolution statement 2026-06-01T22:42:48Z UTC (~5h ago). No new directives or distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged from iters 447–472). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. Larry's last message is a resolution statement. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:14:39Z** — ~22 min old at iter write (~03:36Z). FRESH (well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**3fc04c8** ("Pulse cycle 20260602T032950Z" — iter 472 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=**no-change**, commit=e63dd6f lags HEAD 3fc04c8 by several wrapper commits — normal inter-cycle state. last_sync=2026-06-02T03:09:16Z (~27 min old at iter start; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 did not recur. APPROVAL_REQUEST remains open but no active error. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ OPEN PR.** Forge inbox: 0. Beacon inbox: 0. **PR #242 OPEN** — "fix(heal-systemd-install-drift): stop false-positive stuck-timer alerts", created 2026-06-02T03:18:34Z by Larry-Yatch on branch `fix/stuck-timer-false-positive`. mergeable=UNKNOWN (GitHub still computing), reviewDecision="" (no Mirror review yet). Not clean+green — no auto-fix this iter. Carry-forward. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T03:36Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` holds at **2/3** (no new occurrence this iter — 0 new alerts, PR #242 not yet merged). Prediction: PR #242 merge will touch `heal-systemd-install-drift` — heal-stale-daemon-code will auto-restart the healer, producing the 3/3 trigger; dispatch to Beacon fires that iter. `remaining-timers-infinity-trap` G-rule (1/3) and `daemon-reload triggers cycle.timer stuck` G-rule (1/3) remain — both addressed by PR #242 code fix; close on merge confirmation. Steady-state degraded hold: **97th iter in series (377–473)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. PR #242: mergeable=UNKNOWN, no Mirror review — not clean+green, no auto-fix this iter.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T03:36:25.428616+00:00. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T03:36:26.574980+00:00. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open but no active error.
+
+**Patterns:**
+- **System fully quiescent, 97th consecutive degraded-hold iter.** 0 new alerts, 1 open PR (#242, awaiting Mirror), 0 inbox tasks, 7/7 services, healer heartbeat fresh, sync nominal. Only active divergence from prior iters: PR #242 now open for review.
+- **PR #242 still awaiting Mirror review.** Created 03:18:34Z, ~18 min before this iter write. Reasonable for Mirror to not have reviewed yet — no action. If clean+green and >30 min in a future iter, check auto-merge eligibility.
+- **heal-stale-daemon-code G-rule at 2/3 — 3/3 still expected on PR #242 merge.** Dispatch plan ready (two-part Beacon envelope: add alert-translations.json entry + downgrade WARNING→INFO in stale-daemon healer).
+
+**Learned:** Nothing new. State is stable carry-forward from iter 472.
+
+---
+
 ## Iteration 472 — 2026-06-02 03:27 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (unchanged — 0 new alerts since iter 471). Sync: ✅ Nominal (status=no-change at 03:09:16Z; commit=e63dd6f lags HEAD 79b2acc by 1 wrapper commit — normal inter-cycle state; within 2h threshold). Healer heartbeat: **03:14:39Z** (~13 min old at iter write; FRESH). 7/7 services active. **1 open PR (#242, new)**. Forge inbox: 0. Beacon inbox: 0.
