@@ -4,6 +4,59 @@
 
 ---
 
+## Iteration 447 — 2026-06-02 00:09 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts). Sync: ⚠️ ERROR carry-forward at 23:55:25Z (SYNC-PUSH-REBASE-FALLBACK-001 — 10th total / 4th post-clear; repo HEAD=9e457ca current via wrapper push). Healer heartbeat: 23:43:37Z (~26 min old; FRESH). 7/7 services active. 0 open PRs.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1127 lines** (unchanged). 0 new alerts since iter 446 watermark.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1127). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No directive or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, IMPROVING).** alert-cooldown/warning/: **112** total (was 293 at iter 446 — **181 non-stall files expired naturally; plateau broke**). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No orphan Larry directives found. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **23:43:37Z** — ~26 min old at 00:09Z. FRESH (within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus context: branch=main, clean. HEAD=9e457ca ("Pulse cycle 20260602T000703Z" — iter 446 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 carry-forward.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-01T23:55:25Z. Commit in sync.json (3cf4e8bc) predates iter 446 wrapper push (9e457ca); wrapper recovered the push independently. 12 min old — under 2h threshold. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + elevated. No new DM (last sent iter 440, idx=1125). ⚠️ Carry-forward.
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. All clear. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday — all day-gated checks (Check I Monday, Check VIII Monday, Check IX Monday, Check X Monday) gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **71st iter in series (377–447)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (0 open PRs; repo at parity; pipeline stall carry-forward; sync error carry-forward with repo current).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:09:30.592784+00:00. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:09:31Z. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 already elevated at iter 440 (idx=1125); no new occurrence this iter.
+
+**Patterns:**
+- **Cooldown plateau broke: 293 → 112 total (−181 non-stall files).** Pipeline-stall keyed files unchanged at 27. The non-stall cooldown files (deploy-notifier, burn-rate, misc healers) expired naturally between iters 446 and 447 (~4 min gap). The plateau (iters 443–446 all at 293) self-corrected without OAuth restore — those files simply hit their max-age and expired. The remaining 27 pipeline-stall files will persist (or be replaced) as long as OAuth remains expired. This is the expected natural-expiry behavior. No action.
+- **System near-quiescent.** After PR #238 merge (Check X live), no new build activity. 0 open PRs, 0 inbox tasks, 7/7 services active, 0 new alerts. The pipeline stall + sync error are the only open carry-forwards, both APPROVAL_REQUEST-gated.
+
+**Learned:** Non-stall cooldown plateau was temporary — natural expiry resumed within ~4 minutes of the plateau observation. The cooldown file count is not a reliable trend indicator on a per-5-min basis; individual file TTLs cause step-function drops rather than smooth decay.
+
+---
+
 ## Iteration 446 — 2026-06-02 00:04 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (1 new alert — review-pass PR #238, Tier 3). **PR #238 MERGED** ✅ — "feat(pulse): Check X chain-quality regression watch" — Mirror approved, auto-merged ~23:59:59Z, commit 1e47005. Local main at parity with origin. Sync: ⚠️ ERROR at 23:55:25Z (SYNC-PUSH-REBASE-FALLBACK-001 — **10th total / 4th post-clear** — as predicted). Healer heartbeat: 23:43:37Z (~18 min old; FRESH). 7/7 services active.
