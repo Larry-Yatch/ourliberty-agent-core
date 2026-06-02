@@ -149,6 +149,8 @@ fi
 # diff mentions a fixture-leak task_id.
 # shellcheck source=_lib_pulse_runtime.sh
 source "${SCRIPTS_DIR}/_lib_pulse_runtime.sh"
+# shellcheck source=_lib_push_with_rebase.sh
+source "${SCRIPTS_DIR}/_lib_push_with_rebase.sh"
 if ! git diff --quiet || ! git diff --cached --quiet; then
     if all_modified_in_pulse_runtime_allowlist "$REPO_DIR"; then
         AUTO_PRE_HEAD="$(git rev-parse HEAD)"
@@ -158,10 +160,15 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "pulse: auto-commit runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only Pulse-owned runtime files dirty (see scripts/_lib_pulse_runtime.sh allowlist). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
             log "Auto-committed Pulse runtime files; pushing to origin/main"
-            if git push -q origin main 2>/dev/null; then
-                log "Pushed Pulse runtime auto-commit to origin/main"
+            # Reuse run_cycle.sh's rebase fallback: a bare push loses the race
+            # when an interactive PR merge advances origin/main mid-cycle. Rebase
+            # onto origin and retry instead of rolling back + alerting on every
+            # routine non-FF (SYNC-PUSH-REBASE-FALLBACK-001).
+            if push_with_rebase origin main /dev/stdout; then
+                log "Pushed Pulse runtime auto-commit to origin/main (rebase fallback available)"
             else
-                log "ERROR: push of Pulse runtime auto-commit failed; rolling back to ${AUTO_PRE_HEAD}"
+                log "ERROR: push of Pulse runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD}"
+                git rebase --abort 2>/dev/null || true
                 git reset --hard "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
                 write_status "error" "Auto-commit push failed; rolled back"
                 alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
