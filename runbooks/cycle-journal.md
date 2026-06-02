@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 589 — 2026-06-02 18:28 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1142** (unchanged — 0 new alerts since iter 588). Sync: ⚠️ ERROR (carry-forward, ADVANCED timestamp) — sync.json `status=error`, 18:25:06Z, "Wrong branch: chore/foo" (was 17:57:15Z at iter 588; another sync attempt fired and failed; same SYNC-PUSH-REBASE-FALLBACK-001 pattern; self-recovers; main+clean confirmed by session-start gitStatus). Healer heartbeat: **18:17:33Z** (ADVANCED from 17:47:21Z at iter 588 — fresh sweep ~30 min after last; no post-sweep WARNs). **7/7 services active.** **1 open PR (#251) — PR #250 MERGED this iter.** Forge inbox: **5 files** (build-build-test-suite-green-001, marker-error-step-autoclear-1, marker-error-step-alert-promotion-1, step-digest-generator, **suppress-by-design-tier2-skipped-alerts.json [NEW]**). Beacon/Mirror inboxes: 0.
+
+**Notable since iter 588:**
+- **PR #250 MERGED** (18:27:43Z) — always-fix applied: `gh pr merge 250 --auto --squash`. PR "feat(heal): auto-clear resolved decision rows (approvals-queue-rework N1)" was CLEAN/MERGEABLE and had reached the 30-min threshold. Merged successfully. `merge_commit: a55204a` (step-autoclear feature; heal_stale_approvals.py + systemd timer). Sequence `approvals-queue-rework` N1 complete.
+- **Healer swept at 18:17:33Z** — ~30 min after 17:47:21Z. No WARNs fired. G-rule 2/3 holds.
+- **suppress-by-design-tier2-skipped-alerts.json arrived in Forge inbox at 18:18Z** — Beacon envelope implementing Larry's 2026-06-02 directive to make tier2-fallback SKIPPED alerts log-only (not DMed). Source: `beacon`, reply_chat_id indicates Telegram-originated. Forge task: fix `heal_pipeline_stall.py` check_tier2_fallback_failures so SKIPPED → INFO log only; FAILED/UNAVAILABLE unchanged. Prompt well-formed. Task age ~10 min; under 1h threshold.
+- **Sync at 18:25:06Z** — another sync attempt ran and failed ("Wrong branch: chore/foo"). 13th SYNC-PUSH-REBASE-FALLBACK-001 occurrence — confirms the pattern now fires after every PR merge day (PR #250 merged at 18:27Z; sync at 18:25Z caught the transient branch checkout). APPROVAL_REQUEST still open.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1142 lines** (unchanged from iter 588). 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1142). Watermark stable. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "18:15:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since "18:15:00"` → no entries. No Telegram activity since iter 588. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No new Telegram activity. Forge inbox: 5 files — all within 1h stale threshold (oldest: step-digest-generator at 17:46Z = ~41 min; newest: suppress-by-design at 18:18Z = ~10 min). Forge bot active. New `suppress-by-design-tier2-skipped-alerts.json` is a well-formed Beacon envelope implementing Larry's actionable-only alert directive; noted but not stale. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat ADVANCED: **18:17:33Z** (~11 min old at 18:28Z; FRESH within 90-min threshold; ~30 min cadence from prior 17:47:21Z). No post-sweep WARNs in journalctl. G-rule at **2/3** holds (no persistent daemon code updated; healer found nothing to warn about). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (carry-forward, new occurrence).** sync.json `status=error`, 18:25:06Z, "Wrong branch: chore/foo". PR #250 merged at 18:27Z; sync ran ~90s before merge and caught a transient non-main branch state. **13th SYNC-PUSH-REBASE-FALLBACK-001 occurrence** (was 12th at iter 474; pattern: fires on every PR merge day). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. Session-start gitStatus confirms main+clean. Self-recovers on next sync. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #251 OPEN — 17 min elapsed, under 30-min threshold. PR #250 MERGED.** PR #250 merged at 18:27:43Z (always-fix, see Did section). PR #251 "feat(promote-alerts): N4 needs-CEO-attention promotion rule" — created 18:10:46Z, `mergeStateStatus=CLEAN`, `mergeable=MERGEABLE`, `reviewDecision=""`, `autoMergeRequest=null`. 30-min watch threshold: 18:40:46Z. Forge inbox: 5 files — step-digest-generator and build-build-test-suite-green-001 approaching 45-min mark; marker-error-step-autoclear-1 (step 0 retry, should resolve now that PR #250 merged); marker-error-step-alert-promotion-1 (step 1 preflight retry); suppress-by-design new task (fresh). Forge bot active. ⚠️ (watch PR #251 at 18:40:46Z; watch step-digest-generator approaching 1h at 18:46Z)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer swept at 18:17:33Z — no WARNs fired (no persistent daemon code updated). Dispatch plan ready; awaiting next persistent daemon code update.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences this iter.
+  - All other G-rules stable. Steady-state degraded hold: **213th iter in series (377–589)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1142 — 0 new alerts; no action.
+3. Check 5: healer heartbeat ADVANCED to 18:17:33Z (was 17:47:21Z at iter 588). No post-sweep WARNs → G-rule at 2/3 holds.
+4. **Always-fix (enable-pr-auto-merge): PR #250 CLEAN/MERGEABLE, 30-min threshold reached** → `gh pr merge 250 --auto --squash` → merged at 2026-06-02T18:27:43Z. Logged to `runbooks/cycle-actions.jsonl`. Sequence `approvals-queue-rework` N1 (step-autoclear) complete. ✅
+5. Check E: PR #251 noted (17 min, under threshold); watch at 18:40:46Z.
+6. Check E: New `suppress-by-design-tier2-skipped-alerts.json` in Forge inbox — Beacon envelope for Larry's actionable-only alert directive. Noted, not stale.
+7. Check B: SYNC-PUSH-REBASE-FALLBACK-001 13th occurrence noted. APPROVAL_REQUEST still open.
+8. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:28:57.284222+00:00. ✅
+9. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:28:57.652823+00:00. ✅
+10. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 13th (APPROVAL_REQUEST open).
+
+**Patterns:**
+- **213th consecutive degraded-hold iter (377–589).** PR #250 merged this iter — N1 of `approvals-queue-rework` sequence complete. Sequence advancing: N4 (step-alert-promotion→PR #251) under Mirror review. Step-digest-generator (N2?) still in Forge inbox, now unblocked by N1 merge.
+- **SYNC-PUSH-REBASE-FALLBACK-001 at 13/14 PR merge days (92.9%).** Pattern fully confirmed: fires every time a PR merges and the sync catches the transient branch checkout. APPROVAL_REQUEST open; fix prevents the noise entirely. Pattern is predictable but APPROVAL_REQUEST hasn't moved — note as carry-forward.
+- **suppress-by-design task arrived via Beacon** — this implements Larry's directive from today. Forge will process it; once merged, the tier2-fallback SKIPPED alert noise stops reaching Larry's phone. G-rule (outbox-notifier:mirror-dag-pass 1/3) stays open.
+- **PR #251 UNKNOWN in gh pr list but CLEAN in gh pr view.** Same gh pr list staleness observed across iters 587–589 for both PRs. Pattern: `gh pr list` returns cached UNKNOWN for recently-opened PRs; `gh pr view` forces recompute and returns the real state. Future Check E should default to `gh pr view` for PRs showing UNKNOWN in list output.
+
+**Learned:** `gh pr merge --auto --squash` on a PR with no required-review branch protection merges immediately rather than queuing for auto-merge (returns exit 0 with no output; `mergedAt` populated on follow-up check). This is the correct behavior for T0 sandbox repos. The UNKNOWN/UNKNOWN state in `gh pr list` is a GitHub API caching artifact — not a real conflict. Always validate with `gh pr view` when list shows UNKNOWN.
+
+---
+
 ## Iteration 588 — 2026-06-02 18:16 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1142** (unchanged — 0 new alerts since iter 587). Sync: ⚠️ ERROR (carry-forward, self-recovering) — sync.json `status=error`, "Wrong branch: chore/foo", 17:57:15Z. Healer heartbeat: **17:47:21Z** (same since iter 585; ~29 min old at 18:16Z; FRESH within 90-min threshold). **7/7 services active.** **2 open PRs (#250, #251).** Forge inbox: **4 files** (build-build-test-suite-green-001, marker-error-step-autoclear-1, marker-error-step-alert-promotion-1 **[NEW]**, step-digest-generator). Beacon/Mirror inboxes: 0.
