@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 625 — 2026-06-02 23:01 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Alert watermark: **1150** (+1 new since iter 624). Sync: ⚠️ ERROR — `status=error, "Auto-commit push failed; rolled back"`, `last_sync=2026-06-02T22:58:20Z` (~3 min old; SYNC-PUSH-REBASE-FALLBACK-001 22nd occurrence; rollback confirmed clean). Healer heartbeat: **22:48:19Z** (ADVANCED from 22:18:19Z at iter 624; ~13 min old; FRESH within 90-min threshold; healer swept at ~22:48Z). **7/7 services active.** **No open PRs.** Pipeline stall carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief absent — **~254 min since Beacon consumed dispatch** (18:51Z). Tier 2 OAuth expired. [yellow] escalation idx=9 stands.
+
+**Notable since iter 624 (22:48Z — ~13-min window):**
+- **+1 new alert.** larry-alerts.jsonl: 1149 → **1150**. New alert (line 1150, ts 22:51Z): `source: pulse-cycle, subject: cycle-blocked:dirty-tree-on-fix-test-live-emit-guard`. Cycle that ran at 22:51Z saw the repo on branch `fix-test-live-emit-guard` with uncommitted changes; refused to auto-commit. **Self-resolved:** PR #256 from `fix-test-live-emit-guard` merged (session-start gitStatus: main, clean, HEAD=d8fb58d). No action needed.
+- **SYNC-PUSH-REBASE-FALLBACK-001 recurred (22nd total).** sync.json status=error at 22:58:20Z. "Auto-commit push failed; rolled back." Rollback left repo clean (confirmed session-start gitStatus). APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. No new escalation — existing APPROVAL_REQUEST stands.
+- **Healer heartbeat ADVANCED.** 22:18:19Z → 22:48:19Z. Healer swept at ~22:48Z (confirms ~30-min cadence). No new alerts produced.
+- **PR #256 MERGED.** "fix(tests): block live chain_events writes during test runs" (`fix-test-live-emit-guard` branch). Commit d8fb58d. Repo returned to main+clean. The corresponding cycle-blocked alert (line 1150) is self-resolved.
+- **Beacon inbox stable at 34 tasks.** Larry-reject/approval tasks from 22:15-22:16Z (~46 min old at check; within 1h threshold; stale ETA ~23:15Z UTC, now ~14 min away). 3 sequence steps from 22:25Z (~36 min old; stale ETA ~23:25Z). All Beacon OAuth-blocked.
+- **Forge inbox stable at 1 task.** `fix-advancer-reconcile-gh-failure.json` (~21 min old; within 1h threshold; stale ETA ~23:40Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert, Tier 3 by judgment.**
+  - New line 1150: `source=pulse-cycle, subject=cycle-blocked:dirty-tree-on-fix-test-live-emit-guard, ts=22:51Z`. Cycle blocked own auto-commit when repo was on PR branch. PR #256 merged; repo back on main+clean. Self-resolved.
+  - Classification: **Tier 3 by judgment** (expected-by-design behavior; self-resolving when PR work completes; no action required). Subject is NOT in `config/alert-translations.json` — first occurrence of this subject shape. G-rule candidate: `cycle-blocked:dirty-tree-*` not in alert-translations.json (1/3; at 3/3 dispatch to Beacon to add Tier 3 translation).
+  - Tier-reset: NO (Tier 3 carve-out per § 2.3).
+  - Triage: 1 alert, Tier-3 silenced by judgment (cycle-blocked self-resolved, PR #256 merged).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -p warning --since 2026-06-02T22:48:00` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No beacon-bot distress. No Larry directives detected in scan window. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. `heal-stale-daemon-warn-info-calibration-001` brief absent — ~254 min post-Beacon-consumption (18:51Z). [yellow] escalation idx=9 stands. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Watch.** Beacon inbox: **34 tasks** (31 larry-reject/approval ~46 min old; 3 sequence steps ~36 min old; all within 1h threshold; stale ETAs ~23:15-23:25Z UTC). Forge inbox: **1 task** (`fix-advancer-reconcile-gh-failure.json`, ~21 min old; stale ETA ~23:40Z). Beacon + Forge both OAuth-blocked. ⚠️ Watch
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **22:48:19Z** (ADVANCED; ~13 min old; FRESH within 90-min threshold; healer confirmed sweeping on ~30-min cadence). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: main, clean, HEAD=d8fb58d (PR #256 merge commit). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (22nd total).** sync.json `status=error`, `last_sync=22:58:20Z`. "Auto-commit push failed; rolled back." Rollback confirmed clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open; no new occurrence count until this iter. ⚠️ (Carry-forward; no new escalation.)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Watch.** No open PRs. Beacon 34 tasks (within threshold; stale ETAs ~23:15-23:25Z UTC). Forge 1 task (within threshold; stale ETA ~23:40Z). `heal-stale-daemon-warn-info-calibration-001` pipeline stall carry-forward. ⚠️ Watch
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (stable, no new occurrences).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (stable).
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Forge brief MISSING — ~254 min post-Beacon-consumption.** [yellow] escalation idx=9 stands.
+  - **NEW: `cycle-blocked:dirty-tree-* not in alert-translations.json`: 1/3** (first observation, this iter, 22:51Z). Expected-by-design; at 3/3 dispatch to Beacon to add Tier 3 translation.
+  - Steady-state degraded hold: **248th iter in series (377–625)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: classified 1 new alert as Tier 3 by judgment (cycle-blocked:dirty-tree self-resolved via PR #256 merge). No dispatch.
+3. Check B: noted SYNC-PUSH-REBASE-FALLBACK-001 22nd occurrence. No new escalation (existing APPROVAL_REQUEST `sync-push-rebase-fallback-001` stands).
+4. All other checks nominal or carry-forward. No auto-fix actions required.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T23:02:14.825119+00:00. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:02:15Z. ✅
+7. Wrote journal entry and updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending; [yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 (22nd total; APPROVAL_REQUEST open; no new escalation). `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (escalated iter 602 [yellow] idx=9; ~254 min elapsed, no change). Watch: Beacon inbox tasks will stale at ~23:15-23:25Z UTC if OAuth not restored.
+
+**Patterns:** SYNC-PUSH-REBASE-FALLBACK-001 22nd total confirms the pattern fires again on PR merge day (PR #256 today). New G-rule candidate (1/3): `cycle-blocked:dirty-tree-*` alert subject not in alert-translations.json. Healer heartbeat advancing normally. No new systemic signals beyond carry-forward stalls.
+
+**Learned:** `cycle-blocked:dirty-tree-*` is a self-resolving alert when PR work is in flight — the cycle correctly blocks its own auto-commit to avoid landing changes on the wrong branch, and the situation resolves when the PR merges. This should become a Tier 3 known-pattern in `config/alert-translations.json` to prevent future triage overhead. G-rule at 1/3; dispatch to Beacon if it recurs twice more.
+
+---
+
 ## Iteration 624 — 2026-06-02 22:48 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 623). Sync: ✅ FRESHENED — `status=no-change`, `last_sync=2026-06-02T22:37:36Z` (~11 min old; IMPROVED from 21:37:24Z at iter 623; automated cycle triggered successful sync at 22:37Z; no SYNC-PUSH-REBASE-FALLBACK-001 recurrence). Healer heartbeat: **22:18:19Z** (UNCHANGED since iter 620; now ~30 min old; approaching 90-min threshold; sweep expected imminently). **7/7 services active.** **No open PRs.** Pipeline stall carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief still absent — **~237 min since Beacon consumed the dispatch** (18:51Z). Root cause: Tier 2 OAuth expired. [yellow] escalation at pulse-escalations.json idx=9 stands.
