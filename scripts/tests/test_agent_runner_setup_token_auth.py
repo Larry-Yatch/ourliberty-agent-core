@@ -40,8 +40,8 @@ if str(_REPO_SCRIPTS) not in sys.path:
 import agent_runner as ar  # noqa: E402
 
 
-_TIER1_TOKEN = 'sk-ant-setuptoken-tier1-fake-value-xxxxxxxxxxxxxxxxxxxxxxxxxx'
-_TIER2_TOKEN = 'sk-ant-setuptoken-tier2-fake-value-yyyyyyyyyyyyyyyyyyyyyyyyyy'
+_TIER1_TOKEN = 'FAKE-oauth-setuptoken-tier1-not-a-real-key-xxxxxxxxxxxxxxxx'
+_TIER2_TOKEN = 'FAKE-oauth-setuptoken-tier2-not-a-real-key-yyyyyyyyyyyyyyyy'
 _DEFAULT_TOKEN = 'oauth-default-from-token-manager-zzzzzzzzzzzzzzzzzzzzzzzzzz'
 
 
