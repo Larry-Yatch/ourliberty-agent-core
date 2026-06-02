@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration 472 — 2026-06-02 03:27 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (unchanged — 0 new alerts since iter 471). Sync: ✅ Nominal (status=no-change at 03:09:16Z; commit=e63dd6f lags HEAD 79b2acc by 1 wrapper commit — normal inter-cycle state; within 2h threshold). Healer heartbeat: **03:14:39Z** (~13 min old at iter write; FRESH). 7/7 services active. **1 open PR (#242, new)**. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1133 lines** (unchanged from iter 471 watermark). 0 new alerts. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1133). Last alerts were idx=1131–1133 (heal-pipeline-stall tier2-fallback-skipped, ts 2026-06-02T00:51Z — prior cycles, already claimed). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format confirmed). Larry's last message: resolution statement 2026-06-01T22:42:48Z UTC. No new directives or distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged from iters 447–471). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. Larry's last message is a resolution statement. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:14:39Z** — ~13 min old at iter write. FRESH (well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**79b2acc** ("Pulse cycle 20260602T031908Z" — iter 471 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=**no-change**, commit=e63dd6f lags HEAD 79b2acc by 1 wrapper commit — normal inter-cycle state. last_sync=2026-06-02T03:09:16Z (within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 did not recur. APPROVAL_REQUEST remains open but no active error. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ NEW PR.** Forge inbox: 0. Beacon inbox: 0. **PR #242 OPEN** — "fix(heal-systemd-install-drift): stop false-positive stuck-timer alerts", created 2026-06-02T03:18:34Z by Larry-Yatch on branch `fix/stuck-timer-false-positive`. mergeable=UNKNOWN (GitHub still computing), reviewDecision="" (no Mirror review yet), no CI checks. Not clean+green — no auto-fix this iter. Monitor next cycle. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T03:27Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` holds at **2/3** (no new occurrence this iter). **Prediction: PR #242 merge will touch `heal-systemd-install-drift` — heal-stale-daemon-code will auto-restart the healer, producing the 3/3 trigger; dispatch to Beacon will fire that iter.** `remaining-timers-infinity-trap` G-rule (1/3, iter 397) and `daemon-reload triggers cycle.timer stuck` G-rule (1/3, iter 317) are directly addressed by PR #242's fix logic — if PR merges successfully, these two G-rules can be closed as "addressed by code fix". Steady-state degraded hold: **96th iter in series (377–472)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. PR #242: not clean+green yet — no auto-fix. Will monitor next cycle; if clean+green and >30 min without Mirror review, surface for attention.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T03:27:09.643925+00:00. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T03:27:10.695578+00:00. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open but no active error.
+
+**Patterns:**
+- **PR #242 opened by Larry directly.** Permanent fix for the false-positive stuck-timer alert from `heal-systemd-install-drift` — the transient infinity-anchor read during timer co-fire at the top of each period. Root cause matches the `remaining-timers-infinity-trap` G-rule (1/3, iter 397) and `daemon-reload triggers cycle.timer stuck` G-rule (1/3, iter 317). If this PR merges cleanly: close both G-rules as "addressed by code fix." Separately, the merge will likely produce `heal-stale-daemon-code` G-rule 3/3 — dispatch ready.
+- **heal-stale-daemon-code G-rule at 2/3 — 3/3 trigger expected on PR #242 merge.** Dispatch plan: two-part Beacon envelope: (1) add `heal-stale-daemon-code` auto-restart entry to `config/alert-translations.json` as Tier 3/FYI; (2) downgrade successful-restart log emission from WARNING to INFO in the stale-daemon healer script. Will dispatch that iter.
+- **System otherwise quiescent.** All other signals stable carry-forward.
+
+**Learned:** PR #242 is Larry's own permanent fix for the infinity-trap false-positive — a code-level fix that pre-empts the G-rule dispatch I would have needed to do. Pattern: when Larry directly ships a fix for a G-rule finding, close the G-rule watch items on merge confirmation rather than waiting for the 3/3 dispatch path.
+
+---
+
 ## Iteration 471 — 2026-06-02 03:18 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (unchanged — 0 new alerts since iter 470). Sync: ✅ Nominal (status=no-change at 03:09:16Z; commit=**e63dd6f** = HEAD — fully caught up, no lag). Healer heartbeat: **03:14:39Z** (~4 min old at iter start; FRESH). 7/7 services active. 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
