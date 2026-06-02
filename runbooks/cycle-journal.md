@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 587 — 2026-06-02 18:06 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1142** (+3 since iter 586: idx=1140–1142 — three `pipeline-stall:tier2-fallback-skipped-*` alerts at 18:03:10Z; all Tier 3/FYI known-pattern matches). Sync: ⚠️ ERROR (carry-forward, self-recovering) — sync.json `status=error`, "Wrong branch: chore/foo". Healer heartbeat: **17:47:21Z** (same as iter 586; ~19 min old at 18:06Z; FRESH within 90-min threshold). **7/7 services active.** **1 open PR (#250).** Forge inbox: **4 files** (same as iter 586; step-alert-promotion, step-digest-generator, build-build-test-suite-green-001, marker-error-step-autoclear-1; all under 1h stale threshold). Beacon/Mirror inboxes: 0.
+
+**Notable since iter 586:**
+- **3 new alerts (idx 1140–1142)** at 18:03:10Z — all `pipeline-stall:tier2-fallback-skipped-*` variants: `rate_limit:forge`, `auth_401:forge`, `rate_limit:beacon-bot`. Strip-segment lookup matches `pipeline-stall:tier2-fallback-skipped-rate_limit` and `pipeline-stall:tier2-fallback-skipped-auth_401` in `config/alert-translations.json` (PR #237). Tier 3/FYI — silenced, no DM, no tier-reset. Watermark advanced to 1142.
+- **PR #250 mergeStateStatus changed to UNKNOWN** (was CLEAN at iter 586 17:58Z). Likely transient GitHub recompute after new commits to main (iter 586 auto-commit `2672de8` at 18:05:59Z pushed to main after PR was opened). Under 30-min auto-merge threshold (~18:28:09Z). Watch.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1142 lines** (+3 from iter 586). alert-triage.json missing on disk (INFO; known state).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 3 new alerts — all Tier 3/FYI known-pattern.** idx=1140: `pipeline-stall:tier2-fallback-skipped-rate_limit:forge` (18:03:10Z). idx=1141: `pipeline-stall:tier2-fallback-skipped-auth_401:forge` (18:03:10Z). idx=1142: `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` (18:03:10Z). Strip-segment lookup: `:forge`/`:beacon-bot` stripped → matches existing entries in `config/alert-translations.json`. All Tier 3/FYI: Forge Tier 1 hit rate_limit/auth_401 on --resume sessions; Tier 2 skip is correct behavior (account-bound). Silence. No DM. No tier-reset. Watermark: **1142**. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "18:03:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since "18:03:00"` → no entries. No Telegram activity since iter 586. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: 4 files — step-alert-promotion (17:46Z, ~20 min), step-digest-generator (17:46Z, ~20 min), build-build-test-suite-green-001 (17:47Z, ~19 min), marker-error-step-autoclear-1 (17:58Z, ~8 min). All under 1h stale threshold. Forge bot active. Beacon/Mirror: 0. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **17:47:21Z** (~19 min old at 18:06Z; FRESH within 90-min threshold). No WARNs in journalctl since 18:03Z. G-rule at **2/3** holds. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (carry-forward, self-recovering).** sync.json `status=error`, "Wrong branch: chore/foo". Same SYNC-PUSH-REBASE-FALLBACK-001 pattern. Session-start confirms main+clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #250 OPEN — 8.5 min elapsed, under 30-min threshold. mergeStateStatus=UNKNOWN (transient).** PR #250 "feat(heal): auto-clear resolved decision rows (approvals-queue-rework N1)" opened 17:58:09Z. `mergeStateStatus=UNKNOWN`, `mergeable=UNKNOWN` (was CLEAN/MERGEABLE at iter 586; likely GitHub recomputing after `2672de8` pushed to main at 18:05:59Z). `reviewDecision=""` (Mirror not yet reviewed). `autoMergeRequest=null`. 30-min always-fix threshold at ~18:28:09Z. marker-error-step-autoclear-1.json: retry 1/3, self-recovering. Remaining inbox files: step-alert-promotion, step-digest-generator (awaiting step 0 merge), build-build-test-suite-green-001. All under stale threshold. ⚠️ (watch)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Heartbeat unchanged at 17:47:21Z. No WARNs fired. Dispatch plan ready; awaiting next persistent daemon code update.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences this iter.
+  - All other G-rules stable. Steady-state degraded hold: **211th iter in series (377–587)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 3 new alerts (idx 1140–1142) at 18:03:10Z, all Tier 3/FYI (`pipeline-stall:tier2-fallback-skipped-*`). Classified via strip-segment lookup against `config/alert-translations.json`. Watermark advanced to 1142. No DM, no dispatch, no tier-reset.
+3. Check E: PR #250 mergeStateStatus=UNKNOWN noted (transient GitHub recompute likely). Under 30-min threshold; watch at ~18:28:09Z.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:08:29.599950+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:08:30.430184+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open).
+
+**Patterns:**
+- **211th consecutive degraded-hold iter (377–587).** No structural change vs iter 586. 3 pipeline-stall FYI alerts fired at 18:03:10Z — same recurring pattern from Forge --resume session hitting Tier 1 rate_limit/auth_401 while Tier 2 OAuth is expired. All correctly Tier 3/FYI via allowlist.
+- **PR #250 mergeStateStatus=UNKNOWN.** New observation: PR opened when repo is mid-activity (main receiving auto-commits) can flip to UNKNOWN as GitHub recomputes merge state. Expect it to resolve to CLEAN/MERGEABLE on next query once GitHub settles.
+- **Iter inter-arrival:** iter 586 was at 18:03Z; iter 587 at 18:06Z — only 3.5 minutes between interactive iters. Normal for interactive session patterns.
+
+**Learned:** `pipeline-stall:tier2-fallback-skipped-*` pattern fires every time Forge --resume sessions hit rate_limit or auth_401 while Tier 2 OAuth is expired. Correctly Tier 3/FYI (allowlist match, PR #237). Volume: 3 alerts in one tick (2 for forge, 1 for beacon-bot). Pattern is stable and well-handled; no new G-rule observation needed until rate changes.
+
+---
+
 ## Iteration 586 — 2026-06-02 18:03 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (unchanged — 0 new alerts). Sync: ⚠️ ERROR (carry-forward, self-recovering) — sync.json `status=error`, 17:57:15Z, "Wrong branch: chore/foo" (same SYNC-PUSH-REBASE-FALLBACK-001 pattern; session-start gitStatus confirms main+clean now). Healer heartbeat: **17:47:21Z** (same as iter 585; ~16 min old at 18:03Z; FRESH within 90-min threshold). **7/7 services active.** **1 open PR (#250).** Forge inbox: **4 files** (build-build-test-suite-green-001, marker-error-step-autoclear-1, step-alert-promotion, step-digest-generator). Beacon/Mirror inboxes: 0.
