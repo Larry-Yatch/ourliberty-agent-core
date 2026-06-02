@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 599 — 2026-06-02 19:39 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (+1 new alert since iter 598). Sync: ✅ RECOVERED — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date" (recovered from iter 598's 21st failure; self-recovery confirmed). Healer heartbeat: **19:17:35Z** (~22 min old at 19:39Z; FRESH within 90-min threshold). **7/7 services active.** **No open PRs.** Forge inbox empty (consuming `heal-stale-daemon-warn-info-calibration-001`; no PR yet).
+
+**Notable since iter 598 (19:34Z):**
+- **Sync RECOVERED** — sync.json `status=no-change`, 19:37:23Z. The 21st sync failure (iter 598, "Auto-commit push failed; rolled back") self-recovered exactly as documented: the rollback left local state clean, next sync cycle found "Already up to date." APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (systemic fix, not a crisis).
+- **1 new alert** — `outbox-notifier` review-pass notification for PR #254 at 19:32:17Z. `intent: "review-pass"`, `task_id: "suppress-by-design-tier2-skipped-alerts"`. Same pattern as iter 593 (PR #253 review-pass). Tier 3 / FYI — suppressed. G-rule `outbox-notifier:review-pass not in alert-translations.json` → **2/3**.
+- **All inboxes empty** — Beacon, Forge, Mirror all clear. Forge has consumed `heal-stale-daemon-warn-info-calibration-001` (dispatched by Beacon per iter 594); no new PR yet. Normal build lag.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1149 lines** (+1 new, Tier 3 suppressed). G-rule counter: review-pass 2/3.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (Tier 3 suppressed).** 1149 lines — 1 new vs iter 598 watermark. New alert: `outbox-notifier` / `intent: "review-pass"` for PR #254 at 19:32:17Z. Same FYI success pattern as iter 593 (PR #253 auto-merge). Tier 3 — known pattern, silence + journal. G-rule `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (was 1/3, iter 593). At 3/3: dispatch to Beacon to add `review-pass` as Tier 3/FYI translation in `config/alert-translations.json`. Note: related to `mirror-dag-pass` G-rule (1/3, iter 584); dispatch will batch both when either hits 3/3. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:32:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:32:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Beacon inbox: EMPTY ✅. Forge inbox: EMPTY ✅. Mirror inbox: EMPTY ✅. All clear. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:17:35Z** (~22 min old at 19:39Z; FRESH within 90-min threshold). No new WARNs. Forge task `heal-stale-daemon-warn-info-calibration-001` consumed (Forge inbox empty); no PR yet — Forge building. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ✅ RECOVERED.** sync.json `status=no-change`, `last_sync=19:37:23Z`, message="Already up to date at 8a93357...". Recovered from iter 598's 21st sync failure. Self-recovery confirmed — rollback left state clean, next cycle succeeded. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (prevent future occurrences). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** No open PRs (`gh pr list --state open` → `[]`). Most recent: PR #254 MERGED (iter 598). Forge inbox empty — `heal-stale-daemon-warn-info-calibration-001` consumed, build in progress. Watch for new PR. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (was 1/3, iter 593; +1 from new alert idx=1149, PR #254 review-pass at 19:32:17Z). Next occurrence → dispatch to Beacon (batch with `mirror-dag-pass` 1/3 if it also fires).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge task `heal-stale-daemon-warn-info-calibration-001` consumed; build in progress.** Awaiting Forge PR.
+  - All other G-rules stable. Steady-state degraded hold: **222nd iter in series (377–599)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 1 new alert (1149 total) — review-pass for PR #254, Tier 3 suppressed. G-rule `outbox-notifier:review-pass` → 2/3. No dispatch (not yet at 3/3).
+3. Check B: Sync RECOVERED — noted positive, no action needed. APPROVAL_REQUEST still open.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:39:40.553185Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:39:41Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 21st occurrence; self-recovered iter 599).
+
+**Patterns:**
+- **Sync self-recovery confirmed.** The "Auto-commit push failed; rolled back" variant (iter 598, 21st sync failure) recovered exactly as documented: next sync cycle at 19:37Z found the repo already up to date and completed cleanly. The rollback mechanism in `sync_agent_core.sh` is working — it prevents dirty-state corruption — but the APPROVAL_REQUEST `sync-push-rebase-fallback-001` fix (add rebase-before-push fallback) would prevent the rollback cycle entirely.
+- **review-pass G-rule at 2/3.** Both PR #253 (iter 593) and PR #254 (iter 599) produced FYI review-pass notifications that are not in `alert-translations.json`. One more occurrence → batch dispatch to Beacon alongside `mirror-dag-pass` (1/3) to add both as Tier 3/FYI translations.
+
+**Learned:** The sync self-recovery path is now observed to work for both the "Wrong branch" variant AND the "Auto-commit push failed" variant. The invariant holds: both rollback paths leave local state clean, and the next cycle finds "Already up to date." This is a safe degraded mode, not a silent corruption path.
+
+---
+
 ## Iteration 598 — 2026-06-02 19:34 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (UNCHANGED — 0 new alerts since iter 597). Sync: ⚠️ ERROR — NEW VARIANT: sync.json `status=error`, 19:31:18Z, "Auto-commit push failed; rolled back" (**21st sync failure total; new message form vs. "Wrong branch: chore/foo" seen in iters 594–597; same root cause per APPROVAL_REQUEST `sync-push-rebase-fallback-001`**). Healer heartbeat: **19:17:35Z** (~17 min old at 19:34Z; FRESH within 90-min threshold). **7/7 services active.** **PR #254 MERGED at 19:32:15Z** — "fix(healer): tier2-fallback SKIPPED is log-only — suppress by-design alert noise". Mirror approved + auto-merged. Watch item CLOSED. **Forge inbox: EMPTY.** Mirror inbox: `review-suppress-by-design-tier2-skipped-alerts-rev1.json` (orphan post-merge; Mirror will archive).
