@@ -1,0 +1,335 @@
+#!/usr/bin/env python3
+"""Tests for ceo_digest_generator.py — N6 daily/weekly CEO digest.
+
+Covers:
+  - period_window: daily + weekly bounds computed in Larry-local tz.
+  - activity buckets: auto-cleared classification, attention dedup, spend
+    window-sum, decisions-waiting parse, commit-prefix stripping.
+  - render_raw: jargon-free plain outcomes containing the key figures.
+  - build_prompt: carries the jargon ban + the facts.
+  - generate_ceo_voice: success + every failure path (timeout, non-zero,
+    bad JSON, empty result) falls through to (None, None).
+  - write_digest: emits a ceo_digest row with the expected payload shape.
+  - run: end-to-end voice path AND fallback path.
+  - ceo_digest is registered in chain_event_shipper.KNOWN_EVENT_TYPES.
+
+Run:
+    python3 -m unittest scripts.tests.test_ceo_digest_generator
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from contextlib import ExitStack
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+from zoneinfo import ZoneInfo
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+import ceo_digest_generator as cdg  # noqa: E402
+import chain_event_shipper as ces  # noqa: E402
+
+DENVER = ZoneInfo('America/Denver')
+
+
+class _FakeQuery:
+    def __init__(self, parent):
+        self.parent = parent
+        self._lo = 0
+        self._hi = 10 ** 9
+        self._is_upsert = False
+
+    def select(self, *a, **k):
+        return self
+
+    def gte(self, *a, **k):
+        return self
+
+    def lt(self, *a, **k):
+        return self
+
+    def range(self, lo, hi):
+        self._lo, self._hi = lo, hi
+        return self
+
+    def upsert(self, rows, **k):
+        self._is_upsert = True
+        self.parent.upserted.append({'rows': rows, 'kwargs': k})
+        return self
+
+    def execute(self):
+        if self._is_upsert:
+            return SimpleNamespace(data=[])
+        return SimpleNamespace(data=self.parent.events[self._lo:self._hi + 1])
+
+
+class _FakeClient:
+    """Supports both the chain_events read chain and the upsert chain."""
+
+    def __init__(self, events=None):
+        self.events = events or []
+        self.upserted: list[dict] = []
+
+    def table(self, name):
+        self.table_name = name
+        return _FakeQuery(self)
+
+
+class PeriodWindowTest(unittest.TestCase):
+    def test_daily_window_is_prior_local_day(self):
+        # 07:00 MDT on a given day → window = the prior local day [00:00,00:00).
+        now = datetime(2026, 6, 2, 13, 0, tzinfo=timezone.utc)  # 07:00 MDT
+        start, end, label = cdg.period_window('daily', now, DENVER)
+        self.assertEqual(end - start, timedelta(days=1))
+        end_local = end.astimezone(DENVER)
+        start_local = start.astimezone(DENVER)
+        self.assertEqual((end_local.hour, end_local.minute), (0, 0))
+        self.assertEqual(end_local.date(), now.astimezone(DENVER).date())
+        self.assertEqual(start_local.date(), end_local.date() - timedelta(days=1))
+        self.assertIn(start_local.strftime('%B'), label)
+
+    def test_weekly_window_is_prior_local_week_ending_monday(self):
+        now = datetime(2026, 6, 2, 13, 0, tzinfo=timezone.utc)
+        start, end, label = cdg.period_window('weekly', now, DENVER)
+        self.assertEqual(end - start, timedelta(days=7))
+        end_local = end.astimezone(DENVER)
+        self.assertEqual(end_local.weekday(), 0)  # Monday
+        self.assertEqual((end_local.hour, end_local.minute), (0, 0))
+        self.assertLessEqual(end_local, now.astimezone(DENVER))
+        self.assertTrue(label)
+
+    def test_invalid_period_raises(self):
+        with self.assertRaises(ValueError):
+            cdg.period_window('hourly', datetime.now(timezone.utc), DENVER)
+
+
+class ActivityBucketTest(unittest.TestCase):
+    def test_strip_commit_prefix(self):
+        self.assertEqual(cdg._strip_commit_prefix('feat(scope): add thing'), 'add thing')
+        self.assertEqual(cdg._strip_commit_prefix('fix: bug'), 'bug')
+        self.assertEqual(cdg._strip_commit_prefix('plain title'), 'plain title')
+
+    def test_count_auto_cleared(self):
+        events = [
+            {'event_type': 'clarify_response'},
+            {'event_type': 'clarify_response'},
+            {'event_type': 'larry_action', 'payload': {'actor': 'system'}},
+            {'event_type': 'larry_action', 'payload': {'actor': 'larry'}},  # excluded
+            {'event_type': 'session_start'},  # ignored
+        ]
+        self.assertEqual(cdg.count_auto_cleared(events), 3)
+
+    def test_collect_attention_dedups(self):
+        events = [
+            {'event_type': 'escalation', 'payload': {'subject': 'disk full'}},
+            {'event_type': 'escalation', 'payload': {'subject': 'disk full'}},
+            {'event_type': 'larry_alert', 'payload': {'subject': 'token expiring'}},
+            {'event_type': 'session_done', 'payload': {'subject': 'noise'}},
+        ]
+        self.assertEqual(cdg.collect_attention(events), ['disk full', 'token expiring'])
+
+    def test_sum_spend_window_filter(self):
+        with tempfile.TemporaryDirectory() as d:
+            costs = Path(d) / 'costs.jsonl'
+            costs.write_text('\n'.join([
+                json.dumps({'ts': '2026-06-01T12:00:00+00:00', 'cost_usd': 1.50}),
+                json.dumps({'ts': '2026-06-01T18:00:00+00:00', 'cost_usd': 2.25}),
+                json.dumps({'ts': '2026-05-30T00:00:00+00:00', 'cost_usd': 9.99}),  # before
+                json.dumps({'ts': 'garbage'}),  # skipped
+            ]) + '\n')
+            with mock.patch.object(cdg, 'COSTS_FILE', costs):
+                total = cdg.sum_spend(
+                    datetime(2026, 6, 1, tzinfo=timezone.utc),
+                    datetime(2026, 6, 2, tzinfo=timezone.utc),
+                )
+        self.assertEqual(total, 3.75)
+
+    def test_fetch_decisions_waiting(self):
+        with tempfile.TemporaryDirectory() as d:
+            approvals = Path(d) / 'beacon-pending-approvals.json'
+            approvals.write_text(json.dumps({'pending': [
+                {'id': 'a1', 'plan_summary': 'ship the thing'},
+                {'id': 'a2', 'summary': 'review the other thing'},
+            ]}))
+            with mock.patch.object(cdg, 'APPROVALS_FILE', approvals):
+                waiting = cdg.fetch_decisions_waiting()
+        self.assertEqual(waiting, ['ship the thing', 'review the other thing'])
+
+    def test_fetch_events_in_window_paginates(self):
+        client = _FakeClient(events=[{'event_type': 'clarify_response'}] * 3)
+        rows = cdg.fetch_events_in_window(
+            datetime(2026, 6, 1, tzinfo=timezone.utc),
+            datetime(2026, 6, 2, tzinfo=timezone.utc),
+            client=client,
+        )
+        self.assertEqual(len(rows), 3)
+
+
+class RenderRawTest(unittest.TestCase):
+    def _activity(self, **over):
+        base = {
+            'shipped': [{'number': 5, 'title': 'faster checkout'}],
+            'shipped_count': 1,
+            'auto_cleared_count': 2,
+            'decisions_waiting': ['approve the budget'],
+            'spend_usd': 4.20,
+            'attention': ['token expiring'],
+        }
+        base.update(over)
+        return base
+
+    def test_raw_contains_figures_and_no_jargon(self):
+        raw = cdg.render_raw('daily', 'Monday, June 1', self._activity())
+        self.assertIn('shipped', raw)
+        self.assertIn('$4.20', raw)
+        self.assertIn('waiting on you', raw)
+        self.assertIn('faster checkout', raw)
+        lowered = raw.lower()
+        for banned in ('pull request', ' pr ', 'healer', 'marker', 'merge', 'commit'):
+            self.assertNotIn(banned, lowered, f'jargon leaked: {banned!r}')
+
+    def test_raw_handles_empty(self):
+        raw = cdg.render_raw('weekly', 'May 25–May 31', self._activity(
+            shipped=[], shipped_count=0, auto_cleared_count=0,
+            decisions_waiting=[], spend_usd=0.0, attention=[],
+        ))
+        self.assertIn('Nothing new shipped', raw)
+        self.assertIn('Nothing waiting on you', raw)
+        self.assertIn('$0.00', raw)
+
+
+class PromptTest(unittest.TestCase):
+    def test_prompt_bans_jargon_and_includes_facts(self):
+        activity = {
+            'shipped': [{'title': 'thing'}], 'shipped_count': 1,
+            'auto_cleared_count': 0, 'decisions_waiting': [],
+            'spend_usd': 1.0, 'attention': [],
+        }
+        prompt = cdg.build_prompt('daily', 'Monday, June 1', activity)
+        self.assertIn('CEO', prompt)
+        self.assertIn('NEVER use', prompt)
+        self.assertIn('"healer"', prompt)
+        self.assertIn('amount_spent_usd', prompt)
+
+
+class GenerateCeoVoiceTest(unittest.TestCase):
+    def test_success_returns_text_and_cost(self):
+        out = json.dumps({'result': 'We shipped a faster checkout.', 'total_cost_usd': 0.03})
+        with mock.patch.object(cdg.subprocess, 'run',
+                               return_value=SimpleNamespace(returncode=0, stdout=out, stderr='')):
+            text, cost = cdg.generate_ceo_voice('prompt')
+        self.assertEqual(text, 'We shipped a faster checkout.')
+        self.assertEqual(cost, 0.03)
+
+    def test_nonzero_exit_falls_through(self):
+        with mock.patch.object(cdg.subprocess, 'run',
+                               return_value=SimpleNamespace(returncode=1, stdout='', stderr='err')):
+            self.assertEqual(cdg.generate_ceo_voice('p'), (None, None))
+
+    def test_timeout_falls_through(self):
+        with mock.patch.object(cdg.subprocess, 'run',
+                               side_effect=subprocess.TimeoutExpired('claude', 1)):
+            self.assertEqual(cdg.generate_ceo_voice('p'), (None, None))
+
+    def test_bad_json_falls_through(self):
+        with mock.patch.object(cdg.subprocess, 'run',
+                               return_value=SimpleNamespace(returncode=0, stdout='not json', stderr='')):
+            self.assertEqual(cdg.generate_ceo_voice('p'), (None, None))
+
+    def test_empty_result_falls_through(self):
+        out = json.dumps({'result': '   ', 'total_cost_usd': 0.01})
+        with mock.patch.object(cdg.subprocess, 'run',
+                               return_value=SimpleNamespace(returncode=0, stdout=out, stderr='')):
+            self.assertEqual(cdg.generate_ceo_voice('p'), (None, None))
+
+
+class WriteDigestTest(unittest.TestCase):
+    def test_emits_ceo_digest_row(self):
+        client = _FakeClient()
+        activity = {
+            'shipped': [], 'shipped_count': 0, 'auto_cleared_count': 1,
+            'decisions_waiting': ['x'], 'spend_usd': 2.5, 'attention': [],
+        }
+        ok = cdg.write_digest(
+            'daily', 'Monday, June 1',
+            datetime(2026, 6, 1, 6, tzinfo=timezone.utc),
+            datetime(2026, 6, 2, 6, tzinfo=timezone.utc),
+            activity, 'CEO note here', used_fallback=False, client=client,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(len(client.upserted), 1)
+        row = client.upserted[0]['rows'][0]
+        self.assertEqual(row['event_type'], 'ceo_digest')
+        self.assertEqual(row['agent'], 'ceo-digest')
+        self.assertEqual(row['payload']['period'], 'daily')
+        self.assertEqual(row['payload']['summary'], 'CEO note here')
+        self.assertFalse(row['payload']['used_fallback'])
+        self.assertIn('raw', row['payload'])
+        self.assertEqual(row['payload']['metrics']['spend_usd'], 2.5)
+
+
+class RunEndToEndTest(unittest.TestCase):
+    def _patch_sources(self, stack, *, costs=None, approvals_missing=True):
+        stack.enter_context(mock.patch.object(
+            cdg, 'fetch_shipped',
+            return_value=[{'number': 7, 'title': 'faster checkout'}]))
+        if approvals_missing:
+            stack.enter_context(mock.patch.object(
+                cdg, 'APPROVALS_FILE', Path('/nonexistent/approvals.json')))
+        stack.enter_context(mock.patch.object(
+            cdg, 'COSTS_FILE', costs or Path('/nonexistent/costs.jsonl')))
+        stack.enter_context(mock.patch.object(
+            cdg, 'ACTIVE_TIER_FILE', Path('/nonexistent/tier.json')))
+
+    def test_voice_path(self):
+        client = _FakeClient(events=[{'event_type': 'clarify_response'}])
+        with tempfile.TemporaryDirectory() as d:
+            costs = Path(d) / 'costs.jsonl'
+            costs.write_text('')
+            with ExitStack() as stack:
+                self._patch_sources(stack, costs=costs)
+                stack.enter_context(mock.patch.object(
+                    cdg, 'generate_ceo_voice', return_value=('CEO voice note', 0.02)))
+                rc = cdg.run('daily',
+                             now_utc=datetime(2026, 6, 2, 13, tzinfo=timezone.utc),
+                             client=client)
+            self.assertEqual(rc, 0)
+            row = client.upserted[0]['rows'][0]
+            self.assertEqual(row['payload']['summary'], 'CEO voice note')
+            self.assertFalse(row['payload']['used_fallback'])
+            # Voice path records its own LLM spend.
+            cost_lines = [l for l in costs.read_text().splitlines() if l.strip()]
+            self.assertEqual(len(cost_lines), 1)
+            self.assertEqual(json.loads(cost_lines[0])['agent'], 'ceo-digest')
+
+    def test_fallback_path(self):
+        client = _FakeClient(events=[])
+        with ExitStack() as stack:
+            self._patch_sources(stack)
+            stack.enter_context(mock.patch.object(
+                cdg, 'generate_ceo_voice', return_value=(None, None)))
+            rc = cdg.run('daily',
+                         now_utc=datetime(2026, 6, 2, 13, tzinfo=timezone.utc),
+                         client=client)
+        self.assertEqual(rc, 0)
+        row = client.upserted[0]['rows'][0]
+        self.assertTrue(row['payload']['used_fallback'])
+        # Fallback summary equals the raw rendering.
+        self.assertEqual(row['payload']['summary'], row['payload']['raw'])
+
+
+class RegistrationTest(unittest.TestCase):
+    def test_ceo_digest_in_known_event_types(self):
+        self.assertIn('ceo_digest', ces.KNOWN_EVENT_TYPES)
+
+
+if __name__ == '__main__':
+    unittest.main()

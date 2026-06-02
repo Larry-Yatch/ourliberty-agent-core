@@ -429,3 +429,26 @@ ls -la ~/agents/blackboard/ledger/
 ```
 
 See `docs/operating-manual.md` §10.1 for full ops detail (recovery from missed run, manual `--week-ending` invocation, sentinel contract with Pulse Check I).
+
+### CEO digest (N6 — daily + weekly CEO-voice summary)
+
+`scripts/ceo_digest_generator.py` reads the period's chain activity (shipped PRs, auto-cleared decisions, decisions still waiting, spend, attention items) and writes a CEO-to-CEO plain-business summary that the dashboard's Approvals page reads off the `ceo_digest` chain_event. It calls `claude --print` for the voice pass and falls through to a deterministic jargon-free render if the LLM is unavailable. Two units: a **daily** timer (Mon–Sun 06:00 Larry-local, covers the prior day) and a **weekly** timer (Monday 06:00 Larry-local, covers the prior week).
+
+> **⚠️ Timezone not yet Larry-DM-confirmed.** Both timers use `America/Denver` (the repo-documented Larry-local zone — system tz + ledger timer + Pulse MDT digests). The spec instructed confirming the tz by DM before wiring 6am; that confirmation has not happened. The generator reads `OURLIBERTY_LARRY_TZ` (default `America/Denver`), so the change point if wrong is a single env line in both service files plus the `OnCalendar=` zone. Verify before relying on the 6am boundary.
+
+```bash
+sudo cp ~/agent-core/systemd/ourliberty-ceo-digest-daily.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-ceo-digest-daily.timer /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-ceo-digest-weekly.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-ceo-digest-weekly.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-ceo-digest-daily.timer
+sudo systemctl enable --now ourliberty-ceo-digest-weekly.timer
+systemctl list-timers 'ourliberty-ceo-digest-*'
+
+# Manual smoke (writes a real digest for the prior period):
+sudo systemctl start ourliberty-ceo-digest-daily.service
+journalctl -u ourliberty-ceo-digest-daily.service -n 50
+```
+
+The `run_ceo_digest.sh` wrapper handles the concurrency lock (`.ceo-digest-{daily,weekly}.lock`), the `EMERGENCY_HALT` gate, and logging — same pattern as `run_ledger.sh`. Each run push-emits exactly one `ceo_digest` chain_event row.

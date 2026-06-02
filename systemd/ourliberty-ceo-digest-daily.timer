@@ -1,0 +1,20 @@
+[Unit]
+Description=N6 CEO digest — daily (covers the prior day) at 6:00am Larry-local
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/approvals-queue-rework.md
+
+[Timer]
+# 6:00am Larry-local. Larry's timezone is America/Denver (MDT/MST) — the
+# droplet system tz, the ledger timer comment, and Pulse's MDT digest all
+# agree. Pinning the named zone here (systemd honors it) keeps 6am correct
+# across DST without a UTC-offset comment to maintain. SINGLE EDIT POINT for
+# the daily schedule's timezone — must match ceo_digest_generator.py
+# DEFAULT_LARRY_TZ and the weekly timer. NOTE: not yet Larry-DM-confirmed; see
+# the PR body. If his tz differs, change the zone on this OnCalendar line, the
+# weekly timer, and DEFAULT_LARRY_TZ (or set OURLIBERTY_LARRY_TZ).
+OnCalendar=*-*-* 06:00:00 America/Denver
+Persistent=true
+RandomizedDelaySec=120
+Unit=ourliberty-ceo-digest-daily.service
+
+[Install]
+WantedBy=timers.target

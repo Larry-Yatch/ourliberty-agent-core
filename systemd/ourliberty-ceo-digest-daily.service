@@ -1,0 +1,37 @@
+[Unit]
+Description=Ourliberty N6 CEO digest — daily generator (CEO-voice summary of the prior day)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/approvals-queue-rework.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT gate + logging.
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_ceo_digest.sh daily
+
+# LLM summarization call is bounded at 180s inside the generator; allow margin.
+TimeoutStartSec=600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-ceo-digest-daily
+
+# Hardening (matches ourliberty-ledger.service). ReadWritePaths includes
+# ~/.claude /.cache /.local so the `claude` CLI can authenticate + cache.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10

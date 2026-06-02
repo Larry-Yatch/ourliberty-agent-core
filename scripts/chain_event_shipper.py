@@ -132,6 +132,13 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # type. The shipper itself never produces these rows; listing the type here
     # also admits it to the weekly chain-event-type audit (heal_chain_event_type_audit).
     'needs_attention',
+    # N6 (approvals-queue-rework spec): the daily/weekly CEO digest generator
+    # (scripts/ceo_digest_generator.py) push-emits one row per run. payload
+    # carries period ('daily'|'weekly'), window bounds, the CEO-voice summary,
+    # and a structured raw fallback the dashboard card renders if the voice is
+    # absent. The shipper never produces these rows; listing the type here
+    # admits it to the weekly audit (heal_chain_event_type_audit.py).
+    'ceo_digest',
 })
 
 # PII / credential redaction. Any payload field key matching one of these
