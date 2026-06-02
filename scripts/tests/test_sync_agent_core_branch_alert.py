@@ -34,6 +34,9 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SYNC_SCRIPT = _REPO_ROOT / 'scripts' / 'sync_agent_core.sh'
 _LARRY_ALERTS = _REPO_ROOT / 'scripts' / 'larry_alerts.py'
 _LIB_PULSE = _REPO_ROOT / 'scripts' / '_lib_pulse_runtime.sh'
+# sync_agent_core.sh sources this for the push rebase-fallback (c0e238e); the
+# fake scripts dir must carry it or every run dies at the `source` line.
+_LIB_PUSH = _REPO_ROOT / 'scripts' / '_lib_push_with_rebase.sh'
 
 
 class _SyncTestBase(unittest.TestCase):
@@ -57,6 +60,7 @@ class _SyncTestBase(unittest.TestCase):
         (self.scripts_dir / 'sync_agent_core.sh').write_bytes(_SYNC_SCRIPT.read_bytes())
         (self.scripts_dir / 'larry_alerts.py').write_bytes(_LARRY_ALERTS.read_bytes())
         (self.scripts_dir / '_lib_pulse_runtime.sh').write_bytes(_LIB_PULSE.read_bytes())
+        (self.scripts_dir / '_lib_push_with_rebase.sh').write_bytes(_LIB_PUSH.read_bytes())
         os.chmod(self.scripts_dir / 'sync_agent_core.sh', 0o755)
         # Init git, make an initial commit on main, then optionally switch
         # branches per the specific subtest.

@@ -4,6 +4,386 @@
 
 ---
 
+## Iteration 596 — 2026-06-02 19:19 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (UNCHANGED — 0 new alerts since iter 595). Sync: ⚠️ ERROR — sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo" (**19th SYNC-PUSH-REBASE-FALLBACK-001** — same Wrong-branch variant; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~32 min old at 19:19Z; FRESH within 90-min threshold). **7/7 services active.** **PR #252 MERGED at 19:14:40Z** — sequence `approvals-queue-rework` N6 COMPLETE; all 3 sequence steps shipped. **PR #254 OPEN, under active revision** (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 11 min old).
+
+**Notable since iter 595 (19:12Z):**
+- **PR #252 MERGED at 19:14:40Z** — Mirror processed `review-step-digest-generator.json` (full-scope review task), approved, auto-merged. "Add N6 CEO digest generator (daily + weekly)". Branch `forge/step-digest-generator`. Sequence `approvals-queue-rework` N6 COMPLETE. Full sequence shipped: N1 (PR #250, auto-clear resolved rows), N4 (PR #251, CEO-attention promotion), N6 (PR #252, CEO digest generator). The approvals queue rework feature is fully implemented.
+- **19th SYNC-PUSH-REBASE-FALLBACK-001** — sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo". Wrong-branch variant (same as iter 595). PR merge day correlation holds (19/20 PR-related sync days = 95%). Self-recovers; APPROVAL_REQUEST open.
+- **Mirror orphan task** — `review-rebase-pr252-digest-generator-001.json` (19:09Z, 10 min old) still in Mirror inbox. This was the rebase-delta review task; PR #252 merged before Mirror processed it. Mirror bot will archive on next processing sweep. Not actionable.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1148 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1148 lines — watermark unchanged from iter 595. No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:12:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:12:00` → no entries. No Larry directives. No orphan directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json` (19:08Z = 11 min; fresh) ✅. Beacon inbox: EMPTY ✅. Mirror inbox: `review-rebase-pr252-digest-generator-001.json` (19:09Z = 10 min; orphaned post-PR#252-merge but under 1h threshold — Mirror will archive) ✅. No stale directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:47:34Z** (~32 min old at 19:19Z; FRESH within 90-min threshold). No new WARNs. Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 19th total).** sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo". Wrong-branch variant. **19th total** (19/20 PR-related sync days = 95%). Session-start gitStatus confirms main+clean. Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #254 under active revision; Mirror orphan task noted (non-actionable).**
+  - **PR #252** "Add N6 CEO digest generator" — **MERGED** 19:14:40Z. Mirror approved + auto-merged via `review-step-digest-generator.json`. Sequence `approvals-queue-rework` N6 COMPLETE. ✅ CLOSED.
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED is log-only" — CLEAN/MERGEABLE per `gh pr list` (`gh pr view` returns UNKNOWN, GH caching artifact). Opened 18:56:10Z; 23 min elapsed. Under active revision (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 19:08Z). NOT eligible for auto-merge until Forge submits revision and Mirror re-reviews. 30-min threshold N/A (active revision in progress). ⚠️ (watch)
+  - **Mirror orphan** `review-rebase-pr252-digest-generator-001.json` (10 min, PR already merged) — informational; Mirror bot handles. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **1/3** (iter 593). No new occurrences (watermark unchanged).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline.** Awaiting Forge PR. Note: PR #252 merge may trigger another healer auto-restart on next sweep (new CEO digest generator scripts). If so, another auto-restarted alert will land; already accounted for by the G-rule dispatch.
+  - All other G-rules stable. Steady-state degraded hold: **219th iter in series (377–596)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark 1148 — unchanged; 0 new alerts. No DM, no dispatch. ✅
+3. Check E: PR #252 confirmed MERGED (19:14:40Z via `gh pr view`). Sequence `approvals-queue-rework` fully shipped. MEMORY.md watch item CLOSED.
+4. Check E: PR #254 noted (23 min elapsed; under active revision; not eligible for auto-merge). Watch continues.
+5. Check B: 19th SYNC-PUSH-REBASE-FALLBACK-001 (Wrong-branch variant, 19:15:05Z). No new action; APPROVAL_REQUEST open.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:19:41.940949Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:19:42Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 19th occurrence).
+
+**Patterns:**
+- **Sequence `approvals-queue-rework` COMPLETE.** N1 (#250) + N4 (#251) + N6 (#252) all shipped in 5 iters (589→596). Forge and Mirror pipeline is moving briskly: PR #252 went from CONFLICTING to rebase-complete to approved-and-merged in under 18 minutes (18:51Z conflict detected → 19:08Z Forge rebase → 19:09Z Mirror review queued → 19:14Z Mirror approved + merged).
+- **SYNC-PUSH-REBASE-FALLBACK-001 now 95% PR-merge-day hit rate (19/20).** Pattern fully predictable; the fix (rebase-before-push fallback in `sync_agent_core.sh:161`) is the only cure. Every new PR merge day adds one more occurrence until APPROVAL_REQUEST `sync-push-rebase-fallback-001` ships. This is now among the highest-confidence G-rule-driven fixes in the pipeline.
+
+**Learned:** Mirror's two-task pattern for PR #252 (original full-scope review + rebase-delta review) resolved as expected: Mirror processed the original full-scope task first, approved+merged, and the rebase-delta task became orphaned. The two-task pattern doesn't cause duplication problems — Mirror processes them in order, the first match triggers auto-merge, and the orphan gets cleaned up. No new process change needed.
+
+---
+
+## Iteration 595 — 2026-06-02 19:12 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (+3 from iter 594: idx=1146–1148 — all `heal-pipeline-stall tier2-fallback-skipped-*`; Tier 3 known patterns; no DM). Sync: ⚠️ ERROR — sync.json `status=error`, 19:06:48Z, "Wrong branch: chore/foo" (**18th SYNC-PUSH-REBASE-FALLBACK-001** — same Wrong-branch variant as iter 594; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~25 min old at 19:12Z; FRESH within 90-min threshold). **7/7 services active.** **PR #252 CLEAN/MERGEABLE** (Forge rebase complete, updated 19:08:43Z; Mirror review dispatched — 2 tasks in inbox, both fresh). **PR #254 under revision** (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 4 min; Mirror found 3 medium findings). Beacon inbox: EMPTY.
+
+**Notable since iter 594 (19:03Z):**
+- **PR #252 rebased** — `gh pr view 252` returns CLEAN/MERGEABLE; `updatedAt=19:08:43Z`. Forge completed the rebase dispatch (sent ~19:03Z iter 594) and pushed to `forge/step-digest-generator`. Mirror inbox received 2 review tasks: `review-rebase-pr252-digest-generator-001.json` (19:09Z) and `review-step-digest-generator.json` (18:57Z). Sequence `approvals-queue-rework` N6 unblocked from conflict; pending Mirror approval before auto-merge.
+- **PR #254 Mirror revision** — Mirror reviewed "fix(healer): tier2-fallback SKIPPED is log-only — suppress by-design alert noise" and returned 3 medium findings: (1) `test_tier2_fallback_wrapper.py L437–447` stale contract; (2) `test_beacon_tier2_fallback.py L212–243` stale assertion; (3) full-discover regression (10 new failures from test-isolation/cursor pollution). Revision 1 of 3 dispatched to Forge inbox (19:08Z).
+- **3 new alerts (1146–1148)** — `heal-pipeline-stall` `pipeline-stall:tier2-fallback-skipped-rate_limit:forge` (19:08Z), `pipeline-stall:tier2-fallback-skipped-auth_401:forge` (19:08Z), `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot` (19:08Z). All Tier 3 known patterns per PR #237 strip-segment lookup. No DM; silence per design.
+- **18th SYNC-PUSH-REBASE-FALLBACK-001** — sync.json `status=error`, 19:06:48Z, "Wrong branch: chore/foo" — same variant as iter 594. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1148 lines** (+3 from iter 594). 3 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts — all Tier 3 (known patterns; pipeline-stall:tier2-fallback-skipped-*).** idx=1146: `source=heal-pipeline-stall, subject=pipeline-stall:tier2-fallback-skipped-rate_limit:forge, ts=19:08:12Z`. idx=1147: `source=heal-pipeline-stall, subject=pipeline-stall:tier2-fallback-skipped-auth_401:forge, ts=19:08:12Z`. idx=1148: `source=heal-pipeline-stall, subject=pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot, ts=19:08:12Z`. Strip-segment lookup matches `pipeline-stall:tier2-fallback-skipped-rate_limit` and `pipeline-stall:tier2-fallback-skipped-auth_401` from PR #237 Tier 3 allowlist. By-design: healer skips Tier 2 fallback for --resume sessions (correct; Tier 2 was never contacted). PR #254 will suppress healer from writing these to larry-alerts.jsonl once merged. Watermark: **1148**. ⚠️ (Tier 3, silenced)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:03:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:03:00` → no entries. No Larry directives. No orphan directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json` (19:08Z = 4 min old; fresh). Beacon inbox: EMPTY ✅. Mirror inbox: `review-rebase-pr252-digest-generator-001.json` (19:09Z = 3 min) + `review-step-digest-generator.json` (18:57Z = 15 min) — both under 1h threshold. All inboxes nominal. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:47:34Z** (~25 min old at 19:12Z; FRESH within 90-min threshold). No new WARNs. G-rule dispatch processed by Beacon (iter 594); Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean (M MEMORY.md, M runbooks/cycle-journal.md — wrapper-owned changes; no Pulse-initiated code changes). ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 18th total).** sync.json `status=error`, 19:06:48Z, "Wrong branch: chore/foo". Wrong-branch variant (same as iter 594, 17th). **18th total** (18/19 PR-related sync days). Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #252 CLEAN/MERGEABLE (Mirror review pending); PR #254 under revision.**
+  - **PR #252** "Add N6 CEO digest generator" — CLEAN/MERGEABLE (`gh pr view 252`), `updatedAt=19:08:43Z`. Forge rebase complete. Mirror has 2 review tasks (fresh: 3–15 min). **NOT eligible for auto-merge** — Mirror review pending; 30-min clock starts after Mirror approval, not from PR update. Sequence `approvals-queue-rework` N6 unblocked; awaiting Mirror verdict. ⚠️ (watch)
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED log-only" — UNKNOWN via `gh pr view` (GH caching artifact; PR 12+ min old). Mirror revision 1 of 3 dispatched to Forge inbox at 19:08Z. 3 medium findings (stale test contracts + full-discover regression). Not eligible for auto-merge. ⚠️ (watch)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **1/3** (iter 593). No new occurrences.
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge task in pipeline.** Awaiting Forge PR `heal-stale-daemon-warn-info-calibration-001`.
+  - All other G-rules stable. Steady-state degraded hold: **218th iter in series (377–595)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 3 new alerts (1146–1148) — all Tier 3 `pipeline-stall:tier2-fallback-skipped-*`; no DM (known pattern, by-design). Watermark: **1148**.
+3. Check E: PR #252 confirmed CLEAN/MERGEABLE post-rebase (19:08:43Z); Mirror review tasks fresh (3–15 min); not eligible for auto-merge until Mirror approves.
+4. Check E: PR #254 under revision (Mirror 3 medium findings); Forge has revision task (19:08Z, 4 min old).
+5. Check B: 18th SYNC-PUSH-REBASE-FALLBACK-001 (Wrong-branch variant, 19:06:48Z). No new action; APPROVAL_REQUEST open.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:13:31Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:13:32Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 18th occurrence).
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001 variant alternating.** Iters 591–593: push-rejection variant. Iter 594: Wrong-branch. Iter 595: Wrong-branch again. Same root cause either way; APPROVAL_REQUEST `sync-push-rebase-fallback-001` is the right instrument.
+- **PR #254 full-discover isolation issue recurred.** Mirror's finding #3 (10 regressions under full discover) is the same class as the issue that motivated PR #253 (which fixed 9 of these). The new test introduced by PR #254 (`TestCheckTier2FallbackOutcomes`) writes `logs/forge.log` + a check8 cursor without cleaning up — same isolation pattern that caused PR #253's scope. Forge should model the fix on PR #253's cleanup approach (Bucket A: snapshot/restore for sys.modules/agents-root; Bucket B: fixture cleanup for cursor/log files).
+- **Pipeline-stall tier2-fallback-skipped alerts continuing to accumulate** despite Tier 3 allowlist (PR #237). These will stop landing in larry-alerts.jsonl once PR #254 merges (healer suppresses at source). Each active Tier 1 OAuth stall produces 2–3 of these per healer sweep. Not a concern per se, but confirms PR #254's value.
+
+**Learned:** PR #252 rebase-to-MERGEABLE happened in ~5 min of Forge receiving the dispatch (dispatch sent ~19:03Z iter 594; PR updated 19:08:43Z). Forge bot is consistently fast on mechanical rebase tasks. The Mirror review queue at iter 595 (two PR-252 tasks simultaneously) represents a new two-review pattern: original-scope review + rebase-delta review. Not a concern — Mirror handles both; auto-merge waits on Mirror approval regardless of which task triggers it.
+
+---
+
+## Result notification — 2026-06-02 ~19:03 UTC (inter-agent)
+
+**Source:** Beacon — task `cycle-finding-pr-252-conflict-20260602T185128Z` — status=SUCCESS
+
+**Content:** Beacon confirmed PR #252 (`forge/step-digest-generator`) is CONFLICTING (mergeStateStatus=DIRTY, mergeable=CONFLICTING — refetched ~18:51Z). Root cause: PR #251 (`forge/step-alert-promotion`) merged at 18:42:53Z, 12 min after PR #252 opened, introducing a textual conflict. Beacon classified this as a mechanical "how" call and decided autonomously — no Larry escalation needed.
+
+**Beacon decision:** Dispatch rebase to Forge. `forge/step-digest-generator` rebase onto `origin/main` to clear conflict. Both N4 (on main) and N6 (on branch) must survive resolution. Force-push `--force-with-lease` to update PR #252 in place. No new PR.
+
+**Pulse action (approval gate):** APPROVED and wrote Forge inbox envelope `rebase-pr252-digest-generator-001.json` → `~/agents/inboxes/forge/`. Beacon confirmed conflict; rebase is safe; fully within Forge's scope. Task phase: `preflight`. (Routing: Pulse-originated Beacon task returns APPROVAL_REQUEST to Pulse at depth=1 per MEMORY.md routing exception — Pulse is the approval gate, dispatches to Forge with `source: "beacon"`.)
+
+**Watch:** Forge preflight → build → `gh pr view 252` back to CLEAN/MERGEABLE. Pulse's next cycle applies the 30-min auto-merge once MERGEABLE. Sequence `approvals-queue-rework` N6 unblocked on Forge completion.
+
+---
+
+## Iteration 594 — 2026-06-02 19:03 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1145** (UNCHANGED — no new alerts since iter 593). Sync: ⚠️ ERROR — sync.json `status=error`, 19:00:39Z, "Wrong branch: chore/foo" (**17th SYNC-PUSH-REBASE-FALLBACK-001** occurrence; "Wrong branch" variant, different from push-failure variant at iters 591–593; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~16 min old; FRESH within 90-min threshold). **7/7 services active.** **PR #254 OPEN (7 min), under 30-min threshold.** **PR #252 CONFLICTING (carry-forward).** Notable: Beacon processed `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` (G-rule 3/3 dispatch from iter 592) — file gone from Beacon inbox; systemic-fix pipeline in motion.
+
+**Notable since iter 593 (19:00Z):**
+- **Beacon processed stale-daemon-restart G-rule dispatch** — `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` no longer in Beacon inbox (was present at iter 593 at 19:00Z). Beacon bot processed between 19:00Z and 19:03Z. Two-part fix (add `auto-restarted:*` Tier-3 allowlist + downgrade healer log to INFO) in pipeline. A Forge task is likely in transit.
+- **New sync error at 19:00:39Z** — 17th SYNC-PUSH-REBASE-FALLBACK-001 occurrence. "Wrong branch: chore/foo" variant (distinct from the push-rejection variant at iters 591–593 but same root cause). Self-recovers on next sync; APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open.
+- **PR #254 still OPEN** — `gh pr view 254` confirms CLEAN/MERGEABLE. Opened 18:56:10Z; 7 min 31 sec elapsed at 19:03:41Z. 30-min watch: **19:26:10Z**.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1145 lines** (UNCHANGED from iter 593). No new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1145 lines — watermark unchanged from iter 593. No new alerts since last claim. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:00:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:00:00` → no output. No Larry directives. No orphan directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: EMPTY ✅. Beacon: 6 files — all fresh; `cycle-finding-pr-252-conflict-20260602T185128Z.json` (18:51Z = ~12 min) + 5 coordination/notify items. Mirror: 2 review tasks — `review-step-digest-generator.json` (blocked on PR #252 conflict) + `review-suppress-by-design-tier2-skipped-alerts.json` (PR #254, fresh). All under 1h threshold. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:47:34Z** (~16 min old at 19:03Z; FRESH within 90-min threshold). No post-sweep WARNs in journalctl. G-rule dispatch `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` processed by Beacon this iter. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 17th total).** sync.json `status=error`, 19:00:39Z, "Wrong branch: chore/foo". "Wrong branch" variant (distinct from push-rejection variant at iters 591–593; same underlying SYNC-PUSH-REBASE-FALLBACK-001 root cause). **17th total occurrence** (17/18 PR-related sync days). Session-start gitStatus confirms main+clean. Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #252 CONFLICTING (carry-forward); PR #254 OPEN — 7 min, under threshold.**
+  - **PR #252** "Add N6 CEO digest generator" — DIRTY/CONFLICTING. Beacon dispatch in inbox (`cycle-finding-pr-252-conflict`). Forge must rebase `forge/step-digest-generator`. Blocked. ⚠️
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED is log-only" — CLEAN/MERGEABLE confirmed via `gh pr view`. Opened 18:56:10Z; 7 min elapsed. 30-min watch: **19:26:10Z**. ✅ (watch)
+  - **Beacon inbox:** `cycle-finding-pr-252-conflict` (12 min, fresh). Stale-daemon-restart dispatch already processed (gone). 5 coordination/notify items (fresh). ✅
+  - **Mirror inbox:** review-step-digest-generator (PR #252 blocked), review-suppress-by-design (PR #254 fresh). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **1/3** (iter 593). No new occurrences.
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSING (this iter)**. Beacon consumed the dispatch envelope between 19:00Z and 19:03Z. Forge task likely in transit. Close watch item when Forge PR merges.
+  - All other G-rules stable. Steady-state degraded hold: **217th iter in series (377–594)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark unchanged (1145); 0 new alerts. No DM, no dispatch. ✅
+3. Check B: 17th SYNC-PUSH-REBASE-FALLBACK-001 (Wrong-branch variant, 19:00:39Z). No new action; APPROVAL_REQUEST open.
+4. Check E: PR #254 confirmed CLEAN/MERGEABLE via `gh pr view`; 7 min elapsed, watch at 19:26:10Z.
+5. Notable: Beacon consumed stale-daemon-restart dispatch (G-rule 3/3) — systemic fix moving through pipeline.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:04:48Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:04:48Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 17th occurrence).
+
+**Patterns:**
+- **Sync variant oscillation.** Iters 591–593 saw the push-rejection variant; iter 594 sees the Wrong-branch variant again. Both are SYNC-PUSH-REBASE-FALLBACK-001 family; the root fix (rebase-before-push fallback in `sync_agent_core.sh:161`) addresses both. APPROVAL_REQUEST `sync-push-rebase-fallback-001` covers both variants.
+- **Beacon latency on cycle-finding dispatches.** The stale-daemon-restart G-rule dispatch was processed by Beacon in <3 min of being in the inbox. The PR-252-conflict dispatch is 12+ min in the inbox (not yet processed). Both were from iter 592. Different processing latency by task type. `cycle-finding-pr-252-conflict` may require Forge routing which adds processing time.
+
+**Learned:** Sync variant oscillation (push-rejection vs. Wrong-branch) within the same incident series does not represent two separate root causes. Both are SYNC-PUSH-REBASE-FALLBACK-001. The APPROVAL_REQUEST is already the right instrument; no new tracking needed.
+
+---
+
+## Iteration 593 — 2026-06-02 19:00 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1145** (+1 from iter 592: idx=1145 — outbox-notifier `review-pass` for PR #253 auto-merge at 18:55:29Z; novel subject, Tier 4; no DM per actionable-only). Sync: ⚠️ ERROR — sync.json `status=error`, 18:54:23Z, "Auto-commit push failed; rolled back" (**16th SYNC-PUSH-REBASE-FALLBACK-001** occurrence; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~13 min old; FRESH within 90-min threshold). **7/7 services active.** **PR #253 MERGED (18:55:29Z, Mirror review+auto-merge, early); PR #254 OPENED (18:56:10Z); PR #252 still CONFLICTING.** Forge inbox: EMPTY (all iter 592 tasks processed). Mirror inbox: 3 fresh review tasks. Beacon inbox: 7 files (coordination + iter 592 Pulse dispatches, all fresh).
+
+**Notable since iter 592 (18:52Z):**
+- **PR #253 MERGED at 18:55:29Z** — Mirror reviewed task `build-test-suite-green-001` and approved. "test: green the unittest suite under full discover (isolation + stale sync tests)". Mirror verdict: 9 previously-failing tests fixed; 1 pre-existing failure (test_log_dir_resolution.LogWriteHitsOverrideDirTest) tracked separately, out of scope. Branch deleted. Watch-item CLOSED (was 19:17:22Z; merged 22 min early). **Test suite is green.**
+- **PR #254 OPENED at 18:56:10Z** — Forge processed `suppress-by-design-tier2-skipped-alerts.json`. "fix(healer): tier2-fallback SKIPPED is log-only — suppress by-design alert noise". CLEAN/MERGEABLE. 30-min watch: **19:26:10Z**.
+- **Forge inbox CLEARED** — all 5 files from iter 592 processed by Forge bot within 5 min of iter 592 (marker-error files archived; suppress-by-design → PR #254 opened; build-step-digest-generator archived).
+- **New sync error at 18:54:23Z** — 16th SYNC-PUSH-REBASE-FALLBACK-001 occurrence (push-failure variant). Self-recovers; no new action beyond noting.
+- **Mirror inbox populated with 3 review tasks** — review-step-autoclear.json (PR #250 already merged iter 589 — Mirror may do after-action or mark complete; Mirror bot active), review-step-digest-generator.json (PR #252 CONFLICTING — blocked), review-suppress-by-design-tier2-skipped-alerts.json (PR #254, fresh).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1145 lines** (+1 from iter 592). 1 new alert (idx=1145).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel subject; successful pipeline event).** idx=1145: `source=outbox-notifier, kind=notification, intent=review-pass, ts=18:55:29Z`. Subject `outbox-notifier:review-pass` NOT in alert-translations.json (Tier 4 novel). Content: Mirror approved + auto-merged PR #253. Successful enforcement event (Mirror→auto-merge pipeline working as designed). Per WARN-vs-INFO calibration + actionable-only preference: no DM. New G-rule 1/3: `outbox-notifier:review-pass not in alert-translations.json`. At 3/3: dispatch to Beacon to add as Tier 3/FYI in alert-translations.json. Watermark: **1145**. ⚠️ (G-rule 1/3 started)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 18:52:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 18:52:00` → no entries. No Telegram activity. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: EMPTY ✅. Beacon: 7 files — all fresh (<6 min old at check time); 2 are Pulse cycle-finding dispatches from iter 592 (awaiting Beacon processing), 5 are outbox-notifier coordination items. Mirror: 3 review tasks — all fresh (0–5 min old). No files approaching 1h stale threshold. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:47:34Z** (~13 min old at 19:00Z; FRESH within 90-min threshold). No post-sweep WARNs in journalctl. G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` → **DISPATCHED (iter 592)**. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 16th total).** sync.json `status=error`, 18:54:23Z, "Auto-commit push failed; rolled back". Push-failure variant of SYNC-PUSH-REBASE-FALLBACK-001. **16th total occurrence** (16/17 PR merge days, 94.1%). Session-start gitStatus confirms main+clean. Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #252 CONFLICTING (carry-forward); PR #254 OPEN 4 min, under threshold.**
+  - **PR #252** "Add N6 CEO digest generator" — DIRTY/CONFLICTING confirmed via `gh pr view`. Dispatch sent to Beacon iter 592. Forge must rebase `forge/step-digest-generator` onto current main. Blocked. ⚠️
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED is log-only" — CLEAN/MERGEABLE, opened 18:56:10Z; 4 min elapsed. 30-min watch: **19:26:10Z**. Mirror review task `review-suppress-by-design-tier2-skipped-alerts.json` in Mirror inbox. ✅ (watch)
+  - **PR #253** MERGED 18:55:29Z — test suite green; watch item CLOSED. ✅
+  - **Mirror inbox:** review-step-autoclear.json (PR #250 already merged — Mirror bot will handle), review-step-digest-generator.json (PR #252 blocked until rebase), review-suppress-by-design-tier2-skipped-alerts.json (PR #254, fresh). ⚠️ (watch)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **NEW — 1/3** (iter 593, 18:55:29Z). idx=1145 review-pass notification for PR #253 auto-merge. At 3/3: dispatch to Beacon to add Tier 3/FYI entry for `outbox-notifier:review-pass` in alert-translations.json.
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCHED (iter 592)**. Awaiting Forge PR.
+  - All other G-rules stable. Steady-state degraded hold: **216th iter in series (377–593)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 1 new alert (idx=1145) outbox-notifier:review-pass — Tier 4 novel; successful pipeline event (PR #253 merged by Mirror); no DM per actionable-only; new G-rule 1/3 noted. Watermark: **1145**.
+3. Check E: PR #253 confirmed MERGED (18:55:29Z, via outbox-notifier notification + `gh pr list` absence). Test suite green. Watch item CLOSED.
+4. Check E: PR #254 noted (4 min, under threshold); watch at 19:26:10Z.
+5. Check B: 16th SYNC-PUSH-REBASE-FALLBACK-001 (push-failure variant, 18:54:23Z). No new action; APPROVAL_REQUEST open.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:00:01Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:00:02Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 16th occurrence).
+
+**Patterns:**
+- **PR #253 merged in ~8 min** (opened 18:47:22Z, merged 18:55:29Z). Mirror's fastest turnaround observed — test-only PR, clean scope, no security findings. Suggests Mirror can process light-scope PRs well within the 30-min auto-merge window.
+- **Forge cleared 5-task inbox in ~5 min** (iter 592 ended 18:52Z; Forge inbox empty by 18:57Z). Forge bot active and fast.
+- **outbox-notifier FYI notifications continue landing in larry-alerts.jsonl** without allowlist coverage (review-pass, mirror-dag-pass both at 1/3 G-rule). Two related G-rules that would be resolved by the same Beacon dispatch — once either hits 3/3, batch the fix.
+
+**Learned:** `outbox-notifier:review-pass` is a new Tier 4 novel subject class (idx=1145). The pattern: every Mirror review-pass notification for an individual PR auto-merge will generate one of these. Similar to `mirror-dag-pass` (iter 584 G-rule). Both need Tier 3 allowlist entries. Consider batching the fix dispatch when either G-rule hits 3/3.
+
+---
+
+## Result notification — 2026-06-02 ~19:02 UTC (inter-agent)
+
+**Source:** Beacon — task `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z` — status=SUCCESS
+
+**Content:** Beacon spec complete and dispatched to Forge as `heal-stale-daemon-warn-info-calibration-001`. Closes the G-rule 3/3 systemic-fix dispatch from iter 592.
+
+**Spec summary (two-part):**
+- **Part 1 — `config/alert-translations.json`:** New source object `heal-stale-daemon-code` with subject key `auto-restarted` → Tier 3/FYI, severity INFO. Colon-strip rule catches `auto-restarted:<unit>` subjects. Scope: success path only. `auto-restart-failed`, `stale-code`, `still-stale-after-restart` intentionally excluded (actionable; stay Tier 4).
+- **Part 2 — `scripts/larry_alerts.py` + `scripts/heal_stale_daemon_code.py`:** Add `info` to `VALID_SEVERITIES` (architectural call: without this, `append_alert(severity='info')` silently drops). `dm_larry_auto_restarted` changes from `severity='warning'` to `severity='info'`. Failure-path DMs stay `severity='warning'`.
+
+**Forge task ID:** `heal-stale-daemon-warn-info-calibration-001`. Target repo: `ourliberty-agent-core`. PR title: `fix(heal-stale-daemon): silence + INFO-calibrate successful auto-restart alerts`.
+
+**No new work.** Awaiting Forge PR; normal watch at next /cycle. When merged: Close G-rule watch item `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` and record `verified_at` in cycle-prime-ledger.
+
+---
+
+## Iteration 592 — 2026-06-02 18:52 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1144** (+1 since iter 591: idx=1144 — `auto-restarted:ourliberty-chain-event-shipper.service` at 18:47:36Z; G-rule 3/3 threshold met; dispatch sent to Beacon). Sync: ⚠️ ERROR — sync.json `status=error`, 18:45:59Z, "Auto-commit push failed; rolled back"; **new occurrence** of SYNC-PUSH-REBASE-FALLBACK-001 (push-failure variant, same as 18:37:20Z in iter 591; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (ADVANCED; FRESH; ~5 min old at 18:52Z). **7/7 services active.** **PR #252 CONFLICTING; PR #253 OPEN.** G-rule 3/3 dispatch sent for heal-stale-daemon-code WARNING log level.
+
+**Notable since iter 591 (18:43Z):**
+- **Healer swept at 18:47:34Z** — auto-restarted chain-event-shipper (script mtime 1083.2 min newer than active-since 00:44Z; new code from PR #251 live). Alert idx=1144 written. G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` → **3/3 threshold met.** Dispatch sent to Beacon.
+- **PR #253 OPENED at 18:47:22Z** — "test: green the unittest suite under full discover (isolation + stale sync tests)"; CLEAN/MERGEABLE. Forge processed `build-build-test-suite-green-001` task (was in inbox since 17:47Z). Mirror review task `review-build-test-suite-green-001` dispatched.
+- **PR #252 CONFLICTING** — `gh pr list` showed UNKNOWN at iter 591; `gh pr view 252` this iter returns DIRTY/CONFLICTING. PR #251 merge at 18:42:53Z touched overlapping code paths with `forge/step-digest-generator` branch. Sequence `approvals-queue-rework` N6 blocked. Dispatch sent to Beacon for Forge to rebase.
+- **Sync error at 18:45:59Z** — same push-failure variant as iter 591 (18:37:20Z). SYNC-PUSH-REBASE-FALLBACK-001 pattern; APPROVAL_REQUEST open.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1144 lines** (+1 from iter 591). 1 new alert (idx=1144).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel subject); G-rule 3/3 threshold met; dispatch sent.** idx=1144: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-chain-event-shipper.service, ts=18:47:36Z`. Subject NOT in alert-translations.json (Tier 4 novel). Successful enforcement event — healer auto-restarted chain-event-shipper after PR #251 updated chain_event_shipper.py. Per actionable-only preference: no DM (not actionable; healer worked as designed). G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` → **3/3.** Dispatch: `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` → Beacon inbox. Two-part fix: (1) add `auto-restarted:*` to alert-translations.json as Tier 3/FYI; (2) downgrade healer successful-restart log from WARNING to INFO. Watermark: **1144**. ⚠️ (G-rule dispatch)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 18:20:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 18:20:00` → no entries. No Telegram activity. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **27** heal-pipeline-stall keyed files (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No orphan Larry directives. Build-test-suite-green-001 → PR #253 opened this iter (Forge processed it). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat ADVANCED to **18:47:34Z** (~5 min old at 18:52Z; FRESH). Healer ran and auto-restarted chain-event-shipper (new code from PR #251 live). State file missing (known calibration issue per MEMORY.md iters 143+; heartbeat is authoritative). G-rule at **3/3** → dispatch sent (see Check 0). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, same variant).** sync.json `status=error`, 18:45:59Z, "Auto-commit push failed; rolled back". Same push-failure variant as 18:37:20Z in iter 591. SYNC-PUSH-REBASE-FALLBACK-001 pattern continues. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-recovers on next sync. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #252 CONFLICTING (sequence N6 blocked); PR #253 OPEN under threshold.**
+  - **PR #252** "Add N6 CEO digest generator" — `gh pr view` returned DIRTY/CONFLICTING (`gh pr list` cached UNKNOWN). Opened 18:30:20Z on `forge/step-digest-generator`. PR #251 merge at 18:42:53Z introduced conflict. Dispatch sent to Beacon to route Forge for rebase. Cannot auto-merge conflicting PR. ⚠️
+  - **PR #253** "test: green the unittest suite under full discover" — CLEAN/MERGEABLE, opened 18:47:22Z; 5 min old. Watch mark: **19:17:22Z**. Mirror has `review-build-test-suite-green-001` task. ✅ (watch)
+  - **Forge inbox: 4 files.** marker-error-step-autoclear-1 (17:58Z = ~54 min; approaching 1h), marker-error-step-alert-promotion-1 (18:11Z = ~41 min), suppress-by-design (18:18Z = ~34 min), marker-error-step-digest-generator-1 (18:30Z = ~22 min). All within 1h threshold. Forge bot active. ⚠️ (watch marker-error-step-autoclear-1 approaching 1h at ~18:58Z)
+  - Beacon inbox: notify-build-test-suite-green-001.json (coordination item); + 2 new dispatch envelopes from this iter.
+  - Mirror inbox: review-build-test-suite-green-001.json (Mirror review for PR #253).
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCH SENT (this iter).** cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json → Beacon inbox. Close G-rule watch when Forge PR merges.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences.
+  - All other G-rules stable. Steady-state degraded hold: **215th iter in series (377–592)** with 0 pre-existing G-rule advances (excluding the new 3/3 dispatch above).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 1 new alert (idx=1144) — heal-stale-daemon-code auto-restarted chain-event-shipper (Tier 4 novel; no DM per actionable-only; G-rule 3/3). Watermark: **1144**.
+3. **G-rule 3/3 dispatch:** `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` → Beacon inbox. Two-part fix: add `auto-restarted:*` Tier-3 allowlist + downgrade healer log level. Logged to cycle-actions.jsonl. ✅
+4. **PR #252 conflict dispatch:** `cycle-finding-pr-252-conflict-20260602T185128Z.json` → Beacon inbox. Route to Forge for rebase of `forge/step-digest-generator` onto current main. Logged to cycle-actions.jsonl. ✅
+5. Check E: PR #253 noted (5 min, under threshold); watch at 19:17:22Z.
+6. Check E: marker-error-step-autoclear-1 approaching 1h (watch ~18:58Z).
+7. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:52:01Z. ✅
+8. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:52:02Z. ✅
+9. Wrote journal entry.
+
+**Escalated:** None new to Larry (both findings routed to Beacon, not Larry-actionable). Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; push-failure variant recurred 18:45:59Z).
+
+**Patterns:**
+- **215th consecutive degraded-hold iter (377–592).** G-rule 3/3 dispatch sent for heal-stale-daemon-code WARNING log level — if Beacon→Forge fix lands, this class of Tier-4 triage noise disappears. First systemic fix dispatch in this degraded-hold window.
+- **PR #252 CONFLICTING.** `gh pr list` UNKNOWN vs `gh pr view` DIRTY/CONFLICTING — confirms the memory note (MEMORY.md calibration section): always validate UNKNOWN PRs via `gh pr view` before reporting status. This iter the UNKNOWN-then-CONFLICTING pattern took 22 minutes to resolve from UNKNOWN to confirmed-CONFLICTING.
+- **Healer auto-restarted chain-event-shipper** 18:47:36Z — 5 min after PR #251 merged at 18:42:53Z. Healer's 30-min cadence appears to have fired early (prior sweep at 18:17:33Z → next expected ~18:47Z). Timing aligns correctly. New code for PR #251 (feat/promote-alerts) is live in chain-event-shipper.
+
+**Learned:** G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` closed at 3/3. The third trigger was the chain-event-shipper restart post-PR#251 merge — confirming the prediction that a PERSISTENT daemon code update would trigger 3/3 (per MEMORY.md iter 478 calibration note). Once Beacon/Forge fix lands, this pattern → Tier 3 allowlist match → silent per design.
+
+---
+
 ## Iteration 591 — 2026-06-02 18:43 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1143** (+1 since iter 590: idx=1143 — `sync-blocked:auto-commit-push-failed` at 18:37:20Z; novel subject, not in allowlist; connected to SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST; no separate DM per actionable-only preference). Sync: ⚠️ ERROR — sync.json `status=error`, 18:37:20Z, "Auto-commit push failed; rolled back to 8dd3f450"; **new variant** of SYNC-PUSH-REBASE-FALLBACK-001 (push rejection vs prior "Wrong branch" shape). Healer heartbeat: **18:17:33Z** (stable; ~25 min old at 18:43Z; FRESH within 90-min threshold). **7/7 services active.** **PR #251 MERGED this iter; PR #252 OPEN.** Forge inbox: **5 files** (build-build-test-suite-green-001 at 17:47Z = ~56 min old; approaching 1h stale; Forge bot active).
