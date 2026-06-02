@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 596 — 2026-06-02 19:19 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (UNCHANGED — 0 new alerts since iter 595). Sync: ⚠️ ERROR — sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo" (**19th SYNC-PUSH-REBASE-FALLBACK-001** — same Wrong-branch variant; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~32 min old at 19:19Z; FRESH within 90-min threshold). **7/7 services active.** **PR #252 MERGED at 19:14:40Z** — sequence `approvals-queue-rework` N6 COMPLETE; all 3 sequence steps shipped. **PR #254 OPEN, under active revision** (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 11 min old).
+
+**Notable since iter 595 (19:12Z):**
+- **PR #252 MERGED at 19:14:40Z** — Mirror processed `review-step-digest-generator.json` (full-scope review task), approved, auto-merged. "Add N6 CEO digest generator (daily + weekly)". Branch `forge/step-digest-generator`. Sequence `approvals-queue-rework` N6 COMPLETE. Full sequence shipped: N1 (PR #250, auto-clear resolved rows), N4 (PR #251, CEO-attention promotion), N6 (PR #252, CEO digest generator). The approvals queue rework feature is fully implemented.
+- **19th SYNC-PUSH-REBASE-FALLBACK-001** — sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo". Wrong-branch variant (same as iter 595). PR merge day correlation holds (19/20 PR-related sync days = 95%). Self-recovers; APPROVAL_REQUEST open.
+- **Mirror orphan task** — `review-rebase-pr252-digest-generator-001.json` (19:09Z, 10 min old) still in Mirror inbox. This was the rebase-delta review task; PR #252 merged before Mirror processed it. Mirror bot will archive on next processing sweep. Not actionable.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1148 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1148 lines — watermark unchanged from iter 595. No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:12:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:12:00` → no entries. No Larry directives. No orphan directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json` (19:08Z = 11 min; fresh) ✅. Beacon inbox: EMPTY ✅. Mirror inbox: `review-rebase-pr252-digest-generator-001.json` (19:09Z = 10 min; orphaned post-PR#252-merge but under 1h threshold — Mirror will archive) ✅. No stale directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:47:34Z** (~32 min old at 19:19Z; FRESH within 90-min threshold). No new WARNs. Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 19th total).** sync.json `status=error`, 19:15:05Z, "Wrong branch: chore/foo". Wrong-branch variant. **19th total** (19/20 PR-related sync days = 95%). Session-start gitStatus confirms main+clean. Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #254 under active revision; Mirror orphan task noted (non-actionable).**
+  - **PR #252** "Add N6 CEO digest generator" — **MERGED** 19:14:40Z. Mirror approved + auto-merged via `review-step-digest-generator.json`. Sequence `approvals-queue-rework` N6 COMPLETE. ✅ CLOSED.
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED is log-only" — CLEAN/MERGEABLE per `gh pr list` (`gh pr view` returns UNKNOWN, GH caching artifact). Opened 18:56:10Z; 23 min elapsed. Under active revision (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 19:08Z). NOT eligible for auto-merge until Forge submits revision and Mirror re-reviews. 30-min threshold N/A (active revision in progress). ⚠️ (watch)
+  - **Mirror orphan** `review-rebase-pr252-digest-generator-001.json` (10 min, PR already merged) — informational; Mirror bot handles. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **1/3** (iter 593). No new occurrences (watermark unchanged).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline.** Awaiting Forge PR. Note: PR #252 merge may trigger another healer auto-restart on next sweep (new CEO digest generator scripts). If so, another auto-restarted alert will land; already accounted for by the G-rule dispatch.
+  - All other G-rules stable. Steady-state degraded hold: **219th iter in series (377–596)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark 1148 — unchanged; 0 new alerts. No DM, no dispatch. ✅
+3. Check E: PR #252 confirmed MERGED (19:14:40Z via `gh pr view`). Sequence `approvals-queue-rework` fully shipped. MEMORY.md watch item CLOSED.
+4. Check E: PR #254 noted (23 min elapsed; under active revision; not eligible for auto-merge). Watch continues.
+5. Check B: 19th SYNC-PUSH-REBASE-FALLBACK-001 (Wrong-branch variant, 19:15:05Z). No new action; APPROVAL_REQUEST open.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:19:41.940949Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:19:42Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 19th occurrence).
+
+**Patterns:**
+- **Sequence `approvals-queue-rework` COMPLETE.** N1 (#250) + N4 (#251) + N6 (#252) all shipped in 5 iters (589→596). Forge and Mirror pipeline is moving briskly: PR #252 went from CONFLICTING to rebase-complete to approved-and-merged in under 18 minutes (18:51Z conflict detected → 19:08Z Forge rebase → 19:09Z Mirror review queued → 19:14Z Mirror approved + merged).
+- **SYNC-PUSH-REBASE-FALLBACK-001 now 95% PR-merge-day hit rate (19/20).** Pattern fully predictable; the fix (rebase-before-push fallback in `sync_agent_core.sh:161`) is the only cure. Every new PR merge day adds one more occurrence until APPROVAL_REQUEST `sync-push-rebase-fallback-001` ships. This is now among the highest-confidence G-rule-driven fixes in the pipeline.
+
+**Learned:** Mirror's two-task pattern for PR #252 (original full-scope review + rebase-delta review) resolved as expected: Mirror processed the original full-scope task first, approved+merged, and the rebase-delta task became orphaned. The two-task pattern doesn't cause duplication problems — Mirror processes them in order, the first match triggers auto-merge, and the orphan gets cleaned up. No new process change needed.
+
+---
+
 ## Iteration 595 — 2026-06-02 19:12 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (+3 from iter 594: idx=1146–1148 — all `heal-pipeline-stall tier2-fallback-skipped-*`; Tier 3 known patterns; no DM). Sync: ⚠️ ERROR — sync.json `status=error`, 19:06:48Z, "Wrong branch: chore/foo" (**18th SYNC-PUSH-REBASE-FALLBACK-001** — same Wrong-branch variant as iter 594; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (~25 min old at 19:12Z; FRESH within 90-min threshold). **7/7 services active.** **PR #252 CLEAN/MERGEABLE** (Forge rebase complete, updated 19:08:43Z; Mirror review dispatched — 2 tasks in inbox, both fresh). **PR #254 under revision** (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 4 min; Mirror found 3 medium findings). Beacon inbox: EMPTY.
