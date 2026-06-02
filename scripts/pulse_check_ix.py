@@ -67,7 +67,7 @@ TIME_TO_ACTION_THRESHOLD = 5   # `> N` per spec § 2.2
 ALERT_IGNORED_THRESHOLD = 3    # `>= N` per spec § 2.3
 RESCUE_BURDEN_THRESHOLD = 2    # `>= N` per spec § 2.4
 
-DEFAULT_API_BASE = 'http://127.0.0.1:8001'
+DEFAULT_API_BASE = 'http://127.0.0.1:8000'
 DEFAULT_REPO = 'ourliberty-agent-core'
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
