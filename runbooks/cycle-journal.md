@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 453 — 2026-06-02 00:56 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (5 new alerts since iter 452 watermark 1128). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 carry-forward at 00:38:29Z (11th total / 5th post-clear; no new instance this iter). Healer heartbeat: **00:44:05Z** (~12 min old at check time; FRESH). 7/7 services active. 0 open PRs.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1133 lines** (was 1128 at iter 452 watermark; 5 new lines). New alerts classified below.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 5 new alerts (2 Tier 4/informational, 3 Tier 3/FYI).** 
+  - **Lines 1129–1130** (00:44:06Z + 00:44:08Z): `heal-stale-daemon-code` auto-restarted `ourliberty-chain-event-shipper.service` AND `ourliberty-outbox-notifier.service`. Both triggered by same PR #241 merge (updated chain_event_shipper.py + outbox_notifier.py). `heal-stale-daemon-code` not in config/alert-translations.json → **Tier 4 by spec**; classified **Tier 3 informational by judgment** (successful enforcement events — healer did exactly what it should). No DM to Larry. **G-rule 2/3:** iter 452 was 1/3 (chain-event-shipper); this iter is 2/3 (outbox-notifier). One more occurrence → dispatch to Beacon. ⚠️
+  - **Lines 1131–1133** (00:51:01Z): `heal-pipeline-stall` tier2-fallback-skipped alerts for `forge` (rate_limit), `forge` (auth_401), `beacon-bot` (rate_limit). Subjects match Tier 3 known-pattern translations in config/alert-translations.json (`pipeline-stall:tier2-fallback-skipped-rate_limit` + `pipeline-stall:tier2-fallback-skipped-auth_401`, both INFO/FYI, PR #237). **Tier 3.** Silence + log. ✅
+  - Watermark: 1128 → **1133**. ⚠️ (G-rule 2/3 advances)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session, chat_id=7998341473). No directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged from iters 447–452). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs** (gh pr list → []). No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **00:44:05Z** — ~12 min old at check time (~00:56Z). FRESH (well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**0e8d72b** ("Pulse cycle 20260602T005226Z" — iter 452 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 carry-forward.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T00:38:29Z, commit=e987955e. Unchanged from iter 451/452. No NEW sync run occurred in this iter's window. Last sync ~18 min ago — under 2h threshold. 12th occurrence expected when sync_agent_core.sh next runs (post-PR-#241-merge pattern confirmed 11 for 11). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + elevated; no new DM. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent post-PR #241. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I (Monday), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` advances to **2/3** (iter 452 = chain-event-shipper 1/3; this iter = outbox-notifier 2/3). All other tracked G-rule items stable. Steady-state degraded hold: **77th iter in series (377–453)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (0 open PRs; pipeline stall carry-forward; sync error carry-forward; 7/7 services active).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:56:31.612957+00:00. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:56:32.584967+00:00. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 12th occurrence pending (no new DM; APPROVAL_REQUEST already elevated at iter 440, idx=1125).
+
+**Patterns:**
+- **heal-stale-daemon-code G-rule at 2/3.** Both the chain-event-shipper restart (iter 452 line 1129) and the outbox-notifier restart (this iter line 1130) were triggered by the same PR #241 merge event at 00:44Z. Both generated WARNING-severity larry-alerts from `heal-stale-daemon-code`. Both are correct enforcement — healer restarted services with stale code, new code is now live. The problem is purely the alert classification: `heal-stale-daemon-code` is not in config/alert-translations.json, so these informational events hit Tier 4 and would generate unnecessary DMs if the Tier 4 DM path were wired. **At 3/3: dispatch to Beacon** — two-part fix: (1) add `heal-stale-daemon-code` auto-restart patterns to config/alert-translations.json as Tier 3/FYI; (2) downgrade healer's log emission for successful restarts from WARNING to INFO per WARN-vs-INFO calibration heuristic (§ 9 of cycle-prompt.md).
+- **System quiescent otherwise.** PR #241 pipeline fully complete, 0 open PRs, 0 inbox tasks. The only open signals remain the OAuth carry-forward stall and SYNC-PUSH-REBASE-FALLBACK-001, both Larry-gated.
+
+**Learned:** When a PR merges and updates multiple monitored scripts, heal-stale-daemon-code fires one auto-restart alert per service — not one alert per merge event. PR #241 updated chain_event_shipper.py and outbox_notifier.py; two separate alerts followed (lines 1129+1130, 2 seconds apart). For G-rule counting: each service restart is a separate alert occurrence, so a single PR merge can contribute 2+ occurrences to the same G-rule counter. This makes the G-rule counter reach 3/3 faster than expected (2/3 in just 2 iters; likely 3/3 on the next PR merge that touches a monitored script). The dispatch cadence is appropriate given the allowlist gap.
+
+---
+
 ## Iteration 452 — 2026-06-02 00:47 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1128** (1 new alert since iter 451 — heal-stale-daemon-code auto-restart). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 error carry-forward at 00:38:29Z (11th total / 5th post-clear; self-recovered via wrapper). Healer heartbeat: **00:44:05Z** (~3 min old; FRESH). 7/7 services active. **PR #241 MERGED** ✅ (feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds — confirmed from session-start gitStatus commit 7477576). 0 open PRs.
