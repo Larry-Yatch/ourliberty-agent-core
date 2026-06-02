@@ -707,7 +707,9 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # in sync if the set changes. The review_pass/review_revision/
         # review_escalate types were added by check-x-verdict-emission
         # (pushed from outbox_notifier._emit_mirror_verdict_chain_event at
-        # the Mirror verdict-classification site).
+        # the Mirror verdict-classification site). The ceo_digest type was
+        # added by the N6 digest generator (approvals-queue-rework spec),
+        # push-emitted by scripts/ceo_digest_generator.py.
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -717,6 +719,7 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'approval_request', 'clarify_request', 'clarify_response',
             'larry_action',
             'review_pass', 'review_revision', 'review_escalate',
+            'ceo_digest',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

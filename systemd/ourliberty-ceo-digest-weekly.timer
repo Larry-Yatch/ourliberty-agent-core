@@ -1,0 +1,15 @@
+[Unit]
+Description=N6 CEO digest — weekly (covers the prior week) Monday 6:00am Larry-local
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/approvals-queue-rework.md
+
+[Timer]
+# Monday 6:00am Larry-local. See the daily timer for the timezone rationale;
+# this MUST stay in sync with the daily timer's zone and the generator's
+# DEFAULT_LARRY_TZ. NOTE: not yet Larry-DM-confirmed; see the PR body.
+OnCalendar=Mon *-*-* 06:00:00 America/Denver
+Persistent=true
+RandomizedDelaySec=120
+Unit=ourliberty-ceo-digest-weekly.service
+
+[Install]
+WantedBy=timers.target
