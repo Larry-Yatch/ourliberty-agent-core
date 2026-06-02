@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 586 — 2026-06-02 18:03 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (unchanged — 0 new alerts). Sync: ⚠️ ERROR (carry-forward, self-recovering) — sync.json `status=error`, 17:57:15Z, "Wrong branch: chore/foo" (same SYNC-PUSH-REBASE-FALLBACK-001 pattern; session-start gitStatus confirms main+clean now). Healer heartbeat: **17:47:21Z** (same as iter 585; ~16 min old at 18:03Z; FRESH within 90-min threshold). **7/7 services active.** **1 open PR (#250).** Forge inbox: **4 files** (build-build-test-suite-green-001, marker-error-step-autoclear-1, step-alert-promotion, step-digest-generator). Beacon/Mirror inboxes: 0.
+
+**Notable since iter 585:**
+- **PR #250 OPENED** — "feat(heal): auto-clear resolved decision rows (approvals-queue-rework N1)" at 17:58:09Z. Branch `forge/step-autoclear`. CLEAN, MERGEABLE. Mirror not yet reviewed. Auto-merge not enabled. 30-min threshold fires ~18:28:09Z. Forge completed N1 of the sequence.
+- **marker-error-step-autoclear-1.json arrived at 17:58Z** — Forge processed `step-autoclear` and opened PR #250 but the preflight response lacked a PROCEED/CLARIFY_REQUEST/REJECT marker block. Retry 1 of 3. Forge bot active; will process this iter. Self-recovering.
+- **Sync at 17:57:15Z** caught repo on `chore/foo` — same transient pattern as prior occurrences; session-start confirms main+clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1139 lines** (unchanged). Watermark: **1139**. 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1139). Watermark stable. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "17:54:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** journalctl since 17:54Z: no Telegram activity. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: 4 files — all fresh (oldest: step-alert-promotion / step-digest-generator at 17:46Z, ~17 min old; build-build-test-suite-green-001 at 17:47Z; marker-error-step-autoclear-1 at 17:58Z). All under 1h stale threshold. Forge bot active. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **17:47:21Z** (~16 min old at 18:03Z; FRESH within 90-min threshold). No WARNs in journalctl since 17:54Z. G-rule at **2/3** holds. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (carry-forward, self-recovering).** sync.json `status=error`, 17:57:15Z, "Wrong branch: chore/foo". Sync ran ~50s after iter 585 auto-commit (17:56:25Z) and caught a transient non-main state. Session-start gitStatus confirms main+clean now. SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #250 OPEN — 5 min elapsed, under 30-min threshold.** PR #250 "feat(heal): auto-clear resolved decision rows (approvals-queue-rework N1)" opened 17:58:09Z. `mergeStateStatus=CLEAN`, `mergeable=MERGEABLE`, `reviewDecision=""` (Mirror not yet reviewed), `autoMergeRequest=null`. 30-min always-fix threshold fires at ~18:28:09Z. **marker-error-step-autoclear-1.json**: Forge missed preflight marker (PROCEED/CLARIFY/REJECT not in response); retry 1 of 3; self-recovering (Forge bot active). Remaining inbox files: step-alert-promotion, step-digest-generator (sequence steps 1+2, waiting on step 0 Mirror review), build-build-test-suite-green-001. All under stale threshold. Beacon/Mirror inboxes: 0. ⚠️ (watch)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** No new healer sweep since 17:47:21Z. G-rule holds; dispatch plan ready; awaiting next persistent daemon code update.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (first obs iter 584). No new occurrences this iter. Watch.
+  - All other G-rules stable. Steady-state degraded hold: **210th iter in series (377–586)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1139 — 0 new alerts; no action.
+3. Check E: PR #250 opened 17:58:09Z (Forge N1 output for step-autoclear). Under 30-min threshold; watch ~18:28:09Z.
+4. Check E: marker-error-step-autoclear-1.json noted — Forge preflight response missing marker; retry 1/3; self-recovering.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:03:06.701029+00:00. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:03:07.382674+00:00. ✅
+7. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open).
+
+**Patterns:**
+- **210th consecutive degraded-hold iter (377–586).** System advancing: Forge completed N1 of `approvals-queue-rework` sequence (PR #250 under review). Marker-error is a normal retry path — Forge missed the preflight marker on first response; retry 1/3 is self-healing. Steps 1+2 (alert-promotion, digest-generator) are queued awaiting step 0 completion.
+- **Sequence `approvals-queue-rework` progressing.** Forge opened PR #250 for N1 (auto-clear resolved decision rows). Mirror review pending. Pattern: sequence step PRs expected to flow through Mirror review → auto-merge → next step dispatch.
+- **Sync error at 17:57:15Z** — 50s after iter 585's auto-commit. Likely the run_cycle.sh process or a transient checkout. Same SYNC-PUSH-REBASE-FALLBACK-001 shape; self-recovered before session start.
+
+**Learned:** Sequence step processing produces: (1) a PR opened by Forge, (2) a marker-error retry if Forge's preflight response was malformed. PR #250 exists so the N1 build was substantive; marker-error is the outbox-notifier retry asking Forge to re-emit the preflight decision. Forge's next pick-up will close this loop. Steps 1+2 remain in inbox pending step 0's Mirror review + merge.
+
+---
+
 ## Iteration 585 — 2026-06-02 17:54 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (unchanged from iter 584 — 0 new alerts). Sync: ⚠️ ERROR (carry-forward) — sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo" (last successful: 17:14:06Z, ~40 min old at 17:54Z; within 2h threshold; self-recovers next run since repo is on main+clean). Healer heartbeat: **17:47:21Z** (ADVANCED from 17:17:19Z at iter 584 — fresh sweep ~7 min before this iter). **7/7 services active.** **0 open PRs.** Forge inbox: **4 files** (step-autoclear, step-alert-promotion, step-digest-generator, build-build-test-suite-green-001; all from 17:45–17:47Z, ~7–9 min old, within 1h threshold). Beacon inbox: 0.
