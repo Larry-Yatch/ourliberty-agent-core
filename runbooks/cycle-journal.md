@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 592 — 2026-06-02 18:52 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1144** (+1 since iter 591: idx=1144 — `auto-restarted:ourliberty-chain-event-shipper.service` at 18:47:36Z; G-rule 3/3 threshold met; dispatch sent to Beacon). Sync: ⚠️ ERROR — sync.json `status=error`, 18:45:59Z, "Auto-commit push failed; rolled back"; **new occurrence** of SYNC-PUSH-REBASE-FALLBACK-001 (push-failure variant, same as 18:37:20Z in iter 591; APPROVAL_REQUEST open). Healer heartbeat: **18:47:34Z** (ADVANCED; FRESH; ~5 min old at 18:52Z). **7/7 services active.** **PR #252 CONFLICTING; PR #253 OPEN.** G-rule 3/3 dispatch sent for heal-stale-daemon-code WARNING log level.
+
+**Notable since iter 591 (18:43Z):**
+- **Healer swept at 18:47:34Z** — auto-restarted chain-event-shipper (script mtime 1083.2 min newer than active-since 00:44Z; new code from PR #251 live). Alert idx=1144 written. G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` → **3/3 threshold met.** Dispatch sent to Beacon.
+- **PR #253 OPENED at 18:47:22Z** — "test: green the unittest suite under full discover (isolation + stale sync tests)"; CLEAN/MERGEABLE. Forge processed `build-build-test-suite-green-001` task (was in inbox since 17:47Z). Mirror review task `review-build-test-suite-green-001` dispatched.
+- **PR #252 CONFLICTING** — `gh pr list` showed UNKNOWN at iter 591; `gh pr view 252` this iter returns DIRTY/CONFLICTING. PR #251 merge at 18:42:53Z touched overlapping code paths with `forge/step-digest-generator` branch. Sequence `approvals-queue-rework` N6 blocked. Dispatch sent to Beacon for Forge to rebase.
+- **Sync error at 18:45:59Z** — same push-failure variant as iter 591 (18:37:20Z). SYNC-PUSH-REBASE-FALLBACK-001 pattern; APPROVAL_REQUEST open.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1144 lines** (+1 from iter 591). 1 new alert (idx=1144).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel subject); G-rule 3/3 threshold met; dispatch sent.** idx=1144: `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-chain-event-shipper.service, ts=18:47:36Z`. Subject NOT in alert-translations.json (Tier 4 novel). Successful enforcement event — healer auto-restarted chain-event-shipper after PR #251 updated chain_event_shipper.py. Per actionable-only preference: no DM (not actionable; healer worked as designed). G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` → **3/3.** Dispatch: `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` → Beacon inbox. Two-part fix: (1) add `auto-restarted:*` to alert-translations.json as Tier 3/FYI; (2) downgrade healer successful-restart log from WARNING to INFO. Watermark: **1144**. ⚠️ (G-rule dispatch)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 18:20:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 18:20:00` → no entries. No Telegram activity. No orphan Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **27** heal-pipeline-stall keyed files (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No orphan Larry directives. Build-test-suite-green-001 → PR #253 opened this iter (Forge processed it). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat ADVANCED to **18:47:34Z** (~5 min old at 18:52Z; FRESH). Healer ran and auto-restarted chain-event-shipper (new code from PR #251 live). State file missing (known calibration issue per MEMORY.md iters 143+; heartbeat is authoritative). G-rule at **3/3** → dispatch sent (see Check 0). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, same variant).** sync.json `status=error`, 18:45:59Z, "Auto-commit push failed; rolled back". Same push-failure variant as 18:37:20Z in iter 591. SYNC-PUSH-REBASE-FALLBACK-001 pattern continues. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-recovers on next sync. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #252 CONFLICTING (sequence N6 blocked); PR #253 OPEN under threshold.**
+  - **PR #252** "Add N6 CEO digest generator" — `gh pr view` returned DIRTY/CONFLICTING (`gh pr list` cached UNKNOWN). Opened 18:30:20Z on `forge/step-digest-generator`. PR #251 merge at 18:42:53Z introduced conflict. Dispatch sent to Beacon to route Forge for rebase. Cannot auto-merge conflicting PR. ⚠️
+  - **PR #253** "test: green the unittest suite under full discover" — CLEAN/MERGEABLE, opened 18:47:22Z; 5 min old. Watch mark: **19:17:22Z**. Mirror has `review-build-test-suite-green-001` task. ✅ (watch)
+  - **Forge inbox: 4 files.** marker-error-step-autoclear-1 (17:58Z = ~54 min; approaching 1h), marker-error-step-alert-promotion-1 (18:11Z = ~41 min), suppress-by-design (18:18Z = ~34 min), marker-error-step-digest-generator-1 (18:30Z = ~22 min). All within 1h threshold. Forge bot active. ⚠️ (watch marker-error-step-autoclear-1 approaching 1h at ~18:58Z)
+  - Beacon inbox: notify-build-test-suite-green-001.json (coordination item); + 2 new dispatch envelopes from this iter.
+  - Mirror inbox: review-build-test-suite-green-001.json (Mirror review for PR #253).
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **3/3 — DISPATCH SENT (this iter).** cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json → Beacon inbox. Close G-rule watch when Forge PR merges.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584). No new occurrences.
+  - All other G-rules stable. Steady-state degraded hold: **215th iter in series (377–592)** with 0 pre-existing G-rule advances (excluding the new 3/3 dispatch above).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: 1 new alert (idx=1144) — heal-stale-daemon-code auto-restarted chain-event-shipper (Tier 4 novel; no DM per actionable-only; G-rule 3/3). Watermark: **1144**.
+3. **G-rule 3/3 dispatch:** `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` → Beacon inbox. Two-part fix: add `auto-restarted:*` Tier-3 allowlist + downgrade healer log level. Logged to cycle-actions.jsonl. ✅
+4. **PR #252 conflict dispatch:** `cycle-finding-pr-252-conflict-20260602T185128Z.json` → Beacon inbox. Route to Forge for rebase of `forge/step-digest-generator` onto current main. Logged to cycle-actions.jsonl. ✅
+5. Check E: PR #253 noted (5 min, under threshold); watch at 19:17:22Z.
+6. Check E: marker-error-step-autoclear-1 approaching 1h (watch ~18:58Z).
+7. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T18:52:01Z. ✅
+8. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T18:52:02Z. ✅
+9. Wrote journal entry.
+
+**Escalated:** None new to Larry (both findings routed to Beacon, not Larry-actionable). Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; push-failure variant recurred 18:45:59Z).
+
+**Patterns:**
+- **215th consecutive degraded-hold iter (377–592).** G-rule 3/3 dispatch sent for heal-stale-daemon-code WARNING log level — if Beacon→Forge fix lands, this class of Tier-4 triage noise disappears. First systemic fix dispatch in this degraded-hold window.
+- **PR #252 CONFLICTING.** `gh pr list` UNKNOWN vs `gh pr view` DIRTY/CONFLICTING — confirms the memory note (MEMORY.md calibration section): always validate UNKNOWN PRs via `gh pr view` before reporting status. This iter the UNKNOWN-then-CONFLICTING pattern took 22 minutes to resolve from UNKNOWN to confirmed-CONFLICTING.
+- **Healer auto-restarted chain-event-shipper** 18:47:36Z — 5 min after PR #251 merged at 18:42:53Z. Healer's 30-min cadence appears to have fired early (prior sweep at 18:17:33Z → next expected ~18:47Z). Timing aligns correctly. New code for PR #251 (feat/promote-alerts) is live in chain-event-shipper.
+
+**Learned:** G-rule `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` closed at 3/3. The third trigger was the chain-event-shipper restart post-PR#251 merge — confirming the prediction that a PERSISTENT daemon code update would trigger 3/3 (per MEMORY.md iter 478 calibration note). Once Beacon/Forge fix lands, this pattern → Tier 3 allowlist match → silent per design.
+
+---
+
 ## Iteration 591 — 2026-06-02 18:43 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1143** (+1 since iter 590: idx=1143 — `sync-blocked:auto-commit-push-failed` at 18:37:20Z; novel subject, not in allowlist; connected to SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST; no separate DM per actionable-only preference). Sync: ⚠️ ERROR — sync.json `status=error`, 18:37:20Z, "Auto-commit push failed; rolled back to 8dd3f450"; **new variant** of SYNC-PUSH-REBASE-FALLBACK-001 (push rejection vs prior "Wrong branch" shape). Healer heartbeat: **18:17:33Z** (stable; ~25 min old at 18:43Z; FRESH within 90-min threshold). **7/7 services active.** **PR #251 MERGED this iter; PR #252 OPEN.** Forge inbox: **5 files** (build-build-test-suite-green-001 at 17:47Z = ~56 min old; approaching 1h stale; Forge bot active).
