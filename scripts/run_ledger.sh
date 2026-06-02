@@ -18,6 +18,9 @@ LOG_DIR="${HOME}/agents/logs"
 LOG_FILE="${LOG_DIR}/ledger.log"
 HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
 
+# shellcheck source=_lib_push_with_rebase.sh
+source "${REPO_DIR}/scripts/_lib_push_with_rebase.sh"
+
 mkdir -p "$LOCK_DIR" "$LOG_DIR"
 
 log() {
@@ -67,10 +70,14 @@ if [ -d "$REPO_DIR/.git" ]; then
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "ledger: weekly run ${TS}" -m "Auto-committed by run_ledger.sh." 2>>"$LOG_FILE"; then
             log "auto-commit: created commit for run ${TS}"
-            if git push -q origin main 2>>"$LOG_FILE"; then
-                log "auto-commit: pushed to origin/main"
+            # Rebase fallback (same helper run_cycle.sh uses): a bare push to
+            # main loses the race when a PR merge advances origin mid-run, and a
+            # bare-push failure here would leave a local-only commit on main that
+            # breaks the next sync fast-forward. push_with_rebase rebases + retries.
+            if push_with_rebase origin main "$LOG_FILE"; then
+                log "auto-commit: pushed to origin/main (rebase fallback available)"
             else
-                log "auto-commit: push failed (commit retained locally)"
+                log "auto-commit: push failed even after rebase fallback (commit retained locally)"
             fi
         else
             log "auto-commit: nothing to commit"
