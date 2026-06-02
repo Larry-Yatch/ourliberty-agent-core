@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration 446 — 2026-06-02 00:04 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (1 new alert — review-pass PR #238, Tier 3). **PR #238 MERGED** ✅ — "feat(pulse): Check X chain-quality regression watch" — Mirror approved, auto-merged ~23:59:59Z, commit 1e47005. Local main at parity with origin. Sync: ⚠️ ERROR at 23:55:25Z (SYNC-PUSH-REBASE-FALLBACK-001 — **10th total / 4th post-clear** — as predicted). Healer heartbeat: 23:43:37Z (~18 min old; FRESH). 7/7 services active.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1127 lines** (was 1126). 1 new alert at line 1127: outbox-notifier review-pass for PR #238. **Tier 3** (known pattern — review-pass + auto-merge notifications are expected system behavior per D3.5 5d). Watermark → 1127.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1 new alert (line 1127): outbox-notifier review-pass — "Mirror approved PR #238 on task `build-check-x-chain-quality-regression-001`. Revision 1 resolves prior medium finding (pulse-check-x alert-translations entry added). 14/14 + 15/15 tests pass. Auto-merged + branch deleted." Tier 3 (known pattern). Watermark 1126 → 1127. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No directives or agent-distress keywords in recent bot logs. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, PLATEAU).** alert-cooldown/warning/: **293** total (unchanged from iters 443–445 — 4th consecutive unchanged iter). Heal-pipeline-stall keyed files: **27** (unchanged). Plateau confirmed. Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No orphan Larry directives found in recent bot logs. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **23:43:37Z** — ~18 min old at 00:04Z. FRESH (well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Branch=main, clean. HEAD=**1e47005** ("feat(pulse): Check X chain-quality regression watch (#238)") — PR #238 squash-merge commit. At parity with origin/main (git log HEAD..FETCH_HEAD empty). No ff needed. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 10th total / 4th post-clear.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-01T23:55:25Z, commit=3cf4e8bc. Occurred at 23:55:25Z (iter 445 post-journal push window, concurrent with PR #238 review-pass landing). 10th total — predicted explicitly at iter 445. No new DM (APPROVAL_REQUEST already elevated at iter 440, idx=1125). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. All clear. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~81d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** All Monday checks fired at iter 266 — idempotency guards active; skip. Check III next 2026-06-14. Skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **70th iter in series (377–446)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (0 open PRs; local at parity with origin — no ff needed; pipeline stall carry-forward; sync error carry-forward with repo current).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:04:38.832183+00:00. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:04:39Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 10th total — no new DM (APPROVAL_REQUEST already elevated at iter 440, idx=1125; no new occurrence since iter 445 check-B window).
+
+**Patterns:**
+- **PR #238 MERGED ✅** — "feat(pulse): Check X chain-quality regression watch." Auto-merged ~23:59:59Z (Mirror approved revision 1 after resolving the alert-translations medium finding). Check X is now live in main (commit 1e47005). The check-x-chain-quality-regression-001 build chain is complete. 0 open PRs.
+- **SYNC-PUSH-REBASE-FALLBACK-001 10th total / 4th post-clear.** Called at iter 445: "Next PR merge (PR #238 Check X) will likely trigger 10th occurrence." Confirmed. Pattern fully predictable — fires on every push-race window during active PR merge days. APPROVAL_REQUEST `sync-push-rebase-fallback-001` is now the most urgent open systemic fix. Must ship before next PR merge.
+- **Cooldown plateau: 293/27 — unchanged 4th consecutive iter (443–446).** Confirmed plateau. Natural expiry paused; self-corrects when Tier 2 OAuth restored.
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 predictability is now iron-clad — fires on every PR merge day, 10 for 10. This makes it a blocking systemic gap, not just a recurring annoyance. The APPROVAL_REQUEST posture is correct but urgency should reflect the pattern.
+
+---
+
 ## Iteration 445 — 2026-06-01 23:51 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1126** (unchanged — 0 new alerts since iter 444). **PR #238 OPEN** ✅ — "feat(pulse): Check X chain-quality regression watch" (created 23:50:07Z, ~1.8 min old, mergeable=UNKNOWN, Mirror review pending). Forge inbox: 0 (build task consumed). Sync: ⚠️ ERROR carry-forward at 23:42:45Z (SYNC-PUSH-REBASE-FALLBACK-001 — 9th total / 3rd post-clear; repo HEAD=4df1dd0 current; error ~9 min old, under 2h threshold). Healer heartbeat: 23:43:37Z (~8 min old; FRESH). 7/7 services active.
