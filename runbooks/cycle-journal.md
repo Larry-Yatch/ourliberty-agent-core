@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 479 — 2026-06-02 04:26 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 478). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error; subsequent wrapper commits confirm tree recovered). Healer heartbeat: **04:14:49Z** (~11 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Last alerts were idx=1134–1136 (heal-pipeline-stall tier2-fallback-skipped-*, ts 2026-06-02T03:49:21Z — claimed in iter 475). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format). Larry's last message: 2026-06-01T22:42:48Z UTC ("I think we have addressed all of these so we will wait to see what comes up") — resolution statement, no new directives or distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. Larry's last message is a resolution statement. No orphaned directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:14:49Z** — ~11 min old at iter write. FRESH (within 90-min threshold). No stale-daemon alerts in larry-alerts.jsonl since watermark. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**7e5c96c** ("Pulse cycle 20260602T042329Z" — iter 478 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR stale — SYNC-PUSH-REBASE-FALLBACK-001 (12th total, carry-forward).** sync.json status=**error**, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T03:44:25Z. Session-start gitStatus shows HEAD=7e5c96c on clean main — wrapper commits since the error (b4854ad, 7e5c96c) pushed successfully. sync.json stale; self-recovers on next sync_agent_core.sh run. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open; no new DM (Larry chose to wait). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs (PR #242 merged iter 474). Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T04:26Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer heartbeat at 04:14:49Z; no new auto-restart alerts in larry-alerts.jsonl. G-rule 3/3 requires a PERSISTENT daemon code update (one-shot services have empty ActiveEnterTimestamp → healer skips → no WARNING; confirmed calibration from iter 478). Watch: next PR touching a persistent daemon's source file.
+  - All other G-rule items stable. Steady-state degraded hold: **103rd iter in series (377–479)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+3. Sync error (SYNC-PUSH-REBASE-FALLBACK-001, 12th) — carry-forward; no new action.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T04:26:25.198396+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T04:26:25.834922+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **103rd consecutive degraded-hold iter (377–479).** System structurally quiescent: 0 new alerts, 0 open PRs, 7/7 services, healer heartbeat fresh, pipeline idle. Only active degradation is Tier 2 OAuth (Larry-gated).
+- **G-rule 2/3 hold persists.** heal-stale-daemon-code G-rule correction from iter 478 stable: one-shot services are invisible to the healer's stale-code detection. No new triggers.
+- **sync.json stale error does not reflect current repo state.** Three successful wrapper pushes since the 03:44:25Z error (f2f093f, ba404ff, b4854ad, 7e5c96c). Pattern: sync.json self-corrects on next sync_agent_core.sh run.
+
+**Learned:** Nothing new. State is stable carry-forward from iter 478.
+
+---
+
 ## Iteration 478 — 2026-06-02 04:20 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 477). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error). Healer heartbeat: **04:14:49Z** (~6 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
