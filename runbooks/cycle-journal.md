@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 481 — 2026-06-02 04:36 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 480). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error; subsequent wrapper commit a2ef3f0 at ~04:35Z pushed cleanly). Healer heartbeat: **04:14:49Z** (~21 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Carry-forward from iter 480. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict, chat_id=7998341473). Larry's last message: 2026-06-01T22:42:48Z UTC (resolution statement — carry-forward, ~6h old, no new directives). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:14:49Z** — ~21 min old at iter write. FRESH (within 90-min threshold). No new auto-restart alerts in larry-alerts.jsonl. G-rule at 2/3 (unchanged). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**a2ef3f0** ("Pulse cycle 20260602T043142Z" — iter 480 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR stale — SYNC-PUSH-REBASE-FALLBACK-001 (12th total, carry-forward).** sync.json status=**error**, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T03:44:25Z. Session-start gitStatus shows HEAD=a2ef3f0 on clean main — wrapper commits since the error have pushed cleanly. sync.json stale; self-recovers on next sync_agent_core.sh run. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open; no new DM (Larry chose to wait). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T04:36Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer heartbeat at 04:14:49Z; no new auto-restart alerts in larry-alerts.jsonl. One-shot services (empty ActiveEnterTimestamp) remain invisible to healer restart logic. G-rule 3/3 requires next persistent daemon code update. Dispatch plan ready.
+  - All other G-rule items stable. Steady-state degraded hold: **105th iter in series (377–481)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+3. Check B: sync.json stale error — carry-forward; no new action.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T04:36:05.579102+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T04:36:06.437922+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **105th consecutive degraded-hold iter (377–481).** System structurally quiescent: 0 new alerts, 0 open PRs, 7/7 services, healer heartbeat fresh, pipeline idle. Only active degradation is Tier 2 OAuth (Larry-gated). No change.
+- **G-rule 2/3 stable.** No new auto-restart alerts from healer. One-shot service visibility gap confirmed across iters 478–481. 3/3 trigger awaits next persistent daemon code update.
+- **sync.json stale error does not reflect current repo state.** Wrapper pushes since 03:44:25Z error have all succeeded. sync.json self-corrects on next sync_agent_core.sh run.
+
+**Learned:** Nothing new. State is stable carry-forward from iter 480.
+
+---
+
 ## Iteration 480 — 2026-06-02 04:30 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 479). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error; subsequent wrapper commit 43db508 at 04:28:55Z pushed cleanly). Healer heartbeat: **04:14:49Z** (~15 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
