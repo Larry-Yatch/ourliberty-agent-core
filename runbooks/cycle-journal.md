@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 451 — 2026-06-02 00:39 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts since iter 450). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 error at 00:38:29Z (**11th total / 5th post-clear**; self-recovers). Healer heartbeat: **00:13:39Z** (~25 min old; FRESH). 7/7 services active. **PR #241 OPEN** (feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds — created 00:32:53Z, ~7 min old, mergeable=MERGEABLE, Mirror review pending). **PR #240 MERGED** ✅ (fix/check-ix-dashboard-port — Check IX probe port corrected :8001 → :8000; now in main, closes Check IX fatal-error).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1127 lines** (unchanged). 0 new alerts since iter 450. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1127). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No directives or agent-distress keywords in recent bot logs. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (unchanged from iters 447–450). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ PR #241 new.** Forge inbox: **0** (consumed; build-check-x-verdict-emission-001 task produced PR #241). Beacon inbox: **0**. **PR #241 OPEN** — "feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds" — created 00:32:53Z (~7 min old at check time), mergeable=MERGEABLE, reviewDecision="" (no Mirror review yet). Under 30-min gate — watch next iter for auto-merge eligibility. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **00:13:39Z** — ~25 min old at 00:38:57Z. FRESH (within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus at session start: branch=main, clean. HEAD=b040f40 ("Pulse cycle 20260602T003317Z" — iter 450 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 11th total / 5th post-clear.** `agent-core-sync.json` (re-read at 00:38:57Z): status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T00:38:29Z, commit=e987955e. Fired during this iter's window (~5 min after PR #241 opened). Pattern fully confirmed: fires on every active PR-build day (11 for 11 now). Wrapper recovery path handles it correctly — repo is clean. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + elevated; no new DM (last sent iter 440, idx=1125). ⚠️ Carry-forward.
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #241 active.** PR #241 open, 7 min old, under 30-min gate. Forge inbox: 0. Beacon inbox: 0. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Forge build task completed (PR #241 opened). ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC — all day-gated checks (Check I, VIII, IX, X — Monday only) gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **75th iter in series (377–451)** with 0 new G-rule advances.
+
+**Positive finding: PR #240 MERGED ✅ (Check IX port fix).** The git log for this session (session-start gitStatus) shows commit 276c963 ("Merge pull request #240 from Larry-Yatch/fix/check-ix-dashboard-port") and 93a26fa ("fix(pulse-check-ix): probe dashboard API on :8000 not :8001") are in main. PR #240 merged between iter 447 and iter 448's wrapper (before 00:21Z), but was not surfaced in prior iters due to session gitStatus snapshot timing. This closes the Check IX fatal-error issue first observed at iter 266 — the script was probing `http://127.0.0.1:8001/api/system/missions` (connection refused); PR #240 corrects to `:8000`. **Next Monday's Check IX will fire successfully for the first time.** Closing the Check IX FATAL watch item from MEMORY.md.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (PR #241 under 30-min gate; pipeline stall carry-forward; 7/7 services active; 0 open auto-mergeable PRs).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:39:42Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:39:43Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 11th total — no new DM (APPROVAL_REQUEST already elevated at iter 440, idx=1125; pattern confirmed, wrapper recovery working).
+
+**Patterns:**
+- **PR #241 OPEN — Check X verdict emission.** "feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds" — the `build-check-x-verdict-emission-001` build task completed, producing PR #241 (opened 00:32:53Z). Mergeable=MERGEABLE. Mirror review will follow. Expected flow: Mirror reviews → approves → auto-merge → 12th SYNC-PUSH-REBASE-FALLBACK-001 occurrence (pattern: fires on every PR merge day, now 11 for 11).
+- **SYNC-PUSH-REBASE-FALLBACK-001 11th total / 5th post-clear.** Confirmed at 00:38:29Z during this iter's window. Error fires, wrapper recovery path clears it. APPROVAL_REQUEST priority: ship before PR #241 merges (or accept 12th occurrence). No action available to Pulse; Larry-gated.
+- **Check IX closed.** PR #240 (fix/check-ix-dashboard-port) in main. Next Monday Check IX fires on port :8000. The "Check IX FIRST FIRING FATAL" watch item from iter 266 can be retired.
+
+**Learned:** Session gitStatus snapshots at session-start can miss PR merges that land during the brief window between session start and journal write. iters 448-450 all operated with stale gitStatus that predated PR #240's merge. The lag is benign (Check A uses the snapshot for clean/branch checks, not for PR discovery), but it means PR #240's merge appeared "new" in this iter even though it was 15+ minutes old. The correct check for PR status is `gh pr list`, which showed PR #241 (not #240 — #240 was already merged and therefore not in the open-PR list).
+
+---
+
 ## Iteration 450 — 2026-06-02 00:32 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts since iter 449). Sync: ✅ no-change at 00:08:21Z (~24 min old, under 2h threshold). Healer heartbeat: **00:13:39Z** (~19 min old; FRESH). 7/7 services active. Forge inbox: 1 (`build-check-x-verdict-emission-001`, **phase=build** — ~14 min old at 00:18:15Z). 0 open PRs.
