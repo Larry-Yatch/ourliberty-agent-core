@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 452 — 2026-06-02 00:47 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1128** (1 new alert since iter 451 — heal-stale-daemon-code auto-restart). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 error carry-forward at 00:38:29Z (11th total / 5th post-clear; self-recovered via wrapper). Healer heartbeat: **00:44:05Z** (~3 min old; FRESH). 7/7 services active. **PR #241 MERGED** ✅ (feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds — confirmed from session-start gitStatus commit 7477576). 0 open PRs.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1128 lines** (was 1127 at iter 451). 1 new alert (line 1128): heal-stale-daemon-code auto-restarted ourliberty-chain-event-shipper.service at 00:44:06Z. Line 1127 (PR #241 review-pass outbox-notifier notification) processed as Tier 3 nominal — confirmed timing places it in iter 451's window or this window, treated as Tier 3 either way.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier 4 by spec / informational by judgment).** Line 1128: `{"source": "heal-stale-daemon-code", "severity": "warning", "message": "Auto-restarted ourliberty-chain-event-shipper.service (script mtime newer than active-since by 4787.2 min; new code now live). Commits since pre-restart: 7477576 feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds (#241)"}`. Root cause: PR #241 merged ~00:41Z, updating chain_event_shipper.py. Healer detected mtime delta and auto-restarted service. Service confirmed active (7/7 still active). **Tier 4 by spec** (heal-stale-daemon-code not in config/alert-translations.json), but classifying as **informational by judgment**: this is a successful enforcement event — healer did exactly what it should, no action needed from Pulse. No DM to Larry (false-positive risk: "your healer worked" is not actionable). **G-rule 1/3:** add `heal-stale-daemon-code` "auto-restarted" pattern to alert-translations.json. Watermark 1127 → 1128. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: count=1 (Larry's session). No directives or agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable from iters 447–451; wc -l output 115 = 3 header lines + 112 files). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. **0 open PRs** (PR #241 merged ✅). No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **00:44:05Z** — ~3 min old at check time. FRESH (well within 90-min threshold). Active heal confirmed: stale-daemon healer auto-restarted chain-event-shipper at 00:44:06Z (1 second after heartbeat write — healer is alive and functioning). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**35a5c24** ("Pulse cycle 20260602T004300Z" — iter 451 wrapper). **PR #241 merge commit (7477576) is in main** — confirmed from session-start git log. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 carry-forward.** `agent-core-sync.json`: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T00:38:29Z. This is the 11th occurrence (iter 451 reported it as 11th). No NEW sync run has occurred since 00:38:29Z — the error state persists, but the repo is at parity (wrapper pushed 35a5c24 independently). The 12th SYNC-PUSH-REBASE-FALLBACK-001 is expected when sync_agent_core.sh next runs after PR #241's merge (pattern: fires on every PR merge day, 11 for 11). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open + elevated; no new DM. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. chain-event-shipper running new PR #241 code. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. All clear post-PR #241. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline quiescent. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I (Monday), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** 0 new occurrences on any tracked item. New G-rule candidate: `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json` — 1st observation (1/3). Steady-state degraded hold: **76th iter in series (377–452)** with 0 pre-existing G-rule advances.
+
+**Positive finding: PR #241 MERGED ✅** — "feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds." Forge/Mirror verdict chain_events emission is now live. chain-event-shipper restarted with new code by heal-stale-daemon-code healer within 3 minutes of PR merge. `build-check-x-verdict-emission-001` CLOSED. Check X verdict thresholds (Forge/Mirror verdict-mix ratio) now reactivated — data-gated on `min_tasks_per_window` until sufficient verdicts accumulate.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (0 open PRs; pipeline stall carry-forward; sync error carry-forward; 7/7 services active).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:47:41Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:47:42Z. ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 11th total, no new DM. 12th expected when sync next runs after PR #241 merge.
+
+**Patterns:**
+- **PR #241 pipeline fully complete.** "feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds" — Forge build → Mirror approve → auto-merge → chain-event-shipper auto-restarted with new code → 0 open PRs → 0 inbox tasks. Clean pipeline exit.
+- **heal-stale-daemon-code WARNING for successful auto-restart: G-rule 1/3.** `heal-stale-daemon-code` not in config/alert-translations.json. Every PR that touches a monitored script (chain_event_shipper.py, outbox_notifier.py, etc.) will generate a Tier-4 warning-severity larry-alert when the healer successfully restarts the service. This is a false-positive at the Tier 3 / Tier 4 classification level — the action was correct, the severity is wrong, and no allowlist entry exists. At 3/3: dispatch to Beacon for two-part fix: (1) add `heal-stale-daemon-code` "auto-restarted" pattern to `config/alert-translations.json` as Tier 3; (2) downgrade the healer's log emission for successful restarts from WARNING to INFO per WARN-vs-INFO calibration heuristic (§ 9). Workaround: manual Tier 3 judgment until allowlist entry lands.
+- **SYNC-PUSH-REBASE-FALLBACK-001 12th occurrence pending.** PR #241 merged; sync_agent_core.sh will fire its next scheduled run into a freshly-updated origin and trigger the 12th instance. APPROVAL_REQUEST priority remains critical.
+
+**Learned:** heal-stale-daemon-code's Tier-4 false-positive pattern (successful auto-restart → warning-severity larry-alert → no allowlist → Tier 4) is structurally identical to the WARN-vs-INFO calibration problem: the correct action was taken, but the alert classification makes it look like a problem requiring human attention. The fix is an allowlist entry, not a process change. Starting G-rule count.
+
+---
+
 ## Iteration 451 — 2026-06-02 00:39 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts since iter 450). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 error at 00:38:29Z (**11th total / 5th post-clear**; self-recovers). Healer heartbeat: **00:13:39Z** (~25 min old; FRESH). 7/7 services active. **PR #241 OPEN** (feat(chain): emit Forge/Mirror verdicts to chain_events + reactivate Check X thresholds — created 00:32:53Z, ~7 min old, mergeable=MERGEABLE, Mirror review pending). **PR #240 MERGED** ✅ (fix/check-ix-dashboard-port — Check IX probe port corrected :8001 → :8000; now in main, closes Check IX fatal-error).
