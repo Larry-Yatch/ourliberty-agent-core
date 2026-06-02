@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 606 — 2026-06-02 20:26 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 605). Sync: ✅ STABLE — `status=no-change`, `last_sync=19:37:23Z` (~49 min old at check; within 2h threshold). Healer heartbeat: **20:18:05Z** (~8 min old at check; FRESH within 90-min threshold — unchanged from iter 605; healer has not swept since). **7/7 services active.** **No open PRs.** All inboxes empty. Pipeline stall carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief still absent — now **~95 min since Beacon consumed the dispatch** (18:51Z). Root cause: Tier 2 OAuth expired. [yellow] escalation at pulse-escalations.json idx=9 stands.
+
+**Notable since iter 605 (20:21Z — 5-min window):**
+- **0 new alerts.** larry-alerts.jsonl remains at 1149 lines. Watermark unchanged.
+- **No WARNING logs.** `journalctl --since 2026-06-02T20:21:00 --priority warning` → no entries.
+- **No beacon-bot activity.** No Telegram messages; no Larry directives.
+- **Healer heartbeat unchanged.** Still 20:18:05Z from iter 605. Healer has not swept in the ~8-min window.
+- **Forge/Beacon archives unchanged.** No new activity; `heal-stale-daemon-warn-info-calibration-001` brief absent (confirmed).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1149 lines — watermark unchanged from iter 605. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 2026-06-02T20:21:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-02T20:21:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. `heal-stale-daemon-warn-info-calibration-001` brief absent — Beacon OAuth-blocked mid-session (confirmed iter 602); stall duration now ~95 min post-Beacon-consumption. [yellow] escalation idx=9 stands. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Beacon inbox: EMPTY ✅. Forge inbox: EMPTY ✅. Mirror inbox: EMPTY ✅. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **20:18:05Z** (~8 min old at check; FRESH within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ✅ STABLE.** sync.json `status=no-change`, `last_sync=19:37:23Z` (~49 min old; within 2h threshold). No new sync failures. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (no new occurrence). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** No open PRs. All inboxes empty. `heal-stale-daemon-warn-info-calibration-001` pipeline stall confirmed carry-forward (Forge archive unchanged). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (iters 593, 599). No new occurrences.
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon consumed dispatch (18:51Z); Forge brief MISSING — now ~95 min post-consumption.** [yellow] escalation idx=9 stands. Awaiting Tier 2 OAuth restore or Larry go-ahead to re-dispatch.
+  - All other G-rules stable. Steady-state degraded hold: **229th iter in series (377–606)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. All checks nominal except Check 3 (pipeline stall, carry-forward). No new findings, no new auto-fix actions.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T20:26:22Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T20:26:53Z. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending; [yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; no new occurrence). `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (escalated iter 602 [yellow] idx=9; ~95 min elapsed, no change).
+
+**Patterns:** Stale-daemon pipeline stall now ~95 min post-Beacon-consumption (up from ~90 min at iter 605). Same root cause. No new G-rule occurrences this iter. Healer active (heartbeat 20:18:05Z).
+
+**Learned:** Nothing new beyond iter 602's diagnosis. System steady in degraded hold. Stall clock continues incrementing.
+
+---
+
 ## Iteration 605 — 2026-06-02 20:21 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 604). Sync: ✅ STABLE — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357" (~44 min old at check; within 2h threshold). Healer heartbeat: **20:18:05Z** (FRESH — advanced from iter 604's 19:47:43Z; ~3 min old at check). **7/7 services active.** **No open PRs.** All inboxes empty. Pipeline stall carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief still absent — now **~90 min since Beacon consumed the dispatch** (18:51Z). Root cause: Tier 2 OAuth expired. [yellow] escalation at pulse-escalations.json idx=9 stands.
