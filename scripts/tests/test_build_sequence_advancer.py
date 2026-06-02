@@ -94,6 +94,14 @@ class _AdvancerHarness(unittest.TestCase):
         (self.agents_root / 'logs').mkdir(parents=True)
         (self.agents_root / 'state').mkdir(parents=True)
         (self.agents_root / 'inboxes' / 'beacon').mkdir(parents=True)
+        # Save prior env so tearDown restores rather than blindly popping.
+        # Blindly popping OURLIBERTY_AGENTS_ROOT leaked across modules under
+        # `unittest discover`: sibling modules that set it at import time
+        # (e.g. test_deploy_notifier) found it gone when their tests ran.
+        self._prior_agents_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        self._prior_advancer_enabled = os.environ.get(
+            'OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED',
+        )
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.agents_root)
         os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'true'
         # safe_write_inbox uses Path.home() not the env var, so override
@@ -103,11 +111,18 @@ class _AdvancerHarness(unittest.TestCase):
         self._prior_home = os.environ.get('HOME')
         os.environ['HOME'] = str(self.agents_root.parent)
         # Force fresh module imports so the env-var-dependent constants
-        # re-resolve to the tmpdir.
-        for mod in (
+        # re-resolve to the tmpdir. Snapshot the prior sys.modules entries so
+        # tearDown can restore them: leaving safe_write_inbox absent leaked
+        # under discover (test_outbox_notifier.setUpModule reloads it and
+        # raised "module not in sys.modules").
+        self._reloaded_mods = (
             'build_sequence_advancer', 'build_sequence_validator',
             'safe_write_inbox', 'sequence_shortcut_helpers',
-        ):
+        )
+        self._prior_modules = {
+            mod: sys.modules.get(mod) for mod in self._reloaded_mods
+        }
+        for mod in self._reloaded_mods:
             sys.modules.pop(mod, None)
         import build_sequence_advancer as bsa  # noqa: E402
         self.bsa = bsa
@@ -149,15 +164,26 @@ class _AdvancerHarness(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
-        for k in (
-            'OURLIBERTY_AGENTS_ROOT',
-            'OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED',
+        for k, prior in (
+            ('OURLIBERTY_AGENTS_ROOT', self._prior_agents_root),
+            ('OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED',
+             self._prior_advancer_enabled),
         ):
-            os.environ.pop(k, None)
+            if prior is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = prior
         if self._prior_home is None:
             os.environ.pop('HOME', None)
         else:
             os.environ['HOME'] = self._prior_home
+        # Restore the sys.modules entries we popped so sibling modules that
+        # reload these (test_outbox_notifier) still find them present.
+        for mod, prior in self._prior_modules.items():
+            if prior is None:
+                sys.modules.pop(mod, None)
+            else:
+                sys.modules[mod] = prior
 
     # -------- helpers --------
 
