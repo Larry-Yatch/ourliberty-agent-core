@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 478 — 2026-06-02 04:20 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 477). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error). Healer heartbeat: **04:14:49Z** (~6 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Carry-forward from iter 477. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". heal-stale-daemon-code INFO logs (unparseable timestamps, tick summary) visible but INFO-level; not flagged. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format). No new directives or distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:14:49Z** — ~6 min old at iter write. FRESH (within 90-min threshold). Healer sweep at 04:14:50Z completed: `tick: fresh=21 unparseable=30`. heal-systemd-install-drift.service: `ExecMainStartTimestamp=2026-06-01T18:00Z MDT`, script mtime=2026-06-02T03:48Z (script IS newer than last run). BUT `ActiveEnterTimestamp=''` → classified "unparseable" → healer skips restart decision for this service. No WARNING emitted. See G-rule calibration note below. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**b4854ad** ("Pulse cycle 20260602T041639Z" — iter 477 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR stale — SYNC-PUSH-REBASE-FALLBACK-001 (12th total, carry-forward).** sync.json status=**error**, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T03:44:25Z (~36 min old at iter write). Session-start gitStatus shows HEAD=b4854ad on clean main — iter 477 wrapper pushed successfully post-error. sync.json stale; self-recovers on next sync_agent_core.sh run. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open; no new DM (Larry chose to wait). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. cycle.timer: OnCalendar=*:0/5 confirmed (PR #225 fix in place), SubState=running (in-progress, expected while service executes), NEXT=`-` in list-timers is a transient display artifact — not an infinity trap. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T04:20Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3 — prediction corrected.** The expected 3/3 trigger from PR #242 merge did NOT occur. Diagnosis: heal-systemd-install-drift.service is a **one-shot** (`Type=oneshot`) service — after it runs and exits, `ActiveEnterTimestamp=''` (empty). The stale-daemon-code healer checks `ActiveEnterTimestamp`, not `ExecMainStartTimestamp`. Empty → classified as "unparseable" → restart decision skipped → no WARNING emitted. The script IS newer than the service's last run (`ExecMainStartTimestamp=18:00Z Jun 1` < `mtime=03:48Z Jun 2`), but the healer never sees this for one-shot services. **G-rule 3/3 requires a PERSISTENT daemon's code to be updated** (like chain-event-shipper or outbox-notifier). Watch: next PR touching a persistent daemon's source file will produce the 3/3 trigger.
+  - All other G-rule items stable. Steady-state degraded hold: **102nd iter in series (377–478)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 5: confirmed healer tick at 04:14:50Z — fresh=21, unparseable=30. heal-systemd-install-drift classified "unparseable" (one-shot service, ActiveEnterTimestamp empty). No restart, no WARNING. G-rule stays at 2/3.
+3. cycle.timer SubState=running confirmed as expected in-progress state (OnCalendar=*:0/5, not an infinity trap).
+4. Sync error (SYNC-PUSH-REBASE-FALLBACK-001, 12th) — carry-forward; no new action.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T04:20:58.139810+00:00. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T04:20:59.051305+00:00. ✅
+7. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **102nd consecutive degraded-hold iter (377–478).** System structurally quiescent: 0 new alerts, 0 open PRs, 7/7 services, pipeline idle. Only active degradation is Tier 2 OAuth (Larry-gated).
+- **G-rule 3/3 prediction was wrong (one-shot vs. persistent daemon).** Prior iters (474–477) predicted heal-stale-daemon-code would restart ourliberty-heal-systemd-install-drift.service after PR #242 and log a WARNING. It didn't — because heal-systemd-install-drift is one-shot and has empty `ActiveEnterTimestamp`. The healer's "stale code" detection only works for persistent daemons. This distinction is worth capturing so future predictions are accurate.
+- **cycle.timer NEXT=`-` during SubState=running is normal.** Confirmed: OnCalendar timer doesn't show next elapse while the associated service is running. Not an infinity trap. The `-` disappears once the service exits.
+
+**Learned:** heal-stale-daemon-code healer's "restart stale code" logic uses `ActiveEnterTimestamp`, not `ExecMainStartTimestamp`. One-shot services always have empty `ActiveEnterTimestamp` after completing → "unparseable" → no restart attempted → no WARNING. G-rule 3/3 path requires a persistent service to be code-updated. Updating MEMORY.md with this calibration note.
+
+---
+
 ## Iteration 477 — 2026-06-02 04:14 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 476). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error). Healer heartbeat: **03:44:44Z** (~30 min old at iter write; FRESH — timer confirmed active via list-timers, next fire was ~04:14:44Z). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
