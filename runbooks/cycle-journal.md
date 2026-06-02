@@ -4,6 +4,59 @@
 
 ---
 
+## Iteration 449 — 2026-06-02 00:22 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts since iter 448). Sync: ✅ no-change at 00:08:21Z (14 min old, under 2h threshold). Healer heartbeat: **00:13:39Z** (FRESH, ~9 min old at check time). 7/7 services active. Forge inbox: 1 (`build-check-x-verdict-emission-001`, **phase=build** — advanced from preflight since iter 448).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1127 lines** (unchanged). 0 new alerts since iter 448.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1127). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No directive or agent-distress keywords detected. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (unchanged). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Active Forge build.** Forge inbox: **1** — `build-check-x-verdict-emission-001` phase advanced to **build** (was preflight at iter 448, ~6 min ago). Forge completed preflight and is actively building Check X verdict emission + reactivate deferred thresholds. Expected next: PR opened within 1–2 iters. Beacon inbox: 0. 0 open PRs. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **00:13:39Z** — ~9 min old at 00:22Z. FRESH (well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** gitStatus: branch=main, clean. HEAD=**16d8f49** ("Pulse cycle 20260602T002104Z" — iter 448 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-02T00:08:21Z (14 min old). Commit recorded in sync.json (9e457ca) is one commit behind current HEAD (16d8f49 — iter 448 wrapper commit appended post-sync); this is the normal post-wrapper-commit lag, not an error. No SYNC-PUSH-REBASE-FALLBACK-001 instance this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Forge build active.** 0 open PRs. Forge inbox: 1 (`build-check-x-verdict-emission-001`, phase=build — see Check 4). Beacon inbox: 0. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge actively building. No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC — all day-gated checks (Check I, VIII, IX, X — Monday only) gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:** All 7 items stable. 0 new occurrences. Steady-state degraded hold: **73rd iter in series (377–449)** with 0 new G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. No always-allowed auto-fixes triggered (Forge build active + expected; pipeline stall carry-forward; repo current + sync nominal; 7/7 services active; 0 open PRs).
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T00:23:33Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T00:23:34Z. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 systemic fix still needed (APPROVAL_REQUEST open, elevated); no new instance this iter.
+
+**Patterns:**
+- **Forge build phase advancing.** `build-check-x-verdict-emission-001` progressed from preflight → build in ~6 minutes (00:16Z→00:22Z). Forge is processing the Check X verdict emission spec (PR #239): push Forge/Mirror verdicts into chain_events + reactivate two deferred Check X thresholds. Next expected artifact: PR opened against ourliberty-agent-core.
+- **System otherwise quiescent.** 0 new alerts, 0 open PRs, 7/7 services, sync nominal. Only open signals are the OAuth carry-forward stall and the SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST. Both are Larry-gated; no Pulse action available.
+
+**Learned:** Forge preflight → build transition happens within the 5-min cycle window (~6 min observed). For future iters: when a Forge inbox task is in `build` phase, the PR open event is likely 1–3 iters away. No action needed at `build` phase — watch for the PR and the subsequent SYNC-PUSH-REBASE-FALLBACK-001 occurrence (fires on every PR merge day, 10 for 10; PR #240 will be the 11th test of the pattern).
+
+---
+
 ## Iteration 448 — 2026-06-02 00:16 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1127** (unchanged — 0 new alerts since iter 447). **SYNC RECOVERED ✅** — sync.json now status=no-change at 00:08:21Z (SYNC-PUSH-REBASE-FALLBACK-001 error instance from 23:55:25Z cleared by post-iter-447 sync run). **PR #239 MERGED** — "Add Check X follow-up brief: Forge/Mirror verdict + preflight emission" (commit 4c10c08, arrived since iter 447). Healer heartbeat: 00:13:39Z (FRESH, ~3 min old). 7/7 services active. Forge inbox: 1 (Check X verdict emission build, phase=preflight).
