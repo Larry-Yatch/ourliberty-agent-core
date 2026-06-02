@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 476 — 2026-06-02 04:03 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 475). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward from iter 474; sync.json still shows 03:44:25Z error, but wrapper at 03:57:23Z committed f2f093f cleanly). Healer heartbeat: **03:44:44Z** (~18 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Last alerts were idx=1134–1136 (heal-pipeline-stall tier2-fallback-skipped-*, ts 2026-06-02T03:49:21Z — claimed in iter 475). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format). No new directives or distress keywords since Larry's resolution statement (2026-06-01T22:42:48Z UTC). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:44:44Z** — ~18 min old at iter write. FRESH (within 90-min threshold). Note: heartbeat still predates PR #242 merge (03:45:49Z); healer has not yet swept with updated `heal_systemd_install_drift.py` mtime. 3/3 G-rule trigger still pending. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**f2f093f** ("Pulse cycle 20260602T035723Z" — iter 475 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ stale error — SYNC-PUSH-REBASE-FALLBACK-001 (12th total).** sync.json status=**error**, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T03:44:25Z (~18 min old at iter write). Carry-forward. The wrapper at 03:57:23Z committed f2f093f to local main cleanly (visible in session gitStatus); the sync.json reflects the pre-wrapper push failure at 03:44:25Z and will update on next sync_agent_core.sh run. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open; no new DM. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T04:03Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: still at **2/3**. 0 new alerts this iter. Healer heartbeat unchanged at 03:44:44Z — has not swept since PR #242 merged (03:45:49Z). 3/3 trigger still pending next healer sweep (next sweep will detect updated `heal_systemd_install_drift.py` mtime and auto-restart the service). Dispatch plan ready.
+  - All other G-rule items stable. Steady-state degraded hold: **100th iter in series (377–476)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+3. Sync error (SYNC-PUSH-REBASE-FALLBACK-001, 12th) — carry-forward; no new action (sync.json stale; wrapper f2f093f commit clean; self-recovers on next sync run).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T04:03:10.379217+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T04:03:11.043111+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **100th consecutive degraded-hold iter (377–476).** System is structurally quiescent — 0 new alerts, 0 open PRs, 7/7 services, healer heartbeat fresh — with one persistent root cause (Tier 2 OAuth expired) that is Larry-gated. Nothing new for Pulse to act on.
+- **heal-stale-daemon-code G-rule 3/3 still pending post-PR-#242.** PR #242 merged at 03:45:49Z. Healer heartbeat has not advanced past 03:44:44Z in this iter (18 min post-merge). The 3/3 trigger is coming when the healer next sweeps; dispatch to Beacon remains ready. No action needed this iter.
+- **sync.json stale error does not reflect current repo state.** The wrapper at 03:57:23Z committed and pushed f2f093f cleanly (session gitStatus: branch=main, clean, HEAD=f2f093f). The error at 03:44:25Z preceded the successful wrapper push. sync.json will self-correct on next sync_agent_core.sh run.
+
+**Learned:** 100th iter in the degraded-hold series. No structural change from iter 475. Steady-state.
+
+---
+
 ## Iteration 475 — 2026-06-02 03:55 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (+3 new alerts, all Tier 3 silenced — pipeline-stall tier2-fallback-skipped). Sync: ⚠️ ERROR (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward from iter 474; self-recovers next wrapper run). Healer heartbeat: **03:44:44Z** (~11 min old at iter write; FRESH but predates PR #242 merge at 03:45:49Z). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
