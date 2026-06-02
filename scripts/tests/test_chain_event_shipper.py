@@ -704,7 +704,10 @@ class TestKnownEventTypesContract(unittest.TestCase):
         # types added by E4.4e PR-A (spec § 5.1) and the clarify_response
         # type added by clarify-round-visibility § 6 (pushed from
         # outbox_notifier._handle_beacon_clarification_response). Keep this
-        # in sync if the set changes.
+        # in sync if the set changes. The review_pass/review_revision/
+        # review_escalate types were added by check-x-verdict-emission
+        # (pushed from outbox_notifier._emit_mirror_verdict_chain_event at
+        # the Mirror verdict-classification site).
         spec_listed = {
             'session_start', 'session_done', 'marker_emit', 'auto_merge',
             'marker_error', 'cost_budget', 'review_request',
@@ -713,6 +716,7 @@ class TestKnownEventTypesContract(unittest.TestCase):
             'healer_fire',
             'approval_request', 'clarify_request', 'clarify_response',
             'larry_action',
+            'review_pass', 'review_revision', 'review_escalate',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

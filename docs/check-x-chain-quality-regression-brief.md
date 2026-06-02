@@ -28,14 +28,22 @@ future model/prompt change), motivated by but not hard-coded to 4.8.
    (filter by `model` substring `claude-opus-4-7` vs `claude-opus-4-8`, or by `ts`
    vs cutover) and for counting build/revision dispatches per `task_id`.
 
-INVESTIGATE during preflight (do not assume the schema): the exact representation
-of Mirror review OUTCOME (PASS / REVISION / ESCALATE). Likely derivable from
-`marker_emit` payloads (marker text `REVIEW_PASS` / `REVIEW_REVISION` /
-`REVIEW_EMERGENCY_HALT`), `escalation` events, and `auto_merge` (implies a PASS).
-Confirm the payload field shape at the `chain_event_emit.emit_event(...)` call sites
-and in `outbox_notifier.py` before relying on it. If outcome can't be cleanly
-derived from existing events, surface that in preflight CLARIFY rather than guessing —
-do NOT add new emission as part of this task (separate PR).
+Mirror review OUTCOME (PASS / REVISION / ESCALATE) representation — RESOLVED by the
+follow-up `check-x-verdict-emission` PR (see `docs/check-x-verdict-emission-brief.md`).
+`outbox_notifier.py` now push-emits dedicated `review_pass` / `review_revision` /
+`review_escalate` chain_events at the verdict-classification site (mapped by routed
+intent, so an auto-promoted / budget-exhausted REVISION is recorded as `review_escalate`).
+Dedicated types were chosen over reusing `auto_merge` so a PASS is recorded at the
+verdict moment, not at actual merge (a PASS can sit in the auto-merge queue behind a
+blocker). Forge preflight outcomes are likewise emitted as `preflight_proceed` /
+`preflight_clarify` / `preflight_reject`.
+
+HONEST LIMITATION (non-retroactive): verdict emission started at the merge of the
+`check-x-verdict-emission` PR. The baseline window for the CURRENT 4.8 cutover (before
+2026-06-01) has NO verdict events, so the verdict-mix thresholds CANNOT read the 4.8
+transition retroactively — they report `insufficient_signal` for 4.8 and activate for
+FUTURE cutovers once verdict history exists on both sides of `cutover_date`. The
+clarify/revision thresholds remain the 4.8 read (they have pre-cutover history).
 
 ## Metrics (computed per window, Forge/Mirror dispatches only)
 - Forge preflight CLARIFY rate = preflight_clarify / (proceed + clarify + reject)
@@ -55,8 +63,11 @@ do NOT add new emission as part of this task (separate PR).
     no DM, no proposal (log silently). Beacon/Forge/Mirror volume is modest; do NOT
     cry wolf on thin data.
   - thresholds (relative unless noted): `clarify_rate_rel_increase` (0.5),
-    `revision_rounds_rel_increase` (0.5), `escalate_rate_abs_increase` (0.10),
-    `pass_rate_abs_drop` (0.15)
+    `revision_rounds_rel_increase` (0.5), `escalate_rate_abs_increase` (0.10, absolute),
+    `pass_rate_abs_drop` (0.15, absolute). All four ACTIVE as of the
+    `check-x-verdict-emission` PR. The verdict-mix pair (`escalate_rate_abs_increase`,
+    `pass_rate_abs_drop`) is additionally gated on `min_tasks_per_window` Mirror
+    verdicts per window → `insufficient_signal` when below the floor.
 - If ANY threshold breaches → outcome `regression_suspected`. Else `none`.
 - Drop fixture task_ids via `fixture_patterns.is_fixture_task_id` BEFORE counting
   (same as Check VIII).
