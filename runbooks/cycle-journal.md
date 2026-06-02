@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 600 — 2026-06-02 19:43 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 599). Sync: ✅ RECOVERED — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357" (same state as iter 599; stable recovery). Healer heartbeat: **19:17:35Z** (~26 min old at 19:43Z; FRESH within 90-min threshold). **7/7 services active.** **No open PRs.** All inboxes empty. Forge still building `heal-stale-daemon-warn-info-calibration-001`; no PR yet (normal build lag — task consumed iter 594, ~42 min ago).
+
+**Notable since iter 599 (19:39Z):**
+- **No new alerts.** larry-alerts.jsonl remains at 1149 lines. 0 new events in the 4-min window since iter 599.
+- **All inboxes remain empty.** Beacon, Forge, Mirror all clear. Forge is building `heal-stale-daemon-warn-info-calibration-001` — no PR opened yet. Build lag nominal (Forge typically takes 10–30 min for a focused fix).
+- **Sync stable.** sync.json unchanged from iter 599 (19:37:23Z `no-change` recovery); no new sync failures.
+- **No WARNING logs.** `journalctl --since 19:39:00 --priority warning` → no entries across all ourliberty services.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1149 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1149 lines — watermark unchanged from iter 599. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:39:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:39:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Beacon inbox: EMPTY ✅. Forge inbox: EMPTY ✅ (task consumed; building). Mirror inbox: EMPTY ✅. All clear. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:17:35Z** (~26 min old at 19:43Z; FRESH within 90-min threshold). No new WARNs. Forge task `heal-stale-daemon-warn-info-calibration-001` consumed (iter 594); Forge building. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ✅ RECOVERED (stable).** sync.json `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357". No new sync failures since iter 599's recovery. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (systemic fix pending). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** No open PRs. All inboxes empty. Forge consuming `heal-stale-daemon-warn-info-calibration-001` — watch for PR on next cycle. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (iters 593, 599). No new occurrences (watermark unchanged).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge building `heal-stale-daemon-warn-info-calibration-001`.** Awaiting Forge PR.
+  - All other G-rules stable. Steady-state degraded hold: **223rd iter in series (377–600)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. All checks nominal except Check 3 (pipeline stall, carry-forward). No new findings, no new actions.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:44:09.503153Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:44:10Z. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 21 occurrences; self-recovering).
+
+**Patterns:**
+- **Milestone: iter 600.** System has been running continuously from iter 1 through iter 600. Steady-state degraded hold at 223 consecutive iters (377–600) — all attributable to Tier 2 OAuth expiry, not a systemic instability. The Forge→Mirror→auto-merge pipeline demonstrated excellent throughput this session (PRs #250–#254 all shipped within hours; PR #254 revised and merged in under 10 min post-revision).
+
+**Learned:** Nothing new this iter. 4-minute window between iters 599 and 600 is the shortest inter-iter gap on record — confirms the system is responsive at sub-5-min cadence when invoked interactively. No state drift observed.
+
+---
+
 ## Iteration 599 — 2026-06-02 19:39 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (+1 new alert since iter 598). Sync: ✅ RECOVERED — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date" (recovered from iter 598's 21st failure; self-recovery confirmed). Healer heartbeat: **19:17:35Z** (~22 min old at 19:39Z; FRESH within 90-min threshold). **7/7 services active.** **No open PRs.** Forge inbox empty (consuming `heal-stale-daemon-warn-info-calibration-001`; no PR yet).
