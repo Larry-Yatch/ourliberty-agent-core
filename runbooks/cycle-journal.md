@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 582 — 2026-06-02 17:33 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. **NEW: repo off-main (`approvals-rework-spec`) + sync error.** Alert watermark: **1136** (unchanged). Sync: **⚠️ ERROR** — sync.json `status=error`, 17:28:27Z, "Wrong branch: chore/foo" (last successful: 17:14:06Z at iter 581; ~19 min old, within 2h threshold). Healer heartbeat: **17:17:19Z** (same as iter 581; ~16 min old at 17:33Z; FRESH within 90-min threshold; next sweep ~17:47Z). **7/7 services active.** **0 open PRs** (PR #246 merged ✅). Forge inbox: **1** (`build-test-suite-green-001`, arrived 17:31:54Z, ~2 min old). Beacon inbox: 0. Telegram sessions: 1. **gitStatus clean** on `approvals-rework-spec` — scripts previously untracked on main now committed on this branch.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable. alert-triage.json missing on disk (INFO; known state).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Watermark stable. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "17:28:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** sessions=1. `journalctl -u 'ourliberty-*.service' --since "17:28:00"` → no entries → no Telegram activity since iter 581. No orphan directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **109** total (stable). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: `build-test-suite-green-001` (arrived 17:31:54Z, ~2 min old, NOT stale; Beacon-originated Forge task, `phase=preflight`; Forge bot active). Beacon inbox: 0. Mirror inbox: 0. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **17:17:19Z** (same as iter 581; ~16 min old at 17:33Z; FRESH within 90-min threshold; next expected ~17:47Z). journalctl since 17:28Z: no entries → no WARNs → G-rule stays at **2/3**. ✅
+
+- **(Check A) Source repo: ⚠️ WRONG BRANCH (NEW).** Session-start gitStatus: branch=`approvals-rework-spec` (NOT `main`). Working-copy discipline violated. gitStatus `(clean)` — the three scripts previously untracked on main (`scripts/approvals_cleanup.py`, `scripts/triage_decisions.py`, `scripts/clear_verified.py`) appear committed on this branch (commit `f3ec259` "docs: approvals-queue rework spec + proven cleanup/triage tooling"). Larry is building the approvals-queue rework spec on a feature branch. **Never-auto.** ⚠️
+
+- **(Check B) Sync health: ⚠️ SYNC ERROR (NEW).** sync.json `status=error`, 17:28:27Z, "Wrong branch: chore/foo". Sync script found the repo on `chore/foo` at sync time — indicates a second non-main branch was active briefly before current `approvals-rework-spec`. Last successful sync: 17:14:06Z (iter 581, ~19 min ago; within 2h stale threshold). Sync self-recovers once repo returns to `main`. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (12/13 PR merge days; separate issue). **Never-auto (downstream of Check A).** ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. **PR #246 MERGED** — confirmed from git log (`9bab0c8`). Watch item from iters 580–581 CLOSED. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I, VIII, IX, X (Monday-only) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** No new healer sweep since 17:17:19Z. G-rule at 2/3; dispatch plan ready; awaiting next persistent daemon code update.
+  - All other G-rule items stable. Steady-state degraded hold: **206th iter in series (377–582)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+3. Check 1: no WARN entries since 17:28Z.
+4. Check 2: no journalctl entries since 17:28Z → no Telegram activity → nominal.
+5. Check 3: cooldown file count stable at 109; pipeline-stall count stable at 27.
+6. Check 5: healer heartbeat at 17:17:19Z (same as iter 581; ~16 min old; FRESH within 90-min threshold; next sweep ~17:47Z). No WARNs. G-rule at 2/3 holds.
+7. Check A: flagged wrong branch (`approvals-rework-spec`). Never-auto.
+8. Check B: flagged sync error (17:28:27Z, "Wrong branch: chore/foo"). Never-auto.
+9. Check D: noted Forge inbox task `build-test-suite-green-001` (arrived 17:31:54Z, not stale, phase=preflight). No action by Pulse — Forge bot active and will process normally.
+10. Check E: PR #246 MERGED confirmed. Watch item CLOSED. ✅
+11. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T17:34:26.195048+00:00. ✅
+12. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+13. Wrote [yellow] escalation to `~/agents/blackboard/pulse-escalations.json` (wrong branch + sync error).
+14. Wrote journal entry.
+
+**Escalated:** [yellow] Repo off-main (`approvals-rework-spec`) + sync error (chore/foo at 17:28Z). Written to `pulse-escalations.json`. Suggested action: `git -C ~/agent-core checkout main` once spec work is complete (or open PR first). Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open).
+
+**Patterns:**
+- **206th consecutive degraded-hold iter (377–582).** New dimension this iter: repo off-main on feature branch `approvals-rework-spec`. Larry committing approvals-queue rework spec + the three previously-untracked scripts. System structurally healthy (7/7 services, 0 new alerts, 0 open PRs) but sync is blocked until repo returns to main.
+- **PR #246 MERGED** between iters 581 and 582 — "Make tier2-fallback suggested_action outcome-specific" confirmed from git log. Auto-merge watch item CLOSED. 30-min threshold did not need to fire (Mirror reviewed and merge completed naturally).
+- **New Forge task `build-test-suite-green-001`** arrived 17:31:54Z — greening the unittest suite (2 isolation leaks + 6 stale sync tests). Beacon-originated. Forge bot will process in preflight phase. Fresh, not stale.
+- **Sync error shape:** sync found `chore/foo` at 17:28Z, then repo moved to `approvals-rework-spec`. Two non-main branches active in the same ~5-min window. Consistent with Larry switching branches during active spec work. Sync self-recovers on return to main.
+
+**Learned:** PR #246 merged. `build-test-suite-green-001` test-greening task dispatched to Forge. Repo on `approvals-rework-spec` — sync blocked. Three untracked scripts (iters 573-581) committed on this branch (`f3ec259`). System otherwise stable at 17:33Z.
+
+---
+
 ## Iteration 581 — 2026-06-02 17:21 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 580). Sync: ✅ Fresh — sync.json `status=success`, `last_sync=2026-06-02T17:14:06Z` (~7 min old at 17:21Z; within 2h threshold; same reading as iter 580). Healer heartbeat: **17:17:19Z** — **UPDATED** (was 16:46:59Z through iters 577–580; healer swept at 17:17:19Z, ~30 min after prior sweep; no WARNs emitted). **7/7 services active.** **1 open PR (#246).** Forge inbox: 0. Beacon inbox: 0. Telegram sessions: 1. Untracked files: `scripts/approvals_cleanup.py` (9th consecutive obs, iters 573–581) + `scripts/triage_decisions.py` (7th obs, iters 575–581) + `scripts/clear_verified.py` (6th obs, iters 576–581).
