@@ -230,11 +230,19 @@ class Check8CursorTest(_TempDirBase):
                 f'reason={reason} extra=context'
             )
         self._write_log(log_path, log_lines)
-        # First run — all three signatures alert
+        # First run — only the two ACTIONABLE signatures alert. SKIPPED is
+        # by-design + auto-remediated, so it's log-only (no DM) as of the
+        # tier2-skipped-suppression change.
         alerts = self.healer.check_tier2_fallback_failures({})
-        self.assertEqual(len(alerts), 3,
-                         f'expected 3 alerts on first run, got {len(alerts)}')
-        # Cursor file written, contains all three keys
+        self.assertEqual(len(alerts), 2,
+                         f'expected 2 actionable alerts on first run, got {len(alerts)}')
+        subjects = sorted(a['subject'] for a in alerts)
+        self.assertEqual(subjects, [
+            'pipeline-stall:tier2-fallback-failed-rate_limit:beacon-bot',
+            'pipeline-stall:tier2-fallback-unavailable-rate_limit:beacon-bot',
+        ])
+        # Cursor still contains all THREE keys — it advances before the
+        # outcome branch, so SKIPPED is recorded even though it didn't alert.
         cursor = self.healer.load_check8_cursor()
         self.assertEqual(len(cursor), 3)
         # Second run on UNCHANGED log — all entries are at/below cursor; no alerts
