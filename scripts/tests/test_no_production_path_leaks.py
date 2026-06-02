@@ -48,6 +48,13 @@ from pathlib import Path
 _TESTS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _TESTS_DIR.parent.parent
 
+# Put scripts/ on sys.path so the regression gate below can import the
+# production module it guards (chain_event_emit), same as the handler tests.
+import sys as _sys
+_REPO_SCRIPTS = _TESTS_DIR.parent
+if str(_REPO_SCRIPTS) not in _sys.path:
+    _sys.path.insert(0, str(_REPO_SCRIPTS))
+
 # String-literal patterns that indicate a test is touching production
 # agent state. Each pattern matches a substring — a literal containing
 # any of these triggers the gate unless whitelisted below.
@@ -253,6 +260,42 @@ class GateSelfCheckTest(unittest.TestCase):
             )
             hits = _scan_file_for_literals(synth)
             self.assertEqual(hits, [])
+
+
+
+class LiveChainEventEmitGuardTest(unittest.TestCase):
+    """Regression gate (2026-06-02 live-DB leak): a test run must never be
+    able to build a live Supabase client in chain_event_emit, or handler
+    tests transitively upsert fixture rows into the production chain_events
+    table. The path-literal scanner above is blind to this network sink."""
+
+    def test_disable_env_blocks_live_client(self):
+        import os as _os
+        import chain_event_emit
+        prev = _os.environ.get('OURLIBERTY_DISABLE_LIVE_EMIT')
+        _os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
+        try:
+            chain_event_emit.reset_client_for_testing()
+            self.assertIsNone(
+                chain_event_emit._get_client(),
+                'chain_event_emit._get_client() returned a live client with '
+                'OURLIBERTY_DISABLE_LIVE_EMIT set — the test-isolation guard '
+                'is broken; emit_event would write production chain_events.',
+            )
+        finally:
+            if prev is None:
+                _os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
+            else:
+                _os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = prev
+            chain_event_emit.reset_client_for_testing()
+
+    def test_pytest_ambient_guard_blocks_live_client(self):
+        import os as _os
+        import chain_event_emit
+        if not _os.environ.get('PYTEST_CURRENT_TEST'):
+            self.skipTest('not under pytest; ambient PYTEST_CURRENT_TEST guard N/A')
+        chain_event_emit.reset_client_for_testing()
+        self.assertIsNone(chain_event_emit._get_client())
 
 
 if __name__ == '__main__':

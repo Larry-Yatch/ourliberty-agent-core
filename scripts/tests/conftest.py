@@ -37,3 +37,23 @@ def _isolate_production_logs(tmp_path, monkeypatch):
     log_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv('OURLIBERTY_LOG_DIR', str(log_dir))
     yield log_dir
+
+
+@pytest.fixture(autouse=True)
+def _block_live_chain_event_emit(monkeypatch):
+    """Make it impossible for a test to write the live chain_events table.
+
+    The Forge/Mirror bot services inject live SUPABASE_* creds, so a pytest
+    run inside a build worktree would otherwise let any test that transitively
+    calls chain_event_emit.emit_event() upsert fixture rows into production
+    (2026-06-02 leak: 200+ real-*/prod-* rows). Forcing _get_client() to None
+    routes every unstubbed emit to the existing WARN+drop branch. Belt: the
+    env var; suspenders: the direct attribute patch.
+    """
+    monkeypatch.setenv('OURLIBERTY_DISABLE_LIVE_EMIT', '1')
+    try:
+        import chain_event_emit as cee
+        cee.reset_client_for_testing()
+        monkeypatch.setattr(cee, '_get_client', lambda: None)
+    except Exception:
+        pass

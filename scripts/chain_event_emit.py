@@ -80,6 +80,16 @@ def _get_client():
     crash the producer (which is typically a long-lived daemon or bot).
     """
     global _CLIENT
+    # Test-isolation guard (2026-06-02 live-DB leak): never return a live
+    # client during a test run. pytest sets PYTEST_CURRENT_TEST for every
+    # test; OURLIBERTY_DISABLE_LIVE_EMIT is the explicit opt-out the
+    # conftest fixture + test runners set. Without this, handler tests that
+    # transitively call emit_event upsert fixture rows (real-001, ...) into
+    # the live chain_events table. Runs before the cache return so a
+    # pre-cached client is also ignored under test.
+    if os.environ.get('PYTEST_CURRENT_TEST') or os.environ.get(
+            'OURLIBERTY_DISABLE_LIVE_EMIT'):
+        return None
     if _CLIENT is not None:
         return _CLIENT
     url = os.environ.get('SUPABASE_URL')

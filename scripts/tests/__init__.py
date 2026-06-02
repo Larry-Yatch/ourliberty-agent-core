@@ -31,3 +31,13 @@ if not os.environ.get('OURLIBERTY_LOG_DIR'):
     os.environ['OURLIBERTY_LOG_DIR'] = tempfile.mkdtemp(
         prefix='ourliberty-test-logs-',
     )
+
+# Test-isolation guard (2026-06-02 live-DB leak): block the chain-event
+# emitter from ever building a live Supabase client during a test run.
+# The Forge/Mirror bot services inject live SUPABASE_* creds, so without
+# this any test that transitively calls chain_event_emit.emit_event()
+# upserts fixture rows (real-001, ...) into the production chain_events
+# table. Runner-agnostic counterpart to conftest.py's pytest fixture,
+# exactly like OURLIBERTY_LOG_DIR above — set at unittest/pytest package
+# import. chain_event_emit._get_client() returns None when this is set.
+os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
