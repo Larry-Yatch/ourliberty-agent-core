@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 475 — 2026-06-02 03:55 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (+3 new alerts, all Tier 3 silenced — pipeline-stall tier2-fallback-skipped). Sync: ⚠️ ERROR (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward from iter 474; self-recovers next wrapper run). Healer heartbeat: **03:44:44Z** (~11 min old at iter write; FRESH but predates PR #242 merge at 03:45:49Z). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (+3 since watermark 1133). Three new alerts, all `heal-pipeline-stall` `tier2-fallback-skipped` subjects (ts 2026-06-02T03:49:21Z): `pipeline-stall:tier2-fallback-skipped-rate_limit:forge`, `pipeline-stall:tier2-fallback-skipped-auth_401:forge`, `pipeline-stall:tier2-fallback-skipped-rate_limit:beacon-bot`. All match Tier 3 known-pattern allowlist (PR #237 — `config/alert-translations.json`). Silenced; journal note only; no DM; no tier-reset from these. Watermark advance: 1133→1136.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (Tier 3 silenced).** 3 new alerts since watermark — all `pipeline-stall:tier2-fallback-skipped-*` subjects. These are the steady-state Tier 2 OAuth fallback-skipped noise; in known-pattern allowlist per PR #237. Silenced per discipline. No dispatch, no DM. Watermark: **1136**. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format). No new directives or distress keywords since Larry's resolution statement (2026-06-01T22:42:48Z UTC). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:44:44Z** — ~11 min old at iter write. FRESH (well within 90-min threshold). Note: heartbeat is 65s before PR #242 merge (03:45:49Z); next healer sweep will be the first to see updated `heal-systemd-install-drift.py` mtime. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**e03eb2a** ("Pulse cycle 20260602T035259Z" — iter 474 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 (12th total).** `agent-core-sync.json` status=**error**, message="Auto-commit push failed; rolled back", commit=cf2a91e, last_sync=2026-06-02T03:44:25Z (~11 min before iter write). Carry-forward from iter 474. Cause: sync push at 03:44:25Z collided with origin/main advance from PR #242 merge (03:45:49Z). Self-recovers on next wrapper run (pull will fast-forward over PR #242). APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. No new DM — Larry chose to wait; APPROVAL_REQUEST current. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs (PR #242 merged iter 474). Forge inbox: 0. Beacon inbox: 0. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T03:55Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart` stays at **2/3** — no new auto-restart alerts this iter (the 3 new alerts are all pipeline-stall Tier 3, not stale-daemon). Healer heartbeat (03:44:44Z) predates PR #242 merge (03:45:49Z); next healer sweep is the expected 3/3 trigger. Dispatch plan ready.
+  - All other tracked G-rule items stable. Steady-state degraded hold: **99th iter in series (377–475)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: advanced watermark 1133→1136; 3 Tier-3 silenced pipeline-stall alerts — no dispatch, no DM.
+3. Sync error (SYNC-PUSH-REBASE-FALLBACK-001, 12th) — carry-forward; no action.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T03:55:58.958935+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T03:55:59.436423+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **3 new pipeline-stall Tier 3 alerts (03:49Z) — all silenced.** The tier2-fallback-skipped noise continues at steady rate (Tier 2 OAuth expired). Allowlist is holding; no escalation spiral. The APPROVAL_REQUEST for OAuth restore remains the only path to ending this noise.
+- **heal-stale-daemon-code G-rule still at 2/3.** The healer hasn't swept post-PR-#242 yet (heartbeat predates merge). When it does, the auto-restart of `ourliberty-heal-systemd-install-drift.service` will produce the 3/3 alert; dispatch to Beacon fires that iter.
+- **Sync self-recovers on next wrapper run.** Once the wrapper pulls PR #242's merge commit, the push will succeed. Pattern (12/13 PR merge days = 92.3%) confirms systemic fix is warranted — APPROVAL_REQUEST is the right path.
+
+**Learned:** Nothing new. State is stable carry-forward from iter 474 with known Tier 3 alert noise continuing at steady rate.
+
+---
+
 ## Iteration 474 — 2026-06-02 03:48 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1133** (unchanged — 0 new alerts post-PR-#242-merge). Sync: ⚠️ ERROR — "Auto-commit push failed; rolled back" at 03:44:25Z (SYNC-PUSH-REBASE-FALLBACK-001, 12th total occurrence). Healer heartbeat: **03:44:44Z** (~4 min old at iter write; FRESH). **7/7 services active.** PR #242 **MERGED** at 03:45:49Z. Forge inbox: 0. Beacon inbox: 0.
