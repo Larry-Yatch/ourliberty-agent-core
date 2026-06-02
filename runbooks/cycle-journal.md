@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 576 — 2026-06-02 16:46 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 575). Sync: ✅ Fresh — sync.json `status=no-change`, `last_sync=2026-06-02T15:49:47Z` (~57 min old at 16:46Z; within 2h threshold). Healer heartbeat: **16:16:50Z** (same as iter 575; ~30 min old at 16:46Z; FRESH within 90-min threshold; next expected ~16:46Z — sweep may be occurring now). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Untracked files: `scripts/approvals_cleanup.py` (4th consecutive obs) + `scripts/triage_decisions.py` (2nd obs) + **`scripts/clear_verified.py` (NEW — 1st observation)**.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Last entries: 2026-06-02T03:49:21Z pipeline-stall tier2-fallback-skipped-* (carry-forward Tier-3 known-pattern silenced). Watermark stable. alert-triage.json missing on disk (INFO; known state).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Last alerts: 03:49:21Z UTC June 2 (pipeline-stall:tier2-fallback-skipped-*, Tier-3 known-pattern silenced, carry-forward). alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "16:16:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** sessions=1. No new Larry directives or distress signals since iter 575. No Telegram activity in journalctl since 16:16Z. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **109** total (stable). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. 0 open PRs. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **16:16:50Z** — same as iter 575 (~30 min old at 16:46Z; FRESH within 90-min threshold; at/near expected next sweep cadence). journalctl since 16:16Z: no entries → no WARNs fired → no persistent daemon code updated → G-rule stays at **2/3**. ✅
+
+- **(Check A) Source repo: ⚠️ Working-copy discipline.** Session-start gitStatus: branch=main, **three untracked files**:
+  - `scripts/approvals_cleanup.py` — 4th consecutive observation (iters 573–576). Sync unaffected. Never-auto.
+  - `scripts/triage_decisions.py` — 2nd consecutive observation (iters 575–576). Never-auto.
+  - `scripts/clear_verified.py` — **1st observation (NEW this iter).** Not present in iter 575 gitStatus. Appeared between iter 575 end (~16:36Z) and this session start (~16:46Z). Companion to the other two approvals/triage scripts. Larry is actively building this tooling. Never-auto. ⚠️
+
+- **(Check B) Sync health: ✅ Fresh.** sync.json `status=no-change`, `last_sync=2026-06-02T15:49:47Z` (~57 min old at 16:46Z; within 2h threshold). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (12/13 PR merge days; Larry chose to wait). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T16:46Z) — Check I (Monday-only), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer same sweep as iter 575 (16:16:50Z; ~30 min old at 16:46Z; at/near next expected fire). journalctl since 16:16Z: no entries → no WARNs fired → no persistent daemon code updated → G-rule holds at 2/3. Dispatch plan ready; awaiting next persistent daemon code update.
+  - All other G-rule items stable. Steady-state degraded hold: **200th iter in series (377–576)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+3. Check 1: no WARN entries since 16:16Z.
+4. Check 2: no Telegram activity in journalctl since 16:16Z; sessions=1. Nominal.
+5. Check 3: cooldown file count stable at 109; pipeline-stall count stable at 27.
+6. Check 5: healer heartbeat at 16:16:50Z (same as iter 575; ~30 min old; FRESH; at next expected sweep cadence). journalctl since 16:16Z: no WARNs. G-rule at 2/3, no action.
+7. Check A: noted 3 untracked files — `scripts/approvals_cleanup.py` (4th obs), `scripts/triage_decisions.py` (2nd obs), `scripts/clear_verified.py` (**1st obs, NEW**). All never-auto.
+8. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T16:46:38.974437+00:00. ✅
+9. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T16:46:40Z. ✅
+10. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait). Three untracked files noted (journal only; never-auto).
+
+**Patterns:**
+- **200th consecutive degraded-hold iter (377–576).** System structurally quiescent: 0 new alerts, 0 open PRs, 7/7 services, healer heartbeat at 16:16:50Z (~30 min old; at next expected sweep), sync at 15:49:47Z (~57 min old; within threshold), pipeline idle. Only active degradation is Tier 2 OAuth (Larry-gated). Steady-state hold continues.
+- **`scripts/clear_verified.py` untracked — 1st observation.** Third approvals/triage script to appear. Pattern: Larry adding `approvals_cleanup.py` (iter 573), `triage_decisions.py` (iter 575), `clear_verified.py` (this iter) in rapid succession — actively building out the approvals/triage tooling suite. Commit or gitignore as a group when the suite is ready.
+- **`scripts/approvals_cleanup.py` untracked — 4th consecutive observation** (iters 573–576). `scripts/triage_decisions.py` — 2nd observation. Both stable, no sync impact.
+
+**Learned:** `scripts/clear_verified.py` appeared post-iter-575 (first observation). Three approvals/triage scripts now untracked together, suggesting a tooling build-out in progress. Healer at 16:16:50Z approaching expected next sweep (overdue by ~0 min at journal write). No WARNs → G-rule holds at 2/3. All other substrates stable. **200th consecutive degraded-hold iter milestone.**
+
+---
+
 ## Iteration 575 — 2026-06-02 16:36 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 574). Sync: ✅ Fresh — sync.json `status=no-change`, `last_sync=2026-06-02T15:49:47Z` (~46 min old at 16:36Z; within 2h threshold). Healer heartbeat: **16:16:50Z** (same as iter 574; ~19 min old at 16:36Z; FRESH within 90-min threshold; next expected ~16:46Z). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Untracked files: `scripts/approvals_cleanup.py` (3rd consecutive obs) + `scripts/triage_decisions.py` (**NEW — 1st observation**).
