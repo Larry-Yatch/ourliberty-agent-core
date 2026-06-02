@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 477 — 2026-06-02 04:14 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 476). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward; sync.json last_sync=03:44:25Z, status=error). Healer heartbeat: **03:44:44Z** (~30 min old at iter write; FRESH — timer confirmed active via list-timers, next fire was ~04:14:44Z). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1136 lines** (unchanged). 0 new alerts since watermark 1136. Watermark stable.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1136). Carry-forward from iter 476. alert-triage.json missing on disk (INFO; known state). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 minutes ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: sessions=1 (Larry's session, flat-dict format). No new directives or distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (stable, unchanged since iter 447). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **0**. Beacon inbox: **0**. No open action items. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:44:44Z** — ~30 min old at iter write. FRESH (within 90-min threshold). **Confirmed active via `list-timers`:** `ourliberty-heal-stale-daemon-code.timer` showing NEXT=22:14:44 MDT (= 04:14:44 UTC) — fired ~1 min before ledger write. SubState=waiting, not stuck. 30-minute cadence is nominal. `NextElapseUSecRealtime=` empty is expected for monotonic-based timer (OnUnitActiveSec), NOT an infinity trap. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean. HEAD=**ba404ff** ("Pulse cycle 20260602T040436Z" — iter 476 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR — SYNC-PUSH-REBASE-FALLBACK-001 (12th total, carry-forward).** sync.json status=**error**, message="Auto-commit push failed; rolled back", last_sync=2026-06-02T03:44:25Z. Still stale (persists across multiple wrapper runs since error). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open; no new DM (Larry chose to wait). Self-recovers on next successful sync_agent_core.sh push. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0. Pipeline quiescent. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. Build pipeline idle. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, outside window). CLAUDE_MAX_OAUTH stale/expired (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks:** Tuesday UTC (2026-06-02T04:14Z) — Check I (Mon/Wed/Fri/Sun), Check VIII (Monday), Check IX (Monday), Check X (Monday) all gated. Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: still at **2/3**. Timer confirmed fire at ~04:14:44Z (within this iter's window). Next healer sweep will detect updated `heal-systemd-install-drift.py` mtime from PR #242 (merged 03:45:49Z) and auto-restart `ourliberty-heal-systemd-install-drift.service` — this produces the 3/3 WARNING alert. **Dispatch to Beacon fires next iter.** Dispatch plan: two-part envelope: (1) add `heal-stale-daemon-code` auto-restart entries to `config/alert-translations.json` as Tier 3/FYI; (2) downgrade successful-restart log emission from WARNING to INFO in stale-daemon healer script.
+  - All other G-rule items stable. Steady-state degraded hold: **101st iter in series (377–477)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 5 / timer investigation: confirmed `ourliberty-heal-stale-daemon-code.timer` is active with 30-min cadence, not stuck. `NextElapseUSecRealtime=` empty is a monotonic-timer artifact, not an infinity trap.
+3. Check 0: watermark confirmed at 1136 — 0 new alerts; no action.
+4. Sync error (SYNC-PUSH-REBASE-FALLBACK-001, 12th) — carry-forward; no new action.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T04:14:56.432428+00:00. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T04:14:57.832693+00:00. ✅
+7. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12th; APPROVAL_REQUEST open, Larry chose to wait).
+
+**Patterns:**
+- **101st consecutive degraded-hold iter (377–477).** System structurally quiescent: 0 new alerts, 0 open PRs, 7/7 services, pipeline idle. Only active degradation is Tier 2 OAuth (Larry-gated). Pattern is stable.
+- **heal-stale-daemon-code G-rule 3/3 trigger imminent.** Timer fired at ~04:14:44Z; healer will have swept by the time wrapper commits this iter. Next cycle should see the G-rule trip and the dispatch will fire.
+- **Calibration note: `NextElapseUSecRealtime=` on monotonic timers is NOT an infinity trap.** The infinity trap produces `NextElapse=n/a` in `list-timers` output with the timer stuck. `ourliberty-heal-stale-daemon-code.timer` showed a valid NEXT time (04:14:44 UTC) in list-timers even though `NextElapseUSecRealtime=` was empty (monotonic-only timer). Future Check 5 scans should use `list-timers` output to confirm a NEXT field exists, not just probe `NextElapseUSecRealtime`.
+
+**Learned:** Monotonic-based timers (`OnUnitActiveSec`) don't populate `NextElapseUSecRealtime` but are not stuck — confirmed via `systemctl list-timers`. The infinity trap appears in `list-timers` as `n/a` in the NEXT column. Using `list-timers` is the correct diagnostic for stuck-timer detection; `NextElapseUSecRealtime=` is insufficient.
+
+---
+
 ## Iteration 476 — 2026-06-02 04:03 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1136** (unchanged — 0 new alerts since iter 475). Sync: ⚠️ ERROR stale (SYNC-PUSH-REBASE-FALLBACK-001, 12th total — carry-forward from iter 474; sync.json still shows 03:44:25Z error, but wrapper at 03:57:23Z committed f2f093f cleanly). Healer heartbeat: **03:44:44Z** (~18 min old at iter write; FRESH). **7/7 services active.** 0 open PRs. Forge inbox: 0. Beacon inbox: 0.
