@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 585 — 2026-06-02 17:54 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (unchanged from iter 584 — 0 new alerts). Sync: ⚠️ ERROR (carry-forward) — sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo" (last successful: 17:14:06Z, ~40 min old at 17:54Z; within 2h threshold; self-recovers next run since repo is on main+clean). Healer heartbeat: **17:47:21Z** (ADVANCED from 17:17:19Z at iter 584 — fresh sweep ~7 min before this iter). **7/7 services active.** **0 open PRs.** Forge inbox: **4 files** (step-autoclear, step-alert-promotion, step-digest-generator, build-build-test-suite-green-001; all from 17:45–17:47Z, ~7–9 min old, within 1h threshold). Beacon inbox: 0.
+
+**Notable since iter 584:**
+- **Healer swept at 17:47:21Z** — heartbeat advanced ~30 min. No post-sweep WARNs in journalctl. All daemons fresh-code. G-rule at 2/3 holds (no persistent daemon code updated; healer found nothing to warn about). ✅
+- **Alert watermark stable at 1139.** No new alerts since iter 584's outbox-notifier `mirror-dag-pass:approvals-queue-rework` alert at 17:45:02Z. ✅
+- **Sequence `approvals-queue-rework` ACTIVE** — Forge inbox holds all 3 step files. Status unchanged; Forge is processing.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1139 lines** (unchanged). Watermark: **1139**. 0 new alerts.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark (1139). Watermark stable. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "17:47:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since "17:47:00"` → no entries → no Telegram activity since iter 584. No orphan directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** files (stable from iter 584). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** No Telegram activity since iter 584; no new Larry directives. All prior directives tracked by open Forge tasks. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat ADVANCED: **17:47:21Z** (~7 min old at 17:54Z; FRESH within 90-min threshold). No WARNs in journalctl post-sweep. G-rule at **2/3** (no persistent daemon code updated; healer skip path for one-shot services holds — no new WARNING emitted). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (carry-forward, self-recovering).** sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo". Last successful sync: 17:14:06Z (~40 min old at 17:54Z; within 2h stale threshold). Repo on main+clean; self-recovers on next sync run. SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST remains open (12/13 PR merge days). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. Forge inbox: 4 files — step-autoclear (17:45Z), step-alert-promotion (17:46Z), step-digest-generator (17:46Z), build-build-test-suite-green-001 (17:47Z). All ~7–9 min old; within 1h stale threshold; Forge bot active. Beacon/Mirror inboxes: 0. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer swept at 17:47:21Z — no WARNs fired (no persistent daemon code updated since last G-rule observation). G-rule at 2/3; dispatch plan ready; awaiting next persistent daemon code update.
+  - `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **STILL 1/3** (iter 584 observation, 17:45:02Z). No new occurrences this iter. Watch.
+  - All other G-rules stable. Steady-state degraded hold: **209th iter in series (377–585)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark confirmed at 1139 — 0 new alerts; no action.
+3. Check 5: healer heartbeat ADVANCED to 17:47:21Z (was 17:17:19Z at iter 584). No post-sweep WARNs → G-rule at 2/3 holds.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T17:54:40.600237+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T17:54:41.167936+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12/13 PR merge days; APPROVAL_REQUEST open).
+
+**Patterns:**
+- **209th consecutive degraded-hold iter (377–585).** No structural changes this iter vs 584. System progressing (sequence active, Forge processing). Remaining degradation is Larry-gated (Tier 2 OAuth restore).
+- **Healer cadence confirmed.** 17:17:19Z → 17:47:21Z = ~30 min between sweeps. Consistent with expected cadence. No stale-daemon findings. Healer healthy.
+- **Sync error pattern.** Error from 17:42:41Z still showing in sync.json — the sync script hasn't fired again since iter 584. Normal. Next sync run (when cycle auto-commits this journal) will self-recover since repo is on main+clean.
+
+**Learned:** Nothing new this iter. System behavior matches expectations from iter 584. Healer sweep cadence holding at ~30 min.
+
+---
+
 ## Iteration 584 — 2026-06-02 17:49 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (+1 since iter 583: idx=1138→1139 — `mirror-dag-pass:approvals-queue-rework` from `outbox-notifier` at 17:45:02Z). Sync: ⚠️ ERROR — sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo" (self-recovers; repo on main+clean; last success 17:14:06Z, ~35 min old at 17:49Z; within 2h threshold). Healer heartbeat: **17:17:19Z** (same since iters 577–583; ~32 min old at 17:49Z; FRESH within 90-min threshold; next expected sweep ~17:47Z — may have just fired). **7/7 services active.** **0 open PRs.** Forge inbox: **4 files** (build task + 3 sequence steps, all fresh). Beacon inbox: 0.
