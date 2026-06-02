@@ -46,6 +46,10 @@ RE_DM_WINDOW = timedelta(hours=12)
 SYSTEMCTL_TIMEOUT_S = 10
 RESTART_TIMEOUT_S = 30
 
+# A timer whose NextElapse anchor reads "infinity" but that fired within this
+# many seconds is NOT stuck — see _recently_triggered / detect_stuck_timers.
+JUST_FIRED_GRACE_S = 120
+
 
 # -------------------- logging + heartbeat --------------------
 
@@ -238,18 +242,79 @@ def _systemctl_show(unit: str) -> Optional[dict[str, str]]:
     return props
 
 
+def _parse_systemd_timestamp(value: Optional[str]) -> Optional[datetime]:
+    """Parse systemctl's humanized timestamp into a naive *local* datetime.
+
+    `systemctl show -p LastTriggerUSec` renders e.g. "Mon 2026-06-01 18:00:09
+    MDT" (there is no flag that yields epoch for `show`). We drop the leading
+    weekday and the trailing timezone abbreviation and compare in local time:
+    both this value and the `now` we measure against are in the droplet's
+    local zone, so a naive same-zone comparison is correct. (A DST boundary
+    could skew it by an hour, immaterial against the minute-scale grace.)
+
+    Returns None for empty / 'n/a' / anything unparseable.
+    """
+    if not value:
+        return None
+    v = value.strip()
+    if not v or v.lower() == 'n/a':
+        return None
+    parts = v.split()
+    # Expect: <weekday> <YYYY-MM-DD> <HH:MM:SS> [<TZ>]
+    if len(parts) < 3:
+        return None
+    try:
+        return datetime.strptime(f'{parts[1]} {parts[2]}', '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        return None
+
+
+def _recently_triggered(
+    last_trigger: Optional[str],
+    now: Optional[datetime] = None,
+    grace_s: int = JUST_FIRED_GRACE_S,
+) -> Optional[bool]:
+    """Did the timer fire within `grace_s` seconds of `now`?
+
+    Returns None when the trigger timestamp can't be parsed, so the caller can
+    fall back to its prior behavior rather than silently suppress. `now`
+    defaults to naive local wall-clock (to match the systemctl-local
+    timestamp). The window is two-sided (abs) to tolerate sub-second clock
+    skew where a just-fired timestamp reads slightly in the future.
+    """
+    parsed = _parse_systemd_timestamp(last_trigger)
+    if parsed is None:
+        return None
+    now = now or datetime.now()
+    return abs((now - parsed).total_seconds()) <= grace_s
+
+
 def detect_stuck_timers(
     installed_dir: Path = INSTALLED_SYSTEMD_DIR,
+    now: Optional[datetime] = None,
 ) -> list[dict[str, Optional[str]]]:
-    """Return a list of `.timer` units in the infinity trap.
+    """Return a list of `.timer` units genuinely in the infinity trap.
 
     Trap predicate: ActiveState=active AND NextElapseUSecRealtime is empty
     AND NextElapseUSecMonotonic=infinity. Both empty-realtime and infinity-
     monotonic are required — either alone is a normal transient state.
 
+    False-positive guard (the just-fired filter): the same infinity-anchor
+    reading appears *transiently* when a daemon-reload lands in the sub-second
+    window a timer is firing at the top of its period. This bites at 00:00 /
+    12:00, when many timers fire at once and this healer issues its own
+    daemon-reload — whichever timers are mid-fire get snapshotted anchor-less.
+    They are NOT stuck: they fire again on schedule (proven by unbroken 5-min
+    trigger history straight through both the 2026-05-31 00:04 and 2026-06-01
+    12:00 "incidents"). 8fe7bef's OnUnitActiveSec->OnCalendar conversion did
+    NOT fix this — the transient hits OnCalendar timers too. So a timer that
+    triggered within JUST_FIRED_GRACE_S is treated as healthy; a genuinely
+    wedged timer's last trigger is far older and still classifies as stuck.
+
     Per-unit shell-out failures are logged INFO and the unit is skipped;
     the function never raises.
     """
+    now = now or datetime.now()
     stuck: list[dict[str, Optional[str]]] = []
     for unit in sorted(list_installed_units(installed_dir)):
         if not unit.endswith('.timer'):
@@ -263,9 +328,18 @@ def detect_stuck_timers(
             continue
         if props.get('NextElapseUSecMonotonic') != 'infinity':
             continue
+        last_trigger = props.get('LastTriggerUSec')
+        if _recently_triggered(last_trigger, now=now):
+            log(
+                f'{unit}: NextElapse=infinity but it fired at '
+                f'{last_trigger!r} (within {JUST_FIRED_GRACE_S}s) — transient '
+                f'post-fire recompute, not stuck; skipping',
+                'INFO',
+            )
+            continue
         stuck.append({
             'unit': unit,
-            'last_trigger': props.get('LastTriggerUSec') or None,
+            'last_trigger': last_trigger or None,
         })
     return stuck
 

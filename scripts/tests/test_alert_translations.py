@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -476,6 +478,62 @@ class FormatDmTranslationTest(unittest.TestCase):
         })
         self.assertIn('[no translation', text)
         self.assertIn('CRITICAL 95%', text)
+
+
+class TranslationCacheReloadTest(unittest.TestCase):
+    """_load_translations must pick up config edits without a process restart.
+
+    Regression: the Beacon bot runs for days, and a once-per-process cache
+    left a newly added translation entry rendering `[no translation]` until
+    the bot was restarted — exactly what happened to the stuck-timer entry
+    (added 2026-05-31, still rendering raw on 2026-06-01 because Beacon had
+    been up since 2026-05-30). Cache is now keyed on the file's mtime.
+    """
+
+    def setUp(self):
+        self._orig_file = larry_alerts.TRANSLATIONS_FILE
+        self._orig_cache = larry_alerts._TRANSLATIONS_CACHE  # noqa: SLF001
+        self._orig_mtime = larry_alerts._TRANSLATIONS_MTIME  # noqa: SLF001
+
+    def tearDown(self):
+        larry_alerts.TRANSLATIONS_FILE = self._orig_file
+        larry_alerts._TRANSLATIONS_CACHE = self._orig_cache  # noqa: SLF001
+        larry_alerts._TRANSLATIONS_MTIME = self._orig_mtime  # noqa: SLF001
+
+    def _point_at(self, path):
+        larry_alerts.TRANSLATIONS_FILE = path
+        larry_alerts._TRANSLATIONS_CACHE = None  # noqa: SLF001
+        larry_alerts._TRANSLATIONS_MTIME = None  # noqa: SLF001
+
+    def test_edit_is_picked_up_on_mtime_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'alert-translations.json'
+            p.write_text(json.dumps({'src': {'subj': {'severity': 'INFO'}}}))
+            os.utime(p, (1000, 1000))
+            self._point_at(p)
+            self.assertEqual(
+                larry_alerts.translate_alert('src', 'subj'),
+                {'severity': 'INFO'})
+            # Edit + bump mtime -> the next lookup must reflect the edit.
+            p.write_text(json.dumps({'src': {'subj': {'severity': 'URGENT'}}}))
+            os.utime(p, (2000, 2000))
+            self.assertEqual(
+                larry_alerts.translate_alert('src', 'subj'),
+                {'severity': 'URGENT'})
+
+    def test_unchanged_mtime_serves_cache(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'alert-translations.json'
+            p.write_text(json.dumps({'src': {'subj': {'severity': 'INFO'}}}))
+            os.utime(p, (1000, 1000))
+            self._point_at(p)
+            larry_alerts.translate_alert('src', 'subj')
+            # Rewrite content but KEEP the mtime -> cache must win (no re-read).
+            p.write_text(json.dumps({'src': {'subj': {'severity': 'URGENT'}}}))
+            os.utime(p, (1000, 1000))
+            self.assertEqual(
+                larry_alerts.translate_alert('src', 'subj'),
+                {'severity': 'INFO'})
 
 
 if __name__ == '__main__':

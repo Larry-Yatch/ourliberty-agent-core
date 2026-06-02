@@ -77,8 +77,8 @@
     "stuck-timer": {
       "severity": "INFO",
       "tier": "FYI",
-      "plain_language_summary": "A relative (monotonic) systemd timer lost its next-fire anchor — `NextElapseUSecMonotonic` went to `infinity`, meaning it would never fire again — and the healer auto-recovered it with a daemon-reload + restart. This typically happens when a daemon-reload catches an `OnUnitActiveSec` timer mid-cycle. Self-healed; no action needed unless the same timer trips repeatedly.",
-      "recommended_action": "None required — already auto-healed and re-armed. If a specific timer trips this repeatedly, convert it from `OnUnitActiveSec` to `OnCalendar` in systemd/<name>.timer (absolute schedules populate `NextElapseUSecRealtime` and cannot lose their anchor). Verify: `systemctl show <unit> --property=NextElapseUSecRealtime`. Runbook: runbooks/heal-systemd-install-drift.md."
+      "plain_language_summary": "A systemd timer momentarily read with no next-fire anchor (`NextElapseUSecRealtime` empty + `NextElapseUSecMonotonic=infinity`) and the healer restarted it. In practice this is almost always a FALSE ALARM: the anchor blanks for a sub-second while a timer fires at the top of its period, and if a `daemon-reload` lands in that exact window (as this healer's own run does at 00:00/12:00) the timer gets snapshotted anchor-less. It was never actually stuck — it keeps firing on schedule. NOTE: this is NOT an OnUnitActiveSec problem; it hits OnCalendar timers too, so converting timer types does not fix it (8fe7bef tried that and it recurred).",
+      "recommended_action": "None — the timer is healthy. Confirm with `systemctl show <unit> --property=NextElapseUSecRealtime,LastTriggerUSec`; a recent LastTrigger means it is firing fine. The detector now ignores timers that fired within the last ~2 minutes, so this transient should stop alerting. Treat as real only if a timer's LastTrigger is genuinely stale (older than its interval). Runbook: runbooks/heal-systemd-install-drift.md."
     }
   },
   "heal-credential-registry-drift": {
