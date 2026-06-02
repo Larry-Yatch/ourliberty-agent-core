@@ -126,6 +126,12 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     'review_pass',
     'review_revision',
     'review_escalate',
+    # N4 promotion rule (approvals-queue-rework.md L6): scripts/promote_alerts.py
+    # push-emits one of these for each escalation that crosses the needs-CEO-
+    # attention bar. The dashboard's NeedsAttentionCard on /live queries this
+    # type. The shipper itself never produces these rows; listing the type here
+    # also admits it to the weekly chain-event-type audit (heal_chain_event_type_audit).
+    'needs_attention',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

@@ -1,0 +1,17 @@
+[Unit]
+Description=Run Ourliberty N4 promotion rule every 10 minutes (aligns with the Pulse cycle)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/runbooks/promote-alerts.md
+
+[Timer]
+# First fire 10 min after boot (let the shipper + escalation snapshot settle),
+# then every 10 min so a persisted critical escalation surfaces within one cycle.
+OnBootSec=10min
+OnUnitActiveSec=10min
+# Add up to 2 min of random jitter so we don't lock-step with the 10/15-min healers.
+RandomizedDelaySec=2min
+AccuracySec=30s
+
+Unit=ourliberty-promote-alerts.service
+
+[Install]
+WantedBy=timers.target
