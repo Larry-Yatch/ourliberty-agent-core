@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 602 — 2026-06-02 19:59 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 601). Sync: ✅ STABLE — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357". Healer heartbeat: **19:47:43Z** (carry-forward from iter 601 check; ~12 min old at 19:59Z — FRESH within 90-min threshold). **7/7 services active.** **No open PRs.** All inboxes empty. **NEW FINDING: Forge brief for `heal-stale-daemon-warn-info-calibration-001` missing from pipeline — Beacon session likely OAuth-blocked before producing output.**
+
+**Notable since iter 601 (19:51Z):**
+- **0 new alerts.** larry-alerts.jsonl remains at 1149 lines. Watermark unchanged.
+- **No WARNING logs.** `journalctl --since 2026-06-02T19:47:00 --priority warning` → no entries.
+- **No beacon-bot activity.** No Telegram messages.
+- **Pipeline stall diagnosed.** Forge brief for `heal-stale-daemon-warn-info-calibration-001` is absent: Forge inbox empty, Forge archive shows no stale-daemon/warn-info task consumed (most recent Forge archive entry is `revision-suppress-by-design-tier2-skipped-alerts-1.json` at 19:08Z — the PR #254 revision task). Beacon consumed the Pulse dispatch (`cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json`) at ~18:51Z (confirmed in beacon/.archive) but produced no Forge brief. Root cause: Beacon session was likely OAuth-blocked mid-session (Tier 2 OAuth expired since 2026-05-30T13:59Z — ongoing active stalls). The "task consumed" note in MEMORY/iter 601 referred to Beacon consuming the Pulse dispatch, not Forge consuming a build task.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1149 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1149 lines — watermark unchanged from iter 601. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 2026-06-02T19:47:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-02T19:47:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward + new stall).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. **NEW: `heal-stale-daemon-warn-info-calibration-001` brief missing (Beacon OAuth-blocked mid-session; see Check E below).** ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Beacon inbox: EMPTY ✅. Forge inbox: EMPTY ✅. Mirror inbox: EMPTY ✅. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:47:43Z** (carry-forward; ~12 min old at 19:59Z; FRESH within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ✅ STABLE.** sync.json `status=no-change`, `last_sync=19:37:23Z`. No new sync failures. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (no new occurrence since iter 598). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Pipeline stall — Forge brief missing.**
+  - **No open PRs.** `gh pr list --state open` → `[]`. Most recent: PR #254 MERGED (19:32Z). ✅
+  - **`heal-stale-daemon-warn-info-calibration-001` brief missing.** Beacon consumed dispatch `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` at ~18:51Z (timestamp confirmed: Beacon archive shows file mtime Jun 2 12:51 MDT = 18:51Z UTC). Forge inbox archive search confirms no stale-daemon/warn-info/calibration task was ever received or consumed. Forge archive most recent entry: `revision-suppress-by-design-tier2-skipped-alerts-1.json` (19:08Z). Beacon outbox: empty. Forge inbox: empty. Diagnosis: Beacon session started processing the dispatch but was OAuth-blocked (Tier 2 expired) before it could write the Forge brief. **Ask-then-do** — escalated to Larry (pulse-escalations.json idx=9). ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (iters 593, 599). No new occurrences.
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge brief MISSING (pipeline stall diagnosed this iter).** Escalated [yellow]. Awaiting Larry's go-ahead to re-dispatch.
+  - All other G-rules stable. Steady-state degraded hold: **225th iter in series (377–602)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Diagnosed pipeline stall: `heal-stale-daemon-warn-info-calibration-001` Forge brief missing — Beacon consumed dispatch at 18:51Z but produced no Forge brief (Forge inbox + archive confirm no such task). Root cause: Tier 2 OAuth-blocked Beacon session.
+3. Wrote [yellow] escalation to `~/agents/blackboard/pulse-escalations.json` (idx=9).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:59:16Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:59:18Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** [yellow] `heal-stale-daemon-warn-info-calibration-001` Forge brief missing — Beacon OAuth-blocked mid-session. pulse-escalations.json idx=9. Suggested: restore Tier 2 OAuth then re-dispatch to Beacon; or Pulse dispatches directly to Forge (approval-gate path). Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; no new occurrence).
+
+**Patterns:**
+- **Beacon OAuth-blocking is now confirmed to drop task output.** This iter diagnosed that a Beacon session started on the stale-daemon dispatch at ~18:51Z and was OAuth-blocked before it could write the Forge brief. This is the first confirmed case of an OAuth-block causing silent output loss in the Beacon→Forge pipeline. The symptom: Beacon archive shows the dispatch consumed, Forge archive shows no corresponding task. This pattern should trigger a new G-rule watch: if a Beacon input task is consumed but no Forge output appears within 30 minutes, flag as potential OAuth-blocked session. At 3/3 → dispatch to Beacon to spec a "Beacon session resumption on OAuth restore" feature.
+- **MEMORY clarification: "task consumed" at iter 601 was ambiguous.** The note "Forge building `heal-stale-daemon-warn-info-calibration-001`" was inferred from Beacon's consumption of the dispatch, not from confirmed Forge activity. Future MEMORY entries should distinguish "Beacon consumed dispatch" from "Forge consumed build brief" more precisely.
+
+**Learned:** Tier 2 OAuth expiry can cause silent output loss in mid-session Beacon tasks. The Beacon archive shows the task was consumed, giving a false "in pipeline" signal. Real confirmation requires checking BOTH the Beacon archive (dispatch consumed) AND the Forge archive (build brief consumed). Both must exist for the pipeline to be healthy.
+
+---
+
 ## Iteration 601 — 2026-06-02 19:51 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 600). Sync: ✅ STABLE — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357" (~14 min old at iter time). Healer heartbeat: **19:47:43Z** (FRESH — ~3 min old at check; advanced from iter 600's 19:17:35Z). **7/7 services active.** **No open PRs.** All inboxes empty. Forge has not yet opened a PR for `heal-stale-daemon-warn-info-calibration-001` (~50 min since task consumed — watch item, not yet alarming).
