@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 583 — 2026-06-02 17:40 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1138** (+2 since iter 582: idx=1136→1137 new alert from build-sequence-advancer; idx=1137→1138 Pulse [yellow] escalation for same). Sync: ⚠️ STALE ERROR — sync.json `status=error`, 17:35:51Z, "Wrong branch: chore/foo" (last success: 17:14:06Z, ~26 min old at 17:40Z; within 2h threshold; self-recovers on next run since repo is now on main+clean). Healer heartbeat: **17:17:19Z** (same as iters 581–582; ~23 min old at 17:40Z; FRESH within 90-min threshold; next expected sweep ~17:47Z). **7/7 services active.** **0 open PRs.** Forge inbox: 1 (`build-test-suite-green-001`, phase=preflight, ~8 min old). Beacon inbox: 0.
+
+**Notable since iter 582:**
+- **PR #247 MERGED** (`approvals-rework-spec` → main) — commit `0c292fa`. Larry's approvals-queue rework spec + 3 tooling scripts landed on main.
+- **PR #248 MERGED** (`test-suite-green-brief` → main) — commit `2279bd8`. Brief: "green the test suite under full discover." Forge task `build-test-suite-green-001` dispatched and sitting in Forge inbox.
+- **Repo back on main + clean** — all watch items from iters 573–582 (untracked scripts, off-main branch) RESOLVED.
+- **NEW: Alert #1136 (17:35:02Z)** — `build-sequence-advancer` paused `approvals-queue-rework` sequence: 3 steps had dispatch_text >500 chars (step[0]=562, step[4]=503, step[5]=570). Current file inspection shows all 8 dispatch_texts now under 500 chars (491/489/417/493/455/494/472/438) and status=`pending`. Alert fired before PR merges completed; file appears to have been updated since.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1138 lines** (+2 from iter 582). alert-triage.json missing on disk (INFO; known state).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ NEW alert idx=1136.** `subject=sequence-invalid:approvals-queue-rework` from `build-sequence-advancer` at 17:35:02Z. Sequence paused: 3 dispatch_text fields exceeded 500-char cap. Current file shows all dispatch_texts now valid + status=`pending`. Novel source (`build-sequence-advancer` not in alert-translations.json) → Tier 4 classification. [yellow] escalation written to larry-alerts.jsonl (idx=1137, 17:42:04Z). ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since "17:36:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** sessions=1. No journalctl entries since 17:36Z → no Telegram activity. No orphan directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **110** total (+1 from iter 582's 109 — new cooldown entry, likely from build-sequence-advancer alert at 17:35Z). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: `build-test-suite-green-001` (arrived 17:31:54Z, phase=preflight, ~8 min old at 17:40Z; well under 1h stale threshold; Forge bot active, will process). Beacon/Mirror inboxes: 0. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **17:17:19Z** (same as iters 581–582; ~23 min old at 17:40Z; FRESH within 90-min threshold; next expected sweep ~17:47Z). No WARNs since 17:36Z. G-rule stays **2/3**. ✅
+
+- **(Check A) Source repo: ✅ RESOLVED.** Session-start gitStatus: branch=`main`, status=clean. Watch items from iters 573–582 (untracked scripts + off-main branch) all CLOSED. PR #247 merged the approvals-rework-spec branch; the three previously-untracked scripts (`scripts/approvals_cleanup.py`, `scripts/triage_decisions.py`, `scripts/clear_verified.py`) are now on main via `f3ec259`. ✅
+
+- **(Check B) Sync health: ⚠️ STALE ERROR (carry-forward from iter 582).** sync.json `status=error`, 17:35:51Z, "Wrong branch: chore/foo". Sync ran while repo was on `chore/foo`; repo is now on `main+clean`; next sync run will succeed. Last success: 17:14:06Z (~26 min old; within 2h stale threshold). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST remains open (12/13 PR merge days). ⚠️ (self-recovers; no action needed)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. **PR #247 MERGED** (`approvals-rework-spec`). **PR #248 MERGED** (`test-suite-green-brief`). Both watch items from iter 582 CLOSED. Forge inbox task `build-test-suite-green-001` is fresh (8 min old) — not stale. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X all gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** No new healer sweep since 17:17:19Z. G-rule at 2/3; dispatch plan ready; awaiting next persistent daemon code update.
+  - All other G-rule items stable. Steady-state degraded hold: **207th iter in series (377–583)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: new alert idx=1136 (`sequence-invalid:approvals-queue-rework`, 17:35:02Z). Inspected `~/agents/blackboard/build-sequences/approvals-queue-rework.json` — dispatch_texts now valid, status=pending. [yellow] escalation written to larry-alerts.jsonl (idx=1137) via `larry_alerts.py append_alert`. Watermark updated to 1138.
+3. Check 3: cooldown count +1 (109→110). New cooldown file from build-sequence-advancer alert at 17:35Z. Pipeline-stall count stable at 27.
+4. Check A: confirmed repo back on main+clean. Watch items (573–582 untracked scripts + off-main branch) CLOSED.
+5. Check E: PR #247 + PR #248 MERGED confirmed from session-start git log. Both watch items CLOSED.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T17:41:21.462339+00:00. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T17:41:21.677385+00:00. ✅
+8. Wrote journal entry.
+
+**Escalated:** [yellow] `sequence-invalid:approvals-queue-rework` — build-sequence-advancer paused the sequence at 17:35:02Z (3 dispatch_texts too long). File now shows valid lengths + status=pending. Advancer may require status=`active` to resume processing. Larry: check if `~/agents/blackboard/build-sequences/approvals-queue-rework.json` needs status set to `active`. Alert idx=1137 in larry-alerts.jsonl.
+
+**Patterns:**
+- **207th consecutive degraded-hold iter (377–583).** Two PRs merged (#247 + #248) since iter 582 — system progressed. Repo clean+main. Forge picking up test-greening task in preflight.
+- **build-sequence-advancer alert (first observation).** New component surfacing. `approvals-queue-rework` sequence dispatched via PR #247 but arrived with 3 overlength dispatch_texts. File corrected between alert-fire (17:35:02Z) and next sync. Sequence status is now `pending` — watch whether advancer auto-starts from `pending` or requires `active`.
+- **Sync self-recovery confirmed pattern.** sync.json error at 17:35:51Z (wrong branch: chore/foo) from the approvals-rework-spec work. Repo is on main+clean; next sync will succeed. No manual intervention needed.
+
+**Learned:** build-sequence-advancer is a new component producing `sequence-invalid:*` alerts. `approvals-queue-rework` status=`pending` after correction — need to observe whether advancer picks it up or requires `active`. PR #247 + PR #248 merged; system progressing. G-rule 2/3 holds; no new persistent daemon code updated this sweep.
+
+---
+
 ## Iteration 582 — 2026-06-02 17:33 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. **NEW: repo off-main (`approvals-rework-spec`) + sync error.** Alert watermark: **1136** (unchanged). Sync: **⚠️ ERROR** — sync.json `status=error`, 17:28:27Z, "Wrong branch: chore/foo" (last successful: 17:14:06Z at iter 581; ~19 min old, within 2h threshold). Healer heartbeat: **17:17:19Z** (same as iter 581; ~16 min old at 17:33Z; FRESH within 90-min threshold; next sweep ~17:47Z). **7/7 services active.** **0 open PRs** (PR #246 merged ✅). Forge inbox: **1** (`build-test-suite-green-001`, arrived 17:31:54Z, ~2 min old). Beacon inbox: 0. Telegram sessions: 1. **gitStatus clean** on `approvals-rework-spec` — scripts previously untracked on main now committed on this branch.
