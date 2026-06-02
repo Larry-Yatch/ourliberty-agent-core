@@ -1308,19 +1308,16 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                             '(the fallback was attempted and rejected by the API).'
                         )
                     else:  # SKIPPED
-                        cause = (
-                            f'Tier 1 hit {reason} on a --resume session; '
-                            f'Tier 2 retry skipped because session IDs are '
-                            f'account-bound. Task marked paused_on_tier1.'
+                        # SKIPPED is expected + auto-remediated (heal_resume_paused_on_tier1
+                        # re-dispatches). Log-only per the actionable-only alert discipline;
+                        # only FAILED/UNAVAILABLE reach the operator. The cursor already
+                        # advanced above, so this line won't re-emit on the next scan.
+                        log(
+                            f'tier2-fallback SKIPPED (by-design, auto-remediated): '
+                            f'agent={agent} reason={reason} — no DM',
+                            'INFO',
                         )
-                        action = (
-                            'No auth action needed: Tier 2 is healthy and was '
-                            'never contacted. A --resume session is account-bound, '
-                            'so skipping the Tier 2 fallback is correct. '
-                            'heal_resume_paused_on_tier1 re-dispatches the task '
-                            'as fresh once Tier 1 recovers. Re-auth Tier 2 only '
-                            'if a FAILED or UNAVAILABLE variant also appears.'
-                        )
+                        continue
                     key = f'tier2_fallback:{agent}:{outcome}:{reason}'
                     alerts.append({
                         'key': key,

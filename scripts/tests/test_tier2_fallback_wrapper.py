@@ -434,17 +434,22 @@ class HealPipelineStallCheck8Test(unittest.TestCase):
         self.assertEqual(len(alerts), 1)
         self.assertIn('rate_limit', alerts[0]['subject'])
 
-    def test_skipped_marker_alerts(self):
+    def test_skipped_marker_is_log_only(self):
+        # SKIPPED is expected + auto-remediated (heal_resume_paused_on_tier1
+        # re-dispatches), so it is log-only: zero alerts, no DM. The cursor
+        # still advances so a second scan doesn't re-process the line.
         from datetime import datetime, timezone
         ts = datetime.now(timezone.utc).isoformat()
         self._make_log('forge.log',
             f'[{ts}] [forge] [WARN] TIER2_FALLBACK_SKIPPED '
             f'reason=auth_401 cause=resume_session_account_bound\n')
-        with self._patch_root():
+        cursor_file = self.tmp_path / 'state' / 'check-8-cursor.json'
+        with self._patch_root(), \
+                mock.patch.object(self.healer, 'CHECK8_CURSOR_FILE', cursor_file):
             alerts = self.healer.check_tier2_fallback_failures({})
-        self.assertEqual(len(alerts), 1)
-        self.assertIn('--resume', alerts[0]['message'].lower()
-                      .replace('—', '-'))  # tolerate em-dash vs --
+            cursor = self.healer.load_check8_cursor()
+        self.assertEqual(alerts, [])
+        self.assertIn('forge:SKIPPED:auth_401', cursor)
 
     def test_old_marker_outside_window_no_alert(self):
         # 2 days ago — well outside the 24h lookback
