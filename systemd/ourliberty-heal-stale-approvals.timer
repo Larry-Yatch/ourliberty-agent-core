@@ -1,0 +1,15 @@
+[Unit]
+Description=Run stale-approvals auto-clear every 10 min (approvals-queue-rework N1)
+
+[Timer]
+# Every 10 minutes on the wall clock — aligns with the Pulse cycle cadence.
+OnCalendar=*:0/10
+# Up to 1 min of jitter so we don't lock-step with the 10-min Pulse cycle.
+RandomizedDelaySec=1min
+AccuracySec=30s
+Persistent=true
+
+Unit=ourliberty-heal-stale-approvals.service
+
+[Install]
+WantedBy=timers.target
