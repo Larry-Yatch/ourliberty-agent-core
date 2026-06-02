@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 598 — 2026-06-02 19:34 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (UNCHANGED — 0 new alerts since iter 597). Sync: ⚠️ ERROR — NEW VARIANT: sync.json `status=error`, 19:31:18Z, "Auto-commit push failed; rolled back" (**21st sync failure total; new message form vs. "Wrong branch: chore/foo" seen in iters 594–597; same root cause per APPROVAL_REQUEST `sync-push-rebase-fallback-001`**). Healer heartbeat: **19:17:35Z** (~17 min old at 19:34Z; FRESH within 90-min threshold). **7/7 services active.** **PR #254 MERGED at 19:32:15Z** — "fix(healer): tier2-fallback SKIPPED is log-only — suppress by-design alert noise". Mirror approved + auto-merged. Watch item CLOSED. **Forge inbox: EMPTY.** Mirror inbox: `review-suppress-by-design-tier2-skipped-alerts-rev1.json` (orphan post-merge; Mirror will archive).
+
+**Notable since iter 597 (19:25Z):**
+- **PR #254 MERGED at 19:32:15Z** — Forge pushed revision at 19:26:33Z (fixing Mirror's 3 medium findings: stale test contracts + full-discover isolation). Mirror processed `review-suppress-by-design-tier2-skipped-alerts-rev1.json`, approved, and auto-merged. Time from revision push to merge: ~6 min. Pipeline working briskly.
+- **21st sync failure — new variant** — sync.json `last_sync=19:31:18Z`, `status=error`, `message="Auto-commit push failed; rolled back"`. Prior iters 594–597 saw "Wrong branch: chore/foo". This is a push-failure-then-rollback variant (bare push at `sync_agent_core.sh:161` rejected + script rolled back the auto-commit). Root cause identical; APPROVAL_REQUEST `sync-push-rebase-fallback-001` is the cure.
+- **Forge inbox empty** — Forge consumed all tasks (revision task now processed). No new Forge tasks pending.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1148 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1148 lines — watermark unchanged from iter 597. No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 19:25:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 19:25:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: EMPTY ✅. Beacon inbox: EMPTY ✅. Mirror inbox: `review-suppress-by-design-tier2-skipped-alerts-rev1.json` (orphan post-PR#254-merge; Mirror bot will archive on next sweep) ✅. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:17:35Z** (~17 min old at 19:34Z; FRESH within 90-min threshold). No new WARNs. Forge task `heal-stale-daemon-warn-info-calibration-001` was in pipeline (Beacon processed dispatch iter 594); Forge inbox now empty — Forge may be actively building or task was consumed before this iter. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (new occurrence, 21st total, new variant).** sync.json `last_sync=19:31:18Z`, `status=error`, `message="Auto-commit push failed; rolled back"`. **New message variant** vs. "Wrong branch: chore/foo" (iters 594–597). Both are manifestations of the same root cause: `sync_agent_core.sh:161` bare push fails + no rebase fallback. The rollback-after-failed-push path leaves local state clean (session-start gitStatus confirms main+clean). Self-recovers on next sync. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal — PR #254 MERGED.**
+  - **PR #254** "fix(healer): tier2-fallback SKIPPED is log-only" — **MERGED** 19:32:15Z. Forge revision (pushed 19:26:33Z) fixed Mirror's 3 medium findings (stale test contracts + full-discover isolation regression per PR #253 Bucket A/B pattern). Mirror processed `review-suppress-by-design-tier2-skipped-alerts-rev1.json`, approved + auto-merged in ~6 min. Watch item CLOSED. ✅
+  - **No other open PRs.** `gh pr list --state open` → `[]`. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **1/3** (iter 593). No new occurrences (watermark unchanged).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge task `heal-stale-daemon-warn-info-calibration-001` in pipeline.** Forge inbox now empty — Forge likely consuming or building. Awaiting PR.
+  - All other G-rules stable. Steady-state degraded hold: **221st iter in series (377–598)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: watermark 1148 — unchanged; 0 new alerts. No DM, no dispatch. ✅
+3. Check B: 21st sync failure, new variant ("Auto-commit push failed; rolled back"). No new action; APPROVAL_REQUEST open.
+4. Check E: PR #254 confirmed MERGED (19:32:15Z via `gh pr view`). Watch item CLOSED. No other open PRs.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:34:21Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:34:21Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 21st occurrence; new variant "Auto-commit push failed; rolled back" noted).
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001: two message variants now confirmed.** The "Wrong branch: chore/foo" variant (iters 594–597, 4 consecutive) and the new "Auto-commit push failed; rolled back" variant (iter 598). Both trace to the same `sync_agent_core.sh:161` bare-push-with-no-fallback root cause. The rollback path is at least working (local state restored to clean). APPROVAL_REQUEST `sync-push-rebase-fallback-001` is still the right fix.
+- **Pipeline throughput.** PR #254 went from Forge revision push (19:26Z) to Mirror approval + merge (19:32Z) in ~6 minutes. This is fast — Mirror is processing review tasks within minutes when Forge submits clean revisions. The Forge→Mirror→auto-merge pipeline is healthy.
+
+**Learned:** The "Auto-commit push failed; rolled back" sync message is a new confirmation that the push-failure path in `sync_agent_core.sh` has a rollback mechanism (it doesn't leave the repo in a dirty state). The rollback works, but it means the journal/MEMORY.md writes from this cycle won't reach origin/main until the next successful sync. Acceptable transient gap.
+
+---
+
 ## Iteration 597 — 2026-06-02 19:25 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1148** (UNCHANGED — 0 new alerts since iter 596). Sync: ⚠️ ERROR — sync.json `status=error`, 19:21:38Z, "Wrong branch: chore/foo" (**20th SYNC-PUSH-REBASE-FALLBACK-001** — same Wrong-branch variant; self-recovers; APPROVAL_REQUEST open). Healer heartbeat: **19:17:35Z** (~8 min old at 19:25Z; FRESH within 90-min threshold). **7/7 services active.** **PR #254 CLEAN/MERGEABLE under active revision** (Forge inbox: `revision-suppress-by-design-tier2-skipped-alerts-1.json`, 19:08Z, ~17 min old — under 1h threshold). **Mirror inbox EMPTY** (orphan `review-rebase-pr252-digest-generator-001.json` archived as expected per iter 596 note).
