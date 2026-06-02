@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 601 — 2026-06-02 19:51 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 600). Sync: ✅ STABLE — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357" (~14 min old at iter time). Healer heartbeat: **19:47:43Z** (FRESH — ~3 min old at check; advanced from iter 600's 19:17:35Z). **7/7 services active.** **No open PRs.** All inboxes empty. Forge has not yet opened a PR for `heal-stale-daemon-warn-info-calibration-001` (~50 min since task consumed — watch item, not yet alarming).
+
+**Notable since iter 600 (19:43Z):**
+- **0 new alerts.** larry-alerts.jsonl remains at 1149 lines. Watermark unchanged.
+- **No WARNING logs.** `journalctl --since 2026-06-02T19:40:00 --priority warning` → no entries across all ourliberty services.
+- **No beacon-bot activity.** No Telegram messages, no Larry directives.
+- **Healer heartbeat advanced.** 19:17:35Z (iter 600) → 19:47:43Z (iter 601 check). ~30 min cadence. Healer swept while Pulse was inactive.
+- **No Forge PR yet.** `gh pr list --state all --limit 5` confirms most recent PR is #254 (merged 19:32Z). Forge task `heal-stale-daemon-warn-info-calibration-001` consumed ~19:01Z (~50 min ago). Typical build lag is 10–30 min; at 50 min this is at the outer edge. Not yet escalation-worthy; watch next cycle.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1149 lines** (UNCHANGED). 0 new alerts. ✅
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1149 lines — watermark unchanged from iter 600. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 2026-06-02T19:40:00 --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-02T19:40:00` → no entries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **113** files (stable). Heal-pipeline-stall keyed files: **27** (stable). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Beacon inbox: EMPTY ✅. Forge inbox: EMPTY ✅. Mirror inbox: EMPTY ✅. All clear. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:47:43Z** (FRESH — ~3 min old at check; advanced from iter 600's 19:17:35Z, confirming healer swept between iters). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. ✅
+
+- **(Check B) Sync health: ✅ STABLE.** sync.json `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357". Stable recovery continues. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (systemic fix pending; 21 historical occurrences; no new occurrence this iter). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal with watch.** No open PRs (`gh pr list --state open` → `[]`). Most recent: PR #254 MERGED (19:32Z). All inboxes empty. **Watch:** Forge task `heal-stale-daemon-warn-info-calibration-001` consumed ~19:01Z; no PR opened yet (~50 min elapsed). Within outer range of build lag; escalate if no PR by next iter. ✅ (watch)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (iters 593, 599). No new occurrences (watermark unchanged).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (iter 584). No new occurrences.
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon PROCESSED (iter 594); Forge building `heal-stale-daemon-warn-info-calibration-001`.** Forge inbox empty (~50 min into build). Awaiting PR.
+  - All other G-rules stable. Steady-state degraded hold: **224th iter in series (377–601)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. All checks nominal except Check 3 (pipeline stall, carry-forward). No new findings, no new auto-fix actions.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T19:51:05.898596Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T19:51:06Z. ✅
+5. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (APPROVAL_REQUEST open; 21 total occurrences; no recurrence this iter).
+
+**Patterns:**
+- **Healer cadence confirmed ~30 min.** Heartbeat advanced 30 min between iters 600 and 601. No stale-daemon triggers.
+- **Forge build lag at 50 min for focused calibration task.** `heal-stale-daemon-warn-info-calibration-001` consumed ~19:01Z; no PR at 19:51Z. One more iter without a PR warrants ask-then-do escalation (process may be stuck or longer build than expected for a warn-level calibration change). Normal builds in this system complete within 30 min.
+
+**Learned:** Nothing new.
+
+---
+
 ## Iteration 600 — 2026-06-02 19:43 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0 (carry-forward: Tier 2 OAuth expired, active stalls). Alert watermark: **1149** (UNCHANGED — 0 new alerts since iter 599). Sync: ✅ RECOVERED — `status=no-change`, `last_sync=19:37:23Z`, "Already up to date at 8a93357" (same state as iter 599; stable recovery). Healer heartbeat: **19:17:35Z** (~26 min old at 19:43Z; FRESH within 90-min threshold). **7/7 services active.** **No open PRs.** All inboxes empty. Forge still building `heal-stale-daemon-warn-info-calibration-001`; no PR yet (normal build lag — task consumed iter 594, ~42 min ago).
