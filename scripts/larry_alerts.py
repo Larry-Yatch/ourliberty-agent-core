@@ -303,14 +303,27 @@ def write_offset(offset: int) -> None:
 
 
 _TRANSLATIONS_CACHE: Optional[dict] = None
+_TRANSLATIONS_MTIME: Optional[float] = None
 
 
 def _load_translations() -> dict:
-    """Read config/alert-translations.json once per process. Returns the
-    nested-by-source dict, or {} if the file is missing/malformed (the
-    caller falls back to raw-body + [no translation] footer in that case)."""
-    global _TRANSLATIONS_CACHE
-    if _TRANSLATIONS_CACHE is not None:
+    """Read config/alert-translations.json, reloading whenever the file's
+    mtime changes. Returns the nested-by-source dict, or {} if the file is
+    missing/malformed (the caller falls back to raw-body + [no translation]
+    footer in that case).
+
+    Cache-by-mtime, not cache-once: the Beacon bot is a long-running process
+    (uptime measured in days), so a once-per-process cache meant a freshly
+    added translation entry stayed invisible until the next bot restart — an
+    entry could be live in the file yet still render `[no translation]`.
+    Keying on mtime lets a config edit take effect on the next alert.
+    """
+    global _TRANSLATIONS_CACHE, _TRANSLATIONS_MTIME
+    try:
+        mtime: Optional[float] = TRANSLATIONS_FILE.stat().st_mtime
+    except OSError:
+        mtime = None
+    if _TRANSLATIONS_CACHE is not None and mtime == _TRANSLATIONS_MTIME:
         return _TRANSLATIONS_CACHE
     try:
         with open(TRANSLATIONS_FILE, encoding='utf-8') as f:
@@ -320,6 +333,7 @@ def _load_translations() -> dict:
     except (OSError, json.JSONDecodeError):
         data = {}
     _TRANSLATIONS_CACHE = data
+    _TRANSLATIONS_MTIME = mtime
     return data
 
 

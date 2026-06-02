@@ -362,6 +362,68 @@ class DetectStuckTimersTest(_IsolatedAgentsRoot):
             self.assertEqual([s['unit'] for s in stuck], ['app.timer'])
 
 
+class JustFiredGuardTest(_IsolatedAgentsRoot):
+    """The false-positive guard: a timer reading the infinity anchor but that
+    fired within JUST_FIRED_GRACE_S is a transient post-fire recompute, not a
+    stall, and must NOT be classified stuck. Regression on the recurring
+    2026-06-01 12:00 leak that 8fe7bef's OnCalendar conversion did not fix.
+    """
+
+    # Fixed naive-local "now" so timestamp math is deterministic.
+    NOW = datetime(2026, 6, 1, 12, 0, 5)
+
+    def _trap_props(self, last_trigger):
+        return {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': last_trigger,
+        }
+
+    def _detect(self, last_trigger):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['t.timer'])
+            per = {'t.timer': self._trap_props(last_trigger)}
+            with mock.patch.object(h, '_systemctl_show',
+                                   side_effect=lambda u: per.get(u)):
+                return h.detect_stuck_timers(i, now=self.NOW)
+
+    def test_just_fired_timer_in_trap_is_not_stuck(self):
+        # Fired 5s ago at the top of the period — the leak's exact shape.
+        stuck = self._detect('Mon 2026-06-01 12:00:00 MDT')
+        self.assertEqual(stuck, [])
+
+    def test_stale_trigger_in_trap_is_still_stuck(self):
+        # Last fired 12h ago and lost its anchor — a genuine stall.
+        stuck = self._detect('Mon 2026-06-01 00:00:00 MDT')
+        self.assertEqual([s['unit'] for s in stuck], ['t.timer'])
+
+    def test_unparseable_trigger_falls_back_to_stuck(self):
+        # 'n/a' / garbage can't prove recency, so we keep the prior behavior
+        # (classify stuck) rather than silently suppress a real stall.
+        self.assertEqual(
+            [s['unit'] for s in self._detect('n/a')], ['t.timer'])
+        self.assertEqual(
+            [s['unit'] for s in self._detect('')], ['t.timer'])
+
+    def test_parse_systemd_timestamp(self):
+        self.assertEqual(
+            h._parse_systemd_timestamp('Mon 2026-06-01 18:00:09 MDT'),
+            datetime(2026, 6, 1, 18, 0, 9))
+        self.assertIsNone(h._parse_systemd_timestamp(''))
+        self.assertIsNone(h._parse_systemd_timestamp('n/a'))
+        self.assertIsNone(h._parse_systemd_timestamp('garbage'))
+
+    def test_recently_triggered_window(self):
+        now = self.NOW
+        self.assertTrue(
+            h._recently_triggered('Mon 2026-06-01 12:00:00 MDT', now=now))
+        self.assertFalse(
+            h._recently_triggered('Mon 2026-06-01 11:00:00 MDT', now=now))
+        # Unparseable -> None so the caller can fall back.
+        self.assertIsNone(h._recently_triggered('n/a', now=now))
+
+
 class SystemctlShowParserTest(_IsolatedAgentsRoot):
     """_systemctl_show shell-out adapter: parses the KEY=VALUE block; on
     rc != 0 or shell failure returns None + INFO log.
