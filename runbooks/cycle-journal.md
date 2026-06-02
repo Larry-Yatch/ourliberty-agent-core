@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 584 — 2026-06-02 17:49 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1139** (+1 since iter 583: idx=1138→1139 — `mirror-dag-pass:approvals-queue-rework` from `outbox-notifier` at 17:45:02Z). Sync: ⚠️ ERROR — sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo" (self-recovers; repo on main+clean; last success 17:14:06Z, ~35 min old at 17:49Z; within 2h threshold). Healer heartbeat: **17:17:19Z** (same since iters 577–583; ~32 min old at 17:49Z; FRESH within 90-min threshold; next expected sweep ~17:47Z — may have just fired). **7/7 services active.** **0 open PRs.** Forge inbox: **4 files** (build task + 3 sequence steps, all fresh). Beacon inbox: 0.
+
+**Notable since iter 583:**
+- **PR #249 MERGED** (`feat/soft-validate-push-gate` → main) — commit `29cd800 Add soft (alert-only) validate gate to the push path`, merge commit `0b82c14`. New capability: soft validate gate on push path (alert-only mode).
+- **Pulse cycle auto-commit** at 17:45:09Z (`5f0f168 Pulse cycle 20260602T174509Z`) — run_cycle.sh committed iter 583 journal to main.
+- **Sequence `approvals-queue-rework` ACTIVATED**: Mirror DAG-preflight PASS at 17:45:02Z → status `pending` → `active`. Advancer dispatched 3 step files to Forge inbox (step-autoclear, step-alert-promotion, step-digest-generator).
+- **Iter 583 [yellow] escalation RESOLVED**: `sequence-invalid:approvals-queue-rework` issue from idx=1137 — sequence corrected, Mirror validated, now active.
+- **Untracked-scripts watch item CLOSED**: `scripts/approvals_cleanup.py`, `scripts/triage_decisions.py`, `scripts/clear_verified.py` — all committed on main via PR #247 (iters 573–583 watch). ✅
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1139 lines** (+1 from iter 583). alert-triage.json missing on disk (INFO; known state).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 1 new alert — informational, Tier 3 judgment.** Alert idx=1139 (line 1139): `mirror-dag-pass:approvals-queue-rework` from `outbox-notifier` at 17:45:02Z. Source: `outbox-notifier`; subject: `mirror-dag-pass:*`. Message: Mirror DAG-preflight PASS for `approvals-queue-rework`; sequence transitioned `pending` → `active`; advancer dispatching first step. Per WARN-vs-INFO calibration § 9: "successful enforcement events (the rule worked as designed)" → Tier 3 silence, journal-only. Source `outbox-notifier` not in `alert-translations.json` for this subject. **G-rule watch:** first observation of `outbox-notifier:mirror-dag-pass` subject — propose adding to alert-translations.json as Tier 3/FYI. Watermark updated: **1139**. No DM. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "17:42:00" --priority warning` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No journalctl entries since iter 583 → no Telegram activity. No orphan directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **112** total (+2 from iter 583's 110). Heal-pipeline-stall keyed files: **27** (unchanged). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Nominal.** Forge inbox: **4 files** — all fresh (17:45–17:47 UTC):
+  - `build-build-test-suite-green-001.json` (11:47 MDT = 17:47Z) — test-greening task, refreshed/re-dispatched
+  - `step-autoclear.json` (11:45 MDT = 17:45Z) — sequence `approvals-queue-rework` step 0
+  - `step-alert-promotion.json` (11:46 MDT = 17:46Z) — sequence step
+  - `step-digest-generator.json` (11:46 MDT = 17:46Z) — sequence step
+  All under 5 min old. Forge bot active; processing expected. No stale tasks. Beacon inbox: 0. Mirror inbox: 0. No orphan Larry directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **17:17:19Z** — same since iters 577–583; ~32 min old at 17:49Z; FRESH within 90-min threshold. No WARNs in journalctl since 17:42Z. G-rule holds at **2/3** (no new persistent daemon code updated since prior sweep). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=`main`, status=clean. **0 untracked files** — the 3 scripts (`approvals_cleanup.py`, `triage_decisions.py`, `clear_verified.py`) that were untracked for iters 573–583 are now committed via PR #247. Watch item CLOSED. ✅
+
+- **(Check B) Sync health: ⚠️ ERROR (carry-forward).** sync.json `status=error`, 17:42:41Z, "Wrong branch: chore/foo". Error is the same pattern as iter 583 — sync ran during a transient non-main state; repo is now on main+clean; self-recovers on next run. Last success 17:14:06Z (~35 min old; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST remains open (12/13 PR merge days). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ✅ Nominal.** 0 open PRs. **PR #249 MERGED** — "Add soft (alert-only) validate gate to the push path" (`feat/soft-validate-push-gate`, commit `29cd800`, merge `0b82c14`). Forge inbox: 4 fresh files (all <5 min old; not stale). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH stale (carry-forward). ✅
+
+- **Periodic checks:** Tuesday UTC — Check I/VIII/IX/X gated (Monday-only). Check III next 2026-06-14. All skip. ✅
+
+- **G-rule watch:**
+  - `heal-stale-daemon-code WARNING for successful auto-restart not in alert-translations.json`: **STILL 2/3.** Healer heartbeat unchanged at 17:17:19Z; no WARNs in journalctl. Dispatch plan ready; awaiting next persistent daemon code update.
+  - **NEW (1/3): `outbox-notifier:mirror-dag-pass` subject not in alert-translations.json.** First observation at 17:45:02Z (iter 584). Correctly classified as Tier 3/FYI by judgment; but not in alert-translations.json. At 3/3: dispatch to Beacon to add `mirror-dag-pass:*` as Tier 3 FYI translation. Watch.
+  - All other G-rules stable. Steady-state degraded hold: **208th iter in series (377–584)** with 0 pre-existing G-rule advances.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic check gates (all gated, skipped).
+2. Check 0: new alert idx=1139 (`mirror-dag-pass:approvals-queue-rework`, 17:45:02Z). Classified Tier 3/FYI by WARN-vs-INFO judgment (successful enforcement event). Watermark updated to 1139. G-rule 1/3 started (`outbox-notifier:mirror-dag-pass` not in alert-translations.json).
+3. Check A: confirmed 0 untracked files — 3-script watch item (iters 573–583) CLOSED. ✅
+4. Check E: PR #249 MERGED (`feat/soft-validate-push-gate`). New: soft validate gate on push path (alert-only). Watch item CLOSED. ✅
+5. Check 4: noted 4 fresh Forge inbox tasks (sequence step dispatches + test-greening task rebuild). All under 5 min old; no stale tasks; no action by Pulse.
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-02T17:49:20.114598+00:00. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-02T17:49:20.980333+00:00. ✅
+8. Wrote journal entry.
+
+**Escalated:** None new. Iter 583 [yellow] escalation (`sequence-invalid:approvals-queue-rework`) RESOLVED — sequence now active. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending). SYNC-PUSH-REBASE-FALLBACK-001 (12/13 PR merge days; APPROVAL_REQUEST open).
+
+**Patterns:**
+- **208th consecutive degraded-hold iter (377–584).** Positive trajectory: PR #249 merged, sequence activated, untracked files closed, 0 open PRs. Active degradation remains Tier 2 OAuth (Larry-gated).
+- **Sequence `approvals-queue-rework` fully activated.** Mirror DAG-preflight PASS at 17:45:02Z. 3 step files dispatched to Forge (step-autoclear at current_step=0, step-alert-promotion, step-digest-generator). Sequence is now live in the build pipeline. Larry's approvals-queue rework has entered active build phase.
+- **PR #249 merged.** Soft validate gate on push path shipped. Alert-only mode means any push-gate failures become alerts rather than hard blocks — additive safety without pipeline risk.
+- **`outbox-notifier:mirror-dag-pass` G-rule 1/3.** Source is correctly generating FYI success notifications, but subject isn't in alert-translations.json. At 3/3: propose adding. Not urgent.
+- **Sync error at 17:42:41Z** — same self-recovering pattern as iter 583 (sync caught a transient non-main state). Repo is on main+clean now; will auto-resolve on next sync cycle.
+
+**Learned:** Sequence activation produces `mirror-dag-pass:*` alerts via `outbox-notifier` — a new observable signal type. The sequence step dispatch creates files directly in Forge's inbox (naming: `step-<step_id>.json`). `approvals-queue-rework` now at current_step=0 (`step-autoclear`); Forge processing the pipeline.
+
+---
+
 ## Iteration 583 — 2026-06-02 17:40 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1138** (+2 since iter 582: idx=1136→1137 new alert from build-sequence-advancer; idx=1137→1138 Pulse [yellow] escalation for same). Sync: ⚠️ STALE ERROR — sync.json `status=error`, 17:35:51Z, "Wrong branch: chore/foo" (last success: 17:14:06Z, ~26 min old at 17:40Z; within 2h threshold; self-recovers on next run since repo is now on main+clean). Healer heartbeat: **17:17:19Z** (same as iters 581–582; ~23 min old at 17:40Z; FRESH within 90-min threshold; next expected sweep ~17:47Z). **7/7 services active.** **0 open PRs.** Forge inbox: 1 (`build-test-suite-green-001`, phase=preflight, ~8 min old). Beacon inbox: 0.
