@@ -2501,8 +2501,56 @@ class ClassifyMirrorMarkerTest(unittest.TestCase):
         self.assertIn('credentials', decision['intent_kwargs']['reason'])
         self.assertIn('secret', decision['intent_kwargs']['evidence'])
 
-    def test_no_marker_returns_none(self):
-        data = _mirror_outbox_body(result='Just chat output, no marker.')
+    def test_no_marker_non_review_phase_returns_none(self):
+        # fix-mirror-verdict-marker-gate-001: the legitimate None path —
+        # a Mirror output that is NOT a phase=review dispatch (chat-mode,
+        # no phase field) and carries no marker still falls through to
+        # default routing. The review-discipline gate must NOT fire here.
+        data = _mirror_outbox_body(
+            result='Just chat output, no marker.', phase=None,
+        )
+        self.assertIsNone(on._classify_mirror_marker(data))
+
+    def test_review_phase_prose_verdict_raises_kickback(self):
+        # fix-mirror-verdict-marker-gate-001 — the PR #277 regression. A
+        # phase=review dispatch whose result is a PROSE verdict
+        # ("**Verdict: PASS.**") carries no canonical marker, no `===`
+        # delimiters, and no bare REVIEW_* keyword — so parse_mirror_marker
+        # returns None. Pre-fix this silently returned None and auto-merge
+        # never fired. The gate now RAISES into the marker-error kickback.
+        data = _mirror_outbox_body(
+            result=(
+                '**Verdict: PASS.** Verification summary: all ACs met, '
+                'tests green. The REVIEW_PASS marker is emitted above.'
+            ),
+        )
+        with self.assertRaises(on.mrh.MalformedMirrorMarker) as ctx:
+            on._classify_mirror_marker(data)
+        msg = str(ctx.exception)
+        self.assertIn('phase=review', msg)
+        self.assertIn('canonical', msg)
+
+    def test_dag_preflight_result_path_returns_none(self):
+        # fix-mirror-verdict-marker-gate-001 — highest-risk regression guard.
+        # The DAG-preflight path uses a `review-sequence-dag <seq-id>` prompt,
+        # emits `result: PASS` (NOT a REVIEW_* marker), and carries no
+        # phase=review. The gate must NOT catch it — it short-circuits to
+        # None at the top of _classify_mirror_marker.
+        data = _mirror_outbox_body(
+            result='result: PASS\n\nThe sequence DAG is sound.',
+            prompt='review-sequence-dag seq-build-001',
+            phase=None,
+        )
+        self.assertIsNone(on._classify_mirror_marker(data))
+
+    def test_dag_preflight_prompt_excluded_even_if_phase_review(self):
+        # Belt-and-suspenders: even if a DAG-preflight envelope somehow
+        # carried phase=review, the `review-sequence-dag` prompt prefix
+        # short-circuits to None BEFORE the gate is reached.
+        data = _mirror_outbox_body(
+            result='result: REVISION\n\nThe DAG has a cycle.',
+            prompt='review-sequence-dag seq-build-002',
+        )
         self.assertIsNone(on._classify_mirror_marker(data))
 
     def test_envelope_task_id_mismatch_raises(self):
@@ -2611,21 +2659,29 @@ class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
         self.assertEqual(decision['marker_type'], 'review_revision')
         self.assertEqual(decision['intent'], 'review-revision')
 
-    def test_fallback_returns_none_when_session_log_absent(self):
-        # No log file at all — happy-path null behavior preserved.
+    def test_fallback_review_phase_raises_when_session_log_absent(self):
+        # fix-mirror-verdict-marker-gate-001: no log file AND no recoverable
+        # marker in result_text. Under the review-discipline gate, a
+        # phase=review dispatch with no marker anywhere RAISES (was: silent
+        # None). The session-log absence behavior (no FS crash) is preserved;
+        # only the no-marker outcome changed.
         data = _mirror_outbox_body(
             result='Just chat output, no marker.',
             claude_session_id='sess-does-not-exist',
         )
-        self.assertIsNone(on._classify_mirror_marker(data))
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
 
-    def test_fallback_skips_when_no_session_id(self):
-        # Missing claude_session_id — don't probe the filesystem.
+    def test_fallback_review_phase_raises_when_no_session_id(self):
+        # fix-mirror-verdict-marker-gate-001: missing claude_session_id — the
+        # classifier still must not probe the filesystem, and a phase=review
+        # dispatch with no marker RAISES (was: silent None).
         data = _mirror_outbox_body(
             result='Just chat output, no marker.',
             claude_session_id=None,
         )
-        self.assertIsNone(on._classify_mirror_marker(data))
+        with self.assertRaises(on.mrh.MalformedMirrorMarker):
+            on._classify_mirror_marker(data)
 
     def test_happy_path_consults_session_log_first(self):
         # chain-discipline-marker-parser-and-regression-check-001 (2026-05-25):
@@ -2903,13 +2959,17 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         self.assertEqual(data['marker_error_count'], 1)
         self.assertIn('summary', data['prompt'])
 
-    def test_no_marker_falls_through_to_default_routing(self):
-        # Mirror's chat-mode outputs (no marker) should NOT trigger marker
-        # routing — they go via the default path (notify Beacon as
-        # mirror-result with intent=result-notification).
+    def test_no_marker_chat_mode_falls_through_to_default_routing(self):
+        # Mirror's chat-mode outputs (no marker, NOT a phase=review dispatch)
+        # should NOT trigger marker routing — they go via the default path
+        # (notify Beacon as mirror-result with intent=result-notification).
+        # fix-mirror-verdict-marker-gate-001: phase is explicitly cleared so
+        # this represents a genuine chat-mode output, not a review dispatch
+        # (a phase=review no-marker outbox now kicks back — see below).
         body = _mirror_outbox_body(
             result=('Reviewed but reporting back in chat mode without '
                     'a marker — Larry asked me a question, not a review.'),
+            phase=None,
         )
         f = self._write_mirror_outbox('real-chat.json', body)
         result = on.process_outbox(f)
@@ -2917,6 +2977,72 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         data = self._get_beacon_notify()
         self.assertEqual(data['source'], 'mirror-result')
         self.assertEqual(data['intent'], 'result-notification')
+
+    def test_review_phase_prose_verdict_kicks_back_to_mirror(self):
+        # fix-mirror-verdict-marker-gate-001 — the PR #277 regression at the
+        # process_outbox integration level. A phase=review outbox whose result
+        # is the exact #277 prose-verdict shape must classify as a marker-error
+        # and kick back to Mirror (NOT silently fall through to default
+        # routing / skip auto-merge).
+        body = _mirror_outbox_body(
+            result=(
+                '**Verdict: PASS.** Verification summary: all ACs met, '
+                'tests green. The REVIEW_PASS marker is emitted above.'
+            ),
+        )
+        f = self._write_mirror_outbox('real-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        # No notify to Beacon (it did not route as a result).
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json')), [],
+        )
+        # No auto-merge attempted — the fix catches the prose verdict BEFORE
+        # it could reach the merge path.
+        self.assertEqual(self._auto_merge_calls, [])
+        # Kickback notify lands in Mirror's inbox so she re-emits a canonical
+        # marker.
+        mirror_notifies = list(
+            (on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')
+        )
+        self.assertEqual(len(mirror_notifies), 1)
+        data = json.loads(mirror_notifies[0].read_text())
+        self.assertEqual(data['intent'], 'marker-error')
+        self.assertEqual(data['marker_error_count'], 1)
+        self.assertIn('canonical', data['prompt'].lower())
+
+    def test_review_phase_prose_verdict_retry_exhaustion_dead_letters(self):
+        # fix-mirror-verdict-marker-gate-001 — the loud-on-exhaust contract.
+        # After MAX_MARKER_ERROR_RETRIES consecutive prose verdicts, the
+        # dispatch dead-letters to Beacon AND DMs Larry (never silently
+        # dropped). Simulate the final strike by seeding marker_error_count
+        # at the cap so the next failure exceeds it.
+        body = _mirror_outbox_body(
+            result='**Verdict: PASS.** Approving in prose, no marker.',
+            source='outbox-notifier',
+            original_source='beacon',
+            marker_error_count=on.MAX_MARKER_ERROR_RETRIES,
+            reply_chat_id=12345,
+        )
+        f = self._write_mirror_outbox('real-rev.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        # No further kickback to Mirror — the cascade is exhausted.
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('marker-error-*.json')), [],
+        )
+        # Dead-letter lands in Beacon's inbox.
+        beacon_dead_letters = list(
+            (on.INBOXES_ROOT / 'beacon').glob('dead-letter-marker-*.json')
+        )
+        self.assertEqual(len(beacon_dead_letters), 1)
+        dl = json.loads(beacon_dead_letters[0].read_text())
+        self.assertEqual(dl['intent'], 'dead-letter')
+        # Larry is escalated via the alerts file (the _maybe_dm_larry path
+        # fires because reply_chat_id is present and dead-letter is terminal).
+        import larry_alerts as la
+        self.assertTrue(la.ALERTS_FILE.exists())
+        self.assertIn('real-rev', la.ALERTS_FILE.read_text())
 
 
 class PreflightDisciplineGateTest(unittest.TestCase):
@@ -8140,10 +8266,14 @@ class LarryDirectDispatchTest(unittest.TestCase):
         # the existing default routing — NOT trip the new larry_direct
         # branch, which is marker-specific. Default routing for source
         # 'larry' archives via _should_notify_back returning False.
+        # phase=None because a Larry-driven chat dispatch carries no
+        # phase=='review' envelope — so the marker-discipline gate
+        # (fix-mirror-verdict-marker-gate-001) does NOT fire here.
         body = _mirror_outbox_body(
             result='Reviewed in chat mode, no marker emitted.',
             source='larry',
             reply_chat_id=12345,
+            phase=None,
         )
         f = self._write_mirror_outbox('real-chat.json', body)
         result = on.process_outbox(f)
