@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration 802 — 2026-06-03 23:52 UTC (interactive)
+
+**Health:** ✅ Nominal — **Tier 1**, consecutive_clean=1. Alert watermark: **1223 lines / anchor 23:44:19Z** (0 new alerts this iter). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success, last_sync=23:46:04Z, commit=1fe0a66 (behind HEAD=e18e5d0 by post-wrapper lag — normal). Healer heartbeat: **23:24:59Z** (~28 min old at check time; ✅ within 90-min threshold). **8/8 services active.** **0 open PRs in agent-core; 1 open PR in ourliberty-dashboard** (#34 CLEAN/MERGEABLE, under Mirror review). Forge: 2 tasks (fresh, ~23:47Z). Mirror: 1 task (review PR #34). Beacon: EMPTY. Worktrees: **5** (2 active Forge builds + 1 Mirror review + 2 potentially stale preflight worktrees from PR #293).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** `larry-alerts.jsonl`: **1223 lines** — 0 new lines above iter-801 watermark (23:16:17Z). The 1 line added since iter-800 was claimed by iter-801 (deploy-notifier:READY at 23:16:17Z, Tier 4). The review-pass notification at 23:44:19Z (`outbox-notifier:review-pass`, Mirror approved PR #292) is a Tier-3 known-pattern (in `alert-translations.json` since PR #264 MERGED iter 668); it was the +1 from iter-801's post-watermark catch-up. Current watermark: 1223 / anchor 23:44:19Z. No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon sessions file confirms 1 active session. No new Larry directives since iter 801. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 23:24:59Z (~28 min old; ✅ within 90-min threshold). No active stalls. Cooldown residue 199 structural carry-forward. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **23:24:59Z** (~28 min old; ✅). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=e18e5d0 "Pulse cycle 20260603T234722Z". This is the iter-801 wrapper commit (23:47:22Z) — iter 801 completed and committed successfully. ✅
+
+- **(Check B) Sync health: ✅ Clean — post-wrapper lag.** `agent-core-sync.json`: status=success, last_sync=2026-06-03T23:46:04Z, commit=1fe0a66. Session HEAD (e18e5d0) is ahead by 3 commits (6ad5cc2, 30cbaf0, e18e5d0) — all committed after the sync service's last pull. Normal post-wrapper lag; no sync error. Hourly ourliberty-sync.timer will catch up. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-dashboard-api — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline — normal.**
+  - **agent-core:** 0 open PRs. PR #292 (Phase B Check 0) MERGED since iter 801 (auto-merged 23:44:19Z per Mirror review-pass notification). PR #293 (docs: fix Forge Queue brief queued-lane reader, `scan_inbox` not `_agent_inbox_pending`) MERGED since iter 801 — commit 6ad5cc2 + merge 30cbaf0.
+  - **ourliberty-dashboard:** 1 open PR — **#34** "feat(system): Auto/Off account-rotation toggle on System tab", CLEAN/MERGEABLE, no review decision. Mirror review task `review-dashboard-rotation-switch-ui-001.json` arrived 23:47:59Z — < 10 min old at check time. No auto-merge trigger yet. ✅
+  - **Forge inbox: 2 tasks** (both arrived ~23:47Z):
+    - `build-forge-queue-api-20260603T234656Z.json` (from larry, phase=build) — Queue API endpoint GET /api/system/agent-queue with 4 lanes (queued/building/in_review/done_today). Arrived 23:46:56Z.
+    - `pulse-triage-phase-c-promotion-001.json` (from beacon, phase=preflight) — Phase C of Pulse triage: promotion loop (Check V graduation + plain-language approval + auto-demotion). Arrived 23:47:55Z.
+  - **Mirror inbox: 1 task** — `review-dashboard-rotation-switch-ui-001.json` (23:47:59Z).
+  - **Beacon: EMPTY.** ✅
+  - All inbox items < 10 min old at check time. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts since iter-801 watermark. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 5**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — active (Queue API build, just started)
+  - `wt-forge-dashboard-rotation-switch-ui-001` — active (dashboard build, PR #34 open)
+  - `wt-mirror-dashboard-rotation-switch-ui-001` — active (Mirror reviewing PR #34)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` — **potentially stale** (preflight phase that produced PR #293, now merged)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z-clarify` — **potentially stale** (clarify phase that produced PR #293, now merged)
+  - The two stale preflight worktrees: event-driven teardown may have missed these (PR #293 was a docs-only clarify → no full build cycle). Hourly GC backstop will clean them. Not urgent; not actionable by me. ✅
+
+- **G-rule watch (unchanged from iter 801):**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **2/3** (iter 801). No new occurrence this iter.
+  - `pulse-check-stale:*` not in alert-translations.json: **1/3** (iter 784).
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784).
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776).
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776).
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775).
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769).
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680).
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716).
+  - `cycle-blocked:dirty-tree-*`: **2/3**.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=682, systemic_fixes=4, ratio=170.5, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark updated to 1223 / anchor 23:44:19Z (the Tier-3 review-pass from iter-801's claim). ✅
+3. Check B: sync success, post-wrapper lag (3 commits behind HEAD). Normal. ✅
+4. Check E: PR #292 and PR #293 confirmed merged. PR #34 (dashboard) fresh under Mirror review. Phase C and Queue API build tasks both arrived fresh in Forge inbox. ✅
+5. No always-allowed auto-fixes triggered. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 802` → ts=2026-06-03T23:52:35Z. ✅
+7. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1, last_signal_at=2026-06-03T23:45:05Z (unchanged). ✅
+8. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. All checks nominal.
+
+**Patterns:** Significant pipeline throughput since iter 800's drained state: PR #292 (Phase B) merged, PR #293 (Queue brief fix) merged, Phase C dispatched to Forge, Queue API build dispatched by Larry, dashboard rotation switch UI #34 in Mirror review. Two stale preflight worktrees remain from PR #293's build cycle — event-driven teardown likely didn't fire (clarify task rather than a full build). Hourly GC backstop handles.
+
+**Learned:** The "Pulse cycle YYYYMMDDTHHMMSSZ" commit is always the wrapper commit for the preceding interactive iter — not a separate automated cycle. This is iter 802 (not 803), confirming the automated-vs-interactive commit attribution is working as designed.
+
+---
+
 ## Iteration 801 — 2026-06-03 23:45 UTC (interactive)
 
 **Health:** ⚠️ Tier 3→1 reset — **deploy-notifier:READY Tier 4 alert** (by-design Vercel deploy success, G-rule 2/3, not actionable — no DM to Larry). Alert watermark: **1222 lines / anchor 23:16:17Z** (+1 new). Cooldown residue: **199** (structural; unchanged). Sync: ✅ fully current, last_sync=2026-06-03T23:21:28Z, commit=6ab2bbc=HEAD. Healer heartbeat: **23:24:59Z** (~21 min old; ✅). **8/8 services active.** **1 open PR** (#292 Phase B Check 0 — fresh, under Mirror review). Forge: 2 tasks (dashboard-rotation-switch-ui, queue-api-preflight-clarify). Mirror: 1 task (review PR #292). Beacon: EMPTY. Worktrees: **5** (4 Forge + 1 Mirror — all active builds from post-iter-800 pipeline activity).
