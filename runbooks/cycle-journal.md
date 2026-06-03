@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 779 — 2026-06-03 18:34 UTC (interactive)
+
+**Health:** ✅ Nominal — Tier 1 → **Tier 2** (de-escalation: consecutive_clean=3). Alert watermark: **1192 lines / anchor 18:05:03Z** (UNCHANGED from iter 778). Cooldown residue: **183** (177 warning + 6 critical; unchanged). Sync: ✅ status=success, last_sync=18:21:46Z (~12 min ago). Healer heartbeat: **18:22:39Z** (~11 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge: 5 active tasks (2 build + 2 preflight + 1 retry-preflight). Beacon EMPTY. Mirror EMPTY.** Worktrees: **8** (4 stale + 4 active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1192 lines** — anchor 18:05:03Z UNCHANGED from iter 778. No new alerts since last watermark. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Pipeline stall cooldown dict active (existing snoozed entries only; no new stall signals). Cooldown residue 183 (unchanged) — GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **18:22:39Z** (~11 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=24644d6 "Pulse cycle 20260603T183007Z". New commit since iter 778 (was 77b532b); run_cycle.sh wrapper committed iter 778's journal entry. ✅
+
+- **(Check B) Sync health: ✅ status=success.** last_sync=18:21:46Z (~12 min at iter start; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline.** 0 open PRs (both repos). Forge inbox: **5 tasks**:
+  - `build-harden-ledger-intervention-tagging-002.json` (phase=build) — **progressed from preflight since iter 778**; worktree `wt-forge-harden-ledger-intervention-tagging-002` created. ✅
+  - `build-deploy-restart-gap-001.json` (phase=build) — **progressed from marker-error retry-preflight since iter 778** (9th MalformedForgeMarker retry passed); worktree `wt-forge-deploy-restart-gap-001` active. ✅
+  - `dashboard-rotation-switch-001.json` (preflight, ~13 min old) — worktree `wt-forge-dashboard-rotation-switch-001` created; Forge started preflight. ✅
+  - `install-drift-emission-fix-001.json` (preflight, ~8 min old) — no worktree yet; freshly arrived. ✅
+  - `marker-error-pulse-check-liveness-watcher-001-1.json` (retry-preflight, ~9 min old) — worktree `wt-forge-pulse-check-liveness-watcher-001` active (Forge building main task). ✅
+  - Beacon EMPTY. Mirror EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 8** — stale: `wt-forge-alert-fix-first-outcome-routing-001`, `wt-forge-harden-ledger-intervention-tagging-001` (task archived; awaiting GC), `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-deploy-restart-gap-001`, `wt-forge-pulse-check-liveness-watcher-001`, `wt-forge-harden-ledger-intervention-tagging-002` (NEW), `wt-forge-dashboard-rotation-switch-001` (NEW). ✅
+
+- **G-rule watch (all unchanged from iter 778):**
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776). Next occurrence → dispatch Beacon.
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776). Unchanged.
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775). Unchanged.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+  - **MalformedForgeMarker**: 10th total (pulse-check-liveness-watcher-001-1). APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. 9th (deploy-restart-gap-001-1) retry-preflight **RESOLVED** — task now in build phase. No new G-rule action.
+
+- **PRIME DIRECTIVE ratio:** interventions=662, systemic_fixes=4, verification_pending=2, ratio=165.5, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: Watermark UNCHANGED (1192/18:05:03Z) — no new alerts since iter 778. Nominal. ✅
+3. Periodic: Check I sentinel exists; skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+4. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync clean; healer alive; Forge tasks fresh (all < 15 min old). ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 779 --template pulse-cycle-check --detail iter-779` → intervention_id=pulse-cycle-check:iter-779, ts=2026-06-03T18:34:11Z. ✅
+6. `cycle_tier_state.py record --checks-clean true` → **tier promoted 1 → 2** (consecutive_clean=3 threshold reached). New state: tier=2, consecutive_clean=0, last_signal_at=2026-06-03T18:13:38Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** None. All checks nominal; no actionable signals for Larry this iter.
+
+**Patterns:**
+- **Tier de-escalation to Tier 2.** Iters 777+778+779 all returned clean. System promoted to 15-min cadence. Next non-clean iter will pull back to Tier 1.
+- **Pipeline throughput high.** Since iter 778 (~6 min ago), 2 Forge tasks advanced from preflight to build (`harden-ledger-intervention-tagging-002`, `deploy-restart-gap-001`). The 9th MalformedForgeMarker retry for `deploy-restart-gap-001-1` resolved successfully — that build is now active. Four concurrent Forge builds at various stages. Pipeline responding well to the post-PR-#283 dispatch wave.
+
+**Learned:** The 3-iter clean streak (777+778+779) confirms the system is in steady state despite 5 concurrent Forge tasks. Tier 2 cadence appropriate.
+
+---
+
 ## Iteration 778 — 2026-06-03 18:28 UTC (interactive)
 
 **Health:** ✅ Pipeline active — Tier 1, consecutive_clean=2 (all checks clean; structural carry-forward only). Alert watermark: **1192 lines / anchor 18:05:03Z** (UNCHANGED from iter 777). Cooldown residue: **183** (177 warning + 6 critical; unchanged). Sync: ✅ status=success, commit=77b532b, last_sync=18:21:46Z (~6 min ago). Healer heartbeat: **18:22:39Z** (✅ just fired). **7/7 core services active.** **0 open PRs (both repos). Forge: 5 active tasks (all preflight; 3 new since iter 777). Beacon EMPTY. Mirror EMPTY.** Worktrees: **6** (4 stale + 2 active).
