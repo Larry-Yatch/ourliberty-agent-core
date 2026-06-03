@@ -96,6 +96,16 @@ def _missions_json_path() -> Path:
     return _repo_root() / 'agents' / 'beacon' / 'missions.json'
 
 
+def _agent_models_json_path() -> Path:
+    """Path to config/agent-models.json (carries the rotation.enabled
+    default). Env-overridable so tests redirect reads to a tmpdir without
+    touching the deployed checkout."""
+    override = os.environ.get('OURLIBERTY_AGENT_MODELS_JSON')
+    if override:
+        return Path(override)
+    return _repo_root() / 'config' / 'agent-models.json'
+
+
 # ---- agent + healer registries ----
 
 AGENT_NAMES: tuple[str, ...] = ('beacon', 'forge', 'mirror', 'pulse')
@@ -183,6 +193,14 @@ ALLOWED_TARGET_AGENTS: frozenset[str] = frozenset({
 LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     'approve', 'reject', 'comment', 'mark_done',
 })
+
+# Account-tier rotation Auto/Off switch (dashboard-rotation-switch-001).
+# The live control is a runtime override file — touching ~/agents/
+# rotation.disabled forces the scheduler off on its next ~2-min tick,
+# exactly like config rotation.enabled=false, but mutates NO tracked file.
+# Mirrors the ~/agents/healers.disabled idiom. Two-state only: no force-on.
+ROTATION_OVERRIDE_FILE_NAME = 'rotation.disabled'
+ROTATION_VALID_MODES: frozenset[str] = frozenset({'auto', 'off'})
 
 # Approvals-queue-rework N1 (L8): the agent-reviewed "clean up" button.
 # POST /api/larry/cleanup-review runs the SAME triage as
@@ -413,6 +431,28 @@ class LarryActionResponse(BaseModel):
 
 class LarryAllowlistResponse(BaseModel):
     allowed_emails: list[str]
+
+
+class RotationModeResponse(BaseModel):
+    # Effective rotation mode the dashboard renders beside kill_switch_active.
+    # 'off' when the runtime override file is present OR the config default is
+    # disabled; 'auto' only when neither forces it off.
+    mode: str
+    override_active: bool
+    config_enabled: bool
+    as_of: str
+
+
+class RotationModeRequest(BaseModel):
+    mode: str
+
+
+class RotationModeUpdateResponse(BaseModel):
+    mode: str
+    override_active: bool
+    config_enabled: bool
+    action_event_id: str
+    as_of: str
 
 
 class CleanupReviewKeptItem(BaseModel):
@@ -2231,6 +2271,115 @@ def _handle_larry_action(
     }
 
 
+# ---- /api/system/rotation Auto/Off switch (dashboard-rotation-switch-001) ----
+#
+# GET returns the effective mode the System tab renders beside
+# kill_switch_active. POST toggles the runtime override file
+# (~/agents/rotation.disabled): mode=off creates it, mode=auto removes it.
+# The scheduler picks the change up on its next ~2-min tick. POST writes a
+# larry_action audit row mirroring _handle_larry_action — but without a
+# source chain-event, since this is a direct operator toggle, not a response
+# to a pending event. NO tracked file is mutated.
+
+
+def _read_rotation_config_enabled(models_path: Path) -> bool:
+    """Read ``rotation.enabled`` from agent-models.json. Missing file,
+    malformed JSON, or a missing block all collapse to False (off) — the
+    same safe default as the scheduler's ``_load_rotation_config``."""
+    try:
+        data = json.loads(models_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    block = data.get('rotation')
+    if not isinstance(block, dict):
+        return False
+    return bool(block.get('enabled'))
+
+
+def _reader_rotation_mode(
+    agents_root: Path, models_path: Path, now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Resolve the effective rotation mode from the override file + config.
+
+    ``off`` whenever the override file is present OR the config default is
+    disabled; ``auto`` only when neither forces it off. The component
+    signals are surfaced so the UI can show *why* it's off."""
+    override_active = (agents_root / ROTATION_OVERRIDE_FILE_NAME).exists()
+    config_enabled = _read_rotation_config_enabled(models_path)
+    mode = 'auto' if (config_enabled and not override_active) else 'off'
+    return {
+        'mode': mode,
+        'override_active': override_active,
+        'config_enabled': config_enabled,
+        'as_of': _now_utc_iso(now),
+    }
+
+
+def _handle_rotation_mode_post(
+    *,
+    mode: str,
+    actor: str,
+    agents_root: Path,
+    models_path: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Toggle the rotation override file + write the larry_action audit row.
+
+    Raises HTTPException for 4xx; returns the resulting mode state on
+    success. Idempotent on the filesystem: touching an existing override
+    file or removing an absent one is a no-op.
+    """
+    if mode not in ROTATION_VALID_MODES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid mode={mode!r}',
+        )
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+    override_path = agents_root / ROTATION_OVERRIDE_FILE_NAME
+
+    # off → create the override file; auto → remove it. The scheduler reads
+    # presence on its next tick.
+    if mode == 'off':
+        override_path.parent.mkdir(parents=True, exist_ok=True)
+        override_path.touch()
+    else:  # auto
+        try:
+            override_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    # Audit row — mirrors _handle_larry_action's writer (top-level `actor`
+    # column per migration 0006; same dedup contract). No source-event
+    # lookup / read_at flip: this toggle has no originating chain-event.
+    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    action_payload = {
+        'control': 'rotation_mode',
+        'mode': mode,
+        'override_file': str(override_path),
+    }
+    action_event_id = compute_event_id('rotation-mode', 'larry_action', ts_iso)
+    row: dict[str, Any] = {
+        'event_id': action_event_id,
+        'ts': ts_iso,
+        'agent': 'dashboard',
+        'event_type': 'larry_action',
+        'actor': actor,
+        'task_id': 'rotation-mode',
+        'payload': sanitize_payload(action_payload),
+    }
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+    state = _reader_rotation_mode(agents_root, models_path, now=now)
+    state['action_event_id'] = action_event_id
+    return state
+
+
 # ---- /api/larry/cleanup-review engine (approvals-queue-rework N1 / L8) ----
 #
 # The "clean up" button. Given the current pending decision set, run the
@@ -2650,6 +2799,46 @@ def post_larry_action(
 )
 def get_larry_allowlist() -> dict[str, Any]:
     return {'allowed_emails': sorted(LARRY_ACTION_ALLOWED_EMAILS)}
+
+
+# ---- /api/system/rotation routes (dashboard-rotation-switch-001) ----
+#
+# GET is token-gated (read-only state). POST additionally requires a valid
+# X-Actor — it mutates the runtime override file + writes an audit row,
+# same gate posture as /api/larry/action.
+
+
+@app.get(
+    '/api/system/rotation',
+    response_model=RotationModeResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_rotation() -> dict[str, Any]:
+    return _reader_rotation_mode(_agents_root(), _agent_models_json_path())
+
+
+@app.post(
+    '/api/system/rotation',
+    response_model=RotationModeUpdateResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_system_rotation(
+    body: RotationModeRequest,
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    return _handle_rotation_mode_post(
+        mode=body.mode,
+        actor=actor,
+        agents_root=_agents_root(),
+        models_path=_agent_models_json_path(),
+        supabase_client=client,
+    )
 
 
 @app.post(
