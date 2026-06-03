@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 674 — 2026-06-03 05:01 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1204** (unchanged from iter 673 — no new alerts). Healer heartbeat: **04:49:56Z** (~12 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, 04:38:12Z (~23 min ago). **7/7 services active.** Forge inbox: **3 tasks** — ALL advanced to `build` phase since iter 673 (`build-step-digest-card.json` + `build-fix-tier2-probe-setup-token-auth.json` + `build-stale-worktree-teardown-001.json`). Mirror/Beacon inboxes: EMPTY. 0 open PRs in both repos. Worktrees: **20** (+2 from 18 — new `wt-forge-fix-tier2-probe-setup-token-auth` + `wt-forge-stale-worktree-teardown-001`).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1204 lines** (unchanged from iter 673). No new alerts since idx 1204 (`deploy-notifier:READY` for `forge/step-digest-card` at 04:48:15Z — Tier 3). Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ No new alerts.** 1204 lines (unchanged). Nominal. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No Larry directives. No distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (160, unchanged).** alert-cooldown/warning/: **160 total** (unchanged from iter 673). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ✅ Major pipeline advance — all 3 Forge tasks moved to `build` phase.**
+  - **0 open PRs** in both repos (agent-core + ourliberty-dashboard). ✅
+  - **Forge inbox: 3 tasks** (all `build` phase):
+    - `build-step-digest-card.json` — **advanced from preflight → build** since iter 673. Worktree `wt-forge-step-digest-card` active. PR not yet submitted. Archive shows `step-digest-card.json` + `step-digest-card.1.json` (prior phases consumed). ✅
+    - `build-fix-tier2-probe-setup-token-auth.json` — **advanced from preflight → build** since iter 673. Worktree `wt-forge-fix-tier2-probe-setup-token-auth` created. ✅
+    - `build-stale-worktree-teardown-001.json` — **advanced from queued → build** since iter 673. Worktree `wt-forge-stale-worktree-teardown-001` created. ✅
+  - **Mirror inbox: EMPTY.** ✅ **Beacon inbox: EMPTY.** ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:49:56Z** (~12 min old at 05:01Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=907720e ("Pulse cycle 20260603T045839Z" — iter 673 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-03T04:38:12Z (~23 min ago; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 remains clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ 0 open PRs; Forge building 3 tasks simultaneously.** Pipeline throughput high. ✅
+
+- **(Check F) Cost/quota: ⚠️ Burn rate at 82%/10M (last alert 04:46:30Z).** No new burn-rate alert since iter 673. 3 simultaneous Forge builds add load. Tier 3 — no dispatch. ⚠️ (monitored)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe still failing (idx 1201, known). `build-fix-tier2-probe-setup-token-auth.json` now in Forge build phase — root fix advancing. ⚠️ (known, fix in pipeline)
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 20** (+2 from iter 673's 18). New: `wt-forge-fix-tier2-probe-setup-token-auth` + `wt-forge-stale-worktree-teardown-001`. Note: stale-worktree-teardown itself will add a worktree before it ships the GC fix — self-referential but expected. ⚠️ (in pipeline)
+
+- **G-rule watch:**
+  - **All 3 Forge build tasks advancing.** `build-step-digest-card`, `build-fix-tier2-probe-setup-token-auth`, `build-stale-worktree-teardown-001` all in build phase. Watch for PRs submitted to ourliberty-dashboard. ⚠️ (active)
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - **`deploy-notifier cooldown GC gap`** — 160 files (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — 9th total lifetime.** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. No new occurrences.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync nominal; 3 Forge builds in progress autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 674` → ts: 2026-06-03T05:03:12Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T05:03:12Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open. `forge-claude-md-preflight-self-check-bullet-001` pending Larry. Burn-rate at 82% — monitoring (Tier 3).
+
+**Patterns:**
+- **Pipeline in simultaneous 3-task build burst.** step-digest-card + fix-tier2-probe + stale-worktree-teardown all advanced to build phase in a single inter-iter window (~5 minutes). High-throughput moment: Forge is doing more work than any prior single iter has observed. Expected to surface 2-3 PRs before the next cycle.
+- **Worktree count ticking up despite pending GC.** 20 worktrees (+2 this iter), up from 17 at iter 671. The stale-worktree-teardown build is the fix, but it adds its own worktree before cleaning others — net +1 even after it ships until teardown logic runs. GC will self-apply post-PR merge.
+
+**Learned:** Nothing new this iter. Pipeline throughput metric: all 3 tasks advanced from preflight/queued to build within 5 minutes of iter 673 completing. The inbox-watcher + outbox-notifier chain is working correctly at high throughput.
+
+---
+
 ## Iteration 673 — 2026-06-03 04:56 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1204** (unchanged from iter 672). Healer heartbeat: **04:49:56Z** (~6 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: 3 tasks (`step-digest-card.json` building + `stale-worktree-teardown-001.json` queued + **`fix-tier2-probe-setup-token-auth.json` NEW — preflight**). Mirror/Beacon inboxes: EMPTY. 0 open PRs in both repos.

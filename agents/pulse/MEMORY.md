@@ -6,14 +6,14 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 04:56Z UTC (Iter 673 — interactive)
+## Status snapshot — updated 2026-06-03 05:03Z UTC (Iter 674 — interactive)
 
-**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1204** (no change from 1203; no new alerts since 04:48:15Z). Healer heartbeat: **04:49:56Z** (within 90-min threshold). Cooldown/warning: **160** files (unchanged). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: 3 tasks (`step-digest-card.json` building + `stale-worktree-teardown-001.json` queued + **`fix-tier2-probe-setup-token-auth.json` NEW preflight**). Mirror/Beacon inboxes: EMPTY. **Burn-rate: 82%/10M gate, 125 rate-limit events in 2h (Tier 3 FYI, monitoring).** Check III 2026-06-14. **Tier 2 weekly probe root fix IN PIPELINE** (`fix-tier2-probe-setup-token-auth.json` in Forge preflight — addresses recurring false "Tier 2 OAuth expired" by making probe use setup-token same as agent_runner). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open but fix in pipeline.
+**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1204** (unchanged; no new alerts since 04:48:15Z). Healer heartbeat: **04:49:56Z** (within 90-min threshold). Cooldown/warning: **160** files (unchanged). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: **3 tasks ALL in build phase** (`build-step-digest-card.json` + `build-fix-tier2-probe-setup-token-auth.json` + `build-stale-worktree-teardown-001.json`). Mirror/Beacon inboxes: EMPTY. 0 open PRs. **Burn-rate: 82%/10M gate (Tier 3 FYI, monitoring; 3 simultaneous builds adding load).** Check III 2026-06-14. Worktrees: **20** (+2 from iter 673). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open; root fix (`build-fix-tier2-probe-setup-token-auth.json`) now in **build** phase.
 
-**Watch items (iter 673 update):**
-- **`fix-tier2-probe-setup-token-auth.json` — NEW (iter 673).** Forge preflight. Root fix for recurring `tier2_weekly_probe_failed` alerts: probe will use setup-token auth (not HOME-swap→expired credentials.json). Cost target $4-7. Watch for PROCEED marker + PR. ⚠️ (in pipeline)
-- **Stale worktrees — pipeline advancing.** 18 worktrees (unchanged). `stale-worktree-teardown-001.json` in Forge inbox (queued). Watch for PR. ⚠️ (in pipeline)
-- **`step-digest-card.json` in Forge inbox (N6, digest card on Approvals page).** Forge building. Vercel preview at 04:48:15Z (branch pushed). PR pending. Watch for PR + Mirror review.
+**Watch items (iter 674 update):**
+- **`build-fix-tier2-probe-setup-token-auth.json` — in build phase (iter 674).** Root fix for recurring `tier2_weekly_probe_failed` alerts. Advanced from preflight→build. Watch for PR. ⚠️ (in pipeline)
+- **Stale worktrees: 20 total.** `build-stale-worktree-teardown-001.json` now in Forge build phase. New worktree created (`wt-forge-stale-worktree-teardown-001`). Watch for PR. ⚠️ (in pipeline)
+- **`build-step-digest-card.json` in Forge build phase (N6, digest card on Approvals page).** Advanced from preflight→build. Vercel preview at 04:48:15Z (branch pushed). PR pending. Watch for PR + Mirror review. ⚠️ (active)
 - **PR #259 MERGED (03:34:10Z, auto-cycle always-fix).** "feat(dashboard): agent-reviewed cleanup-review button (N1/L8)". Watch item CLOSED.
 - **step-ops-alerts-ui BUILD DONE (Vercel preview live).** Deployed 03:12:11Z. marker-error-step-ops-alerts-ui-1.json retry queued (retry 1/3). UNCHANGED.
 - **MalformedForgeMarker — 8th total lifetime (iter 668).** `marker-error-medic-reliability-gate-delivery-cli-001-1.json` in Mirror inbox (revision-1 review for PR #263 failed at preflight). Pattern now confirmed in Mirror as well as Forge. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` should be expanded to cover Mirror's preflight bullet. Pending Larry.
