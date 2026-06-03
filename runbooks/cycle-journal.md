@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 685 — 2026-06-03 06:45 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue + worktree GC mismatch). ✅ **NEW: Sync health restored** — `status=no-change` (self-cleared from 37-episode SYNC-PUSH-REBASE-FALLBACK-001 error). Alert watermark: **1225** (unchanged — 0 new alerts since iter 684). Healer heartbeat: **06:20:09Z** (~25 min old; ✅ within 90-min threshold). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (6th consecutive iter). Worktrees: **19** (unchanged — GC timer still on daily cadence; fires ~02:43 UTC Thu). Cooldown residue: **172** (unchanged).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1225 lines** — unchanged from iter 684 watermark. 0 new alerts this window. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new directives or agent-distress signals. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 172 files** (unchanged from iter 684 — 27 heal-pipeline-stall entries in `alert-cooldown/warning/`; pipeline fully quiescent; residue from prior stall-period). Plateau stable. GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - 6th consecutive iter with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **06:20:09Z** (~25 min old; ✅ within 90-min threshold). No new auto-restart events since iter 684. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=ab2cfbf ("Pulse cycle 20260603T064251Z" — iter 684 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ SELF-CLEARED — SYNC-PUSH-REBASE-FALLBACK-001 resolved.** sync.json: `status=no-change`, commit=036800b7 (iter 683), last_sync=2026-06-03T06:38:20Z. Sync service ran at 06:38Z and returned `no-change` — no push failure this window. **First clean sync.json in 5+ iters; error count remains at 37 total (no new occurrence).** APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (the structural fix is still needed; the pattern recurs on PR merge days). ✅ (this window clean)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs; all inboxes empty. 6th consecutive iter. ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1225). Last known: 82%/10M at ~04:46:30Z (~119 min before this iter). Medic rate-window fix (PR #274) live. Monitoring. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: next fire ~10:37Z UTC today (still pending visibility in alerts). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ Worktrees: 19 (6th consecutive unchanged) — GC timer cadence mismatch persists.** `ourliberty-cleanup-stale-worktrees.timer` NEXT=Wed 2026-06-03 20:43:45 MDT (~Thu 02:43 UTC) — daily cadence. PR #266 intended 1h. Fix: `sudo cp ~/agent-core/systemd/ourliberty-cleanup-stale-worktrees.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cleanup-stale-worktrees.timer`. Ask-then-do (sudo + systemd). G-rule `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (carries from iter 684). ⚠️
+
+- **G-rule watch (unchanged from iter 684):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). At 3/3 → dispatch Beacon.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3**. At 3/3 → dispatch Beacon.
+  - `medic:medic-diagnosis` G-rule: **1/3**. At 3/3 → dispatch Beacon.
+  - `cycle-blocked:dirty-tree-*` G-rule: **2/3**. At 3/3 → dispatch Beacon.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync self-recovering clean; 0 new alerts; GC fix requires sudo = ask-then-do).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 685` → ts: 2026-06-03T06:45:16Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T06:45:10Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Worktree GC timer cadence mismatch ([yellow] escalation from iter 684 stands). `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry. `sync-push-rebase-fallback-001` APPROVAL_REQUEST open (37 total; no new occurrence this window). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. `medic-tier2auth401-beaconbot-20260529T045737Z` APPROVAL_REQUEST open.
+
+**Patterns:**
+- **Sync self-cleared** — `status=no-change` at 06:38Z; first clean sync since the 37th SYNC-PUSH-REBASE-FALLBACK-001 at iter 676. Pattern fires on PR merge days; no PRs merged since iter 680 → sync has been clean since. APPROVAL_REQUEST still needed for the permanent fix.
+- **Pipeline fully quiescent for 6th consecutive iter.** 0 open PRs, all inboxes empty. Genuine steady-state rest continues.
+- **Worktrees plateau at 19 for 6th consecutive iter** (GC timer fires in ~20h). No operational emergency; the content-drift healer gap (G-rule 1/3) is the structural issue.
+- **Cooldown residue plateau at 172 for 6th consecutive iter.** No new install-drift events. Stable.
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK-001 self-clears between PR merge days because the sync script finds nothing to push (`no-change`). The error only manifests when a PR merge triggers a push race between the wrapper and the sync service. The APPROVAL_REQUEST fix is still load-bearing to prevent the next occurrence when PRs start merging again.
+
+---
+
 ## Iteration 684 — 2026-06-03 06:40 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: sync error + cooldown residue). ⚠️ NEW: Worktree GC timer cadence mismatch detected (5th consecutive iter at 19 worktrees). Alert watermark: **1225** (unchanged — 0 new alerts since iter 683). Healer heartbeat: **06:20:09Z** (~20 min old; ✅ within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total — unchanged; self-recovering). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (5th consecutive iter). Worktrees: **19** (5th consecutive unchanged — **GC timer on daily cadence, not 1h as PR #266 intended**). Cooldown residue: **172** (unchanged).
