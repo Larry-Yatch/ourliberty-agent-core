@@ -374,6 +374,15 @@ class LookupRuleTest(unittest.TestCase):
         self.assertIsNotNone(t)
         self.assertEqual(t['severity'], 'URGENT')
 
+    def test_sentinel_inbox_stall_full_path_subject(self):
+        t = larry_alerts.translate_alert(
+            'sentinel',
+            'inbox-stall:/tmp/foo/beacon/foo.json',
+        )
+        self.assertIsNotNone(t)
+        self.assertEqual(t['severity'], 'INFO')
+        self.assertEqual(t['tier'], 'FYI')
+
     def test_unmatched_returns_none(self):
         t = larry_alerts.translate_alert(
             'heal-pipeline-stall', 'nonexistent:subject:here',
