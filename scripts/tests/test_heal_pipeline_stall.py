@@ -1585,6 +1585,27 @@ class TestCheckTier2FallbackOutcomes(_TempAgentsRootMixin, unittest.TestCase):
             'pipeline-stall:tier2-fallback-unavailable-auth_401:forge',
         )
 
+    def test_tier2_failed_wording_not_lapsed_when_auth_ok(self) -> None:
+        # 2026-06-02 false-alarm fix: FAILED still alerts, but when Tier 2 OAuth
+        # verifies the message must NOT claim lapsed/expired credentials.
+        self._write_forge_log(_tier2_line('FAILED', 'rate_limit'))
+        with patch('active_tier.tier_auth_ok', return_value=True):
+            alerts = self.hps.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            'pipeline-stall:tier2-fallback-failed-rate_limit:forge',
+        )
+        self.assertNotIn('lapsed', alerts[0]['message'].lower())
+        self.assertIn('verifies ok', alerts[0]['message'].lower())
+
+    def test_tier2_failed_wording_lapsed_when_auth_fails(self) -> None:
+        self._write_forge_log(_tier2_line('FAILED', 'rate_limit'))
+        with patch('active_tier.tier_auth_ok', return_value=False):
+            alerts = self.hps.check_tier2_fallback_failures({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('lapsed', alerts[0]['message'].lower())
+
     def test_tier2_mixed_outcomes(self) -> None:
         self._write_forge_log(
             _tier2_line('SKIPPED', 'rate_limit'),
