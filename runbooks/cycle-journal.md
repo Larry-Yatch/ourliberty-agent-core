@@ -4,6 +4,95 @@
 
 ---
 
+## Iteration 670 — 2026-06-03 04:36 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. PR #31 (ourliberty-dashboard, step-approvals-rescope N5) OPEN (CLEAN/MERGEABLE, 04:34:15Z, Mirror reviewing). PR #261 (fix-advancer) MERGED 03:18:55Z — watch item CLOSED. Alert watermark: **1198** (no change). Healer heartbeat: **04:19:52Z** (16 min old; ✅ within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (34th total, unchanged)** — status=error, last_sync=04:23:18Z, self-recovering. **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: 1 task (`review-step-approvals-rescope.json`). Beacon inbox: EMPTY → new G-rule dispatch written this iter.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1198 lines** (no change from iter 669). No new alerts since 04:25:17Z (PR #263 review-pass, Tier 3). Nominal. Cooldown: **155 total** (unchanged).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1198 lines (no change). No new alerts since iter 669 watermark. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 30 min ago --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new deliveries. No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (155, unchanged).** alert-cooldown/warning/: 155 files (unchanged from iter 669). GC gap APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ⚠️ PR #31 OPEN (2 min, HOLD); step-ops-alerts-ui stall (4th iter).**
+  - **PR #261 MERGED (03:18:55Z).** "fix(advancer): repair reconcile gh pr list failure so V6 self-heal actually works" — Forge task `fix-advancer-reconcile-gh-failure-recovery-20260602T234551Z` + build task both archived. PR merged. Watch item CLOSED. ✅
+  - **PR #31 OPEN (ourliberty-dashboard, step-approvals-rescope N5).** "feat(approvals): decision-only queue, CEO framing, cleanup button (N5)" — created 04:34:15Z. CLEAN/MERGEABLE. Mirror reviewing (`review-step-approvals-rescope.json` in inbox). 30-min threshold: **05:04:15Z**. HOLD — Mirror must approve before auto-merge. ⚠️
+  - **Forge inbox: EMPTY.** All active tasks completed. ✅
+  - **Mirror inbox: 1 task.** `review-step-approvals-rescope.json` (PR #31, active). ✅
+  - **Beacon inbox: EMPTY** (before this iter's dispatch). → G-rule dispatch written.
+  - **step-ops-alerts-ui: 4th iter stall.** Iter 669 [yellow] escalation active at `pulse-escalations.json`. No Larry response yet. Forge archive shows `build-step-ops-alerts-ui.json` + `marker-error-step-ops-alerts-ui-1.json` both archived — retry consumed, no PR submitted. Worktrees (`wt-forge-step-ops-alerts-ui` + `wt-mirror-step-ops-alerts-ui`) still exist. Still awaiting Larry's direction (options B or C from iter 669 escalation). ⚠️ (ask-then-do; no new action)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:19:52Z** (16 min old at 04:36Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=fc1647b ("Pulse cycle 20260603T043418Z" — iter 669 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (34th total, unchanged).** sync.json: status=error, last_sync=2026-06-03T04:23:18Z (13 min ago; within 2h threshold). Same record as iter 669 — sync service hasn't re-fired since the 04:23Z rollback. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #31 under review (HOLD); step-ops-alerts-ui stall.** 0 open PRs in agent-core. 1 open PR in ourliberty-dashboard (#31, 2 min). Mirror reviewing. Forge empty. step-ops-alerts-ui: 4th iter stall. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Mirror reviewing 1 PR. Pipeline otherwise quiet. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **`stale-worktrees accumulating` — G-rule 3/3 (iter 670, 3rd observation). DISPATCHED.** 17 worktrees in `/home/larry/agent-worktrees/` (was 16 iter 669; +1 `wt-forge-step-approvals-rescope`). Multiple from merged PRs (#259, #260, #261, #262, #263, #264). Dispatch `cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json` written to Beacon inbox. G-rule watch item CLOSED — dispatched. ✅
+  - ~~**PR #261 (fix-advancer) watch item.**~~ **CLOSED.** Merged 03:18:55Z. `fix-advancer-reconcile-gh-failure` task fully complete. ✅
+  - **step-ops-alerts-ui stall — 4th iter.** No change; iter 669 escalation stands. Awaiting Larry.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - `deploy-notifier cooldown GC gap` — **155 files** (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — 9th total lifetime.** `marker-error-step-approvals-rescope-1.json` archived (Forge processed retry → PR #31 submitted). Retry resolved. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (PR #31 too young; step-ops-alerts-ui awaiting Larry; 7/7 active; sync self-recovering).
+4. **G-rule 3/3 dispatch: `cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json` → Beacon inbox.** Permanent fix: Forge/Mirror should clean up worktrees on task completion. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 670` → ts: 2026-06-03T04:38:35Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:38:36Z. ✅
+7. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Iter 669 [yellow] step-ops-alerts-ui escalation carries forward (4th iter stall). G-rule 3/3 stale-worktrees dispatched to Beacon (no Larry DM needed — within Pulse's routing authority). SYNC-PUSH-REBASE-FALLBACK-001 34th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry.
+
+**Patterns:**
+- **step-approvals-rescope N5 retry resolved cleanly.** `marker-error-step-approvals-rescope-1.json` was consumed by Forge between iter 669 and 670; Forge successfully submitted PR #31 to ourliberty-dashboard. Mirror review underway. The MalformedForgeMarker retry mechanism DID produce a retry-2/3 eventually (or Forge re-ran the preflight correctly on retry-1). This resolves the "retry chain dead" pattern observed in iter 669 — that was a diagnosis artifact of checking mid-processing.
+- **fix-advancer task fully resolved.** PR #261 merged 03:18:55Z, both worktrees and archive entries present. The task that was "stale/OAuth-blocked" in iter 645 MEMORY is now complete — cleared between those iters and now.
+- **G-rule 3/3 stale-worktrees dispatched.** 17 worktrees is the steady-state accumulation rate after ~5 PRs worth of build activity. Without GC, this grows linearly. The systemic fix (add worktree cleanup to Forge's task-completion flow) would have prevented all 12+ stale worktrees seen today.
+
+**Learned:** `gh pr list` only queries the current repo context (agent-core). PRs in ourliberty-dashboard don't appear. Always disambiguate with `--repo Larry-Yatch/ourliberty-dashboard` when checking dashboard build tasks. Mirror's review task `review-step-approvals-rescope.json` pointed to PR #31 (ourliberty-dashboard) — the explicit `pr_url` field in the review task is the reliable source of truth for repo + PR number.
+
+---
+
+## Iteration 670 — 2026-06-03 (inter-agent dead-letter notification)
+
+**Health:** N/A — not a full cycle; processing dead-letter notification from Beacon.
+
+**Event:** Dead-letter notification received for dispatch `cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json`. The dispatch was rejected by `dispatch_validator` before reaching Beacon.
+
+**Root cause diagnosed:** Envelope included `"phase": "spec"`. The validator's allowed phase set is `['build', 'preflight', 'review', 'revision', 'routing-signal']` — "spec" is not a valid value. Prior successful Pulse→Beacon `cycle-finding-*` dispatches omit the `phase` field entirely (confirmed by inspecting `cycle-finding-stale-daemon-restart-warn-level-20260602T185128Z.json` and `cycle-finding-sentinel-inbox-stall-alert-translations-20260603T015947Z.json` in Beacon archive — neither has a `phase` field).
+
+**Did:**
+1. Found rejected envelope at `~/agents/inboxes/beacon/.invalid/cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json`.
+2. Read `.reason` file: `validator: phase "spec" not in allowed set ['build', 'preflight', 'review', 'revision', 'routing-signal']`.
+3. Constructed corrected envelope (same task_id, same content, `phase` field removed) and wrote to `~/agents/inboxes/beacon/cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json`.
+4. Archived pulse dead-letter inbox notification + cleaned in-flight state record.
+
+**Learned:** Pulse→Beacon `cycle-finding-*` dispatches must NOT include a `phase` field. The validator rejects unknown/invalid phase values. Add this to calibration: if a structured Beacon dispatch has a `phase` field, drop it — Beacon dispatches have no phase in their schema. This matches why prior G-rule dispatches (stale-daemon, sentinel-inbox-stall) had no `phase` field.
+
+**Escalated:** None. Re-dispatch is the complete remediation. Inbox-watcher will pick up the corrected envelope.
+
+---
+
 ## Iteration 669 — 2026-06-03 04:31 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **Pipeline CLEARED: 0 open PRs.** PR #263 MERGED (04:25:17Z) + PR #265 MERGED (04:26:15Z) — first clear pipeline in many iterations. Alert watermark: **1198** (+1, Tier 3). Healer heartbeat: **04:19:52Z** (11 min old; ✅ within threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (34th total)** — status=error, last_sync=04:23:18Z, self-recovering. **7/7 services active.** Forge inbox: 1 marker-error (`marker-error-step-approvals-rescope-1.json`, retry-1/3). Mirror inbox: EMPTY. Beacon inbox: EMPTY.
