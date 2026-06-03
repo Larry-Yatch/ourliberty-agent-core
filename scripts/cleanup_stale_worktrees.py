@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""cleanup_stale_worktrees.py — Remove git worktrees older than 24 hours.
+"""cleanup_stale_worktrees.py — Remove git worktrees older than 4 hours.
 
-Runs daily via systemd timer (ourliberty-cleanup-stale-worktrees). Cleans
-up ``~/agent-worktrees/wt-*`` directories left behind by Forge dispatches.
-Worktrees are preserved for 24 hours after task completion so Larry can
-inspect the working state if anything went wrong.
+Runs hourly via systemd timer (ourliberty-cleanup-stale-worktrees) as the GC
+backstop for worktrees that never auto-merge (REJECT/ESCALATE/abandonment) —
+merged-task worktrees are reaped immediately by outbox_notifier's event-driven
+teardown. Cleans up ``~/agent-worktrees/wt-*`` directories left behind by
+Forge dispatches. Worktrees are preserved for 4 hours after task completion so
+Larry can inspect the working state if anything went wrong.
 
 Adapted from GrowthMastery-ai/gm-agent-core ``scripts/cleanup_stale_worktrees.py``
 for Larry-Yatch/ourliberty-agent-core (2026-05-12, Phase D3 commit 4b — Gap 10

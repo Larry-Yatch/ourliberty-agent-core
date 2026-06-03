@@ -73,6 +73,7 @@ import mirror_review_handler as mrh  # noqa: E402
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
 import trust_policy                 # noqa: E402
+import worktree_manager             # noqa: E402  # auto-merge worktree teardown
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -3929,6 +3930,121 @@ def _signal_sequence_step_merged(
 
 
 # ============================================================================
+# stale-worktree-teardown-001 — event-driven worktree teardown at auto-merge
+# ============================================================================
+#
+# When a PR auto-merges, the forge AND mirror worktrees that produced it are
+# dead weight: the branch is deleted (gh pr merge --delete-branch), the task
+# is terminal. The daily-now-hourly cleanup_stale_worktrees GC is the backstop
+# for tasks that never merge (REJECT/ESCALATE/abandonment); this hook is the
+# primary path that reaps merged-task worktrees within the same notifier cycle
+# rather than waiting up to the next GC sweep.
+#
+# Lives here (not in Forge/Mirror self-removal) because an agent can't reliably
+# `git worktree remove` the tree it's running inside, and the auto-merge
+# chokepoint deterministically knows the task_id and resolves both worktree
+# paths. Mirrors the _signal_sequence_step_merged side-effect pattern.
+
+
+def _canonical_repo_for_coords(repo_coords: str) -> Optional[Path]:
+    """Map a `owner/repo` coords string to its canonical filesystem Path.
+
+    Reads the same top-level `repo_paths` block of config/agent-models.json
+    that cleanup_stale_worktrees._load_canonical_repos consumes, so the two
+    teardown mechanisms agree on where each repo lives. `repo_coords` is the
+    `owner/repo` form `gh` uses; `repo_paths` keys are bare repo names, so we
+    match on the segment after the last slash. Returns None when the repo is
+    not configured (caller logs + skips).
+    """
+    if not repo_coords:
+        return None
+    try:
+        cfg = json.loads(_MODELS_CONFIG_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    block = cfg.get('repo_paths') if isinstance(cfg, dict) else None
+    if not isinstance(block, dict):
+        return None
+    repo_name = repo_coords.rsplit('/', 1)[-1]
+    raw = block.get(repo_name)
+    if not isinstance(raw, str) or not raw:
+        return None
+    return Path(raw)
+
+
+def _active_task_stems() -> set[str]:
+    """In-flight task stems from `AGENTS_ROOT/state/in-flight/*.json`.
+
+    Mirrors cleanup_stale_worktrees.load_active_task_stems' stem-matching so
+    teardown never removes a worktree that a live agent_runner subprocess is
+    still using. Should never overlap with a just-merged task at merge time,
+    but it's cheap insurance against removing an active tree.
+    """
+    stems: set[str] = set()
+    in_flight_dir = AGENTS_ROOT / 'state' / 'in-flight'
+    if not in_flight_dir.exists():
+        return stems
+    for f in in_flight_dir.glob('*.json'):
+        try:
+            entry = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        stem = entry.get('task_stem') or f.stem
+        if stem:
+            stems.add(stem)
+    return stems
+
+
+def _teardown_worktrees_for_task(task_id: str, repo_coords: str) -> None:
+    """Remove the forge AND mirror worktrees for a just-merged task.
+
+    Best-effort and never raises (the caller is the safety-critical merge
+    chokepoint). Fired only on merged/already_merged outcomes. Skips either
+    agent's worktree if the task_id still appears in the in-flight registry.
+    """
+    if not task_id:
+        return
+    canonical_repo = _canonical_repo_for_coords(repo_coords)
+    if canonical_repo is None:
+        log(
+            f'AUTO_MERGE_WORKTREE_TEARDOWN task={task_id} skipped — no '
+            f'canonical repo path for coords={repo_coords!r}',
+            'WARN',
+        )
+        return
+    active_stems = _active_task_stems()
+    for agent_id in ('forge', 'mirror'):
+        try:
+            wt_path = worktree_manager.worktree_path_for(agent_id, task_id)
+            if any(stem and stem in wt_path.name for stem in active_stems):
+                log(
+                    f'AUTO_MERGE_WORKTREE_TEARDOWN task={task_id} '
+                    f'agent={agent_id} skipped — task still in-flight',
+                )
+                continue
+            on_disk = wt_path.exists()
+            registered = worktree_manager._is_worktree_registered(
+                canonical_repo, wt_path,
+            )
+            if not on_disk and not registered:
+                continue
+            worktree_manager._remove_worktree(
+                canonical_repo, wt_path, log_fn=log,
+            )
+            log(
+                f'AUTO_MERGE_WORKTREE_TEARDOWN task={task_id} '
+                f'agent={agent_id} path={wt_path} repo={canonical_repo}',
+            )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'AUTO_MERGE_WORKTREE_TEARDOWN task={task_id} '
+                f'agent={agent_id} raised {type(e).__name__}: {e}; '
+                f'swallowing — GC backstop will reap it',
+                'WARN',
+            )
+
+
+# ============================================================================
 # D3.5 5d-prime — AUTO_MERGE serializer (overlap-aware merge gating)
 # ============================================================================
 #
@@ -4492,6 +4608,9 @@ def _attempt_auto_merge_with_gates(
                 pr_url=pr_url,
                 merged_at_iso=datetime.now(timezone.utc).isoformat(),
             )
+            _teardown_worktrees_for_task(
+                task_id=task_id, repo_coords=repo_coords,
+            )
         return bypass_result
 
     # Fail-closed gate (highest priority — never merge when queue is corrupt).
@@ -4631,6 +4750,10 @@ def _attempt_auto_merge_with_gates(
             pr_url=pr_url,
             merged_at_iso=datetime.now(timezone.utc).isoformat(),
         )
+        # stale-worktree-teardown-001: reap the forge + mirror worktrees the
+        # instant the PR merges — the branch is gone and the task is terminal.
+        # Best-effort; the hourly GC sweep is the backstop if this misses.
+        _teardown_worktrees_for_task(task_id=task_id, repo_coords=repo_coords)
 
     # Post-merge release: if this PR merged successfully, re-attempt every
     # queue entry that was blocked behind it.

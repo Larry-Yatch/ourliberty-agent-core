@@ -16,8 +16,10 @@ dispatches: the worktree path is keyed by ``task_id`` (no timestamp). The
 dispatches.
 
 Called from ``inbox_watcher.process_task`` when
-``models_config[agent].worktree_enabled`` is true. Cleanup is performed
-daily by ``cleanup_stale_worktrees.py`` (24h grace).
+``models_config[agent].worktree_enabled`` is true. Merged-task worktrees are
+reaped immediately by ``outbox_notifier._teardown_worktrees_for_task`` at
+auto-merge; the hourly ``cleanup_stale_worktrees.py`` (4h grace) is the GC
+backstop for tasks that never merge.
 
 Public API:
 
@@ -54,7 +56,7 @@ from typing import Callable, Optional, Tuple
 #   - Cleanup service can reach the same dir.
 #
 # The directory is auto-created if missing. cleanup_stale_worktrees.py
-# scans the same path with the same 24h MAX_AGE_SECONDS grace.
+# scans the same path with the same 4h MAX_AGE_SECONDS grace.
 WORKTREE_BASE = Path.home() / 'agent-worktrees'
 WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
 WORKTREE_PREFIX = 'wt-'
