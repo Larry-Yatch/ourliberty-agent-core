@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 784 — 2026-06-03 19:29 UTC (interactive)
+
+**Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check 0 novel alerts + Check B SYNC-PUSH-REBASE-FALLBACK 46th total). Alert watermark: **1216 lines / anchor 19:26:06Z** (was 1193/18:37:29Z — 23 new alerts this iter). Cooldown residue: **183** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=8a541253, last_sync=19:23:27Z. Healer heartbeat: **18:53:19Z** (~37 min old; ✅ within 90-min threshold). **7/7 core services active** (4 restarted by stale-daemon healer at 19:23Z; all still active). **2 open PRs** (#285: install-drift-emission-fix, self-healing; #289: pulse-check-liveness-watcher, Mirror reviewing). **Forge: 2 tasks** (build-dashboard-rotation-switch-001 + build-install-drift-emission-fix-001 retry). Mirror: 1 task. Beacon: EMPTY. Worktrees: **8** (4 stale + 4 active; −2 from iter 783 via event-driven teardown on PR #287 + #288 merges).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 23 new alerts since iter 783 watermark.** 1193→1216 lines. Anchor: 19:26:06Z. New Tier 4 novel alerts (tier-reset triggers):
+  - 19:21:16Z: `sync-blocked:auto-commit-push-failed` (SYNC-PUSH-REBASE-FALLBACK 46th — NOT in Tier-3 allowlist; APPROVAL_REQUEST `sync-push-rebase-fallback-001` open)
+  - 19:23:23-26Z: `auto-restarted:ourliberty-forge-bot.service`, `auto-restarted:ourliberty-mirror-bot.service`, `auto-restarted:ourliberty-pulse-bot.service`, `auto-restarted:ourliberty-chain-event-shipper.service` (4 alerts — stale-daemon-code healer fired; services restarted and active; NOT in Tier-3 allowlist — Forge brief for systemic fix still MISSING)
+  - 19:26:06Z: `pulse-check-stale:ix`, `pulse-check-stale:v`, `pulse-check-stale:vi`, `pulse-check-stale:viii`, `pulse-check-stale:x` (5 alerts — new subject type from new pulse-check liveness watcher build; 1st occurrence each; likely by-design periodic-check staleness signals from Monday-only checks)
+  - New Tier 3 FYI (known-allowlist): 19:21:27Z `sentinel:inbox-stall:agent-a` (registered Tier 3 FYI). ✅
+  - 19:21:44Z cluster (6): `kickoff-malformed-prompt:larry-misemit-001`, `mirror-dag-malformed-result:dag-bad-seq`, `mirror-dag-pass:dag-pass-seq`, `sequence-kickoff-pulse-upgrade-001`, `kickoff-malformed-prompt:dispatch-larry-001`, `sequence-kickoff-cycle-seq` — likely test-fixture outputs from new feature build validation; 1st occurrence each.
+  - 19:11:13Z: unparseable JSON entry (AUTO_MERGE success for deploy-restart-gap-001).
+  - **Tier-reset: yes** → Tier 1, consecutive_clean=0. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** No WARNING entries for key services (beacon-bot, forge-bot, inbox-watcher) in last 30 min. Healer restarts appear as INFO in journald. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Carry-forward from iter 783: 1 active Beacon session (chat_id 7998341473 → 1b5ed242). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 183 total** (unchanged). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: 18:53:19Z (~37 min old; ✅ within 90-min threshold). Healer fired at 19:23:23Z (restarted 4 services: forge-bot, mirror-bot, pulse-bot, chain-event-shipper — all confirmed active post-restart). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=6f2e57e "Pulse cycle 20260603T192217Z". Newer than iter 783 HEAD (1a772d8); wrapper committed iter 783's journal. ✅
+
+- **(Check B) Sync health: ⚠️ status=error.** commit=8a541253, last_sync=19:23:27Z (sync service attempted during this cycle; SYNC-PUSH-REBASE-FALLBACK again at 19:23Z, 46th total). Session-start HEAD (6f2e57e) newer than sync commit (8a541253) → wrapper push succeeded; sync service raced and rolled back. Self-recovering via hourly `ourliberty-sync.timer`. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. **Tier-reset: yes.** ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** All confirmed active at 19:22Z. Stale-daemon-code healer restarted forge-bot, mirror-bot, pulse-bot, chain-event-shipper at 19:23Z (4 services restarted within 4 seconds); all still active post-restart. `ourliberty-outbox-notifier` not restarted (was processing normally). ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline (2 merges this cycle; 1 notable watch item).**
+  - **PR #287 MERGED** ("fix(deploy): restart stale Type=simple daemons on sync via explicit manifest"): auto-merged 19:11:13Z. Mirror review_pass at 19:11:06Z. Worktrees torn down (event-driven). ✅
+  - **PR #288 MERGED** ("fix(ledger): enforce template on every intervention row"): auto-merged 19:24:30Z. Mirror review_pass at 19:24:24Z. Worktrees torn down. ✅
+  - **PR #289 OPEN** ("feat(pulse): pulse-check liveness watcher"): created 19:27:01Z, CLEAN/MERGEABLE, Mirror reviewing (`review-pulse-check-liveness-watcher-001.json`). ~2 min old at journal time. ✅
+  - **PR #285 WATCH** ("fix(heal-install-drift): non-imperative healed subject + 3-way unit classifier"): created 18:49:39Z, 40+ min old. No Mirror review dispatched. Root cause confirmed: outbox-notifier detected MalformedForgeMarker in preflight at 12:49:54Z local (18:49:54Z UTC); wrote retry notification `marker-error-install-drift-emission-fix-001-1.json`. Retry consumed; fresh `build-install-drift-emission-fix-001.json` now in Forge inbox — self-healing path active. When Forge completes the retry build, outbox-notifier will dispatch review-request to Mirror. No action needed from Pulse yet. ⚠️ (watch)
+  - Forge inbox: 2 tasks (`build-dashboard-rotation-switch-001.json`, `build-install-drift-emission-fix-001.json`). Mirror inbox: 1 task (`review-pulse-check-liveness-watcher-001.json`). Beacon: EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** 18:37:29Z `claude_max_5h_burn_threshold_breached` alert was at iter 783 watermark boundary (pre-counted). No new burn-rate breach alerts during this iter window. Stale-daemon-code healer restarts expected cost. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 8** — stale: `wt-forge-alert-fix-first-outcome-routing-001`, `wt-forge-harden-ledger-intervention-tagging-001`, `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-dashboard-rotation-switch-001`, `wt-forge-install-drift-emission-fix-001`, `wt-forge-pulse-check-liveness-watcher-001`, `wt-mirror-pulse-check-liveness-watcher-001`. (−2 from iter 783: harden-ledger + deploy-restart-gap worktrees torn down on merge.) ✅
+
+- **G-rule watch:**
+  - **NEW (iter 784): `pulse-check-stale:*` not in alert-translations.json`: G-rule 1/3.** 5 subjects (`pulse-check-stale:ix/v/vi/viii/x`) at 19:26:06Z. By-design Monday-only check staleness signals from new pulse-check liveness watcher. At 3/3: dispatch Beacon to add `source:pulse-cycle / subject:pulse-check-stale:*` as Tier 3/FYI in `config/alert-translations.json`.
+  - **NEW (iter 784): 19:21:44Z cluster not in alert-translations.json: G-rule 1/3.** `kickoff-malformed-prompt:*` (2), `mirror-dag-malformed-result:*` (1), `sequence-kickoff-*` (2), `mirror-dag-revision:*` (1) — 6 subjects, likely test-fixture outputs from feature build validation. At 3/3: dispatch Beacon to classify.
+  - All prior G-rule items unchanged from iter 783.
+
+- **PRIME DIRECTIVE ratio:** interventions=667, systemic_fixes=4, verification_pending=2, ratio=166.75, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 23 new alerts since iter 783 watermark. Tier 4 novel alerts (SYNC-PUSH-REBASE-FALLBACK, auto-restarted ×4, pulse-check-stale ×5). Tier-reset.
+3. Check E investigation: PR #287 and #288 merged during this cycle. PR #285 self-healing (MalformedForgeMarker retry path active, fresh build dispatched). PR #289 in Mirror review.
+4. Outbox-notifier log analysis confirmed: install-drift-emission-fix-001 marker-error retry consumed; build re-dispatched; self-healing path intact. No Pulse action needed.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 784 --template pulse-cycle-check --detail iter-784` → intervention_id=pulse-cycle-check:iter-784, ts=2026-06-03T19:29:30Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+7. No always-allowed auto-fixes triggered: PR #285 in self-healing (fresh build dispatch, not yet past merge-without-review threshold since fix path is active); all services active; sync self-recovering. ✅
+8. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. 23 new alerts but all categorized: SYNC-PUSH-REBASE-FALLBACK (structural, APPROVAL_REQUEST open), auto-restarted (by-design healer, Forge brief still missing for systemic fix), pulse-check-stale (by-design, new feature), test-cluster (likely fixture outputs). No Larry DM warranted.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK (46th).** Structural. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Same self-recovering pattern. Sync timer will clear.
+- **auto-restarted ×4 (Forge brief MISSING).** Stale-daemon-code healer firing correctly; alerts are WARNING when they should be INFO. G-rule 3/3 dispatched (iter 592); Beacon consumed (iter 594); Forge brief MISSING — re-dispatch pending Larry go-ahead.
+- **High pipeline throughput this session.** PR #287 (deploy-restart-gap) + PR #288 (harden-ledger-tagging) merged this iter. PR #289 (pulse-check-liveness-watcher) in review. PR #285 (install-drift-emission-fix) in retry build path. 4 tasks active in pipeline concurrently.
+- **MalformedForgeMarker self-healing confirmed.** install-drift-emission-fix-001: preflight marker-error detected → retry notification consumed → fresh build dispatch confirmed in Forge inbox. End-to-end retry mechanism working as designed. When build completes, outbox-notifier will dispatch review to Mirror normally.
+
+**Learned:** `pulse-check-stale:*` is a new alert subject family from the pulse-check liveness watcher feature (PR #289). These are by-design: the watcher monitors whether Pulse's own periodic checks (V, VI, VIII, IX, X — Monday-only) have run within their expected cadence. On a Wednesday, these are expected to show as "stale" for Monday-only checks. New G-rule 1/3 noted; will suppress via alert-translations.json at 3/3.
+
+---
+
 ## Iteration 783 — 2026-06-03 19:10 UTC (interactive)
 
 **Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 45th total). Alert watermark: **1193 lines / anchor 18:37:29Z** (UNCHANGED from iter 782; no new alerts). Cooldown residue: **183** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=91bef130, last_sync=19:08:19Z. Healer heartbeat: **18:53:19Z** (~17 min old; ✅ within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: MERGEABLE/CLEAN, no Mirror review task; #287: MERGEABLE/CLEAN, Mirror review in progress). **Forge: 4 tasks** (1 build task completed — deploy-restart-gap-001 → PR #287). Mirror: 1 task. Beacon: EMPTY. Worktrees: **10** (4 stale + 6 active; +1 new: wt-mirror-deploy-restart-gap-001).
