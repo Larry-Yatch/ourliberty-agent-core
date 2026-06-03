@@ -163,6 +163,15 @@ pending → triaged-tier-N → action-dispatched → resolved
 | 3 | Action-template recognized + has 3+ prior successful executions + no recent Larry-correction? | yes → Tier 1 | Auto-dispatch; DM only if Decision IV thresholds crossed. |
 | 4 | (fallthrough — alert shape doesn't match any of the above) | Tier 4 | DM Larry for triage guidance; Check IV uses the response to grow the allowlist. |
 
+**Durable backend (Phase B — `docs/pulse-triage-phase-b-brief.md`).** The decision table above is no longer prompt-only judgment: it is implemented, data-driven, by `scripts/alert_triage_state.py`. For each new signal, Pulse **calls the helper and acts on its classification** rather than re-deriving the tier in-prompt each iter:
+
+```
+python3 scripts/alert_triage_state.py triage-alert \
+  --alert-id "<stable id>" --alert '<the larry-alerts.jsonl row as JSON>' --iter <N>
+```
+
+The helper reads `config/auto-fix-patterns.json` (the registry — gate 3's "recognized action-template" is now a registry lookup keyed on the signal's `template` tag; `state=graduated` AND not `permanent_guard` → Tier 1, else `permanent_guard` OR `state=probation` → Tier 2) and `config/alert-translations.json` (gate 1's known-pattern allowlist). It returns the tier + the delivery `route` (stamped via `larry_alerts.classify_route` — `escalate`/`closure`/`digest`, so the #277 routing layer delivers; Check 0 decides, it does not DM), persists the lifecycle row in `~/agents/state/alert-triage.json`, and — on the Tier-1 path — records a **tagged** `cycle_prime_ledger` intervention (`template = the pattern id`) so per-pattern track record accrues for Check V. The helper is **idempotent**: a re-run on an already `action-dispatched`/`resolved` signal is a no-op (it never re-acts or double-records the ledger), so Pulse may safely call it every iter. Pulse's job is to read the returned classification, perform the Tier-1 remediation (an existing healer / corrective envelope per § 6.5 — the helper records the decision + the ledger tag, it does not itself run the fix), and render the Tier-2/Tier-4 DM per § 6.10. The human-readable doctrine in this section is the *contract*; the helper is the durable *enforcement* of it. (With no pattern yet `graduated`, the helper correctly classifies every registry signal Tier 2/ask and auto-fixes nothing — see the brief; graduation is Phase C.)
+
 **Tier-reset side-effect across the four tiers.**
 
 - Tier 1 dispatch → `tier-reset` (an action fired this iter; the iter is not clean for de-escalation purposes per § 2.3).
