@@ -268,5 +268,21 @@
       "plain_language_summary": "The weekly chain-quality watch found that since the last model/prompt cutover, the Forge/Mirror build chain has gotten measurably harder on at least one quality signal (Forge needs more clarification rounds per task, or more build/revision rounds per task). This is CORRELATIONAL — the cutover happens to coincide with the rise; it is not proven cause. It is a heads-up awaiting your call, not an automated change.",
       "recommended_action": "Review the recent Forge/Mirror PRs from the trailing window (the DM names the metric and shows the before -> after numbers). If the regression looks real, revert the affected agent to claude-opus-4-7 by flipping its routing value in config/agent-models.json and restarting the inbox-watcher (it caches config at startup, inbox_watcher.py:778). No automated action is taken; the full metric table is in ~/agents/blackboard/pulse-check-x-proposals/check-x-<Monday>.json."
     }
+  },
+  "pulse-cycle": {
+    "cycle-blocked": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A Pulse maintenance cycle was stopped by its branch-guard because ~/agent-core was not on a clean main checkout, so it refused to auto-commit the cycle journal onto the wrong branch. Read the subject to tell the two cases apart: 'dirty-tree-on-<branch>' is expected-by-design and self-resolves once the working tree returns to main (no action needed); 'auto-restore-failed-from-<branch>' means the automatic return-to-main failed and needs a manual fix.",
+      "recommended_action": "If the subject is dirty-tree-on-*, no action is required -- the next cycle runs once ~/agent-core is back on a clean main. If it is auto-restore-failed-from-*, ssh ourliberty-vm, cd ~/agent-core, and manually restore a clean main checkout (origin may have diverged); cycles resume on the next tick."
+    }
+  },
+  "push-soft-gate": {
+    "push-soft-validate-failed": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The pre-push soft validator (validate_agent_core.py) flagged an error on the commit that was about to push to origin/main. This is a SOFT gate -- the push was NOT blocked, so the commit went through; this is a review-when-convenient signal, not a chain stop. The subject carries the short SHA of the flagged commit.",
+      "recommended_action": "ssh ourliberty-vm, cd ~/agent-core, run `python3 scripts/validate_agent_core.py` to see what the validator flagged. Duplicate failures with the same fingerprint are suppressed, so a repeat means a new or changed failure. Fix on origin/main when convenient."
+    }
   }
 }
