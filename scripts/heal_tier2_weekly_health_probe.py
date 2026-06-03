@@ -64,6 +64,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import active_tier  # noqa: E402
 import larry_alerts  # noqa: E402
 
 HOME = Path.home()
@@ -197,8 +198,22 @@ def run_probe(model_id: str) -> tuple[bool, str, str, int]:
     Returns (success_bool, stdout, stderr, exit_code).
 
     success_bool is True iff: exit code 0 AND stdout contains
-    EXPECTED_TOKEN AND (if JSON-parseable) is_error is not true."""
+    EXPECTED_TOKEN AND (if JSON-parseable) is_error is not true.
+
+    Auth mirrors the dispatch path (agent_runner._apply_tier_auth): when the
+    Tier 2 long-lived setup-token is configured, authenticate via it so the
+    probe exercises the SAME auth source a real dispatch uses. The HOME-swap
+    to TIER2_HOME stays (session/project dirs live under HOME/.claude) but
+    auth no longer depends on the auto-refreshing .credentials.json there —
+    intentionally not refreshed once the setup-token became primary, so a
+    HOME-swap-only probe would always 401 and emit a FALSE "Tier 2 down"
+    signal. Only when no setup-token is configured do we fall back to the
+    legacy HOME-swap->.credentials.json path. The token value is never
+    logged."""
     env = {**os.environ, 'HOME': TIER2_HOME}
+    setup_token = active_tier._setup_token_for_tier('tier2')
+    if setup_token:
+        env['CLAUDE_CODE_OAUTH_TOKEN'] = setup_token
     cmd = [
         CLAUDE_BIN, '--print', '--output-format', 'json',
         '--model', model_id, PROBE_PROMPT,

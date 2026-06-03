@@ -654,6 +654,17 @@ class TierDistinctnessTest(_IsolatedAgentsRoot):
 
     def setUp(self):
         super().setUp()
+        # These tests exercise the legacy creds.json distinctness path, so the
+        # setup-token short-circuit must be inactive. Clear any ambient
+        # CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2} (the live host has them set) and
+        # restore on teardown.
+        self._token_env_orig = {}
+        for name in (
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
+        ):
+            self._token_env_orig[name] = os.environ.pop(name, None)
+        self.addCleanup(self._restore_token_env)
         self._dm_calls: list[dict] = []
 
         def fake_dm(message, subject, suggested_action, severity='warning'):
@@ -666,6 +677,13 @@ class TierDistinctnessTest(_IsolatedAgentsRoot):
         self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
         self._dm_patch.start()
         self.addCleanup(self._dm_patch.stop)
+
+    def _restore_token_env(self):
+        for name, prev in self._token_env_orig.items():
+            if prev is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = prev
 
     def _probe(self, mapping):
         """Build a probe stub that maps HOME → (status, identity)."""
@@ -841,6 +859,79 @@ class TierDistinctnessTest(_IsolatedAgentsRoot):
         self.assertEqual(counts['tier_distinct'], 1)
         self.assertNotIn(drift_key, state['drifts'])
         self.assertEqual(counts['reconciled_gc'], 1)
+
+
+class TierDistinctnessSetupTokenShortCircuitTest(TierDistinctnessTest):
+    """When a tier dispatches via its long-lived setup-token, its creds.json
+    `claude auth status` state is irrelevant: a logged-out / unparseable read
+    there is NOT a dispatch-auth failure and must not fire the
+    "cannot authenticate" distinctness DM. This is the fix for the recurring
+    false "Tier 2 down" signal that arose once the Tier 2 creds.json lapsed
+    (intentionally unrefreshed) while the setup-token stayed valid.
+    """
+
+    def test_tier2_logged_out_suppressed_when_setup_token_present(self):
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'FAKE-tier2-token-xxxx'
+        state = {'drifts': {}}
+        counts, live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-tier1'),
+                h.TIER2_HOME: ('logged_out', None),
+            }),
+        )
+        self.assertEqual(counts['tier_distinct'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 0)
+        self.assertEqual(counts['tier_logged_out'], 0)
+        self.assertEqual(self._dm_calls, [])
+        self.assertEqual(live, set())
+
+    def test_tier2_unparseable_suppressed_when_setup_token_present(self):
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'FAKE-tier2-token-xxxx'
+        state = {'drifts': {}}
+        counts, _live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-tier1'),
+                h.TIER2_HOME: ('unparseable', None),
+            }),
+        )
+        self.assertEqual(counts['tier_distinct'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 0)
+        self.assertEqual(self._dm_calls, [])
+
+    def test_identical_orgs_still_dm_with_setup_tokens(self):
+        # The genuine duplicate-account failure mode (both tiers 'ok' with the
+        # SAME identity) is NOT masked by the short-circuit — it only fires
+        # when both report 'ok' from creds.json, which the token override
+        # never touches.
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER1'] = 'FAKE-tier1-token-xxxx'
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'FAKE-tier2-token-yyyy'
+        state = {'drifts': {}}
+        counts, _live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('ok', 'org-shared'),
+                h.TIER2_HOME: ('ok', 'org-shared'),
+            }),
+        )
+        self.assertEqual(counts['tier_identical'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 1)
+
+    def test_logged_out_tier_without_token_still_dms(self):
+        # Tier 1 has no setup-token and is logged-out → still alarms, even
+        # though Tier 2 has a token. The short-circuit is strictly per-tier.
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'FAKE-tier2-token-xxxx'
+        state = {'drifts': {}}
+        counts, _live = h.check_tier_distinctness(
+            state,
+            probe=self._probe({
+                h.TIER1_HOME: ('logged_out', None),
+                h.TIER2_HOME: ('ok', 'org-tier2'),
+            }),
+        )
+        self.assertEqual(counts['tier_logged_out'], 1)
+        self.assertEqual(counts['tier_dm_sent'], 1)
 
 
 class RunClaudeAuthStatusTest(_IsolatedAgentsRoot):

@@ -53,6 +53,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+import active_tier  # noqa: E402
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-credential-registry-drift.log'
@@ -779,7 +785,33 @@ def check_tier_distinctness(
             live_keys.add(drift_key)
         return counts, live_keys
 
+    # Setup-token short-circuit (mirrors active_tier.tier_auth_ok precedence):
+    # a tier that dispatches via its long-lived setup-token does NOT depend on
+    # the .credentials.json under its HOME, so a logged-out / unparseable read
+    # there is not a dispatch-auth failure and must not fire the "cannot
+    # authenticate" distinctness DM. This kills the false "Tier 2 down" signal
+    # that arose once the Tier 2 creds.json lapsed (intentionally unrefreshed)
+    # while the setup-token stayed valid. The same-account check below only
+    # triggers when BOTH tiers report 'ok' from creds.json, so suppressing a
+    # token-backed tier's bad read cannot mask a genuine duplicate-account.
+    if active_tier._setup_token_for_tier('tier1') and s1 in ('logged_out', 'unparseable'):
+        s1 = 'token'
+    if active_tier._setup_token_for_tier('tier2') and s2 in ('logged_out', 'unparseable'):
+        s2 = 'token'
+
     if s1 == 'ok' and s2 == 'ok' and id1 != id2:
+        counts['tier_distinct'] = 1
+        return counts, live_keys
+
+    identical = s1 == 'ok' and s2 == 'ok' and id1 == id2
+    has_bad = (
+        s1 in ('logged_out', 'unparseable')
+        or s2 in ('logged_out', 'unparseable')
+    )
+    if not identical and not has_bad:
+        # Every tier is either creds.json-authenticated (and distinct) or
+        # token-backed — no authentication failure and no duplicate identity,
+        # so there is nothing to alarm on.
         counts['tier_distinct'] = 1
         return counts, live_keys
 

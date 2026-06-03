@@ -232,7 +232,18 @@ class CallBeaconTier2Test(unittest.TestCase):
     """
 
     def setUp(self):
+        # These tests exercise the legacy HOME-swap fallback (no setup-token),
+        # so clear any ambient CLAUDE_CODE_OAUTH_TOKEN_TIER2 the live host has
+        # set; restore it on teardown. The token-present behavior is covered
+        # by CallBeaconTier2SetupTokenTest below.
+        self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
         self.bot = _BotImporter.load_with_env()
+
+    def tearDown(self):
+        if self._prev_t2 is None:
+            os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        else:
+            os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = self._prev_t2
 
     def test_tier1_success_no_tier2_attempted(self):
         ok = mock.Mock(returncode=0, stdout=json.dumps({
@@ -326,6 +337,83 @@ class CallBeaconTier2Test(unittest.TestCase):
             reply, _ = self.bot.call_beacon('hello', None)
         self.assertIn('Tier 2 retry also failed', reply)
         dm_mock.assert_called_once()
+
+
+class CallBeaconTier2SetupTokenTest(unittest.TestCase):
+    """When the Tier 2 long-lived setup-token is configured, the bot's Tier 2
+    fallback authenticates via it (mirroring agent_runner._apply_tier_auth)
+    instead of the HOME-swap->credentials.json path — eliminating the false
+    'Tier 2 down' failures once the Tier 2 creds.json lapsed."""
+
+    _TIER2_TOKEN = 'FAKE-beacon-tier2-token-not-a-real-key-zzzzzzzzzzzz'
+
+    def setUp(self):
+        self._prev_t2 = os.environ.get('CLAUDE_CODE_OAUTH_TOKEN_TIER2')
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = self._TIER2_TOKEN
+        self.bot = _BotImporter.load_with_env()
+
+    def tearDown(self):
+        if self._prev_t2 is None:
+            os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        else:
+            os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = self._prev_t2
+
+    def test_fallback_applies_setup_token(self):
+        tier1 = mock.Mock(
+            returncode=1, stdout='Invalid authentication credentials', stderr='',
+        )
+        tier2 = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'recovered', 'session_id': 'sid2'}),
+            stderr='',
+        )
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]) as run_mock:
+            reply, sid = self.bot.call_beacon('hello', None)
+        self.assertEqual(reply, 'recovered')
+        self.assertEqual(sid, 'sid2')
+        # The Tier 2 call carried the setup-token AND kept the HOME-swap.
+        tier2_kwargs = run_mock.call_args_list[1].kwargs
+        self.assertEqual(tier2_kwargs.get('oauth_token'), self._TIER2_TOKEN)
+        self.assertEqual(tier2_kwargs.get('home_override'), self.bot.TIER2_HOME)
+
+    def test_token_present_skips_unavailable_gate(self):
+        # creds.json missing (tier2_available False) must NOT short-circuit
+        # the retry when a setup-token is configured — dispatch via the token
+        # does not depend on creds.json.
+        tier1 = mock.Mock(
+            returncode=1, stdout='Invalid authentication credentials', stderr='',
+        )
+        tier2 = mock.Mock(
+            returncode=0,
+            stdout=json.dumps({'result': 'recovered', 'session_id': 'sid2'}),
+            stderr='',
+        )
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]) as run_mock, \
+             mock.patch.object(self.bot, 'tier2_available', return_value=False):
+            reply, _sid = self.bot.call_beacon('hello', None)
+        self.assertEqual(reply, 'recovered')
+        # Two calls: the unavailable gate did not abort before the retry.
+        self.assertEqual(run_mock.call_count, 2)
+
+    def test_token_value_not_logged(self):
+        tier1 = mock.Mock(
+            returncode=1, stdout='Invalid authentication credentials', stderr='',
+        )
+        tier2 = mock.Mock(returncode=1, stdout='still broken', stderr='')
+        logged: list[str] = []
+        with mock.patch.object(self.bot, '_run_claude_once',
+                                side_effect=[tier1, tier2]), \
+             mock.patch.object(self.bot, 'tier2_available', return_value=True), \
+             mock.patch.object(self.bot, 'log',
+                                side_effect=lambda m: logged.append(m)), \
+             mock.patch.object(self.bot.larry_alerts, 'append_alert'):
+            self.bot.call_beacon('hello', None)
+        self.assertFalse(
+            any(self._TIER2_TOKEN in m for m in logged),
+            'setup-token value leaked into a log line',
+        )
 
 
 # ---- credential-drift healer Tier 2 scan -------------------------------

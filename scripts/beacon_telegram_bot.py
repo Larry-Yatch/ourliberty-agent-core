@@ -53,6 +53,7 @@ from typing import Optional
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
+import active_tier  # noqa: E402  # setup-token precedence (tier2 fallback auth)
 import agent_runner  # noqa: E402  # shared rate-limit ledger writer (Step C)
 import beacon_approval_handler as approval  # noqa: E402
 import catch_me_up  # noqa: E402  # operator-UX shortcut synthesizer
@@ -363,6 +364,7 @@ def telegram_send_action(chat_id: int, action: str = "typing") -> None:
 
 def _run_claude_once(
     cmd: list, home_override: Optional[str] = None,
+    oauth_token: Optional[str] = None,
 ) -> Optional[subprocess.CompletedProcess]:
     """Single subprocess.run for `claude`. Returns the CompletedProcess
     or None on TimeoutExpired / FileNotFoundError / unexpected exception.
@@ -370,10 +372,20 @@ def _run_claude_once(
     `home_override`, when set, builds a copy of os.environ with HOME
     swapped to the override path — used for the Tier 2 fallback. We never
     mutate the parent process env; the override lives only on the child.
+
+    `oauth_token`, when set, authenticates the child via
+    CLAUDE_CODE_OAUTH_TOKEN — the long-lived setup-token path that mirrors
+    agent_runner._apply_tier_auth. It takes precedence over the HOME-swap's
+    auto-refreshing .credentials.json, so the fallback no longer 401s when
+    the Tier 2 creds.json has lapsed. The token value is never logged.
     """
     env = None
+    if home_override or oauth_token:
+        env = {**os.environ}
     if home_override:
-        env = {**os.environ, "HOME": home_override}
+        env["HOME"] = home_override
+    if oauth_token:
+        env["CLAUDE_CODE_OAUTH_TOKEN"] = oauth_token
     try:
         return subprocess.run(
             cmd,
@@ -456,7 +468,15 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     f"{(result.stdout or '')[:1500]}",
                     session_id,
                 )
-            if not tier2_available():
+            # Setup-token precedence (mirrors agent_runner._apply_tier_auth):
+            # when the Tier 2 long-lived setup-token is configured, the
+            # fallback authenticates via it and does NOT depend on the
+            # .credentials.json under TIER2_HOME. In that case the existence
+            # gate below must NOT short-circuit the retry — the creds.json may
+            # be absent/lapsed (intentionally unrefreshed) while dispatch auth
+            # via the token is healthy. The token value is never logged.
+            t2_setup_token = active_tier._setup_token_for_tier('tier2')
+            if not t2_setup_token and not tier2_available():
                 log(
                     f"TIER2_FALLBACK_UNAVAILABLE reason={failure_type} "
                     f"home={TIER2_HOME} (missing credentials file)"
@@ -467,8 +487,13 @@ def call_beacon(prompt: str, session_id: Optional[str]) -> tuple[str, Optional[s
                     f"{(result.stdout or '')[:1500]}",
                     session_id,
                 )
-            log(f"TIER2_FALLBACK_ATTEMPT reason={failure_type} home={TIER2_HOME}")
-            t2 = _run_claude_once(cmd, home_override=TIER2_HOME)
+            log(
+                f"TIER2_FALLBACK_ATTEMPT reason={failure_type} home={TIER2_HOME} "
+                f"auth={'setup_token' if t2_setup_token else 'credentials_json'}"
+            )
+            t2 = _run_claude_once(
+                cmd, home_override=TIER2_HOME, oauth_token=t2_setup_token,
+            )
             if t2 is not None and t2.returncode == 0:
                 log(f"TIER2_FALLBACK_USED reason={failure_type}")
                 try:
