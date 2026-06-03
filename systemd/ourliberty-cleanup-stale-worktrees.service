@@ -1,5 +1,5 @@
 [Unit]
-Description=Self-healing healer — clean up stale /tmp/wt-* worktrees older than 24h
+Description=Self-healing healer — clean up stale ~/agent-worktrees/wt-* worktrees older than 4h
 Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/cleanup_stale_worktrees.py
 After=network.target
 
