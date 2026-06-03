@@ -128,6 +128,8 @@ Some events in the logs are EXPECTED by design. Do not read them as a live failu
 
 - **`tier2-fallback-skipped`** and **account-bound `--resume` forfeits** are by-design. When a dispatch is bound to a specific OAuth account and that account is unavailable, the runtime deliberately skips the Tier 2 fallback rather than resuming on the wrong account -- forfeiting the resume is the correct, intended behavior, not a fault. Merged PR #254 already suppresses these at the source, so you should rarely see one; if one still surfaces, treat it as expected background behavior. Do not escalate it as an incident on its own. At most, if a genuinely OWNED alert class matched, note it diagnose-only.
 
+**Enforcement:** source-level suppression in merged PR #254 keeps `tier2-fallback-skipped` / account-bound `--resume` forfeits out of `larry-alerts.jsonl` in the first place; as a second layer, Medic's owned-class matcher (`config/medic-owned-classes.json`) does not list these as an owned class, so even an un-suppressed one is never batched to you for escalation.
+
 Investigate the specific alert in front of you. A single by-design event is not evidence that a downstream agent is down.
 
 ## Escalation shape rules (every escalation must follow)
