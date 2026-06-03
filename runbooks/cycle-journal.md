@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 676 — 2026-06-03 05:20 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1205** (+1 from iter 675 — 1 new Tier 3 review-pass). Healer heartbeat: **04:49:56Z** (~30 min old; ✅ within 90-min threshold; next fire ~05:19:56Z). Sync: ⚠️ status=error (05:13:07Z) — SYNC-PUSH-REBASE-FALLBACK-001 35th total; self-recovering. **7/7 services active.** Forge inbox: **4 tasks** — 2 build + 2 preflight (NEW: `orchestrator-bootstrap-runbook.json`; DONE: `stale-worktree-teardown-001` — PR #266 merged). Mirror/Beacon inboxes: EMPTY. 0 open PRs. Worktrees: **21** (+1; GC timer now active from PR #266, daily cadence pending daemon-reload for hourly).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1205 lines** (+1 from iter 675). New alert idx 1205: `outbox-notifier / intent=review-pass` for PR #266 (stale-worktree-teardown-001) at 05:14:06Z → **Tier 3 known-pattern** (review-pass in config/alert-translations.json via PR #264; silenced). Watermark advances to 1205. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 1 new alert — Tier 3 known-pattern silenced.** idx 1205: outbox-notifier `review-pass` for PR #266 → silenced per allowlist. Watermark 1205. Nominal. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No Larry directives. No distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (160, unchanged).** alert-cooldown/warning/: **160 total** (unchanged). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ✅ PR #266 MERGED; new Forge task `orchestrator-bootstrap-runbook` in preflight.**
+  - **0 open PRs** in both repos (agent-core + ourliberty-dashboard). ✅
+  - **Forge inbox: 4 tasks:**
+    - `build-fix-tier2-probe-setup-token-auth.json` — build phase (unchanged). ✅
+    - `build-step-digest-card.json` — build phase (unchanged). ✅
+    - `fix-rotation-drain-deadlock-open-sequence.json` — preflight (unchanged). ✅
+    - **`orchestrator-bootstrap-runbook.json` — NEW (arrived post-iter 675, source: beacon, phase=preflight).** Task: create `runbooks/orchestrator-bootstrap-runbook.md` — operator doc on authoring + running multi-step sequences through the build-sequence orchestrator. This is the remaining undone step (step-root) of the archived `orchestrator-bootstrap-001` sequence; all other steps (advancer, etc.) were previously shipped. Target: ourliberty-agent-core. ⚠️ (new preflight; watch for PROCEED/REJECT)
+  - **`build-stale-worktree-teardown-001.json` — GONE.** PR #266 merged at 05:14:06Z (auto-merged by outbox-notifier). Watch item CLOSED. ✅
+  - Mirror/Beacon inboxes: EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:49:56Z** (~30 min old; ✅ within 90-min threshold). Service last exit: inactive (dead) exit 0 — one-shot behavior, normal. Timer NEXT: 05:19:56Z (~0 min from check time). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start HEAD: 487cf32 "fix(worktrees): event-driven teardown at auto-merge + hourly GC backstop (#266)". Branch=main, clean. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 35th total occurrence.** sync.json: status=error, message="Auto-commit push failed; rolled back", commit=eb72c55b, last_sync=05:13:07Z. Session-start HEAD (487cf32) is newer than sync.json commit (eb72c55b) → wrapper already pushed successfully after sync failed; self-clears on next sync tick. Pattern fires on PR merge days (PR #266 merged at ~05:14Z). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ 0 open PRs; Forge building 2 tasks + 2 in preflight.** Pipeline active. ✅
+
+- **(Check F) Cost/quota: ⚠️ Burn rate at 82%/10M (last alert 04:46:30Z, ~34 min before this iter).** No new burn-rate alert. 4 simultaneous Forge tasks add load. Tier 3 — no dispatch. ⚠️ (monitored)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe still failing (known; root fix `build-fix-tier2-probe-setup-token-auth.json` in Forge build phase). ⚠️ (known, fix in pipeline)
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 21** (+1 from iter 675's 20). PR #266 merged but the running `outbox_notifier` service hasn't restarted with the new teardown code yet (stale-daemon healer fires next at ~05:19:56Z — will detect stale Python and restart outbox_notifier). The `ourliberty-cleanup-stale-worktrees.timer` is active but running at daily cadence (NEXT: ~21h); PR #266 changed it to hourly in the unit file but `daemon-reload` hasn't been run yet — heal-systemd-install-drift healer should detect and remediate. ⚠️ (in-flight; GC mechanisms operational once healer sweeps)
+
+- **G-rule watch:**
+  - ~~**`stale-worktrees accumulating` — G-rule 3/3 → PR #266 MERGED (05:14:06Z, iter 676).**~~ **CLOSED.** Event-driven teardown + hourly GC backstop live in codebase. Watch item CLOSED.
+  - **`fix-rotation-drain-deadlock-open-sequence.json` — still in preflight.** Root fix for 20.5h fleet freeze. Watch for PROCEED marker + PR. ⚠️ (active)
+  - **2 Forge build tasks in build phase** (step-digest-card, fix-tier2-probe). Watch for PRs. ⚠️ (active)
+  - **`orchestrator-bootstrap-runbook.json` — NEW in preflight.** Doc task; watch for PROCEED + Forge build. ⚠️ (new)
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - **`deploy-notifier cooldown GC gap`** — 160 files (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — 9th total lifetime.** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. No new occurrences.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync self-recovering; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 676` → ts: 2026-06-03T05:20:03Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T05:20:04Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (35th occurrence). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. Burn-rate 82% — monitoring (Tier 3).
+
+**Patterns:**
+- **PR #266 shipped the worktree GC fix.** Both mechanisms are live in code: event-driven teardown fires at auto-merge chokepoints in `outbox_notifier.py`; hourly GC backstop timer (`ourliberty-cleanup-stale-worktrees.timer`) is installed. Stale-daemon healer will restart outbox_notifier to pick up new code; install-drift healer should detect the daily→hourly timer unit change and issue daemon-reload. Worktree count should trend down over the next 1-2 healer sweeps.
+- **Pipeline now running 4 simultaneous tasks** (2 build + 2 preflight): step-digest-card, fix-tier2-probe, drain-deadlock, orchestrator-runbook. Broad concurrent build load — burn-rate context.
+
+**Learned:** `ourliberty-cleanup-stale-worktrees.timer` was already installed (daily cadence) before PR #266. The PR changed it to hourly in the unit file, but the running timer still has the old cadence until daemon-reload. This is the install-drift pattern — expected to self-remediate via the heal-systemd-install-drift healer. No manual action needed.
+
+---
+
 ## Iteration 675 — 2026-06-03 05:07 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1204** (unchanged from iter 674 — no new alerts). Healer heartbeat: **04:49:56Z** (~17 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, 04:38:12Z (~29 min ago). **7/7 services active.** Forge inbox: **4 tasks** — 3 in build phase (unchanged) + **1 NEW: `fix-rotation-drain-deadlock-open-sequence.json` in preflight**. Mirror/Beacon inboxes: EMPTY. 0 open PRs in both repos. Worktrees: 20 (unchanged).
