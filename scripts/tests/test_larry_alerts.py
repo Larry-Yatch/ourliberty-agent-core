@@ -376,5 +376,86 @@ class FormatDmNotificationTest(unittest.TestCase):
         self.assertIn('Run:', text)
 
 
+class CliSubcommandTest(_IsolatedQueueTest):
+    """The shell-callable CLI exposes append_notification and
+    append_approval_request (so the Medic operator can escalate via a stable
+    allowlist-matchable form), while append_alert remains the ONLY subcommand
+    that writes an alert-kind record."""
+
+    def _last_record(self) -> dict:
+        lines = larry_alerts.ALERTS_FILE.read_text().strip().splitlines()
+        return json.loads(lines[-1])
+
+    def test_append_notification_subcommand_writes_record(self):
+        rc = larry_alerts.main([
+            'append_notification', '--source', 'medic',
+            '--intent', 'medic-diagnosis', '--message', 'hello',
+            '--chat-id', '4242'])
+        self.assertEqual(rc, 0)
+        rec = self._last_record()
+        self.assertEqual(rec['kind'], 'notification')
+        self.assertEqual(rec['source'], 'medic')
+        self.assertEqual(rec['intent'], 'medic-diagnosis')
+        self.assertEqual(rec['message'], 'hello')
+        self.assertEqual(rec['chat_id'], 4242)
+        self.assertNotIn('task_id', rec)
+
+    def test_append_notification_subcommand_with_task_id(self):
+        rc = larry_alerts.main([
+            'append_notification', '--source', 'medic',
+            '--intent', 'medic-action-taken', '--message', 'acted',
+            '--chat-id', '7', '--task-id', 't-99'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._last_record()['task_id'], 't-99')
+
+    def test_append_approval_request_subcommand_writes_record(self):
+        rc = larry_alerts.main([
+            'append_approval_request', '--source', 'medic',
+            '--approval-id', 'medic-fp-1', '--body', 'do X',
+            '--chat-id', '7'])
+        self.assertEqual(rc, 0)
+        rec = self._last_record()
+        self.assertEqual(rec['kind'], 'approval_request')
+        self.assertEqual(rec['approval_id'], 'medic-fp-1')
+        self.assertEqual(rec['body'], 'do X')
+        self.assertEqual(rec['source'], 'medic')
+        self.assertEqual(rec['chat_id'], 7)
+
+    def test_approval_request_source_defaults_when_omitted(self):
+        rc = larry_alerts.main([
+            'append_approval_request', '--approval-id', 'a-1',
+            '--body', 'b', '--chat-id', '1'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._last_record()['source'], 'outbox-notifier')
+
+    def test_append_alert_remains_only_alert_path(self):
+        # append_alert writes an alert-kind record (no `kind` field -> treated
+        # as an alert by the dispatcher's owned-class matcher).
+        rc = larry_alerts.main([
+            'append_alert', '--source', 'watchdog', '--severity', 'critical',
+            '--message', 'boom', '--subject', 'x'])
+        self.assertEqual(rc, 0)
+        self.assertNotIn('kind', self._last_record())
+        # Neither new subcommand ever writes an alert-kind record.
+        larry_alerts.main([
+            'append_notification', '--source', 'medic', '--intent', 'i',
+            '--message', 'm', '--chat-id', '1'])
+        self.assertEqual(self._last_record()['kind'], 'notification')
+        larry_alerts.main([
+            'append_approval_request', '--approval-id', 'a', '--body', 'b',
+            '--chat-id', '1'])
+        self.assertEqual(self._last_record()['kind'], 'approval_request')
+
+    def test_chat_id_must_be_int(self):
+        with self.assertRaises(SystemExit):
+            larry_alerts.main([
+                'append_notification', '--source', 'medic', '--intent', 'i',
+                '--message', 'm', '--chat-id', 'not-an-int'])
+
+    def test_unknown_subcommand_rejected(self):
+        with self.assertRaises(SystemExit):
+            larry_alerts.main(['frobnicate'])
+
+
 if __name__ == '__main__':
     unittest.main()

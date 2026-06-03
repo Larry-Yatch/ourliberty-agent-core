@@ -507,6 +507,27 @@ def _cli_append_alert(args) -> int:
     return 0 if ok else 1
 
 
+def _cli_append_notification(args) -> int:
+    ok = append_notification(
+        source=args.source,
+        intent=args.intent,
+        message=args.message,
+        chat_id=args.chat_id,
+        task_id=args.task_id,
+    )
+    return 0 if ok else 1
+
+
+def _cli_append_approval_request(args) -> int:
+    ok = append_approval_request(
+        chat_id=args.chat_id,
+        approval_id=args.approval_id,
+        body=args.body,
+        source=args.source,
+    )
+    return 0 if ok else 1
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     import argparse
     parser = argparse.ArgumentParser(
@@ -523,9 +544,38 @@ def main(argv: Optional[list[str]] = None) -> int:
     aa.add_argument('--message', required=True)
     aa.add_argument('--subject', default=None)
     aa.add_argument('--suggested-action', dest='suggested_action', default=None)
+
+    # Notification + approval-request subcommands let the Medic operator
+    # escalate via a stable CLI shape its bash allowlist can match, instead of
+    # the fragile inline `python3 -c "..."` form. append_alert is deliberately
+    # NOT reachable for Medic (it would loop back into Medic's own batch); its
+    # allowlist permits only these two subcommands.
+    an = sub.add_parser(
+        'append_notification',
+        help='Append one notification (no cooldown; targeted to chat_id).',
+    )
+    an.add_argument('--source', required=True)
+    an.add_argument('--intent', required=True)
+    an.add_argument('--message', required=True)
+    an.add_argument('--chat-id', dest='chat_id', type=int, required=True)
+    an.add_argument('--task-id', dest='task_id', default=None)
+
+    ar = sub.add_parser(
+        'append_approval_request',
+        help='Append one approval-request (no cooldown; targeted to chat_id).',
+    )
+    ar.add_argument('--chat-id', dest='chat_id', type=int, required=True)
+    ar.add_argument('--approval-id', dest='approval_id', required=True)
+    ar.add_argument('--body', required=True)
+    ar.add_argument('--source', default='outbox-notifier')
+
     args = parser.parse_args(argv)
     if args.cmd == 'append_alert':
         return _cli_append_alert(args)
+    if args.cmd == 'append_notification':
+        return _cli_append_notification(args)
+    if args.cmd == 'append_approval_request':
+        return _cli_append_approval_request(args)
     return 2
 
 
