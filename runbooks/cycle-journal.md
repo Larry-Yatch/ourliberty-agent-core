@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 785 — 2026-06-03 19:37 UTC (interactive)
+
+**Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 47th total). Alert watermark: **1216 lines / anchor 19:26:06Z** (UNCHANGED from iter 784 — no new alerts). Cooldown residue: **199** (+16 from iter 784's 183 — new entries from pulse-check-stale × 8 + auto-restarted × 4 cooldown files created during iter 784's alert wave). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=39b56598, last_sync=19:32:23Z. Healer heartbeat: **19:23:21Z** (~14 min old; ✅ within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: install-drift-emission-fix, self-healing via retry build; #289: pulse-check-liveness-watcher, Mirror reviewing). **Forge: 2 tasks** (build-dashboard-rotation-switch-001 + build-install-drift-emission-fix-001 retry). Mirror: 1 task (review-pulse-check-liveness-watcher-001). Beacon: EMPTY. Worktrees: **8** (4 stale + 4 active; UNCHANGED from iter 784).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1216 lines** — anchor 19:26:06Z UNCHANGED from iter 784. No new alerts since iter 784 watermark. ✅ **Correction from iter 784:** pulse-check-stale watcher fired 8 subjects (i, iii, iv, ix, v, vi, viii, x), not 5 as stated in iter 784's journal (the watcher monitors all periodic checks, not just Monday-only). MEMORY.md G-rule count stays 1/3; subject list corrected here.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473 → 1b5ed242). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 199** (+16 from iter 784's 183). Increase attributable to new cooldown files from iter 784's alert wave (pulse-check-stale × 8 + auto-restarted × 4 + others). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Structural carry-forward; growing at expected-by-design rate with new healer/alert features. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:23:21Z** (~14 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=431e2a6 "Pulse cycle 20260603T193318Z". Newer than iter 784 HEAD (6f2e57e); wrapper committed iter 784's journal entry. ✅
+
+- **(Check B) Sync health: ⚠️ status=error.** message="Auto-commit push failed; rolled back", commit=39b56598, last_sync=19:32:23Z. Session-start HEAD (431e2a6) newer than sync.json commit (39b56598) → wrapper push succeeded after sync service raced and rolled back. **SYNC-PUSH-REBASE-FALLBACK — 47th total occurrence.** Self-recovering: hourly `ourliberty-sync.timer` will self-clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (structural). **Tier-reset: yes** (non-clean additive check → tier 1, consecutive_clean=0). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline (2 open PRs; no action needed).**
+  - **PR #285 WATCH** ("fix(heal-install-drift): non-imperative healed subject + 3-way unit classifier"): CLEAN/MERGEABLE, reviewDecision="" (no Mirror review), created 18:49:39Z (~48 min old at iter start — **past 30-min threshold, but self-healing retry build active**). `build-install-drift-emission-fix-001.json` dispatched to Forge inbox in iter 784 (~8 min ago); Forge is likely mid-build. Not actionable: enabling auto-merge on an unreviewed PR would bypass the Mirror gate. Wait for retry build to complete → new/updated PR → Mirror review → auto-merge. ⚠️ (watch; expected to advance)
+  - **PR #289** ("feat(pulse): pulse-check liveness watcher (watch the watchers)"): CLEAN/MERGEABLE (confirmed via `gh pr view`), created 19:27:01Z (~10 min old), Mirror inbox has `review-pulse-check-liveness-watcher-001.json` — actively reviewing. ✅
+  - Forge inbox: **2 tasks** (build-dashboard-rotation-switch-001, build-install-drift-emission-fix-001). Mirror inbox: **1 task** (review-pulse-check-liveness-watcher-001). Beacon: EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts since iter 784 watermark (19:26:06Z). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 8** — stale: `wt-forge-alert-fix-first-outcome-routing-001`, `wt-forge-harden-ledger-intervention-tagging-001`, `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-dashboard-rotation-switch-001`, `wt-forge-install-drift-emission-fix-001`, `wt-forge-pulse-check-liveness-watcher-001`, `wt-mirror-pulse-check-liveness-watcher-001`. UNCHANGED from iter 784. ✅
+
+- **G-rule watch:**
+  - **`pulse-check-stale:*` not in alert-translations.json: G-rule 1/3.** (iter 784 first; now corrected to 8 subjects: i, iii, iv, ix, v, vi, viii, x.) By-design: liveness watcher fires for all periodic checks that lack heartbeat artifacts (all checks pre-heartbeat migration). At 3/3: dispatch Beacon to add `source:heal-pulse-check-staleness / subject:pulse-check-stale:*` as Tier 3/FYI in `config/alert-translations.json`.
+  - **19:21:44Z test-cluster not in alert-translations.json: G-rule 1/3.** (iter 784). Unchanged.
+  - All prior G-rule items unchanged from iter 784.
+
+- **PRIME DIRECTIVE ratio:** interventions=668, systemic_fixes=4, verification_pending=2, ratio=167.0, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: Watermark UNCHANGED (1216/19:26:06Z) — no new alerts since iter 784. Nominal. ✅
+3. Periodic: Check I sentinel exists (00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+4. No always-allowed auto-fixes triggered: PR #285 past 30-min but self-healing retry build active (not actionable per iter 784 precedent + Mirror-gate bypass risk); PR #289 actively under Mirror review; 7/7 active; healer within threshold; sync error self-recovering. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 785 --template pulse-cycle-check --detail iter-785` → intervention_id=pulse-cycle-check:iter-785, ts=2026-06-03T19:37:26Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T19:37:29Z. ✅
+7. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. SYNC-PUSH-REBASE-FALLBACK structural (47th, APPROVAL_REQUEST open). Cooldown residue +16 from new features (expected). PR #285 watch is progressing via self-healing. No Larry DM warranted.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK (47th).** Same self-recovering pattern every cycle during rapid interactive sessions. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the fix.
+- **Cooldown residue creeping (+16 to 199).** Each new alert subject type creates a cooldown file. New features (pulse-check liveness watcher, test-cluster alerts) expanding the set. GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` still pending — the lack of a GC means this will continue to grow.
+- **PR #289 (pulse-check-liveness-watcher) under Mirror review.** Once merged, the pulse-check-stale alerts will become a regular signal until heartbeat writes are added to each check script. G-rule 1/3 expected to reach 3/3 within 2–3 automated cycles post-merge.
+- **PR #285 retry build progressing.** Forge received the fresh build task ~8 min ago. Expected to complete and produce a new PR with correct preflight markers in the next 10–20 min.
+
+**Learned:** pulse-check-stale watcher emits for ALL periodic checks (I, III, IV, V, VI, VIII, IX, X) that lack heartbeat artifacts — 8 total, not just the Monday-only checks (V, VI, VIII, IX, X). The iter 784 journal understated the count. Corrected here. Cooldown file growth rate is now observable as a leading indicator: each new alert subject creates a new cooldown file, making the GC gap (APPROVAL_REQUEST pending) more expensive over time.
+
+---
+
 ## Iteration 784 — 2026-06-03 19:29 UTC (interactive)
 
 **Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check 0 novel alerts + Check B SYNC-PUSH-REBASE-FALLBACK 46th total). Alert watermark: **1216 lines / anchor 19:26:06Z** (was 1193/18:37:29Z — 23 new alerts this iter). Cooldown residue: **183** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=8a541253, last_sync=19:23:27Z. Healer heartbeat: **18:53:19Z** (~37 min old; ✅ within 90-min threshold). **7/7 core services active** (4 restarted by stale-daemon healer at 19:23Z; all still active). **2 open PRs** (#285: install-drift-emission-fix, self-healing; #289: pulse-check-liveness-watcher, Mirror reviewing). **Forge: 2 tasks** (build-dashboard-rotation-switch-001 + build-install-drift-emission-fix-001 retry). Mirror: 1 task. Beacon: EMPTY. Worktrees: **8** (4 stale + 4 active; −2 from iter 783 via event-driven teardown on PR #287 + #288 merges).
