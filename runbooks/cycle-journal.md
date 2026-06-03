@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 754 — 2026-06-03 15:24 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1226** (unchanged). Sync: ✅ no-change at 14:39:20Z, commit=06d420f; within 2h threshold. Healer heartbeat: **14:52:15Z** (~32 min old; ✅ within 90-min threshold). **7/7 core services active.** **Forge ACTIVE BUILD**: `add-larry-alerts-retention-healer` (started 15:20:25 UTC, claude-opus-4-8, timeout=4h). **Forge QUEUED**: `alert-fix-first-outcome-routing-001.json`. Beacon/Mirror inboxes: **EMPTY**. **0 open PRs** (both repos). Worktrees: **20** (+1 from prior iter's 19 — new active build worktree).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1226 lines** — unchanged from iter 753 watermark. No new alerts. Last 3: install-drift (06:00:23Z, Tier-3 known-pattern), stuck-timer:ourliberty-cycle.timer (06:00:24Z, Tier-3 known-pattern), sync-blocked:auto-commit-push-failed (09:38:41Z — SYNC-PUSH-REBASE-FALLBACK-001 #38, previously claimed). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 178 total** (172 warning + 6 critical — structural legacy; pipeline active this iter). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active — pipeline no longer quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge ACTIVE BUILD**: `add-larry-alerts-retention-healer` — inbox-watcher started this build at 15:20:25 UTC (during this cycle window). Worktree: `/home/larry/agent-worktrees/wt-forge-add-larry-alerts-retention-healer`. Model: claude-opus-4-8, timeout=14400s. Task: durable cursor-safe retention for `~/agents/blackboard/larry-alerts.jsonl` (1226 lines, unbounded growth; consumers: beacon-alerts-offset.txt + medic-alerts-offset.txt + chain-event-cursors.json). Source: beacon. ⚠️
+  - **Forge QUEUED**: `alert-fix-first-outcome-routing-001.json` — fix-first/notify-on-outcome routing per Larry's 2026-06-03 policy ("fix first, then inform me it's fixed or tell me you couldn't"). Source: beacon. Will be picked up after current build completes. ⚠️
+  - Beacon inbox: **EMPTY**. Mirror inbox: **EMPTY**. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **14:52:15Z** (~32 min old at 15:24Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=70d2852 ("Pulse cycle 20260603T151327Z" — iter 753 wrapper commit). ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: `status=no-change`, last_sync=2026-06-03T14:39:20Z, commit=06d420f. ~45 min old; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** 0 open PRs (both repos verified). Forge has 1 active build + 1 queued task (see Check 4). Beacon/Mirror inboxes empty. ⚠️
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1226). Active Forge build on claude-opus-4-8 expected to consume. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, no action). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ Worktrees: 20** (was 19 — +1 for `wt-forge-add-larry-alerts-retention-healer` ACTIVE BUILD). 9 old wt-forge-* + 9 old wt-mirror-* (Jun 2 completed tasks) + `wt-fix` orphan (G-rule 1/3) + 1 active build. GC fires ~02:43 UTC Jun 4 — will clean the 18 stale completed worktrees; `wt-fix` persists (non-git-registered; GC blind to it). ⚠️
+
+- **G-rule watch (unchanged from iter 753):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=635, systemic_fixes=4, verification_pending=2, ratio=158.75, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; no new alerts; sync nominal. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 754` → ts: 2026-06-03T15:24:02.757258+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T15:24:03.324987+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. Forge build and queued task are legitimate pipeline activity — inbox-watcher operating normally. No Larry action needed.
+
+**Patterns:**
+- **Pipeline resumed after 75 quiescent iters.** Two Forge tasks arrived in sequence: `add-larry-alerts-retention-healer` (building now) and `alert-fix-first-outcome-routing-001` (queued). Both are substantive feature work (retention healer + fix-first routing policy). System behavior is correct — pipeline unblocked.
+- **Alert watermark stable at 1226.** No new healer activity.
+- **Worktrees: 20 (+1).** GC fires ~02:43 UTC Jun 4. The active build worktree will remain; 18 stale ones will be cleaned.
+
+**Learned:** The 74-iter quiescent streak ended with two Forge tasks arriving. `add-larry-alerts-retention-healer` (cursor-safe jsonl rotation) directly addresses the 1226-line unbounded growth of `larry-alerts.jsonl` observed at alert watermark. `alert-fix-first-outcome-routing-001` implements Larry's 2026-06-03 explicit policy on outcome-based alerting. Both are organic responses to observed production state.
+
+---
+
 ## Iteration 753 — 2026-06-03 15:11 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue 178; worktrees 19 — GC fires ~02:43 UTC Jun 4). Alert watermark: **1226** (unchanged — 0 new alerts). Sync: ✅ current (`status=no-change` at 14:39:20Z, commit=06d420f; ~32 min old, within 2h threshold). Healer heartbeat: **14:52:15Z** (~19 min old; ✅ within 90-min threshold). **7/7 core services active.** Forge/Mirror/Beacon inboxes: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**74th consecutive iter**). Worktrees: **19** (GC fires ~02:43 UTC Jun 4).
