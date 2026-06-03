@@ -1,0 +1,10 @@
+{
+  "_meta": {
+    "owner": "larry-alerts-retention (cursor-safe healer for ~/agents/blackboard/larry-alerts.jsonl)",
+    "tweak_via": "edit this file + commit; the retention job reads it on the next tick (no service reload needed)",
+    "rationale": "Retention for the append-only larry-alerts.jsonl queue, which grows unbounded (1226 lines / ~770KB on 2026-06-03, no prior retention). The job keeps entries newer than retention_days OR the last min_retained_lines, WHICHEVER RETAINS MORE, then cursor-safely archives + drops the rest. retention_cut never exceeds the beacon/medic line-consumer offsets, so no pending alert is ever archived. Defaults are conservative; intended to become Pulse-Check self-optimizing per the Check III/VIII pattern (analyzer proposes a window, Larry approves, Forge writes this file) rather than hand-pinned long-term.",
+    "last_retention_update": null
+  },
+  "retention_days": 14,
+  "min_retained_lines": 500
+}

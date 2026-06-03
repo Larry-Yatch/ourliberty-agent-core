@@ -1,0 +1,19 @@
+[Unit]
+Description=Cursor-safe retention on the larry-alerts.jsonl queue
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/larry_alerts_retention.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="OURLIBERTY_LARRY_ALERTS_RETENTION_ENABLED=1"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/larry_alerts_retention.py
+TimeoutStartSec=600
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-larry-alerts-retention
