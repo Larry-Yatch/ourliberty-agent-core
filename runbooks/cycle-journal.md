@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 673 — 2026-06-03 04:56 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1204** (unchanged from iter 672). Healer heartbeat: **04:49:56Z** (~6 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: 3 tasks (`step-digest-card.json` building + `stale-worktree-teardown-001.json` queued + **`fix-tier2-probe-setup-token-auth.json` NEW — preflight**). Mirror/Beacon inboxes: EMPTY. 0 open PRs in both repos.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1204 lines** (unchanged from iter 672). No new alerts since idx 1204 (`deploy-notifier:READY` for `forge/step-digest-card` at 04:48:15Z — Tier 3, by-design Vercel preview; active build). Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ No new alerts since iter 672.** 1204 lines (unchanged). Nominal. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 min ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id active). No Larry directives. No distress. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (160, unchanged).** alert-cooldown/warning/: **160 total** (unchanged from iter 672). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline flowing — new Forge task + active build.**
+  - **0 open PRs** in both repos (agent-core + ourliberty-dashboard). ✅
+  - **Forge inbox: 3 tasks.**
+    - `step-digest-card.json` — active build. Vercel preview appeared 04:48:15Z (branch pushed to GitHub). PR not yet submitted (no PR visible in dashboard query). Build still in progress. ✅
+    - `stale-worktree-teardown-001.json` — queued (Beacon spec from G-rule dispatch). Not yet started by Forge. ✅
+    - **`fix-tier2-probe-setup-token-auth.json` — NEW (not in iter 672).** Source: beacon, phase=preflight, reply_chat_id=7998341473 (Telegram session). Goal: fix the recurring false "Tier 2 OAuth expired" signal. Root cause: `heal_tier2_weekly_health_probe.py` authenticates via HOME-swap→credentials.json which expired 2026-05-31. Fix: apply the setup-token (`CLAUDE_CODE_OAUTH_TOKEN_TIER2`) same as `agent_runner._apply_tier_auth`, with fallback to HOME-swap only when no setup-token is configured. Also audits other auth scripts for the same issue. Cost target $4-7. Forge in preflight phase. ⚠️ (watch for PROCEED/REJECT marker)
+  - **Mirror inbox: EMPTY.** ✅ **Beacon inbox: EMPTY.** ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:49:56Z** (~6 min old at 04:56Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=bbc682b ("Pulse cycle 20260603T045428Z" — iter 672 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-03T04:38:12Z (~18 min ago; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 cleared at iter 671 and remains clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ 0 open PRs; Forge building step-digest-card + preflight on fix-tier2-probe; stale-worktree-teardown queued.** Pipeline flowing. ✅
+
+- **(Check F) Cost/quota: ⚠️ Burn rate at 82%/10M (last reading 04:46:30Z), 125 rate-limit events in 2h.** Tier 3 alert — no dispatch. High interactive session cadence. Step-digest-card build adding load. Monitor. ⚠️ (monitored)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe still failing (idx 1201 at 04:37:49Z, known; APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open). `fix-tier2-probe-setup-token-auth.json` in Forge preflight addresses the root probe issue specifically. ⚠️ (known, fix in pipeline)
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees:** 18 (unchanged). Includes `wt-forge-step-digest-card` (active build) + 17 stale from merged PRs. `stale-worktree-teardown-001.json` queued in Forge inbox — systemic fix in pipeline. ⚠️ (in pipeline)
+
+- **G-rule watch:**
+  - **Stale-worktrees pipeline advancing.** `stale-worktree-teardown-001.json` in Forge inbox (preflight or queued). Watch for PR. ⚠️
+  - **`fix-tier2-probe-setup-token-auth` (NEW watch item).** Forge in preflight. Addresses recurring tier2_weekly_probe_failed alerts. Watch for PROCEED marker + PR. ⚠️
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - **`deploy-notifier cooldown GC gap`** — 160 files (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — 9th total lifetime.** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. No new occurrences.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync nominal; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 673` → ts: 2026-06-03T04:56:43Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:56:47Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open. `forge-claude-md-preflight-self-check-bullet-001` pending Larry. Burn-rate at 82% — monitoring (Tier 3).
+
+**Patterns:**
+- **Fix-tier2-probe now in pipeline.** The recurring `tier2_weekly_probe_failed` alert (weekly cadence, consistently 401 since probe uses HOME-swap→expired credentials.json) has a root fix in Forge's preflight. Once the PR ships, the weekly probe will authenticate via setup-token (same path as real dispatches) and the false "Tier 2 down" signal ends. This addresses an APPROVAL_REQUEST (`medic-tier2auth401-beaconbot-20260529T045737Z`) that has been open since iter 346.
+- **Burn-rate pressure real but classified correctly.** 82% of 5h gate with 125 rate-limit events reflects the high interactive session cadence since OAuth restore (iter 656). Tier 3 classification is correct — no dispatch — but the step-digest-card build will add to the total this cycle. Once the build completes and the session quiets, the rolling window will clear.
+
+**Learned:** Nothing new this iter. `fix-tier2-probe-setup-token-auth.json` arrived in Forge inbox between iters 672 and 673, sourced from an active Beacon Telegram session. Pipeline handoff working correctly: Beacon produced the brief → Forge inbox without Pulse involvement. Standard chain.
+
+---
+
 ## Iteration 672 — 2026-06-03 04:50 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **PR #30 (ourliberty-dashboard, step-ops-alerts-ui N4) MERGED 03:54:14Z** — stall watch item CLOSED (was misclassified as stall; PR submitted and merged before iter 671). Alert watermark: **1203** (+2 from 1201 — both Tier 3). Healer heartbeat: **04:19:52Z** (30 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, last_sync=04:38:12Z. **7/7 services active.** Forge inbox: 2 tasks (`step-digest-card.json` actively building + `stale-worktree-teardown-001.json` queued from Beacon spec). Mirror inbox: EMPTY. Beacon inbox: EMPTY (stale-worktrees dispatch consumed; spec delivered to Forge).

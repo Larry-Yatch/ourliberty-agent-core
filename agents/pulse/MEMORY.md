@@ -6,15 +6,14 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 04:52Z UTC (Iter 672 — interactive)
+## Status snapshot — updated 2026-06-03 04:56Z UTC (Iter 673 — interactive)
 
-**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1203** (+2 from 1201, both Tier 3). Healer heartbeat: **04:19:52Z** (within 90-min threshold). Cooldown/warning: **160** files (+1). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: 2 tasks (`step-digest-card.json` building + `stale-worktree-teardown-001.json` queued). Mirror inbox: EMPTY. Beacon inbox: EMPTY (stale-worktrees dispatch consumed; spec produced). ~~step-ops-alerts-ui stall~~ **CLOSED — PR #30 MERGED 03:54:14Z** (diagnostic gap: default gh pr list misses ourliberty-dashboard PRs). **Burn-rate: 82%/10M gate, 125 rate-limit events in 2h (Tier 3 FYI, monitoring).** Check III 2026-06-14. Medic formal approval_request pending: medic-tier2auth401-beaconbot-20260529T045737Z. Tier 2 weekly probe FAILED (idx 1201) — personal Claude OAuth still broken.
+**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1204** (no change from 1203; no new alerts since 04:48:15Z). Healer heartbeat: **04:49:56Z** (within 90-min threshold). Cooldown/warning: **160** files (unchanged). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: 3 tasks (`step-digest-card.json` building + `stale-worktree-teardown-001.json` queued + **`fix-tier2-probe-setup-token-auth.json` NEW preflight**). Mirror/Beacon inboxes: EMPTY. **Burn-rate: 82%/10M gate, 125 rate-limit events in 2h (Tier 3 FYI, monitoring).** Check III 2026-06-14. **Tier 2 weekly probe root fix IN PIPELINE** (`fix-tier2-probe-setup-token-auth.json` in Forge preflight — addresses recurring false "Tier 2 OAuth expired" by making probe use setup-token same as agent_runner). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open but fix in pipeline.
 
-**Watch items (iter 672 update):**
-- ~~**PR #31 (ourliberty-dashboard) OPEN.**~~ **MERGED 04:40:31Z** — step-approvals-rescope N5. CLOSED. ✅
-- ~~**step-ops-alerts-ui STALL.**~~ **PR #30 MERGED 03:54:14Z** — "feat: re-home alerts in Ops/System with dedup rollup (N4)". CLOSED. Stall was a diagnostic artifact — default `gh pr list` misses ourliberty-dashboard. Always query `--repo Larry-Yatch/ourliberty-dashboard` in Check 4 sweep. ✅
-- **Stale worktrees — pipeline advancing.** Dispatch consumed by Beacon. Beacon produced `stale-worktree-teardown-001.json` → Forge inbox. 18 worktrees. Watch for PR. ⚠️ (in pipeline)
-- **`step-digest-card.json` in Forge inbox (N6, digest card on Approvals page).** Forge building (`wt-forge-step-digest-card` active). Watch for PR + Mirror review.
+**Watch items (iter 673 update):**
+- **`fix-tier2-probe-setup-token-auth.json` — NEW (iter 673).** Forge preflight. Root fix for recurring `tier2_weekly_probe_failed` alerts: probe will use setup-token auth (not HOME-swap→expired credentials.json). Cost target $4-7. Watch for PROCEED marker + PR. ⚠️ (in pipeline)
+- **Stale worktrees — pipeline advancing.** 18 worktrees (unchanged). `stale-worktree-teardown-001.json` in Forge inbox (queued). Watch for PR. ⚠️ (in pipeline)
+- **`step-digest-card.json` in Forge inbox (N6, digest card on Approvals page).** Forge building. Vercel preview at 04:48:15Z (branch pushed). PR pending. Watch for PR + Mirror review.
 - **PR #259 MERGED (03:34:10Z, auto-cycle always-fix).** "feat(dashboard): agent-reviewed cleanup-review button (N1/L8)". Watch item CLOSED.
 - **step-ops-alerts-ui BUILD DONE (Vercel preview live).** Deployed 03:12:11Z. marker-error-step-ops-alerts-ui-1.json retry queued (retry 1/3). UNCHANGED.
 - **MalformedForgeMarker — 8th total lifetime (iter 668).** `marker-error-medic-reliability-gate-delivery-cli-001-1.json` in Mirror inbox (revision-1 review for PR #263 failed at preflight). Pattern now confirmed in Mirror as well as Forge. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` should be expanded to cover Mirror's preflight bullet. Pending Larry.
