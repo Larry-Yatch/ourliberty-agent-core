@@ -215,7 +215,7 @@ class _AdvancerHarness(unittest.TestCase):
         # Default reconciler to "no merged PRs in any repo" so tests that
         # don't care about reconciliation don't fire real `gh` subprocess
         # calls. TestActiveReconciliation overrides this per-test.
-        self.bsa._gh_list_merged_prs = lambda repo: []
+        self.bsa._gh_list_merged_prs = lambda repo, logger=None: []
 
 
 class TestActivationGate(_AdvancerHarness):
@@ -766,7 +766,7 @@ class TestActiveReconciliation(_AdvancerHarness):
     def _patch_gh_pr_list(self, prs_by_repo):
         """Stub _gh_list_merged_prs to return the given mapping (or None
         for repos where reconciliation should soft-fail)."""
-        def _fake_list(repo):
+        def _fake_list(repo, logger=None):
             return prs_by_repo.get(repo)
         self.bsa._gh_list_merged_prs = _fake_list
 
@@ -915,7 +915,7 @@ class TestActiveReconciliation(_AdvancerHarness):
         self._patch_gates(chain_merged=False, gh_merged=False)
         calls = {'n': 0}
 
-        def _counting_list(repo):
+        def _counting_list(repo, logger=None):
             calls['n'] += 1
             return [
                 {
@@ -1036,13 +1036,86 @@ class TestActiveReconciliation(_AdvancerHarness):
         self._patch_gates(chain_merged=False, gh_merged=False)
         calls = {'n': 0}
 
-        def _counting_list(repo):
+        def _counting_list(repo, logger=None):
             calls['n'] += 1
             return []  # no merges → no reconcile fires, but still 1 call
 
         self.bsa._gh_list_merged_prs = _counting_list
         self.bsa.tick()
         self.assertEqual(calls['n'], 1)
+
+    def test_reconcile_logs_gh_failure_detail(self):
+        # Regression for the silent-ish failure that stranded three
+        # incidents: a non-zero `gh` exit must surface its returncode +
+        # stderr in the WARNING, not just a bare "gh pr list failed".
+        class _Proc:
+            returncode = 1
+            stdout = ''
+            stderr = 'auth error: not logged in to github.com'
+
+        logger = _RecordingLogger()
+        with patch.object(self.bsa.subprocess, 'run', return_value=_Proc()):
+            result = self.bsa._gh_list_merged_prs(
+                'ourliberty-agent-core', logger,
+            )
+        self.assertIsNone(result)
+        joined = '\n'.join(logger.warnings)
+        self.assertIn('rc=1', joined)
+        self.assertIn('auth error', joined)
+
+    def test_reconcile_gh_subprocess_inherits_env_and_qualifies_repo(self):
+        # Two-in-one: (a) the gh subprocess must inherit the daemon's full
+        # environment (no stripped `env=` that would drop HOME/PATH/auth —
+        # matches the working notifier pattern), and (b) the bare repo name
+        # must be owner-qualified to OWNER/REPO, which is the actual fix
+        # for the rc=1 "expected [HOST/]OWNER/REPO format" failure.
+        captured = {}
+
+        class _Proc:
+            returncode = 0
+            stdout = '[]'
+            stderr = ''
+
+        def _fake_run(cmd, **kwargs):
+            captured['cmd'] = cmd
+            captured['kwargs'] = kwargs
+            return _Proc()
+
+        with patch.object(self.bsa.subprocess, 'run', _fake_run):
+            result = self.bsa._gh_list_merged_prs('ourliberty-agent-core')
+        self.assertEqual(result, [])
+        # env not passed → subprocess inherits the full environment.
+        self.assertNotIn('env', captured['kwargs'])
+        # repo qualified with the owner; the bare name is never passed alone.
+        repo_arg = captured['cmd'][captured['cmd'].index('--repo') + 1]
+        self.assertEqual(repo_arg, 'Larry-Yatch/ourliberty-agent-core')
+
+    def test_qualify_repo_leaves_owner_qualified_value_untouched(self):
+        # Idempotent: an already-qualified value passes through unchanged.
+        self.assertEqual(
+            self.bsa._qualify_repo('Larry-Yatch/ourliberty-dashboard'),
+            'Larry-Yatch/ourliberty-dashboard',
+        )
+        self.assertEqual(
+            self.bsa._qualify_repo('ourliberty-dashboard'),
+            'Larry-Yatch/ourliberty-dashboard',
+        )
+
+
+class _RecordingLogger:
+    """Minimal logger stand-in capturing warning() message strings."""
+
+    def __init__(self):
+        self.warnings: list[str] = []
+
+    def warning(self, msg, *args, **kwargs):
+        self.warnings.append(str(msg))
+
+    def info(self, *a, **kw):
+        pass
+
+    def error(self, *a, **kw):
+        pass
 
 
 if __name__ == '__main__':

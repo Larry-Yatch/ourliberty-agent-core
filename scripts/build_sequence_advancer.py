@@ -111,6 +111,14 @@ GH_PR_LIST_TIMEOUT_SEC = 10
 # silent-misses go undetected past the lookback window.
 RECONCILE_PR_LOOKBACK = 20
 
+# GitHub owner for the sandbox repos. Sequence steps store a bare repo
+# name (e.g. 'ourliberty-agent-core'), but `gh --repo` requires the
+# OWNER/REPO form — passing the bare name fails with rc=1 ("expected the
+# [HOST/]OWNER/REPO format") before any auth/network, which is why the
+# reconciliation pass never queried anything. Matches the GH_REPO
+# convention used across the rest of the scripts (catch_me_up, heal_*).
+GITHUB_OWNER = os.environ.get('OURLIBERTY_GH_OWNER', 'Larry-Yatch')
+
 # Repo scripts dir on sys.path so sibling imports (larry_alerts,
 # build_sequence_validator) resolve cleanly when invoked by systemd.
 _SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -871,9 +879,29 @@ def _process_active_sequence(
 # -------------------- active reconciliation (V6 silent-miss backstop) --------------------
 
 
-def _gh_list_merged_prs(repo: str) -> Optional[list[dict[str, Any]]]:
+def _qualify_repo(repo: str) -> str:
+    """Return `repo` in the OWNER/REPO form `gh --repo` requires.
+
+    Sequence steps store a bare repo name (`ourliberty-agent-core`); gh
+    rejects that with rc=1 before any network call. Prepend GITHUB_OWNER
+    unless the value is already qualified (an owner-or-host '/' is
+    present)."""
+    if '/' in repo:
+        return repo
+    return f'{GITHUB_OWNER}/{repo}'
+
+
+def _gh_list_merged_prs(
+    repo: str, logger: Optional[logging.Logger] = None,
+) -> Optional[list[dict[str, Any]]]:
     """Return the list of recently-merged PRs for `repo`, or None on
     failure (gh missing, auth missing, timeout, non-zero rc, bad JSON).
+
+    On any failure, log a WARNING that includes the concrete reason
+    (returncode + truncated stderr, or the exception) so a self-heal that
+    can't query is diagnosable from the log rather than silently-ish
+    skipping — three stranded incidents traced back to the bare
+    'gh pr list failed' line that swallowed the underlying cause.
 
     None vs []: None means "couldn't query" (caller should skip
     reconciliation for this repo this tick); [] means "queried OK, no
@@ -881,24 +909,44 @@ def _gh_list_merged_prs(repo: str) -> Optional[list[dict[str, Any]]]:
     we'd consider this a soft failure or a confident no-match."""
     if not repo:
         return None
+    qualified = _qualify_repo(repo)
+
+    def _warn(detail: str) -> None:
+        if logger is not None:
+            logger.warning(
+                f'reconcile: gh pr list failed for repo={qualified} '
+                f'({detail}); skipping reconciliation for steps in this '
+                f'repo this tick'
+            )
+
     try:
         proc = subprocess.run(
             [
-                'gh', 'pr', 'list', '--repo', repo,
+                'gh', 'pr', 'list', '--repo', qualified,
                 '--state', 'merged', '--limit', str(RECONCILE_PR_LOOKBACK),
                 '--json', 'number,url,title,headRefName,mergedAt',
             ],
             capture_output=True, text=True, timeout=GH_PR_LIST_TIMEOUT_SEC,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+    except subprocess.TimeoutExpired:
+        _warn(f'timed out after {GH_PR_LIST_TIMEOUT_SEC}s')
+        return None
+    except (FileNotFoundError, OSError) as e:
+        _warn(f'{type(e).__name__}: {e}')
         return None
     if proc.returncode != 0:
+        stderr = ' '.join((proc.stderr or '').split())
+        if len(stderr) > 500:
+            stderr = stderr[:500] + '…'
+        _warn(f'rc={proc.returncode} stderr={stderr!r}')
         return None
     try:
         data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        _warn(f'unparseable JSON: {e}')
         return None
     if not isinstance(data, list):
+        _warn(f'unexpected JSON shape: {type(data).__name__}, expected list')
         return None
     return data
 
@@ -992,14 +1040,10 @@ def _reconcile_dispatched_steps(
         target_repo = step.get('target_repo')
         if not isinstance(target_repo, str) or not target_repo:
             continue
-        # Per-repo lookup with per-pass cache.
+        # Per-repo lookup with per-pass cache. _gh_list_merged_prs logs the
+        # concrete failure reason (rc + stderr / exception) itself.
         if target_repo not in _repo_cache:
-            merged_prs = _gh_list_merged_prs(target_repo)
-            if merged_prs is None:
-                logger.warning(
-                    f'reconcile: gh pr list failed for repo={target_repo}; '
-                    f'skipping reconciliation for steps in this repo this tick'
-                )
+            merged_prs = _gh_list_merged_prs(target_repo, logger)
             _repo_cache[target_repo] = merged_prs
         merged_prs = _repo_cache[target_repo]
         if merged_prs is None:
