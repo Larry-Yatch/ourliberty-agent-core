@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 758 — 2026-06-03 15:56 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines / anchor 15:43:33Z** (unchanged — no new alerts since iter 757). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #40 at 15:53:36Z ("Wrong branch: chore/foo"); self-recovering (session-start gitStatus: main+clean). Healer heartbeat: **15:52:17Z** (~4 min old; ✅ within 90-min threshold). **7/7 core services active.** Forge inbox: 2 tasks (`build-alert-fix-first-outcome-routing-001` 28 min = active build, worktree present; `extend-install-drift-healer-content-drift` 9 min = queued). Beacon/Mirror inboxes: EMPTY. **0 open PRs** (both repos). Worktrees: **1** (`wt-forge-alert-fix-first-outcome-routing-001`).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1180 lines** — unchanged from iter 757 watermark. Last alert still 15:43:33Z (`heal-systemd-install-drift / install-drift:ourliberty-larry-alerts-retention.timer`). No new alerts since watermark anchor. SYNC-PUSH-REBASE-FALLBACK-001 #40 did NOT append a new alert (the "Wrong branch: chore/foo" variant — different from the "auto-commit-push-failed" variant that produces the `sync-blocked:*` subject). No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (176 warning + 6 critical; unchanged from iter 757). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active — 2 Forge tasks.**
+  - **`build-alert-fix-first-outcome-routing-001.json`** (mtime 15:27:43Z, age=28 min): Active build — worktree `wt-forge-alert-fix-first-outcome-routing-001` present. Session started at 15:32Z (per iter 756 observation); ~24 min into build at 15:56Z. Within 14400s timeout. Normal. ⚠️ in-progress.
+  - **`extend-install-drift-healer-content-drift.json`** (mtime 15:46:35Z, age=9 min): Queued; Forge will pick up after current build completes. ⚠️ queued.
+  - **0 open PRs** in both repos (agent-core and ourliberty-dashboard). ✅
+  - Beacon inbox: EMPTY. Mirror inbox: EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **15:52:17Z** (~4 min old at 15:56Z; ✅ well within 90-min threshold). ✅
+
+- **(Check A) Source repo: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #40.** `agent-core-sync.json`: `status=error / "Wrong branch: chore/foo" / commit=470c63c78affd8201b76466e563d3550d7598f9a` at 15:53:36Z. Session-start gitStatus: branch=main, clean, HEAD=0884cd7 ("Pulse cycle 20260603T155328Z" = iter 757 wrapper commit at 15:53:28Z). Wrapper push preceded the sync error by 8s. Self-recovering per established pattern (#40, every prior occurrence resolved). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (root code fix pending Larry). ⚠️
+
+- **(Check B) Sync health: ⚠️ status=error.** Same sync error (15:53:36Z). Last successful sync was iter 757 at 15:39:52Z before this occurrence. Will self-clear on next sync tick (sync service runs ~every 5 min). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** 0 open PRs (both repos). 2 Forge tasks in flight (1 active, 1 queued). ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts. Watermark unchanged at 1180 lines. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, no action). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **Worktrees: 1** — only `wt-forge-alert-fix-first-outcome-routing-001` (active build). ✅
+
+- **G-rule watch (unchanged from iter 757):**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). No new Vercel deploys this window. Unchanged.
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). `extend-install-drift-healer-content-drift.json` queued in Forge inbox. Fix in pipeline.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=640, systemic_fixes=4, verification_pending=2, ratio=160.0, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync self-recovering; no duplicate tasks; watermark unchanged. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 758` → ts: 2026-06-03T15:56:17Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T15:56:20Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. SYNC-PUSH-REBASE-FALLBACK-001 #40 self-recovering per established pattern; no new escalation beyond the standing APPROVAL_REQUEST. Pipeline activity is legitimate.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001 #40** (15:53:36Z) — "Wrong branch: chore/foo" variant. 40th occurrence; every prior self-recovered. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the standing fix request.
+- **No new alerts since iter 757 watermark** — nominal pipeline cadence. Retention healer keeping file bounded.
+- **Forge build active ~24 min** — `alert-fix-first-outcome-routing-001` within normal duration range. Watch for PR in next iter.
+
+---
+
 ## Iteration 757 — 2026-06-03 15:50 UTC (interactive)
 
 **Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines** (DOWN from 1228 — retention healer first run pruned ~51 old entries; watermark anchor now 15:43:33Z timestamp). Sync: ✅ SUCCESS at 15:39:52Z (SYNC-PUSH-REBASE-FALLBACK-001 #39 self-recovered). Healer heartbeat: **15:22:17Z** (~28 min old; ✅ within 90-min threshold). **7/7 core services active.** **Retention healer LIVE** (timer active, next fire Jun 4 03:45 MDT). Forge inbox: 2 tasks (Phase 2 of `alert-fix-first-outcome-routing-001` + new `extend-install-drift-healer-content-drift`). Beacon/Mirror inboxes: EMPTY. **0 open PRs** (both repos). Worktrees: **1** (down from 22 — hourly GC cleaned all stale build worktrees; `wt-fix` orphan GONE).
