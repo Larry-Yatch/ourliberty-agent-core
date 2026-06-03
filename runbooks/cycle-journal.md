@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 658 — 2026-06-03 02:56 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline active: 3 Forge worktrees building, no PRs yet (builds ~3-12 min in at check time). Alert watermark: **1188** (UNCHANGED — 0 new alerts since iter 657). Healer heartbeat: **02:49:19Z** (ADVANCED from 02:19:09Z — healer swept as predicted at ~02:49Z; ~7 min old at 02:56Z check; next sweep ~03:19Z). Sync: ⚠️ sync.json still shows `status=error` from 02:37:59Z — however, session-start gitStatus HEAD=4fbf991 ("Pulse cycle 20260603T025234Z") confirms iter 657 wrapper push succeeded at ~02:52Z; sync.json is stale, will update on next sync tick. **7/7 services active.** **0 open PRs** (Forge builds in progress). Beacon inbox: **0 tasks** (CLEARED). Forge inbox: **6 tasks** (same as iter 657 — 3 actively building in worktrees + 3 queued). Cooldown files: **149 total, 27 pipeline-stall** (UNCHANGED).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1188 lines** (UNCHANGED). 0 new alerts since watermark. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1188 lines (UNCHANGED). 0 new alerts since watermark. Healer swept at 02:49:19Z — no new alerts emitted. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 2026-06-03T02:50:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-03T02:50:00Z` → "-- No entries --". No Larry directives, no agent-distress signals. beacon-bot ENETUNREACH G-rule (1/3, iter 654) — no new occurrence. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Legacy cooldown residue (UNCHANGED).** alert-cooldown/warning/: **149 total** (UNCHANGED). 27 heal-pipeline-stall keyed files (stable). Root cause: legacy artifacts from OAuth-blocked period; pipeline actively flowing. No new stall alerts. ⚠️ (structural residue only)
+
+- **(Check 4) Pending directives: ⚠️ Forge 6 tasks; 3 active worktrees; 0 new PRs yet.** Forge inbox: **6 tasks** — `build-fix-advancer-reconcile-gh-failure.json` + `build-medic-reliability-gate-delivery-cli-001.json` + `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` + `step-cleanup-review.json` + `step-ops-alerts-ui.json` + `step-retention.json`. Active worktrees: `wt-forge-fix-advancer-reconcile-gh-failure`, `wt-forge-medic-reliability-gate-delivery-cli-001`, `wt-forge-step-cleanup-review` + `wt-fix` (legacy). Builds started ~02:41–02:48Z; ~5-15 min in at check. 0 open PRs — builds still in flight. Beacon inbox: **0 tasks** (CLEARED). ⚠️ (active progress)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **02:49:19Z** (ADVANCED — healer swept at ~02:49Z as predicted at iter 657; ~7 min old at 02:56Z; next sweep ~03:19Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=4fbf991 ("Pulse cycle 20260603T025234Z" — iter 657 wrapper at 02:52:34Z). **Notable: PR #258 observed in git log** — "Merge pull request #258 from Larry-Yatch/fix/disable-rotation-tier2-down" (merge commit 452a2bf; branch commit b60a682 "Disable account rotation while Tier2 OAuth is down"). Appears between iter 656 wrapper (f4691c2, 02:47:25Z) and iter 657 wrapper (4fbf991, 02:52:34Z). Larry hotfix — disabling account rotation in response to Tier 2 OAuth degradation. Not Pulse-triggered; within Larry's direct authority. Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ Sync.json stale (SYNC-PUSH-REBASE-FALLBACK-001, 23rd — but appears self-recovered).** sync.json: `status=error`, `last_sync=2026-06-03T02:37:59Z`. However, HEAD=4fbf991 (committed/pushed at ~02:52Z by iter 657 wrapper) confirms the push DID succeed after the 02:37:59Z error. Sync.json not yet updated by sync service — will resolve on next sync tick. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠→✅ (transitional; monitoring)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Forge 6 tasks (3 active, 3 queued); 0 open PRs; builds in flight.** All 3 active Forge builds (fix-advancer, medic, step-cleanup-review) started ~02:41–02:50Z — still mid-build at 02:56Z check. Sentinel-translation build brief + 2 seq steps (step-ops-alerts-ui, step-retention) queued. 0 open PRs — expect PRs to arrive in next 5-20 min. No Pulse action available. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** 3 simultaneous Forge builds within normal bounds. No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d; outside 60d window). CLAUDE_MAX_OAUTH: Tier 2 restored (iter 656). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired at iter 637 (00:22Z today) — skip. Check VIII/IX/X (Monday only) — skip. Check III (next 2026-06-14) — skip. ✅
+
+- **G-rule watch:**
+  - **`source:sentinel / subject:inbox-stall:*`: 3/3 — DISPATCHED (iter 650). Beacon COMPLETE.** `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` in Forge inbox. Build in progress. Watch for PR adding `sentinel` + `inbox-stall` to `config/alert-translations.json`.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING (carry-forward).** Pipeline unblocked; re-dispatch still pending Larry's go-ahead ([yellow] escalation idx=9 stands). No change.
+  - **`source:ledger / subject:weekly-* not in alert-translations.json`: 1/3** (iter 638; no new occurrence).
+  - **`source:pulse / subject:check-i-* not in alert-translations.json`: 1/3** (iter 638; no new occurrence).
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (stable; iters 593+599; no new occurrence).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (stable; iter 584; no new occurrence).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **1/3** (stable; iter 625; self-resolved).
+  - beacon-bot ENETUNREACH re-established G-rule watch: **1/3** (iter 654; no new occurrence).
+  - All other G-rules stable.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 services active; sync self-recovering; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 658` → ts: 2026-06-03T02:56:01.498787+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T02:56:02.534110+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (pipeline unblocked; re-dispatch awaiting Larry's go-ahead; [yellow] escalation idx=9 stands). SYNC-PUSH-REBASE-FALLBACK-001 23rd total (APPROVAL_REQUEST open; appears self-recovered; sync.json will update on next tick).
+
+**Patterns:**
+- **PR #258 first observed in git log this iter.** "Disable account rotation while Tier2 OAuth is down" — Larry hotfix merged ~02:47-02:52Z. Not a Pulse auto-fix — Larry's direct response to the OAuth degradation. Correct response. No action from Pulse.
+- **Healer swept on schedule.** Heartbeat advanced from 02:19:09Z to 02:49:19Z — exactly 30 min, on cadence. No new alerts emitted. Healer is healthy.
+- **3 simultaneous Forge builds in progress.** Maximum throughput since OAuth restore. PRs expected within next ~5-20 min at next iter check.
+
+**Learned:** Sync.json error state (02:37:59Z) can coexist with a successful wrapper push (4fbf991 at 02:52Z). The error records the sync SERVICE's last run; the wrapper commits independently. Pattern: when sync.json shows `status=error` but session gitStatus HEAD is newer than `commit` field in sync.json, interpret as "sync script hasn't re-fired yet, wrapper push succeeded." Not a new failure.
+
+---
+
 ## Iteration 657 — 2026-06-03 02:50 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline actively unblocking: 3 Forge worktrees running simultaneously, Beacon inbox CLEARED. Alert watermark: **1188** (UNCHANGED — 0 new alerts since iter 656 sync-blocked claim). Healer heartbeat: **02:19:09Z** (~31 min old at check; within 90-min threshold; next sweep ~02:49Z — imminent/recent). Sync: ⚠️ `status=error`, `last_sync=2026-06-03T02:37:59Z` (SYNC-PUSH-REBASE-FALLBACK-001, 23rd total; self-recovering). **7/7 services active.** **0 open PRs.** Beacon inbox: **0 tasks** (CLEARED since iter 656 — sentinel/inbox-stall task completed → `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` delivered to Forge). Forge inbox: **6 tasks** — `build-fix-advancer-reconcile-gh-failure.json` (NEW, 02:44Z Beacon brief) + `build-medic-reliability-gate-delivery-cli-001.json` (NEW, 02:48Z Beacon brief) + `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` (02:46Z, Pulse-gate approved) + `step-cleanup-review.json` + `step-ops-alerts-ui.json` + `step-retention.json`. Forge worktrees: **4 active** — `wt-forge-fix-advancer-reconcile-gh-failure` + `wt-forge-medic-reliability-gate-delivery-cli-001` + `wt-forge-step-cleanup-review` + `wt-fix` (legacy). Cooldown files: **149 total, 27 pipeline-stall** (UNCHANGED).
