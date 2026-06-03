@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 767 — 2026-06-03 17:01 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1183 lines / anchor 16:37:59Z** (unchanged — no new alerts since iter 766). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 **#45** at 16:54:06Z ("Auto-commit push failed; rolled back") — self-recovering per established pattern; session-start HEAD = 710ed30 "Pulse cycle 20260603T164949Z" (main, clean). Healer heartbeat: **16:52:19Z** (~9 min old; ✅ within 90-min threshold). **7/7 core services active.** **PR #281 OPEN** ("fix(notifier): enforce canonical Mirror verdict marker — kick back prose verdicts instead of silent-dropping") — CLEAN/MERGEABLE, Mirror reviewing (opened 16:55:21Z, 6 min ago). Forge inbox: EMPTY (build complete). Mirror inbox: 1 task active. Beacon inbox: EMPTY. Worktrees: **4** (2 stale post-PR#277-merge + 2 active for PR #281 Forge/Mirror).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1183 lines** — anchor 16:37:59Z unchanged from iter 766. No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). TIER2_FALLBACK sequence in beacon bot log at 16:54:07Z (auth_401 + rate_limit; TIER2_FALLBACK_UNAVAILABLE for larry-personal credentials) — self-resolving per known pattern (same as iter 766 16:35–16:42Z episode). `source=heal-x` delivery failure at 16:56:59Z is fixture pattern (not production alert); bot retries on next sweep. No Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (unchanged). Healer heartbeat 16:52:19Z fresh. GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active — PR #281 + Mirror review in-flight.**
+  - **PR #281 OPEN** — "fix(notifier): enforce canonical Mirror verdict marker — kick back prose verdicts instead of silent-dropping (closes marker-invisible auto-merge gap)". State: CLEAN/MERGEABLE, reviewDecision="" (pending). Opened 16:55:21Z (6 min ago). Mirror inbox has `review-fix-mirror-verdict-marker-gate-001.json`. Auto-merge not yet enabled (expected — Mirror PASS will trigger it). Within all thresholds. ⚠️ in-progress.
+  - Forge inbox: EMPTY. Beacon inbox: EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **16:52:19Z** (~9 min old at 17:01Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Session-start clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=710ed30 "Pulse cycle 20260603T164949Z". SYNC-PUSH-REBASE-FALLBACK-001 #45 rollback left repo clean per established pattern. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #45.** `agent-core-sync.json`: status=error / "Auto-commit push failed; rolled back" / commit=3475820 / last_sync=16:54:06Z. Pattern: automated cycle ran post-iter-766, wrapper committed + sync service raced → push failed, rolled back. Self-recovering; hourly timer is backstop. Occurrence #45 lifetime (all prior self-recovered). ⚠️ structural.
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** PR #281 OPEN (Mirror reviewing). Forge inbox EMPTY. Mirror inbox 1 task. ⚠️ in-progress.
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z). Already fired → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 4** — `wt-forge-alert-fix-first-outcome-routing-001` (stale; PR #277 merged; next hourly GC expected to clear — PR merged AFTER last GC run), `wt-mirror-alert-fix-first-outcome-routing-001` (same), `wt-forge-fix-mirror-verdict-marker-gate-001` (build complete; PR #281 open), `wt-mirror-fix-mirror-verdict-marker-gate-001` (Mirror reviewing). Stale wt pair timeline consistent with GC running pre-PR#277-merge → next hourly GC (~17:00–17:30Z) should clear. ✅
+
+- **G-rule watch (unchanged from iter 766):**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Monitoring — stale PR#277 worktrees persisting; timeline consistent with GC running pre-merge (not a script bug yet).
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=650, systemic_fixes=4, verification_pending=2, ratio≈108.3, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Periodic: Check I sentinel exists (fired 00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+3. No always-allowed auto-fixes triggered — PR #281 opened 16:55Z (6 min, <30 min threshold); 7/7 active; sync self-recovering; no duplicate tasks; alert watermark unchanged. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 767` → ts: 2026-06-03T17:01:41.220887Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T17:01:41.869Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. Forge build complete + PR #281 open is expected pipeline progress. TIER2_FALLBACK in beacon bot log is known self-resolving pattern. SYNC-PUSH-REBASE-FALLBACK-001 #45 is self-recovering (APPROVAL_REQUEST already open). No new Larry action needed.
+
+**Patterns:**
+- **Forge build `fix-mirror-verdict-marker-gate-001` COMPLETE → PR #281 opened.** The MalformedForgeMarker notifier-layer fix is in review. Mirror's verdict on this PR will be the key signal to watch next iter.
+- **SYNC-PUSH-REBASE-FALLBACK-001 #45.** Continued pattern: fires during rapid interactive session when automated cycles race with interactive session wrapper commits. APPROVAL_REQUEST open; root code fix pending.
+- **Stale PR#277 worktrees.** PR #277 merged after the previous hourly GC run; next GC (~17:00–17:30Z) expected to clear them. If still present at iter 768, flag as G-rule 2/3 for `cleanup_stale_worktrees.py misses orphaned dirs`.
+
+**Learned:** PR #281 opened at 16:55:21Z — Forge completed the `fix-mirror-verdict-marker-gate-001` build between iter 766 (16:47Z) and this iter (17:01Z). This is the MalformedForgeMarker notifier root fix; once merged, prose verdicts from Mirror will be kicked back rather than silently dropped. Pipeline chain: Forge→PR#281→Mirror review→Mirror PASS→auto-merge.
+
+---
+
 ## Iteration 766 — 2026-06-03 16:47 UTC (interactive)
 
 **Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1183 lines / anchor 16:37:59Z** (unchanged — no new alerts since iter 765). Sync: ✅ CLEAN — status=success, commit=86bc994 (PR #279 merge), last_sync=16:40:03Z. Healer heartbeat: **16:22:18Z** (~25 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs** (both repos). Forge inbox: 1 task (`build-fix-mirror-verdict-marker-gate-001.json`; worktree active). Mirror inbox: EMPTY. Beacon inbox: EMPTY. Worktrees: **3** (2 stale post-PR#277-merge + `wt-forge-fix-mirror-verdict-marker-gate-001` active).
