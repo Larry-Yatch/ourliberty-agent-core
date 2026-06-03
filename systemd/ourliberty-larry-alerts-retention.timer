@@ -1,0 +1,17 @@
+[Unit]
+Description=Run larry-alerts.jsonl cursor-safe retention daily
+
+[Timer]
+# Once a day — retention is housekeeping, not a hot loop. 03:42 keeps it off
+# the busy top-of-hour, the Pulse-cycle boundaries, and the 03:17
+# chain-events-retention slot so the two daily housekeepers don't lock-step.
+OnCalendar=*-*-* 03:42:00
+# Up to 5 min of jitter so it never lock-steps with other daily jobs.
+RandomizedDelaySec=5min
+AccuracySec=1min
+Persistent=true
+
+Unit=ourliberty-larry-alerts-retention.service
+
+[Install]
+WantedBy=timers.target
