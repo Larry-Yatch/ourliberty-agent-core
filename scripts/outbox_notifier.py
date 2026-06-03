@@ -2244,6 +2244,37 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         marker_type, payload, _narrative = mrh.parse_mirror_marker(result_text)
 
     if marker_type is None:
+        # fix-mirror-verdict-marker-gate-001 (2026-06-03) — review-discipline
+        # runtime gate, SYMMETRIC with `_classify_forge_marker`'s preflight
+        # gate above. A `phase=review` dispatch MUST end with one canonical
+        # verdict marker. When Mirror emits a PROSE verdict instead
+        # (`**Verdict: PASS.**`), `parse_mirror_marker` correctly returns no
+        # marker_type — but pre-fix this fell through to `return None`,
+        # default routing skipped the auto-merge block (which keys on the
+        # canonical REVIEW_PASS marker), and the PR sat open indefinitely
+        # while heal_pr_auto_merge missed it (no merge was ever ATTEMPTED).
+        # PR #277 was exactly this shape. Raise into the EXISTING
+        # marker-error kickback (caught in process_outbox →
+        # _notify_mirror_marker_error → 3 retries → dead-letter to Beacon +
+        # DM Larry) so Mirror re-emits a canonical marker and auto-merge
+        # fires. We fix at the source (classification); we do NOT teach the
+        # merger to read prose.
+        #
+        # Scope: ONLY `phase=review`. The DAG-preflight path
+        # (`review-sequence-dag` prompt) legitimately uses `result: PASS`
+        # not markers and carries no `phase` field — it already short-circuits
+        # to None at the top of this function and is consumed by
+        # _handle_mirror_dag_preflight_result before we get here. Mirror's
+        # chat-mode outputs (no phase=review) also keep returning None.
+        if data.get('phase') == 'review':
+            raise mrh.MalformedMirrorMarker(
+                'phase=review requires ONE canonical verdict marker at end '
+                'of response (=== REVIEW_PASS === / REVIEW_REVISION / '
+                'REVIEW_ESCALATE / REVIEW_EMERGENCY_HALT) — none found. A '
+                'PROSE verdict (e.g. "Verdict: PASS") is silently invisible '
+                'to auto-merge and leaves the PR stuck. Re-emit via marker.py '
+                "(see agents/mirror/CLAUDE.md 'Marker formats')."
+            )
         return None
 
     # Marker discipline: payload task_id MUST match envelope task_id

@@ -120,6 +120,14 @@ TELEGRAM_MAX = 4000  # Telegram caps at 4096; leave headroom for our markers
 CLAUDE_BIN = shutil.which("claude") or "/usr/bin/claude"
 CLAUDE_TIMEOUT_SEC = 600  # 10 min — long enough for Beacon to think hard
 
+# fix-mirror-verdict-marker-gate-001 (2026-06-03) — bounded in-loop kickback
+# for malformed APPROVAL_REQUEST markers. Parallel intent to the notifier's
+# MAX_MARKER_ERROR_RETRIES (the Forge/Mirror marker-error cascade), but the
+# telegram bot is a SYNCHRONOUS call_beacon request/response loop — not the
+# file-based outbox daemon — so we re-prompt Beacon in-process instead of
+# writing dead-letter inbox files. Same cap (3) keeps the budgets aligned.
+MAX_APPROVAL_MARKER_RETRIES = 3
+
 # D3 reminder cadence — check at most every REMINDER_INTERVAL_SEC. With our
 # 30s getUpdates long-poll this means roughly every ~5 minutes of wall clock,
 # which is more than fine for 6h/24h/72h schedule granularity.
@@ -684,17 +692,54 @@ def _send_beacon_response(
     Without this, every modify/reject on a replan resets the counter and
     defeats max_replans.
     """
-    try:
-        payload, narrative = approval.extract_approval_request(reply)
-    except approval.MalformedApprovalMarker as e:
-        telegram_send(chat_id, reply)
-        telegram_send(
-            chat_id,
-            f"⚠ Beacon's APPROVAL_REQUEST marker was malformed ({e}). "
-            f"No approval flow triggered.",
-        )
-        log(f"malformed approval marker from beacon: {e}")
-        return
+    # fix-mirror-verdict-marker-gate-001 (2026-06-03) — bounded in-loop
+    # kickback. A malformed APPROVAL_REQUEST marker used to only log + forward
+    # the raw reply with a warning (no re-emit chance), parallel to the
+    # pre-fix Mirror silent-drop. Now we re-prompt Beacon to re-emit a clean
+    # canonical block, capped at MAX_APPROVAL_MARKER_RETRIES, then fall back to
+    # forward+warn on exhaust so the thread is loud, never silently dropped.
+    # Synchronous re-prompt (not the file-based dead-letter cascade) because
+    # this bot is a request/response loop, not the outbox daemon.
+    payload = None
+    narrative = None
+    marker_errors = 0
+    while True:
+        try:
+            payload, narrative = approval.extract_approval_request(reply)
+            break
+        except approval.MalformedApprovalMarker as e:
+            marker_errors += 1
+            if marker_errors > MAX_APPROVAL_MARKER_RETRIES:
+                telegram_send(chat_id, reply)
+                telegram_send(
+                    chat_id,
+                    f"⚠ Beacon's APPROVAL_REQUEST marker was malformed "
+                    f"{MAX_APPROVAL_MARKER_RETRIES}x in a row ({e}). No approval "
+                    f"flow triggered — re-issue the plan when ready.",
+                )
+                log(
+                    f"malformed approval marker from beacon — kickback exhausted "
+                    f"({MAX_APPROVAL_MARKER_RETRIES}/{MAX_APPROVAL_MARKER_RETRIES}): {e}"
+                )
+                return
+            log(
+                f"malformed approval marker from beacon — kickback "
+                f"{marker_errors}/{MAX_APPROVAL_MARKER_RETRIES}: {e}"
+            )
+            correction = (
+                "Your previous response carried an APPROVAL_REQUEST marker that "
+                f"failed to parse: {e}\n\n"
+                "Re-emit your response with EXACTLY ONE canonical block: "
+                "`=== APPROVAL_REQUEST ===` on its own line, a single valid JSON "
+                "object with the required fields, then `=== END_APPROVAL_REQUEST ===`. "
+                "Put any narrative ABOVE the block — JSON only INSIDE it. Prefer "
+                "marker.py to hand-typing the delimiters."
+            )
+            session_id = _bot_state['sessions'].get(str(chat_id))
+            reply, new_session = call_beacon(correction, session_id)
+            if new_session and new_session != session_id:
+                _bot_state['sessions'][str(chat_id)] = new_session
+                save_sessions(_bot_state['sessions'])
 
     if payload is None:
         telegram_send(chat_id, reply)

@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""test_mirror_marker_discipline.py — forward-looking Mirror marker-shape scanner.
+"""test_mirror_marker_discipline.py — Mirror marker-shape scanner + enforced gate.
 
-Forward-looking scanner. At PR merge: expect 4 historical violations from
-2026-05-25 PR #101 + PR #104 r1/r2/r3 reviews — that is documentation of
-the before-state, not failure. Hard-fail enforcement deferred until
-historical non-canonical sessions roll out of the 7-day window.
+ENFORCEMENT (fix-mirror-verdict-marker-gate-001, 2026-06-03): the canonical-
+marker contract is now hard-asserted by `CanonicalContractEnforcementTests`,
+which pins the runtime gate in `outbox_notifier._classify_mirror_marker` — a
+phase=review dispatch with anything other than a parseable canonical verdict
+marker (including pure-prose verdicts the heuristic scanner below misses) is
+rejected into the marker-error kickback, never silently dropped.
+
+The `LiveScannerWatcher` below remains a print-only watcher over the real
+`~/.claude/projects/` tree (non-hermetic by nature — it observes whatever
+sessions exist on the machine, including non-Mirror agents). Keeping it as a
+watcher avoids flaky failures on unrelated sessions while the hermetic
+enforcement above carries the contract.
 
 What this catches:
 
@@ -575,6 +583,88 @@ class RecentSessionFilterTests(unittest.TestCase):
         self.assertEqual(
             find_recent_sessions(Path('/nonexistent/path'), within_days=7), [],
         )
+
+
+# -------------------- enforced canonical-marker contract --------------------
+
+class CanonicalContractEnforcementTests(unittest.TestCase):
+    """ENFORCED contract (fix-mirror-verdict-marker-gate-001, 2026-06-03).
+
+    Promotes this file from a print-only scanner to a hard enforcement of
+    the canonical-marker rule, per 'every rule earns an enforcement
+    mechanism'. The scanner above catches FOUR known non-canonical shapes
+    heuristically — but it MISSES pure-prose verdicts like
+    `**Verdict: PASS.**` (no REVIEW_* token at all), which is exactly the
+    shape that left PR #277 stuck.
+
+    The real enforcement is the runtime gate in
+    `outbox_notifier._classify_mirror_marker`: for a `phase=review` dispatch,
+    ANYTHING that is not a parseable canonical verdict marker is rejected
+    (raised into the marker-error kickback), not silently dropped. These
+    tests pin that contract hermetically (synthetic envelopes, no live
+    filesystem / session log).
+    """
+
+    def setUp(self):
+        import outbox_notifier as on
+        import mirror_review_handler as mrh
+        self.on = on
+        self.mrh = mrh
+
+    def _review_envelope(self, result_text):
+        # Minimal phase=review Mirror outbox; no claude_session_id so the
+        # classifier does not probe the session-log filesystem.
+        return {
+            'agent': 'mirror',
+            'source': 'beacon',
+            'task_id': 'enforce-001',
+            'phase': 'review',
+            'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+            'result': result_text,
+        }
+
+    def test_prose_verdict_is_rejected(self):
+        # The PR #277 shape — pure prose, no REVIEW_* token, no delimiters.
+        data = self._review_envelope('**Verdict: PASS.** Everything looks good.')
+        with self.assertRaises(self.mrh.MalformedMirrorMarker):
+            self.on._classify_mirror_marker(data)
+
+    def test_wrapper_shape_is_rejected(self):
+        data = self._review_envelope(
+            '=== REVIEW_RESULT ===\n{"verdict": "pass"}\n=== END_REVIEW_RESULT ==='
+        )
+        with self.assertRaises(self.mrh.MalformedMirrorMarker):
+            self.on._classify_mirror_marker(data)
+
+    def test_inline_prefix_shape_is_rejected(self):
+        data = self._review_envelope(
+            'REVIEW_PASS:\n```json\n{"task_id": "enforce-001"}\n```'
+        )
+        with self.assertRaises(self.mrh.MalformedMirrorMarker):
+            self.on._classify_mirror_marker(data)
+
+    def test_bare_keyword_shape_is_rejected(self):
+        data = self._review_envelope(
+            'Reviewed the diff, all clean.\n\nVerdict: REVIEW_PASS\n'
+        )
+        with self.assertRaises(self.mrh.MalformedMirrorMarker):
+            self.on._classify_mirror_marker(data)
+
+    def test_canonical_marker_is_accepted(self):
+        # The happy path MUST still classify cleanly — enforcement rejects
+        # non-canonical shapes only, never the canonical one.
+        data = self._review_envelope(
+            'Reviewed the diff, coverage clean.\n\n'
+            '=== REVIEW_PASS ===\n'
+            '{"task_id": "enforce-001", '
+            '"pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1", '
+            '"summary": "AC coverage clean."}\n'
+            '=== END_REVIEW_PASS ==='
+        )
+        decision = self.on._classify_mirror_marker(data)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
 
 
 # -------------------- live watcher (prints, does not assert) --------------------
