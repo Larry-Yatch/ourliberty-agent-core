@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 661 — 2026-06-03 03:17 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing: 2 PRs open (#259 + #260, sub-threshold), Forge building 2 complex tasks (~30-33 min). Alert watermark: **1189** (+1 from 1188 — new deploy-notifier:READY for step-ops-alerts-ui Vercel preview; Tier 3, delivered). Healer heartbeat: **02:49:19Z** (UNCHANGED — 28 min old; within 90-min threshold; next sweep ~03:19Z — imminent). Sync: ⚠️ sync.json `status=error` (03:03:06Z, 9c166456 rolled back) — HEAD=d97c0aa (iter 660 wrapper, ~03:15:52Z) is newer → wrapper push succeeded; self-recovering. **7/7 services active.** **2 open PRs** (#259 CLEAN/MERGEABLE 13.6 min, #260 CLEAN/MERGEABLE 7.8 min — both < 30-min threshold). Forge inbox: **6 tasks** (3 queued briefs + **3 marker-error retries**: step-cleanup-review + step-ops-alerts-ui + step-retention). step-ops-alerts-ui.json gone from inbox (archived on completion; marker-error-step-ops-alerts-ui-1.json created ~03:15Z). Cooldown files: **150** (+1 from 149 — new deploy-notifier cooldown file).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1189 lines** (+1 from 1188). New alert: `deploy-notifier:READY:dpl_8SRGLC2JY5DHUqVXzRPQyQKxh919` at 03:12:11Z (Vercel preview live for step-ops-alerts-ui on ourliberty-dashboard, branch `forge/step-ops-alerts-ui`). Tier 3 — expected by-design success notification; beacon-bot delivered at idx=1188 (21:14:05-0600). Cooldown file added (+1 to 150). GC gap ongoing (APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z`).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier 3 — delivered, by design).** 1189 lines (watermark was 1188). New: `deploy-notifier:READY:dpl_8SRGLC2JY5DHUqVXzRPQyQKxh919` at 03:12:11Z — Vercel preview for `forge/step-ops-alerts-ui` on ourliberty-dashboard. Tier 3 (expected success event; step-ops-alerts-ui build triggered preview as designed). Beacon-bot delivered at 03:14:05Z. Cooldown file `deploy-notifier:deploy-notifier:READY:dpl_8SRGLC2JY5DHUqVXzRPQyQKxh919` added (+1 to 150 total). No action required; GC gap APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` still open. ⚠️ (by-design residue)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 03:14:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon-bot last entries at 03:14:05Z (alert idx=1188 delivered) + 03:15:41Z (getUpdates read timeout — benign long-poll timeout, not ENETUNREACH). No Larry directives. No agent-distress signals. beacon-bot ENETUNREACH G-rule (1/3, iter 654) — no new occurrence. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown files: 150 (+1).** New deploy-notifier cooldown file for step-ops-alerts-ui Vercel preview (+1 to 150). 27 heal-pipeline-stall keyed files unchanged (stable). No new stall alerts. GC gap ongoing. ⚠️ (structural residue; by-design accumulation)
+
+- **(Check 4) Pending directives: ⚠️ Forge 6 inbox tasks; 3 marker-errors; 2 complex builds ~30-33 min; 2 open PRs sub-threshold.** **NEW: marker-error-step-ops-alerts-ui-1.json created ~03:15Z.** step-ops-alerts-ui build completed (~5 min, 03:10:02Z–03:15Z), pushed branch `forge/step-ops-alerts-ui`, triggered Vercel preview, but omitted preflight marker block → marker-error retry queued (same pattern as step-cleanup-review + step-retention). 3 marker-errors now simultaneously in Forge inbox. Remaining builds: `wt-forge-fix-advancer-reconcile-gh-failure` (~33 min at check; complex GH API + healer reconcile task; extended but within observation range), `wt-forge-medic-reliability-gate-delivery-cli-001` (~29 min; approaching expected max). Beacon inbox: 0. Mirror inbox: 0. PRs: #259 CLEAN/MERGEABLE (13.6 min old, < 30-min threshold), #260 CLEAN/MERGEABLE (7.8 min, < 30-min threshold). ⚠️ (active progress; monitoring)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **02:49:19Z** (UNCHANGED — 28 min old at 03:17:33Z check; within 90-min threshold; next sweep ~03:19Z — imminent). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=d97c0aa ("Pulse cycle 20260603T031552Z" — iter 660 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (25th, carry-forward).** sync.json: `status=error`, `last_sync=2026-06-03T03:03:06Z`, 9c166456 rolled back. HEAD=d97c0aa (wrapper at ~03:15:52Z) is NEWER than sync.json commit → wrapper push succeeded; sync.json will update on next sync tick. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 2 open PRs sub-threshold; 6 Forge inbox tasks; 2 complex builds in flight.** PR #259 (13.6 min, CLEAN/MERGEABLE) + PR #260 (7.8 min, CLEAN/MERGEABLE) — both below 30-min auto-merge threshold. 30-min threshold for PR #259 fires at ~03:33:56Z; PR #260 at ~03:39:44Z. Forge worktrees: fix-advancer (~33 min), medic (~29 min), step-cleanup-review (PR #259 submitted), step-ops-alerts-ui (build done, marker-error pending), step-retention (PR #260 submitted), wt-fix (legacy). ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** 2 Forge builds in extended range (30-33 min). Both are known-complex tasks (GH API reconcile + medic delivery CLI). No runaway signals. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **MalformedForgeMarker — 3 in inbox simultaneously; 7 total lifetime.** step-ops-alerts-ui joined step-cleanup-review + step-retention: ALL 3 recent sequential Forge builds omitted preflight marker. Prior 4 self-resolved; these 3 are retry-1/3 pending. Pattern is now 3/3 consecutive builds in this push failing marker check — consistent with high-throughput concurrency hypothesis (iter 660 observation). APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry — strongest case yet for approval.
+  - **`source:sentinel / subject:inbox-stall:*`: 3/3 — DISPATCHED (iter 650). Beacon COMPLETE.** `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` in Forge inbox (queued). ✅ Watch for PR.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch awaiting Larry go-ahead. No change.
+  - `deploy-notifier:READY:* cooldown GC gap` — 150 files (+1). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - All other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, review-pass 2/3, mirror-dag-pass 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (both PRs < 30-min threshold; 7/7 services active; sync self-recovering; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 661` → ts: 2026-06-03T03:19:56.268906+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T03:19:57.359395+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 25th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` (now 3 consecutive builds failing; strongest case yet for Larry approval).
+
+**Patterns:**
+- **3 consecutive Forge builds all produced MalformedForgeMarker (step-cleanup-review + step-retention + step-ops-alerts-ui).** Every recent build in this pipeline push failed the preflight check. The retry mechanism handles each one (retry-1/3), but 3 simultaneous marker-errors in the inbox is the highest concurrency failure observed. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` is the systemic fix. Larry's approval is the blocker.
+- **step-ops-alerts-ui Vercel preview live (`forge/step-ops-alerts-ui` on ourliberty-dashboard).** Build completed in ~5 min, deployed preview. Marker-error queued for retry. Build itself was successful; only the postprocessing marker was missing.
+- **fix-advancer build at ~33 min.** Extended but not anomalous for GH reconcile complexity. Will monitor at next iter.
+
+**Learned:** All 3 sequential Forge builds in this pipeline push omitted the preflight marker. This is the first time 3 simultaneous marker-errors have been observed in one iter. The pattern strongly suggests the doc-fix (`forge-claude-md-preflight-self-check-bullet-001`) is the single highest-priority open APPROVAL_REQUEST.
+
+**Post-write observation (03:22:15Z):** sync.json updated during journal-write to `status=error, last_sync=2026-06-03T03:22:15Z, commit=6b17aad rolled back` — **SYNC-PUSH-REBASE-FALLBACK-001, 26th total.** Sync service ran while this session's journal/MEMORY.md edits were uncommitted; tried to push its auto-commit, failed non-FF (HEAD=d97c0aa is ahead), rolled back. Self-recovering. Wrapper will commit this session's changes after exit, and sync will pick up the corrected HEAD on its next tick.
+
+---
+
 ## Iteration 660 — 2026-06-03 03:12 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing rapidly post-OAuth restore: 2 PRs now open (#259 + #260), step-ops-alerts-ui building, 3 more briefs queued. Alert watermark: **1188** (UNCHANGED — 0 new alerts). Healer heartbeat: **02:49:19Z** (UNCHANGED — ~23 min old; within 90-min threshold; next sweep ~03:19Z). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (25th total)** — sync.json: `status=error`, `last_sync=2026-06-03T03:03:06Z`, commit=9c166456 rolled back; pattern: sync service ran just after iter 659 wrapper push (58c7ad9 at ~03:02:38Z), created auto-commit, failed non-FF, rolled back; self-recovering. **7/7 services active.** **2 open PRs** (#259 + #260, both CLEAN+MERGEABLE, < 30-min threshold; no auto-merge action yet). Forge inbox: **6 tasks** (3 queued briefs + 2 marker-error retries + step-ops-alerts-ui in-flight). Beacon inbox: **0 tasks.** Mirror inbox: **0 tasks.**
