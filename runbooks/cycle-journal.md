@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 717 — 2026-06-03 10:54 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue 178; worktrees 19 — GC fires 20:43 MDT tonight ~15h). Alert watermark: **1226** (unchanged — 0 new alerts). Sync: ✅ Nominal (`status=no-change` at 10:39:05Z; session HEAD e600ed6 is 2 wrapper commits ahead — self-clearing pattern; NOT the SYNC-PUSH-REBASE-FALLBACK-001 error state). Healer heartbeat: **10:51:09Z** (~3 min old; ✅ freshened from iter 713's 10:20:57Z; 30-min cadence confirmed; next ~11:20Z). **7/7 core services active.** Forge/Mirror/Beacon inboxes: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**38th consecutive iter**). Worktrees: **19** (GC fires 20:43 MDT tonight).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1226 lines** — unchanged from iter 716 watermark. No new alerts. Last entry: sync-blocked:auto-commit-push-failed at 09:38:41Z (previously claimed; SYNC-PUSH-REBASE-FALLBACK-001 #38 is a carry-forward, error state cleared iter 715). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 178 total** (172 warning + 6 critical — structural legacy from stall period; pipeline fully quiescent 38 consecutive iters). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - All inboxes (Forge, Mirror, Beacon): **EMPTY**. ✅
+  - **38th consecutive iter** with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **10:51:09Z** (~3 min old at check time; ✅ freshened from 10:20:57Z; 30-min cadence healthy; next ~11:20Z UTC). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=e600ed6 ("Pulse cycle 20260603T105303Z" — iter 716 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: `status=no-change`, last_sync=2026-06-03T10:39:05Z, commit=44e6c52. Session HEAD e600ed6 is 2 wrapper commits newer (iter 715: 57dc253, iter 716: e600ed6 — both pushed after the 10:39Z sync tick). Normal lag pattern; self-clears on next sync tick. SYNC-PUSH-REBASE-FALLBACK-001 #38 error cleared iter 715; no recurrence. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs (both repos); all inboxes empty. **38th consecutive iter.** ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1226). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, no action). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ Worktrees: 19 (unchanged).** GC timer NEXT=Wed 2026-06-03 20:43:45 MDT (~15h); LAST=Tue 2026-06-02 20:43:45 MDT (8h ago). On 1d cadence. June 2 worktrees will be 23–26h old at next GC — expect cleanup tonight. `wt-fix` orphan G-rule 1/3 carry-forward (iter 716). ⚠️
+
+- **G-rule watch (unchanged from iter 716):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). GC timer confirmed still on 1d cadence (LAST=20:43 MDT yesterday). G-rule unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `medic:medic-diagnosis`: **1/3**. Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; no new alerts; sync not in error state). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 717` → ts: 2026-06-03T10:54:27Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T10:54:30Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. All findings are carry-forwards or structural. No new escalations warranted.
+
+**Patterns:**
+- **Pipeline fully quiescent for 38th consecutive iter.** 0 open PRs, all inboxes empty. System holding stable post-Tier-2 OAuth restore.
+- **Healer heartbeat freshened to 10:51:09Z.** Arrived on schedule relative to prior 10:20:57Z reading — 30-min cadence confirmed. Next expected ~11:20Z UTC.
+- **Sync lag (2 wrapper commits) is normal.** e600ed6 and 57dc253 pushed after last sync tick at 10:39Z. NOT the SYNC-PUSH-REBASE-FALLBACK-001 error; status=no-change confirms no error. Self-clears on next sync tick.
+- **Worktrees: 19 — GC fires tonight at 20:43 MDT.** June 2 dirs will be 23–26h old; expect cleanup. Post-GC count is the key next data point.
+- **Alert watermark stable at 1226.** No new healer activity since iter 708 (09:38:41Z).
+
+**Learned:** Nothing new. 38th consecutive quiescent iter. Healer confirmed on 30-min cadence. GC fires tonight.
+
+---
+
 ## Iteration 716 — 2026-06-03 10:51 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue 178; worktrees 19 — GC ran 02:43 UTC, next fires 20:43 MDT tonight). Alert watermark: **1226** (unchanged — 0 new alerts). Sync: ✅ Nominal (no-change at 10:39:05Z; wrapper HEAD 57dc253 post-dates sync, will self-clear next tick). Healer heartbeat: **10:20:57Z** (~30 min old at write time; ✅ within 90-min threshold). **7/7 core services active.** Forge/Mirror/Beacon inboxes: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**37th consecutive iter**). Worktrees: **19** (GC ran at 02:43 UTC; explained below).
