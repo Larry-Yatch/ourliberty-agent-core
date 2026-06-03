@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 679 — 2026-06-03 05:58 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1215** (+2 from 1213). Healer heartbeat: **05:50:08Z** (~8 min old; ✅ within 90-min threshold; beacon-bot auto-restarted with PR #267 code at this timestamp). Sync: ⚠️ status=error ("Auto-commit push failed; rolled back", 05:53:37Z) — SYNC-PUSH-REBASE-FALLBACK-001 **37th total**; self-recovering (session gitStatus: main+clean). **7/7 services active.** Forge inbox: **EMPTY** (medic task gone — PR #274 merged). Mirror inbox: **1 task** (`review-orchestrator-bootstrap-runbook-rev1.json`). Beacon inbox: EMPTY. **1 open PR** (#270 — orchestrator-bootstrap-runbook docs, Mirror reviewing rev1). Worktrees: **21** (−2 from iter 678; PR #269 + PR #274 auto-teardowns fired ✅).
+
+**Pipeline advances since iter 678:**
+- **PR #274 MERGED** (05:54:17Z) — "medic-ratewindow-cooldown-primary-001" — fix `_rate_window_ok()` to gate solely on `cooldown_until` hard signal; soft all-account 429 count demoted to INFO advisory. Mirror auto-merged + branch deleted. `medic-ratewindow-cooldown-primary-001` watch item CLOSED. ✅
+- **Beacon-bot auto-restarted** (05:50:09Z) — heal-stale-daemon-code detected PR #267 code (setup-token probe fix) newer than beacon-bot active-since (1549.1 min delta); restarted ourliberty-beacon-bot.service. Setup-token auth now live in beacon-bot. ✅
+- **PR #270 under revision** — Mirror rev1 review task active (`review-orchestrator-bootstrap-runbook-rev1.json` in mirror inbox); Forge submitted revision. Active review cycle, not a stall. ⚠️
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1215 lines** (+2 from watermark 1213).
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new alerts — 1 Tier-4 journal-only + 1 Tier-3 silenced.**
+  - idx 1214: `heal-stale-daemon-code` / `auto-restarted:ourliberty-beacon-bot.service` (05:50:09Z) — beacon-bot restarted with PR #267 setup-token code. Source NOT in `config/alert-translations.json` (pre-existing gap; G-rule dispatched 3/3 iter 592, Beacon processed iter 594, Forge brief STILL MISSING). Tier-4 novel by spec, but this is a known-gap pattern. No DM — informational, system self-healed, Larry aware of the pending fix. Journal-only. ⚠️
+  - idx 1215: `outbox-notifier` / `intent=review-pass` (05:54:17Z) — Mirror approved + auto-merged PR #274 (medic-ratewindow-cooldown-primary-001). **Tier 3 silenced** (review-pass in allowlist via PR #264). ✅
+  - Watermark advances to **1215**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Carry-forward: 1 active Beacon session (chat_id 7998341473 per state). No new directive alerts in larry-alerts.jsonl for this window. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 164 files** (unchanged from iter 677–678). Healer heartbeat 05:50:08Z fresh — trusting healer substrate (no stall). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ PR #270 open; Mirror reviewing rev1.**
+  - **PR #274 MERGED (05:54:17Z).** medic-ratewindow-cooldown-primary-001 watch item CLOSED. ✅
+  - **PR #270 OPEN** (docs: orchestrator-bootstrap-runbook, created 05:40:54Z — ~17 min old at check time). reviewDecision="" (Mirror rev1 active). Not at 30-min auto-merge threshold; active review cycle in progress. ⚠️
+  - **Forge inbox: EMPTY.** All build tasks consumed. ✅
+  - **Mirror inbox: 1 task** — `review-orchestrator-bootstrap-runbook-rev1.json`. Active review. ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - **Git history note:** PR #273 ("fix/reenable-rotation-deadlock-fixed" — Larry re-enabled account rotation post-PR-#269 drain fix) and PR #275 ("fix(tier2): make agent_runner fallback gate setup-token aware") are in main history before iter 678's cycle commit. Alerts for these were claimed pre-watermark 1213. Logging for completeness — pipeline is current. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat **05:50:08Z** (~8 min old; ✅ within 90-min threshold). Auto-restart fired cleanly (beacon-bot, PR #267 code). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start: branch=main, clean, HEAD=4096d76 ("Pulse cycle 20260603T055351Z"). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 37th total (05:53:37Z).** "Auto-commit push failed; rolled back". sync.json commit=b9ee4a9; session HEAD=4096d76 (iter 678 cycle commit, 05:53:51Z) is newer → wrapper already pushed; self-clears on next sync tick. Pattern fires on PR merge days. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ 1 open PR (#270); active Mirror rev1 review.** Pipeline flowing. ⚠️
+
+- **(Check F) Cost/quota: ⚠️ No new burn-rate alert since ~05:46Z.** Last known: 82%/10M. PR #274 build completed; load decreasing. Monitoring. ⚠️ (Tier 3 — no dispatch)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: PR #267 setup-token fix now live in both probe path AND beacon-bot (post-restart). Next probe cycle at ~10:37Z UTC confirms. ⚠️ (verification pending)
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 21** (−2 from iter 678's 23). PR #269 + PR #274 auto-teardowns confirmed working. Hourly GC timer still pending daemon-reload. ⚠️
+
+- **G-rule watch:**
+  - **`cycle-blocked:dirty-tree-*` G-rule: 2/3** (no new occurrence this iter). At 3/3 → dispatch Beacon.
+  - **`medic:medic-diagnosis` G-rule: 1/3** (no new occurrence this iter). At 3/3 → dispatch Beacon.
+  - **`heal-stale-daemon-code:auto-restarted:*` still untranslated.** idx 1214 is another manifestation (beacon-bot). G-rule was dispatched (iter 592) + Beacon processed (iter 594). Forge brief STILL MISSING. `alert-xlate-outbox-success-fyi-001` task status unclear — no PR covering `auto-restarted:*` has merged. Re-dispatch pending Larry go-ahead. ⚠️
+  - **`ledger/weekly 1/3, pulse/check-i 1/3`** — no new occurrences.
+  - Other G-rules stable.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (PR #270 not yet at 30-min threshold; 7/7 active; sync self-recovering).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 679` → ts: 2026-06-03T05:58:16Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T05:58:16Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (37th occurrence). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+
+**Patterns:**
+- **PR #274 (medic rate-window fix) shipped same-session as iter 678.** The medic rate-window fix (gate solely on `cooldown_until`, demote soft count to INFO) shipped in ~7 minutes from when it was in the Forge build phase in iter 678. The fix eliminates false Medic deferrals during Larry interactive sessions. Pipeline throughput continues to accelerate.
+- **Auto-teardown working.** −2 worktrees (21 from 23) confirms PR #266 teardown code fires on merge. The worktree accumulation trend is now reversed. Hourly GC cadence pending daemon-reload will address remaining stale entries.
+- **Forge brief STILL MISSING for `heal-stale-daemon-warn-info-calibration-001`.** Both idx 1206 (iter 677) and idx 1214 (this iter) are beacon-bot auto-restart alerts that would be silenced by this fix. The pattern is persisting. If Larry approves re-dispatch, this is a low-effort PR (2 files: alert-translations.json + healer log level).
+
+**Learned:** Beacon-bot auto-restarted this iter with PR #267 setup-token code. This means the setup-token auth path is now live in beacon-bot itself, not just the probe. The Tier 2 weekly probe fix is now end-to-end: probe authenticates via setup-token (PR #267) AND beacon-bot that processes the probe response is now running that code.
+
+---
+
 ## Iteration 678 — 2026-06-03 05:51 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1213** (+2 from 1211). Healer heartbeat: **05:19:58Z** (~32 min old; ✅ within 90-min threshold). Sync: ⚠️ status=error ("Auto-commit push failed; rolled back", 05:47:57Z) — SYNC-PUSH-REBASE-FALLBACK-001 **36th total**; self-recovering (session gitStatus: main+clean). **7/7 services active.** Forge inbox: **1 task** (`build-medic-ratewindow-cooldown-primary-001.json` — advanced to build phase). Mirror inbox: **1 task** (`review-orchestrator-bootstrap-runbook.json`). Beacon inbox: EMPTY. **1 open PR** (PR #270 — orchestrator-bootstrap-runbook docs, Mirror reviewing). Worktrees: **23** (+1).
