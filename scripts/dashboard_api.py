@@ -184,6 +184,15 @@ LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     'approve', 'reject', 'comment', 'mark_done',
 })
 
+# Approvals-queue-rework N1 (L8): the agent-reviewed "clean up" button.
+# POST /api/larry/cleanup-review runs the SAME triage as
+# scripts/triage_decisions.py (no fork), auto-clears confirmed-stale rows
+# (backup-first), and surfaces still-live items with a reason each. Low-
+# confidence (UNCERTAIN) rows escalate to a verification subagent rather
+# than being guessed — we NEVER clear an item we cannot confirm resolved.
+CLEANUP_REVIEW_VERIFY_MODEL = 'claude-sonnet-4-6'
+CLEANUP_REVIEW_VERIFY_TIMEOUT_S = 120
+
 # CORS.
 CORS_ORIGIN = 'https://dashboard.ourliberty.dev'
 
@@ -404,6 +413,24 @@ class LarryActionResponse(BaseModel):
 
 class LarryAllowlistResponse(BaseModel):
     allowed_emails: list[str]
+
+
+class CleanupReviewKeptItem(BaseModel):
+    task_id: str
+    reason: str
+
+
+class CleanupReviewResponse(BaseModel):
+    # task_ids of rows the engine auto-cleared (confirmed-stale / mock /
+    # subagent-verified resolved). Deduped — multiple rows can share a id.
+    cleared: list[str]
+    # Items that still need Larry, each with a one-line reason.
+    kept: list[CleanupReviewKeptItem]
+    # Path to the pre-clear backup (every clear is reversible via read_at
+    # -> NULL from this file). None when nothing was cleared.
+    backup_path: Optional[str] = None
+    # How many low-confidence rows were handed to the verification subagent.
+    uncertain_reviewed: int = 0
 
 
 # ---- helpers ----
@@ -2204,6 +2231,232 @@ def _handle_larry_action(
     }
 
 
+# ---- /api/larry/cleanup-review engine (approvals-queue-rework N1 / L8) ----
+#
+# The "clean up" button. Given the current pending decision set, run the
+# SAME triage as scripts/triage_decisions.py (imported, not forked),
+# auto-clear the confirmed-stale (backup-first, reversible), and return the
+# items still judged live with a one-line reason each. Low-confidence
+# (UNCERTAIN) rows are handed to a verification subagent — the pattern
+# proven manually 2026-06-02 — and cleared ONLY when it positively confirms
+# resolution. We never clear an item we cannot confirm resolved.
+
+
+def _import_triage_decisions():
+    """Lazy import of triage_decisions so dashboard_api loads cleanly on a
+    host without supabase-py (triage_decisions only imports it inside
+    _client(), so module import itself is stdlib-only)."""
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import triage_decisions as td  # noqa: PLC0415
+    return td
+
+
+def _beacon_pending_approvals_path(agents_root: Path) -> Path:
+    return agents_root / 'state' / 'beacon-pending-approvals.json'
+
+
+def _cleanup_review_backup_dir(agents_root: Path) -> Path:
+    return agents_root / 'blackboard' / 'backups'
+
+
+def _build_cleanup_review_prompt(items: list[dict[str, Any]]) -> str:
+    """Prompt for the verification subagent over UNCERTAIN rows."""
+    facts = json.dumps(items, indent=2)
+    return (
+        'You are verifying whether agent-OS decision rows are still LIVE '
+        '(genuinely still need a human decision) or RESOLVED (the work '
+        'already shipped or was answered, so the row is safe to clear).\n\n'
+        'For each task_id below, decide whether it resolved. Use whatever '
+        'evidence you can reach — git log, `gh pr list`/`gh pr view`, and '
+        'beacon approval history. Be CONSERVATIVE: only answer "resolved" '
+        'when you have positive evidence the work completed. If you are not '
+        'sure, answer "unknown" (the caller will keep it for the human).\n\n'
+        f'Items (JSON):\n{facts}\n\n'
+        'Output ONLY a JSON object mapping each task_id to '
+        '{"verdict": "resolved"|"live"|"unknown", "reason": "<one short '
+        'sentence>"}. No prose, no markdown fence.'
+    )
+
+
+def _parse_verifier_verdicts(result_text: Optional[str]) -> dict[str, dict[str, str]]:
+    """Extract the verdict map from the subagent's freeform result text.
+
+    The subagent is asked for a bare JSON object but may wrap it in prose
+    or a code fence; pull the first balanced {...} span and parse it.
+    Returns {} on any failure — the caller then keeps every uncertain row.
+    """
+    if not result_text or not isinstance(result_text, str):
+        return {}
+    text = result_text.strip()
+    start = text.find('{')
+    end = text.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        return {}
+    try:
+        data = json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for tid, v in data.items():
+        if isinstance(v, dict):
+            out[tid] = {
+                'verdict': str(v.get('verdict') or '').lower(),
+                'reason': str(v.get('reason') or ''),
+            }
+    return out
+
+
+# Test seam: tests monkeypatch this so the suite never spawns a real
+# subagent. Production default shells out to the `claude` CLI.
+def _cleanup_review_verify_uncertain(
+    items: list[dict[str, Any]],
+    *,
+    timeout: int = CLEANUP_REVIEW_VERIFY_TIMEOUT_S,
+) -> dict[str, dict[str, str]]:
+    """Subagent-verify low-confidence rows.
+
+    `items` is a list of {task_id, event_type, ts, why}. Returns a map
+    task_id -> {"verdict": ..., "reason": ...}. On ANY failure (claude
+    missing, timeout, non-zero exit, unparseable output) returns {} so the
+    caller keeps every uncertain row — we never clear what we cannot
+    positively confirm resolved.
+    """
+    if not items:
+        return {}
+    prompt = _build_cleanup_review_prompt(items)
+    try:
+        proc = subprocess.run(
+            ['claude', '--print', '--model', CLEANUP_REVIEW_VERIFY_MODEL,
+             '--output-format', 'json', prompt],
+            capture_output=True, text=True, timeout=timeout, check=False,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return {}
+    if proc.returncode != 0:
+        return {}
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except json.JSONDecodeError:
+        return {}
+    result = data.get('result') if isinstance(data, dict) else None
+    return _parse_verifier_verdicts(result)
+
+
+def _handle_cleanup_review(
+    *,
+    actor: str,
+    agents_root: Path,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/larry/cleanup-review.
+
+    Reuses triage_decisions' classification verbatim (no fork), auto-clears
+    STALE+MOCK (and subagent-verified-resolved UNCERTAIN) rows backup-first,
+    and returns {cleared, kept, backup_path, uncertain_reviewed}. Never
+    clears a row whose source is still genuinely pending or unconfirmed.
+    """
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+    td = _import_triage_decisions()
+
+    # Current pending decision rows (read_at IS NULL).
+    approvals = td._fetch(supabase_client, event_type='approval_request')
+    clarifies = td._fetch(supabase_client, event_type='clarify_request')
+
+    # Resolution signals: beacon approval state + clarify_response events.
+    ba_path = _beacon_pending_approvals_path(agents_root)
+    try:
+        beacon_approvals = json.loads(ba_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        beacon_approvals = {}
+    pending_ids, history_ids, hist_resolved_at = td.build_beacon_signals(
+        beacon_approvals)
+    cresp_ts = td.fetch_clarify_response_ts(supabase_client)
+
+    classified = td.classify_rows(
+        approvals, clarifies,
+        pending_ids, history_ids, hist_resolved_at, cresp_ts,
+    )
+
+    to_clear: list[tuple[dict[str, Any], str]] = []  # (row, reason)
+    kept: list[dict[str, str]] = []
+    uncertain: list[tuple[dict[str, Any], str, str]] = []  # (row, et, why)
+
+    for cls, et, row, why in classified:
+        if cls in ('STALE', 'MOCK'):
+            to_clear.append((row, why))
+        elif cls == 'LIVE':
+            kept.append({'task_id': row.get('task_id') or '', 'reason': why})
+        else:  # UNCERTAIN
+            uncertain.append((row, et, why))
+
+    # Low-confidence rows: escalate to the verification subagent. Skip the
+    # subagent entirely when there's nothing uncertain (no cost on the
+    # common path). Anything not positively confirmed `resolved` is KEPT.
+    uncertain_reviewed = 0
+    if uncertain:
+        verify_input = [
+            {'task_id': r.get('task_id'), 'event_type': et,
+             'ts': r.get('ts'), 'why': why}
+            for r, et, why in uncertain
+        ]
+        uncertain_reviewed = len(verify_input)
+        verdicts = _cleanup_review_verify_uncertain(verify_input) or {}
+        for r, et, why in uncertain:
+            tid = r.get('task_id') or ''
+            v = verdicts.get(tid) or {}
+            verdict = v.get('verdict') or ''
+            reason = v.get('reason') or why
+            if verdict == 'resolved':
+                to_clear.append((r, f'subagent-verified resolved: {reason}'))
+            else:
+                kept.append({
+                    'task_id': tid,
+                    'reason': f'unconfirmed ({verdict or "unknown"}): {reason}',
+                })
+
+    # Backup-first, then clear. Backup carries the actor + full rows so the
+    # clear is both auditable and reversible (read_at -> NULL from `rows`).
+    backup_path: Optional[str] = None
+    cleared_task_ids: list[str] = []
+    if to_clear:
+        rows = [r for r, _why in to_clear]
+        backup_dir = _cleanup_review_backup_dir(agents_root)
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stamp = now.strftime('%Y%m%dT%H%M%SZ')
+        bpath = backup_dir / f'cleanup-review-{stamp}.json'
+        bpath.write_text(json.dumps(
+            {'triggered_by': actor, 'ts': ts_iso, 'rows': rows},
+            indent=2, default=str,
+        ))
+        backup_path = str(bpath)
+
+        ids = [r['event_id'] for r in rows if r.get('event_id')]
+        for i in range(0, len(ids), 200):
+            supabase_client.table('chain_events').update(
+                {'read_at': ts_iso}
+            ).in_('event_id', ids[i:i + 200]).execute()
+
+        seen: set[str] = set()
+        for r, _why in to_clear:
+            tid = r.get('task_id')
+            if tid and tid not in seen:
+                seen.add(tid)
+                cleared_task_ids.append(tid)
+
+    return {
+        'cleared': cleared_task_ids,
+        'kept': kept,
+        'backup_path': backup_path,
+        'uncertain_reviewed': uncertain_reviewed,
+    }
+
+
 # ---- FastAPI app ----
 
 app = FastAPI(
@@ -2397,6 +2650,27 @@ def post_larry_action(
 )
 def get_larry_allowlist() -> dict[str, Any]:
     return {'allowed_emails': sorted(LARRY_ACTION_ALLOWED_EMAILS)}
+
+
+@app.post(
+    '/api/larry/cleanup-review',
+    response_model=CleanupReviewResponse,
+    dependencies=[Depends(_require_token)],
+)
+def post_larry_cleanup_review(
+    actor: str = Depends(_require_actor),
+) -> dict[str, Any]:
+    client = _get_larry_action_supabase_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='supabase unavailable',
+        )
+    return _handle_cleanup_review(
+        actor=actor,
+        agents_root=_agents_root(),
+        supabase_client=client,
+    )
 
 
 # Auth-gate the FastAPI auto-docs surfaces too. We override the routes

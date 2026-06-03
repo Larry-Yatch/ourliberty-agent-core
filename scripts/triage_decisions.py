@@ -54,6 +54,87 @@ def _fetch(client, **filt):
     return rows
 
 
+def build_beacon_signals(beacon_approvals):
+    """Derive the approval-resolution signals from parsed
+    beacon-pending-approvals.json content.
+
+    Returns (pending_ids, history_ids, hist_resolved_at) where
+    hist_resolved_at maps task_id -> latest resolved_at stamp in history.
+    """
+    pending_ids = {e.get("id") or e.get("task_id")
+                   for e in beacon_approvals.get("pending", [])}
+    history_ids = {e.get("id") or e.get("task_id")
+                   for e in beacon_approvals.get("history", [])}
+    hist_resolved_at = {}
+    for e in beacon_approvals.get("history", []):
+        tid = e.get("id") or e.get("task_id")
+        ra = e.get("resolved_at") or ""
+        if tid and ra > hist_resolved_at.get(tid, ""):
+            hist_resolved_at[tid] = ra
+    return pending_ids, history_ids, hist_resolved_at
+
+
+def fetch_clarify_response_ts(client):
+    """task_id -> [clarify_response ts, ...] — the clarify resolution signal."""
+    resp = client.table("chain_events").select("task_id,ts").eq(
+        "event_type", "clarify_response").execute()
+    cresp_ts = defaultdict(list)
+    for r in (resp.data or []):
+        if r.get("task_id"):
+            cresp_ts[r["task_id"]].append(r.get("ts") or "")
+    return cresp_ts
+
+
+def classify_approval(row, pending_ids, history_ids):
+    """LIVE/STALE/MOCK/UNCERTAIN for one approval_request row, + a reason."""
+    tid = row.get("task_id")
+    if _is_mock(tid):
+        return "MOCK", "mock task_id"
+    if tid in pending_ids:
+        return "LIVE", "still pending in beacon-pending-approvals"
+    if tid in history_ids:
+        return "STALE", "resolved in beacon history"
+    return "UNCERTAIN", "no entry in beacon pending or history"
+
+
+def classify_clarify(row, history_ids, hist_resolved_at, cresp_ts):
+    """LIVE/STALE/MOCK/UNCERTAIN for one clarify_request row, + a reason."""
+    tid = row.get("task_id")
+    if _is_mock(tid):
+        return "MOCK", "mock task_id"
+    later = [t for t in cresp_ts.get(tid, []) if t > (row.get("ts") or "")]
+    if later:
+        return "STALE", f"clarify_response exists ({len(later)})"
+    if cresp_ts.get(tid):
+        return "STALE", "clarify_response exists (same/earlier ts)"
+    # Progressed-past signal: same task had an approval resolved at/after
+    # this clarify's ts -> the task moved on, clarify effectively answered.
+    ra = hist_resolved_at.get(tid)
+    if ra and ra >= (row.get("ts") or ""):
+        return "STALE", "task approval resolved after clarify (progressed past)"
+    if tid in history_ids:
+        return "UNCERTAIN", "task in beacon history but resolved before clarify ts"
+    return "LIVE", "no clarify_response and task not resolved"
+
+
+def classify_rows(approvals, clarifies, pending_ids, history_ids,
+                  hist_resolved_at, cresp_ts):
+    """Classify every pending decision row.
+
+    Returns a list of (cls, event_type, row, why) tuples. This is the
+    single source of triage truth shared by the CLI (`main`) and the
+    dashboard `/api/larry/cleanup-review` engine — no fork.
+    """
+    out = []
+    for r in approvals:
+        cls, why = classify_approval(r, pending_ids, history_ids)
+        out.append((cls, "approval_request", r, why))
+    for r in clarifies:
+        cls, why = classify_clarify(r, history_ids, hist_resolved_at, cresp_ts)
+        out.append((cls, "clarify_request", r, why))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
@@ -68,63 +149,18 @@ def main():
 
     # Beacon approval state.
     ba = json.load(open(PENDING_APPROVALS))
-    pending_ids = {e.get("id") or e.get("task_id") for e in ba.get("pending", [])}
-    history_ids = {e.get("id") or e.get("task_id") for e in ba.get("history", [])}
-    # task_id -> latest resolved_at in history (task progressed-past signal).
-    hist_resolved_at = {}
-    for e in ba.get("history", []):
-        tid = e.get("id") or e.get("task_id")
-        ra = e.get("resolved_at") or ""
-        if tid and ra > hist_resolved_at.get(tid, ""):
-            hist_resolved_at[tid] = ra
+    pending_ids, history_ids, hist_resolved_at = build_beacon_signals(ba)
 
     # All clarify_response task_ids (resolution signal for clarify_request).
-    resp = client.table("chain_events").select("task_id,ts").eq(
-        "event_type", "clarify_response").execute()
-    cresp_ts = defaultdict(list)
-    for r in (resp.data or []):
-        if r.get("task_id"):
-            cresp_ts[r["task_id"]].append(r.get("ts") or "")
+    cresp_ts = fetch_clarify_response_ts(client)
 
+    rows_classified = classify_rows(
+        approvals, clarifies,
+        pending_ids, history_ids, hist_resolved_at, cresp_ts,
+    )
     buckets = defaultdict(list)
-
-    def classify_approval(r):
-        tid = r.get("task_id")
-        if _is_mock(tid):
-            return "MOCK", "mock task_id"
-        if tid in pending_ids:
-            return "LIVE", "still pending in beacon-pending-approvals"
-        if tid in history_ids:
-            return "STALE", "resolved in beacon history"
-        return "UNCERTAIN", "no entry in beacon pending or history"
-
-    def classify_clarify(r):
-        tid = r.get("task_id")
-        if _is_mock(tid):
-            return "MOCK", "mock task_id"
-        later = [t for t in cresp_ts.get(tid, []) if t > (r.get("ts") or "")]
-        if later:
-            return "STALE", f"clarify_response exists ({len(later)})"
-        if cresp_ts.get(tid):
-            return "STALE", "clarify_response exists (same/earlier ts)"
-        # Progressed-past signal: same task had an approval resolved at/after
-        # this clarify's ts -> the task moved on, clarify effectively answered.
-        ra = hist_resolved_at.get(tid)
-        if ra and ra >= (r.get("ts") or ""):
-            return "STALE", "task approval resolved after clarify (progressed past)"
-        if tid in history_ids:
-            return "UNCERTAIN", "task in beacon history but resolved before clarify ts"
-        return "LIVE", "no clarify_response and task not resolved"
-
-    rows_classified = []
-    for r in approvals:
-        cls, why = classify_approval(r)
-        buckets[cls].append(("approval_request", r, why))
-        rows_classified.append((cls, "approval_request", r, why))
-    for r in clarifies:
-        cls, why = classify_clarify(r)
-        buckets[cls].append(("clarify_request", r, why))
-        rows_classified.append((cls, "clarify_request", r, why))
+    for cls, et, r, why in rows_classified:
+        buckets[cls].append((et, r, why))
 
     total = len(approvals) + len(clarifies)
     print(f"DECISION ROWS PENDING: {total}  "
