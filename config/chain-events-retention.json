@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "owner": "chain-events-retention (approvals-queue-rework N2)",
+    "tweak_via": "edit this file + commit; the retention job reads it on the next tick (no service reload needed)",
+    "rationale": "Retention window for chain_events bookkeeping rows (session_start/session_done and other plumbing types). These never get read_at set, so they grow the table unbounded (~3,200 rows on 2026-06-02). Default 14d is conservative; intended to become Pulse-Check self-optimizing per the Check III/VIII pattern (analyzer proposes a window, Larry approves, Forge writes this file) rather than hand-pinned long-term. DECISION event types (approval_request, clarify_request) are NEVER deletable — the job hard-excludes them regardless of what this list says.",
+    "last_retention_update": null
+  },
+  "retention_days": 14,
+  "bookkeeping_event_types": [
+    "session_start",
+    "session_done"
+  ]
+}
