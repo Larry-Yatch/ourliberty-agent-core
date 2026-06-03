@@ -144,5 +144,213 @@ class TestAtomicWrite(_ATSTestBase):
         self.assertIn('a2', data)
 
 
+# -------------------- Phase B: data-driven § 6.6 classification --------------------
+
+# Deterministic route stub so tier classification tests don't depend on the live
+# significance config: healed→closure, not-healed→escalate.
+def _route_stub(source, subject, healed):
+    return 'closure' if healed else 'escalate'
+
+
+# Fixture registry (the only inputs classify reads, alongside translations).
+_FIXTURE_REGISTRY = {
+    'restart-daemon': {
+        'template': 'restart-daemon', 'state': 'probation',
+        'permanent_guard': False,
+    },
+    'reinstall-systemd-unit': {  # fixture-GRADUATED, non-guarded → Tier 1
+        'template': 'reinstall-systemd-unit', 'state': 'graduated',
+        'permanent_guard': False,
+    },
+    'rotate-credential': {  # fixture-GRADUATED but permanent_guard → floor at Tier 2
+        'template': 'rotate-credential', 'state': 'graduated',
+        'permanent_guard': True,
+    },
+}
+
+_FIXTURE_TRANSLATIONS = {
+    '_schema': {'note': 'metadata, never a source'},
+    'heal-known': {
+        'known-subject': {'severity': 'INFO', 'tier': 'FYI'},
+    },
+}
+
+
+class TestTranslationMatch(unittest.TestCase):
+
+    def test_exact_subject_match(self):
+        self.assertTrue(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'known-subject'))
+
+    def test_prefix_strip_match(self):
+        # subject 'known-subject:extra:detail' strips back to 'known-subject'.
+        self.assertTrue(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'known-subject:extra:detail'))
+
+    def test_unknown_source_no_match(self):
+        self.assertFalse(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-other', 'known-subject'))
+
+    def test_schema_key_is_not_a_source(self):
+        self.assertFalse(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, '_schema', 'note'))
+
+    def test_none_subject_no_match(self):
+        self.assertFalse(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', None))
+
+
+class TestClassify(unittest.TestCase):
+
+    def _classify(self, alert):
+        return ats.classify(alert, registry=_FIXTURE_REGISTRY,
+                            translations=_FIXTURE_TRANSLATIONS,
+                            route_fn=_route_stub)
+
+    def test_tier3_known_pattern_silences_to_digest(self):
+        r = self._classify({'source': 'heal-known', 'subject': 'known-subject'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+
+    def test_tier3_short_circuits_before_registry(self):
+        # A signal that ALSO carries a graduated template must still Tier-3 when
+        # it matches the translation table — gate order is translations first.
+        r = self._classify({'source': 'heal-known', 'subject': 'known-subject',
+                            'template': 'reinstall-systemd-unit'})
+        self.assertEqual(r['tier'], 3)
+
+    def test_tier2_probation_template_asks(self):
+        r = self._classify({'source': 's', 'subject': 'sub',
+                            'template': 'restart-daemon'})
+        self.assertEqual(r['tier'], 2)
+        self.assertEqual(r['route'], 'escalate')
+        self.assertEqual(r['decision'], 'ask')
+        self.assertEqual(r['template'], 'restart-daemon')
+
+    def test_tier1_graduated_nonguarded_autofixes(self):
+        r = self._classify({'source': 's', 'subject': 'sub',
+                            'template': 'reinstall-systemd-unit'})
+        self.assertEqual(r['tier'], 1)
+        self.assertEqual(r['decision'], 'auto-fix')
+        self.assertEqual(r['template'], 'reinstall-systemd-unit')
+        # Tier-1 route comes from route_fn(healed=True) → closure here.
+        self.assertEqual(r['route'], 'closure')
+
+    def test_permanent_guard_never_tier1_even_if_graduated(self):
+        # rotate-credential is fixture-graduated BUT permanent_guard → the floor
+        # holds: Tier 2 (ask), never Tier 1.
+        r = self._classify({'source': 's', 'subject': 'sub',
+                            'template': 'rotate-credential'})
+        self.assertEqual(r['tier'], 2)
+        self.assertEqual(r['route'], 'escalate')
+        self.assertIn('permanent_guard', r['rationale'])
+
+    def test_tier4_novel_asks(self):
+        r = self._classify({'source': 's', 'subject': 'sub',
+                            'template': 'not-in-registry'})
+        self.assertEqual(r['tier'], 4)
+        self.assertEqual(r['route'], 'escalate')
+        self.assertIsNone(r['template'])
+
+    def test_no_template_no_translation_is_tier4(self):
+        r = self._classify({'source': 's', 'subject': 'sub'})
+        self.assertEqual(r['tier'], 4)
+
+
+class TestTriageAlert(_ATSTestBase):
+    """Orchestration: classify → persist → (Tier-1) ledger link, idempotent."""
+
+    def _ledger_rows(self):
+        import cycle_prime_ledger as cpl  # noqa: E402
+        path = self.tmp / cpl.LEDGER_REL
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in
+                path.read_text().splitlines() if line.strip()]
+
+    def _triage(self, alert_id, alert, **kw):
+        return ats.triage_alert(alert_id, alert, registry=_FIXTURE_REGISTRY,
+                               translations=_FIXTURE_TRANSLATIONS,
+                               route_fn=_route_stub, **kw)
+
+    def test_tier1_dispatches_and_records_tagged_ledger_intervention(self):
+        row = self._triage('a-grad', {'source': 's', 'subject': 'sub',
+                                      'template': 'reinstall-systemd-unit'},
+                           iter_num=42)
+        self.assertEqual(row['status'], 'action-dispatched')
+        self.assertEqual(row['tier'], 1)
+        self.assertEqual(row['route'], 'closure')
+        self.assertEqual(row['dispatch_target_agent'], ats.AUTO_FIX_AGENT)
+        # The B→C link: exactly one tagged intervention with the pattern template.
+        rows = self._ledger_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['kind'], 'intervention')
+        self.assertEqual(rows[0]['tier'], 1)
+        self.assertEqual(rows[0]['iter'], 42)
+        self.assertTrue(
+            rows[0]['intervention_id'].startswith('reinstall-systemd-unit:'))
+
+    def test_tier1_is_idempotent_no_double_ledger_write(self):
+        alert = {'source': 's', 'subject': 'sub',
+                 'template': 'reinstall-systemd-unit'}
+        self._triage('a-grad', alert)
+        row2 = self._triage('a-grad', alert)  # re-run same iter/alert
+        self.assertEqual(row2['status'], 'action-dispatched')
+        # Ledger written exactly once despite two triage passes.
+        self.assertEqual(len(self._ledger_rows()), 1)
+
+    def test_tier3_silence_resolves_and_writes_no_ledger(self):
+        row = self._triage('a-known', {'source': 'heal-known',
+                                       'subject': 'known-subject'})
+        self.assertEqual(row['status'], 'resolved')
+        self.assertEqual(row['route'], 'digest')
+        self.assertEqual(self._ledger_rows(), [])
+
+    def test_tier3_resolved_is_idempotent(self):
+        alert = {'source': 'heal-known', 'subject': 'known-subject'}
+        self._triage('a-known', alert)
+        first_resolved_at = ats.read_state()['a-known']['resolved_at']
+        row2 = self._triage('a-known', alert)
+        # Re-run is a no-op: same resolved_at, still no ledger.
+        self.assertEqual(row2['resolved_at'], first_resolved_at)
+        self.assertEqual(self._ledger_rows(), [])
+
+    def test_tier2_probation_awaits_larry_no_ledger(self):
+        row = self._triage('a-prob', {'source': 's', 'subject': 'sub',
+                                      'template': 'restart-daemon'})
+        self.assertEqual(row['status'], 'triaged-tier-2')
+        self.assertEqual(row['route'], 'escalate')
+        self.assertIsNone(row['dispatched_at'])
+        self.assertEqual(self._ledger_rows(), [])
+
+    def test_permanent_guard_graduated_stays_tier2_no_ledger(self):
+        row = self._triage('a-guard', {'source': 's', 'subject': 'sub',
+                                       'template': 'rotate-credential'})
+        self.assertEqual(row['status'], 'triaged-tier-2')
+        self.assertEqual(self._ledger_rows(), [])
+
+    def test_tier4_novel_awaits_larry_no_ledger(self):
+        row = self._triage('a-novel', {'source': 's', 'subject': 'sub'})
+        self.assertEqual(row['status'], 'triaged-tier-4')
+        self.assertEqual(row['route'], 'escalate')
+        self.assertEqual(self._ledger_rows(), [])
+
+
+class TestLoaders(_ATSTestBase):
+
+    def test_missing_registry_is_empty(self):
+        self.assertEqual(ats.load_registry(self.tmp / 'nope.json'), {})
+
+    def test_missing_translations_is_empty(self):
+        self.assertEqual(ats.load_translations(self.tmp / 'nope.json'), {})
+
+    def test_live_registry_loads_seeded_templates(self):
+        # The real config must parse and expose the seeded probation templates.
+        reg = ats.load_registry()
+        self.assertIn('restart-daemon', reg)
+        self.assertIn('rotate-credential', reg)
+
+
 if __name__ == '__main__':
     unittest.main()
