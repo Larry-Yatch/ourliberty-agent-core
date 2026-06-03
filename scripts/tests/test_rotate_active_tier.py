@@ -223,6 +223,94 @@ class DisabledKillSwitchTest(RotateTickBaseTest):
         self.assertEqual(result['action'], 'disabled')
 
 
+class RuntimeOverrideTest(RotateTickBaseTest):
+    """dashboard-rotation-switch-001: the ~/agents/rotation.disabled runtime
+    override forces the scheduler off exactly like config enabled=false, even
+    while the config default stays enabled=true. Distinct from config-disabled
+    in one way only: an override-driven force-tier1 emits a manual_override
+    rotation-events line. Config-disabled stays silent (backward compat)."""
+
+    def _touch_override(self):
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / 'rotation.disabled').touch()
+
+    def _events_lines(self):
+        path = self.root / 'blackboard' / 'rotation-events.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines()
+                if line.strip()]
+
+    def test_override_forces_tier1_even_when_config_enabled(self):
+        # Config default ON, but the override file is present → off.
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._touch_override()
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['action'], 'disabled')
+        self.assertEqual(result['reason'], 'override')
+        self.assertIn('forced-tier1', result['changes'])
+        self.assertEqual(active_tier.read()['tier'], 'tier1')
+
+    def test_override_abandons_partial_drain(self):
+        self._set_state(tier='tier1', draining=True,
+                        next_switch_due='2026-05-28T14:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._touch_override()
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        state = active_tier.read()
+        self.assertFalse(state['draining'])
+        self.assertIsNone(state['next_switch_due'])
+        self.assertEqual(result['reason'], 'override')
+
+    def test_override_emits_manual_override_event_with_schema(self):
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._touch_override()
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        rotate_active_tier.tick(now=now, models_file=self.models_file)
+        lines = self._events_lines()
+        self.assertEqual(len(lines), 1)
+        ev = lines[0]
+        self.assertEqual(ev['trigger'], 'manual_override')
+        self.assertEqual(ev['action'], 'disengage')
+        self.assertEqual(ev['from_tier'], 'tier2')
+        self.assertEqual(ev['to_tier'], 'tier1')
+        # Locked schema: every field present on every line.
+        for key in ('ts', 'action', 'from_tier', 'to_tier', 'trigger',
+                    'rolling_5h_tokens', 'threshold', 'drained_after_sec'):
+            self.assertIn(key, ev)
+
+    def test_override_idempotent_when_already_parked_no_event(self):
+        # Clean tier1 + no drain + override present → no change, no event line
+        # (matches the emit-on-transition discipline of the load-gate events).
+        self._set_rotation(enabled=True)
+        self._touch_override()
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['action'], 'disabled')
+        self.assertEqual(result['reason'], 'override')
+        self.assertEqual(result['changes'], [])
+        self.assertEqual(self._events_lines(), [])
+
+    def test_config_disabled_stays_silent_no_event(self):
+        # The override adds an event; plain config-disabled must NOT — its
+        # historical silent behavior is preserved.
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=False)
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['reason'], 'disabled')
+        self.assertIn('forced-tier1', result['changes'])
+        self.assertEqual(self._events_lines(), [])
+
+    def test_no_override_with_config_enabled_runs_normally(self):
+        # Sanity: absent the override file, enabled=true proceeds past the
+        # kill-switch block into normal scheduling (not 'disabled').
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        self._set_rotation(enabled=True)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertNotEqual(result['action'], 'disabled')
+
+
 class WindowElapseTest(RotateTickBaseTest):
     """Spec acceptance: window elapse → drain gate opens."""
 

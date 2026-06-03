@@ -81,6 +81,12 @@ DEFAULT_MODELS_FILE = AGENT_CORE / 'config' / 'agent-models.json'
 LOG_FILE_NAME = 'rotate-active-tier.log'
 EVENTS_FILE_NAME = 'rotation-events.jsonl'
 
+# Runtime override file. Presence forces the scheduler off (tier1, no drain)
+# exactly like config rotation.enabled=false, but unlike the config default it
+# is a live, dashboard-toggleable switch that mutates no tracked file — same
+# idiom as the fleet-wide ~/agents/healers.disabled kill switch.
+OVERRIDE_DISABLE_FILE_NAME = 'rotation.disabled'
+
 # Spec §§ 6.3 + 6.4 default config values; only used when the rotation block
 # is missing OR partial. The shipped block in config/agent-models.json
 # carries the same numbers; this duplication is a defensive
@@ -118,6 +124,14 @@ def _log_file():
     base = Path(log_dir) if log_dir else (_agents_root() / 'logs')
     base.mkdir(parents=True, exist_ok=True)
     return base / LOG_FILE_NAME
+
+
+def _override_disabled():
+    """True when the runtime override file ``~/agents/rotation.disabled``
+    exists. Mirrors the shared ``~/agents/healers.disabled`` idiom: presence
+    means off. Resolved at call time so a touch/rm between ticks takes effect
+    on the next tick."""
+    return (_agents_root() / OVERRIDE_DISABLE_FILE_NAME).exists()
 
 
 def _events_file():
@@ -365,10 +379,16 @@ def tick(now=None, models_file=None, logger=None):
     state = active_tier.read()
     tier = state['tier']
     enabled = bool(cfg.get('enabled'))
+    override_off = _override_disabled()
 
-    # Master kill switch — when disabled, force tier1 + clear drain state.
-    # Idempotent: a no-op when already tier1 + not draining.
-    if not enabled:
+    # Master kill switch — force tier1 + clear drain state when rotation is
+    # off, via either the permanent config default (enabled=false) or the
+    # live runtime override file (~/agents/rotation.disabled). Idempotent: a
+    # no-op when already tier1 + not draining. The override mirrors
+    # enabled=false exactly; its only added side effect is a manual_override
+    # event line (below) so a future Pulse Check can correlate the manual
+    # disable against the rate-limit ledger.
+    if not enabled or override_off:
         actions = []
         if tier != 'tier1':
             active_tier.set_tier('tier1')
@@ -379,7 +399,26 @@ def tick(now=None, models_file=None, logger=None):
         if state['next_switch_due']:
             active_tier.set_next_switch_due(None)
             actions.append('cleared-next-switch-due')
-        result = {'action': 'disabled', 'changes': actions, 'tier': 'tier1'}
+        # Emit one manual_override event only when the override file drove an
+        # actual state change (snap to tier1 / drain abandon) — matches the
+        # emit-on-transition discipline of the load-gate events and avoids a
+        # per-tick event line while parked. Load is not consulted on this
+        # fast path, so the token/threshold fields carry 0 sentinels; the
+        # distinct trigger marks the row as a manual action, not a load
+        # event. Config-disabled keeps its historical silent behavior.
+        if override_off and actions:
+            _emit_event(
+                action='disengage',
+                from_tier=tier,
+                to_tier='tier1',
+                trigger='manual_override',
+                rolling_5h_tokens=0,
+                threshold=0,
+                now=now,
+            )
+        reason = 'override' if override_off else 'disabled'
+        result = {'action': 'disabled', 'reason': reason,
+                  'changes': actions, 'tier': 'tier1'}
         logger.info('rotation disabled tick: ' + json.dumps(result))
         return result
 

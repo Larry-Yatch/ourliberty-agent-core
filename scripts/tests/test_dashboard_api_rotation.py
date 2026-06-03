@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+"""Tests for GET/POST /api/system/rotation (dashboard-rotation-switch-001).
+
+The Auto/Off switch for account-tier rotation. GET resolves the effective
+mode from the runtime override file (~/agents/rotation.disabled) + the
+config rotation.enabled default. POST toggles that override file and writes
+a larry_action audit row — same token+actor gate as /api/larry/action.
+
+The supabase client is stubbed via a recording stub that captures the
+upsert chain. Tests monkeypatch da._get_larry_action_supabase_client,
+da._agents_root (override-file dir), and da._agent_models_json_path
+(config default) so nothing touches the real droplet state.
+
+Run::
+
+    cd /home/larry/agent-core && \\
+        python3 -m unittest scripts.tests.test_dashboard_api_rotation
+"""
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from typing import Any, Optional
+
+_REPO_SCRIPTS = Path(__file__).resolve().parent.parent
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
+
+TOKEN = 'test-token-value'
+os.environ.setdefault('DASHBOARD_API_TOKEN', TOKEN)
+
+import dashboard_api as da  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+
+ALLOWED_ACTOR = 'larry@sealteamleaders.com'
+AUTH = {
+    'X-Dashboard-Token': TOKEN,
+    'X-Actor': ALLOWED_ACTOR,
+    'Content-Type': 'application/json',
+}
+TOKEN_ONLY = {'X-Dashboard-Token': TOKEN}
+
+
+class _RecordingClient:
+    """Captures the upsert chain the rotation POST uses (no select/update)."""
+
+    def __init__(self):
+        self.calls: list[dict[str, Any]] = []
+        self._table: Optional[str] = None
+        self._upsert_rows: Optional[list[dict[str, Any]]] = None
+        self._upsert_kwargs: Optional[dict[str, Any]] = None
+
+    def table(self, name: str):
+        self._table = name
+        self._upsert_rows = None
+        self._upsert_kwargs = None
+        return self
+
+    def upsert(self, rows: list[dict[str, Any]], **kwargs):
+        self._upsert_rows = rows
+        self._upsert_kwargs = kwargs
+        return self
+
+    def execute(self):
+        self.calls.append({
+            'table': self._table,
+            'upsert_rows': self._upsert_rows,
+            'upsert_kwargs': self._upsert_kwargs,
+        })
+        return _Resp([])
+
+
+class _Resp:
+    def __init__(self, data: list[Any]):
+        self.data = data
+
+
+class _RotationBase(unittest.TestCase):
+    def setUp(self):
+        os.environ['DASHBOARD_API_TOKEN'] = TOKEN
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-rotation-'))
+        self.models_path = self.tmp / 'agent-models.json'
+        self._write_config(enabled=True)
+        self._orig_agents_root = da._agents_root
+        self._orig_models_path = da._agent_models_json_path
+        self._orig_get_client = da._get_larry_action_supabase_client
+        da._agents_root = lambda: self.tmp  # type: ignore[assignment]
+        da._agent_models_json_path = lambda: self.models_path  # type: ignore[assignment]
+        self.client_stub = _RecordingClient()
+        da._get_larry_action_supabase_client = lambda: self.client_stub  # type: ignore[assignment]
+        self.c = TestClient(da.app)
+
+    def tearDown(self):
+        da._agents_root = self._orig_agents_root  # type: ignore[assignment]
+        da._agent_models_json_path = self._orig_models_path  # type: ignore[assignment]
+        da._get_larry_action_supabase_client = self._orig_get_client  # type: ignore[assignment]
+
+    def _write_config(self, *, enabled: bool):
+        self.models_path.write_text(json.dumps({'rotation': {'enabled': enabled}}))
+
+    def _override_path(self) -> Path:
+        return self.tmp / 'rotation.disabled'
+
+
+# ---------- GET ----------
+
+class GetRotationTest(_RotationBase):
+
+    def test_auto_when_config_enabled_and_no_override(self):
+        r = self.c.get('/api/system/rotation', headers=TOKEN_ONLY)
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'auto')
+        self.assertFalse(body['override_active'])
+        self.assertTrue(body['config_enabled'])
+        self.assertIn('as_of', body)
+
+    def test_off_when_override_present(self):
+        self._override_path().touch()
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertTrue(body['override_active'])
+        self.assertTrue(body['config_enabled'])
+
+    def test_off_when_config_disabled_even_without_override(self):
+        self._write_config(enabled=False)
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertFalse(body['override_active'])
+        self.assertFalse(body['config_enabled'])
+
+    def test_missing_token_401(self):
+        r = self.c.get('/api/system/rotation')
+        self.assertEqual(r.status_code, 401)
+
+    def test_bad_token_401(self):
+        r = self.c.get('/api/system/rotation',
+                       headers={'X-Dashboard-Token': 'wrong'})
+        self.assertEqual(r.status_code, 401)
+
+
+# ---------- POST ----------
+
+class PostRotationTest(_RotationBase):
+
+    def test_off_creates_override_and_audits(self):
+        self.assertFalse(self._override_path().exists())
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'off'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertTrue(body['override_active'])
+        self.assertIn('action_event_id', body)
+        # Override file now present.
+        self.assertTrue(self._override_path().exists())
+        # Exactly one audit upsert, shaped like a larry_action row.
+        self.assertEqual(len(self.client_stub.calls), 1)
+        call = self.client_stub.calls[0]
+        self.assertEqual(call['table'], 'chain_events')
+        row = call['upsert_rows'][0]
+        self.assertEqual(row['event_type'], 'larry_action')
+        self.assertEqual(row['actor'], ALLOWED_ACTOR)
+        self.assertEqual(row['agent'], 'dashboard')
+        self.assertEqual(row['payload']['control'], 'rotation_mode')
+        self.assertEqual(row['payload']['mode'], 'off')
+        self.assertEqual(call['upsert_kwargs'].get('on_conflict'), 'event_id')
+
+    def test_auto_removes_override(self):
+        self._override_path().touch()
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'auto'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'auto')
+        self.assertFalse(body['override_active'])
+        self.assertFalse(self._override_path().exists())
+
+    def test_auto_when_no_override_is_idempotent(self):
+        # Removing an absent override file must not error.
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'auto'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['mode'], 'auto')
+
+    def test_off_then_auto_round_trip(self):
+        self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'off'})
+        self.assertTrue(self._override_path().exists())
+        self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'auto'})
+        self.assertFalse(self._override_path().exists())
+
+    def test_invalid_mode_400(self):
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'on'})
+        self.assertEqual(r.status_code, 400)
+        # No override file created on the rejected path.
+        self.assertFalse(self._override_path().exists())
+
+    def test_missing_token_401(self):
+        r = self.c.post('/api/system/rotation',
+                        headers={'X-Actor': ALLOWED_ACTOR,
+                                 'Content-Type': 'application/json'},
+                        json={'mode': 'off'})
+        self.assertEqual(r.status_code, 401)
+
+    def test_missing_actor_401(self):
+        r = self.c.post('/api/system/rotation',
+                        headers={'X-Dashboard-Token': TOKEN,
+                                 'Content-Type': 'application/json'},
+                        json={'mode': 'off'})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.json(), {'detail': 'unauthorized'})
+
+    def test_bad_actor_401_no_leak(self):
+        r = self.c.post('/api/system/rotation',
+                        headers={'X-Dashboard-Token': TOKEN,
+                                 'X-Actor': 'someone-else@gmail.com',
+                                 'Content-Type': 'application/json'},
+                        json={'mode': 'off'})
+        self.assertEqual(r.status_code, 401)
+        self.assertNotIn('someone-else', r.text)
+
+    def test_supabase_unavailable_503(self):
+        da._get_larry_action_supabase_client = lambda: None  # type: ignore[assignment]
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'off'})
+        self.assertEqual(r.status_code, 503)
+
+
+if __name__ == '__main__':
+    unittest.main()
