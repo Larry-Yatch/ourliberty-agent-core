@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration 677 — 2026-06-03 05:43 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1211** (+6 from 1205). Healer heartbeat: **05:19:58Z** (~24 min old; ✅ within 90-min threshold; outbox_notifier auto-restarted with PR #266 code at this timestamp). Sync: ⚠️ status=error ("Uncommitted changes in working tree", 05:36:36Z) — **new sync error variant** (not SYNC-PUSH-REBASE-FALLBACK-001); self-resolved (session gitStatus: main+clean). **7/7 services active (assumed; no error alerts).** Forge inbox: **2 tasks** (build-orchestrator-bootstrap-runbook + **NEW: medic-ratewindow-cooldown-primary-001 preflight**). Mirror inbox: **1 task** (review-fix-rotation-drain-deadlock → PR #269). Beacon inbox: EMPTY. **1 open PR** (PR #269 — drain-deadlock fix, in Mirror review). Worktrees: **22** (+1; event-driven teardown code now live in outbox_notifier post-restart).
+
+**Major pipeline advances since iter 676:**
+- **PR #267 MERGED** (05:29:21Z) — "fix(tier2): authenticate probe/health paths via setup-token to kill false 'Tier 2 down' signal" — closes `build-fix-tier2-probe-setup-token-auth` watch item. Recurring `tier2_weekly_probe_failed` false-alarm should stop; next probe cycle confirms. ✅
+- **PR #268 MERGED** (05:36:47Z) — "fix(medic): correct escalation allowlist patterns + wire LARRY_CHAT_ID" — closes `medic-reliability-gate-delivery-cli-001` watch item. ✅
+- **PR #32 MERGED on ourliberty-dashboard** (05:32:00Z) — "feat(approvals): digest card on the Approvals page (N6)" — closes `build-step-digest-card` (approvals-queue-rework N6). ✅
+- **PR #269 OPEN** (05:39:07Z) — "fix(rotation): force drain flip past max_drain when only an open sequence blocks" — drain-deadlock root fix for 20.5h fleet freeze. In Mirror inbox for review. mergeable: UNKNOWN (just created). ⚠️ Watch for Mirror approval + auto-merge.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1211 lines** (+6 from watermark 1205).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 6 new alerts — 1 untranslated + 1 G-rule.**
+  - idx 1206: `heal-stale-daemon-code` / `auto-restarted:ourliberty-outbox-notifier.service` (05:20:00Z) → **NOT in alert-translations.json** (`heal-stale-daemon-code` source not registered). G-rule fix `auto-restarted:*` not yet shipped despite G-rule 3/3 dispatch at iter 592. Pre-existing gap re-manifested. ⚠️
+  - idx 1207: `deploy-notifier:READY` forge/step-digest-card PR #32 (05:26:11Z) → **Tier 3** ✅
+  - idx 1208: `outbox-notifier:review-pass` PR #267 (05:29:22Z) → **Tier 3** ✅
+  - idx 1209: `pulse-cycle:cycle-blocked:dirty-tree-on-fix-tier2-false-expired-alarm` (05:30:07Z) → **NOT in allowlist** — G-rule `cycle-blocked:dirty-tree-*` **now 2/3** (iter 625 = 1/3). Self-resolved (current state: main+clean). ⚠️
+  - idx 1210: `deploy-notifier:READY` mirror/step-digest-card (05:30:14Z) → **Tier 3** ✅
+  - idx 1211: `deploy-notifier:READY` main branch deploy post-PR#32 (05:34:10Z) → **Tier 3** ✅
+  - Watermark advances to **1211**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue now 164 (+4 from 160).** GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Residue count trending slowly upward. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Major pipeline advance — 3 PRs merged + 1 new PR + 1 new Forge task.**
+  - **PR #267, #268 MERGED in agent-core; PR #32 MERGED in ourliberty-dashboard.** Three parallel build tasks shipped. ✅
+  - **PR #269 OPEN** (drain-deadlock fix, Mirror review). mergeable: UNKNOWN (just created ~4 min prior). 30-min auto-merge threshold not reached. ⚠️ Watch.
+  - **Forge inbox: 2 tasks** — `build-orchestrator-bootstrap-runbook.json` (build phase) + **`medic-ratewindow-cooldown-primary-001.json` (preflight, NEW)**. New task: fix `_rate_window_ok()` in `medic_dispatcher.py` to gate solely on hard cooldown (`cooldown_until`), not soft all-account event count dominated by Beacon chat. Well-specced; stdlib-only; regression dial 3. ✅ (new, in preflight)
+  - **Mirror inbox: 1 task** (`review-fix-rotation-drain-deadlock-open-sequence.json`). Mirror processing PR #269. ✅
+  - **Beacon inbox: EMPTY.** ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **05:19:58Z** (~24 min old; ✅ within 90-min threshold). Healer detected PR #266 script mtime (05:14:35Z) vs service start (2026-06-02T00:44:08Z = 1710.5 min delta) and auto-restarted `ourliberty-outbox-notifier.service` at 05:19:58Z. Outbox_notifier now running PR #266 teardown code. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start: branch=main, clean, HEAD=ad6361a ("Pulse cycle 20260603T052257Z"). Current state confirmed clean+main. Working-copy discipline intact. ✅
+  - Note: automated cycle at 05:30Z found repo on branch `fix-tier2-false-expired-alarm` (cycle-blocked alert, idx 1209). Self-resolved; G-rule updated below.
+
+- **(Check B) Sync health: ⚠️ New sync error variant.** sync.json: status=error, message="Uncommitted changes in working tree", commit=b2f3b61d, last_sync=05:36:36Z. Session-start gitStatus shows main+clean → self-resolved. This is a **different message** than SYNC-PUSH-REBASE-FALLBACK-001 ("Auto-commit push failed; rolled back"). Likely fired during the dirty-tree window at 05:30Z. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (covers sync failures generally). ⚠️ (self-recovering; watch for pattern recurrence)
+
+- **(Check C) Agent liveness: ✅ 7/7 assumed active.** No error alerts; outbox_notifier auto-restarted cleanly at 05:19:58Z. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ PR #269 open, Mirror reviewing.** Pipeline active at high throughput. ⚠️
+
+- **(Check F) Cost/quota: ⚠️ Burn rate unknown this iter (no log access without approval).** Last known: 82%/10M at iter 676. Three PRs merged + 2 active Forge tasks = high ongoing load. Tier 3 — no dispatch. ⚠️ (monitored)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: PR #267 just fixed the root cause — next probe cycle will confirm. Watch. ⚠️ (fix now live; verification pending)
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 22** (+1). outbox_notifier restart activates PR #266 event-driven teardown for future merges; existing stale worktrees need hourly GC timer (requires daemon-reload for hourly cadence from daily). `wt-fix` is an empty stale directory (mtime 2026-05-31). `wt-claude-medic-escalation-fix` observed but not inspected. ⚠️ (GC in progress via healer sweep cadence)
+
+- **G-rule watch:**
+  - **`cycle-blocked:dirty-tree-*` G-rule: 2/3** (iter 625 = 1/3; this iter = 2/3). Automated cycle at 05:30Z blocked on branch `fix-tier2-false-expired-alarm`. At **3/3 → dispatch to Beacon** for alert-translations.json entry (cycle-blocked:dirty-tree-* as Tier 3/FYI, expected-by-design self-resolving). ⚠️
+  - **`heal-stale-daemon-code:auto-restarted:*` still untranslated.** G-rule was dispatched (iter 592) + Beacon processed (iter 594), but Forge PR covering this specific translation has NOT merged. `alert-xlate-outbox-success-fyi-001` task status unclear — PR #264 covered `review-pass`/`mirror-dag-pass` only. ⚠️ (pre-existing gap; no new G-rule counter since already at 3/3 dispatched)
+  - **`fix-rotation-drain-deadlock-open-sequence.json` → PR #269 in Mirror review.** Root fix for 20.5h fleet freeze. ⚠️ (active)
+  - **`medic-ratewindow-cooldown-primary-001.json` NEW in Forge preflight.** Medic rate-window gate defect (false deferral on Beacon chat volume). Watch for PROCEED + build. ⚠️ (new)
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - **`deploy-notifier cooldown GC gap`** — 164 files (+4). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (PR #269 < 30 min old; services active; outbox_notifier restarted by healer autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 677` → ts: 2026-06-03T05:43:44Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open. `forge-claude-md-preflight-self-check-bullet-001` pending Larry. Burn-rate 82% — monitoring (Tier 3). `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+
+**Patterns:**
+- **Three PRs merged in one inter-cycle window** (PR #267, #268, #32). Highest single-window merge count observed. Forge + Mirror pipeline throughput continues to grow.
+- **PR #266 teardown code now active** in outbox_notifier (first worktree teardown event will occur at next auto-merge). The worktree count should now trend down with new merges.
+- **Medic rate-window false-deferral confirmed.** The new `medic-ratewindow-cooldown-primary-001` task addresses a live defect: Beacon's normal chat traffic dominates the soft event count, causing Medic to defer unnecessarily during interactive sessions with Larry. Fix: gate solely on `cooldown_until` (hard signal). This is the right call — fail-open on gauge error is already preserved by `run_medic.sh`.
+
+**Learned:** `gh pr list` returned `[]` for agent-core even though PR #269 was open (created at 05:39:07Z). GitHub API caching. Always use `gh pr view <num>` to verify specific PRs, especially recently-created ones. Mirror inbox was the reliable detection path here.
+
+---
+
 ## Iteration 676 — 2026-06-03 05:20 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1205** (+1 from iter 675 — 1 new Tier 3 review-pass). Healer heartbeat: **04:49:56Z** (~30 min old; ✅ within 90-min threshold; next fire ~05:19:56Z). Sync: ⚠️ status=error (05:13:07Z) — SYNC-PUSH-REBASE-FALLBACK-001 35th total; self-recovering. **7/7 services active.** Forge inbox: **4 tasks** — 2 build + 2 preflight (NEW: `orchestrator-bootstrap-runbook.json`; DONE: `stale-worktree-teardown-001` — PR #266 merged). Mirror/Beacon inboxes: EMPTY. 0 open PRs. Worktrees: **21** (+1; GC timer now active from PR #266, daily cadence pending daemon-reload for hourly).
