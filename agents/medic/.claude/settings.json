@@ -27,8 +27,8 @@
       "Bash(gh run view:*)",
       "Bash(curl http://localhost*:*)",
       "Bash(curl http://127.0.0.1*:*)",
-      "Bash(python3:*scripts/larry_alerts.py:*)",
-      "Bash(python3 -c import sys; sys.path.insert*larry_alerts*)",
+      "Bash(python3:*scripts/larry_alerts.py append_notification:*)",
+      "Bash(python3:*scripts/larry_alerts.py append_approval_request:*)",
       "Bash(python3:*scripts/medic_actions.py:*)",
       "Bash(python3 -c import sys; sys.path.insert*medic_actions*)"
     ],

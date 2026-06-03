@@ -18,7 +18,7 @@ Record shape:
       "source": "<source>",
       "subject": "<subject or ''>",
       "classification": "reversible|privileged|judgment|unknown",
-      "outcome": "escalated|acted|skipped",
+      "outcome": "escalated|acted|skipped|escalate-failed",
       "attempt": <int starting at 1>,
       "notes": "<optional short string>"
     }
@@ -53,7 +53,7 @@ LEDGER_FILE = AGENTS_ROOT / 'state' / 'medic-handled-ledger.jsonl'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'medic-dispatcher.log'
 
 VALID_CLASSIFICATIONS = ('reversible', 'privileged', 'judgment', 'unknown')
-VALID_OUTCOMES = ('escalated', 'acted', 'skipped')
+VALID_OUTCOMES = ('escalated', 'acted', 'skipped', 'escalate-failed')
 
 
 def _log(level: str, msg: str) -> None:
@@ -118,6 +118,24 @@ def attempt_count(fp: str) -> int:
     count = 0
     for rec in _iter_records():
         if rec.get('fingerprint') == fp:
+            count += 1
+    return count
+
+
+def escalate_failed_count(fp: str) -> int:
+    """Number of prior records for this fingerprint with outcome
+    'escalate-failed' (an escalation the operator was asked to deliver but
+    that never reached the alert queue). Backs the dispatcher's bounded-retry
+    decision: once a fingerprint has failed to deliver enough times, the
+    dispatcher emits one meta-alert and stops auto-retrying so a permanently
+    undeliverable escalation cannot wedge the offset forever. Fail safe:
+    missing / malformed file -> 0.
+    """
+    if not isinstance(fp, str) or not fp:
+        return 0
+    count = 0
+    for rec in _iter_records():
+        if rec.get('fingerprint') == fp and rec.get('outcome') == 'escalate-failed':
             count += 1
     return count
 

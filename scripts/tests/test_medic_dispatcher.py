@@ -44,6 +44,7 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+import larry_alerts  # noqa: E402
 import medic_dispatcher  # noqa: E402
 import medic_ledger  # noqa: E402
 
@@ -141,8 +142,27 @@ class _IsolatedDispatcher(unittest.TestCase):
             return_value=False)
         self._cool_event_patch.start()
         self._cool_cooldown_patch.start()
+        # The delivery-failure meta-alert path calls larry_alerts.append_alert,
+        # whose module-level paths are NOT env-isolated. Redirect them at the
+        # same tmp queue so a test that exercises the give-up path never writes
+        # the real ~/agents queue. medic_dispatcher.ALERTS_FILE already points
+        # here via the env override, so both modules share one tmp file.
+        self._la_paths = [
+            mock.patch.object(larry_alerts, 'AGENTS_ROOT', self.agents_root),
+            mock.patch.object(larry_alerts, 'ALERTS_FILE',
+                              medic_dispatcher.ALERTS_FILE),
+            mock.patch.object(larry_alerts, 'COOLDOWN_ROOT',
+                              self.agents_root / 'state' / 'alert-cooldown'),
+            mock.patch.object(larry_alerts, 'OFFSET_FILE',
+                              self.agents_root / 'state'
+                              / 'beacon-alerts-offset.txt'),
+        ]
+        for p in self._la_paths:
+            p.start()
 
     def tearDown(self) -> None:
+        for p in self._la_paths:
+            p.stop()
         self._cool_event_patch.stop()
         self._cool_cooldown_patch.stop()
         for k, v in self._env_snapshot.items():
@@ -155,10 +175,33 @@ class _IsolatedDispatcher(unittest.TestCase):
         shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     # Helper: returns a mocked _invoke_operator that records its calls
-    # so tests can assert run_medic.sh was (or was not) invoked.
+    # so tests can assert run_medic.sh was (or was not) invoked. Note this
+    # variant delivers NOTHING -- under delivery-gating an owned alert run
+    # through it is recorded escalate-failed. Use _patch_invoke_delivering
+    # when the test expects the operator to deliver an escalation.
     def _patch_invoke(self, returncode: int = 0):
         return mock.patch.object(
             medic_dispatcher, '_invoke_operator', return_value=returncode)
+
+    def _patch_invoke_delivering(self, fingerprints, returncode: int = 0):
+        """Patch _invoke_operator with a fake operator that simulates the Medic
+        operator delivering an escalation: it appends a source='medic'
+        notification embedding each fingerprint to the queue -- the same signal
+        the dispatcher diff-matches on to confirm delivery."""
+        def _op(_batch_path):
+            with open(medic_dispatcher.ALERTS_FILE, 'a', encoding='utf-8') as f:
+                for fp in fingerprints:
+                    f.write(json.dumps({
+                        'ts': '2026-06-02T00:00:00+00:00',
+                        'source': 'medic',
+                        'kind': 'notification',
+                        'intent': 'medic-diagnosis',
+                        'message': f'Diagnose-only for fingerprint {fp}.',
+                        'chat_id': 123,
+                    }) + '\n')
+            return returncode
+        return mock.patch.object(
+            medic_dispatcher, '_invoke_operator', side_effect=_op)
 
 
 class OwnedClassFilterTest(_IsolatedDispatcher):
@@ -166,7 +209,8 @@ class OwnedClassFilterTest(_IsolatedDispatcher):
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
         ])
-        with self._patch_invoke() as invoke, \
+        with self._patch_invoke_delivering(
+                ['sentinel:inbox-stall:agent-a']) as invoke, \
                 mock.patch.object(medic_dispatcher, '_write_batch',
                                   wraps=medic_dispatcher._write_batch) as wb:
             rc = medic_dispatcher.main([])
@@ -207,7 +251,9 @@ class OwnedClassFilterTest(_IsolatedDispatcher):
             _alert('different-source', 'bar'),                    # unowned
             _alert('heal-pipeline-stall', 'pipeline-stall:abc'),  # owned
         ])
-        with self._patch_invoke() as invoke, \
+        with self._patch_invoke_delivering(
+                ['sentinel:inbox-stall:x',
+                 'heal-pipeline-stall:pipeline-stall:abc']) as invoke, \
                 mock.patch.object(medic_dispatcher, '_write_batch',
                                   wraps=medic_dispatcher._write_batch) as wb:
             medic_dispatcher.main([])
@@ -335,7 +381,8 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
         ])
-        with self._patch_invoke() as invoke:
+        with self._patch_invoke_delivering(
+                ['sentinel:inbox-stall:agent-a']) as invoke:
             rc = medic_dispatcher.main([])
         self.assertEqual(rc, 0)
         invoke.assert_called_once()
@@ -358,6 +405,44 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         self.assertEqual(rc, 0)
         invoke.assert_not_called()
         # Unprocessed owned alert must be retried next tick.
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_high_soft_event_count_below_backstop_proceeds(self) -> None:
+        # The 2026-06-02 incident shape: a high soft 429-event count (15 --
+        # Beacon's normal chat/opus chatter) with NO hard cooldown must NOT
+        # defer now that the default threshold is a flood backstop (100).
+        # Hard cooldown is the primary gate; soft chatter is not a defer.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        self.assertGreater(medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS, 15)
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=15), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=False), \
+                self._patch_invoke_delivering(
+                    ['sentinel:inbox-stall:agent-a']) as invoke:
+            rc = medic_dispatcher.main([])
+        self.assertEqual(rc, 0)
+        invoke.assert_called_once()
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
+    def test_hard_cooldown_defers_even_with_low_event_count(self) -> None:
+        # Cooldown is PRIMARY: zero soft events but an active tier cooldown
+        # still defers. (Complements test_active_tier_cooldown_defers by
+        # asserting the ordering explicitly.)
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
+                               return_value=0), \
+                mock.patch.object(medic_dispatcher,
+                                  '_active_tier_in_rate_limit_cooldown',
+                                  return_value=True), \
+                self._patch_invoke() as invoke:
+            medic_dispatcher.main([])
+        invoke.assert_not_called()
         self.assertEqual(medic_dispatcher._read_offset(), 0)
 
     def test_event_count_at_threshold_does_not_defer(self) -> None:
@@ -409,9 +494,10 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         # Fail-open: gauge raise must NOT block dispatch.
         self.assertEqual(rc, 0)
         invoke.assert_called_once()
-        # The gauge raised before _active_tier_in_rate_limit_cooldown got a
-        # chance to run; the function returned True directly. Sanity-check
-        # the helper in isolation too.
+        # Cooldown is the primary gate and returns False (cool) here; the
+        # flood-backstop event gauge then raises -> _rate_window_ok() fails
+        # open and returns True. Sanity-check the helper in isolation too
+        # (the cool-cooldown shim from setUp keeps the primary gate clear).
         with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
                                side_effect=RuntimeError('gauge boom')):
             self.assertTrue(medic_dispatcher._rate_window_ok())
@@ -501,7 +587,7 @@ class OffsetDisciplineTest(_IsolatedDispatcher):
             _alert('sentinel', 'inbox-stall:agent-a'),
             _alert('some-other-healer', 'foo'),
         ])
-        with self._patch_invoke():
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:agent-a']):
             medic_dispatcher.main([])
         # Beacon's offset is byte-for-byte unchanged.
         self.assertEqual(beacon_offset_file.read_text(), '42')
@@ -516,7 +602,7 @@ class OffsetDisciplineTest(_IsolatedDispatcher):
             f.write(json.dumps(_alert('sentinel', 'inbox-stall:agent-a')) + '\n')
             f.write('not json at all\n')
             f.write(json.dumps(_alert('different-source', 'bar')) + '\n')
-        with self._patch_invoke():
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:agent-a']):
             medic_dispatcher.main([])
         # All three lines consumed.
         self.assertEqual(medic_dispatcher._read_offset(), 3)
@@ -529,7 +615,9 @@ class LedgerRecordingTest(_IsolatedDispatcher):
             _alert('different-source', 'bar'),
             _alert('heal-pipeline-stall', 'pipeline-stall:xyz'),
         ])
-        with self._patch_invoke():
+        with self._patch_invoke_delivering([
+                'sentinel:inbox-stall:agent-a',
+                'heal-pipeline-stall:pipeline-stall:xyz']):
             medic_dispatcher.main([])
         recs = medic_ledger.read_recent(50)
         self.assertEqual(len(recs), 2)
@@ -554,9 +642,23 @@ class LedgerRecordingTest(_IsolatedDispatcher):
         acted_fp = 'sentinel:inbox-stall:agent-a'
 
         def _fake_operator(_batch_path):
+            # Simulate medic_actions.py recording the authoritative 'acted'
+            # record for the first fingerprint (no notification needed -- the
+            # act path is the delivery), and the operator delivering a normal
+            # escalation notification for the second.
             medic_ledger.append_record(
                 'sentinel', 'inbox-stall:agent-a', 'reversible', 'acted', 1,
                 notes='acted by medic_actions this run')
+            with open(medic_dispatcher.ALERTS_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'ts': '2026-06-02T00:00:00+00:00',
+                    'source': 'medic',
+                    'kind': 'notification',
+                    'intent': 'medic-diagnosis',
+                    'message': ('Diagnose-only for fingerprint '
+                                'heal-pipeline-stall:pipeline-stall:xyz.'),
+                    'chat_id': 123,
+                }) + '\n')
             return 0
 
         with mock.patch.object(medic_dispatcher, '_invoke_operator',
@@ -578,12 +680,12 @@ class LedgerRecordingTest(_IsolatedDispatcher):
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
         ])
-        with self._patch_invoke():
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:agent-a']):
             medic_dispatcher.main([])
         # Same fingerprint appears again in a second tick.
         with open(medic_dispatcher.ALERTS_FILE, 'a', encoding='utf-8') as f:
             f.write(json.dumps(_alert('sentinel', 'inbox-stall:agent-a')) + '\n')
-        with self._patch_invoke():
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:agent-a']):
             medic_dispatcher.main([])
         recs = medic_ledger.read_recent(50)
         self.assertEqual(len(recs), 2)
@@ -748,6 +850,167 @@ class EscalateOnlyContractTest(unittest.TestCase):
                 / 'medic_dispatcher.py').read_text()
         self.assertIn("outcome='escalated'", body)
         self.assertNotIn("outcome='acted'", body)
+
+
+class DeliveryGatingTest(_IsolatedDispatcher):
+    """Gate-at-emission: an owned alert is recorded 'escalated' only when a
+    matching source='medic' record actually landed in the queue this run.
+    Otherwise it is 'escalate-failed' and its offset line is held for retry.
+    """
+
+    def test_delivered_owned_alert_records_escalated(self) -> None:
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:agent-a']):
+            medic_dispatcher.main([])
+        recs = medic_ledger.read_recent(50)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]['outcome'], 'escalated')
+        self.assertEqual(recs[0]['fingerprint'], 'sentinel:inbox-stall:agent-a')
+        # Delivered -> offset advances past the line.
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
+    def test_undelivered_owned_alert_escalate_failed_and_holds_offset(self) -> None:
+        # The operator runs but delivers NOTHING (broken notify path). The
+        # owned alert must be recorded escalate-failed and the offset must NOT
+        # advance past it, so the next tick retries.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with self._patch_invoke():  # delivers nothing
+            medic_dispatcher.main([])
+        recs = medic_ledger.read_recent(50)
+        self.assertEqual(len(recs), 1)
+        self.assertEqual(recs[0]['outcome'], 'escalate-failed')
+        # Offset held at 0 -- the line retries next tick.
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_partial_delivery_holds_offset_at_first_undelivered(self) -> None:
+        # Two owned alerts: the first delivers, the second does not. The
+        # offset advances past the delivered line but is held at the
+        # undelivered one (line 1), so only the failure retries.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:a'),     # line 0 -> delivered
+            _alert('sentinel', 'inbox-stall:b'),     # line 1 -> NOT delivered
+        ])
+        with self._patch_invoke_delivering(['sentinel:inbox-stall:a']):
+            medic_dispatcher.main([])
+        recs = medic_ledger.read_recent(50)
+        by_fp = {r['fingerprint']: r['outcome'] for r in recs}
+        self.assertEqual(by_fp['sentinel:inbox-stall:a'], 'escalated')
+        self.assertEqual(by_fp['sentinel:inbox-stall:b'], 'escalate-failed')
+        # Offset clamped to the first undelivered line (index 1).
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
+    def test_acted_exclusion_preserved_under_delivery_gating(self) -> None:
+        # A fingerprint medic_actions.py recorded 'acted' this run is handled
+        # via the act path (no notification needed) and must NOT also get an
+        # escalate-failed record from the dispatcher.
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+
+        def _acting_operator(_batch_path):
+            medic_ledger.append_record(
+                'sentinel', 'inbox-stall:agent-a', 'reversible', 'acted', 1,
+                notes='acted by medic_actions this run')
+            return 0
+
+        with mock.patch.object(medic_dispatcher, '_invoke_operator',
+                               side_effect=_acting_operator):
+            medic_dispatcher.main([])
+        recs = medic_ledger.read_recent(50)
+        outcomes = [r['outcome'] for r in recs
+                    if r['fingerprint'] == 'sentinel:inbox-stall:agent-a']
+        self.assertEqual(outcomes, ['acted'])
+        # Acted is handled -> offset advances.
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
+    def test_repeated_failure_emits_meta_alert_and_advances(self) -> None:
+        # After ESCALATE_FAILED_RETRY_LIMIT consecutive delivery failures for a
+        # fingerprint, the dispatcher emits one meta-alert and lets the offset
+        # advance past the line so it cannot wedge the cursor forever.
+        fp = 'sentinel:inbox-stall:agent-a'
+        # Pre-seed (LIMIT - 1) prior escalate-failed records so this run is the
+        # one that crosses the threshold.
+        for _ in range(medic_dispatcher.ESCALATE_FAILED_RETRY_LIMIT - 1):
+            medic_ledger.append_record(
+                'sentinel', 'inbox-stall:agent-a', 'reversible',
+                'escalate-failed', 1, notes='prior failure')
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+        with mock.patch.object(medic_dispatcher,
+                               '_emit_delivery_failure_meta_alert') as meta, \
+                self._patch_invoke():  # still delivers nothing
+            medic_dispatcher.main([])
+        meta.assert_called_once()
+        # Auto-retry exhausted -> offset advances past the wedged line.
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+        # The crossing run still recorded an escalate-failed row.
+        failed = [r for r in medic_ledger.read_recent(50)
+                  if r['outcome'] == 'escalate-failed']
+        self.assertEqual(len(failed),
+                         medic_dispatcher.ESCALATE_FAILED_RETRY_LIMIT)
+
+    def test_meta_alert_routes_to_non_owned_source(self) -> None:
+        # The real meta-alert helper must write source='medic-dispatcher'
+        # (NOT a Medic-owned class) so it cannot loop back into Medic's batch.
+        entry = {
+            'fingerprint': 'sentinel:inbox-stall:agent-a',
+            'subject': 'inbox-stall:agent-a',
+            'source': 'sentinel',
+        }
+        medic_dispatcher._emit_delivery_failure_meta_alert(entry, 3)
+        lines = medic_dispatcher.ALERTS_FILE.read_text().strip().splitlines()
+        rec = json.loads(lines[-1])
+        self.assertEqual(rec['source'], 'medic-dispatcher')
+        self.assertEqual(rec['subject'], 'sentinel:inbox-stall:agent-a')
+        # Not owned by Medic -> _match_owned returns None.
+        owned = medic_dispatcher._load_owned_classes()
+        self.assertIsNone(medic_dispatcher._match_owned(rec, owned))
+
+
+class MedicAllowlistShapeTest(unittest.TestCase):
+    """The Medic operator allowlist must permit ONLY the append_notification
+    and append_approval_request subcommands of larry_alerts.py -- never
+    append_alert (which would loop Medic back into its own batch) -- and the
+    legacy inline `python3 -c` escalation entry must be gone."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        settings = repo_root / 'agents' / 'medic' / '.claude' / 'settings.json'
+        cls.allow = json.loads(settings.read_text())['permissions']['allow']
+
+    def test_append_notification_permitted(self) -> None:
+        self.assertIn(
+            'Bash(python3:*scripts/larry_alerts.py append_notification:*)',
+            self.allow)
+
+    def test_append_approval_request_permitted(self) -> None:
+        self.assertIn(
+            'Bash(python3:*scripts/larry_alerts.py append_approval_request:*)',
+            self.allow)
+
+    def test_append_alert_not_permitted(self) -> None:
+        for entry in self.allow:
+            self.assertNotIn('larry_alerts.py append_alert', entry)
+        # The broad entry that would permit ANY larry_alerts subcommand
+        # (including append_alert) must be gone.
+        self.assertNotIn('Bash(python3:*scripts/larry_alerts.py:*)', self.allow)
+
+    def test_no_inline_python_c_larry_alerts_entry(self) -> None:
+        # The removed broad inline form for larry_alerts must be gone. The
+        # out-of-scope medic_actions inline entry is intentionally untouched,
+        # so scope the check to larry_alerts entries only.
+        self.assertNotIn(
+            'Bash(python3 -c import sys; sys.path.insert*larry_alerts*)',
+            self.allow)
+        for entry in self.allow:
+            if 'larry_alerts' in entry:
+                self.assertNotIn('-c import sys', entry)
 
 
 if __name__ == '__main__':

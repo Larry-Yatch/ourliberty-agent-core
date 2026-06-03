@@ -82,14 +82,13 @@ It prints a JSON result on stdout and exits 0 only on verified success. Read the
 
 - `ok: false` (refused on a gate / allowlist / recurrence, or the restart ran but did not verify) -> do NOT claim success. Fall back to a **diagnose-only** escalation that surfaces the `reason` and `detail` from the result (e.g. *"Attempted restart of <unit>; medic_actions refused: not-permitted"* or *"Restart ran but unit did not return to active; recommend manual investigation"*).
 
-Emit the notification via the `append_notification` CLI pattern:
+Emit the notification via the `append_notification` CLI subcommand:
 
 ```bash
-python3 -c "import sys; sys.path.insert(0, '/home/larry/agent-core/scripts'); \
-import larry_alerts; \
-larry_alerts.append_notification(source='medic', intent='medic-action-taken', \
-  message='<the Acted:/diagnose-only line above, <= 1800 chars>', \
-  chat_id=$LARRY_CHAT_ID)"
+python3 /home/larry/agent-core/scripts/larry_alerts.py append_notification \
+  --source medic --intent medic-action-taken \
+  --message '<the Acted:/diagnose-only line above, <= 1800 chars>' \
+  --chat-id "$LARRY_CHAT_ID"
 ```
 
 ### Reversible tier -- other action types (escalate-only this PR)
@@ -97,11 +96,10 @@ larry_alerts.append_notification(source='medic', intent='medic-action-taken', \
 For **kick-stuck-timer**, **clear-stale-lock**, **redispatch-chain-leg**: do NOT act. Surface the diagnosis + the exact command Larry could run, via `append_notification`:
 
 ```bash
-python3 -c "import sys; sys.path.insert(0, '/home/larry/agent-core/scripts'); \
-import larry_alerts; \
-larry_alerts.append_notification(source='medic', intent='medic-diagnosis', \
-  message='<your diagnosis + recommended command, <= 1800 chars>', \
-  chat_id=$LARRY_CHAT_ID)"
+python3 /home/larry/agent-core/scripts/larry_alerts.py append_notification \
+  --source medic --intent medic-diagnosis \
+  --message '<your diagnosis + recommended command, <= 1800 chars>' \
+  --chat-id "$LARRY_CHAT_ID"
 ```
 
 The bot's `LARRY_CHAT_ID` is in `/home/larry/credentials/.env.larry` and is loaded into the run_medic.sh environment.
@@ -111,12 +109,11 @@ The bot's `LARRY_CHAT_ID` is in `/home/larry/credentials/.env.larry` and is load
 PR1 escalate-only: surface the proposed command in the body so Larry sees exactly what would run. Do NOT register a real `approval_id` in the pending-approvals state (PR3 wires that path); use a stable derived id of the form `medic-<fingerprint>-<ts>` and let the bot render the body as a fallback.
 
 ```bash
-python3 -c "import sys; sys.path.insert(0, '/home/larry/agent-core/scripts'); \
-import larry_alerts; \
-larry_alerts.append_approval_request(source='medic', \
-  approval_id='medic-<fingerprint>-<ts>', \
-  body='<the proposed privileged command + diagnosis, <= 1800 chars>', \
-  chat_id=$LARRY_CHAT_ID)"
+python3 /home/larry/agent-core/scripts/larry_alerts.py append_approval_request \
+  --source medic \
+  --approval-id 'medic-<fingerprint>-<ts>' \
+  --body '<the proposed privileged command + diagnosis, <= 1800 chars>' \
+  --chat-id "$LARRY_CHAT_ID"
 ```
 
 ### Judgment tier -- emit a diagnose-only notification
@@ -124,6 +121,14 @@ larry_alerts.append_approval_request(source='medic', \
 Surface what you checked, your best guess, and the recommended next step (often "investigate further" or "wait for human"). Same shape as the reversible tier above, but the message frames the limitation:
 
 > "Diagnose-only: <what you checked>. Best guess: <hypothesis>. Recommended next step: <what Larry should do or who he should ask>."
+
+## By-design events -- do NOT escalate as incidents
+
+Some events in the logs are EXPECTED by design. Do not read them as a live failure, and never infer a system-wide outage (e.g. "Forge down / not recovering") from one of them:
+
+- **`tier2-fallback-skipped`** and **account-bound `--resume` forfeits** are by-design. When a dispatch is bound to a specific OAuth account and that account is unavailable, the runtime deliberately skips the Tier 2 fallback rather than resuming on the wrong account -- forfeiting the resume is the correct, intended behavior, not a fault. Merged PR #254 already suppresses these at the source, so you should rarely see one; if one still surfaces, treat it as expected background behavior. Do not escalate it as an incident on its own. At most, if a genuinely OWNED alert class matched, note it diagnose-only.
+
+Investigate the specific alert in front of you. A single by-design event is not evidence that a downstream agent is down.
 
 ## Escalation shape rules (every escalation must follow)
 

@@ -30,8 +30,15 @@ Discipline:
     are treated as empty / unknown -- never raise.
   - Offset never regresses. The advance helper takes max(current, new).
   - All escalation writes happen inside the Medic operator via
-    scripts/larry_alerts.py append_notification / append_approval_request;
-    the dispatcher itself NEVER writes to the alert queue.
+    scripts/larry_alerts.py append_notification / append_approval_request.
+    The dispatcher writes to the alert queue in exactly ONE sanctioned case:
+    a delivery-failure meta-alert (source='medic-dispatcher', a class Medic
+    does NOT own, so it cannot loop back into Medic's batch) emitted only
+    after an owned escalation has failed to deliver RETRY_LIMIT times.
+  - Gate-at-emission: an owned alert is recorded outcome='escalated' only
+    when a matching source='medic' record actually landed in the queue
+    during this run. Otherwise it is recorded 'escalate-failed' and its
+    queue line is NOT advanced past, so the next tick retries it.
 """
 
 from __future__ import annotations
@@ -71,25 +78,37 @@ RUN_MEDIC_TIMEOUT_SEC = 20 * 60
 
 ENABLE_ENV_VAR = 'OURLIBERTY_MEDIC_ENABLED'
 
-# Rate-window gate. When the rolling-5h Tier 1 window is hot the dispatcher
-# defers this tick rather than spinning a Claude session that would compete
-# with Forge / Mirror / Pulse for the same window. "Hot" is detected via two
-# orthogonal signals already maintained elsewhere in the repo:
+# Rate-window gate. The PRIMARY protection is the hard per-tier rate_limit
+# cooldown; a soft 429-event count is only a true-flood backstop.
 #
-#   * `heal_claude_max_burn_rate.recent_rate_limit_event_count()` -- count
-#     of HTTP 429 / rate-limit events recorded in the trailing
-#     RATE_LIMIT_RECENT_HOURS (2h today). When this exceeds the configurable
-#     threshold (env OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS, default 2),
-#     defer.
 #   * `active_tier.cooldown_until(tier)` -- per-tier cooldown set by the
-#     rotation scheduler when a rate_limit fires. If EITHER tier has an
-#     active cooldown, defer.
+#     rotation scheduler when a rate_limit actually fires. If EITHER tier has
+#     an active cooldown, defer. THIS is the real signal that the next Medic
+#     run would compete for a genuinely exhausted window.
+#   * `heal_claude_max_burn_rate.recent_rate_limit_event_count()` -- count of
+#     HTTP 429 / rate-limit events in the trailing window. This gauge counts
+#     ALL account 429s, which are dominated by Beacon's normal chat / opus
+#     traffic, so a handful of soft blips is NOT a reason to defer. We keep it
+#     ONLY as a flood backstop: defer if the count exceeds the configurable
+#     threshold (env OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS), whose default is
+#     deliberately high (a flood, not chatter). Before 2026-06-02 the default
+#     was 2, which made Medic defer on nearly every tick despite no hard
+#     cooldown; raised to a flood-scale default here so the interim systemd
+#     drop-in (override.conf setting the env to 100) becomes redundant.
 #
 # Fail-open: on any read / import error from the gauges, log WARN and return
 # True. A gauge bug must not permanently silence Medic; the per-session
 # timeout in run_medic.sh plus the concurrency lock bound the blast radius.
 RATE_WINDOW_MAX_EVENTS_ENV_VAR = 'OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS'
-DEFAULT_RATE_WINDOW_MAX_EVENTS = 2
+DEFAULT_RATE_WINDOW_MAX_EVENTS = 100
+
+# Delivery-failure bound. An owned alert whose escalation never reaches the
+# queue is recorded 'escalate-failed' and retried next tick (its offset line
+# is held). After this many consecutive failures for the same fingerprint the
+# dispatcher emits ONE meta-alert and lets the offset advance past it, so a
+# permanently-undeliverable escalation (broken run_medic.sh, operator
+# allowlist rot) cannot wedge the cursor forever.
+ESCALATE_FAILED_RETRY_LIMIT = 3
 
 # Cap how many alerts go into a single batch. The Medic operator
 # investigates each one with read-only bash + writes an escalation,
@@ -167,23 +186,18 @@ def _active_tier_in_rate_limit_cooldown() -> bool:
 
 
 def _rate_window_ok() -> bool:
-    """Rolling rate-limit window gate. Returns False (defer this tick)
-    when recent rate-limit events exceed the configured threshold OR an
-    OAuth tier is in a rate_limit cooldown. Fail-open on gauge error:
-    a broken gauge must not permanently silence Medic; the per-session
-    timeout in run_medic.sh and the lock bound the blast radius.
+    """Rolling rate-limit window gate. The hard per-tier cooldown is the
+    PRIMARY gate; the soft 429-event count is only a flood backstop.
+
+    Returns False (defer this tick) when an OAuth tier is in a rate_limit
+    cooldown OR recent rate-limit events exceed the (deliberately high)
+    flood threshold. Fail-open on gauge error: a broken gauge must not
+    permanently silence Medic; the per-session timeout in run_medic.sh and
+    the lock bound the blast radius.
     """
-    threshold = _rate_window_max_events()
-    try:
-        events = _recent_rate_limit_events()
-    except Exception as e:
-        log('WARN', f'rate-window event gauge read failed '
-                    f'({type(e).__name__}: {e}); failing open')
-        return True
-    if events > threshold:
-        log('INFO', f'rate-window hot: {events} recent rate-limit events '
-                    f'> threshold {threshold}; deferring')
-        return False
+    # PRIMARY gate: a hard per-tier rate_limit cooldown is the real
+    # protection. If either tier is cooling down, defer regardless of how
+    # much soft 429 chatter the background traffic is generating.
     try:
         in_cooldown = _active_tier_in_rate_limit_cooldown()
     except Exception as e:
@@ -193,6 +207,21 @@ def _rate_window_ok() -> bool:
     if in_cooldown:
         log('INFO', 'rate-window hot: an OAuth tier is in rate-limit '
                     'cooldown; deferring')
+        return False
+    # BACKSTOP only: defer on a genuine flood of recent 429 events. The
+    # default threshold is deliberately high because the gauge counts ALL
+    # account 429s (dominated by normal chat / opus traffic); this is a
+    # flood backstop, NOT a chatter gate.
+    threshold = _rate_window_max_events()
+    try:
+        events = _recent_rate_limit_events()
+    except Exception as e:
+        log('WARN', f'rate-window event gauge read failed '
+                    f'({type(e).__name__}: {e}); failing open')
+        return True
+    if events > threshold:
+        log('INFO', f'rate-window flood backstop: {events} recent rate-limit '
+                    f'events > threshold {threshold}; deferring')
         return False
     return True
 
@@ -423,6 +452,110 @@ def _invoke_operator(batch_path: Path) -> int:
         return 1
 
 
+# ---------- delivery confirmation (gate-at-emission) ----------
+
+
+def _count_queue_lines() -> int:
+    """Number of lines currently in larry-alerts.jsonl. Snapshotted right
+    before the operator runs so we can read only the records it appends.
+    Never raises; an unreadable / missing file reports 0."""
+    if not ALERTS_FILE.exists():
+        return 0
+    try:
+        with open(ALERTS_FILE, encoding='utf-8') as f:
+            return sum(1 for _ in f)
+    except OSError as e:
+        log('WARN', f'queue line-count failed: {e}')
+        return 0
+
+
+def _read_medic_records_since(start_line: int) -> list[dict]:
+    """Records appended to larry-alerts.jsonl at/after start_line that were
+    written by the Medic operator (source == 'medic'). Used to confirm an
+    escalation actually landed in the queue this run. Never raises."""
+    if not ALERTS_FILE.exists():
+        return []
+    out: list[dict] = []
+    try:
+        with open(ALERTS_FILE, encoding='utf-8') as f:
+            for idx, raw in enumerate(f):
+                if idx < start_line:
+                    continue
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(rec, dict) and rec.get('source') == 'medic':
+                    out.append(rec)
+    except OSError as e:
+        log('WARN', f'post-invoke queue read failed: {e}')
+        return []
+    return out
+
+
+def _delivered_fingerprints(medic_records: list[dict],
+                            batch_fps: set) -> set:
+    """Subset of batch fingerprints that appear in a Medic-emitted record
+    from this run. The operator embeds the fingerprint in every escalation
+    (notification `message`, approval_request `body` / `approval_id`) per
+    agents/medic/CLAUDE.md, so a substring match over those fields confirms
+    delivery. A fingerprint with no matching record was NOT delivered and
+    will be recorded escalate-failed (a false negative is safe: it just
+    triggers a retry, never a silent drop)."""
+    if not batch_fps:
+        return set()
+    haystacks: list[str] = []
+    for rec in medic_records:
+        parts: list[str] = []
+        for field in ('message', 'body', 'approval_id'):
+            val = rec.get(field)
+            if isinstance(val, str):
+                parts.append(val)
+        if parts:
+            haystacks.append(' '.join(parts))
+    delivered: set = set()
+    for fp in batch_fps:
+        if not isinstance(fp, str) or not fp:
+            continue
+        for hay in haystacks:
+            if fp in hay:
+                delivered.add(fp)
+                break
+    return delivered
+
+
+def _emit_delivery_failure_meta_alert(entry: dict, failure_count: int) -> None:
+    """Emit ONE operator-facing meta-alert when an owned escalation has failed
+    to deliver ESCALATE_FAILED_RETRY_LIMIT times. Routed as
+    source='medic-dispatcher' (NOT a Medic-owned class, so it cannot loop back
+    into Medic's batch) with subject=<fingerprint> so larry_alerts' per-subject
+    cooldown collapses repeats into a single notification. This is the only
+    sanctioned dispatcher write to the alert queue. Never raises."""
+    try:
+        import larry_alerts as _la
+        fp = entry.get('fingerprint')
+        subj = entry.get('subject') or ''
+        src = entry.get('source') or '?'
+        _la.append_alert(
+            source='medic-dispatcher',
+            severity='warning',
+            subject=str(fp),
+            message=(
+                f'Medic escalation for {src} alert "{subj}" '
+                f'(fingerprint {fp}) failed to deliver {failure_count} times. '
+                'The Medic operator ran but no matching source=medic '
+                'notification reached larry-alerts.jsonl. Investigate '
+                'run_medic.sh and the operator allowlist; this alert is no '
+                'longer auto-retried.'),
+        )
+    except Exception as e:
+        log('WARN', f'delivery-failure meta-alert emit failed: '
+                    f'{type(e).__name__}: {e}')
+
+
 # ---------- main loop ----------
 
 
@@ -516,12 +649,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         log('WARN', 'batch write failed; not advancing offset, not invoking operator')
         return 1
 
-    # PR2 no-double-record guard: snapshot which fingerprints already have an
+    # No-double-record guard: snapshot which fingerprints already have an
     # 'acted' ledger record BEFORE the operator runs. medic_actions.py writes
     # its authoritative 'acted' record at action time; any fingerprint that
     # becomes acted during this run must NOT also get an 'escalated' record
     # from the dispatcher below (no double-recording for that fingerprint+run).
     acted_before = medic_ledger.acted_fingerprints()
+    # Gate-at-emission: snapshot the queue length so we can read exactly the
+    # records the operator appends, and confirm each owned alert actually got
+    # a delivered escalation before recording it 'escalated'.
+    pre_line_count = _count_queue_lines()
 
     log('INFO', f'invoking run_medic.sh with batch={batch_path.name} '
                 f'count={len(batch)}')
@@ -529,33 +666,65 @@ def main(argv: Optional[list[str]] = None) -> int:
     log('INFO', f'run_medic.sh returned rc={rc}')
 
     newly_acted = medic_ledger.acted_fingerprints() - acted_before
+    medic_records = _read_medic_records_since(pre_line_count)
+    batch_fps = {entry['fingerprint'] for entry in batch}
+    delivered_fps = _delivered_fingerprints(medic_records, batch_fps)
 
-    # Advance offset past everything we consumed, regardless of operator
-    # exit code -- the ledger fingerprint dedup (PR2) handles re-trips,
-    # and leaving the offset behind would re-burn cost on the same batch.
-    if last_consumed_idx is not None:
-        _advance_offset(last_consumed_idx + 1)
-
-    # Record one ledger entry per owned alert as outcome=escalated -- EXCEPT
-    # any fingerprint medic_actions.py recorded as acted during this run (its
-    # action-time record is authoritative; the dispatcher must not duplicate
-    # or overwrite it). Attempt = prior_attempts + 1 so the
-    # one-action-per-fingerprint guard has the data.
+    # Delivery-gated recording. An owned alert is "handled" only if (a)
+    # medic_actions.py recorded it 'acted' this run, or (b) a matching
+    # source='medic' escalation actually landed in the queue this run. Any
+    # other owned alert is recorded 'escalate-failed' and its queue line is
+    # held (the offset does not advance past it) so the next tick retries --
+    # UNLESS it has already failed ESCALATE_FAILED_RETRY_LIMIT times, in which
+    # case we emit one meta-alert and let the offset advance past it so a
+    # permanently-undeliverable fingerprint cannot wedge the cursor forever.
+    blocking_indices: list[int] = []
     for entry in batch:
         fp = entry['fingerprint']
+        attempt = int(entry.get('prior_attempts', 0)) + 1
         if fp in newly_acted:
             log('INFO', f'fingerprint {fp} recorded as acted by medic_actions '
                         'this run; skipping dispatcher post-record')
             continue
-        attempt = int(entry.get('prior_attempts', 0)) + 1
+        if fp in delivered_fps:
+            medic_ledger.append_record(
+                source=entry.get('source'),
+                subject=entry.get('subject'),
+                classification=entry['owned_class']['action_tier_hint'],
+                outcome='escalated',
+                attempt=attempt,
+                notes=f'escalated (delivered this run); batch={batch_path.name}',
+            )
+            continue
+        # Not acted, not delivered -> the escalation did not reach the queue.
+        prior_failed = medic_ledger.escalate_failed_count(fp)
         medic_ledger.append_record(
             source=entry.get('source'),
             subject=entry.get('subject'),
             classification=entry['owned_class']['action_tier_hint'],
-            outcome='escalated',
+            outcome='escalate-failed',
             attempt=attempt,
-            notes=f'escalated (not acted this run); batch={batch_path.name}',
+            notes=('no source=medic delivery detected this run; '
+                   f'batch={batch_path.name}'),
         )
+        if prior_failed + 1 >= ESCALATE_FAILED_RETRY_LIMIT:
+            log('WARN', f'fingerprint {fp} failed to deliver '
+                        f'{prior_failed + 1} times; emitting meta-alert and '
+                        'advancing past it (auto-retry exhausted)')
+            _emit_delivery_failure_meta_alert(entry, prior_failed + 1)
+            # Auto-retry exhausted: not a blocking line; allow advance past it.
+        else:
+            log('INFO', f'fingerprint {fp} not delivered this run; holding '
+                        f'offset at line {entry["line_index"]} for retry')
+            blocking_indices.append(entry['line_index'])
+
+    # Advance the offset past everything we consumed -- but never past the
+    # earliest still-retrying undelivered owned alert, so it retries next tick.
+    if last_consumed_idx is not None:
+        advance_target = last_consumed_idx + 1
+        if blocking_indices:
+            advance_target = min(advance_target, min(blocking_indices))
+        _advance_offset(advance_target)
 
     return 0 if rc == 0 else 1
 
