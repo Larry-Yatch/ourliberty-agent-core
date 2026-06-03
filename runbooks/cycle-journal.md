@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 638 — 2026-06-03 00:28 UTC (interactive)
+
+**Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1152** (ADVANCED +2 — alerts idx=1150+1151: by-design expected outputs, see Check 0). Sync: ✅ `status=no-change`, `last_sync=2026-06-02T23:37:43Z` (~51 min old at check; within 2h threshold; FRESH). Healer heartbeat: **00:18:42Z** (UNCHANGED from iter 637; ~9.8 min old at 00:28Z check; FRESH within 90-min threshold; next sweep ~00:48Z). **7/7 services active.** **0 open PRs.** Beacon inbox: **34 tasks** (all OAuth-blocked; carry-forward). Forge inbox: **1 task** — `fix-advancer-reconcile-gh-failure-recovery-20260602T234551Z.json` (OAuth-blocked; carry-forward).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1152 lines** (+2 since iter 637). Alerts idx=1150 (`source=ledger, subject=weekly-2026-06-01`) and idx=1151 (`source=pulse, subject=check-i-2026-06-01`). Both already delivered by beacon-bot at 00:26:47Z UTC. Both are by-design expected outputs (Ledger's weekly cost run + Pulse's own Check I digest from iter 637). Neither `ledger` nor `pulse` source keys are in `config/alert-translations.json` → technically Tier 4 (novel), but per Larry's stated preference (alerts-actionable-only: suppress expected-by-design noise) → journal note only, no DM, no dispatch. G-rule 1/3 each (see Patterns below).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (by-design suppression).** 2 new alerts (idx=1150-1151) — ledger weekly report + Pulse Check I digest. Both by-design; already beacon-delivered; no action needed. Journal note only. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 2026-06-03T00:20:00Z --priority warning` → 0 entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon-bot delivered 2 by-design DM alerts at 00:26:47Z (ledger weekly + Check I digest). No Larry directives, no agent-distress signals. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ACTIVE STALLS (carry-forward, UNCHANGED).** alert-cooldown/warning/: **27** heal-pipeline-stall keyed files (stable). 114 total cooldown files (stable; deploy-notifier GC gap known pattern). Root cause: Tier 2 OAuth expired. APPROVAL_REQUEST `Tier 2 OAuth restore` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Forge task stale; Beacon blocked by rotation-gate.** Forge inbox: 1 task `fix-advancer-reconcile-gh-failure-recovery-20260602T234551Z.json` (OAuth-blocked; carry-forward). Beacon inbox: 34 tasks (all OAuth-blocked; all past stale threshold). Root cause unchanged: Tier 2 OAuth expired. No Pulse action available. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **00:18:42Z** (UNCHANGED; ~9.8 min old at 00:28Z check; FRESH within 90-min threshold; next sweep ~00:48Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** session-start gitStatus: branch=main, clean, HEAD=0032300 ("Pulse cycle 20260603T002451Z" — iter 637 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: `status=no-change`, `last_sync=2026-06-02T23:37:43Z` (~51 min old; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST still open. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Forge recovery task stale; Beacon rotation-gate blocked.** 0 open PRs. Forge 1 task (OAuth-blocked; carry-forward). Beacon 34 tasks (OAuth-blocked; carry-forward). No action available. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d; outside 60d window). CLAUDE_MAX_OAUTH stale (carry-forward; APPROVAL_REQUEST pending). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired at iter 637 (00:22Z today) — skip this iter. Check VIII/IX/X (Monday only) — skip. Check III (next 2026-06-14) — skip. ✅
+
+- **G-rule watch:**
+  - **NEW: `source:ledger / subject:weekly-* not in alert-translations.json`: 1/3** (iter 638, first observation). Weekly ledger cost report delivered by beacon-bot; no source key in allowlist. At 3/3: dispatch to Beacon to add `source:ledger` with subject-pattern `weekly-*` as Tier 3/FYI in `config/alert-translations.json`.
+  - **NEW: `source:pulse / subject:check-i-* not in alert-translations.json`: 1/3** (iter 638, first observation). Pulse's own Check I digest delivered by beacon-bot; no source key in allowlist. At 3/3: dispatch to Beacon to add `source:pulse` with subject-pattern `check-i-*` as Tier 3/FYI in `config/alert-translations.json`.
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (stable; iters 593+599; no new occurrence).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (stable; iter 584; no new occurrence).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **1/3** (stable; iter 625; self-resolved).
+  - `heal-stale-daemon-code WARNING for successful auto-restart`: **3/3 — DISPATCHED (iter 592); Beacon consumed dispatch (~18:51Z June 2); Forge brief MISSING.** [yellow] escalation idx=9 stands. Stall now **~5h37m** post-Beacon-consumption.
+  - All other G-rules stable. Steady-state degraded hold: **262nd iter in series (377–638)**.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; skip. All other periodic gates closed.
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 services active; pipeline stall carry-forward; all inbox stalls OAuth-gated).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ts: 2026-06-03T00:28:32.018199+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T00:28:32.361390+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Tier 2 OAuth stall (APPROVAL_REQUEST pending; [yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 22nd total (self-recovered iter 631; APPROVAL_REQUEST still open). `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (~5h37m post-Beacon-consumption; [yellow] escalation idx=9 stands).
+
+**Patterns:**
+- **2 new G-rules (1/3 each): `ledger` and `pulse` sources not in alert-translations.json allowlist.** Both source types deliver periodic by-design summary DMs (weekly ledger cost report; Pulse Check I digest). Beacon-bot already delivers them to Larry's Telegram; they create watermark noise at Check 0 each occurrence. At 3/3: batch dispatch to Beacon to add both patterns as Tier 3/FYI in the allowlist.
+- **Healer heartbeat UNCHANGED at 00:18:42Z.** ~9.8 min old at check; FRESH. Next sweep ~00:48Z. Consistent ~30-min cadence.
+- **System quiescent.** 0 new actionable alerts, 0 WARNING logs since iter 637, 0 open PRs. All active signals Larry-gated pending Tier 2 OAuth restore.
+
+**Learned:** `source:ledger` and `source:pulse` are recurring alert sources not yet in the allowlist. These are the system's own self-generated digests. Adding them to alert-translations.json will silence Check 0 noise on every future ledger weekly run and Check I fire.
+
+---
+
 ## Iteration 637 — 2026-06-03 00:22 UTC (interactive)
 
 **Health:** ⚠️ Degraded — Tier 1, consecutive_clean=0. Active pipeline stalls (Tier 2 OAuth expired, carry-forward). Alert watermark: **1150** (UNCHANGED — 0 new alerts since iter 636). Sync: ✅ `status=no-change`, `last_sync=2026-06-02T23:37:43Z` (~44 min old at check; within 2h threshold; FRESH). Healer heartbeat: **00:18:42Z** (ADVANCED +30m from 23:48:27Z at iter 636; ~4 min old at check; FRESH; confirms ~30-min cadence; next sweep ~00:48Z). **7/7 services active.** **0 open PRs.** Beacon inbox: **34 tasks** (all OAuth-blocked; carry-forward). Forge inbox: **1 task** — `fix-advancer-reconcile-gh-failure-recovery-20260602T234551Z.json` (~1h41m old at check; past 1h stale threshold; Forge OAuth-blocked; carry-forward).
