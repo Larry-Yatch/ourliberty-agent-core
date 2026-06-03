@@ -388,36 +388,16 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         invoke.assert_called_once()
         self.assertEqual(medic_dispatcher._read_offset(), 1)
 
-    def test_hot_event_count_defers(self) -> None:
-        # Event count over the default threshold -> defer. No batch,
-        # no operator invocation, offset unchanged.
+    def test_high_soft_event_count_no_cooldown_proceeds(self) -> None:
+        # The 2026-06-02 incident shape: a high soft 429-event count (200 --
+        # dominated by Beacon's normal chat/opus chatter) with NO hard
+        # cooldown must NOT defer. The soft count is advisory-only now; the
+        # hard cooldown is the sole deferral trigger.
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
         ])
-        events_over = medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS + 1
         with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
-                               return_value=events_over), \
-                mock.patch.object(medic_dispatcher,
-                                  '_active_tier_in_rate_limit_cooldown',
-                                  return_value=False), \
-                self._patch_invoke() as invoke:
-            rc = medic_dispatcher.main([])
-        self.assertEqual(rc, 0)
-        invoke.assert_not_called()
-        # Unprocessed owned alert must be retried next tick.
-        self.assertEqual(medic_dispatcher._read_offset(), 0)
-
-    def test_high_soft_event_count_below_backstop_proceeds(self) -> None:
-        # The 2026-06-02 incident shape: a high soft 429-event count (15 --
-        # Beacon's normal chat/opus chatter) with NO hard cooldown must NOT
-        # defer now that the default threshold is a flood backstop (100).
-        # Hard cooldown is the primary gate; soft chatter is not a defer.
-        _write_alerts(medic_dispatcher.ALERTS_FILE, [
-            _alert('sentinel', 'inbox-stall:agent-a'),
-        ])
-        self.assertGreater(medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS, 15)
-        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
-                               return_value=15), \
+                               return_value=200), \
                 mock.patch.object(medic_dispatcher,
                                   '_active_tier_in_rate_limit_cooldown',
                                   return_value=False), \
@@ -445,22 +425,6 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         invoke.assert_not_called()
         self.assertEqual(medic_dispatcher._read_offset(), 0)
 
-    def test_event_count_at_threshold_does_not_defer(self) -> None:
-        # Boundary: events == threshold should NOT defer (we defer on
-        # strict >); confirms threshold semantics.
-        _write_alerts(medic_dispatcher.ALERTS_FILE, [
-            _alert('sentinel', 'inbox-stall:agent-a'),
-        ])
-        at_threshold = medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS
-        with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
-                               return_value=at_threshold), \
-                mock.patch.object(medic_dispatcher,
-                                  '_active_tier_in_rate_limit_cooldown',
-                                  return_value=False), \
-                self._patch_invoke() as invoke:
-            medic_dispatcher.main([])
-        invoke.assert_called_once()
-
     def test_active_tier_cooldown_defers(self) -> None:
         # No 429 events but a tier cooldown is active -> defer.
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
@@ -477,10 +441,10 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
         invoke.assert_not_called()
         self.assertEqual(medic_dispatcher._read_offset(), 0)
 
-    def test_event_gauge_raises_fails_open(self) -> None:
-        # A broken gauge must NOT permanently silence Medic: the
-        # per-session timeout + lock are the real blast-radius bound.
-        # Event shim raises -> _rate_window_ok() returns True (fail open).
+    def test_event_gauge_raises_does_not_block(self) -> None:
+        # The soft 429-event gauge is advisory-only: a raise from it must NOT
+        # block dispatch (and must not even be observed as a gate). The
+        # cooldown gate is cool, so the tick proceeds normally.
         _write_alerts(medic_dispatcher.ALERTS_FILE, [
             _alert('sentinel', 'inbox-stall:agent-a'),
         ])
@@ -489,53 +453,28 @@ class RateWindowGaugeTest(_IsolatedDispatcher):
                 mock.patch.object(medic_dispatcher,
                                   '_active_tier_in_rate_limit_cooldown',
                                   return_value=False), \
-                self._patch_invoke() as invoke:
+                self._patch_invoke_delivering(
+                    ['sentinel:inbox-stall:agent-a']) as invoke:
             rc = medic_dispatcher.main([])
-        # Fail-open: gauge raise must NOT block dispatch.
+        # Advisory gauge raise must NOT block dispatch.
         self.assertEqual(rc, 0)
         invoke.assert_called_once()
-        # Cooldown is the primary gate and returns False (cool) here; the
-        # flood-backstop event gauge then raises -> _rate_window_ok() fails
-        # open and returns True. Sanity-check the helper in isolation too
-        # (the cool-cooldown shim from setUp keeps the primary gate clear).
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+        # Sanity-check the helper in isolation: cooldown cool (setUp shim) +
+        # advisory event gauge raising -> still ok.
         with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
                                side_effect=RuntimeError('gauge boom')):
             self.assertTrue(medic_dispatcher._rate_window_ok())
 
     def test_active_tier_gauge_raises_fails_open(self) -> None:
-        # Same fail-open contract for the active-tier gauge.
+        # The cooldown gauge is the sole gate; a raise from it must fail open
+        # so a broken gauge cannot permanently silence Medic.
         with mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
                                return_value=0), \
                 mock.patch.object(medic_dispatcher,
                                   '_active_tier_in_rate_limit_cooldown',
                                   side_effect=OSError('cooldown read boom')):
             self.assertTrue(medic_dispatcher._rate_window_ok())
-
-    def test_threshold_env_override(self) -> None:
-        # Setting OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS=0 makes any
-        # nonzero event count a defer.
-        _write_alerts(medic_dispatcher.ALERTS_FILE, [
-            _alert('sentinel', 'inbox-stall:agent-a'),
-        ])
-        with mock.patch.dict(os.environ,
-                             {medic_dispatcher.RATE_WINDOW_MAX_EVENTS_ENV_VAR:
-                                  '0'}), \
-                mock.patch.object(medic_dispatcher, '_recent_rate_limit_events',
-                                  return_value=1), \
-                mock.patch.object(medic_dispatcher,
-                                  '_active_tier_in_rate_limit_cooldown',
-                                  return_value=False), \
-                self._patch_invoke() as invoke:
-            medic_dispatcher.main([])
-        invoke.assert_not_called()
-        self.assertEqual(medic_dispatcher._read_offset(), 0)
-
-    def test_threshold_env_malformed_uses_default(self) -> None:
-        with mock.patch.dict(os.environ,
-                             {medic_dispatcher.RATE_WINDOW_MAX_EVENTS_ENV_VAR:
-                                  'not-an-int'}):
-            self.assertEqual(medic_dispatcher._rate_window_max_events(),
-                             medic_dispatcher.DEFAULT_RATE_WINDOW_MAX_EVENTS)
 
 
 class EmptyBatchFastExitTest(_IsolatedDispatcher):

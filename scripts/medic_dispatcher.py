@@ -78,8 +78,8 @@ RUN_MEDIC_TIMEOUT_SEC = 20 * 60
 
 ENABLE_ENV_VAR = 'OURLIBERTY_MEDIC_ENABLED'
 
-# Rate-window gate. The PRIMARY protection is the hard per-tier rate_limit
-# cooldown; a soft 429-event count is only a true-flood backstop.
+# Rate-window gate. The ONLY deferral trigger is the hard per-tier rate_limit
+# cooldown.
 #
 #   * `active_tier.cooldown_until(tier)` -- per-tier cooldown set by the
 #     rotation scheduler when a rate_limit actually fires. If EITHER tier has
@@ -88,19 +88,14 @@ ENABLE_ENV_VAR = 'OURLIBERTY_MEDIC_ENABLED'
 #   * `heal_claude_max_burn_rate.recent_rate_limit_event_count()` -- count of
 #     HTTP 429 / rate-limit events in the trailing window. This gauge counts
 #     ALL account 429s, which are dominated by Beacon's normal chat / opus
-#     traffic, so a handful of soft blips is NOT a reason to defer. We keep it
-#     ONLY as a flood backstop: defer if the count exceeds the configurable
-#     threshold (env OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS), whose default is
-#     deliberately high (a flood, not chatter). Before 2026-06-02 the default
-#     was 2, which made Medic defer on nearly every tick despite no hard
-#     cooldown; raised to a flood-scale default here so the interim systemd
-#     drop-in (override.conf setting the env to 100) becomes redundant.
+#     traffic (e.g. 105 events with NO hard cooldown on either tier, observed
+#     2026-06-02), so it is NOT a valid proxy for "Medic must back off" and is
+#     no longer a deferral trigger. It is kept ONLY as an INFO-logged advisory
+#     so the gauge stays visible in the dispatcher log.
 #
-# Fail-open: on any read / import error from the gauges, log WARN and return
-# True. A gauge bug must not permanently silence Medic; the per-session
+# Fail-open: on a read / import error from the cooldown gauge, log WARN and
+# return True. A gauge bug must not permanently silence Medic; the per-session
 # timeout in run_medic.sh plus the concurrency lock bound the blast radius.
-RATE_WINDOW_MAX_EVENTS_ENV_VAR = 'OURLIBERTY_MEDIC_RATE_WINDOW_MAX_EVENTS'
-DEFAULT_RATE_WINDOW_MAX_EVENTS = 100
 
 # Delivery-failure bound. An owned alert whose escalation never reaches the
 # queue is recorded 'escalate-failed' and retried next tick (its offset line
@@ -145,25 +140,6 @@ def _kill_switches_clear() -> bool:
     return not MEDIC_KILL_SWITCH.exists() and not HEALERS_KILL_SWITCH.exists()
 
 
-def _rate_window_max_events() -> int:
-    """Resolve the configurable rate-limit-events threshold. Bad/missing
-    env value falls back to the default and WARN-logs."""
-    raw = os.environ.get(RATE_WINDOW_MAX_EVENTS_ENV_VAR, '').strip()
-    if not raw:
-        return DEFAULT_RATE_WINDOW_MAX_EVENTS
-    try:
-        value = int(raw)
-    except ValueError:
-        log('WARN', f'{RATE_WINDOW_MAX_EVENTS_ENV_VAR}={raw!r} not an int; '
-                    f'using default {DEFAULT_RATE_WINDOW_MAX_EVENTS}')
-        return DEFAULT_RATE_WINDOW_MAX_EVENTS
-    if value < 0:
-        log('WARN', f'{RATE_WINDOW_MAX_EVENTS_ENV_VAR}={value} negative; '
-                    f'using default {DEFAULT_RATE_WINDOW_MAX_EVENTS}')
-        return DEFAULT_RATE_WINDOW_MAX_EVENTS
-    return value
-
-
 def _recent_rate_limit_events() -> int:
     """Read the trailing-window 429 count from the burn-rate healer.
     Lazy import so dispatcher startup does not depend on the healer
@@ -186,18 +162,19 @@ def _active_tier_in_rate_limit_cooldown() -> bool:
 
 
 def _rate_window_ok() -> bool:
-    """Rolling rate-limit window gate. The hard per-tier cooldown is the
-    PRIMARY gate; the soft 429-event count is only a flood backstop.
+    """Rate-limit window gate. The hard per-tier cooldown is the SOLE
+    deferral trigger.
 
-    Returns False (defer this tick) when an OAuth tier is in a rate_limit
-    cooldown OR recent rate-limit events exceed the (deliberately high)
-    flood threshold. Fail-open on gauge error: a broken gauge must not
-    permanently silence Medic; the per-session timeout in run_medic.sh and
-    the lock bound the blast radius.
+    Returns False (defer this tick) only when an OAuth tier is in a
+    rate_limit cooldown -- the real signal that the next Medic run would
+    compete for a genuinely exhausted window. The recent 429-event count is
+    NOT a gate: it counts all-account 429s dominated by Beacon's normal chat
+    traffic, so it is logged as an advisory only.
+
+    Fail-open on cooldown-gauge error: a broken gauge must not permanently
+    silence Medic; the per-session timeout in run_medic.sh and the lock bound
+    the blast radius.
     """
-    # PRIMARY gate: a hard per-tier rate_limit cooldown is the real
-    # protection. If either tier is cooling down, defer regardless of how
-    # much soft 429 chatter the background traffic is generating.
     try:
         in_cooldown = _active_tier_in_rate_limit_cooldown()
     except Exception as e:
@@ -208,21 +185,16 @@ def _rate_window_ok() -> bool:
         log('INFO', 'rate-window hot: an OAuth tier is in rate-limit '
                     'cooldown; deferring')
         return False
-    # BACKSTOP only: defer on a genuine flood of recent 429 events. The
-    # default threshold is deliberately high because the gauge counts ALL
-    # account 429s (dominated by normal chat / opus traffic); this is a
-    # flood backstop, NOT a chatter gate.
-    threshold = _rate_window_max_events()
+    # Advisory only: surface the soft 429-event gauge in the log so it stays
+    # visible, but never let it gate. A read failure here must not affect the
+    # decision (the cooldown gate above already passed).
     try:
         events = _recent_rate_limit_events()
+        log('INFO', f'rate-window cool: no tier cooldown; proceeding '
+                    f'(advisory recent rate-limit events={events})')
     except Exception as e:
-        log('WARN', f'rate-window event gauge read failed '
-                    f'({type(e).__name__}: {e}); failing open')
-        return True
-    if events > threshold:
-        log('INFO', f'rate-window flood backstop: {events} recent rate-limit '
-                    f'events > threshold {threshold}; deferring')
-        return False
+        log('INFO', f'rate-window cool: no tier cooldown; proceeding '
+                    f'(advisory event gauge read failed: {type(e).__name__})')
     return True
 
 
