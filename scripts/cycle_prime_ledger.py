@@ -16,7 +16,8 @@ Row schema::
       "ts": "<iso8601 utc>",
       "iter": <int>,
       "tier": <int>,
-      "kind": "intervention" | "systemic_fix" | "verification_pending",
+      "kind": "intervention" | "systemic_fix" | "verification_pending"
+              | "iter_clean",
       "intervention_id": "<str>",
       "fix_commit_sha": "<str>"|null,
       "chain_event_id": <int>|null,
@@ -47,7 +48,32 @@ from typing import Any, Iterable, Optional
 LEDGER_REL = 'blackboard/cycle-prime-ledger.jsonl'
 LOG_REL = 'logs/cycle-prime-ledger.log'
 
-VALID_KINDS = ('intervention', 'systemic_fix', 'verification_pending')
+VALID_KINDS = (
+    'intervention',
+    'systemic_fix',
+    'verification_pending',
+    # iter_clean is a non-intervention heartbeat: it marks that a cycle iter
+    # ran and its checks were clean (no intervention happened). It is recorded
+    # so the ledger keeps a per-iter liveness signal, but Check V's ratio +
+    # per-template aggregation count only intervention/systemic_fix, so an
+    # iter_clean row never pollutes the PRIME DIRECTIVE denominator. Clean iters
+    # used to be (wrongly) logged as kind=intervention with an empty id — that
+    # is the cause-(b) mislabel this kind fixes.
+    'iter_clean',
+)
+
+# Recording a row of one of these kinds requires a template (the stable prefix
+# of intervention_id). If a caller omits it, the write layer normalizes to the
+# reserved UNCATEGORIZED_TEMPLATE rather than writing an untaggable empty-id row
+# — so an untagged *real* intervention is preserved as a visible, countable,
+# single-bucket data point instead of being silently lost.
+TEMPLATE_REQUIRED_KINDS = ('intervention', 'systemic_fix')
+
+# The "classify me" bucket. Never an auto-fix pattern, permanently non-
+# graduating (config/auto-fix-patterns.json marks it permanent_guard; Check V
+# refuses to graduate it). Every untagged required-kind row buckets here under
+# ONE stable template so _template_of does not fragment them per row.
+UNCATEGORIZED_TEMPLATE = 'uncategorized'
 
 # An intervention_id is "<template>:<detail>". The template is the stable
 # kebab-case prefix Check V aggregates on (pulse_check_v._template_of splits
@@ -142,20 +168,54 @@ def canonical_intervention_id(template: str, detail: str = '') -> str:
     return f'{template}:{detail}'
 
 
+def _normalize_intervention_id(kind: str, intervention_id: str,
+                               *, iter_num: Optional[int],
+                               detail: Optional[str]) -> str:
+    """Enforce: a row whose kind requires a template MUST carry one.
+
+    If ``kind`` is template-required and ``intervention_id`` is empty (the
+    caller omitted ``--template``), normalize to ``uncategorized:<detail-or-iter>``
+    so the data point is preserved, buckets under one stable template, and is
+    visibly flagged for classification — instead of writing an untaggable
+    empty-id row. Non-empty ids (legacy ``--payload`` path) and non-required
+    kinds (``iter_clean``, ``verification_pending``) pass through untouched.
+    """
+    iid = str(intervention_id or '')
+    if kind in TEMPLATE_REQUIRED_KINDS and not iid:
+        if detail is not None and str(detail) != '':
+            fallback = str(detail)
+        elif iter_num is not None:
+            fallback = f'iter-{int(iter_num)}'
+        else:
+            fallback = 'iter-0'
+        iid = canonical_intervention_id(UNCATEGORIZED_TEMPLATE, fallback)
+        _log(f'untagged {kind} row normalized to {iid!r} (no --template '
+             'supplied); classify it and re-tag the action', 'WARN')
+    return iid
+
+
 def append_action(tier: int, kind: str, payload: dict[str, Any],
-                  *, iter_num: Optional[int] = None) -> dict[str, Any]:
+                  *, iter_num: Optional[int] = None,
+                  detail: Optional[str] = None) -> dict[str, Any]:
     """Append one ledger row. Returns the written record (caller may keep
-    the intervention_id for later promote_verification_pending calls)."""
+    the intervention_id for later promote_verification_pending calls).
+
+    ``detail`` is an optional fallback used only when normalizing an untagged
+    template-required row to the uncategorized bucket (see
+    ``_normalize_intervention_id``)."""
     if kind not in VALID_KINDS:
         raise ValueError(f'invalid kind={kind!r}; expected one of {VALID_KINDS}')
     if not isinstance(tier, int) or tier < 1 or tier > 3:
         raise ValueError(f'invalid tier={tier!r}')
+    intervention_id = _normalize_intervention_id(
+        kind, str(payload.get('intervention_id') or ''),
+        iter_num=iter_num, detail=detail)
     record: dict[str, Any] = {
         'ts': _now_iso(),
         'iter': int(iter_num) if iter_num is not None else 0,
         'tier': int(tier),
         'kind': kind,
-        'intervention_id': str(payload.get('intervention_id') or ''),
+        'intervention_id': intervention_id,
         'fix_commit_sha': payload.get('fix_commit_sha'),
         'chain_event_id': payload.get('chain_event_id'),
         'verifies_at': payload.get('verifies_at'),
@@ -357,11 +417,14 @@ def _cli_append(args) -> int:
         except ValueError as exc:
             print(f'error: {exc}', file=sys.stderr)
             return 2
-    elif args.detail is not None:
+    elif args.detail is not None and args.kind not in TEMPLATE_REQUIRED_KINDS:
+        # For non-required kinds a bare --detail has nowhere to go; keep the
+        # strict error. For required kinds it feeds the uncategorized fallback
+        # below, so a real intervention that only knew its detail is preserved.
         print('error: --detail requires --template', file=sys.stderr)
         return 2
     rec = append_action(tier=args.tier, kind=args.kind, payload=payload,
-                        iter_num=args.iter)
+                        iter_num=args.iter, detail=args.detail)
     print(json.dumps(rec))
     return 0
 
@@ -387,11 +450,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_app.add_argument('--iter', type=int, default=0)
     p_app.add_argument('--template',
                        help='Action-template id (kebab-case, '
-                            '^[a-z][a-z0-9-]*$). Preferred over a pre-joined '
-                            'intervention_id: it is validated + joined with '
-                            '--detail into "<template>:<detail>" so Check V can '
-                            'aggregate a per-template streak. A non-conforming '
-                            'template exits non-zero and writes nothing.')
+                            '^[a-z][a-z0-9-]*$). MANDATORY for --kind '
+                            'intervention/systemic_fix: it is validated + '
+                            'joined with --detail into "<template>:<detail>" so '
+                            'Check V can aggregate a per-template streak. A '
+                            'non-conforming template exits non-zero and writes '
+                            'nothing. If omitted on a required kind, the row is '
+                            'NOT dropped — it normalizes to '
+                            '"uncategorized:<detail-or-iter>" (a visible, single '
+                            'classify-me bucket). Clean iters use --kind '
+                            'iter_clean and need no template.')
     p_app.add_argument('--detail', default=None,
                        help='Free-form variable part of the intervention_id '
                             '(e.g. the affected unit name). Requires --template.')

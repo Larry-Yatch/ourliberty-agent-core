@@ -98,6 +98,60 @@ class TestRunCheckGraduate(unittest.TestCase):
         self.assertEqual(graduates, [])
 
 
+class TestUncategorizedBucket(unittest.TestCase):
+    """The reserved 'uncategorized' template (the ledger's classify-me bucket
+    for untagged interventions) must aggregate into ONE stable bucket and
+    must NEVER graduate, regardless of track record."""
+
+    def _uncat_row(self, *, kind: str, detail: str, days_ago: float) -> dict:
+        return {
+            'ts': (NOW - timedelta(days=days_ago)).isoformat(),
+            'kind': kind,
+            'tier': 1,
+            'intervention_id': f'uncategorized:{detail}',
+            'payload': {},
+        }
+
+    def test_uncategorized_rows_bucket_to_single_template(self):
+        rows = [
+            self._uncat_row(kind='intervention', detail=f'iter-{i}', days_ago=i)
+            for i in range(5)
+        ]
+        stats = p5.compute_template_stats(rows, now=NOW)
+        self.assertEqual(set(stats.keys()), {'uncategorized'})
+        self.assertEqual(stats['uncategorized'].dispatch_count_90d, 5)
+
+    def test_uncategorized_never_graduates_even_if_guarded(self):
+        """Even with >=10 dispatches, 0 Larry-mods, AND present in the guard
+        list, uncategorized produces no graduate proposal — it is reserved
+        non-graduating."""
+        rows = [
+            self._uncat_row(kind='systemic_fix', detail=f'iter-{i}', days_ago=i)
+            for i in range(12)
+        ]
+        result = p5.run_check(rows=rows,
+                              guard_list={'uncategorized'}, now=NOW)
+        graduates = [p for p in result.proposals if p.kind == 'graduate']
+        self.assertEqual(graduates, [])
+
+    def test_real_template_still_graduates_alongside(self):
+        """The guard is scoped to 'uncategorized' only — a real template in
+        the same run still graduates."""
+        rows = [
+            _row(kind='systemic_fix', template='restart-daemon', days_ago=i)
+            for i in range(10)
+        ]
+        rows += [
+            self._uncat_row(kind='systemic_fix', detail=f'iter-{i}', days_ago=i)
+            for i in range(12)
+        ]
+        result = p5.run_check(
+            rows=rows, guard_list={'restart-daemon', 'uncategorized'}, now=NOW)
+        graduated = {p.template for p in result.proposals
+                     if p.kind == 'graduate'}
+        self.assertEqual(graduated, {'restart-daemon'})
+
+
 class TestRunCheckAddToGuard(unittest.TestCase):
 
     def test_add_to_guard_on_recent_correction(self):

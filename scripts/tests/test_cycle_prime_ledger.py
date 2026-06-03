@@ -287,8 +287,22 @@ class TestCliTemplateTagging(_LedgerTestBase):
         self.assertFalse(self._ledger_path().exists(),
                          'a malformed tag must never write a ledger row')
 
-    def test_cli_detail_without_template_exits_nonzero(self):
+    def test_cli_detail_without_template_normalizes_for_required_kind(self):
+        """A required kind (intervention) with --detail but no --template no
+        longer hard-errors — it normalizes to uncategorized:<detail> so the
+        data point survives instead of being dropped."""
         rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--detail', 'orphan-detail'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(rows[0]['intervention_id'],
+                         'uncategorized:orphan-detail')
+
+    def test_cli_detail_without_template_errors_for_nonrequired_kind(self):
+        """iter_clean is not template-required; a bare --detail has nowhere
+        to go, so the strict error is preserved."""
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'iter_clean',
                        '--detail', 'orphan-detail'])
         self.assertNotEqual(rc, 0)
         self.assertFalse(self._ledger_path().exists())
@@ -301,6 +315,120 @@ class TestCliTemplateTagging(_LedgerTestBase):
         rows = [json.loads(l) for l in
                 self._ledger_path().read_text().splitlines() if l.strip()]
         self.assertEqual(rows[0]['intervention_id'], 'legacy-id')
+
+
+class TestTemplateEnforcement(_LedgerTestBase):
+    """A row whose kind requires a template MUST carry one. If the caller
+    omits it, the write layer normalizes to a single uncategorized bucket
+    rather than writing an untaggable empty-id row (no data loss, no
+    fragmentation)."""
+
+    def _template_of(self, intervention_id: str) -> str:
+        return intervention_id.split(':', 1)[0]
+
+    def test_intervention_without_template_normalizes_to_uncategorized(self):
+        rec = cpl.append_action(tier=1, kind='intervention', payload={},
+                                iter_num=770)
+        self.assertEqual(rec['intervention_id'], 'uncategorized:iter-770')
+        self.assertNotEqual(rec['intervention_id'], '')
+
+    def test_systemic_fix_without_template_normalizes_to_uncategorized(self):
+        rec = cpl.append_action(tier=1, kind='systemic_fix', payload={},
+                                iter_num=42)
+        self.assertEqual(self._template_of(rec['intervention_id']),
+                         'uncategorized')
+
+    def test_uncategorized_rows_share_one_template_bucket(self):
+        """No fragmentation: untagged rows from different iters all bucket
+        under the single 'uncategorized' template."""
+        ids = []
+        for it in (767, 768, 769, 770, 771):
+            rec = cpl.append_action(tier=1, kind='intervention', payload={},
+                                    iter_num=it)
+            ids.append(rec['intervention_id'])
+        templates = {self._template_of(i) for i in ids}
+        self.assertEqual(templates, {'uncategorized'})
+        # The details still differ per iter, so the rows are distinguishable.
+        self.assertEqual(len(set(ids)), 5)
+
+    def test_legacy_nonempty_id_not_normalized(self):
+        """The lenient --payload path is untouched: a non-empty id passes
+        through, even if it has no template-style colon."""
+        rec = cpl.append_action(tier=1, kind='intervention',
+                                payload={'intervention_id': 'legacy-id'})
+        self.assertEqual(rec['intervention_id'], 'legacy-id')
+
+    def test_explicit_detail_used_in_uncategorized_fallback(self):
+        rec = cpl.append_action(tier=1, kind='intervention', payload={},
+                                iter_num=5, detail='inbox-watcher')
+        self.assertEqual(rec['intervention_id'], 'uncategorized:inbox-watcher')
+
+    def test_cli_no_template_normalizes_to_uncategorized(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--iter', '770'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(rows[0]['intervention_id'], 'uncategorized:iter-770')
+
+
+class TestIterCleanKind(_LedgerTestBase):
+    """Clean/no-op iters record under a non-intervention kind so Check V's
+    denominator counts only genuine interventions."""
+
+    def test_iter_clean_is_a_valid_kind(self):
+        self.assertIn('iter_clean', cpl.VALID_KINDS)
+
+    def test_iter_clean_row_is_not_normalized(self):
+        """iter_clean is not template-required; it keeps an empty id and is
+        NOT turned into an uncategorized intervention."""
+        rec = cpl.append_action(tier=1, kind='iter_clean', payload={},
+                                iter_num=777)
+        self.assertEqual(rec['kind'], 'iter_clean')
+        self.assertEqual(rec['intervention_id'], '')
+
+    def test_iter_clean_excluded_from_ratio_denominator(self):
+        """A clean iter must NOT inflate the intervention count nor the
+        systemic_fix denominator."""
+        rows = [
+            _row(kind='intervention', hours_ago=1, intervention_id='t:a'),
+            _row(kind='systemic_fix', hours_ago=2, intervention_id='t:b'),
+        ]
+        rows += [_row(kind='iter_clean', hours_ago=h) for h in range(3, 8)]
+        out = cpl.compute_ratio_30d(rows=rows, now=NOW)
+        self.assertEqual(out['interventions'], 1)
+        self.assertEqual(out['systemic_fixes'], 1)
+        self.assertEqual(out['ratio'], 1.0)
+
+    def test_cli_iter_clean_writes_untagged_row(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'iter_clean',
+                       '--iter', '777'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(rows[0]['kind'], 'iter_clean')
+        self.assertEqual(rows[0]['intervention_id'], '')
+
+
+class TestReplayIters767To771(_LedgerTestBase):
+    """Acceptance: replaying the iters-767-771 condition (the cycle recording
+    a clean iter as an intervention without a template) must produce
+    tagged/correctly-kinded rows, never empty-id ones."""
+
+    def test_no_intervention_row_has_empty_id(self):
+        # The OLD broken behavior: --kind intervention, no template.
+        for it in range(767, 772):
+            cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                      '--iter', str(it)])
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        intervention_rows = [r for r in rows if r['kind'] == 'intervention']
+        self.assertEqual(len(intervention_rows), 5)
+        for r in intervention_rows:
+            self.assertTrue(r['intervention_id'],
+                            'no intervention row may have an empty id')
+            self.assertEqual(r['intervention_id'].split(':', 1)[0],
+                             'uncategorized')
 
 
 if __name__ == '__main__':

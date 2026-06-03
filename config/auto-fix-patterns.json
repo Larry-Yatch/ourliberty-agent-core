@@ -25,6 +25,21 @@
   },
   "patterns": [
     {
+      "template": "uncategorized",
+      "state": "probation",
+      "reversible": false,
+      "permanent_guard": true,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A reserved 'classify me' bucket — NOT a real action template. The ledger normalizes any intervention/systemic-fix recorded without a --template into 'uncategorized:<detail>' so the data point is preserved and visible instead of being dropped as an empty-id row.",
+        "action": "Never auto-fix. Someone reviews the row, identifies the real action class, and re-tags the action under its proper template. This bucket exists only so untagged interventions stay countable until classified.",
+        "why_safe": "It performs no action at all; it is a placeholder. It is permanent_guard=true and reversible=false purely so it can NEVER graduate to auto-fix — a classify-me bucket must always ask, by definition."
+      }
+    },
+    {
       "template": "reinstall-systemd-unit",
       "state": "probation",
       "reversible": true,

@@ -52,6 +52,14 @@ GRADUATE_LOOKBACK_DAYS = 90
 GRADUATE_MIN_DISPATCHES = 10
 ADD_LOOKBACK_DAYS = 30
 
+# Reserved templates that can NEVER graduate, regardless of track record. The
+# ledger normalizes any untagged intervention/systemic-fix into the
+# ``uncategorized`` bucket (cycle_prime_ledger.UNCATEGORIZED_TEMPLATE); it is a
+# "classify me" placeholder, not an auto-fix action, so a graduate proposal for
+# it would be meaningless. config/auto-fix-patterns.json also marks it
+# permanent_guard=true; this is the enforcement at the Check V layer.
+NEVER_GRADUATE_TEMPLATES = frozenset({'uncategorized'})
+
 
 def log(msg: str, level: str = 'INFO') -> None:
     ts = datetime.now(timezone.utc).isoformat()
@@ -228,7 +236,8 @@ def run_check(
     for template, stats in sorted(by_template.items()):
         # Rule 1: graduate (template is guarded + trusted).
         if (
-            template in guard_list
+            template not in NEVER_GRADUATE_TEMPLATES
+            and template in guard_list
             and stats.dispatch_count_90d >= GRADUATE_MIN_DISPATCHES
             and stats.larry_modifications_90d == 0
         ):

@@ -116,8 +116,15 @@ class TestSafetyInvariants(unittest.TestCase):
     def test_guard_floor_present(self):
         # Credential, money, and destructive floors must all be seeded guarded.
         guarded = {r['template'] for r in self.patterns if r['permanent_guard']}
-        self.assertEqual(
-            guarded, {'rotate-credential', 'issue-refund', 'delete-resource'})
+        safety_floor = {'rotate-credential', 'issue-refund', 'delete-resource'}
+        self.assertTrue(
+            safety_floor.issubset(guarded),
+            f'safety floor not guarded: {safety_floor - guarded}')
+        # 'uncategorized' is ALSO permanent_guard, but for a different reason:
+        # it is the non-graduating classify-me bucket the ledger normalizes
+        # untagged interventions into — not a destructive action. It must
+        # never graduate, so it carries permanent_guard=true too.
+        self.assertEqual(guarded, safety_floor | {'uncategorized'})
 
 
 class TestDerivedGuardedSet(unittest.TestCase):
