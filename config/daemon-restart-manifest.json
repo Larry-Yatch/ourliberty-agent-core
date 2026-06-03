@@ -1,0 +1,112 @@
+{
+  "_meta": {
+    "description": "Maps each persistent long-running daemon to the repo paths whose change requires restarting it on deploy. Consumed by sync_agent_core.sh (deploy restart) and heal_stale_daemon_code.py (healer backstop).",
+    "membership_rule": "Type=simple systemd unit in systemd/ with no sibling .timer.",
+    "regenerate": "python3 scripts/daemon_restart_manifest.py regenerate",
+    "note": "watch_paths are repo-relative POSIX paths derived from a transitive first-party import scan; commit + review changes rather than auto-deriving at runtime."
+  },
+  "units": {
+    "ourliberty-beacon-bot.service": {
+      "entrypoint": "scripts/beacon_telegram_bot.py",
+      "watch_paths": [
+        "scripts/active_tier.py",
+        "scripts/agent_runner.py",
+        "scripts/beacon_approval_handler.py",
+        "scripts/beacon_telegram_bot.py",
+        "scripts/catch_me_up.py",
+        "scripts/chain_event_emit.py",
+        "scripts/chain_event_shipper.py",
+        "scripts/concurrency_guard.py",
+        "scripts/dispatch_validator.py",
+        "scripts/larry_alerts.py",
+        "scripts/routing_validator.py",
+        "scripts/safe_write_inbox.py",
+        "scripts/telegram_text_utils.py",
+        "scripts/trust_policy.py"
+      ]
+    },
+    "ourliberty-chain-event-shipper.service": {
+      "entrypoint": "scripts/chain_event_shipper.py",
+      "watch_paths": [
+        "scripts/chain_event_shipper.py"
+      ]
+    },
+    "ourliberty-dashboard-api.service": {
+      "entrypoint": "scripts/dashboard_api.py",
+      "watch_paths": [
+        "scripts/chain_event_shipper.py",
+        "scripts/dashboard_api.py",
+        "scripts/triage_decisions.py"
+      ]
+    },
+    "ourliberty-forge-bot.service": {
+      "entrypoint": "scripts/agent_telegram_bot.py",
+      "watch_paths": [
+        "scripts/active_tier.py",
+        "scripts/agent_runner.py",
+        "scripts/agent_telegram_bot.py",
+        "scripts/concurrency_guard.py",
+        "scripts/larry_alerts.py",
+        "scripts/telegram_text_utils.py"
+      ]
+    },
+    "ourliberty-inbox-watcher.service": {
+      "entrypoint": "scripts/inbox_watcher.py",
+      "watch_paths": [
+        "scripts/active_tier.py",
+        "scripts/agent_runner.py",
+        "scripts/concurrency_guard.py",
+        "scripts/dispatch_lease.py",
+        "scripts/dispatch_validator.py",
+        "scripts/fixture_patterns.py",
+        "scripts/inbox_watcher.py",
+        "scripts/larry_alerts.py",
+        "scripts/routing_validator.py",
+        "scripts/task_type_inference.py",
+        "scripts/worktree_manager.py"
+      ]
+    },
+    "ourliberty-mirror-bot.service": {
+      "entrypoint": "scripts/agent_telegram_bot.py",
+      "watch_paths": [
+        "scripts/active_tier.py",
+        "scripts/agent_runner.py",
+        "scripts/agent_telegram_bot.py",
+        "scripts/concurrency_guard.py",
+        "scripts/larry_alerts.py",
+        "scripts/telegram_text_utils.py"
+      ]
+    },
+    "ourliberty-outbox-notifier.service": {
+      "entrypoint": "scripts/outbox_notifier.py",
+      "watch_paths": [
+        "scripts/beacon_approval_handler.py",
+        "scripts/build_sequence_validator.py",
+        "scripts/chain_event_emit.py",
+        "scripts/chain_event_shipper.py",
+        "scripts/dispatch_validator.py",
+        "scripts/fixture_patterns.py",
+        "scripts/forge_preflight_handler.py",
+        "scripts/larry_alerts.py",
+        "scripts/mirror_review_handler.py",
+        "scripts/outbox_notifier.py",
+        "scripts/routing_validator.py",
+        "scripts/safe_write_inbox.py",
+        "scripts/sequence_shortcut_helpers.py",
+        "scripts/trust_policy.py",
+        "scripts/worktree_manager.py"
+      ]
+    },
+    "ourliberty-pulse-bot.service": {
+      "entrypoint": "scripts/agent_telegram_bot.py",
+      "watch_paths": [
+        "scripts/active_tier.py",
+        "scripts/agent_runner.py",
+        "scripts/agent_telegram_bot.py",
+        "scripts/concurrency_guard.py",
+        "scripts/larry_alerts.py",
+        "scripts/telegram_text_utils.py"
+      ]
+    }
+  }
+}

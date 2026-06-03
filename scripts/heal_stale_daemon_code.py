@@ -176,6 +176,62 @@ SHARED_LIB_WATCHLIST: dict[Path, set[str]] = {
     },
 }
 
+# deploy-restart-gap-001 (2026-06-03). The committed restart manifest
+# (config/daemon-restart-manifest.json) maps each persistent Type=simple
+# daemon to the repo paths whose change must restart it — the transitive
+# first-party import closure of its entrypoint. The healer folds that
+# manifest into the watchlist so a daemon whose imported module changed
+# (but whose entrypoint did not) is caught even if the deploy-side restart
+# in sync_agent_core.sh somehow missed it. The hardcoded SHARED_LIB_WATCHLIST
+# above is retained and UNIONED in: it covers subprocess-invoked deps (e.g.
+# marker.py) that an import scan can't see. Manifest path is env-overridable
+# for tests.
+MANIFEST_PATH = Path(os.environ.get(
+    'OURLIBERTY_DAEMON_RESTART_MANIFEST',
+    str(_SCRIPTS_DIR.parent / 'config' / 'daemon-restart-manifest.json'),
+))
+
+
+def load_manifest_watchlist() -> dict[Path, set[str]]:
+    """Invert the committed restart manifest into {abs_path: {units}}.
+
+    Repo-relative `watch_paths` (e.g. `scripts/foo.py`) are resolved against
+    the repo root (`_SCRIPTS_DIR.parent`). Returns {} on any read/parse
+    failure (fail-open: the healer keeps using the hardcoded watchlist, i.e.
+    behavior identical to pre-extension)."""
+    repo_root = _SCRIPTS_DIR.parent
+    try:
+        data = json.loads(MANIFEST_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    units = data.get('units', {})
+    if not isinstance(units, dict):
+        return {}
+    inverse: dict[Path, set[str]] = {}
+    for unit, spec in units.items():
+        if not isinstance(spec, dict):
+            continue
+        for rel in spec.get('watch_paths', []):
+            if not isinstance(rel, str):
+                continue
+            inverse.setdefault((repo_root / rel).resolve(), set()).add(unit)
+    return inverse
+
+
+def build_effective_watchlist() -> dict[Path, set[str]]:
+    """Union of the hardcoded SHARED_LIB_WATCHLIST and the manifest-derived
+    watchlist. The manifest is the source of truth for import-closure
+    staleness; the hardcoded entries add subprocess-dep coverage the import
+    scan cannot derive. Union can only widen coverage, never narrow it."""
+    effective: dict[Path, set[str]] = {
+        path: set(units) for path, units in SHARED_LIB_WATCHLIST.items()
+    }
+    for path, units in load_manifest_watchlist().items():
+        effective.setdefault(path, set()).update(units)
+    return effective
+
 # Conservative ExecStart parser. Match lines that look like:
 #   ExecStart=<interpreter> <args> <script-path>
 #   ExecStart=<script-path> <args>
@@ -918,8 +974,9 @@ def check_unit(
 def check_shared_lib_watchlist(
     state: dict, now: Optional[float] = None,
 ) -> dict[str, int]:
-    """Scan SHARED_LIB_WATCHLIST. For each (lib, dependent-unit) pair, if
-    the lib's mtime is newer than the dependent unit's ActiveEnterTimestamp
+    """Scan the effective watchlist (hardcoded SHARED_LIB_WATCHLIST unioned
+    with the committed restart manifest). For each (lib, dependent-unit) pair,
+    if the lib's mtime is newer than the dependent unit's ActiveEnterTimestamp
     by more than RACE_AVOIDANCE_SEC, route the unit through the same
     auto-restart machinery as the direct-script path.
 
@@ -938,7 +995,7 @@ def check_shared_lib_watchlist(
     therefore observe `in_restart_cooldown=True` and not double-restart.
     """
     counts: dict[str, int] = {}
-    for lib_path, dependent_units in SHARED_LIB_WATCHLIST.items():
+    for lib_path, dependent_units in build_effective_watchlist().items():
         if not lib_path.is_file():
             # Defensive: a watchlisted file may not exist in a sparse test
             # fixture or during a reorganization. Skip silently — the
