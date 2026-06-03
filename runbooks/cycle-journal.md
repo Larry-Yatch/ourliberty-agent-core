@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 662 — 2026-06-03 03:24 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline throughput continues post-OAuth restore: 4 PRs now open (#259 + #260 + #261 + #262). 2 new PRs since iter 661: #261 (fix-advancer reconcile gh-failure, Forge build COMPLETE, Mirror reviewing) + #262 (sentinel inbox-stall translation, Forge build COMPLETE). Alert watermark: **1189** (UNCHANGED — 0 new alerts). Healer heartbeat: **03:19:40Z** (ADVANCED from 02:49:19Z — swept as predicted; ~4.5 min old at check; next sweep ~04:19Z). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (27th total)** — sync.json `status=error` at 03:23:54Z, commit=b9779a53fe rolled back; session-start HEAD=2102904 (wrapper for iter 661, ~03:23:25Z) is newer → self-recovering. **7/7 services active.** Forge inbox: **4 tasks** (medic build still active + 3 marker-error retries). Mirror: **reviewing PR #261** (wt-mirror-fix-advancer-reconcile-gh-failure active).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1189 lines** (UNCHANGED). 0 new alerts since watermark. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1189 lines (UNCHANGED). 0 new alerts since iter 661 watermark. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 03:17:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 03:17:00Z` → no Larry directives, no agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (UNCHANGED).** alert-cooldown/warning/: **150 total** (UNCHANGED). 27 heal-pipeline-stall keyed files (stable). Healer heartbeat: **03:19:40Z** (ADVANCED — fresh sweep, within 90-min threshold). No new stall alerts. ⚠️ (structural residue; GC gap ongoing)
+
+- **(Check 4) Pending directives: ⚠️ 4 open PRs; Mirror reviewing #261; Forge medic ~31 min.** **NEW PR #261** "fix(advancer): repair reconcile gh pr list failure so V6 self-heal actually works" — Branch `forge/fix-advancer-reconcile-gh-failure`, CLEAN/MERGEABLE, ~5.3 min old; Mirror reviewing (wt-mirror-fix-advancer-reconcile-gh-failure active). **NEW PR #262** "feat(alerts): translate sentinel inbox-stall as INFO/FYI" — Branch `forge/sentinel-inbox-stall-translation-001`, CLEAN/MERGEABLE, ~3.9 min old. Both are UNKNOWN/UNKNOWN in `gh pr list` (GH cache artifact); confirmed CLEAN/MERGEABLE via `gh pr view`. PR #259: 20.3 min (threshold at ~03:33:56Z — ~9.7 min away). PR #260: 14.5 min. All 4 below 30-min threshold; no auto-merge action yet. Forge inbox: `build-medic-reliability-gate-delivery-cli-001.json` (active, ~31 min; in worktree) + 3 marker-error retries (step-cleanup-review, step-ops-alerts-ui, step-retention). ⚠️ (active progress)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:19:40Z** (fresh sweep ~4.5 min old at 03:24Z check; within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=2102904 ("Pulse cycle 20260603T032325Z" — iter 661 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (27th total).** sync.json: `status=error`, `last_sync=2026-06-03T03:23:54Z`, commit=b9779a53fe rolled back. Sync service ran at 03:23:54Z (after iter 661 wrapper push of 2102904 at ~03:23:25Z); created auto-commit b9779a53fe, tried to push, failed non-FF, rolled back. HEAD=2102904 confirmed by session-start gitStatus. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 4 open PRs (all sub-threshold); Mirror active; Forge medic extended.** PR #259 (20.3 min, CLEAN/MERGEABLE) — **30-min threshold at ~03:33:56Z**; #260 (14.5 min); #261 (5.3 min, Mirror reviewing); #262 (3.9 min). All CLEAN/MERGEABLE, no auto-merge. Forge medic worktree active (~31 min). Mirror worktree active (PR #261 review). 3 marker-error retries in Forge inbox (step-cleanup-review, step-ops-alerts-ui, step-retention). ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge medic at ~31 min — extended but known complex task (rate-window gate + escalate-record + notify CLI allowlist + by-design docs; 4 defects). Fix-advancer completed at ~36 min (GH API reconcile complexity; confirmed reasonable). No runaway signals. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired iter 637 (00:22Z). Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **NEW: PR #262 = sentinel/inbox-stall G-rule 3/3 fix COMPLETE.** Build `build-sentinel-inbox-stall-translation-001` done; PR #262 "feat(alerts): translate sentinel inbox-stall as INFO/FYI" CLEAN/MERGEABLE. G-rule closes when PR #262 merges. Dispatch `cycle-finding-sentinel-inbox-stall-alert-translations-20260603T015947Z.json` → Beacon → Forge → PR #262 pipeline complete.
+  - **NEW: PR #261 = fix-advancer reconcile gh-failure fix COMPLETE.** Build done; PR #261 CLEAN/MERGEABLE; Mirror reviewing. Fix: `_reconcile_dispatched_steps` was calling `gh pr list --repo <bare-name>` (e.g. `ourliberty-agent-core`); `gh --repo` requires OWNER/REPO form → rc=1 silent miss. Fix repairs V6 self-heal backstop.
+  - **MalformedForgeMarker — 3 in Forge inbox (retry-1/3, UNCHANGED).** step-cleanup-review + step-ops-alerts-ui + step-retention all still pending retry. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry. No change.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] escalation idx=9). No change.
+  - `deploy-notifier:READY:* cooldown GC gap` — 150 files. APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - All other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, review-pass 2/3, mirror-dag-pass 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (all 4 PRs < 30-min threshold; 7/7 services active; sync self-recovering; Forge/Mirror building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 662` → ts: 2026-06-03T03:26:02.967612+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T03:26:03.618448+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (re-dispatch pending Larry go-ahead; [yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 27th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` (3 consecutive builds; Larry approval needed).
+
+**Patterns:**
+- **Pipeline throughput: 4 builds completed since iter 661 wrapper.** fix-advancer (PR #261) + sentinel-inbox-stall (PR #262) both done since iter 661. 4 total open PRs now. System burning through post-OAuth backlog at high throughput.
+- **SYNC-PUSH-REBASE-FALLBACK-001 advanced to 27th total.** Same mechanism as all prior 26 — sync service creates auto-commit just after wrapper push, fails non-FF, rolls back. Self-recovers.
+- **PR #261 root cause clarified.** V6 self-heal (`_reconcile_dispatched_steps`) was silently failing because `gh pr list --repo ourliberty-agent-core` returns rc=1 (bare name rejected). Fix: use OWNER/REPO form. This explains why some silent-miss backstop catches were not firing.
+
+**Learned:** Forge's medic task (4-defect fix: rate-window gate, escalate-record, notify CLI allowlist, by-design docs) is at ~31 min — still building. Complex multi-defect tasks may need longer; will escalate at ~45 min if no PR. Next iter should see: PR #259 crossing 30-min threshold (→ always-fix: gh pr merge 259 --auto --squash), Mirror verdict on PR #261, potentially PR from medic build.
+
+---
+
 ## Iteration 661 — 2026-06-03 03:17 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing: 2 PRs open (#259 + #260, sub-threshold), Forge building 2 complex tasks (~30-33 min). Alert watermark: **1189** (+1 from 1188 — new deploy-notifier:READY for step-ops-alerts-ui Vercel preview; Tier 3, delivered). Healer heartbeat: **02:49:19Z** (UNCHANGED — 28 min old; within 90-min threshold; next sweep ~03:19Z — imminent). Sync: ⚠️ sync.json `status=error` (03:03:06Z, 9c166456 rolled back) — HEAD=d97c0aa (iter 660 wrapper, ~03:15:52Z) is newer → wrapper push succeeded; self-recovering. **7/7 services active.** **2 open PRs** (#259 CLEAN/MERGEABLE 13.6 min, #260 CLEAN/MERGEABLE 7.8 min — both < 30-min threshold). Forge inbox: **6 tasks** (3 queued briefs + **3 marker-error retries**: step-cleanup-review + step-ops-alerts-ui + step-retention). step-ops-alerts-ui.json gone from inbox (archived on completion; marker-error-step-ops-alerts-ui-1.json created ~03:15Z). Cooldown files: **150** (+1 from 149 — new deploy-notifier cooldown file).
