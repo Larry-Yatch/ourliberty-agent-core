@@ -24,6 +24,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import heal_systemd_install_drift as h  # noqa: E402
+import larry_alerts as la  # noqa: E402
 
 
 class _IsolatedAgentsRoot(unittest.TestCase):
@@ -1335,10 +1336,12 @@ class ContentDriftOrchestrationTest(_IsolatedAgentsRoot):
         super().setUp()
         self._dm_calls: list[dict] = []
 
-        def fake_dm(message, subject, suggested_action, severity='warning'):
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
             self._dm_calls.append({
                 'message': message, 'subject': subject,
                 'suggested_action': suggested_action, 'severity': severity,
+                'route': route,
             })
             return True
 
@@ -1387,7 +1390,12 @@ class ContentDriftOrchestrationTest(_IsolatedAgentsRoot):
         self.assertEqual(counts['dm_sent'], 1)
         self.assertEqual(len(self._dm_calls), 1)
         dm = self._dm_calls[0]
-        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        # Healed path must NOT reuse the imperative `install-drift:` subject —
+        # that routes to the "run the install dance" URGENT copy. It carries a
+        # distinct non-imperative healed subject instead.
+        self.assertEqual(dm['subject'], 'content-healed:ourliberty-x.timer')
+        # Routine successful heal → digest (no escalate DM).
+        self.assertEqual(dm['route'], 'digest')
         self.assertIn('Auto-reconciled', dm['message'])
         self.assertIn('Sun 2026-06-03 18:00:00 MDT', dm['message'])
         # restart issued to re-anchor the timer.
@@ -1473,6 +1481,145 @@ class ContentDriftOrchestrationTest(_IsolatedAgentsRoot):
         self.assertEqual(counts['dm_sent'], 0)
         self.assertEqual(counts['content_drift'], 0)
         self.assertEqual(len(self._dm_calls), 0)
+
+
+class ClassifyUnitTest(_IsolatedAgentsRoot):
+    """`_classify_unit` 3-way classifier: `.timer` -> 'timer'; `.service`
+    with `Type=oneshot` -> 'oneshot'; any other `.service` (Type=simple/notify
+    /forking, or no explicit Type, or unreadable) -> 'long-running' (the safe
+    default — a daemon-reload alone never restarts a resident daemon).
+    """
+
+    def _repo_with(self, unit: str, body: str) -> Path:
+        td = Path(tempfile.mkdtemp(prefix='classify-'))
+        self.addCleanup(shutil.rmtree, td, ignore_errors=True)
+        (td / unit).write_text(body)
+        return td
+
+    def test_timer_is_timer(self):
+        td = self._repo_with('x.timer', '[Timer]\nOnCalendar=hourly\n')
+        self.assertEqual(h._classify_unit('x.timer', repo_dir=td), 'timer')
+
+    def test_oneshot_service(self):
+        td = self._repo_with('x.service', '[Service]\nType=oneshot\n')
+        self.assertEqual(h._classify_unit('x.service', repo_dir=td), 'oneshot')
+
+    def test_simple_service_is_long_running(self):
+        td = self._repo_with('x.service', '[Service]\nType=simple\n')
+        self.assertEqual(
+            h._classify_unit('x.service', repo_dir=td), 'long-running')
+
+    def test_notify_service_is_long_running(self):
+        td = self._repo_with('x.service', '[Service]\nType=notify\n')
+        self.assertEqual(
+            h._classify_unit('x.service', repo_dir=td), 'long-running')
+
+    def test_no_type_defaults_long_running(self):
+        # systemd defaults a typeless [Service] to Type=simple (resident).
+        td = self._repo_with('x.service', '[Service]\nExecStart=/bin/true\n')
+        self.assertEqual(
+            h._classify_unit('x.service', repo_dir=td), 'long-running')
+
+    def test_last_type_wins(self):
+        # systemd uses the last assignment of a key; a oneshot overridden to
+        # simple is resident.
+        td = self._repo_with('x.service', '[Service]\nType=oneshot\nType=simple\n')
+        self.assertEqual(
+            h._classify_unit('x.service', repo_dir=td), 'long-running')
+
+    def test_unreadable_service_falls_back_long_running(self):
+        td = Path(tempfile.mkdtemp(prefix='classify-'))
+        self.addCleanup(shutil.rmtree, td, ignore_errors=True)
+        self.assertEqual(
+            h._classify_unit('missing.service', repo_dir=td), 'long-running')
+
+
+class RenderRemediationByClassTest(_IsolatedAgentsRoot):
+    """The render fns emit class-correct remediation text. `_classify_unit` is
+    mocked per case (it reads the real REPO_SYSTEMD_DIR via a default arg bound
+    at import; mocking decouples these from on-disk unit files).
+    """
+
+    def test_content_drift_long_running_says_restart(self):
+        unit = 'ourliberty-inbox-watcher.service'
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'):
+            _msg, _subj, sug = h._render_content_drift_dry_run(unit)
+        self.assertIn(f'systemctl restart {unit}', sug)
+        # Must NOT claim the next timer fire re-execs it.
+        self.assertNotIn('next timer fire', sug)
+
+    def test_content_drift_oneshot_no_restart(self):
+        with mock.patch.object(h, '_classify_unit', return_value='oneshot'):
+            _msg, _subj, sug = h._render_content_drift_dry_run('probe.service')
+        self.assertNotIn('systemctl restart', sug)
+        self.assertIn('daemon-reload', sug)
+
+    def test_content_drift_timer_reanchors(self):
+        with mock.patch.object(h, '_classify_unit', return_value='timer'):
+            _msg, _subj, sug = h._render_content_drift_dry_run('x.timer')
+        self.assertIn('systemctl restart x.timer', sug)
+
+    def test_missing_install_long_running_starts_daemon(self):
+        unit = 'ourliberty-inbox-watcher.service'
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'):
+            _msg, _subj, sug = h._render_missing_install(unit)
+        # A resident daemon must actually be started, not merely daemon-reloaded.
+        self.assertIn(f'enable --now {unit}', sug)
+        self.assertNotIn('activated by its timer', sug)
+
+    def test_missing_install_oneshot_daemon_reload_only(self):
+        with mock.patch.object(h, '_classify_unit', return_value='oneshot'):
+            _msg, _subj, sug = h._render_missing_install('probe.service')
+        self.assertIn('daemon-reload', sug)
+        self.assertNotIn('enable --now', sug)
+
+    def test_content_healed_long_running_no_next_fire(self):
+        unit = 'ourliberty-inbox-watcher.service'
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'):
+            msg, subj, _sug = h._render_content_healed(unit, 'unknown')
+        self.assertIn('restarted', msg)
+        self.assertNotIn('Next fire', msg)
+        self.assertTrue(subj.startswith('content-healed:'))
+
+    def test_content_healed_oneshot_mentions_next_fire(self):
+        with mock.patch.object(h, '_classify_unit', return_value='oneshot'):
+            msg, _subj, _sug = h._render_content_healed(
+                'probe.service', 'Sat 2026-06-03 18:00:00 MDT')
+        self.assertIn('next timer fire', msg)
+        self.assertIn('Next fire', msg)
+
+
+class HealedSubjectTranslationTest(_IsolatedAgentsRoot):
+    """Bug A regression: the healthy auto-reconcile path emits a subject that
+    resolves (via larry_alerts.translate_alert's longest-prefix lookup against
+    the real config/alert-translations.json) to a NON-imperative, no-action
+    entry — never the URGENT 'run the install dance' copy.
+    """
+
+    def test_content_healed_subject_resolves_to_no_action_entry(self):
+        with mock.patch.object(h, '_classify_unit', return_value='timer'):
+            _msg, subj, _sug = h._render_content_healed(
+                'ourliberty-x.timer', 'unknown')
+        entry = la.translate_alert('heal-systemd-install-drift', subj)
+        self.assertIsNotNone(
+            entry, f'healed subject {subj!r} has no translation entry')
+        self.assertEqual(entry['severity'], 'INFO')
+        self.assertEqual(entry['tier'], 'FYI')
+        action = entry['recommended_action'].lower()
+        self.assertIn('none', action)
+        # No imperative install-dance phrasing.
+        self.assertNotIn('run `sudo cp', action)
+        self.assertNotIn('could not auto-install', action)
+
+    def test_imperative_install_drift_subject_stays_urgent(self):
+        # The genuinely-broken paths (_render_missing_install /
+        # _render_content_drift_dry_run) keep the imperative subject and MUST
+        # still resolve to the URGENT entry.
+        entry = la.translate_alert(
+            'heal-systemd-install-drift', 'install-drift:ourliberty-x.service')
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry['severity'], 'URGENT')
+        self.assertEqual(entry['tier'], 'NOW')
 
 
 if __name__ == '__main__':

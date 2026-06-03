@@ -705,6 +705,47 @@ def _remediate_content_drift(unit: str) -> tuple[int, str]:
 
 # -------------------- DM rendering --------------------
 
+def _classify_unit(unit: str, repo_dir: Path = REPO_SYSTEMD_DIR) -> str:
+    """Classify a repo unit into one of three remediation classes.
+
+    Returns one of:
+      'timer'        — a `.timer` unit. Enable/restart the timer; existing
+                       timer remediation copy is correct.
+      'oneshot'      — a `.service` with `Type=oneshot`. A daemon-reload is
+                       enough: the unit re-execs with fresh content on its next
+                       timer fire, and restarting it would run it off-schedule.
+      'long-running' — a `.service` that stays resident (`Type=simple`/
+                       `notify`/`forking`/`exec`/`idle`/`dbus`, or no explicit
+                       `Type=`, which systemd defaults to `simple`). A
+                       daemon-reload alone NEVER restarts it, so remediation
+                       MUST `systemctl restart`/`enable --now` to load new
+                       content and there is no "next fire" to re-exec it.
+
+    The `Type=` is parsed from the *repo* copy of the unit file (the last
+    `Type=` assignment wins, matching systemd). On any read failure a
+    `.service` falls back to 'long-running' — the safe default, since
+    over-restarting a daemon is harmless but failing to restart one leaves it
+    on stale code (the service-restart-after-merge gap this healer exists to
+    close).
+    """
+    if unit.endswith('.timer'):
+        return 'timer'
+    unit_type: Optional[str] = None
+    try:
+        for line in (repo_dir / unit).read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith('Type='):
+                unit_type = stripped.split('=', 1)[1].strip()
+    except OSError as e:
+        log(
+            f'_classify_unit read of {unit} raised {type(e).__name__}: {e}; '
+            f'defaulting to long-running',
+            'INFO',
+        )
+        return 'long-running'
+    return 'oneshot' if unit_type == 'oneshot' else 'long-running'
+
+
 def _render_stuck_timer_heal(unit: str, next_fire: str) -> tuple[str, str, str]:
     message = (
         f'Auto-healed stuck timer `{unit}`. Trap: `NextElapseUSecRealtime` '
@@ -760,12 +801,19 @@ def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
 
 def _render_missing_install(unit: str) -> tuple[str, str, str]:
     repo_path = f'~/agent-core/systemd/{unit}'
-    is_timer = unit.endswith('.timer')
-    enable_line = (
-        f'sudo systemctl enable --now {unit}'
-        if is_timer
-        else f'sudo systemctl daemon-reload  # service activated by its timer'
-    )
+    unit_class = _classify_unit(unit)
+    if unit_class == 'timer':
+        enable_line = f'sudo systemctl enable --now {unit}'
+    elif unit_class == 'oneshot':
+        enable_line = (
+            'sudo systemctl daemon-reload  '
+            '# oneshot service re-execs on its next timer fire'
+        )
+    else:  # long-running daemon — daemon-reload alone never starts it
+        enable_line = (
+            f'sudo systemctl enable --now {unit}  '
+            f'# long-running daemon — starts it now + enables at boot'
+        )
     message = (
         f'Unit `{unit}` is shipped in the repo (`systemd/{unit}`) but is not '
         f'installed under `/etc/systemd/system/`. Likely cause: the PR that '
@@ -784,29 +832,47 @@ def _render_missing_install(unit: str) -> tuple[str, str, str]:
 
 
 def _render_content_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
-    is_timer = unit.endswith('.timer')
-    action_phrase = (
-        'restarted to re-anchor its schedule' if is_timer
-        else 'daemon-reloaded (next fire re-execs with the new content)'
-    )
+    unit_class = _classify_unit(unit)
+    if unit_class == 'timer':
+        action_phrase = 'restarted to re-anchor its schedule'
+        tail = f' Next fire: {next_fire}.'
+    elif unit_class == 'oneshot':
+        action_phrase = (
+            'daemon-reloaded (next timer fire re-execs with the new content)'
+        )
+        tail = f' Next fire: {next_fire}.'
+    else:  # long-running daemon — no "next fire"; it had to be restarted now
+        action_phrase = 'daemon-reloaded and restarted to load the new content'
+        tail = ''
     message = (
         f'Auto-reconciled `{unit}` — its installed copy under '
         f'/etc/systemd/system/ had drifted from the repo. Re-copied, '
-        f'daemon-reloaded, and {action_phrase}. Next fire: {next_fire}.'
+        f'daemon-reloaded, and {action_phrase}.{tail}'
     )
-    subject = f'install-drift:{unit}'
+    # Distinct subject from the failed/manual `install-drift:` so a healthy
+    # auto-reconcile routes to its own no-action translation entry rather than
+    # the imperative "run the install dance" copy (fix-first routing: healed
+    # events carry no imperative). Mirrors `install-healed:` / `stuck-timer-healed:`.
+    subject = f'content-healed:{unit}'
     suggested = f'Verify on the droplet: `systemctl status {unit}`.'
     return message, subject, suggested
 
 
 def _render_content_drift_dry_run(unit: str) -> tuple[str, str, str]:
     repo_path = f'~/agent-core/systemd/{unit}'
-    is_timer = unit.endswith('.timer')
-    post_line = (
-        f'sudo systemctl restart {unit}'
-        if is_timer
-        else f'sudo systemctl daemon-reload  # oneshot re-execs on next timer fire'
-    )
+    unit_class = _classify_unit(unit)
+    if unit_class == 'timer':
+        post_line = f'sudo systemctl restart {unit}  # re-anchor the timer'
+    elif unit_class == 'oneshot':
+        post_line = (
+            'sudo systemctl daemon-reload  '
+            '# oneshot re-execs on its next timer fire'
+        )
+    else:  # long-running daemon — daemon-reload won't pick up new content
+        post_line = (
+            f'sudo systemctl restart {unit}  '
+            f'# long-running daemon — daemon-reload alone keeps it on stale code'
+        )
     message = (
         f'Unit `{unit}` is installed under `/etc/systemd/system/` but its '
         f'contents differ from the repo copy (`systemd/{unit}`). Likely '
@@ -964,7 +1030,9 @@ def run_once(
                 next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
                 counts['content_healed'] += 1
                 msg, subj, sug = _render_content_healed(unit, next_fire)
-                ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+                route = _classify_route(subj, healed=True)
+                ok = dm_larry(message=msg, subject=subj, suggested_action=sug,
+                              route=route)
                 if ok:
                     counts['dm_sent'] += 1
                     _record_dm(state, unit, now=now)
