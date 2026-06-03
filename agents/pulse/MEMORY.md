@@ -6,11 +6,12 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 05:03Z UTC (Iter 674 — interactive)
+## Status snapshot — updated 2026-06-03 05:07Z UTC (Iter 675 — interactive)
 
-**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1204** (unchanged; no new alerts since 04:48:15Z). Healer heartbeat: **04:49:56Z** (within 90-min threshold). Cooldown/warning: **160** files (unchanged). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: **3 tasks ALL in build phase** (`build-step-digest-card.json` + `build-fix-tier2-probe-setup-token-auth.json` + `build-stale-worktree-teardown-001.json`). Mirror/Beacon inboxes: EMPTY. 0 open PRs. **Burn-rate: 82%/10M gate (Tier 3 FYI, monitoring; 3 simultaneous builds adding load).** Check III 2026-06-14. Worktrees: **20** (+2 from iter 673). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open; root fix (`build-fix-tier2-probe-setup-token-auth.json`) now in **build** phase.
+**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1204** (unchanged; no new alerts since 04:48:15Z). Healer heartbeat: **04:49:56Z** (within 90-min threshold). Cooldown/warning: **160** files (unchanged). Sync: ✅ status=no-change, 04:38:12Z. **7/7 services active.** Forge inbox: **4 tasks** (3 in build + **1 NEW preflight: `fix-rotation-drain-deadlock-open-sequence.json`**). Mirror/Beacon inboxes: EMPTY. 0 open PRs. **Burn-rate: 82%/10M gate (Tier 3 FYI, monitoring; 4 simultaneous Forge tasks now active).** Check III 2026-06-14. Worktrees: **20** (unchanged). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open; root fix (`build-fix-tier2-probe-setup-token-auth.json`) in **build** phase.
 
-**Watch items (iter 674 update):**
+**Watch items (iter 675 update):**
+- **`fix-rotation-drain-deadlock-open-sequence.json` — NEW in Forge preflight (iter 675).** Root fix for 20.5h fleet freeze (2026-06-02): drain completion gate `in_flight_clear AND no_open_seq` caused infinite defer (1228 min deferred) when open build sequence existed. Fix: `in_flight_clear AND (no_open_seq OR elapsed > max_drain_minutes)`. tier_auth_ok guard preserved. Cost $4-7. Watch for PROCEED marker + PR. ⚠️ (critical, in preflight)
 - **`build-fix-tier2-probe-setup-token-auth.json` — in build phase (iter 674).** Root fix for recurring `tier2_weekly_probe_failed` alerts. Advanced from preflight→build. Watch for PR. ⚠️ (in pipeline)
 - **Stale worktrees: 20 total.** `build-stale-worktree-teardown-001.json` now in Forge build phase. New worktree created (`wt-forge-stale-worktree-teardown-001`). Watch for PR. ⚠️ (in pipeline)
 - **`build-step-digest-card.json` in Forge build phase (N6, digest card on Approvals page).** Advanced from preflight→build. Vercel preview at 04:48:15Z (branch pushed). PR pending. Watch for PR + Mirror review. ⚠️ (active)
