@@ -26,6 +26,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -232,17 +233,25 @@ class _FakeAlerts:
 
 class MainEmitTest(unittest.TestCase):
     def setUp(self):
+        # Hermetic: patch.dict restores os.environ and sys.modules to their
+        # exact prior state on cleanup (re-installing the genuine larry_alerts
+        # module rather than popping it), so this file can't leak its stub into
+        # later tests under `unittest discover` collection order.
         self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
         root = Path(self._td.name)
         (root / 'blackboard').mkdir(parents=True)
-        os.environ['OURLIBERTY_AGENTS_ROOT'] = str(root)
-        self._fake = _FakeAlerts()
-        sys.modules['larry_alerts'] = self._fake
 
-    def tearDown(self):
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
-        sys.modules.pop('larry_alerts', None)
-        self._td.cleanup()
+        env_patch = mock.patch.dict(
+            os.environ, {'OURLIBERTY_AGENTS_ROOT': str(root)}
+        )
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
+
+        self._fake = _FakeAlerts()
+        mod_patch = mock.patch.dict(sys.modules, {'larry_alerts': self._fake})
+        mod_patch.start()
+        self.addCleanup(mod_patch.stop)
 
     def test_main_emits_stale_alerts(self):
         # Empty blackboard => every canonical check has no signal => stale,
