@@ -88,7 +88,7 @@ Emit the notification via the `append_notification` CLI subcommand:
 python3 /home/larry/agent-core/scripts/larry_alerts.py append_notification \
   --source medic --intent medic-action-taken \
   --message '<the Acted:/diagnose-only line above, <= 1800 chars>' \
-  --chat-id "$LARRY_CHAT_ID"
+  --chat-id <LITERAL-CHAT-ID-FROM-YOUR-RUN-PROMPT>
 ```
 
 ### Reversible tier -- other action types (escalate-only this PR)
@@ -99,10 +99,10 @@ For **kick-stuck-timer**, **clear-stale-lock**, **redispatch-chain-leg**: do NOT
 python3 /home/larry/agent-core/scripts/larry_alerts.py append_notification \
   --source medic --intent medic-diagnosis \
   --message '<your diagnosis + recommended command, <= 1800 chars>' \
-  --chat-id "$LARRY_CHAT_ID"
+  --chat-id <LITERAL-CHAT-ID-FROM-YOUR-RUN-PROMPT>
 ```
 
-`LARRY_CHAT_ID` is exported by run_medic.sh from `TELEGRAM_CHAT_ID_LARRY` (loaded from `/home/larry/credentials/.env.larry` via the systemd unit).
+Your run prompt gives you Larry's chat id as a literal integer -- substitute it for `<LITERAL-CHAT-ID-FROM-YOUR-RUN-PROMPT>`. **Never** use a shell variable such as `$LARRY_CHAT_ID` in any bash command: Claude Code blocks commands containing variable expansions, so the escalation would be silently denied. Always write the chat id as a literal number.
 
 ### Privileged tier -- emit an approval request (PR3 will wire the executor)
 
@@ -113,7 +113,7 @@ python3 /home/larry/agent-core/scripts/larry_alerts.py append_approval_request \
   --source medic \
   --approval-id 'medic-<fingerprint>-<ts>' \
   --body '<the proposed privileged command + diagnosis, <= 1800 chars>' \
-  --chat-id "$LARRY_CHAT_ID"
+  --chat-id <LITERAL-CHAT-ID-FROM-YOUR-RUN-PROMPT>
 ```
 
 ### Judgment tier -- emit a diagnose-only notification

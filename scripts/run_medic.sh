@@ -71,6 +71,12 @@ CLAUDE_TIMEOUT="${MEDIC_CLAUDE_TIMEOUT:-10m}"
 # the Medic escalation CLI requires --chat-id, so alias it here.
 export LARRY_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
 
+# Claude Code BLOCKS any command containing a shell-variable expansion, so the
+# operator cannot use "$LARRY_CHAT_ID" inside an append_notification command --
+# it must write a LITERAL integer. Inject the resolved value into the prompt.
+MEDIC_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
+PROMPT_BODY="${PROMPT_BODY} IMPORTANT: when you emit via scripts/larry_alerts.py append_notification / append_approval_request, write --chat-id ${MEDIC_CHAT_ID} as a LITERAL integer. Never use a shell variable (e.g. \$LARRY_CHAT_ID) in any command -- Claude Code blocks commands containing variable expansions, so the escalation would be denied and silently fail."
+
 if timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
     log "Medic operator completed successfully"
     MEDIC_OK=1
