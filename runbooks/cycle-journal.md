@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 688 — 2026-06-03 07:08 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue + worktree GC mismatch). Alert watermark: **1225** (unchanged — 0 new alerts since iter 687). Healer heartbeat: **06:50:15Z** (~18 min old; ✅ within 90-min threshold). Sync: ✅ `status=no-change`, last_sync=06:38:20Z (unchanged). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (9th consecutive iter). Worktrees: **19** (unchanged — GC fires ~02:43 UTC Thu). Cooldown residue: **172** (unchanged).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1225 lines** — unchanged from iter 687 watermark. Last 3 entries: install-drift events at 06:00:21–06:00:24Z (auto-installed `ourliberty-promote-alerts.service`; `ourliberty-promote-alerts.timer` install-drift warning; auto-healed stuck `ourliberty-cycle.timer`). All within prior 1225 count; no new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "2 hours ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). Last delivery: idx=1224 at 06:05:22Z (unchanged — no new deliveries since iter 680 window). No new Larry directives or agent-distress signals. `ourliberty-promote-alerts.timer` active, last fired 07:07:01Z, next 07:17:53Z (10-min cadence). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 172 files** (unchanged — 27 heal-pipeline-stall entries in `alert-cooldown/warning/`; pipeline fully quiescent; legacy residue from stall period). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - 9th consecutive iter with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **06:50:15Z** (~18 min old; ✅ within 90-min threshold). No new auto-restart events since iter 687. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=f759282 ("Pulse cycle 20260603T070317Z" — iter 687 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: `status=no-change`, commit=036800b7, last_sync=2026-06-03T06:38:20Z (unchanged). No new SYNC-PUSH-REBASE-FALLBACK-001 (37 total). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. Note: ourliberty-cycle.timer SubState=running (this iter's execution — expected display artifact; calibration confirmed, not a stuck-timer event). ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs; all inboxes empty. 9th consecutive iter. ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1225). Medic rate-window fix (PR #274) live. Monitoring. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: next fire ~10:37Z UTC today (not yet visible in alerts). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ Worktrees: 19 (9th consecutive unchanged) — GC timer still on daily cadence.** NEXT=Wed 2026-06-03 20:43:45 MDT (~02:43 UTC Thu, ~19h away — same as prior iters). GC fires tonight. G-rule `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (unchanged). ⚠️
+
+- **G-rule watch (unchanged from iter 687):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). At 3/3 → dispatch Beacon.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680 = 2nd hit; 06:00:24Z). At 3/3 → dispatch Beacon.
+  - `medic:medic-diagnosis`: **1/3**. At 3/3 → dispatch Beacon.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. At 3/3 → dispatch Beacon.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync clean; 0 new alerts; GC fix requires sudo = ask-then-do).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 688` → ts: 2026-06-03T07:08:10Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T07:08:11Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: Worktree GC timer cadence mismatch ([yellow] from iter 684 stands). `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry. `sync-push-rebase-fallback-001` APPROVAL_REQUEST open (37 total). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. `medic-tier2auth401-beaconbot-20260529T045737Z` APPROVAL_REQUEST open.
+
+**Patterns:**
+- **Pipeline fully quiescent for 9th consecutive iter.** 0 open PRs, all inboxes empty. System in sustained steady-state rest.
+- **Worktrees plateau at 19 for 9th consecutive iter.** GC fires tonight (~02:43 UTC Thu). If count drops post-GC next iter, confirms event-driven teardown + daily GC backstop both functioning.
+- **Cooldown residue plateau at 172 for 9th consecutive iter.** Stable. GC APPROVAL_REQUEST pending Larry.
+- **Alert watermark at 1225 for 4+ iters.** 06:00Z install-drift batch (promote-alerts + stuck cycle.timer auto-heal) is the most recent healer activity; within prior count. Promote-alerts.timer is healthy and firing on 10-min cadence.
+
+**Learned:** ourliberty-promote-alerts.timer is installed and active (fired 07:07:01Z, next 07:17:53Z). The 06:00:23Z alert flagging it as "not installed" was transient — healer may have detected a content-drift rather than a true missing-install, or the service install at 06:00:21Z triggered a daemon-reload that restored it. Current state: healthy. No action needed.
+
+---
+
 ## Iteration 687 — 2026-06-03 07:01 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue + worktree GC mismatch). Alert watermark: **1225** (unchanged — 0 new alerts since iter 686). Healer heartbeat: **06:50:15Z** (~11 min old; ✅ within 90-min threshold). Sync: ✅ `status=no-change`, last_sync=06:38:20Z (self-cleared; 37 total SYNC-PUSH-REBASE-FALLBACK-001 — no new occurrence). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (8th consecutive iter). Worktrees: **19** (unchanged — GC fires ~02:43 UTC Thu). Cooldown residue: **172** (unchanged).
