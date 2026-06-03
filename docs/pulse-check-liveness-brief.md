@@ -1,15 +1,19 @@
 # Brief: Pulse-check liveness watcher (watch the watchers)
 
 **Type:** Forge dispatch (new healer + small per-check edits)
-**Origin:** Cost-signal audit 2026-06-03. Checks IX and X silently stopped firing ~June 1–2 and
-nothing noticed for ~2 days. The checks themselves are healthy (confirmed via `--dry-run`, both
-exit 0) — they have no liveness signal of their own, so a scheduler stall is invisible.
+**Origin:** Cost-signal audit 2026-06-03. IX and X are WEEKLY (Monday-only) checks; their most recent
+scheduled runs ERRORED unnoticed (IX on Mon Jun 1 hit stale `:8001` code before the droplet synced
+#240's `:8000` fix; X hit a transient missing-Supabase-env) and were caught only by manual digging.
+Both run clean now via `--dry-run`. The gap this closes: a check has no liveness signal of its own, so
+a scheduled run that errors or is skipped is invisible until a human looks.
 
 ## Problem
 
 Pulse checks (I–X) are the fleet's self-optimization layer, but a check is the one component with
-**no heartbeat**. When its invoker (the Pulse cycle) stops calling it, it goes dark silently — the
-exact failure that hid the IX/X stall for 48h.
+**no heartbeat**. If a check errors on its scheduled run, or its invoker (the Pulse cycle) fails to
+call it on the day it's due, it goes dark silently — exactly what happened to IX/X's last runs.
+Cadences VARY (some run every iter, IX/X weekly Monday-only, Check III every other Sunday), so the
+watcher must be cadence-aware with a per-check grace window — not assume a fixed daily beat.
 
 ## Fix
 
@@ -39,8 +43,9 @@ and Beacon triage already exist; OnCalendar timer pattern already documented.
 
 ## Built-in validation
 
-On first deploy the watcher will **immediately flag the currently-stalled checks** — proves it works
-and surfaces the real #1.
+Validate via tests that inject a stale/missing heartbeat (assert it alerts) and a fresh one (assert
+silence). On a healthy fleet it correctly stays quiet until a check actually errors or misses its
+scheduled run — e.g. it would have fired on IX's Mon Jun 1 errored run.
 
 ## Scope boundary
 
