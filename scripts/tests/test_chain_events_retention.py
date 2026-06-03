@@ -126,6 +126,7 @@ class _Base(unittest.TestCase):
     module-level path constants pick up the env var."""
 
     def setUp(self):
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name) / 'agents'
         (self.root / 'logs').mkdir(parents=True)
@@ -137,7 +138,10 @@ class _Base(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        if self._prev_root is not None:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
+        else:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
 
 
 # -------------------- load_retention_config --------------------
