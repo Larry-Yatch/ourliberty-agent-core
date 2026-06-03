@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 684 — 2026-06-03 06:40 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: sync error + cooldown residue). ⚠️ NEW: Worktree GC timer cadence mismatch detected (5th consecutive iter at 19 worktrees). Alert watermark: **1225** (unchanged — 0 new alerts since iter 683). Healer heartbeat: **06:20:09Z** (~20 min old; ✅ within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total — unchanged; self-recovering). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (5th consecutive iter). Worktrees: **19** (5th consecutive unchanged — **GC timer on daily cadence, not 1h as PR #266 intended**). Cooldown residue: **172** (unchanged).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1225 lines** — unchanged from iter 683 watermark. 0 new alerts this window. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). Last delivery: idx=1224 at 06:05:22Z (~35 min before this iter). No new directives or agent-distress signals. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Pipeline fully quiescent (0 open PRs, all inboxes empty). 27 legacy heal-pipeline-stall cooldown files in `~/agents/state/alert-cooldown/warning/` — carry-forward from stall-period (2026-05-29 to 2026-06-02); no active stalls. Healer substrate active. ✅
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - 5th consecutive iter with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **06:20:09Z** (~20 min old; ✅ within 90-min threshold). No new auto-restart events since iter 683. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=036800b ("Pulse cycle 20260603T063334Z" — iter 683 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 37th total (unchanged from iter 683).** sync.json: status=error, message="Auto-commit push failed; rolled back", commit=b9ee4a9, last_sync=05:53:37Z. Session HEAD=036800b (iter 683, 06:33:34Z) is newer than sync commit → wrapper already pushed; self-clears on next sync tick. No new occurrence this window. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs; all inboxes empty. 5th consecutive iter. ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1225). Last known: 82%/10M at ~04:46:30Z (~114 min before this iter). Medic rate-window fix (PR #274) live. Monitoring. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: PR #267 fix live; next probe ~10:37Z UTC today (not yet visible in alerts — still pending). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ NEW — Worktrees: 19 (5th consecutive unchanged) — GC timer cadence mismatch confirmed:**
+  - `systemctl list-timers ourliberty-cleanup-stale-worktrees.timer` shows: LAST Tue 2026-06-02 20:43:45 MDT (~3h52m ago), NEXT Wed 2026-06-03 20:43:45 MDT (~20h away) — **exactly 24h cadence (daily)**.
+  - Repo file (`~/agent-core/systemd/ourliberty-cleanup-stale-worktrees.timer`) specifies `OnUnitActiveSec=1h` (PR #266 change, merged iter 676 05:14Z).
+  - **Root cause:** The heal-systemd-install-drift healer only detects MISSING units — it does NOT detect CHANGED units. PR #266 updated the timer source file from daily→1h cadence but the installed `/etc/systemd/system/ourliberty-cleanup-stale-worktrees.timer` still has the old daily spec. The installed unit was never refreshed.
+  - **Impact:** Stale worktree orphans will persist until GC fires at 02:43 UTC Thursday (~20h). No operational failure, but 19 stale worktrees consuming disk.
+  - **Fix required (ask-then-do):** `sudo cp ~/agent-core/systemd/ourliberty-cleanup-stale-worktrees.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart ourliberty-cleanup-stale-worktrees.timer`. Not in auto-fix allow-list (sudo + systemd).
+  - **New G-rule (1/3):** `changed-systemd-unit-not-propagated-by-install-drift-healer`. Healer gap: PRs that change existing installed units (not add new ones) don't auto-propagate. At 3/3 → dispatch Beacon: "extend heal-systemd-install-drift to detect content-drift in already-installed units."
+
+- **G-rule watch (updated):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **NEW 1/3** (iter 684 — first observation). At 3/3 → dispatch Beacon.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `medic:medic-diagnosis` G-rule: **1/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `cycle-blocked:dirty-tree-*` G-rule: **2/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Investigated worktree GC timer — confirmed daily cadence vs 1h intended; root cause identified (install-drift healer gap for changed units).
+3. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+4. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync self-recovering; 0 new alerts; GC fix requires sudo = ask-then-do).
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 684` → recorded. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+7. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** [yellow] NEW: Worktree GC timer installed spec is stale (daily cadence; should be `OnUnitActiveSec=1h` per PR #266). Stale orphans will persist until 02:43 UTC Thursday unless manually updated. Written to `pulse-escalations.json`. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry. `sync-push-rebase-fallback-001` APPROVAL_REQUEST open (37th). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. `medic-tier2auth401-beaconbot-20260529T045737Z` APPROVAL_REQUEST open.
+
+**Patterns:**
+- **Pipeline fully quiescent for 5th consecutive iter.** 0 open PRs, all inboxes empty. Genuine steady-state rest.
+- **Worktrees plateau at 19 for 5th consecutive iter — confirmed GC cadence mismatch.** Install-drift healer gap: changed units not detected. New G-rule 1/3. GC will fire in ~20h; no operational emergency.
+- **Cooldown residue plateau at 172 for 5th consecutive iter.** No new install-drift events. Stable. GC fix (APPROVAL_REQUEST pending Larry) is long-term resolution.
+
+**Learned:** The heal-systemd-install-drift healer has a gap: it detects and auto-installs MISSING systemd units but does NOT detect units whose content changed (e.g., timer cadence updated in the repo). PRs that change existing installed units require manual `sudo cp + daemon-reload + restart` to take effect. This is the root cause of the 19-worktree plateau: PR #266's 1h cadence change was not propagated to the installed timer. New G-rule at 1/3.
+
+---
+
 ## Iteration 683 — 2026-06-03 06:32 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: sync error + cooldown residue). Alert watermark: **1225** (unchanged — 0 new alerts since iter 682). Healer heartbeat: **06:20:09Z** (~12 min old; ✅ within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total — unchanged; self-recovering). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (4th consecutive iter). Worktrees: **19** (unchanged). Cooldown residue: **172** (unchanged).
