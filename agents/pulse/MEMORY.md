@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 06:23Z UTC (Iter 682 — interactive)
+## Status snapshot — updated 2026-06-03 06:32Z UTC (Iter 683 — interactive)
 
-**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC pending).** Alert watermark: **1225** (unchanged from iter 681 — 0 new alerts). Healer: heartbeat 06:20:09Z (~2 min old; within threshold). Cooldown/warning: **172** files (unchanged — plateau stable, 3rd consecutive iter). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (self-recovering; no new occurrence). **7/7 core services + 4 new timers all verified active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (3rd consecutive iter). Burn-rate: monitoring (no new alert since 04:46:30Z). Check III 2026-06-14. Worktrees: **19** (unchanged — 3rd iter; GC timer active; stale orphan `wt-forge-sentinel-inbox-stall-translation-001` expected to clear on next GC fire). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open.
+**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC pending).** Alert watermark: **1225** (unchanged from iter 682 — 0 new alerts). Healer: heartbeat 06:20:09Z (~12 min old at iter 683 check; within threshold). Cooldown/warning: **172** files (unchanged — plateau stable, 4th consecutive iter). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (self-recovering; no new occurrence). **7/7 core services + 4 new timers all verified active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (4th consecutive iter). Burn-rate: monitoring (no new alert since 04:46:30Z). Check III 2026-06-14. Worktrees: **19** (unchanged — 4th iter; GC timer active; stale orphans `wt-forge-sentinel-inbox-stall-translation-001` + `wt-forge-alert-xlate-outbox-success-fyi-001` expected to clear on next GC fire; if count unchanged on iter 684, flag GC signal). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open.
 
 **Watch items (iter 681 update):**
 - ~~**PR #270 OPEN; Mirror reviewing rev1.**~~ **PR #270 MERGED (iter 680, 05:56:07Z).** "docs(runbooks): orchestrator-bootstrap-runbook" — Mirror approved rev1. Auto-merged. Watch item CLOSED. ✅
