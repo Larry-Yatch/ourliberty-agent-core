@@ -201,5 +201,107 @@ class TestPromoteVerificationPending(_LedgerTestBase):
         self.assertIsNone(out)
 
 
+class TestCanonicalInterventionId(unittest.TestCase):
+    """The load-bearing tagging helper: a canonical id is
+    '<template>:<detail>' with a kebab-case template that Check V can
+    aggregate on. Reject anything that would fragment per-template
+    track record."""
+
+    def test_joins_template_and_detail(self):
+        self.assertEqual(
+            cpl.canonical_intervention_id('restart-daemon', 'beacon'),
+            'restart-daemon:beacon')
+
+    def test_empty_detail_allowed(self):
+        out = cpl.canonical_intervention_id('reinstall-systemd-unit')
+        self.assertEqual(out, 'reinstall-systemd-unit:')
+
+    def test_template_prefix_is_nonempty(self):
+        """The whole point: _template_of-style split yields a real
+        per-template key, never a singleton."""
+        out = cpl.canonical_intervention_id('retry-sync-push', 'iter-117')
+        self.assertEqual(out.split(':', 1)[0], 'retry-sync-push')
+        self.assertTrue(out.split(':', 1)[0])
+
+    def test_detail_may_contain_colon(self):
+        out = cpl.canonical_intervention_id('restart-daemon', 'a:b:c')
+        # Only the first ':' delimits; the template prefix is still clean.
+        self.assertEqual(out.split(':', 1)[0], 'restart-daemon')
+        self.assertEqual(out, 'restart-daemon:a:b:c')
+
+    def test_rejects_empty_template(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('', 'x')
+
+    def test_rejects_uppercase(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('Restart-Daemon', 'x')
+
+    def test_rejects_whitespace(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('restart daemon', 'x')
+
+    def test_rejects_colon_in_template(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('restart:daemon', 'x')
+
+    def test_rejects_leading_digit(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('1restart', 'x')
+
+    def test_rejects_underscore(self):
+        with self.assertRaises(ValueError):
+            cpl.canonical_intervention_id('restart_daemon', 'x')
+
+
+class TestCliTemplateTagging(_LedgerTestBase):
+    """The CLI --template/--detail path is what the cycle prompt calls.
+    It must write a tagged row on success and write NOTHING (non-zero
+    exit) on a malformed template."""
+
+    def test_cli_template_path_writes_tagged_row(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--iter', '5', '--template', 'restart-daemon',
+                       '--detail', 'beacon'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['intervention_id'], 'restart-daemon:beacon')
+        # Check-V-style aggregation key is non-empty.
+        self.assertTrue(rows[0]['intervention_id'].split(':', 1)[0])
+
+    def test_cli_empty_detail_still_tagged(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--template', 'reinstall-systemd-unit'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(rows[0]['intervention_id'],
+                         'reinstall-systemd-unit:')
+
+    def test_cli_bad_template_exits_nonzero_and_writes_nothing(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--template', 'Bad Template'])
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(self._ledger_path().exists(),
+                         'a malformed tag must never write a ledger row')
+
+    def test_cli_detail_without_template_exits_nonzero(self):
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--detail', 'orphan-detail'])
+        self.assertNotEqual(rc, 0)
+        self.assertFalse(self._ledger_path().exists())
+
+    def test_cli_legacy_payload_path_still_works(self):
+        """The lenient --payload path is untouched for internal callers."""
+        rc = cpl.main(['append', '--tier', '1', '--kind', 'intervention',
+                       '--payload', '{"intervention_id": "legacy-id"}'])
+        self.assertEqual(rc, 0)
+        rows = [json.loads(l) for l in
+                self._ledger_path().read_text().splitlines() if l.strip()]
+        self.assertEqual(rows[0]['intervention_id'], 'legacy-id')
+
+
 if __name__ == '__main__':
     unittest.main()

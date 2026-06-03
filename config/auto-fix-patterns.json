@@ -1,0 +1,118 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Single source of truth for what Pulse may auto-fix. One record per action-template. Check 0 (durable triage, PR B) reads this to decide auto-fix vs ask; Check V (promotion loop, PR C) reads/writes clean_streak + state to graduate/demote. See docs/pulse-triage-layer-brief.md.",
+    "record_shape": {
+      "template": "kebab-case id matching ^[a-z][a-z0-9-]*$ — the stable prefix of an intervention_id '<template>:<detail>'. Must equal cycle_prime_ledger.canonical_intervention_id()'s template.",
+      "state": "'probation' (ask-first; building track record) | 'graduated' (auto-fix eligible). Only Check V flips probation->graduated, and only after Larry approval.",
+      "reversible": "bool. Only reversible templates may ever graduate.",
+      "permanent_guard": "bool. Credential / money / irreversible-or-destructive. A permanent_guard template ALWAYS asks and can NEVER graduate, regardless of track record.",
+      "clean_streak": "int. Consecutive clean executions (reversible, zero Larry-corrections). Reset to 0 on any miss/correction.",
+      "total_dispatches": "int. Lifetime dispatch count for this template (audit only; not a graduation gate).",
+      "last_larry_correction_at": "iso8601 utc | null. Stamped on demotion.",
+      "graduated_at": "iso8601 utc | null. Stamped when Larry approves graduation.",
+      "plain_language": {
+        "what": "Plain-English description of the signal this template responds to.",
+        "action": "Plain-English description of what Pulse does automatically once graduated.",
+        "why_safe": "Plain-English reversibility / safety rationale."
+      }
+    },
+    "graduate_min_clean_streak": 3,
+    "graduate_requires": "state=probation AND reversible AND permanent_guard=false AND clean_streak>=graduate_min_clean_streak AND Larry approval. Check V (PR C) enforces this; it unifies the legacy pulse_check_v GRADUATE_MIN_DISPATCHES (>=10) down to this value.",
+    "guard_list_relationship": "This registry SUPERSEDES a standalone config/action-template-guard-list.json (which does not exist on disk). The guarded set is a DERIVED VIEW computed at read time: { r.template for r in patterns if r.state != 'graduated' or r.permanent_guard }. PR C wires Check V to derive the guarded set from this rule; no separate guard-list file is created. See docs/pulse-triage-layer-brief.md.",
+    "demotion_rule": "Automatic, no approval: on any failed execution OR Larry-correction of a graduated template, flip state->probation, reset clean_streak=0, stamp last_larry_correction_at. Trust is lost faster than earned.",
+    "seeding_note": "Seeded 2026-06-03 (PR A). Routine reversible self-heal templates start in probation (they earn auto-fix via track record). Credential/money/irreversible templates start permanent_guard=true and never graduate."
+  },
+  "patterns": [
+    {
+      "template": "reinstall-systemd-unit",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A systemd unit shipped in the repo drifts out of install (present in systemd/ but missing from /etc/systemd/system/).",
+        "action": "Re-install the unit (cp + daemon-reload + enable --now) and confirm it is running.",
+        "why_safe": "It's a reversible re-install from the repo's own source-of-truth; it restores the intended state and changes nothing else."
+      }
+    },
+    {
+      "template": "restart-daemon",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A managed daemon (a healer, shipper, or bot service) has stalled or is running stale code after a merge.",
+        "action": "Restart the systemd service and confirm the heartbeat / liveness check recovers.",
+        "why_safe": "A restart is reversible and idempotent; the service comes back on the same config, and a failed restart surfaces immediately."
+      }
+    },
+    {
+      "template": "retry-sync-push",
+      "state": "probation",
+      "reversible": true,
+      "permanent_guard": false,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "ourliberty-sync's push to origin/main failed on a transient (rejected fast-forward that a rebase resolves).",
+        "action": "Rebase onto origin/main and retry the push once.",
+        "why_safe": "It's a rebase-and-retry of an already-committed change; a real divergence still fails loudly rather than forcing anything."
+      }
+    },
+    {
+      "template": "rotate-credential",
+      "state": "probation",
+      "reversible": false,
+      "permanent_guard": true,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "A credential / OAuth token / API key needs rotation or re-authentication.",
+        "action": "ASK Larry — never auto-rotate. Credentials are a permanent_guard floor.",
+        "why_safe": "Rotation can lock out a live account and is not cleanly reversible; it always requires a human."
+      }
+    },
+    {
+      "template": "issue-refund",
+      "state": "probation",
+      "reversible": false,
+      "permanent_guard": true,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "An alert implies a money movement (refund, charge, payout adjustment).",
+        "action": "ASK Larry — never move money automatically. Money is a permanent_guard floor.",
+        "why_safe": "Money movements are not reversible without cost and always require a human."
+      }
+    },
+    {
+      "template": "delete-resource",
+      "state": "probation",
+      "reversible": false,
+      "permanent_guard": true,
+      "clean_streak": 0,
+      "total_dispatches": 0,
+      "last_larry_correction_at": null,
+      "graduated_at": null,
+      "plain_language": {
+        "what": "An alert implies a destructive or irreversible action (deleting data/branches, force-push to main, dropping state).",
+        "action": "ASK Larry — never auto-execute destructive actions. Irreversible actions are a permanent_guard floor.",
+        "why_safe": "By definition there is no clean undo; a human must decide."
+      }
+    }
+  ]
+}

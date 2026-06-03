@@ -792,7 +792,21 @@ Field semantics:
 - `ratio_cumulative_30d` — same metric over the trailing 30 days, recomputed each iter from the rolling window.
 - `ratio_trend` — `declining` (monotonic-improvement direction), `stable`, or `rising` — derived by comparing the current 30d ratio against the 30d-ago ratio. PR-β's `cycle_prime_ledger.py` provides the helper.
 
-**How to append (PR-β provides the lib):** `cycle_prime_ledger.append_action(tier, interventions, systemic_fixes)` writes the new row + computes ratios server-side. Pulse calls it once per iter, between § 13 (journal write) and § 16 (end the cycle).
+**How to append (PR-β provides the lib).** Record each intervention/systemic-fix once per iter, between § 13 (journal write) and § 16 (end the cycle), via the CLI:
+
+```
+python3 ~/agent-core/scripts/cycle_prime_ledger.py append \
+  --tier <N> --kind intervention --iter <iter> \
+  --template <action-template> --detail <variable-part>
+```
+
+**The `--template`/`--detail` flags are MANDATORY for every intervention/systemic-fix you record — do NOT use a bare `--payload` for these.** The ledger stores `intervention_id = "<template>:<detail>"`, and Check V (§ 12.3) aggregates per-template track record by splitting on the first `:`. If you omit the template (or fold the variable part into it), the row fragments into a singleton and the auto-fix promotion ladder can never compute a streak — that is the exact break this contract fixes.
+
+- `--template` is the STABLE action class, kebab-case (`^[a-z][a-z0-9-]*$`): e.g. `reinstall-systemd-unit`, `restart-daemon`, `retry-sync-push`. It MUST match a `template` in `config/auto-fix-patterns.json` (the registry Check 0/Check V read) — use one of those ids when the intervention is a known self-heal; coin a new kebab-case id (no colon, no whitespace, no per-iter variable) for a genuinely new failure class, and the registry grows to cover it.
+- `--detail` is the VARIABLE part (the affected unit, the iter context): e.g. `--detail ourliberty-ceo-digest-daily`. Never put the iter number or other per-instance noise in `--template`.
+- A non-conforming `--template` exits non-zero and writes nothing, so a malformed tag fails loudly instead of silently producing an untaggable row. Fix the template and re-run.
+
+The legacy `cycle_prime_ledger.append_action(...)` Python entry and the `--payload` CLI form remain for internal callers (e.g. `promote_verification_pending`); they are NOT the path for recording your interventions.
 
 **Why this file is separate from `runbooks/cycle-actions.jsonl`.** The runbook auto-fix log is git-tracked and lives in the repo — it captures every always-fix execution for audit. The cycle-prime ledger lives under `~/agents/blackboard/` (not git-tracked) because (a) it's append-only, grows unbounded, and would dirty the tree on every iter; (b) PRIME DIRECTIVE accounting is a runtime concern, not a doctrine artifact. Same name, different files — the OQ1 resolution from 2026-05-29 picks Option A (rename one) and assigns the ledger to `cycle-prime-ledger.jsonl`. Any earlier draft that references `cycle-actions.jsonl` as the PRIME DIRECTIVE ledger is stale.
 
