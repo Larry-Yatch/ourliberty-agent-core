@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 801 — 2026-06-03 23:45 UTC (interactive)
+
+**Health:** ⚠️ Tier 3→1 reset — **deploy-notifier:READY Tier 4 alert** (by-design Vercel deploy success, G-rule 2/3, not actionable — no DM to Larry). Alert watermark: **1222 lines / anchor 23:16:17Z** (+1 new). Cooldown residue: **199** (structural; unchanged). Sync: ✅ fully current, last_sync=2026-06-03T23:21:28Z, commit=6ab2bbc=HEAD. Healer heartbeat: **23:24:59Z** (~21 min old; ✅). **8/8 services active.** **1 open PR** (#292 Phase B Check 0 — fresh, under Mirror review). Forge: 2 tasks (dashboard-rotation-switch-ui, queue-api-preflight-clarify). Mirror: 1 task (review PR #292). Beacon: EMPTY. Worktrees: **5** (4 Forge + 1 Mirror — all active builds from post-iter-800 pipeline activity).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — tier-reset.** `larry-alerts.jsonl`: **1222 lines** — 1 new line above iter-800 watermark (1221/19:59:11Z). Alert at 23:16:17Z: `deploy-notifier:READY:dpl_2nruDm9YqmeyuoBxNouhYzb7Eh6B`. Classification: **Tier 4** (not in `config/alert-translations.json`; `deploy-notifier` source absent from allowlist). Context: by-design Vercel dashboard deploy success event. No action warranted; NOT DMing Larry (expected-by-design per Larry's feedback preference). G-rule: `deploy-notifier:READY:* not in alert-translations.json` → **2/3** (iter 801; previously 1/3 since iter 756). Tier-reset triggered. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No Larry directives or agent-distress matches in last 4h. 1 active Beacon session. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 23:24:59Z (~21 min old; ✅ within 90-min threshold). No active stalls. Cooldown residue 199 structural carry-forward. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives in last 24h. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **23:24:59Z** (~21 min old; ✅). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=6ab2bbc "Pulse cycle 20260603T230747Z". Newer than iter-800 HEAD (561f6d1); wrapper committed iter-800's journal entry successfully. ✅
+
+- **(Check B) Sync health: ✅ Fully current.** `agent-core-sync.json`: status=no-change, last_sync=2026-06-03T23:21:28Z, commit=6ab2bbc. Commit matches session HEAD — sync fully current. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-dashboard-api — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline — normal.** 1 open PR in agent-core: **#292** "feat(pulse): Phase B — durable Check 0 triage layer" (created 23:37:39Z, MERGEABLE, no review yet — Mirror review task queued, < 30 min old). 0 open PRs in ourliberty-dashboard. Forge: 2 tasks (`build-dashboard-rotation-switch-ui-001.json` from beacon, `forge-queue-api-preflight-20260603T231401Z-clarify1.json` from larry). Mirror: 1 task (`review-pulse-triage-phase-b-check0-001.json`). Beacon: EMPTY. All inbox items < 30 min old. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts above watermark (only the deploy-notifier:READY alert is new). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z today) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 5** (all created after iter 800): `wt-forge-dashboard-rotation-switch-ui-001`, `wt-forge-forge-queue-api-preflight-20260603T231401Z`, `wt-forge-forge-queue-api-preflight-20260603T231401Z-clarify`, `wt-forge-pulse-triage-phase-b-check0-001`, `wt-mirror-pulse-triage-phase-b-check0-001`. All are active builds — normal pipeline activity. ✅
+
+- **G-rule watch (changes from iter 800):**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **2/3** ← **updated from 1/3** (iter 801; 1st was iter 756).
+  - `pulse-check-stale:*` not in alert-translations.json: **1/3** (iter 784).
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784).
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776).
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776).
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775).
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769).
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680).
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716).
+  - `cycle-blocked:dirty-tree-*`: **2/3**.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=682 (+1), systemic_fixes=4, ratio=170.5, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert (deploy-notifier:READY at 23:16:17Z). Tier 4 classification — not in allowlist, by-design Vercel deploy success. No DM to Larry. G-rule 1/3→2/3. ⚠️
+3. Check B: sync fully current (commit=HEAD=6ab2bbc). ✅
+4. Check E: PR #292 (Phase B) open ~8 min at check time; Mirror review queued. No auto-merge trigger (< 30 min). 2 Forge build tasks fresh. ✅
+5. No always-allowed auto-fixes triggered. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 801 --template deploy-notifier-grule --detail ready-2of3` → ts=2026-06-03T23:45:05Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier reset 3→1, consecutive_clean=0, last_signal_at=2026-06-03T23:45:05Z. ✅
+8. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. deploy-notifier:READY is by-design (Vercel dashboard deploy success); no DM warranted.
+
+**Patterns:** Pipeline re-activated since iter 800's empty state. Forge built Phase B (Check 0 durable triage layer) — PR #292 open, Mirror queued. Two more build tasks in Forge inbox. This is healthy throughput. deploy-notifier:READY G-rule now at 2/3; one more occurrence dispatches Beacon to add source translation.
+
+**Learned:** First `deploy-notifier:READY` alert since watermark settled at 1221/19:59:11Z (iter ~796). Confirms these appear on Vercel deploy events (dashboard PR or commit merge deploys). G-rule path to 3/3 is the systemic fix; no interim action needed.
+
+---
+
 ## Iteration 800 — 2026-06-03 23:06 UTC (interactive)
 
 **Health:** ✅ Nominal — **Tier 3**, consecutive_clean=3. Alert watermark: **1221 lines / anchor 19:59:11Z** (unchanged — 0 new alerts). Cooldown residue: **199** (193 warning + 6 critical; structural). Sync: ✅ no-change, last_sync=2026-06-03T22:21:22Z, commit=02a30bf (normal post-wrapper lag vs HEAD=561f6d1). Healer heartbeat: **22:53:19Z** (~13 min old; ✅). **8/8 services active.** **0 open PRs.** Forge: EMPTY. Mirror: EMPTY. Beacon: EMPTY. Worktrees: **0** (−1: `wt-forge-harden-ledger-intervention-tagging-001` GC'd by hourly backstop between iters 799 and 800).
