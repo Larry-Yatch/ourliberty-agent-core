@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 08:22Z UTC (Iter 698 — interactive)
+## Status snapshot — updated 2026-06-03 08:31Z UTC (Iter 699 — interactive)
 
-**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (cooldown GC pending; worktree GC mismatch).** Alert watermark: **1225** (unchanged — 0 new alerts; 06:00Z install-drift batch is latest in file; stable 12+ iters). Healer: heartbeat **08:20:25Z** (iter 698 check ~2 min old; ✅ within 90-min threshold; 30-min cadence confirmed — updated from 07:50:19Z). Cooldown: **172 warning** + **6 critical stale watchdog** (May 13–30; all services active; total 178). Sync: ✅ `status=no-change`, last_sync=**07:38:21Z** (sync will re-fire post-iter-698 wrapper push; no new SYNC-PUSH-REBASE-FALLBACK-001; 37 total). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**19th consecutive iter**). Check III 2026-06-14. Worktrees: **19** (unchanged — **19th iter**; **⚠️ GC timer cadence mismatch: installed daily, repo spec 1h per PR #266; next GC fire ~02:43 UTC Thu tonight**). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. **G-rule: `changed-systemd-unit-not-propagated-by-install-drift-healer` 1/3** (iter 684).
+**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (cooldown GC pending; worktree GC mismatch).** Alert watermark: **1225** (unchanged — 0 new alerts; 06:00Z install-drift batch is latest in file; stable 13+ iters). Healer: heartbeat **08:20:25Z** (iter 699 check ~11 min old; ✅ within 90-min threshold; 30-min cadence confirmed). Cooldown: **172 warning** + **6 critical stale watchdog** (May 13–30; all services active; total 178). Sync: ✅ `status=no-change`, last_sync=**07:38:21Z** (sync will re-fire post-iter-699 wrapper push; no new SYNC-PUSH-REBASE-FALLBACK-001; 37 total). **7/7 core services active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**20th consecutive iter**). Check III 2026-06-14. Worktrees: **19** (unchanged — **20th iter**; **⚠️ GC timer cadence mismatch: installed daily, repo spec 1h per PR #266; next GC fire ~02:43 UTC Thu tonight**). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. **G-rule: `changed-systemd-unit-not-propagated-by-install-drift-healer` 1/3** (iter 684).
 
 **Watch items (iter 681 update):**
 - ~~**PR #270 OPEN; Mirror reviewing rev1.**~~ **PR #270 MERGED (iter 680, 05:56:07Z).** "docs(runbooks): orchestrator-bootstrap-runbook" — Mirror approved rev1. Auto-merged. Watch item CLOSED. ✅
@@ -16,7 +16,7 @@
 - ~~**`build-fix-tier2-probe-setup-token-auth.json`.**~~ **PR #267 MERGED (iter 677, 05:29:21Z).** Root fix for `tier2_weekly_probe_failed` false alarms. Watch item CLOSED. ✅
 - ~~**Stale worktrees: 20 total.**~~ **PR #266 MERGED (iter 676).** Event-driven teardown LIVE. Worktrees: **19** (−2 from iter 679). Hourly GC timer active. CLOSED. ✅
 - ~~**`build-step-digest-card.json` (N6).**~~ **PR #32 MERGED on ourliberty-dashboard (iter 677).** CLOSED. ✅
-- **NEW (iter 680): 4 new timer service groups auto-installed.** `ourliberty-ceo-digest-daily`, `ourliberty-ceo-digest-weekly`, `ourliberty-chain-events-retention`, `ourliberty-promote-alerts` — all timers active+waiting. Verification: timers fire on schedule. ⚠️ MONITOR.
+- **NEW (iter 680): 4 new timer service groups auto-installed.** `ourliberty-ceo-digest-daily`, `ourliberty-ceo-digest-weekly`, `ourliberty-chain-events-retention`, `ourliberty-promote-alerts` — all timers active+waiting. Verification: timers fire on schedule. ✅ Stable 20+ iters.
 - **step-ops-alerts-ui BUILD DONE (Vercel preview live).** Deployed 03:12:11Z. marker-error-step-ops-alerts-ui-1.json retry queued (retry 1/3). UNCHANGED.
 - **MalformedForgeMarker — 8th total lifetime (iter 668).** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
 - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] escalation idx=9 stands).
