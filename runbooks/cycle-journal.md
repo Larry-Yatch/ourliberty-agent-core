@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 669 — 2026-06-03 04:31 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **Pipeline CLEARED: 0 open PRs.** PR #263 MERGED (04:25:17Z) + PR #265 MERGED (04:26:15Z) — first clear pipeline in many iterations. Alert watermark: **1198** (+1, Tier 3). Healer heartbeat: **04:19:52Z** (11 min old; ✅ within threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (34th total)** — status=error, last_sync=04:23:18Z, self-recovering. **7/7 services active.** Forge inbox: 1 marker-error (`marker-error-step-approvals-rescope-1.json`, retry-1/3). Mirror inbox: EMPTY. Beacon inbox: EMPTY.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1198 lines** (+1 from 1197). New: `outbox-notifier:review-pass` at 04:25:17Z — Mirror approved PR #263 auto-merged (task `medic-reliability-gate-delivery-cli-001`). Tier 3 — `review-pass` in alert-translations.json per PR #264 merged iter 668. Nominal. Cooldown: **155 total** (unchanged).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 1 new alert (Tier 3 — known-pattern silence).** 1198 lines (+1). New: `outbox-notifier:review-pass` at 04:25:17Z — Mirror approved PR #263, auto-merged. Tier 3 per `review-pass` entry in alert-translations.json (landed PR #264, iter 668). No action. Cooldown unchanged at 155. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since "30 min ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Delivery confirmed via review-pass alert idx=1198. No Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (155, unchanged).** 155 alert-cooldown/warning/ files (unchanged from iter 668). 27 heal-pipeline-stall files (stable). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ⚠️ Pipeline CLEARED — but step-ops-alerts-ui stall confirmed at threshold.**
+  - **PR #263 MERGED (04:25:17Z).** "fix(medic): delivery gate-at-emission + cooldown-primary rate window + CLI escalation path" — Mirror retried revision-1 review (marker-error resolved), approved, auto-merged. Watch item CLOSED. ✅
+  - **PR #265 MERGED (04:26:15Z).** "fix(retention): restore OURLIBERTY_AGENTS_ROOT in chain_events_retention test teardown" — Mirror approved, auto-merged. Watch item CLOSED. ✅
+  - **0 open PRs.** First clear pipeline state in many iterations. ✅
+  - **Forge inbox: `marker-error-step-approvals-rescope-1.json` (retry-1/3).** step-approvals-rescope N5 build had MalformedForgeMarker at PR submission. Retry-1/3 in Forge inbox — auto-retry mechanism will handle. MalformedForgeMarker **9th total lifetime.** ⚠️
+  - **Mirror inbox: EMPTY.** ✅ Beacon inbox: EMPTY. ✅
+  - **step-ops-alerts-ui PR: STALL CONFIRMED — 3rd iter, retry exhausted.** `wt-forge-step-ops-alerts-ui` + `wt-mirror-step-ops-alerts-ui` worktrees still exist. Branch pushed to GitHub (Vercel preview confirmed). `marker-error-step-ops-alerts-ui-1.json` consumed and archived; no retry-2 created. Meets re-dispatch threshold (MEMORY iter 668: "re-dispatch if no PR by iter 669"). Escalated [yellow] to `pulse-escalations.json` — options: (A) re-dispatch to Beacon, (B) Larry manually creates PR from `forge/step-ops-alerts-ui`, (C) clean worktrees + re-dispatch fresh. ⚠️ ask-then-do.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:19:52Z** (11 min old at 04:31Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=b5b72bc ("Pulse cycle 20260603T042714Z" — iter 668 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (34th total).** sync.json: status=error, last_sync=2026-06-03T04:23:18Z, commit=654ff316 rolled back. Sync ran after iter 668 wrapper push; failed non-FF; rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 0 open PRs; Forge has marker-error retry-1 for N5; step-ops-alerts-ui stall.** All clear except marker-error auto-retry in progress + step-ops-alerts-ui escalated. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Pipeline quiet. Forge processing marker-error retry-1. Within expected range. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **`stale-worktrees accumulating` — G-rule 2/3 (iter 669, 2nd observation).** 16 worktrees in `/home/larry/agent-worktrees/` (unchanged from iter 668). Many from merged PRs (alert-xlate-outbox-success-fyi-001=PR#264, medic-reliability-gate-delivery-cli-001=PR#263, sentinel-inbox-stall-translation-001=PR#262, step-cleanup-review=PR#259, step-retention=PR#260). At 3/3 (next iter): dispatch to Beacon "Forge should clean up worktrees on task completion."
+  - **MalformedForgeMarker — 9th total lifetime** (`marker-error-step-approvals-rescope-1.json` in Forge inbox, retry-1). Same pattern as previous 8 occurrences. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - `deploy-notifier cooldown GC gap` — **155 files** (unchanged). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - ~~PR #263 HOLD watch item.~~ **CLOSED** (merged 04:25:17Z). ✅
+  - ~~PR #265 HOLD watch item.~~ **CLOSED** (merged 04:26:15Z). ✅
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync self-recovering; marker-error auto-retry mechanism handles autonomously).
+4. Escalated step-ops-alerts-ui stall [yellow] to `pulse-escalations.json` (3rd iter, threshold met, ask-then-do).
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 669` → ts: 2026-06-03T04:31:28Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:31:29Z. ✅
+7. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** [yellow] step-ops-alerts-ui stall — 3rd iter, retry exhausted. Options: (B) manually create PR from `forge/step-ops-alerts-ui`, or (C) authorize worktree cleanup + re-dispatch. `pulse-escalations.json` updated. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 34th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+
+**Patterns:**
+- **Pipeline cleared for the first time in many iterations.** Both PR #263 and PR #265 merged within 15 min of iter 669 start. Mirror completed the previously-stalled revision-1 review for PR #263 (the marker-error from iter 668 was resolved by the retry mechanism). Beacon and Forge inboxes empty. 0 open PRs. This is a meaningful system health improvement.
+- **MalformedForgeMarker recurring at PR submission step.** 9th total lifetime. Pattern consistent across both Forge and Mirror sessions. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` doc fix continues to be the right systemic remedy — the pattern repeats because the preflight self-check bullet isn't enforced.
+- **step-ops-alerts-ui retry chain exhausted after retry-1.** Unlike prior MalformedForgeMarker recoveries (which proceeded through retry-2/3 or self-resolved via branch push), retry-1 for step-ops-alerts-ui was archived without triggering retry-2. The worktrees and branch exist; the issue is specifically the PR submission step. Fresh re-dispatch may conflict with the existing worktree — manual PR creation from the already-built branch is the lower-risk path (option B).
+- **Stale worktrees now at G-rule 2/3.** 16 worktrees, many from PRs merged 1–3 iterations ago. Next iter = 3/3 threshold → dispatch to Beacon. The worktree accumulation creates noise in inbox-watcher logs and increases the chance of worktree-path collisions on future builds.
+
+**Learned:** The MalformedForgeMarker retry mechanism's retry-2/retry-3 creation appears conditional on the retry-1 run leaving some state or signal. When retry-1 silently fails (no marker produced), no retry-2 is created. The exhaustion mode is "retry-1 consumed + archived, no retry-2 visible" — this is the new diagnostic signature for "retry chain dead." Previously I was looking for the retry-N file to be missing from inbox; the cleaner check is whether retry-N-1 appears in the archive without a retry-N in inbox.
+
+---
+
 ## Iteration 668 — 2026-06-03 04:22 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. PR #264 MERGED (04:16:22Z) — closes `outbox-notifier:review-pass` + `mirror-dag-pass` G-rules. 2 PRs open (#263 past threshold HOLD, #265 at 10 min HOLD). Alert watermark: **1197** (+3 all Tier 3). Healer heartbeat: **03:49:49Z** (32 min old; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (33rd total)** — status=error, last_sync=04:15:46Z; self-recovering. **7/7 services active.** Forge inbox: 1 task (`step-approvals-rescope` N5). Mirror inbox: 2 tasks (marker-error + active review).
