@@ -1297,16 +1297,38 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
                             'to restore the fallback safety net.'
                         )
                     elif outcome == 'FAILED':
-                        cause = (
-                            f'Tier 1 hit {reason} and the Tier 2 retry also '
-                            f'failed (Tier 2 credentials likely lapsed or '
-                            f'silently landed in the wrong account).'
-                        )
-                        action = (
-                            'Re-provision Tier 2 OAuth per '
-                            '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md` '
-                            '(the fallback was attempted and rejected by the API).'
-                        )
+                        # 2026-06-02 false-alarm fix: don't word this as lapsed
+                        # Tier 2 credentials when Tier 2 OAuth actually verifies.
+                        # The alert still fires (both tiers failing is worth
+                        # surfacing) but the cause/action reflect the real story
+                        # instead of a false "OAuth expired" claim.
+                        try:
+                            import active_tier as _at
+                            _t2_ok = _at.tier_auth_ok('tier2')
+                        except Exception:
+                            _t2_ok = False
+                        if _t2_ok:
+                            cause = (
+                                f'Tier 1 hit {reason} and the Tier 2 retry also '
+                                f'failed, but Tier 2 OAuth verifies OK — likely '
+                                f'{reason} (capacity) or a session account-bound '
+                                f'resume, not a credentials problem.'
+                            )
+                            action = (
+                                'No Tier 2 OAuth action needed (auth verified); '
+                                'transient — clears as the rate-limit window rolls.'
+                            )
+                        else:
+                            cause = (
+                                f'Tier 1 hit {reason} and the Tier 2 retry also '
+                                f'failed (Tier 2 credentials likely lapsed or '
+                                f'silently landed in the wrong account).'
+                            )
+                            action = (
+                                'Re-provision Tier 2 OAuth per '
+                                '`docs/runbooks/restore-larry-personal-claude-oauth-tier2.md` '
+                                '(the fallback was attempted and rejected by the API).'
+                            )
                     else:  # SKIPPED
                         # SKIPPED is expected + auto-remediated (heal_resume_paused_on_tier1
                         # re-dispatches). Log-only per the actionable-only alert discipline;
