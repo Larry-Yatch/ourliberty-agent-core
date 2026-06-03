@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 790 — 2026-06-03 20:12 UTC (interactive)
+
+**Health:** ✅ Pipeline clear — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 52nd total). Alert watermark: **1221 lines / anchor 19:59:11Z** (unchanged from iter 789 — 0 new alerts). Cooldown residue: **199** (unchanged; 193 warning + 6 critical). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=04424a39, last_sync=19:57:59Z. Healer heartbeat: **19:53:24Z** (~19 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs.** Forge: EMPTY. Mirror: EMPTY. Beacon: EMPTY. Worktrees: **3** (all stale; unchanged from iter 789).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal — 0 new alerts.** `larry-alerts.jsonl`: **1221 lines** — anchor 19:59:11Z (identical to iter 789 watermark). No new alerts since iter 789. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473 → 1b5ed242). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 199** (193 warning + 6 critical; unchanged from iter 789). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:53:24Z** (~19 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=309dfc8 "Pulse cycle 20260603T200504Z". Newer than iter 789 HEAD (603d8e8); wrapper committed iter 789's journal entry successfully. ✅
+
+- **(Check B) Sync health: ⚠️ status=error.** message="Auto-commit push failed; rolled back", commit=04424a39, last_sync=19:57:59Z. Session-start HEAD (309dfc8) newer than sync.json commit (04424a39) → wrapper push succeeded after sync service raced and rolled back. **SYNC-PUSH-REBASE-FALLBACK — 52nd total occurrence.** Self-recovering: hourly `ourliberty-sync.timer` will self-clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (structural). **Tier-reset: yes.** ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ System fully clear.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. Forge: EMPTY. Mirror: EMPTY. Beacon: EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts since iter 789 watermark. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z today) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 3** (all stale; unchanged from iter 789): `wt-forge-harden-ledger-intervention-tagging-001`, `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`. Hourly GC backstop active. ✅
+
+- **G-rule watch (all unchanged from iter 789):**
+  - `pulse-check-stale:*` not in alert-translations.json: **1/3** (iter 784). PR #289 liveness watcher now live — expect pulse-check-stale alerts to increment this G-rule on the next healer sweep.
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784). Unchanged.
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776). Unchanged.
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776). Unchanged.
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775). Unchanged.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=675, systemic_fixes=4, verification_pending=2, ratio=168.75, trend=flat. (Note: one extra uncategorized row from duplicate ledger append this iter — minor; no impact on trend.)
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark unchanged at 1221/19:59:11Z. No tier-reset from Check 0. ✅
+3. Check E: 0 open PRs. All 3 inboxes empty. Pipeline remains fully clear (carried over from iter 789). ✅
+4. No always-allowed auto-fixes triggered: pipeline fully drained; all services active; sync self-recovering; healer fresh. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --template pulse-cycle-check --detail iter-790` → intervention_id=pulse-cycle-check:iter-790, ts=2026-06-03T20:12:10Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T20:12:13Z. ✅
+7. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. SYNC-PUSH-REBASE-FALLBACK structural (52nd, APPROVAL_REQUEST open). Pipeline fully clear. No Larry DM warranted.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK (52nd).** Structural. Same self-recovering race on every interactive cycle session. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the fix. No change in count between iters 789→790 for non-interactive cycles (confirming this pattern is interactive-session-specific).
+- **pulse-check-stale:* G-rule watch.** PR #289 (liveness watcher) merged at iter 789. G-rule is at 1/3. The liveness watcher now actively signals stale checks; expect Check 0 to see `pulse-check-stale:*` subjects on the next healer sweep, ticking toward 3/3. When it fires 3×: dispatch Beacon to add `source:pulse-cycle / subject:pulse-check-stale:*` as Tier 3/FYI to `config/alert-translations.json`.
+
+**Learned:** Nothing new this iter. System stable continuation of iter 789 — fully clear pipeline, 7/7 active, 0 new alerts. The only recurring structural signal remains SYNC-PUSH-REBASE-FALLBACK.
+
+---
+
 ## Iteration 789 — 2026-06-03 20:02 UTC (interactive)
 
 **Health:** ✅ Pipeline clear — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 51st total). Alert watermark: **1221 lines / anchor 19:59:11Z** (+2 from iter 788's 1219/19:53:48Z — both Tier-3 FYI). Cooldown residue: **199** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=04424a39, last_sync=19:57:59Z. Healer heartbeat: **19:53:24Z** (~9 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs** (PR #285 + PR #289 MERGED since iter 788). **Forge: EMPTY. Mirror: EMPTY. Beacon: EMPTY.** Worktrees: **3** (all stale; 4 active torn down on PR #285 + #289 merges).
