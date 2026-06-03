@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 775 — 2026-06-03 18:06 UTC (interactive)
+
+**Health:** ✅ Pipeline active — Tier 1, consecutive_clean=1 (all alerts Tier-3 silenced; checks clean). Alert watermark: **~1190 lines / anchor 18:01:16Z** (+4-5 new from iter 774 watermark 1186/17:22:34Z; all Tier 3 known-pattern). Cooldown residue: **183** (+1). Sync: ✅ last_sync=17:04:24Z (~62 min at iter start; within 2h threshold). Healer heartbeat: **17:52:36Z** (~13 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge: 3 active tasks. Mirror EMPTY. Beacon EMPTY.** Worktrees: **6** (4 stale + 2 active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 5 new alerts — all Tier 3 known-pattern, silenced.** Watermark advanced from 1186/17:22:34Z to ~1190/18:01:16Z.
+  1. `source=heal-systemd-install-drift / subject=install-drift:ourliberty-heal-tier2-weekly-health-probe.service` (18:00:14Z) — auto-reconciled by healer. Tier 3 (allowlist match: heal-systemd-install-drift → install-drift). ✅ silence.
+  2. `source=heal-systemd-install-drift / subject=install-drift:ourliberty-heal-tier2-weekly-health-probe.timer` (18:00:16Z) — auto-reconciled by healer. Tier 3. ✅ silence.
+  3. `source=heal-pipeline-stall / subject=pipeline-stall:retry-exhausted:unknown` (18:00:22Z) — task_id="unknown" (healer parse error; no new invalid tasks in forge/.invalid). Tier 3 (allowlist match: heal-pipeline-stall → pipeline-stall:retry-exhausted). ✅ silence.
+  4. `source=heal-systemd-install-drift / subject=install-drift:ourliberty-inbox-watcher.service` (18:00:48Z) — **NOT auto-reconciled** (healer detected drift but did not auto-fix; inbox-watcher running stale unit config). Tier 3. ✅ silence. Note: first observation of inbox-watcher.service drift surviving install-drift healer sweep (G-rule candidate 1/3 — see Patterns).
+  5. `source=heal-tier2-weekly-probe / subject=tier2_weekly_probe_failed` (18:01:16Z) — probe fired seconds after install-drift healer re-installed the service; output=''. Tier 3 (allowlist match: heal-tier2-weekly-probe → tier2_weekly_probe_failed). ✅ silence. Note: Tier 2 OAuth may be expired again (~15h after iter 656 restore); APPROVAL_REQUEST medic-tier2auth401-beaconbot-20260529T045737Z still open.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 183 total** (+1 from 182; structural carry-forward). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **17:52:36Z** (~13 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=7d4c157 "Pulse cycle 20260603T175422Z". ✅
+
+- **(Check B) Sync health: ✅ status=no-change.** last_sync=17:04:24Z (~62 min at iter start; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline.** 0 open PRs (both repos). Forge: 3 active tasks — `harden-ledger-intervention-tagging-002` (phase=preflight, source=beacon), `pulse-check-liveness-watcher-001` (phase=preflight, source=beacon), `marker-error-deploy-restart-gap-001-1.json` (task_id=deploy-restart-gap-001, phase=preflight, source=outbox-notifier — MalformedForgeMarker retry #1). `harden-ledger-intervention-tagging-001` ARCHIVED (build completed; -002 follow-up in pipeline). Mirror EMPTY. Beacon EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 6** — stale: `wt-forge-alert-fix-first-outcome-routing-001`, `wt-forge-harden-ledger-intervention-tagging-001` (task archived; awaiting event-driven GC post-merge), `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-deploy-restart-gap-001`, `wt-forge-pulse-check-liveness-watcher-001`. ✅
+
+- **G-rule watch:**
+  - `MalformedForgeMarker` — **9th total lifetime** (deploy-restart-gap-001 first attempt). G-rule dispatched iter 150; APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` still pending Larry. Pattern aging without resolution.
+  - **NEW: `inbox-watcher.service install-drift not auto-healed`: G-rule candidate 1/3** (this iter — first observation). PR #278 added content-drift auto-heal for long-running services; healer auto-fixed tier2-probe units in the same sweep but skipped inbox-watcher.service. At 3/3: dispatch Beacon to investigate auto-heal coverage gap for ourliberty-inbox-watcher.service.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. G-rule 3/3 DISPATCHED (iter 592); Beacon consumed (iter 594); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=658, systemic_fixes=4, verification_pending=2, ratio=164.5, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: Classified 5 new alerts (all Tier 3 known-pattern) → silenced, no DM, no dispatch, no tier-reset. Watermark advanced to ~1190/18:01:16Z.
+3. Periodic: Check I sentinel exists (00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+4. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync clean; healer alive; Forge tasks active (not stale). ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 775 --template pulse-cycle-check --detail iter-775` → intervention_id=pulse-cycle-check:iter-775, ts: 2026-06-03T18:06:08Z. ✅
+6. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1, last_signal_at=2026-06-03T17:53:18Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** None. All 5 new alerts Tier 3 known-pattern; no actionable signals for Larry this iter.
+
+**Patterns:**
+- **install-drift healer at 18:00Z: auto-fixed tier2-probe units, skipped inbox-watcher.service.** Both the .service and .timer for `ourliberty-heal-tier2-weekly-health-probe` were auto-reconciled in the same sweep that left `ourliberty-inbox-watcher.service` drift unresolved. Inbox-watcher is a long-running main service (vs one-shot healer units). Possible: healer's auto-heal logic is conservative about restarting services that handle live task dispatch. G-rule candidate (1/3). Watch for recurrence.
+- **tier2_weekly_probe_failed at 18:01Z (~15h after iter 656 OAuth restore).** The probe fired seconds after install-drift healer re-installed it and returned output=''. OAuth was confirmed restored at iter 656 (02:41Z June 3). Failure this quickly after restore may indicate OAuth tokens have short TTL or were not properly persisted. Pattern watch: if probe fails again next weekly fire (scheduled `Wed 2026-06-03 18:00 MDT` per the alert), Tier 2 OAuth re-auth will be needed. APPROVAL_REQUEST medic-tier2auth401-beaconbot-20260529T045737Z still open.
+- **Pipeline burst from PR #282 briefs**: `pulse-check-liveness-watcher-001` + `deploy-restart-gap-001` dispatched to Forge from the "docs: briefs for deploy-restart gap + pulse-check liveness watcher" merge (PR #282). Forge is actively building both (worktrees exist). Normal pipeline progression.
+- **harden-ledger-001 completed, -002 in preflight.** The intervention-tagging enforcement work is progressing through a multi-step sequence. -001 archived, -002 in Forge preflight.
+
+**Learned:** `ourliberty-inbox-watcher.service` install-drift is not auto-healed by the current healer despite PR #278 claiming coverage of long-running services. Watching for 3/3 G-rule threshold before dispatching.
+
+---
+
 ## Iteration 774 — 2026-06-03 17:53 UTC (interactive)
 
 **Health:** ✅ Pipeline active — Tier 1, consecutive_clean=0 (structural: cooldown residue 182; Forge build active on `harden-ledger-intervention-tagging-001`). Alert watermark: **1186 lines / anchor 17:22:34Z** (UNCHANGED from iter 773). Sync: ✅ status=no-change, commit=702080d, last_sync=17:04:24Z (~47 min at iter start). Healer heartbeat: **17:22:33Z** (~29 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge: 1 active task (phase=build). Mirror EMPTY. Beacon EMPTY.** Worktrees: **4** (3 stale + 1 active).
