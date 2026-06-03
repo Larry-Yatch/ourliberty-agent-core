@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 761 — 2026-06-03 16:15 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark updated: **1181 lines / anchor 16:10:09Z** (+1 new; PR #278 review-pass, Tier 3 known-pattern). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 **#43** at 16:08:45Z ("Auto-commit push failed; rolled back"); self-recovering (HEAD 377e96a newer than sync.json commit a1eda59b). Healer heartbeat: **15:52:17Z** (~23 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs** (both PRs #277 and #278 MERGED since iter 760). Forge inbox: EMPTY (marker-error-pulse-triage-layer-check0-001-1.json consumed by inbox-watcher). Mirror inbox: EMPTY. Beacon inbox: EMPTY. Active Forge build: `pulse-triage-layer-check0-001` (worktree present, marker-error retry 1 in progress). Worktrees: **3** (2 stale post-PR#277-merge remnants + 1 active Forge build).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Tier-3 only.** `larry-alerts.jsonl`: **1181 lines** — 1 new entry since iter 760 anchor (15:43:33Z). New entry: `2026-06-03T16:10:09Z / outbox-notifier / review-pass` for PR #278 (`extend-install-drift-healer-content-drift`) — Mirror approved + auto-merged. Classification: `review-pass` → Tier 3 known pattern (live in config/alert-translations.json since PR #264). SILENT. New watermark: **1181 lines / anchor 16:10:09Z**. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (176 warning + 6 critical; unchanged from iter 760). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active — Forge build in-flight.**
+  - **`pulse-triage-layer-check0-001`** build: worktree `wt-forge-pulse-triage-layer-check0-001` present (branch `forge/pulse-triage-layer-check0-001`). `marker-error-pulse-triage-layer-check0-001-1.json` appeared in Forge inbox then was consumed by inbox-watcher (retry 1 in flight). No PR opened yet. ⚠️ in-progress.
+  - Forge inbox: EMPTY (after marker-error consumed). Beacon inbox: EMPTY. Mirror inbox: EMPTY. ✅
+  - **0 open PRs** in both repos (agent-core + dashboard). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **15:52:17Z** (~23 min old at 16:15Z; ✅ within 90-min threshold). Oneshot service inactive (dead) = expected. Timer active. ✅
+
+- **(Check A) Source repo: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #43.** `agent-core-sync.json`: `status=error / "Auto-commit push failed; rolled back" / commit=a1eda59b / last_sync=16:08:45Z`. Session-start HEAD=377e96a ("Pulse cycle 20260603T161146Z") is NEWER than sync.json commit → wrapper push succeeded; sync service hasn't re-fired yet. Self-recovering per established pattern (43 total occurrences, every prior self-resolved). Note: this error fired at 16:08:45Z, AFTER iter 760's SYNC-PUSH-REBASE-FALLBACK #42 at 16:02:36Z — two consecutive errors during rapid interactive session. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check B) Sync health: ⚠️ status=error.** Same 16:08:45Z error. Self-clearing on next sync tick (~5 min). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** 0 open PRs. Forge build `pulse-triage-layer-check0-001` in flight (marker-error retry 1). ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** 1 new alert (PR #278 review-pass, Tier 3). No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. ✅
+
+- **Worktrees: 3** — `wt-forge-alert-fix-first-outcome-routing-001` (stale; PR #277 merged; event-driven teardown missed Phase 1 remnant), `wt-mirror-alert-fix-first-outcome-routing-001` (stale; PR #277 merged; Mirror review session wt persists), `wt-forge-pulse-triage-layer-check0-001` (active Forge build). Hourly GC backstop will clean the 2 stale ones within ≤1h. Not actionable. ✅
+
+- **G-rule watch:**
+  - **`changed-systemd-unit-not-propagated-by-install-drift-healer`: G-RULE CLOSED.** PR #278 "feat(install-drift): auto-heal systemd unit content drift" MERGED since iter 760. Permanent fix live: healer now detects content-drift in already-installed units (not just missing-install). G-rule 1/3 (iter 684) → CLOSED. ✅
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Monitoring.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=644, systemic_fixes=4, verification_pending=2, ratio=107.3, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync self-recovering; no duplicate tasks; watermark updated (1 new Tier 3 alert). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 761` → ts: 2026-06-03T16:16:31Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T16:16:32Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. PRs #277 and #278 merged cleanly. SYNC-PUSH-REBASE-FALLBACK-001 #43 self-recovering per established pattern. Forge build `pulse-triage-layer-check0-001` in-flight (marker-error retry 1 is normal retry behavior). No Larry action needed.
+
+**Patterns:**
+- **PR #277 and PR #278 both MERGED since iter 760.** Back-to-back merges closed two in-flight pipeline items. PR #278 permanently fixes the `changed-systemd-unit-not-propagated-by-install-drift-healer` G-rule. Healthy pipeline throughput.
+- **SYNC-PUSH-REBASE-FALLBACK-001 #43** (16:08:45Z) — two consecutive occurrences in this rapid interactive session (#42 at 16:02:36Z, #43 at 16:08:45Z). Pattern: sync service and wrapper push compete during rapid interactive cycles. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the standing fix.
+- **`pulse-triage-layer-check0-001` build appeared.** New Forge build task with marker-error retry 1. Task name suggests Check 0 triage layer implementation (likely triggered by the `alert-triage-persistence-invocation-001` APPROVAL_REQUEST finally dispatching, or a new Beacon spec post-PR merges). Will watch for PR open.
+
+**Learned:** Event-driven worktree teardown at PR merge reliably cleaned the Phase 2 worktrees (`wt-forge-extend-install-drift-healer-content-drift`, `wt-mirror-extend-install-drift-healer-content-drift`) but left the Phase 1 remnant (`wt-forge-alert-fix-first-outcome-routing-001`) and Mirror's review wt (`wt-mirror-alert-fix-first-outcome-routing-001`) intact. Hourly GC backstop covers these. No G-rule increment (pattern already captured).
+
+---
+
 ## Iteration 760 — 2026-06-03 16:09 UTC (interactive)
 
 **Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines / anchor 15:43:33Z** (no new alerts). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 **#42** at 16:02:36Z ("Auto-commit push failed; rolled back"); self-recovering (HEAD 335affd newer than sync.json commit). Healer heartbeat: **15:52:17Z** (~17 min old at 16:09Z; ✅ within 90-min threshold; next fire ~16:22 UTC). **7/7 core services active.** **PR #277** OPEN/CLEAN/MERGEABLE (~13 min old; Mirror actively reviewing). **PR #278 NEW** OPEN/CLEAN/MERGEABLE ("feat(install-drift): auto-heal systemd unit content drift", created 16:03:24Z, ~6 min old; Mirror reviewing [queued]). Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: 1 task (PR #278 review queued). Worktrees: **4** (2 Forge remnants + 2 Mirror active reviews).
