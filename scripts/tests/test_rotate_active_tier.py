@@ -371,6 +371,92 @@ class DrainTimeoutTest(RotateTickBaseTest):
         self.assertEqual(third['action'], 'flipped')
 
 
+class DrainOpenSequenceDeadlockTest(RotateTickBaseTest):
+    """Regression guard for the 2026-06-02 deadlock: an open build sequence
+    with NO in-flight work must not block the flip forever. Below max_drain we
+    still prefer to wait; once max_drain is exceeded we force the flip so the
+    drain can never close-loop on a paused sequence again."""
+
+    def _events_lines(self):
+        path = self.root / 'blackboard' / 'rotation-events.jsonl'
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text().splitlines()
+                if line.strip()]
+
+    def test_open_seq_within_max_drain_waits(self):
+        # in_flight_clear + open sequence + elapsed <= max_drain → prefer-wait.
+        # since=14:00, max_drain=45, now=14:20 → 20 min elapsed (<= 45).
+        now = datetime(2026, 5, 28, 14, 20, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00')
+        self._add_sequence('approvals-queue-rework', status='active')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'drain-waiting')
+        # No flip: still tier1, still draining.
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertTrue(state['draining'])
+
+    def test_open_seq_past_max_drain_force_flips(self):
+        # THE deadlock case (previously deferred forever):
+        # in_flight_clear + open sequence + elapsed > max_drain → FORCE FLIP.
+        # since=14:00, max_drain=45, now=14:46 → 46 min elapsed (> 45).
+        now = datetime(2026, 5, 28, 14, 46, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00')
+        self._add_sequence('approvals-queue-rework', status='active')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'flipped')
+        self.assertTrue(result['forced_open_sequence'])
+        # Flip landed: now tier2, drain cleared.
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier2')
+        self.assertFalse(state['draining'])
+        # The switch event carries the distinguishing forced trigger.
+        events = [e for e in self._events_lines()
+                  if e['action'] == 'switch']
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['trigger'],
+                         'max_drain_forced_open_sequence')
+
+    def test_in_flight_past_max_drain_still_defers(self):
+        # Unchanged guarantee: a live in-flight lease past max_drain must NEVER
+        # force-flip, even when there is also an open sequence. The force path
+        # only applies when in-flight is clear.
+        now = datetime(2026, 5, 28, 14, 46, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00')
+        self._add_in_flight('stuck-task-001')
+        self._add_sequence('approvals-queue-rework', status='active')
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'drain-deferred')
+        # State unchanged: still tier1, still draining, lease not removed.
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertTrue(state['draining'])
+        self.assertTrue((self.root / 'state' / 'in-flight'
+                        / 'stuck-task-001.json').exists())
+
+    def test_forced_flip_still_gated_by_target_auth(self):
+        # The pre-engage auth guard MUST still gate the forced flip. A forced
+        # flip into a tier whose auth is bad holds the current tier + re-pins a
+        # fresh window — it does NOT flip (prevents the 2026-05-29 storm).
+        now = datetime(2026, 5, 28, 14, 46, 0, tzinfo=timezone.utc)
+        self._set_state(tier='tier1', draining=True,
+                        since='2026-05-28T14:00:00+00:00')
+        self._add_sequence('approvals-queue-rework', status='active')
+        self._set_auth_ok(tier1=True, tier2=False)
+        result = rotate_active_tier.tick(now=now, models_file=self.models_file)
+        self.assertEqual(result['action'], 'auth-blocked')
+        self.assertEqual(result['held_tier'], 'tier1')
+        # Held on tier1, drain cleared, a fresh tier1 window pinned.
+        state = active_tier.read()
+        self.assertEqual(state['tier'], 'tier1')
+        self.assertFalse(state['draining'])
+        self.assertEqual(result['next_switch_due_minutes'], 120)
+
+
 class LoadGatingTest(RotateTickBaseTest):
     """Spec § 6.4 acceptance: load-gated engage/disengage with hysteresis.
 
@@ -550,8 +636,9 @@ class RotationEventsTest(RotateTickBaseTest):
         self.assertEqual(sw['drained_after_sec'], 1800)
 
     def test_drain_defer_event_emitted_on_timeout(self):
-        # Drain stuck past max_drain → drain-defer event with the
-        # max_drain_minutes_exceeded trigger.
+        # Drain stuck past max_drain WITH in-flight work present → drain-defer
+        # event with the in-flight-blocked trigger (an open sequence alone
+        # would force-flip; only a live lease defers now).
         self._set_load_tokens(8_000_000)
         now = datetime(2026, 5, 28, 14, 46, 0, tzinfo=timezone.utc)
         self._set_state(tier='tier1', draining=True,
@@ -567,7 +654,8 @@ class RotationEventsTest(RotateTickBaseTest):
         self._assert_schema(ev)
         self.assertEqual(ev['from_tier'], 'tier1')
         self.assertEqual(ev['to_tier'], 'tier1')
-        self.assertEqual(ev['trigger'], 'max_drain_minutes_exceeded')
+        self.assertEqual(ev['trigger'],
+                         'max_drain_minutes_exceeded_in_flight_present')
         self.assertEqual(ev['drained_after_sec'], 46 * 60)
 
     def test_no_events_emitted_on_silent_paths(self):
