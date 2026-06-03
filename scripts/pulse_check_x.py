@@ -993,8 +993,5 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    try:
-        sys.exit(main())
-    except Exception as exc:  # noqa: BLE001
-        log(f'FATAL: {type(exc).__name__}: {exc}', 'ERROR')
-        sys.exit(1)
+    from pulse_check_heartbeat import run_check
+    sys.exit(run_check('x', main, log_fn=log))
