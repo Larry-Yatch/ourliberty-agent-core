@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 671 — 2026-06-03 04:45 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **PR #31 (ourliberty-dashboard, step-approvals-rescope N5) MERGED 04:40:31Z** — watch item CLOSED. **Sync RECOVERED** (status=no-change, 04:38:12Z; SYNC-PUSH-REBASE-FALLBACK-001 self-cleared). Alert watermark: **1201** (+3 from 1198 — all known-pattern). Healer heartbeat: **04:19:52Z** (25 min old; ✅ within 90-min threshold). **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: EMPTY. Beacon inbox: 1 task (G-rule dispatch `cycle-finding-stale-worktrees-cleanup`, pending inbox-watcher pickup).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1201 lines** (+3 from 1198). New alerts (3):
+- idx 1199: `deploy-notifier:READY` for `mirror/step-approvals-rescope` (04:36:16Z) — Tier 3, by-design Vercel preview.
+- idx 1200: `deploy-notifier:READY` for `forge/step-approvals-rescope` / PR #31 (04:36:16Z) — Tier 3, by-design.
+- idx 1201: `heal-tier2-weekly-probe:tier2_weekly_probe_failed` (04:37:49Z) — **Known pattern** (`heal-tier2-weekly-probe` in alert-translations.json; severity WARNING/SOON; personal Claude Tier 2 OAuth still broken). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` remains open. No new action.
+Cooldown: **159 total** (+4 from 155 — new deploy-notifier events from PR #31 merge).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts (all known-pattern).** 1201 lines (+3). idx 1199-1200: deploy-notifier:READY (Tier 3 by-design). idx 1201: tier2_weekly_probe_failed (known pattern, ongoing broken state). No new action. Cooldown +4. ⚠️ (known)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 min ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No Larry directives evident from alert stream. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (+4).** alert-cooldown/warning/: **159 total** (+4 from 155). New files include `agent-runner-*:claude_tier1_failed_tier2_unavailable:rate_limit` (4 agents) — consistent with ongoing Tier 2 OAuth break. GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue)
+
+- **(Check 4) Pending directives: ⚠️ step-ops-alerts-ui stall (4th iter); PR #31 CLOSED.**
+  - **PR #31 MERGED (04:40:31Z).** "feat(approvals): decision-only queue, CEO framing, cleanup button (N5)" — Mirror approved within ~6 min of creation (04:34:15Z → 04:40:31Z). Auto-merged. step-approvals-rescope N5 **COMPLETE**. Watch item CLOSED. ✅
+  - **Forge inbox: EMPTY.** ✅ **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: 1 task.** `cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json` (G-rule dispatch from iter 670, awaiting inbox-watcher pickup). ✅
+  - **step-ops-alerts-ui: 4th iter stall.** Iter 669 [yellow] escalation stands. No Larry response yet. No change from iter 670. ⚠️ (ask-then-do; no new action)
+  - **Tier 2 weekly probe failure.** idx 1201 at 04:37:49Z — confirms personal Claude OAuth still expired. Known state. APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. No new action. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:19:52Z** (25 min old at 04:45Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=5e24ac0 ("Pulse cycle 20260603T044120Z" — iter 670 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ RECOVERED.** sync.json: status=no-change, last_sync=2026-06-03T04:38:12Z, commit=fc1647b. **SYNC-PUSH-REBASE-FALLBACK-001 self-cleared** — the 34th-total occurrence rolled back cleanly; next sync (04:38:12Z) succeeded. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (fix still needed to prevent recurrence), but no active failure. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ 0 open PRs in both repos.** agent-core: 0 open. ourliberty-dashboard: 0 open (PR #31 merged 04:40:31Z). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** Pipeline quiet. No active builds. ✅
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 OAuth broken (weekly probe idx 1201 confirms; APPROVAL_REQUEST open). ⚠️ (known, no new action)
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **Stale worktrees: 17 (unchanged).** G-rule dispatch in Beacon inbox (pending pickup). wt-forge-step-approvals-rescope and wt-mirror-step-approvals-rescope remain after PR #31 merge — consistent with accumulation pattern. ⚠️ (dispatch active)
+  - **step-ops-alerts-ui stall — 4th iter.** No change. Escalation carries forward.
+  - **MalformedForgeMarker.** No new occurrences this iter. PR #31 merged cleanly via Mirror approval (not a retry). APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead. No change.
+  - **`deploy-notifier cooldown GC gap`** — 159 files. APPROVAL_REQUEST open. No change.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (sync self-recovered; PR #31 merged on Mirror approval; 7/7 active; no stale tasks).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 671` → ts: 2026-06-03T04:45:12Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:45:12Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. step-ops-alerts-ui [yellow] escalation from iter 669 carries forward (4th iter stall, awaiting Larry). Tier 2 weekly probe failure (known, APPROVAL_REQUEST open). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (self-recovered this iter). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001 self-cleared.** 34th total occurrence, but this is the first iter where the subsequent sync run shows `status=no-change`. The self-recovery mechanism works reliably; the systemic fix (rebase fallback in sync_agent_core.sh) remains the right permanent fix to eliminate the noise entirely.
+- **step-approvals-rescope N5 completed fast.** PR #31 opened at 04:34Z, Mirror approved within 6 min, merged 04:40Z. The sequence is running well once PRs are submitted — the stall point is only at step-ops-alerts-ui where the PR submission failed.
+- **Tier 2 OAuth weekly probe confirming ongoing broken state.** The weekly cadence probe at 04:37:49Z is working as designed — it's confirming the known state. The APPROVAL_REQUEST for the Medic fix has been pending since iter 346. If this isn't actioned soon, the weekly probe will keep generating alerts.
+
+**Learned:** PR #31 merged before hitting the 30-min auto-merge threshold — Mirror's approval is the efficient path. The Vercel deploy for `mirror/step-approvals-rescope` (idx 1199 deploy-notifier alert) signals Mirror ran its own build to verify the UI, which is the correct review discipline for dashboard PRs.
+
+---
+
 ## Iteration 670 — 2026-06-03 04:36 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. PR #31 (ourliberty-dashboard, step-approvals-rescope N5) OPEN (CLEAN/MERGEABLE, 04:34:15Z, Mirror reviewing). PR #261 (fix-advancer) MERGED 03:18:55Z — watch item CLOSED. Alert watermark: **1198** (no change). Healer heartbeat: **04:19:52Z** (16 min old; ✅ within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (34th total, unchanged)** — status=error, last_sync=04:23:18Z, self-recovering. **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: 1 task (`review-step-approvals-rescope.json`). Beacon inbox: EMPTY → new G-rule dispatch written this iter.
