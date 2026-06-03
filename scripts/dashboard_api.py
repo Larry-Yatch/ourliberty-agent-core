@@ -365,6 +365,46 @@ class SystemWorktreesResponse(BaseModel):
     worktrees: list[SystemWorktree]
 
 
+# ---- /api/system/agent-queue response models (Forge Queue panel, Phase 1) ----
+#
+# One agent's dispatch lifecycle as four lanes: queued (inbox files not yet
+# picked up), building (worktree in-flight), in_review (PR awaiting Mirror),
+# done_today (terminal outcomes from today, UTC). See docs/forge-queue-brief.md.
+
+class QueuedItem(BaseModel):
+    task_id: str
+    waited_seconds: float
+
+
+class BuildingItem(BaseModel):
+    task_id: Optional[str]
+    branch: Optional[str]
+    age_seconds: Optional[float]
+
+
+class ReviewItem(BaseModel):
+    task_id: str
+    pr_url: Optional[str]
+    since: Optional[str]
+
+
+class DoneItem(BaseModel):
+    task_id: Optional[str]
+    pr_url: Optional[str]
+    outcome: str
+    reason: Optional[str]
+    at: Optional[str]
+
+
+class AgentQueueResponse(BaseModel):
+    agent: str
+    queued: list[QueuedItem]
+    building: list[BuildingItem]
+    in_review: list[ReviewItem]
+    done_today: list[DoneItem]
+    captured_at: str
+
+
 # ---- /api/system/build-sequences response model (PR-S3a) ----
 #
 # Spec § 5.6 commits only to "a JSON list of all sequence files + their
@@ -1463,6 +1503,196 @@ def _reader_system_worktrees(
     return {
         'captured_at': _now_utc_iso(captured_at),
         'worktrees': worktrees,
+    }
+
+
+# ---- /api/system/agent-queue readers (Forge Queue panel, Phase 1) ----
+#
+# Terminal chain_events that close out a build. auto_merge => merged;
+# the rest => failed. Used by BOTH the in_review derivation (a review_request
+# with no later terminal event is still awaiting a verdict) and done_today
+# (today's terminal events only).
+_QUEUE_TERMINAL_EVENT_TYPES = (
+    'auto_merge', 'marker_error', 'preflight_reject',
+    'cost_budget', 'review_escalate',
+)
+
+
+def _reader_agent_queue_queued(
+    agents_root: Path, agent: str, now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """QUEUED lane: inbox dispatches not yet picked up.
+
+    Mirrors `inbox_watcher.scan_inbox`'s matching rule — non-dotfile
+    `*.json`, mtime-sorted oldest-first — rather than `_agent_inbox_pending`
+    (whose `task-` prefix filter misses real `<task_id>.json` dispatches).
+    Parameterized on `agents_root` so it stays tmpdir-testable like the
+    other dashboard readers. `waited_seconds = now(UTC) - file mtime`.
+    """
+    now = now or datetime.now(timezone.utc)
+    inbox = agents_root / 'inboxes' / agent
+    items: list[dict[str, Any]] = []
+    if not inbox.is_dir():
+        return items
+    entries: list[tuple[float, str]] = []
+    try:
+        for e in os.scandir(inbox):
+            if not e.is_file() or e.name.startswith('.') or not e.name.endswith('.json'):
+                continue
+            try:
+                mt = e.stat().st_mtime
+            except OSError:
+                continue
+            entries.append((mt, e.name))
+    except OSError:
+        return items
+    entries.sort(key=lambda x: x[0])
+    for mt, name in entries:
+        waited = (now - datetime.fromtimestamp(mt, tz=timezone.utc)).total_seconds()
+        items.append({
+            'task_id': name[:-len('.json')],
+            'waited_seconds': waited,
+        })
+    return items
+
+
+def _reader_agent_queue_building(
+    agents_root: Path, worktrees_root: Path, agent: str,
+    now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """BUILDING lane: reuse the worktrees reader, filtered to this agent's
+    in-flight worktrees."""
+    wt = _reader_system_worktrees(agents_root, worktrees_root, now=now)
+    out: list[dict[str, Any]] = []
+    for w in wt['worktrees']:
+        if w.get('agent') == agent and w.get('is_in_flight'):
+            out.append({
+                'task_id': w.get('task_id'),
+                'branch': w.get('branch'),
+                'age_seconds': w.get('age_seconds'),
+            })
+    return out
+
+
+def _fetch_chain_events_for_agent(
+    supabase_client: Any, agent: str,
+) -> list[dict[str, Any]]:
+    """Pull this agent's chain_events rows for the in_review / done_today
+    lanes. Returns [] when the client is None (test env / no creds) or on
+    any query error — the endpoint degrades to empty review/done lanes
+    rather than 500ing."""
+    if supabase_client is None:
+        return []
+    try:
+        resp = (
+            supabase_client.table('chain_events')
+            .select('event_type,task_id,pr_url,ts')
+            .eq('agent', agent)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — never 500 on a read-only dashboard lane
+        return []
+    return list(getattr(resp, 'data', None) or [])
+
+
+def _derive_in_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """IN_REVIEW lane: a task whose latest `review_request` has no later
+    terminal event for the same task_id. `since` = that review_request ts."""
+    by_task: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        tid = r.get('task_id')
+        if not tid:
+            continue
+        by_task.setdefault(tid, []).append(r)
+    out: list[dict[str, Any]] = []
+    for tid, evs in by_task.items():
+        reviews = [e for e in evs if e.get('event_type') == 'review_request']
+        latest_rr = None
+        latest_rr_dt = None
+        for e in reviews:
+            dt = _ts_to_dt(e.get('ts'))
+            if dt is None:
+                continue
+            if latest_rr_dt is None or dt > latest_rr_dt:
+                latest_rr, latest_rr_dt = e, dt
+        if latest_rr is None:
+            continue
+        has_later_terminal = False
+        for e in evs:
+            if e.get('event_type') not in _QUEUE_TERMINAL_EVENT_TYPES:
+                continue
+            dt = _ts_to_dt(e.get('ts'))
+            if dt is not None and dt > latest_rr_dt:
+                has_later_terminal = True
+                break
+        if has_later_terminal:
+            continue
+        out.append({
+            'task_id': tid,
+            'pr_url': latest_rr.get('pr_url'),
+            'since': latest_rr.get('ts'),
+        })
+    out.sort(key=lambda x: x.get('since') or '')
+    return out
+
+
+def _derive_done_today(
+    rows: list[dict[str, Any]], now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """DONE_TODAY lane: today's terminal events only (UTC day boundary, per
+    `_reader_costs_today`). auto_merge => merged; the failure types => failed
+    (carrying the event_type as `reason`). Rolling daily window — no storage,
+    self-clears at UTC midnight."""
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        et = r.get('event_type')
+        if et not in _QUEUE_TERMINAL_EVENT_TYPES:
+            continue
+        dt = _ts_to_dt(r.get('ts'))
+        if dt is None:
+            continue
+        if dt.astimezone(timezone.utc).date() != today:
+            continue
+        if et == 'auto_merge':
+            outcome, reason = 'merged', None
+        else:
+            outcome, reason = 'failed', et
+        out.append({
+            'task_id': r.get('task_id'),
+            'pr_url': r.get('pr_url'),
+            'outcome': outcome,
+            'reason': reason,
+            'at': r.get('ts'),
+        })
+    out.sort(key=lambda x: x.get('at') or '')
+    return out
+
+
+def _reader_agent_queue(
+    agents_root: Path,
+    worktrees_root: Path,
+    agent: str,
+    supabase_client: Any,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Assemble one agent's four-lane dispatch lifecycle.
+
+    queued + building are filesystem-only; in_review + done_today come from
+    chain_events and degrade to [] when `supabase_client` is None.
+    """
+    now = now or datetime.now(timezone.utc)
+    rows = _fetch_chain_events_for_agent(supabase_client, agent)
+    return {
+        'agent': agent,
+        'queued': _reader_agent_queue_queued(agents_root, agent, now=now),
+        'building': _reader_agent_queue_building(
+            agents_root, worktrees_root, agent, now=now,
+        ),
+        'in_review': _derive_in_review(rows),
+        'done_today': _derive_done_today(rows, now=now),
+        'captured_at': _now_utc_iso(now),
     }
 
 
@@ -2726,6 +2956,25 @@ def get_system_cgroup_stats() -> dict[str, Any]:
 )
 def get_system_worktrees() -> dict[str, Any]:
     return _reader_system_worktrees(_agents_root(), _worktrees_root())
+
+
+@app.get(
+    '/api/system/agent-queue',
+    response_model=AgentQueueResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_agent_queue(
+    agent: str = Query('forge'),
+) -> dict[str, Any]:
+    if agent not in AGENT_NAMES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'unknown agent: {agent!r}',
+        )
+    client = _get_larry_action_supabase_client()
+    return _reader_agent_queue(
+        _agents_root(), _worktrees_root(), agent, client,
+    )
 
 
 @app.get(
