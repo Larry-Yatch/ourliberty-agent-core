@@ -800,7 +800,16 @@ python3 ~/agent-core/scripts/cycle_prime_ledger.py append \
   --template <action-template> --detail <variable-part>
 ```
 
-**The `--template`/`--detail` flags are MANDATORY for every intervention/systemic-fix you record — do NOT use a bare `--payload` for these.** The ledger stores `intervention_id = "<template>:<detail>"`, and Check V (§ 12.3) aggregates per-template track record by splitting on the first `:`. If you omit the template (or fold the variable part into it), the row fragments into a singleton and the auto-fix promotion ladder can never compute a streak — that is the exact break this contract fixes.
+**A CLEAN iter is NOT an intervention — record it as `--kind iter_clean`.** If this iter took no intervention and dispatched no systemic-fix (all checks nominal, no auto-fix fired), do NOT record a `kind=intervention` row. Record the per-iter liveness heartbeat as:
+
+```
+python3 ~/agent-core/scripts/cycle_prime_ledger.py append \
+  --tier <N> --kind iter_clean --iter <iter>
+```
+
+`iter_clean` needs no `--template` (it is not an action class). Check V's ratio and per-template aggregation count only `intervention`/`systemic_fix`, so an `iter_clean` row keeps the PRIME DIRECTIVE denominator honest. **Do NOT use `--kind intervention --template pulse-cycle-check` for a clean iter** — that is the cause-(b) mislabel (every clean iter looked like an untagged intervention) this contract retires.
+
+**The `--template`/`--detail` flags are MANDATORY for every intervention/systemic-fix you record — do NOT use a bare `--payload` for these.** The ledger stores `intervention_id = "<template>:<detail>"`, and Check V (§ 12.3) aggregates per-template track record by splitting on the first `:`. If you omit the template (or fold the variable part into it), the row fragments into a singleton and the auto-fix promotion ladder can never compute a streak — that is the exact break this contract fixes. **Safety net:** if you record an `intervention`/`systemic_fix` and forget `--template`, the write layer no longer drops it as an empty-id row — it normalizes to `uncategorized:<detail-or-iter>` (a visible, single classify-me bucket) so the data point survives. That is a backstop, not a license to skip the template: an `uncategorized` row flags that the action was never classified, and it can never graduate to auto-fix. Always pass the real `--template`.
 
 - `--template` is the STABLE action class, kebab-case (`^[a-z][a-z0-9-]*$`): e.g. `reinstall-systemd-unit`, `restart-daemon`, `retry-sync-push`. It MUST match a `template` in `config/auto-fix-patterns.json` (the registry Check 0/Check V read) — use one of those ids when the intervention is a known self-heal; coin a new kebab-case id (no colon, no whitespace, no per-iter variable) for a genuinely new failure class, and the registry grows to cover it.
 - `--detail` is the VARIABLE part (the affected unit, the iter context): e.g. `--detail ourliberty-ceo-digest-daily`. Never put the iter number or other per-instance noise in `--template`.
