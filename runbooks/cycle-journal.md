@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 667 — 2026-06-03 04:11 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing: 3 open PRs (#263, #264, #265), all CLEAN/MERGEABLE, all under Mirror review. Alert watermark: **1194** (+1). Healer heartbeat: **03:49:49Z** (23 min old; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (32nd total)** — status=error, last_sync=04:05:14Z; self-recovering. **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: 3 tasks (reviewing all 3 open PRs). **NEW: PR #265** — `fix(retention): restore OURLIBERTY_AGENTS_ROOT in chain_events_retention` (test-isolation follow-up for PR #260; 3.9 min old, Mirror reviewing). PR #263 hit 30-min threshold but Mirror revision-1 review still pending — HOLD.
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1194 lines** (+1 from 1193). New: `deploy-notifier:READY:dpl_ABmAGmT8mZ37SMjqBQ1uSVUUAuri` at 04:08:03Z — Vercel preview for `mirror/step-ops-alerts-ui` branch (Mirror review worktree live). Tier 3 — expected by-design deploy success. Beacon-bot delivered at 04:09:45Z (idx=1193). Cooldown: **153 total** (+1).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier 3 — delivered, by design).** 1194 lines (+1). New: `deploy-notifier:READY:dpl_ABmAGmT8mZ37SMjqBQ1uSVUUAuri` at 04:08:03Z — Vercel preview for `mirror/step-ops-alerts-ui` (Mirror review branch for step-ops-alerts-ui; deploy-notifier:READY:* in translations). Tier 3. No action. Cooldown +1 to 153. ⚠️ (by-design)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 04:04:00 --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last delivery: idx=1193 at 04:09:45Z (deploy-notifier:READY for mirror/step-ops-alerts-ui). No Larry directives. One `ENETUNREACH` blip at 02:18:44Z — recovered (subsequent alerts delivered normally through idx=1193). G-rule beacon-ENETUNREACH 1/3 (stable). ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (+1).** alert-cooldown/warning/: **153 total** (+1 from 152 — new mirror/step-ops-alerts-ui deploy preview cooldown). 27 heal-pipeline-stall files (UNCHANGED). GC gap ongoing (APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z`). ⚠️ (structural residue)
+
+- **(Check 4) Pending directives: ⚠️ 3 open PRs under Mirror review; Forge inbox EMPTY.**
+  - **PR #263 (30.9 min, CLEAN/MERGEABLE, NO autoMerge):** "fix(medic): delivery gate-at-emission + cooldown-primary rate window + CLI escalation path." Hit 30-min threshold at 04:11Z. Mirror still reviewing revision-1 (`review-medic-reliability-gate-delivery-cli-001-rev1.json` in inbox). **HOLD — do NOT auto-merge until Mirror approves revision-1.** No reviews submitted to GitHub yet.
+  - **PR #264 (17.0 min, CLEAN/MERGEABLE, NO autoMerge):** "chore(alerts): register outbox-notifier review-pass + mirror-dag-pass as Tier-3 FYI." Mirror reviewing (`review-alert-xlate-outbox-success-fyi-001.json` in inbox). 30-min threshold ~04:46Z. HOLD.
+  - **PR #265 (3.9 min, CLEAN/MERGEABLE, NO autoMerge) — NEW:** "fix(retention): restore OURLIBERTY_AGENTS_ROOT in chain_events_retention." Follow-up test-isolation fix for PR #260 (chain_events retention job already merged). Mirror found `tearDown` unconditionally popped `OURLIBERTY_AGENTS_ROOT` — test-isolation regression. Forge submitted fix on branch `fix/chain-events-retention-test-isolation`. Mirror reviewing (`review-step-retention-rev1.json` in inbox). 30-min threshold ~04:41Z. HOLD.
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: 3 tasks.** All active reviews. ✅
+  - **step-ops-alerts-ui PR: NOT YET VISIBLE** in `gh pr list`. `wt-forge-step-ops-alerts-ui` worktree active; `wt-mirror-step-ops-alerts-ui` worktree also active (Mirror reviewing `forge/step-ops-alerts-ui` branch directly — Vercel preview at 03:56Z + 04:08Z). PR submission pending. Next iter should resolve. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:49:49Z** (23 min old at 04:14Z; within 90-min threshold; next sweep ~04:49Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=d696b9a ("Pulse cycle 20260603T041042Z" — iter 666 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (32nd total).** sync.json: status=error, last_sync=2026-06-03T04:05:14Z, commit=3788bff0 rolled back. Sync ran after iter 666 wrapper push; created auto-commit, failed non-FF, rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 3 open PRs under Mirror review; step-ops-alerts-ui PR pending.** PR #263 at threshold — HOLD (revision policy). PRs #264 and #265 within threshold — HOLD (under review). Forge empty. Mirror 3 tasks. step-ops-alerts-ui: Forge worktree active, Mirror reviewing branch, PR not yet in gh pr list. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Mirror running 3 concurrent reviews. Build throughput high but expected. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **`alert-xlate-outbox-success-fyi-001` PR #264 OPEN.** When merges: close `outbox-notifier:review-pass` G-rule (3/3) + `outbox-notifier:mirror-dag-pass` G-rule (batched). Config-only.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - `deploy-notifier cooldown GC gap` — **153 files** (+1). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — step-ops-alerts-ui retry (Forge worktree active).** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (PRs under Mirror review / below threshold or HOLD; sync self-recovering; 7/7 active).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 667` → ts: 2026-06-03T04:13:20.687926+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:14:10Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 32nd (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+
+**Patterns:**
+- **PR #263 hit 30-min threshold but no Mirror review submitted.** Revision-1 review task still in Mirror inbox. Mirror is concurrently reviewing 3 PRs — expected queue delay under high throughput. HOLD is correct; next iter should have Mirror's verdict.
+- **PR #265 (NEW) is a clean test-isolation regression catch.** Mirror caught the `tearDown` unconditional pop in PR #260's test suite; Forge submitted fix in < 30 min. The regression gate is working well at high throughput.
+- **step-ops-alerts-ui PR not yet visible.** Mirror already has a worktree and Vercel preview (branch-level deploy). PR submission lag under concurrent build mode. Watch: if PR not visible by next iter, investigate why the submission step didn't complete.
+- **SYNC-PUSH-REBASE-FALLBACK-001 at 32nd total.** Every wrapper push triggers a sync fallback. Fully self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains highest-priority infra debt.
+
+**Learned:** Mirror can start a Vercel preview and build a review worktree from a pushed branch before the PR is formally submitted. This is expected behavior (Vercel listens to branch pushes, not just PR events). The `PR #(unknown)` subject in the deploy-notifier alert is the signature: GitHub hasn't linked the branch to a PR yet.
+
+---
+
 ## Iteration 666 — 2026-06-03 04:07 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Forge inbox cleared — all 3 iter-665 tasks completed: PR #264 OPENED (12 min, chore/alerts alert-xlate-outbox-success-fyi-001) + PR #263 REVISED (25.9 min, CLEAN/MERGEABLE, Mirror reviewing revision-1). Alert watermark: **1193** (+1). Healer heartbeat: **03:49:49Z** (17 min old; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (31st total)** — status=error, last_sync=03:58:37Z, commit=bfde44ca rolled back; self-recovering. **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: 4 tasks (2 active reviews + 1 queued + 1 stale).
