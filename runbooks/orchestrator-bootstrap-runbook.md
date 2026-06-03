@@ -64,7 +64,7 @@ echo '{
 Mirror checks four things: no cycles; all `depends_on` references resolve to valid step_ids; steps declared parallel don't touch overlapping files (static analysis of dispatch_texts + spec sections); all referenced spec sections exist in the spec doc. She returns **PASS** or **REVISION-with-reasons**.
 
 - **On REVISION:** Beacon amends the sequence file and re-dispatches the review.
-- **On PASS:** `_handle_mirror_dag_preflight_result` (`scripts/outbox_notifier.py`, PR-S4-v1 rectification H1) auto-transitions the sequence file `status: pending → active` and appends a `dag-preflight-passed` audit_log entry. The advancer's next tick (≤5 min) dispatches the root step. **No second approval is required** — Larry approved at author-time. The `approve sequence <seq-id>` shortcut (Part 2) still exists for the legacy/manual case where DAG preflight was bypassed; it is idempotent and a no-op on a sequence already advanced.
+- **On PASS:** `_handle_mirror_dag_preflight_result` (`scripts/outbox_notifier.py`, PR-S4-v1 rectification H1) auto-transitions the sequence file `status: pending → active` and appends a `dag-preflight-pass-kickoff` audit_log entry. The advancer's next tick (≤5 min) dispatches the root step. **No second approval is required** — Larry approved at author-time. The `approve sequence <seq-id>` shortcut (Part 2) still exists for the legacy/manual case where DAG preflight was bypassed; it is idempotent and a no-op on a sequence already advanced.
 
 ## Part 2 — Steering a running sequence (the six PR-S4 shortcuts)
 
