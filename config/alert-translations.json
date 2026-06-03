@@ -103,6 +103,18 @@
       "tier": "NOW",
       "plain_language_summary": "The auto-merge queue file at ~/agents/blackboard/auto-merge-queue.json failed to parse — JSON syntax error or structural surprise. The notifier has fail-closed: every subsequent auto-merge attempt is HELD until the file is repaired and the daemon restarts.",
       "recommended_action": "Inspect the file with `cat ~/agents/blackboard/auto-merge-queue.json` to find the corruption. Move it aside (`mv ... .broken`) to clear the queue, then `sudo systemctl restart outbox-notifier.service`. Recovery steps: runbooks/auto-merge-queue.md."
+    },
+    "review-pass": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Mirror approved a Forge-built PR and auto-merge fired — the routine build-completion success path (Mirror PASS -> squash-merge -> branch delete). No action required; the chain advanced as designed. This is a by-design FYI, not a failure.",
+      "recommended_action": "None — by-design success confirmation. The merge outcome (merged / already_merged) is in the closing DM; the audit trail is in ~/agents/logs/outbox-notifier.log under AUTO_MERGE lines."
+    },
+    "mirror-dag-pass": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Mirror's DAG preflight verification PASSED for a multi-step build sequence (no cycles, all depends_on references resolve, parallel steps touch no overlapping files, all referenced spec sections exist). The sequence auto-transitions pending -> active and the advancer dispatches the first step. The raw subject carries the sequence id after a colon (mirror-dag-pass:<seq-id>); this bare key matches via the prefix-strip lookup rule. By-design FYI, not a failure.",
+      "recommended_action": "None — by-design success confirmation that a sequence kicked off cleanly. The sequence file is at ~/agents/blackboard/build-sequences/<seq-id>.json; advancer activity is in ~/agents/logs/outbox-notifier.log."
     }
   },
   "watchdog": {
