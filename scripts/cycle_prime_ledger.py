@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -47,6 +48,14 @@ LEDGER_REL = 'blackboard/cycle-prime-ledger.jsonl'
 LOG_REL = 'logs/cycle-prime-ledger.log'
 
 VALID_KINDS = ('intervention', 'systemic_fix', 'verification_pending')
+
+# An intervention_id is "<template>:<detail>". The template is the stable
+# kebab-case prefix Check V aggregates on (pulse_check_v._template_of splits
+# on the first ':'); the detail is the free-form variable part. Enforcing the
+# template shape here is what makes per-template track record possible — a
+# free-form id with no colon (or with the variable part folded into the
+# prefix) fragments into a singleton per row and the promotion ladder dies.
+TEMPLATE_RE = re.compile(r'^[a-z][a-z0-9-]*$')
 RATIO_LOOKBACK_DAYS = 30
 TREND_HALF_DAYS = 15        # trailing 15d vs prior 15d for trend direction
 PROMOTE_WINDOW_DAYS = 7     # Decision II auto-promote window
@@ -108,6 +117,29 @@ def _atomic_append(record: dict[str, Any]) -> bool:
     except OSError as e:
         _log(f'append failed: {type(e).__name__}: {e}', 'WARN')
         return False
+
+
+def canonical_intervention_id(template: str, detail: str = '') -> str:
+    """Build a canonical intervention_id of the form ``<template>:<detail>``.
+
+    ``template`` MUST be kebab-case (``^[a-z][a-z0-9-]*$``): lowercase, starts
+    with a letter, no colon or whitespace. ``detail`` is the free-form variable
+    part (may be empty, may itself contain ``:`` — only the first ``:`` delimits
+    the template) and MUST NOT be folded into ``template``, or per-template
+    aggregation in Check V breaks.
+
+    Raises ``ValueError`` on a non-conforming ``template`` so a malformed id is
+    never written — callers (the CLI ``--template`` path) surface this as a
+    non-zero exit rather than silently appending an untaggable row.
+    """
+    if not isinstance(template, str) or not TEMPLATE_RE.match(template):
+        raise ValueError(
+            f'invalid intervention template {template!r}: must match '
+            f'{TEMPLATE_RE.pattern} (kebab-case: lowercase, leading letter, '
+            'no colon or whitespace). The variable part belongs in --detail.'
+        )
+    detail = '' if detail is None else str(detail)
+    return f'{template}:{detail}'
 
 
 def append_action(tier: int, kind: str, payload: dict[str, Any],
@@ -311,6 +343,23 @@ def _cli_ratio(_args) -> int:
 
 def _cli_append(args) -> int:
     payload = json.loads(args.payload) if args.payload else {}
+    # Preferred path: separate --template / --detail flags. They are routed
+    # through canonical_intervention_id, which validates the template shape and
+    # rejects (non-zero exit, no row written) anything non-conforming. This is
+    # the deterministic tagging the cycle prompt must use so Check V gets a real
+    # per-template streak. The legacy --payload path stays lenient/untouched
+    # (promote_verification_pending and other callers depend on append_action's
+    # leniency).
+    if args.template is not None:
+        try:
+            payload['intervention_id'] = canonical_intervention_id(
+                args.template, args.detail or '')
+        except ValueError as exc:
+            print(f'error: {exc}', file=sys.stderr)
+            return 2
+    elif args.detail is not None:
+        print('error: --detail requires --template', file=sys.stderr)
+        return 2
     rec = append_action(tier=args.tier, kind=args.kind, payload=payload,
                         iter_num=args.iter)
     print(json.dumps(rec))
@@ -336,9 +385,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_app.add_argument('--tier', required=True, type=int, choices=[1, 2, 3])
     p_app.add_argument('--kind', required=True, choices=list(VALID_KINDS))
     p_app.add_argument('--iter', type=int, default=0)
+    p_app.add_argument('--template',
+                       help='Action-template id (kebab-case, '
+                            '^[a-z][a-z0-9-]*$). Preferred over a pre-joined '
+                            'intervention_id: it is validated + joined with '
+                            '--detail into "<template>:<detail>" so Check V can '
+                            'aggregate a per-template streak. A non-conforming '
+                            'template exits non-zero and writes nothing.')
+    p_app.add_argument('--detail', default=None,
+                       help='Free-form variable part of the intervention_id '
+                            '(e.g. the affected unit name). Requires --template.')
     p_app.add_argument('--payload', default='{}',
                        help='JSON object with intervention_id, '
-                            'fix_commit_sha, chain_event_id, etc.')
+                            'fix_commit_sha, chain_event_id, etc. Legacy path; '
+                            'prefer --template/--detail for tagging.')
     p_prom = sub.add_parser('promote',
                             help='Auto-promote a verification_pending row.')
     p_prom.add_argument('row_id')
