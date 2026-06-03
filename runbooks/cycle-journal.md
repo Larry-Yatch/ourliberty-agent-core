@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 776 — 2026-06-03 18:13 UTC (interactive)
+
+**Health:** ✅ Pipeline active — Tier 1, consecutive_clean=0 (Tier 4 alert; medic-diagnosis not in allowlist). Alert watermark: **1192 lines / anchor 18:05:03Z** (+2 from iter 775 watermark ~1190/18:01:16Z; 1 new alert). Cooldown residue: **183** (unchanged). Sync: ✅ last_sync=18:04:25Z (~9 min ago; within 2h threshold). Healer heartbeat: **17:52:36Z** (~21 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge: 3 active tasks. Mirror EMPTY. Beacon EMPTY.** Worktrees: **6** (4 stale + 2 active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel source).** Watermark advanced from ~1190/18:01:16Z to 1192/18:05:03Z.
+  1. `source=medic / intent=medic-diagnosis` (18:05:03Z) — medic ran its stall-diagnosis on the `pipeline-stall:retry-exhausted:unknown` alert and produced a "Diagnose-only" notification. Classification: **Tier 4** (medic source not in `config/alert-translations.json`; G-rule 1/3 → **2/3**). Severity: **[blue]** — all findings already handled or low-urgency. No DM (per SOUL.md [blue] discipline). Tier-reset applies per § 2.3.
+  
+  Medic findings (for record):
+  - `harden-ledger-intervention-tagging-001` exhausted retries (stale session ID 6c3e5152; malformed completion metadata, duration=Nones, attempts=None). **Already resolved** — -002 is in Forge preflight. ✅
+  - inbox-watcher received SIGTERM at 18:00:18Z, restarted healthy at 18:01:48Z. `pulse-check-liveness-watcher-001` was orphan-reaped and resumed. 7/7 active confirms recovery. ✅
+  - `heal-pipeline-stall` "unknown" task ID is a metadata resolution bug (prior_attempts=11 — healer misfires repeatedly on tasks with unparseable metadata rather than 11 separate failures). **G-rule candidate** — see Patterns below.
+  - Medic recommended: (a) re-dispatch harden-ledger as fresh task → already done via -002; (b) patch heal-pipeline-stall to suppress escalation when task name cannot be resolved (log-only instead).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 183 total** (177 warning + 6 critical; unchanged from iter 775). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **17:52:36Z** (~21 min old at iter start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=f823b83 "Pulse cycle 20260603T180846Z". ✅
+
+- **(Check B) Sync health: ✅ status=no-change.** last_sync=18:04:25Z (~9 min at iter start; within 2h threshold). sync.json commit=7d4c157 (iter 775's wrapper pushed f823b83 after sync ran; sync will self-update on next hourly tick). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline.** 0 open PRs (both repos). Forge: 3 active tasks — `harden-ledger-intervention-tagging-002.json` (phase=preflight), `pulse-check-liveness-watcher-001.json` (phase=preflight, orphan-reaped+resumed), `marker-error-deploy-restart-gap-001-1.json` (retry-preflight). Mirror EMPTY. Beacon EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 6** — stale: `wt-forge-alert-fix-first-outcome-routing-001`, `wt-forge-harden-ledger-intervention-tagging-001` (task archived; -002 is separate task), `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-deploy-restart-gap-001`, `wt-forge-pulse-check-liveness-watcher-001`. ✅
+
+- **G-rule watch:**
+  - `medic:medic-diagnosis not in alert-translations.json`: **1/3 → 2/3** (this iter). At 3/3: dispatch Beacon to add `source:medic / intent:medic-diagnosis` as Tier-3/FYI in `config/alert-translations.json`.
+  - **NEW G-rule candidate: `heal-pipeline-stall metadata resolution bug (unknown task ID, prior_attempts=11)`**: **1/3** (this iter — first time explicitly tracked as code-fix candidate). Medic diagnosed: healer cannot resolve task name from malformed completion metadata (duration=Nones, attempts=None) → fires escalation with task_id="unknown" repeatedly. Fix: patch heal-pipeline-stall to log the resolved task ID and suppress escalation when task name cannot be determined (emit WARNING to logs only). At 3/3: dispatch Beacon.
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775). Unchanged.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. G-rule 3/3 DISPATCHED (iter 592); Beacon consumed (iter 594); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=659, systemic_fixes=4, verification_pending=2, ratio=164.75, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: Classified 1 new medic-diagnosis alert as Tier 4 (novel source; medic G-rule advanced to 2/3). No DM ([blue] severity — all medic findings already resolved or low-urgency patterns). Tier-reset applied. Watermark advanced to 1192/18:05:03Z.
+3. Periodic: Check I sentinel exists (00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+4. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync clean; Forge tasks active. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 776 --template pulse-cycle-check --detail iter-776` → intervention_id=pulse-cycle-check:iter-776, ts=2026-06-03T18:13:37Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T18:13:38Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** None. Medic alert Tier 4 but [blue] severity — all findings already handled or low-urgency pattern candidates.
+
+**Patterns:**
+- **`heal-pipeline-stall` "unknown" metadata resolution bug — G-rule candidate (1/3).** prior_attempts=11 confirms this isn't one instance but a repeating misfire. The healer encounters task completion records with duration=Nones/attempts=None (malformed metadata from build sessions that exit without clean completion logging) and cannot resolve the task name → escalates with task_id="unknown". Fix shape: (1) patch heal-pipeline-stall to extract task ID from the dead-letter filename if resolution fails on the completion record; (2) if still unresolvable, log WARNING-only and suppress the escalation. Medic has already produced the recommendation spec. At 3/3 → dispatch Beacon.
+- **inbox-watcher SIGTERM at 18:00:18Z (around daemon-reload boundary).** Three daemon-reloads fired between 18:00:14Z–18:00:16Z (install-drift healer tier2-probe remediation). inbox-watcher received SIGTERM 2 seconds later at 18:00:18Z. Likely correlation but causation unclear — daemon-reload doesn't normally SIGTERM running services. May be coincidental (watchdog timeout, etc.). inbox-watcher self-healed within 90s. Watching for recurrence; if SIGTERM pattern repeats post-daemon-reload, escalate as install-drift healer side-effect.
+- **medic-diagnosis G-rule now 2/3.** Third occurrence → dispatch Beacon to add `source:medic / intent:medic-diagnosis` as Tier-3/FYI in alert-translations.json. This is purely a routing improvement — the medic's informational diagnostics shouldn't force Tier 4 noise every occurrence.
+
+**Learned:** `heal-pipeline-stall` "unknown" task ID is a metadata resolution failure, not a separate stall. Medic correctly identified this as prior_attempts=11. The Tier-3 allowlist for `pipeline-stall:retry-exhausted` already silences the healer escalation at Check 0; the remaining gap is the heal-pipeline-stall code not distinguishing "unparseable metadata" from "real task exhaustion." Patch target: `scripts/heal_pipeline_stall.py` (or equivalent) — suppress escalation when task_id resolves to "unknown" after best-effort extraction.
+
+---
+
 ## Iteration 775 — 2026-06-03 18:06 UTC (interactive)
 
 **Health:** ✅ Pipeline active — Tier 1, consecutive_clean=1 (all alerts Tier-3 silenced; checks clean). Alert watermark: **~1190 lines / anchor 18:01:16Z** (+4-5 new from iter 774 watermark 1186/17:22:34Z; all Tier 3 known-pattern). Cooldown residue: **183** (+1). Sync: ✅ last_sync=17:04:24Z (~62 min at iter start; within 2h threshold). Healer heartbeat: **17:52:36Z** (~13 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge: 3 active tasks. Mirror EMPTY. Beacon EMPTY.** Worktrees: **6** (4 stale + 2 active).
