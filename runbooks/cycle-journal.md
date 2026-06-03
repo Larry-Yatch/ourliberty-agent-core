@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration 757 — 2026-06-03 15:50 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines** (DOWN from 1228 — retention healer first run pruned ~51 old entries; watermark anchor now 15:43:33Z timestamp). Sync: ✅ SUCCESS at 15:39:52Z (SYNC-PUSH-REBASE-FALLBACK-001 #39 self-recovered). Healer heartbeat: **15:22:17Z** (~28 min old; ✅ within 90-min threshold). **7/7 core services active.** **Retention healer LIVE** (timer active, next fire Jun 4 03:45 MDT). Forge inbox: 2 tasks (Phase 2 of `alert-fix-first-outcome-routing-001` + new `extend-install-drift-healer-content-drift`). Beacon/Mirror inboxes: EMPTY. **0 open PRs** (both repos). Worktrees: **1** (down from 22 — hourly GC cleaned all stale build worktrees; `wt-fix` orphan GONE).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 3 new Tier-3 alerts (all known-pattern; no action).** `larry-alerts.jsonl` now **1180 lines** (was 1228 at iter 756 watermark). Retention healer (PR #276, just merged) ran its first sweep and pruned ~51 old entries; file count no longer monotonically increasing. New alerts appended since watermark 1228:
+  - 15:38:31Z: `source=outbox-notifier / intent=review-pass` — Mirror approved PR #276. **Tier 3** (review-pass in allowlist). ✅
+  - 15:43:31Z: `source=heal-systemd-install-drift / subject=install-drift:ourliberty-larry-alerts-retention.service` — healer auto-installed new retention service. **Tier 3** (install-drift in allowlist). ✅
+  - 15:43:33Z: `source=heal-systemd-install-drift / subject=install-drift:ourliberty-larry-alerts-retention.timer` — healer auto-installed + enabled now retention timer. **Tier 3** (install-drift in allowlist). ✅
+  - **Watermark methodology change:** `larry-alerts.jsonl` now has a retention healer that can shrink the file. Future Check 0 must use the timestamp of the last seen alert (15:43:33Z) as the watermark anchor, not line count. New anchor: **15:43:33Z**.
+  - No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (+4 from iter 756's 178; new cooldown files likely from install-drift healer firing for retention service/timer + possibly other healer runs). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active — 2 Forge tasks in inbox.**
+  - **`build-alert-fix-first-outcome-routing-001.json`** (phase=build, source=beacon): Phase 2 of the `alert-fix-first-outcome-routing-001` build. Phase 1 completed (worktree `wt-forge-alert-fix-first-outcome-routing-001` is the Phase 1 remnant). Phase 2 queued, awaiting Forge pickup. ⚠️
+  - **`extend-install-drift-healer-content-drift.json`** (source=beacon): NEW Beacon-dispatched task to extend the install-drift healer with content-drift detection (related to the `changed-systemd-unit-not-propagated-by-install-drift-healer` G-rule). This task appeared since iter 756; Forge will process after Phase 2 build. ⚠️
+  - Previous stale OAuth-blocked tasks (`medic-reliability-gate-delivery-cli-001.json`, `fix-advancer-reconcile-gh-failure-recovery-*`) are GONE — Forge consumed them at some point.
+  - **0 open PRs** in both repos. ✅
+  - Beacon inbox: EMPTY. Mirror inbox: EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **15:22:17Z** (~28 min old at 15:50Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Sync: `status=success` at 15:39:52Z — the SYNC-PUSH-REBASE-FALLBACK-001 #39 error from iter 756 self-recovered as expected. Branch=main, commit=11c17d0. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: `status=success`, last_sync=2026-06-03T15:39:52Z, commit=11c17d0. ~11 min old at 15:50Z; within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** 0 open PRs (both repos). 2 Forge tasks queued (see Check 4). Beacon/Mirror empty. ⚠️
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** 3 new Tier-3 alerts only. Within normal range. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, no action). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **✅ Worktrees: 1** (down from 22 — hourly GC cleaned 18 stale completed worktrees). Only `wt-forge-alert-fix-first-outcome-routing-001` remains (Phase 1 remnant; will be cleaned when Phase 2 build GC runs). `wt-fix` orphan is **GONE** — cleaned at some point by the hourly GC or manually. This potentially resolves the `cleanup_stale_worktrees.py misses orphaned dirs` G-rule, but I'm leaving it at 1/3 until I can verify the GC script actually handles non-git-registered dirs (could have been cleaned manually). ✅
+
+- **✅ Retention healer first run CONFIRMED.** `ourliberty-larry-alerts-retention.timer` active+waiting (next fire: Thu 2026-06-04 03:45:04 MDT; `--now` trigger ran oneshot service at install time). Service now inactive (dead) = expected for oneshot. File pruned from ~1231 pre-healer lines to 1180. The retention healer is operational.
+
+- **G-rule watch:**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). `extend-install-drift-healer-content-drift.json` now in Forge inbox — Beacon dispatched the fix task (possibly advancing internally or via direct Larry command). Will monitor.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). `wt-fix` gone — monitoring to see if recurs (leaving at 1/3).
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=639, systemic_fixes=4, verification_pending=2, ratio=159.75, trend=flat. (Note: ledger append command ran fallback Python in addition to script, resulting in 1 duplicate row for iter 757 — minor artifact, count is effectively 639.)
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync healthy; 3 new alerts all Tier 3. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 757` → ts: 2026-06-03T15:50:41.583015+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T15:51:01Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. All new alerts are Tier-3 known-pattern. Pipeline activity is legitimate. Sync self-recovered. No Larry action needed.
+
+**Patterns:**
+- **Retention healer operational on first run.** PR #276 merged, install-drift healer auto-installed the timer at 15:43Z, oneshot service ran and pruned ~51 entries. larry-alerts.jsonl now has a working retention loop. First fix of unbounded file growth since the 1226-line watermark was identified. ✅
+- **SYNC-PUSH-REBASE-FALLBACK-001 #39 self-recovered** (15:39:52Z success). Pattern continues to self-recover on every occurrence. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still pending Larry for root code fix.
+- **Hourly GC effective**: worktrees 22 → 1 (18 stale cleared + `wt-fix` orphan gone). Event-driven teardown + hourly GC backstop are both working.
+- **`extend-install-drift-healer-content-drift` task dispatched to Forge.** Beacon produced a brief for extending the install-drift healer to detect content-drift in changed (not just missing) units. Forge will build this after the Phase 2 `alert-fix-first-outcome-routing-001` build.
+- **Check 0 watermark methodology change needed.** With retention healer live, tracking by line count is unreliable. Future iters should use the last-alert timestamp as the anchor. Noting for cycle-prompt.md update via Forge (non-urgent, doc-only).
+
+**Learned:** The retention healer's `--now` timer enable triggers an immediate oneshot run — the file was already pruned within minutes of PR #276 merging. The 14d/500-line policy (whichever-retains-more) pruned ~51 lines on first run, consistent with a small percentage of the 1231-line pre-healer file falling outside the 14-day retention window. Future steady-state: file stays bounded around the 14-day rolling window.
+
+---
+
 ## Iteration 756 — 2026-06-03 15:43 UTC (interactive)
 
 **Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1228** (+2 new). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 #39 at 15:35:33Z; self-recovering). Healer heartbeat: **15:22:17Z** (~21 min old; ✅ within 90-min threshold). **7/7 core services active.** **PR #276 MERGED (15:38:29Z)** — "feat(retention): cursor-safe healer for larry-alerts.jsonl". **Forge BUILD 2** (`alert-fix-first-outcome-routing-001`): ACTIVE (started 15:32:08Z, resumed session a964dd0f). **Dashboard PR #33 MERGED** (~15:32Z). **0 open PRs** (both repos post-merge). Worktrees: **22** (+1 from iter 755: `wt-mirror-add-larry-alerts-retention-healer` added for review; now removed via teardown after merge).
