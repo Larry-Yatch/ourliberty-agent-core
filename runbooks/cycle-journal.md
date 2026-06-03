@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 666 — 2026-06-03 04:07 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Forge inbox cleared — all 3 iter-665 tasks completed: PR #264 OPENED (12 min, chore/alerts alert-xlate-outbox-success-fyi-001) + PR #263 REVISED (25.9 min, CLEAN/MERGEABLE, Mirror reviewing revision-1). Alert watermark: **1193** (+1). Healer heartbeat: **03:49:49Z** (17 min old; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (31st total)** — status=error, last_sync=03:58:37Z, commit=bfde44ca rolled back; self-recovering. **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: 4 tasks (2 active reviews + 1 queued + 1 stale).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1193 lines** (+1 from watermark 1192). New: `deploy-notifier:READY:dpl_AVr1BgdAET8drAwjY43TyMvKLMER` at 03:56:17Z — Vercel preview for PR #264 (chore/alerts branch on ourliberty-dashboard). Beacon-bot delivered at 03:59:39Z (idx=1192). Tier 3 — expected by-design deploy success. Cooldown: **152 total** (+1).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier 3 — delivered, by design).** 1193 lines (+1). New: `deploy-notifier:READY:dpl_AVr1BgdAET8drAwjY43TyMvKLMER` at 03:56:17Z — Vercel preview for PR #264 (`forge/alert-xlate-outbox-success-fyi-001` branch). Tier 3 (expected success; deploy-notifier:READY:* in translations). Beacon-bot delivered at 03:59:39Z UTC. Cooldown file added (+1 to 152). GC gap APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. No action required. ⚠️ (by-design residue)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 03:57:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon-bot delivered alert idx=1192 at 03:59:39Z (deploy-notifier:READY for PR #264). No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (+1).** alert-cooldown/warning/: **152 total** (+1 from 151 — new deploy-notifier cooldown for PR #264 Vercel preview). 27 heal-pipeline-stall files (UNCHANGED). GC gap ongoing. ⚠️ (structural residue)
+
+- **(Check 4) Pending directives: ⚠️ 2 open PRs, Mirror reviewing both; Forge inbox EMPTY; 1 build in worktree.**
+  - **PR #263 (25.9 min, CLEAN/MERGEABLE, NO autoMerge):** "fix(medic): delivery gate-at-emission + cooldown-primary rate window + CLI escalation path." Forge completed revision per Mirror's revision-1 findings. Mirror reviewing (`review-medic-reliability-gate-delivery-cli-001-rev1.json` in inbox). 30-min threshold at **04:11:18Z** (~3 min away at journal write). HOLD — do NOT auto-merge until Mirror approves revision-1.
+  - **PR #264 (12 min, CLEAN/MERGEABLE, NO autoMerge):** "chore(alerts): register outbox-notifier review-pass + mirror-dag-pass as Tier-3 FYI." Forge completed `build-alert-xlate-outbox-success-fyi-001`; PR submitted. Mirror reviewing (`review-alert-xlate-outbox-success-fyi-001.json` in inbox). 30-min threshold at **~04:25Z**. HOLD.
+  - **Forge inbox: EMPTY.** All 3 iter-665 tasks completed — build-alert-xlate-outbox-success-fyi-001 (→ PR #264), revision-medic-reliability-gate-delivery-cli-001-1 (→ PR #263 revised), build-step-ops-alerts-ui (→ worktree `wt-forge-step-ops-alerts-ui` active; no PR yet in gh pr list). ✅ (Forge side)
+  - **Mirror inbox: 4 tasks.** review-alert-xlate-outbox-success-fyi-001 (PR #264, active) + review-medic-reliability-gate-delivery-cli-001-rev1 (PR #263 revision-1, active) + review-step-ops-alerts-ui (queued; Forge worktree exists — build likely in-progress or just completed, PR not yet visible) + review-step-retention (STALE — PR #260 merged 03:42Z; Mirror will detect + clear gracefully). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:49:49Z** (17 min old at 04:07Z; within 90-min threshold; next sweep ~04:49Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=119be95 ("Pulse cycle 20260603T040039Z" — iter 665 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (31st total).** sync.json: status=error, last_sync=2026-06-03T03:58:37Z, commit=bfde44ca rolled back. Sync service ran ~58s after iter 665 wrapper push; created auto-commit, failed non-FF, rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 2 open PRs under Mirror review; Forge cleared; 1 build in-flight.** PR #263 at 30-min threshold in ~3 min — HOLD (revision policy: Mirror must approve before auto-merge). PR #264 at threshold in ~18 min. Forge inbox empty. Mirror 4 tasks. Step-ops-alerts-ui worktree active; no PR yet. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge completed 3 builds since iter 665. Mirror doing 2+ concurrent reviews. All within normal range. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **`alert-xlate-outbox-success-fyi-001` PR #264 OPEN.** When PR #264 merges: close `outbox-notifier:review-pass` G-rule (3/3 dispatched iter 663) + `outbox-notifier:mirror-dag-pass` G-rule (batched). Both G-rules close on this merge. Config-only PR; high-value merge.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - `deploy-notifier cooldown GC gap` — **152 files** (+1). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker — step-ops-alerts-ui retry in worktree.** step-cleanup-review (PR #259 merged — self-resolved) + step-retention (PR #260 merged — self-resolved). step-ops-alerts-ui retry `wt-forge-step-ops-alerts-ui` active. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (PRs under Mirror review / sub-threshold; Forge cleared naturally; 7/7 active; sync self-recovering).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 666` → ts: 2026-06-03T04:07:12.812593+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:07:12.947186+00:00. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 31st (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+
+**Patterns:**
+- **Forge cleared its inbox in ~10 min.** 3 tasks from iter 665 all completed and archived. PRs #263 (revised) and #264 (new) now in Mirror review. High build throughput continues post-OAuth restore.
+- **PR #264 closes 2 G-rules in 1 merge.** `outbox-notifier:review-pass` (3/3) + `outbox-notifier:mirror-dag-pass` (batched) both close when #264 merges. Config-only PR.
+- **SYNC-PUSH-REBASE-FALLBACK-001 hit 31st total.** Every wrapper push triggers a follow-up sync failure. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the single highest-urgency infra debt.
+- **PR #263 HOLD at 30-min threshold boundary.** Mirror reviewing revision-1; 30-min threshold fired ~04:11Z during this write. Auto-merge held per revision policy. Next iter should have Mirror's verdict and a potential always-fix.
+
+**Learned:** step-ops-alerts-ui retry produced `review-step-ops-alerts-ui.json` in Mirror's inbox despite no PR visible in `gh pr list`. Likely the review task was queued before the PR was submitted (pipeline timing). Worktree `wt-forge-step-ops-alerts-ui` active confirms build in-progress or just completing. Next iter will clarify.
+
+---
+
 ## Iteration 665 — 2026-06-03 03:57 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **2 new PR merges since iter 664:** PR #259 (03:34:10Z, auto-cycle always-fix) + PR #262 (03:53:38Z, Mirror approved revision-1). 1 open PR (#263 under Mirror revision). Alert watermark: **1192** (+1 from 1191). Healer heartbeat: **03:49:49Z** (fresh — confirmed by dashboard-api auto-restart event). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (30th total)** — sync.json `status=error`, `last_sync=2026-06-03T03:50:58Z`, commit=dfb2e958 rolled back; self-recovering. **7/7 services active.**
