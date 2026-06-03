@@ -269,6 +269,18 @@ def tier2_available():
     return Path(TIER2_HOME, '.claude', '.credentials.json').exists()
 
 
+def _tier2_fallback_available():
+    """Tier 2 can serve a fallback iff it can AUTHENTICATE — a valid
+    setup-token (preferred; survives an expired/removed credentials.json)
+    OR a credentials.json on disk. Mirrors the setup-token-first guard in
+    beacon_telegram_bot so a stale Tier 2 creds file can't falsely declare
+    the fallback unavailable (2026-06-03 completeness fix, sibling to #267).
+    """
+    if active_tier._setup_token_for_tier('tier2'):
+        return True
+    return tier2_available()
+
+
 def _mark_paused_on_tier1(task_stem, failure_type, agent_id=None, tier=None):
     """Write a sentinel in the in-flight state file so heal_pipeline_stall's
     Check 8 can detect resume-tasks paused on Tier 1 quota/auth failure,
@@ -1105,7 +1117,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     'to Tier 2 (session is account-bound). '
                                     'DM sent.',
                                     None)
-                        if not tier2_available():
+                        if not _tier2_fallback_available():
                             log(agent_id,
                                 'TIER2_FALLBACK_UNAVAILABLE reason=' +
                                 failure_type + ' home=' + TIER2_HOME +

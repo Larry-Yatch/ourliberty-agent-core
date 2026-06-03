@@ -127,6 +127,31 @@ class Tier2AvailableTest(unittest.TestCase):
                 self.assertTrue(self.ar.tier2_available())
 
 
+class Tier2FallbackAvailableTest(unittest.TestCase):
+    """_tier2_fallback_available(): setup-token (preferred) OR creds file. A
+    valid setup-token must survive an expired/removed credentials.json so the
+    fallback is never falsely declared unavailable (2026-06-03 fix)."""
+
+    def setUp(self):
+        self.ar = importlib.import_module('agent_runner')
+
+    def test_true_when_setup_token_present_even_without_creds_file(self):
+        with mock.patch('active_tier._setup_token_for_tier',
+                        return_value='sk-ant-oat01-x'), \
+                mock.patch.object(self.ar, 'tier2_available', return_value=False):
+            self.assertTrue(self.ar._tier2_fallback_available())
+
+    def test_true_when_no_token_but_creds_file_present(self):
+        with mock.patch('active_tier._setup_token_for_tier', return_value=None), \
+                mock.patch.object(self.ar, 'tier2_available', return_value=True):
+            self.assertTrue(self.ar._tier2_fallback_available())
+
+    def test_false_when_no_token_and_no_creds_file(self):
+        with mock.patch('active_tier._setup_token_for_tier', return_value=None), \
+                mock.patch.object(self.ar, 'tier2_available', return_value=False):
+            self.assertFalse(self.ar._tier2_fallback_available())
+
+
 class MarkPausedOnTier1Test(unittest.TestCase):
     """The in-flight state-file marker that heal_pipeline_stall's Check 8
     will key on. Test that the helper:
