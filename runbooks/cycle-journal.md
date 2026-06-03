@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 657 — 2026-06-03 02:50 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline actively unblocking: 3 Forge worktrees running simultaneously, Beacon inbox CLEARED. Alert watermark: **1188** (UNCHANGED — 0 new alerts since iter 656 sync-blocked claim). Healer heartbeat: **02:19:09Z** (~31 min old at check; within 90-min threshold; next sweep ~02:49Z — imminent/recent). Sync: ⚠️ `status=error`, `last_sync=2026-06-03T02:37:59Z` (SYNC-PUSH-REBASE-FALLBACK-001, 23rd total; self-recovering). **7/7 services active.** **0 open PRs.** Beacon inbox: **0 tasks** (CLEARED since iter 656 — sentinel/inbox-stall task completed → `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` delivered to Forge). Forge inbox: **6 tasks** — `build-fix-advancer-reconcile-gh-failure.json` (NEW, 02:44Z Beacon brief) + `build-medic-reliability-gate-delivery-cli-001.json` (NEW, 02:48Z Beacon brief) + `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` (02:46Z, Pulse-gate approved) + `step-cleanup-review.json` + `step-ops-alerts-ui.json` + `step-retention.json`. Forge worktrees: **4 active** — `wt-forge-fix-advancer-reconcile-gh-failure` + `wt-forge-medic-reliability-gate-delivery-cli-001` + `wt-forge-step-cleanup-review` + `wt-fix` (legacy). Cooldown files: **149 total, 27 pipeline-stall** (UNCHANGED).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1188 lines** (UNCHANGED). 0 new alerts since iter 656 watermark. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since watermark 1188. No new healer activity observed. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 2026-06-03T02:44:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-03T02:44:00Z` → "-- No entries --". No Larry directives, no agent-distress signals. beacon-bot ENETUNREACH G-rule (1/3, iter 654) — no new occurrence this iter. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Legacy cooldown residue (UNCHANGED).** alert-cooldown/warning/: **149 total** (UNCHANGED). 27 heal-pipeline-stall keyed files (stable). Root cause: legacy artifacts from OAuth-blocked period; pipeline now actively flowing. No new stall alerts. Cooldowns will expire organically over next several healer sweeps. ⚠️ (structural residue only)
+
+- **(Check 4) Pending directives: ⚠️ Forge 6 tasks; 3 active worktrees; pipeline accelerating.** Forge inbox: **6 tasks** (see header). Since iter 656: 2 recovery tasks (`fix-advancer-reconcile-gh-failure-recovery` + `medic-reliability-gate-delivery-cli-001-recovery`) were consumed by Forge (worktrees spawned); Beacon delivered 2 new build briefs (02:44Z fix-advancer + 02:48Z medic). Beacon inbox: **EMPTY** (sentinel/inbox-stall task completed; brief dispatched). 3 active Forge worktrees simultaneously: fix-advancer, medic, step-cleanup-review. 0 open PRs (builds mid-flight). ⚠️ (active, flowing)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **02:19:09Z** (~31 min old at 02:50Z; within 90-min threshold; next sweep ~02:49Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: M cycle-journal.md (this session's pre-write state only); branch=main, HEAD=f4691c2 ("Pulse cycle 20260603T024725Z" — iter 656 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (23rd total; carry-forward).** sync.json: `status=error`, `last_sync=2026-06-03T02:37:59Z`. Push rolled back to d0f2ca17; self-recovering on next tick. Time since: ~12 min at check — within 2h threshold. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ Forge 6 tasks (3 actively building); Beacon cleared.** 0 open PRs. Forge has 3 active worktrees building simultaneously (fix-advancer, medic, step-cleanup-review). 3 briefs queued (sentinel-translation + 2 more seq steps awaiting inbox-watcher dispatch). Beacon now idle — fastest build throughput since OAuth restore. ⚠️ (active progress)
+
+- **(Check F) Cost/quota: ✅ Nominal.** No runaway processes; 3 simultaneous Forge builds within normal bounds. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d; outside 60d window). CLAUDE_MAX_OAUTH: Tier 2 restored (iter 656). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired at iter 637 (00:22Z today) — skip. Check VIII/IX/X (Monday only) — skip. Check III (next 2026-06-14) — skip. ✅
+
+- **G-rule watch:**
+  - **`source:sentinel / subject:inbox-stall:*`: 3/3 — DISPATCHED (iter 650). Beacon COMPLETE.** `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` now in Forge inbox (02:46Z). Build next. Watch for PR adding `sentinel` + `inbox-stall` to `config/alert-translations.json`.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING (carry-forward).** Pipeline unblocked. Re-dispatch still pending Larry's go-ahead ([yellow] escalation idx=9 stands). No change this iter.
+  - **`source:ledger / subject:weekly-* not in alert-translations.json`: 1/3** (iter 638; no new occurrence).
+  - **`source:pulse / subject:check-i-* not in alert-translations.json`: 1/3** (iter 638; no new occurrence).
+  - `outbox-notifier:review-pass not in alert-translations.json`: **2/3** (stable; iters 593+599; no new occurrence).
+  - `outbox-notifier:mirror-dag-pass not in alert-translations.json`: **1/3** (stable; iter 584; no new occurrence).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **1/3** (stable; iter 625; self-resolved).
+  - beacon-bot ENETUNREACH re-established G-rule watch: **1/3** (iter 654; no new occurrence).
+  - All other G-rules stable.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (sync error self-recovers; 0 open PRs; 7/7 services active; Forge actively building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 657` → ts: 2026-06-03T02:50:01.427547+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T02:50:02.586312+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` Forge brief missing (pipeline unblocked; re-dispatch needs Larry's go-ahead; [yellow] escalation idx=9 stands). SYNC-PUSH-REBASE-FALLBACK-001 23rd total (APPROVAL_REQUEST open; self-recovering).
+
+**Patterns:**
+- **Beacon/Forge pipeline accelerating rapidly post-OAuth restore.** Since iter 656 (~02:44Z): Beacon cleared its 1 remaining task, delivered 2 new Forge build briefs (fix-advancer + medic), Forge started 3 simultaneous worktrees. The 36h stall is draining at maximum throughput. At this rate, PRs for fix-advancer + medic + step-cleanup-review should arrive within the next ~15-30 min. Next iter should show PRs open.
+- **All inbox-watcher activity post-OAuth restore is structural, not new failures.** The 6 Forge inbox tasks are all pipeline-continuation items from the stall period (Beacon briefs + seq steps). No novel failures observed.
+
+**Learned:** Forge builds 3 tasks simultaneously when the backlog clears. The throughput rate (3 worktrees within ~10 min of OAuth restore) suggests the inbox-watcher is dispatching at close to maximum concurrency. If 3 PRs open in the next iter, the auto-merge logic will need to handle them sequentially per policy (check E each iter for clean+green > 30 min).
+
+---
+
+## Notification — 2026-06-03 02:46 UTC (result-notify | beacon → pulse)
+
+**Source:** Beacon outbox — task `cycle-finding-sentinel-inbox-stall-alert-translations-20260603T015947Z` (dispatched iter 650).
+
+**Result:** Beacon completed preflight PROCEED for sentinel/inbox-stall translation. Verified `dispatch_sentinel.py:324-333` call site (`source='sentinel'`, `subject='inbox-stall:<path>'`), colon-strip lookup rule, and schema test gate. Build brief produced.
+
+**Action (Pulse-gate approval):** Reviewed spec. Consistent with the G-rule 3/3 dispatch intent. Scope: `config/alert-translations.json` (add `sentinel`→`inbox-stall` entry, INFO/FYI) + `scripts/tests/test_alert_translations.py` (new colon-strip assertion). No change to `dispatch_sentinel.py` or `larry_alerts.py`. Success criteria: existing shape test + new colon-strip test pass, full suite green. **APPROVED.** Dispatched `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` → Forge inbox.
+
+**Beacon note surfaced:** `in-flight-stall` and `stale-lease` sentinel subjects will still raw-DM once encountered (not yet at G-rule 3/3 for those). No action now; watch for recurrence.
+
+---
+
 ## Iteration 656 — 2026-06-03 02:44 UTC (interactive)
 
 **Health:** ⚠️ Degraded → Recovery in progress — Tier 1, consecutive_clean=0. **MAJOR: Tier 2 OAuth unblocked at ~02:41Z UTC. Beacon and Forge are now actively processing tasks.** Alert watermark: **1188** (+1 from iter 655: sync-blocked:auto-commit-push-failed at 02:37:59Z — SYNC-PUSH-REBASE-FALLBACK-001, 23rd total; beacon-bot delivered DM at 02:38:47Z). Healer heartbeat: **02:19:09Z** (UNCHANGED; ~26 min old at iter 656 check; FRESH within 90-min threshold; next sweep ~02:49Z). Sync: ⚠️ `status=error`, `last_sync=2026-06-03T02:37:59Z` (sync push failed; rolled back to d0f2ca17; self-recovering on next tick). **7/7 services active.** **0 open PRs.** Beacon inbox: **1 task** (cycle-finding-sentinel-inbox-stall-alert-translations-20260603T015947Z.json — actively processing at 02:42:15Z; was 35 tasks; 31 larry-reject routing-denied to .invalid, 3 seq steps processed and dispatched to Forge). Forge inbox: **5 tasks** — `fix-advancer-reconcile-gh-failure-recovery-20260602T234551Z.json` (actively running with worktree since 02:41:13Z) + `medic-reliability-gate-delivery-cli-001-recovery-20260603T021718Z.json` + `step-cleanup-review.json` (NEW — Beacon dispatched ~02:41Z) + `step-ops-alerts-ui.json` (NEW — Beacon dispatched ~02:42Z) + `step-retention.json` (NEW — Beacon dispatched ~02:42Z). Cooldown files: **149 total, 27 pipeline-stall** (UNCHANGED; legacy artifacts from stall period).
