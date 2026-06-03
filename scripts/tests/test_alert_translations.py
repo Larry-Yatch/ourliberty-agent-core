@@ -377,7 +377,7 @@ class LookupRuleTest(unittest.TestCase):
     def test_sentinel_inbox_stall_full_path_subject(self):
         t = larry_alerts.translate_alert(
             'sentinel',
-            'inbox-stall:/home/larry/agents/inboxes/beacon/foo.json',
+            'inbox-stall:/tmp/foo/beacon/foo.json',
         )
         self.assertIsNotNone(t)
         self.assertEqual(t['severity'], 'INFO')
