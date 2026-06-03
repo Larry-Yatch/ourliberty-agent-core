@@ -6,11 +6,11 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 06:09Z UTC (Iter 680 — interactive)
+## Status snapshot — updated 2026-06-03 06:19Z UTC (Iter 681 — interactive)
 
-**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC pending).** Alert watermark: **1225** (+10 iter 680; all Tier 3 known-pattern). Healer: stale-daemon timer active+waiting. Cooldown/warning: **172** files (+8). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (self-recovering). **7/7 core services + 4 new timers active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (first time in many iters). Burn-rate: monitoring (no new alert since 04:46:30Z). Check III 2026-06-14. Worktrees: **19** (−2; teardown working). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open.
+**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC pending).** Alert watermark: **1225** (unchanged from iter 680 — 0 new alerts). Healer: heartbeat 05:50:08Z (~29 min old; within threshold). Cooldown/warning: **172** files (unchanged — plateau, not growing). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (self-recovering; no new occurrence). **7/7 core services + 4 new timers all verified active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (2nd consecutive iter). Burn-rate: monitoring (no new alert since 04:46:30Z). Check III 2026-06-14. Worktrees: **19** (unchanged). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. **NEW (iter 681): 4 new timers verified active** (ceo-digest-daily, ceo-digest-weekly, chain-events-retention, promote-alerts) — iter 680 MONITOR closed ✅.
 
-**Watch items (iter 680 update):**
+**Watch items (iter 681 update):**
 - ~~**PR #270 OPEN; Mirror reviewing rev1.**~~ **PR #270 MERGED (iter 680, 05:56:07Z).** "docs(runbooks): orchestrator-bootstrap-runbook" — Mirror approved rev1. Auto-merged. Watch item CLOSED. ✅
 - ~~**PR #269 OPEN in Mirror review (iter 677).**~~ **PR #269 MERGED (iter 678, 05:45:00Z).** Drain-deadlock root fix LIVE. Watch item CLOSED. ✅
 - ~~**`build-fix-tier2-probe-setup-token-auth.json`.**~~ **PR #267 MERGED (iter 677, 05:29:21Z).** Root fix for `tier2_weekly_probe_failed` false alarms. Watch item CLOSED. ✅

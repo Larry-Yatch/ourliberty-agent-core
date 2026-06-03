@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 681 — 2026-06-03 06:17 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: sync error + cooldown residue). Alert watermark: **1225** (unchanged — 0 new alerts since iter 680). Healer heartbeat: **05:50:08Z** (~27 min old; ✅ within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total — unchanged; self-recovering). **7/7 core services + 4 new timers active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (2nd consecutive iter). Worktrees: **19** (unchanged). Cooldown residue: **172** (unchanged).
+
+**Verification from iter 680 MONITOR:**
+- **4 new timers (ceo-digest-daily, ceo-digest-weekly, chain-events-retention, promote-alerts): all confirmed active ✅.** MONITOR closed.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1225 lines** — unchanged from iter 680 watermark. 0 new alerts this window. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new alert-stream directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 172 files** (unchanged from iter 680). No new install-drift events since the 4-service-group sweep at 06:00Z. Residue plateau is acceptable near-term; GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - 2nd consecutive iter with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **05:50:08Z** (~27 min old; ✅ within 90-min threshold). No new auto-restart events since iter 680. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=3778567 ("Pulse cycle 20260603T061510Z" — iter 680 cycle commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 37th total (unchanged from iter 680).** sync.json: status=error, message="Auto-commit push failed; rolled back", commit=b9ee4a9..., last_sync=05:53:37Z. Session HEAD=3778567 (iter 680, 06:15Z) is newer than sync commit → wrapper already pushed; self-clears on next sync tick. No new occurrence this window. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7 + 4 new timers active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ceo-digest-daily.timer, ceo-digest-weekly.timer, chain-events-retention.timer, promote-alerts.timer — all active+verified. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs; all inboxes empty. ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Last known: 82%/10M at ~04:46:30Z (~91 min before this iter). No new alert in window. Medic rate-window fix (PR #274) live. Monitoring. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe verification pending (~10:37Z UTC today). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 19** (unchanged from iter 680). No new teardowns since 0 PRs merged. Hourly GC timer active; will handle remaining stale entries on next fire.
+
+- **G-rule watch (unchanged from iter 680):**
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `medic:medic-diagnosis` G-rule: **1/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `cycle-blocked:dirty-tree-*` G-rule: **2/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+  - Other G-rules stable.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7+ active; sync self-recovering; 0 new alerts).
+4. `cycle_prime_ledger.py append_action(tier=1, kind="intervention", iter=681)` — recorded. ✅
+5. `cycle_tier_state.py record_iter_result(checks_clean=False)` → tier=1, consecutive_clean=0. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (37th). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+
+**Patterns:**
+- **Pipeline fully quiescent for 2nd consecutive iter.** 0 open PRs, all inboxes empty. After the 7-PR burst across the preceding 48h, the system is in a genuine rest phase.
+- **4 new timers verified active** (ceo-digest-daily, ceo-digest-weekly, chain-events-retention, promote-alerts). iter 680 MONITOR closed.
+- **Cooldown residue plateau at 172.** No new install-drift events since iter 680's 4-service-group sweep. Stable rather than growing — acceptable until GC fix ships.
+
+**Learned:** Nothing new this iter. All structural carry-forwards unchanged; system in steady-state quiescent hold.
+
+---
+
 ## Iteration 680 — 2026-06-03 06:09 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC gap persists). Alert watermark: **1225** (+10 from 1215). Healer heartbeat: stale-daemon timer active+waiting (last beacon-bot restart 05:50:09Z — within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total, 05:53:37Z; self-recovering; session HEAD=cb278a9 newer than sync commit). **7/7 core services active + 4 new timers auto-installed.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** (PR #270 merged 05:56:07Z — all PRs shipped). Worktrees: **19** (−2 from iter 679's 21; event-driven teardown working). Cooldown residue: **172** (+8).
