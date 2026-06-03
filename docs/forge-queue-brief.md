@@ -38,11 +38,22 @@ glance.
   timestamp. Reader functions take an `agents_root: Path` and are unit-tested
   in isolation via the `OURLIBERTY_AGENTS_ROOT` tmpdir convention.
 
-- **QUEUED is already implemented generically.** `_agent_inbox_pending(
-  agents_root, agent)` returns `(count, sorted_task_ids)` of pending inbox
-  JSON files for any agent, scanning `inboxes/<agent>/`. Reuse it. For
-  wait-time, the inbox file **mtime** is the arrival timestamp (this is how
-  `inbox_watcher.scan_inbox()` orders the queue — oldest first).
+- **QUEUED — use `inbox_watcher.scan_inbox`'s matching rule, NOT
+  `_agent_inbox_pending`.** GOTCHA (verified): `_agent_inbox_pending` filters
+  `name.startswith('task-')`, but real dispatched inbox files are
+  `<task_id>.json` with no `task-` prefix — so it returns `(0, [])` against the
+  real queue and the queued lane would be permanently empty. The authoritative
+  scanner is `inbox_watcher.scan_inbox(agent)`: it skips dotfiles, requires
+  `.json`, and returns paths mtime-sorted oldest-first — exactly the queue
+  order. Implement the queued lane as a NEW `agents_root`-parameterized reader
+  that mirrors that rule (so it stays tmpdir-testable like the other dashboard
+  readers, rather than depending on `scan_inbox`'s import-time module-global
+  `INBOXES_ROOT`). For wait-time, `stat` each path's **mtime** =
+  `waited_seconds = now(UTC) - mtime`.
+  NOTE: `_agent_inbox_pending`'s `task-` under-count also affects the existing
+  `/agents/status` `in_flight_count` — that is a SEPARATE pre-existing bug
+  tracked as its own follow-up. Do NOT touch `_agent_inbox_pending` or
+  `/agents/status` here; keep the new reader scoped to this endpoint.
 
 - **BUILDING is already exposed.** The `/api/system/worktrees` reader returns
   `SystemWorktree { name, agent, task_id, branch, age_seconds, is_in_flight }`.
@@ -71,9 +82,11 @@ glance.
 
 For the requested `agent` (default `forge`):
 
-1. **queued** — from `_agent_inbox_pending(agents_root, agent)`. For each
-   pending task_id emit `{ task_id, waited_seconds }` where
-   `waited_seconds = now - inbox_file_mtime`. Oldest first.
+1. **queued** — new `agents_root`-parameterized reader using
+   `inbox_watcher.scan_inbox`'s matching rule (non-dotfile `*.json`, mtime-sorted
+   oldest-first) over `inboxes/<agent>/`. For each pending file emit
+   `{ task_id, waited_seconds }` where `waited_seconds = now(UTC) - mtime`.
+   Oldest first. (NOT `_agent_inbox_pending` — see the queued-lane gotcha above.)
 
 2. **building** — from the worktrees reader, filtered to `agent == agent`
    and `is_in_flight`. Emit `{ task_id, branch, age_seconds }`.
