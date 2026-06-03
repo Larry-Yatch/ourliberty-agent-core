@@ -1100,5 +1100,380 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         self.assertEqual(ran, [])
 
 
+def _make_repo_with_content(td: Path, units: dict) -> Path:
+    d = td / 'repo-content'
+    d.mkdir()
+    for u, text in units.items():
+        (d / u).write_text(text)
+    return d
+
+
+def _make_installed_with_content(td: Path, units: dict) -> Path:
+    d = td / 'installed-content'
+    d.mkdir()
+    for u, text in units.items():
+        (d / u).write_text(text)
+    return d
+
+
+class DetectContentDriftTest(_IsolatedAgentsRoot):
+    """Content drift = unit present in BOTH dirs whose installed MAIN file
+    differs from the repo copy. Drop-ins under `<unit>.d/` are NOT compared;
+    a single trailing newline is normalized.
+    """
+
+    def test_flags_differing_content(self):
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1h\n',
+            })
+            i = _make_installed_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1d\n',
+            })
+            self.assertEqual(h.detect_content_drift(r, i), ['a.timer'])
+
+    def test_ignores_identical_content(self):
+        with tempfile.TemporaryDirectory() as td:
+            same = '[Timer]\nOnUnitActiveSec=1h\n'
+            r = _make_repo_with_content(Path(td), {'a.timer': same})
+            i = _make_installed_with_content(Path(td), {'a.timer': same})
+            self.assertEqual(h.detect_content_drift(r, i), [])
+
+    def test_single_trailing_newline_normalized(self):
+        # Repo has trailing newline, installed does not — NOT drift.
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1h\n',
+            })
+            i = _make_installed_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1h',
+            })
+            self.assertEqual(h.detect_content_drift(r, i), [])
+
+    def test_double_trailing_newline_is_drift(self):
+        # Only ONE trailing newline is normalized; a second is real drift.
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1h\n',
+            })
+            i = _make_installed_with_content(Path(td), {
+                'a.timer': '[Timer]\nOnUnitActiveSec=1h\n\n',
+            })
+            self.assertEqual(h.detect_content_drift(r, i), ['a.timer'])
+
+    def test_ignores_units_missing_from_either_side(self):
+        with tempfile.TemporaryDirectory() as td:
+            # repo-only b.timer (missing-install territory) + installed-only
+            # c.timer (operator install) must both be ignored here.
+            r = _make_repo_with_content(Path(td), {
+                'a.timer': 'x\n', 'b.timer': 'y\n',
+            })
+            i = _make_installed_with_content(Path(td), {
+                'a.timer': 'x\n', 'c.timer': 'z\n',
+            })
+            self.assertEqual(h.detect_content_drift(r, i), [])
+
+    def test_ignores_dropin_overrides(self):
+        # Main file identical; a differing drop-in under a.timer.d/ must NOT
+        # count as drift (operator live-tuning via `systemctl edit`).
+        with tempfile.TemporaryDirectory() as td:
+            same = '[Timer]\nOnUnitActiveSec=1h\n'
+            r = _make_repo_with_content(Path(td), {'a.timer': same})
+            i = _make_installed_with_content(Path(td), {'a.timer': same})
+            dropin = i / 'a.timer.d'
+            dropin.mkdir()
+            (dropin / 'override.conf').write_text(
+                '[Timer]\nOnUnitActiveSec=30m\n',
+            )
+            self.assertEqual(h.detect_content_drift(r, i), [])
+
+
+class ServiceClassifyTest(_IsolatedAgentsRoot):
+    """`_service_is_long_running`: Type=oneshot -> False; active non-oneshot
+    -> True; shell-out failure -> False (safe default never restarts).
+    """
+
+    def _show(self, stdout, rc=0):
+        completed = mock.MagicMock()
+        completed.returncode = rc
+        completed.stdout = stdout
+        completed.stderr = ''
+        return mock.patch.object(h.subprocess, 'run', return_value=completed)
+
+    def test_oneshot_is_not_long_running(self):
+        with self._show('Type=oneshot\nActiveState=active\n'):
+            self.assertFalse(h._service_is_long_running('x.service'))
+
+    def test_active_simple_is_long_running(self):
+        with self._show('Type=simple\nActiveState=active\n'):
+            self.assertTrue(h._service_is_long_running('x.service'))
+
+    def test_inactive_simple_is_not_long_running(self):
+        with self._show('Type=simple\nActiveState=inactive\n'):
+            self.assertFalse(h._service_is_long_running('x.service'))
+
+    def test_nonzero_rc_is_not_long_running(self):
+        with self._show('', rc=1):
+            self.assertFalse(h._service_is_long_running('x.service'))
+
+    def test_shellout_failure_is_not_long_running(self):
+        def boom(*a, **k):
+            raise h.subprocess.TimeoutExpired(cmd=a[0], timeout=10)
+        with mock.patch.object(h.subprocess, 'run', side_effect=boom):
+            self.assertFalse(h._service_is_long_running('x.service'))
+
+
+class RemediateContentDriftTest(_IsolatedAgentsRoot):
+    """`_remediate_content_drift` shell-out sequence — fully mocked.
+    .timer = cp + daemon-reload + restart + verify; long-running .service =
+    cp + daemon-reload + restart; oneshot .service = cp + daemon-reload only.
+    """
+
+    def _fake_runs_record(self, plan):
+        ran: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            ran.append(list(cmd))
+            return plan(list(cmd))
+        return ran, fake_run
+
+    def test_timer_restart_and_verify(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        healed = {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': 'Sat 2026-06-03 18:00:00 MDT',
+            'NextElapseUSecMonotonic': '1h',
+            'LastTriggerUSec': '',
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=healed):
+            rc, stderr = h._remediate_content_drift('foo.timer')
+        self.assertEqual(rc, 0)
+        self.assertEqual(stderr, '')
+        # cp, daemon-reload, restart (verify uses mocked _systemctl_show).
+        self.assertEqual(len(ran), 3)
+        self.assertEqual(ran[0][:3], ['sudo', '-n', 'cp'])
+        self.assertEqual(ran[1], ['sudo', '-n', 'systemctl', 'daemon-reload'])
+        self.assertEqual(
+            ran[2], ['sudo', '-n', 'systemctl', 'restart', 'foo.timer'],
+        )
+
+    def test_timer_verify_failure_returns_nonzero(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        bad = {
+            'ActiveState': 'failed',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': '',
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=bad):
+            rc, stderr = h._remediate_content_drift('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('verify failed', stderr)
+
+    def test_oneshot_service_no_restart_no_enable(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(
+                    h, '_service_is_long_running', return_value=False):
+            rc, stderr = h._remediate_content_drift('foo.service')
+        self.assertEqual(rc, 0)
+        # cp + daemon-reload only — no restart, no enable.
+        self.assertEqual(len(ran), 2)
+        self.assertEqual(ran[0][:3], ['sudo', '-n', 'cp'])
+        self.assertEqual(ran[1], ['sudo', '-n', 'systemctl', 'daemon-reload'])
+        for cmd in ran:
+            self.assertNotIn('enable', cmd)
+            self.assertNotIn('restart', cmd)
+
+    def test_long_running_service_restarts(self):
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(
+                    h, '_service_is_long_running', return_value=True):
+            rc, stderr = h._remediate_content_drift('foo.service')
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(ran), 3)
+        self.assertEqual(
+            ran[2], ['sudo', '-n', 'systemctl', 'restart', 'foo.service'],
+        )
+        for cmd in ran:
+            self.assertNotIn('enable', cmd)
+
+    def test_reload_failure_returns_nonzero(self):
+        def plan(cmd):
+            if cmd[2] == 'cp':
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+            if cmd[3] == 'daemon-reload':
+                return mock.MagicMock(
+                    returncode=1, stdout='', stderr='bus down',
+                )
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h._remediate_content_drift('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('daemon-reload failed', stderr)
+
+
+class ContentDriftOrchestrationTest(_IsolatedAgentsRoot):
+    """`run_once()` content-drift loop: dry-run emits a single activation DM
+    and never shells out; live+allowed remediates-then-notifies; live failure
+    falls back to the manual-dance DM; kill-switch blocks all action.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._dm_calls: list[dict] = []
+
+        def fake_dm(message, subject, suggested_action, severity='warning'):
+            self._dm_calls.append({
+                'message': message, 'subject': subject,
+                'suggested_action': suggested_action, 'severity': severity,
+            })
+            return True
+
+        self._dm_patch = mock.patch.object(h, 'dm_larry', fake_dm)
+        self._dm_patch.start()
+        self.addCleanup(self._dm_patch.stop)
+
+        self._allowlist_path = _write_allowlist(
+            Path(self._isolated_tmp), ['install-drift', 'stuck-timer'],
+        )
+        self._allowlist_patch = mock.patch.object(
+            h, 'ALLOWLIST_FILE', self._allowlist_path,
+        )
+        self._allowlist_patch.start()
+        self.addCleanup(self._allowlist_patch.stop)
+
+    def _drifted_dirs(self, td, unit='ourliberty-x.timer'):
+        r = _make_repo_with_content(Path(td), {unit: 'repo-content\n'})
+        i = _make_installed_with_content(Path(td), {unit: 'stale-content\n'})
+        return r, i
+
+    def test_live_remediate_emits_healed_dm(self):
+        with tempfile.TemporaryDirectory() as td:
+            r, i = self._drifted_dirs(td)
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            healed = {
+                'ActiveState': 'active',
+                'NextElapseUSecRealtime': 'Sun 2026-06-03 18:00:00 MDT',
+                'NextElapseUSecMonotonic': '1h',
+                'LastTriggerUSec': '',
+            }
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                    mock.patch.object(h, '_systemctl_show', return_value=healed):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,
+                )
+        self.assertEqual(counts['content_drift'], 1)
+        self.assertEqual(counts['content_healed'], 1)
+        self.assertEqual(counts['dm_sent'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        dm = self._dm_calls[0]
+        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        self.assertIn('Auto-reconciled', dm['message'])
+        self.assertIn('Sun 2026-06-03 18:00:00 MDT', dm['message'])
+        # restart issued to re-anchor the timer.
+        self.assertIn(
+            ['sudo', '-n', 'systemctl', 'restart', 'ourliberty-x.timer'], ran,
+        )
+
+    def test_live_failure_falls_back_to_manual_dance(self):
+        with tempfile.TemporaryDirectory() as td:
+            r, i = self._drifted_dirs(td)
+
+            def fake_run(cmd, **kwargs):
+                if cmd[2] == 'cp':
+                    return mock.MagicMock(returncode=0, stdout='', stderr='')
+                if cmd[3] == 'daemon-reload':
+                    return mock.MagicMock(
+                        returncode=1, stdout='', stderr='bus down',
+                    )
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            # _systemctl_show only matters for the (skipped) stuck-timer pass;
+            # return a healthy timer so it is not classified stuck.
+            healthy = {
+                'ActiveState': 'active',
+                'NextElapseUSecRealtime': 'Sun 2026-06-03 18:00:00 MDT',
+                'NextElapseUSecMonotonic': '1h',
+                'LastTriggerUSec': '',
+            }
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                    mock.patch.object(h, '_systemctl_show', return_value=healthy):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,
+                )
+        self.assertEqual(counts['content_drift'], 1)
+        self.assertEqual(counts['content_healed'], 0)
+        self.assertEqual(counts['dm_sent'], 1)
+        dm = self._dm_calls[0]
+        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        self.assertIn('cp', dm['suggested_action'])
+        self.assertIn('daemon-reload', dm['suggested_action'])
+
+    def test_dry_run_single_activation_dm_no_shell_out(self):
+        with tempfile.TemporaryDirectory() as td:
+            r, i = self._drifted_dirs(td)
+            ran: list[list[str]] = []
+
+            def fake_run(cmd, **kwargs):
+                ran.append(list(cmd))
+                return mock.MagicMock(returncode=0, stdout='', stderr='')
+
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=True,
+                )
+        self.assertEqual(counts['content_drift'], 1)
+        self.assertEqual(counts['content_healed'], 0)
+        self.assertEqual(counts['dm_sent'], 1)
+        self.assertEqual(
+            self._dm_calls[0]['subject'],
+            'install-drift-healer: activate to receive missing-install alerts',
+        )
+        # No privileged (sudo) action in dry-run. A read-only `systemctl show`
+        # from the stuck-timer pass is allowed; cp/restart/enable are not.
+        sudo_cmds = [c for c in ran if c and c[0] == 'sudo']
+        self.assertEqual(sudo_cmds, [])
+
+    def test_kill_switch_blocks_content_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            kill = Path(td) / 'disable'
+            kill.write_text('1')
+            with mock.patch.object(h, 'KILL_SWITCH', kill):
+                with tempfile.TemporaryDirectory() as td2:
+                    r, i = self._drifted_dirs(td2)
+                    counts = h.run_once(
+                        repo_dir=r, installed_dir=i,
+                        state={'units': {}, 'stuck_timers': {}},
+                        dry_run_override=False,
+                    )
+        self.assertEqual(counts['dm_sent'], 0)
+        self.assertEqual(counts['content_drift'], 0)
+        self.assertEqual(len(self._dm_calls), 0)
+
+
 if __name__ == '__main__':
     unittest.main()
