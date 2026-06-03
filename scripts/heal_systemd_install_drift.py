@@ -198,6 +198,59 @@ def detect_drift(
     return sorted(u for u in repo_units if u not in installed)
 
 
+def _normalize_unit_content(text: str) -> str:
+    """Strip a single trailing newline; otherwise leave the content exact.
+
+    A repo file and its installed copy that differ only by one trailing
+    newline are NOT content drift — `cp` and editors routinely add/drop one.
+    Any other difference (whitespace, body, a second trailing newline) is
+    real and must be caught.
+    """
+    if text.endswith('\n'):
+        return text[:-1]
+    return text
+
+
+def detect_content_drift(
+    repo_dir: Path = REPO_SYSTEMD_DIR,
+    installed_dir: Path = INSTALLED_SYSTEMD_DIR,
+) -> list[str]:
+    """Return sorted unit filenames present in BOTH dirs whose installed
+    MAIN file content differs from the repo copy.
+
+    Only the main unit file (`<installed_dir>/<unit>`) is compared. Drop-in
+    overrides under `<installed_dir>/<unit>.d/` are deliberately NOT read:
+    operator live-tuning via `systemctl edit` lands there and must be
+    preserved, never clobbered by this healer. A single trailing newline is
+    normalized; everything else is compared exactly. Units present in only
+    one side are out of scope here (missing-install handles repo-only units).
+
+    Per-unit read failures are logged INFO and the unit is skipped so the
+    function never raises.
+    """
+    repo_units = list_repo_units(repo_dir)
+    installed = list_installed_units(installed_dir)
+    drifted: list[str] = []
+    for unit in repo_units:
+        if unit not in installed:
+            continue
+        try:
+            repo_text = (repo_dir / unit).read_text()
+            installed_text = (installed_dir / unit).read_text()
+        except OSError as e:
+            log(
+                f'content-drift read of {unit} raised '
+                f'{type(e).__name__}: {e}; skipping',
+                'INFO',
+            )
+            continue
+        if _normalize_unit_content(repo_text) != _normalize_unit_content(
+            installed_text
+        ):
+            drifted.append(unit)
+    return sorted(drifted)
+
+
 # -------------------- stuck-timer detection --------------------
 
 _STUCK_TIMER_PROPS = (
@@ -445,17 +498,15 @@ def _remediation_allowed(class_name: str) -> bool:
     return class_name in classes
 
 
-# -------------------- missing-install remediation --------------------
+# -------------------- shared cp + daemon-reload core --------------------
 
-def _remediate_missing_install(unit: str) -> tuple[int, str]:
-    """cp the repo unit file into /etc/systemd/system, daemon-reload, and
-    enable --now if it's a timer. Returns (rc, stderr); never raises.
+def _cp_and_reload(unit: str) -> tuple[int, str]:
+    """cp the repo unit file into /etc/systemd/system + daemon-reload.
 
-    For a .timer we verify after by re-reading systemctl show and confirming
-    ActiveState=active + NextElapseUSecRealtime populated; verification
-    failure flips rc non-zero so the caller falls back to the manual-dance
-    alert. A .service is intentionally not enabled directly — it is
-    activated by its sibling timer.
+    Shared core of both missing-install and content-drift remediation.
+    Returns (rc, stderr); rc==0 means both steps succeeded. Never raises —
+    timeout / FileNotFoundError are folded into a non-zero rc + message so
+    callers can fall back to the manual-dance alert.
     """
     src = REPO_SYSTEMD_DIR / unit
     try:
@@ -485,6 +536,24 @@ def _remediate_missing_install(unit: str) -> tuple[int, str]:
         return reload_result.returncode, (
             f'daemon-reload failed: {(reload_result.stderr or "").strip()}'
         )
+    return 0, ''
+
+
+# -------------------- missing-install remediation --------------------
+
+def _remediate_missing_install(unit: str) -> tuple[int, str]:
+    """cp the repo unit file into /etc/systemd/system, daemon-reload, and
+    enable --now if it's a timer. Returns (rc, stderr); never raises.
+
+    For a .timer we verify after by re-reading systemctl show and confirming
+    ActiveState=active + NextElapseUSecRealtime populated; verification
+    failure flips rc non-zero so the caller falls back to the manual-dance
+    alert. A .service is intentionally not enabled directly — it is
+    activated by its sibling timer.
+    """
+    rc, stderr = _cp_and_reload(unit)
+    if rc != 0:
+        return rc, stderr
 
     if unit.endswith('.timer'):
         try:
@@ -511,6 +580,110 @@ def _remediate_missing_install(unit: str) -> tuple[int, str]:
         if not post.get('NextElapseUSecRealtime'):
             return -1, (
                 'post-enable verify failed: NextElapseUSecRealtime empty'
+            )
+
+    return 0, ''
+
+
+# -------------------- content-drift remediation --------------------
+
+_SERVICE_CLASS_PROPS = ('Type', 'ActiveState')
+
+
+def _service_is_long_running(unit: str) -> bool:
+    """True iff `unit` is a currently-active, non-oneshot `.service`.
+
+    Decides whether a content-drifted service needs a restart to pick up its
+    new ExecStart *now* (a long-running daemon) vs. a daemon-reload being
+    enough (a oneshot — its next timer fire re-execs it with fresh content,
+    and restarting a oneshot would run it off-schedule). On any shell-out or
+    parse failure return False: the safe default never restarts.
+    """
+    try:
+        result = subprocess.run(
+            [
+                'systemctl', 'show', unit,
+                '--property=' + ','.join(_SERVICE_CLASS_PROPS),
+                '--no-pager',
+            ],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'systemctl show {unit} (service class) raised '
+            f'{type(e).__name__}: {e}; treating as not-long-running',
+            'INFO',
+        )
+        return False
+    if result.returncode != 0:
+        return False
+    props: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, sep, value = line.partition('=')
+        if sep:
+            props[key.strip()] = value.strip()
+    if props.get('Type') == 'oneshot':
+        return False
+    return props.get('ActiveState') == 'active'
+
+
+def _remediate_content_drift(unit: str) -> tuple[int, str]:
+    """Re-install a content-drifted unit. Returns (rc, stderr); never raises.
+
+    Shared core: cp repo->installed + daemon-reload (via `_cp_and_reload`).
+    Then, by type:
+      .timer  — daemon-reload alone will NOT reset an already-active timer's
+                OnUnitActiveSec anchor, so `systemctl restart <unit>` re-anchors
+                it; verify ActiveState=active + NextElapseUSecRealtime populated
+                (verification failure flips rc non-zero -> manual-dance fallback).
+      .service — a oneshot needs only the daemon-reload (its next timer fire
+                re-execs with the new ExecStart); we do NOT enable/start it. A
+                currently long-running .service is restarted so the new content
+                takes effect now.
+    """
+    rc, stderr = _cp_and_reload(unit)
+    if rc != 0:
+        return rc, stderr
+
+    if unit.endswith('.timer'):
+        try:
+            restart_result = subprocess.run(
+                ['sudo', '-n', 'systemctl', 'restart', unit],
+                capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired:
+            return -1, f'restart {unit} timed out'
+        except FileNotFoundError:
+            return -1, 'sudo or systemctl not found in PATH'
+        if restart_result.returncode != 0:
+            return restart_result.returncode, (
+                f'restart failed: {(restart_result.stderr or "").strip()}'
+            )
+        post = _systemctl_show(unit) or {}
+        if post.get('ActiveState') != 'active':
+            return -1, (
+                f'post-restart verify failed: ActiveState='
+                f'{post.get("ActiveState")!r}'
+            )
+        if not post.get('NextElapseUSecRealtime'):
+            return -1, (
+                'post-restart verify failed: NextElapseUSecRealtime empty'
+            )
+        return 0, ''
+
+    if unit.endswith('.service') and _service_is_long_running(unit):
+        try:
+            restart_result = subprocess.run(
+                ['sudo', '-n', 'systemctl', 'restart', unit],
+                capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+            )
+        except subprocess.TimeoutExpired:
+            return -1, f'restart {unit} timed out'
+        except FileNotFoundError:
+            return -1, 'sudo or systemctl not found in PATH'
+        if restart_result.returncode != 0:
+            return restart_result.returncode, (
+                f'restart failed: {(restart_result.stderr or "").strip()}'
             )
 
     return 0, ''
@@ -590,6 +763,47 @@ def _render_missing_install(unit: str) -> tuple[str, str, str]:
     return message, subject, suggested
 
 
+def _render_content_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
+    is_timer = unit.endswith('.timer')
+    action_phrase = (
+        'restarted to re-anchor its schedule' if is_timer
+        else 'daemon-reloaded (next fire re-execs with the new content)'
+    )
+    message = (
+        f'Auto-reconciled `{unit}` — its installed copy under '
+        f'/etc/systemd/system/ had drifted from the repo. Re-copied, '
+        f'daemon-reloaded, and {action_phrase}. Next fire: {next_fire}.'
+    )
+    subject = f'install-drift:{unit}'
+    suggested = f'Verify on the droplet: `systemctl status {unit}`.'
+    return message, subject, suggested
+
+
+def _render_content_drift_dry_run(unit: str) -> tuple[str, str, str]:
+    repo_path = f'~/agent-core/systemd/{unit}'
+    is_timer = unit.endswith('.timer')
+    post_line = (
+        f'sudo systemctl restart {unit}'
+        if is_timer
+        else f'sudo systemctl daemon-reload  # oneshot re-execs on next timer fire'
+    )
+    message = (
+        f'Unit `{unit}` is installed under `/etc/systemd/system/` but its '
+        f'contents differ from the repo copy (`systemd/{unit}`). Likely '
+        f'cause: a PR changed the unit file but the operator did not '
+        f're-install it, so the droplet is running stale unit config.'
+    )
+    subject = f'install-drift:{unit}'
+    suggested = (
+        f'On the droplet (ssh larry@134.209.44.80):\n'
+        f'  sudo cp {repo_path} /etc/systemd/system/\n'
+        f'  sudo systemctl daemon-reload\n'
+        f'  {post_line}\n'
+        f'Then verify: `systemctl status {unit}`'
+    )
+    return message, subject, suggested
+
+
 def _activation_message() -> tuple[str, str, str]:
     message = (
         f'Heal-systemd-install-drift is in dry-run mode '
@@ -623,6 +837,7 @@ def run_once(
         'dm_suppressed_dedup': 0, 'reconciled_gc': 0,
         'stuck_timer': 0, 'timer_healed': 0,
         'install_healed': 0,
+        'content_drift': 0, 'content_healed': 0,
     }
     if kill_switch_active():
         log(f'KILL_SWITCH active at {KILL_SWITCH}; exiting cleanly')
@@ -692,7 +907,66 @@ def run_once(
         else:
             log(f'DM append suppressed for {unit}', 'WARN')
 
-    # GC entries that have been reconciled.
+    # Content-drift pass — units present in BOTH dirs whose installed file
+    # content differs from the repo copy. Runs AFTER missing-install (a unit
+    # absent from the droplet cannot be content-drifted). Same install-drift
+    # allowlist + dry-run + kill-switch + _should_re_dm gating; shares the
+    # `units` state bucket, so both feed the single reconciliation GC below.
+    content_drifts = detect_content_drift(
+        repo_dir or REPO_SYSTEMD_DIR,
+        installed_dir or INSTALLED_SYSTEMD_DIR,
+    )
+    counts['content_drift'] = len(content_drifts)
+    live_set |= set(content_drifts)
+
+    for unit in content_drifts:
+        if not _should_re_dm(state, unit, now=now):
+            counts['dm_suppressed_dedup'] += 1
+            continue
+
+        if dry_run:
+            state.setdefault('_meta', {})
+            if not state['_meta'].get('activation_alerted'):
+                a_msg, a_subj, a_sug = _activation_message()
+                dm_larry(message=a_msg, subject=a_subj, suggested_action=a_sug)
+                state['_meta']['activation_alerted'] = True
+                counts['dm_sent'] += 1
+            log(f'DRY-RUN content drift: {unit} (suppressed; activate via '
+                f'{ENV_HEALER_ENABLED}=true)')
+            continue
+
+        if _remediation_allowed('install-drift'):
+            rc, stderr = _remediate_content_drift(unit)
+            if rc == 0:
+                post = _systemctl_show(unit) or {}
+                next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
+                counts['content_healed'] += 1
+                msg, subj, sug = _render_content_healed(unit, next_fire)
+                ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+                if ok:
+                    counts['dm_sent'] += 1
+                    _record_dm(state, unit, now=now)
+                    log(f'auto-reconciled {unit} next_fire={next_fire!r}')
+                else:
+                    log(f'DM append suppressed for healed content {unit}',
+                        'WARN')
+                continue
+            log(
+                f'auto-reconcile of {unit} failed rc={rc} stderr={stderr!r}; '
+                f'falling back to manual-dance alert',
+                'WARN',
+            )
+
+        msg, subj, sug = _render_content_drift_dry_run(unit)
+        ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+        if ok:
+            counts['dm_sent'] += 1
+            _record_dm(state, unit, now=now)
+            log(f'DM sent for content drift: {unit}')
+        else:
+            log(f'DM append suppressed for {unit}', 'WARN')
+
+    # GC entries that have been reconciled (missing-install OR content drift).
     for gone in list(state['units'].keys()):
         if gone not in live_set:
             state['units'].pop(gone, None)
