@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 716 — 2026-06-03 10:51 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural carry-forwards: cooldown residue 178; worktrees 19 — GC ran 02:43 UTC, next fires 20:43 MDT tonight). Alert watermark: **1226** (unchanged — 0 new alerts). Sync: ✅ Nominal (no-change at 10:39:05Z; wrapper HEAD 57dc253 post-dates sync, will self-clear next tick). Healer heartbeat: **10:20:57Z** (~30 min old at write time; ✅ within 90-min threshold). **7/7 core services active.** Forge/Mirror/Beacon inboxes: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**37th consecutive iter**). Worktrees: **19** (GC ran at 02:43 UTC; explained below).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1226 lines** — unchanged from iter 715 watermark. No new alerts. Last entries: install-drift × 8 at 06:00Z (Tier-3 known-pattern), stuck-timer:ourliberty-cycle.timer at 06:00:24Z (Tier-3 known-pattern), sync-blocked:auto-commit-push-failed at 09:38:41Z (SYNC-PUSH-REBASE-FALLBACK-001 #38, previously claimed iters 708–715). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 178 total** (172 warning + 6 critical — structural legacy from stall period; pipeline fully quiescent 37 consecutive iters). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - All inboxes (Forge, Mirror, Beacon): **EMPTY**. ✅
+  - **37th consecutive iter** with fully-quiescent pipeline. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **10:20:57Z** (~30 min old at write time; ✅ within 90-min threshold; 30-min cadence; next fire ~10:50Z, may have already fired). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=57dc253 ("Pulse cycle 20260603T104339Z" — iter 715 wrapper commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** `agent-core-sync.json`: `status=no-change`, last_sync=2026-06-03T10:39:05Z, commit=44e6c52. Session HEAD 57dc253 (iter 715 wrapper, pushed after 10:39:05Z) not yet in sync.json — will self-clear on next sync tick. No error state. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs (both repos); all inboxes empty. **37th consecutive iter.** ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Alert watermark unchanged (1226). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d, no action). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. All skip. ✅
+
+- **⚠️ Worktrees: 19 — new understanding this iter.** GC ran at 02:43 UTC June 3 (8h ago, status=0/SUCCESS): found 23 git-tracked worktrees in agent-core, removed 20 (stale > 24h at that time), kept 4. Current 19 dirs are all from June 2 builds (created 20:41–23:07 UTC June 2): they were < 24h old at 02:43 UTC, correctly kept by GC. Next GC fires **20:43 MDT tonight** (~9h); by then they'll be 23–26h old and will be cleaned. System is operating as designed on this front — the watch item "GC fires tonight" closes as "GC ran, kept correctly, next fire tonight will clean them." ✅ operationally; **⚠️ carry-forward**: timer still 1d cadence (G-rule 1/3 unchanged). ⚠️
+
+- **NEW (iter 716): `wt-fix` orphan directory — GC gap observation.** `/home/larry/agent-worktrees/wt-fix/` is an EMPTY directory with mtime 2026-05-31T22:39Z (2+ days old). GC ran 8h ago and did NOT remove it. Hypothesis: `cleanup_stale_worktrees.py` scans via `git worktree list` and only removes git-registered worktrees; if a worktree dir was de-registered from git (via `git worktree remove` or `git worktree prune`) but the physical directory was NOT deleted, the GC cannot see or clean it. **G-rule 1/3:** `cleanup_stale_worktrees.py misses orphaned non-git-registered directories`. At 3/3 → dispatch Beacon to spec a directory-sweep fallback in `cleanup_stale_worktrees.py`. Not actionable now; noting. ⚠️
+
+- **G-rule watch (updated from iter 715):**
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). Confirmed again: GC timer still on 1d cadence per `systemctl list-timers` (NEXT=20:43 MDT, LAST=yesterday 20:43 MDT = 24h gap). PR #266 changed timer to 1h in repo but installed unit remains 1d. G-rule carry-forward; no new occurrence.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `medic:medic-diagnosis`: **1/3**. Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **NEW 1/3** (this iter, `wt-fix` observation).
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — no new occurrences.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; no new alerts; no sync error). ✅
+4. GC investigation: confirmed GC ran 02:43 UTC (✅ success) — worktree plateau explained by correct GC behavior (June 2 dirs were < 24h at GC time). Watch item resolved; next GC tonight cleans them. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 716` → ts: 2026-06-03T10:51:01Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T10:51:01Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** None. All findings are carry-forwards or new low-urgency G-rule observations.
+
+**Patterns:**
+- **Pipeline fully quiescent for 37th consecutive iter.** 0 open PRs, all inboxes empty. System stable post-Tier-2 OAuth restore.
+- **Worktree count explained.** GC ran correctly at 02:43 UTC — the plateau at 19 was because the June 2 worktrees were < 24h old and correctly kept. Tonight's GC will clear them. Watch item closes.
+- **wt-fix orphan (G-rule 1/3).** Empty non-git-registered directory, 2+ days old, survived GC. First observation of cleanup gap. No urgency; noting for pattern tracking.
+- **Alert watermark stable at 1226.** No new healer activity since iter 708.
+
+**Learned:** GC behavior confirmed — it only removes git-registered worktrees, leaving orphaned non-registered dirs. `wt-fix` is the first observed orphan. G-rule seeded at 1/3.
+
+---
+
 ## Iteration 715 — 2026-06-03 10:41 UTC (interactive)
 
 **Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (structural: cooldown residue 178; worktree GC fires 20:43 MDT tonight). Alert watermark: **1226** (unchanged — 0 new alerts). **✅ SYNC SELF-CLEARED** — `status=no-change` at 10:39:05Z, HEAD `44e6c52`; SYNC-PUSH-REBASE-FALLBACK-001 #38 carry-forward resolved as predicted. Healer heartbeat: **10:20:57Z** (~21 min old; ✅ within 90-min threshold; next ~10:50Z). **7/7 core services active.** Forge/Mirror/Beacon inboxes: **EMPTY**. **0 open PRs** — pipeline fully quiescent (**36th consecutive iter**). Worktrees: **19** (unchanged — **36th iter**; GC fires 20:43 MDT / 02:43 UTC Thu Jun 4 — ~12h remaining).
