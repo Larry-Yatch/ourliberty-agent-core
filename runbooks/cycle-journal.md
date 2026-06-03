@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 769 — 2026-06-03 17:13 UTC (interactive)
+
+**Health:** ⚠️ Pipeline clear but non-nominal — Tier 1, consecutive_clean=0 (Tier-4 novel alert + structural cooldown residue). Alert watermark: **1185 lines / anchor 17:10:39Z** (+1 new from iter 768 anchor 1184/17:02:17Z). Sync: ✅ status=no-change, commit=702080d, last_sync=17:04:24Z. Healer heartbeat: **16:52:19Z** (~21 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). Forge inbox EMPTY. Mirror inbox EMPTY.** Beacon inbox: 1 notify file (routing delivery, not new work). Worktrees: **3** (all stale; hourly GC pending).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel), DM suppressed per memory.** `larry-alerts.jsonl`: **1185 lines** — +1 from iter 768 anchor 1184/17:02:17Z. New entry at **17:10:39Z**: `source=outbox-notifier / intent=reject / task_id=pulse-triage-phase-a-foundation-001`. Classification path: (1) known-pattern allowlist? — NO (`reject` NOT in outbox-notifier section of `config/alert-translations.json`; only `auto-merge-queue-corrupt`, `review-pass`, `mirror-dag-pass` are registered); (2) guarded-category? — NO (not credential, not prod-config, not high-cost); (3) action-template recognized 3+ prior times? — NO (first-ever `reject` intent from outbox-notifier); (4) fallthrough → **Tier 4 (novel/ambiguous)**. DM suppressed per memory `feedback_alerts_actionable_only.md` (expected-by-design: Forge correctly identified that `pulse-triage-phase-a-foundation-001` is a duplicate of already-shipped PR #279; Beacon inbox already has the notify file `notify-pulse-triage-phase-a-foundation-001.json`; pipeline routing handled it automatically). New watermark: **1185 lines / anchor 17:10:39Z**. ⚠️ Tier-reset: YES (Tier 4 = non-clean iter). **G-rule 1/3: `outbox-notifier:reject not in alert-translations.json`** (first occurrence).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (176 warning + 6 critical; unchanged from iter 768). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 4) Pending directives: ✅ Effectively clear.** 0 open PRs (both repos). Forge inbox EMPTY. Mirror inbox EMPTY. Beacon inbox: `notify-pulse-triage-phase-a-foundation-001.json` (`_notify_depth=1` routing delivery — not a new build task; Beacon processes on next wake). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **16:52:19Z** (~21 min old at 17:13Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=702080d "Pulse cycle 20260603T170406Z". ✅
+
+- **(Check B) Sync health: ✅ status=no-change.** last_sync=17:04:24Z (<10 min at iter start). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Clear.** 0 open PRs (both repos). Forge EMPTY. Mirror EMPTY. Beacon: 1 notify (routing delivery). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 3 (all stale)** — `wt-forge-alert-fix-first-outcome-routing-001` (stale; PR #277 merged), `wt-mirror-alert-fix-first-outcome-routing-001` (stale; PR #277 merged), `wt-forge-pulse-triage-phase-a-foundation-001` (stale; task preflight-rejected at 17:10:39Z, dir mtime 17:06:50Z). All three awaiting hourly GC. Timeline consistent with GC running pre-events; next GC fire expected ~17:30–18:00Z. ✅ (no G-rule escalation yet; 1/3 counter for `cleanup_stale_worktrees.py misses orphaned dirs` unchanged).
+
+- **G-rule watch:**
+  - **NEW: `outbox-notifier:reject not in alert-translations.json`: 1/3** (this iter, first occurrence). At 3/3: dispatch to Beacon to add `intent:reject` under `outbox-notifier` source in `config/alert-translations.json` as Tier-3/FYI (by-design pipeline outcome; routing to Beacon is the system's resolution; no Larry action needed). Batch with other outbox-notifier G-rules.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Monitoring; 3 stale worktrees present (all within expected GC window).
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=652, systemic_fixes=4, verification_pending=2, ratio≈109.0, trend=flat.
+
+- **Calibration note: `intervention_id` empty in iters 767–768 ledger rows.** Ledger rows for iters 767 and 768 show `intervention_id: ""` — the pre-PR#279 rows (iter 764–766) had `pulse-cycle-check:iter-N`. Root cause: the cycle invocations use legacy `--payload` path; `canonical_intervention_id()` (PR #279) only fires when `--template/--detail` are passed. The run_cycle.sh wrapper and interactive cycle prompt need updating to use `--template cycle-check --detail "iter=<N>"`. This is Phase B / Phase C work — the foundation landed in PR #279, but the call sites haven't been updated yet. Not urgent; ledger remains structurally correct.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Periodic: Check I sentinel exists (fired 00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync clean; no duplicate tasks; new alert Tier 4 but expected-by-design (no dispatch needed). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 769` → appended.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. Forge rejection for `pulse-triage-phase-a-foundation-001` is expected-by-design pipeline plumbing (Phase A already shipped via PR #279; Beacon has the notify file). No Larry action needed. No new Larry-visible issues.
+
+**Patterns:**
+- **NEW G-rule 1/3: `outbox-notifier:reject not in alert-translations.json`.** First ever `intent=reject` from `outbox-notifier` in larry-alerts.jsonl. Forge correctly preflight-rejected a stale spec. This is a routine pipeline outcome (Forge identifies duplicate work; Beacon gets the notify; spec gets revised or set aside). The pattern is: when a Beacon spec is built against a pre-merge state of the repo, and the targeted work lands before the build task is dispatched, Forge will reject at preflight. This is expected behavior, not a failure — but it produces a Tier-4 novel alert every time until the allowlist entry is added. At 3/3: dispatch Beacon to add `reject` as Tier-3/FYI under `outbox-notifier` source in alert-translations.json.
+- **`pulse-triage-phase-a-foundation-001` pipeline status: CLOSED-REJECTED.** Beacon will receive the notify file and decide whether to (a) produce a narrow follow-up spec scoped only to the controlled-vocabulary hardening (`uncategorized` fallback for unknown templates), or (b) set aside. Forecast: Beacon produces a narrow Phase A.2 spec for the vocab hardening gap; Phase B (Check 0 durable triage) and Phase C (promotion loop) can proceed independently.
+- **Empty `intervention_id` in post-PR#279 ledger rows.** The `canonical_intervention_id()` introduced in PR #279 is not being called by the current cycle invocations (legacy `--payload` path). Phase B work (or a standalone config update to run_cycle.sh) needs to wire `--template cycle-check --detail "iter=<N>"` into the ledger append calls.
+
+**Learned:** Forge's preflight is correctly catching spec-vs-repo staleness (Phase A spec written pre-PR#279; PR #279 IS Phase A). The pipeline handles it cleanly (reject → notify Beacon → Beacon decides next move). The gap is the alert-translations.json allowlist not covering `reject` as a Tier-3 by-design outcome. One more occurrence and I'll have a second data point; at 3/3 dispatch to Beacon.
+
+---
+
 ## Iteration 768 — 2026-06-03 17:06 UTC (interactive)
 
 **Health:** ✅ Pipeline clear — Tier 1, consecutive_clean=0 (structural: cooldown residue 182). Alert watermark: **1184 lines / anchor 17:02:17Z** (+1 from iter 767 — Tier 3/known-pattern, no action). Sync: ✅ status=no-change, commit=702080d, last_sync=17:04:24Z. Healer heartbeat: **16:52:19Z** (~14 min old; ✅ within 90-min threshold). **7/7 core services active.** **PR #281 MERGED** (17:02:17Z — "fix(notifier): enforce canonical Mirror verdict marker — kick back prose verdicts instead of silent-dropping"). **0 open PRs (both repos). All 3 inboxes EMPTY.** Worktrees: **2** (both stale post-PR#277-merge; PR#281 worktrees torn down at merge — event-driven teardown ✅).
