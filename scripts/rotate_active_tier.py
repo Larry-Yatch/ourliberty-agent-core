@@ -454,7 +454,29 @@ def tick(now=None, models_file=None, logger=None):
         drain_start = (_parse_iso(state.get('next_switch_due'))
                        or _parse_iso(state.get('since'))
                        or now)
-        if in_flight_clear and no_open_seq:
+        # Has the drain run past its cap? Computed up-front because the cap now
+        # gates the flip itself, not just the defer path below.
+        max_drain = int(cfg.get('max_drain_minutes',
+                                _DEFAULTS['max_drain_minutes']))
+        since = _parse_iso(state.get('since')) or now
+        elapsed = now - since
+        max_drain_exceeded = elapsed > timedelta(minutes=max_drain)
+        # Force-complete the flip when the ONLY thing still blocking it is an
+        # open build sequence (no in-flight work) and we've waited past
+        # max_drain. The "never force-kill in-flight work" rule protects
+        # IN_FLIGHT_DIR leases only; an open sequence with no in-flight lease
+        # is merely PAUSED between steps and resumes safely on the post-flip
+        # tier (sequences are tier-agnostic). Blocking the flip on it forever
+        # was the 2026-06-02 deadlock: drain opened, in_flight was clear, but
+        # the `approvals-queue-rework` sequence stayed open — and an open
+        # sequence can only advance by dispatching new top-level tasks, which
+        # the drain gate blocks. A closed loop that deferred for 1228 min.
+        # Below max_drain we still PREFER to wait (preserve the
+        # don't-flip-mid-sequence intent); past it we force so this can NEVER
+        # deadlock again.
+        forced_open_seq = (in_flight_clear and not no_open_seq
+                           and max_drain_exceeded)
+        if in_flight_clear and (no_open_seq or max_drain_exceeded):
             # FLIP — set new tier, reset window, clear draining. The order
             # matters: set_tier() stamps `since`; set_next_switch_due() pins
             # the next deadline; set_draining(False) opens the gate. A
@@ -503,7 +525,8 @@ def tick(now=None, models_file=None, logger=None):
                 action='switch',
                 from_tier=tier,
                 to_tier=next_tier,
-                trigger='window_elapsed_drain_complete',
+                trigger=('max_drain_forced_open_sequence' if forced_open_seq
+                         else 'window_elapsed_drain_complete'),
                 rolling_5h_tokens=usage,
                 threshold=threshold,
                 drained_after_sec=(now - drain_start).total_seconds(),
@@ -514,16 +537,16 @@ def tick(now=None, models_file=None, logger=None):
                 'from_tier': tier,
                 'to_tier': next_tier,
                 'next_switch_due_minutes': window_min,
+                'forced_open_sequence': forced_open_seq,
             }
             logger.info('rotation flip: ' + json.dumps(result))
             return result
 
-        # Drain still pending. Has the timeout elapsed?
-        max_drain = int(cfg.get('max_drain_minutes',
-                                _DEFAULTS['max_drain_minutes']))
-        since = _parse_iso(state.get('since')) or now
-        elapsed = now - since
-        if elapsed > timedelta(minutes=max_drain):
+        # Drain still pending. If we're here with max_drain exceeded, the flip
+        # gate above did NOT fire — which now means in-flight work is present
+        # (an open sequence alone would have force-flipped). DEFER: never
+        # force-kill in-flight leases.
+        if max_drain_exceeded:
             # DEFER — log + leave draining=true. Never force-kill. Next tick
             # will re-evaluate; eventually the in-flight work finishes (or
             # Larry's operator action clears it) and the flip lands.
@@ -531,7 +554,7 @@ def tick(now=None, models_file=None, logger=None):
                 action='drain-defer',
                 from_tier=tier,
                 to_tier=tier,
-                trigger='max_drain_minutes_exceeded',
+                trigger='max_drain_minutes_exceeded_in_flight_present',
                 rolling_5h_tokens=usage,
                 threshold=threshold,
                 drained_after_sec=(now - drain_start).total_seconds(),
