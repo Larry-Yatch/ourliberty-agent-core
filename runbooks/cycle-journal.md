@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 787 — 2026-06-03 19:53 UTC (interactive)
+
+**Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 49th total). Alert watermark: **1217 lines / anchor 19:48:21Z** (+1 from iter 786's 1216/19:26:06Z — 1 new Tier 3 FYI). Cooldown residue: **199** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=86b716c, last_sync=19:47:44Z. Healer heartbeat: **19:23:21Z** (~30 min old; ✅ within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: Mirror review dispatched; #289: Mirror rev1 review dispatched). **Forge: EMPTY** (all 3 iter-786 tasks consumed). Mirror: 2 tasks (review-install-drift-emission-fix-001, review-pulse-check-liveness-watcher-001-rev1). Beacon: EMPTY. Worktrees: **7** (net 0: wt-forge-dashboard-rotation-switch-001 torn down on PR #290 merge; wt-mirror-install-drift-emission-fix-001 added).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1217 lines** — anchor 19:48:21Z. +1 from iter 786 (1216/19:26:06Z). New alert: `outbox-notifier:review-pass` for PR #290 ("feat(rotation): dashboard Auto/Off switch via runtime override file") — auto-merged, branch deleted. `review-pass` is Tier 3 FYI (allowlist, PR #264 merged iter 668). No Tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 199** (unchanged from iter 786). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:23:21Z** (~30 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=f4337bb "feat(rotation): dashboard Auto/Off switch via runtime override file (#290)". Newer than iter 786 HEAD (4cfe770); PR #290 auto-merged since iter 786. ✅
+
+- **(Check B) Sync health: ⚠️ status=error.** message="Auto-commit push failed; rolled back", commit=86b716c, last_sync=19:47:44Z. Session-start HEAD (f4337bb) newer than sync.json commit (86b716c) → wrapper push succeeded after sync service raced and rolled back. **SYNC-PUSH-REBASE-FALLBACK — 49th total occurrence.** Self-recovering: hourly `ourliberty-sync.timer` will self-clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (structural). **Tier-reset: yes.** ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Excellent pipeline throughput since iter 786 (11 min gap).**
+  - **PR #290 MERGED** ("feat(rotation): dashboard Auto/Off switch via runtime override file"): auto-merged ~19:48Z. Mirror approved `dashboard-rotation-switch-001` build; 56 tests passing, 0 regressions. Event-driven worktree teardown: wt-forge-dashboard-rotation-switch-001 gone. ✅
+  - **PR #289 OPEN** ("feat(pulse): pulse-check liveness watcher"): CLEAN/MERGEABLE, created 19:27:01Z (~26 min old). Forge addressed Mirror's revision (dispatched since iter 786); Mirror now has `review-pulse-check-liveness-watcher-001-rev1.json` for rev1. Pipeline advancing. ✅
+  - **PR #285 OPEN** ("fix(heal-install-drift): non-imperative healed subject + 3-way unit classifier"): CLEAN/MERGEABLE, created 18:49:39Z (~64 min old). Forge completed retry build (MalformedForgeMarker resolved); Mirror now has `review-install-drift-emission-fix-001.json`. Pipeline advancing. ✅
+  - Forge inbox: **EMPTY** (all 3 iter-786 tasks consumed: build-dashboard-rotation-switch-001 → PR #290 merged; build-install-drift-emission-fix-001 → retry build done; revision-pulse-check-liveness-watcher-001-1 → rev1 under Mirror review). ✅
+  - Mirror inbox: **2 tasks** (review-install-drift-emission-fix-001, review-pulse-check-liveness-watcher-001-rev1). Beacon: EMPTY. Dashboard repo: 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts since iter 787 watermark (19:48:21Z). Forge built 2 tasks + 1 revision since iter 786; cost expected. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 7** — stale: `wt-forge-harden-ledger-intervention-tagging-001`, `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-install-drift-emission-fix-001`, `wt-forge-pulse-check-liveness-watcher-001`, `wt-mirror-install-drift-emission-fix-001`, `wt-mirror-pulse-check-liveness-watcher-001`. Net 0 from iter 786: wt-forge-dashboard-rotation-switch-001 torn down (PR #290 merge); wt-mirror-install-drift-emission-fix-001 added (Mirror review started). ✅
+
+- **G-rule watch (all unchanged from iter 786):**
+  - `pulse-check-stale:*` not in alert-translations.json: **1/3** (iter 784). Unchanged.
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784). Unchanged.
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776). Unchanged.
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776). Unchanged.
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775). Unchanged.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=670, systemic_fixes=4, verification_pending=2, ratio=167.5, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: +1 Tier 3 FYI (outbox-notifier review-pass → PR #290 auto-merged). Watermark updated 1216/19:26:06Z → 1217/19:48:21Z. ✅
+3. Check E: PR #290 merged, Forge inbox cleared. Both open PRs now under Mirror review. No always-allowed auto-fixes triggered (both PRs in active review pipeline; Mirror gate in progress). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 787 --template pulse-cycle-check --detail iter-787` → intervention_id=pulse-cycle-check:iter-787, ts=2026-06-03T19:53:04Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T19:53:05Z. ✅
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. SYNC-PUSH-REBASE-FALLBACK structural (49th, APPROVAL_REQUEST open). No new alert subjects. Pipeline advancing with excellent throughput. No Larry DM warranted.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK (49th).** Structural. Same self-recovering race on every interactive cycle session. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the fix.
+- **Forge throughput: 3 tasks completed in ~11 min** (since iter 786). build-dashboard-rotation-switch → PR #290 merged; build-install-drift-emission-fix retry → Mirror dispatched; revision-pulse-check-liveness-watcher → Mirror rev1 dispatched. This is high throughput; Forge bot performing well.
+- **PR #285 (install-drift) finally reaching Mirror review after 65+ min.** Timeline: Forge built original PR #285 at 18:49Z → MalformedForgeMarker → retry dispatched iter 784 → Forge consumed retry ~19:48Z → Mirror review-install-drift-emission-fix-001 dispatched. Self-healing path worked as designed.
+
+**Learned:** Nothing new. Consistent with steady-state Tier 1 structural (SYNC-PUSH-REBASE-FALLBACK). Pipeline throughput remains healthy — 3 Forge completions + 1 PR merge in an 11-minute window is operating at near-maximum throughput given the single-agent-per-task constraint.
+
+---
+
 ## Iteration 786 — 2026-06-03 19:42 UTC (interactive)
 
 **Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 48th total). Alert watermark: **1216 lines / anchor 19:26:06Z** (UNCHANGED from iter 785 — no new alerts). Cooldown residue: **199** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=f53a65b, last_sync=19:40:22Z. Healer heartbeat: **19:23:21Z** (~19 min old; ✅ within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: retry build active in Forge inbox, no Mirror review; #289: Mirror review complete, revision dispatched to Forge). **Forge: 3 tasks** (build-dashboard-rotation-switch-001 + build-install-drift-emission-fix-001 + revision-pulse-check-liveness-watcher-001-1). Mirror: EMPTY (completed review of PR #289). Beacon: EMPTY. Worktrees: **7** (−1 from iter 785: wt-forge-alert-fix-first-outcome-routing-001 torn down by GC).
