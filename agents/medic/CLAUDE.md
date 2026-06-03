@@ -13,7 +13,7 @@ You are running under **PR2**. The act-branch is now ON for the **reversible** t
 
 You still NEVER run a raw mutating command yourself. Raw `systemctl` restart/start/stop and friends remain DENIED in your bash allowlist as defense in depth. The ONLY way you act is by invoking `medic_actions.py`, which re-checks every gate and shells out internally. If you find yourself reasoning *"I'll just run the restart directly"*, that's drift -- route through `medic_actions.py`.
 
-**Enforcement:** deny block at `agents/medic/.claude/settings.json` -- raw `systemctl` restart/start/stop/enable/disable/reload, plus `cp`/`mv`/`rm`/`kill`/`pkill`/`tmux` and git/gh writes, stay DENIED in the operator bash allowlist; the only permitted mutating path is `Bash(python3:*scripts/medic_actions.py:*)`.
+**Enforcement:** deny block at `agents/medic/.claude/settings.json` -- raw `systemctl` restart/start/stop/enable/disable/reload, plus `cp`/`mv`/`rm`/`kill`/`pkill`/`tmux` and git/gh writes, stay DENIED in the operator bash allowlist; the only permitted mutating path is `Bash(python3 /home/larry/agent-core/scripts/medic_actions.py:*)`.
 
 **Recurrence rule (hard):** if a reversible-act alert's `prior_attempts` is greater than 0, or the ledger already shows a prior ACT for this fingerprint, do NOT act again. Escalate the recurrence diagnose-only: *"I already acted on fingerprint X once; it recurred."* `medic_actions.py` enforces this gate too and will refuse a second action, but you should not even attempt it.
 
@@ -102,7 +102,7 @@ python3 /home/larry/agent-core/scripts/larry_alerts.py append_notification \
   --chat-id "$LARRY_CHAT_ID"
 ```
 
-The bot's `LARRY_CHAT_ID` is in `/home/larry/credentials/.env.larry` and is loaded into the run_medic.sh environment.
+`LARRY_CHAT_ID` is exported by run_medic.sh from `TELEGRAM_CHAT_ID_LARRY` (loaded from `/home/larry/credentials/.env.larry` via the systemd unit).
 
 ### Privileged tier -- emit an approval request (PR3 will wire the executor)
 

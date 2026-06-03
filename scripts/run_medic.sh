@@ -66,6 +66,11 @@ PROMPT_BODY="Run the Medic protocol now per the spec in ./CLAUDE.md. The batch o
 # default 10 minutes. On timeout the EXIT trap above releases the lock.
 CLAUDE_TIMEOUT="${MEDIC_CLAUDE_TIMEOUT:-10m}"
 
+# Expose Larry's chat id to the operator under the name CLAUDE.md uses.
+# The systemd unit loads TELEGRAM_CHAT_ID_LARRY via EnvironmentFiles=.env.larry;
+# the Medic escalation CLI requires --chat-id, so alias it here.
+export LARRY_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
+
 if timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
     log "Medic operator completed successfully"
     MEDIC_OK=1
