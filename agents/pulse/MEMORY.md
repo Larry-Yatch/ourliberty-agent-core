@@ -6,26 +6,26 @@
 
 ---
 
-## Status snapshot — updated 2026-06-03 05:58Z UTC (Iter 679 — interactive)
+## Status snapshot — updated 2026-06-03 06:09Z UTC (Iter 680 — interactive)
 
-**System: ⚠️ Recovery in progress — Tier 1, consecutive_clean=0.** Alert watermark: **1215** (+2 iter 679; 1 Tier-4 beacon-restart gap + 1 Tier-3 review-pass PR #274). Healer heartbeat: **05:50:08Z** (within 90-min threshold; beacon-bot auto-restarted with PR #267 code). Cooldown/warning: **164** files (unchanged). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (05:53:37Z; self-recovering). **7/7 services active.** Forge inbox: **EMPTY** (PR #274 merged). Mirror inbox: **1 task** (review-orchestrator-bootstrap-runbook-rev1 → PR #270 OPEN, docs). Beacon inbox: EMPTY. **Burn-rate: 82%/10M (Tier 3; last alert ~04:46:30Z; easing post-PR-#274 build complete).** Check III 2026-06-14. Worktrees: **21** (−2; PR #269 + #274 teardowns fired ✅). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open.
+**System: ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC pending).** Alert watermark: **1225** (+10 iter 680; all Tier 3 known-pattern). Healer: stale-daemon timer active+waiting. Cooldown/warning: **172** files (+8). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 37th total (self-recovering). **7/7 core services + 4 new timers active.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** — pipeline fully quiescent (first time in many iters). Burn-rate: monitoring (no new alert since 04:46:30Z). Check III 2026-06-14. Worktrees: **19** (−2; teardown working). APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open.
 
-**Watch items (iter 679 update):**
+**Watch items (iter 680 update):**
+- ~~**PR #270 OPEN; Mirror reviewing rev1.**~~ **PR #270 MERGED (iter 680, 05:56:07Z).** "docs(runbooks): orchestrator-bootstrap-runbook" — Mirror approved rev1. Auto-merged. Watch item CLOSED. ✅
 - ~~**PR #269 OPEN in Mirror review (iter 677).**~~ **PR #269 MERGED (iter 678, 05:45:00Z).** Drain-deadlock root fix LIVE. Watch item CLOSED. ✅
 - ~~**`build-fix-tier2-probe-setup-token-auth.json`.**~~ **PR #267 MERGED (iter 677, 05:29:21Z).** Root fix for `tier2_weekly_probe_failed` false alarms. Watch item CLOSED. ✅
-- ~~**Stale worktrees: 20 total.**~~ **PR #266 MERGED (iter 676).** Event-driven teardown LIVE. Worktrees: **21** (−2 from iter 678; PR #269 + #274 auto-teardowns fired ✅). Hourly GC pending daemon-reload. Watch item → MONITOR. ⚠️
-- **`orchestrator-bootstrap-runbook` — PR #270 OPEN; Mirror reviewing rev1.** `review-orchestrator-bootstrap-runbook-rev1.json` in Mirror inbox. Active review. Watch for Mirror approval + auto-merge. ⚠️
-- ~~**`build-step-digest-card.json` (N6).**~~ **PR #32 MERGED on ourliberty-dashboard (iter 677).** approvals-queue-rework N6 COMPLETE. Watch item CLOSED. ✅
-- ~~**PR #259 MERGED (03:34:10Z, auto-cycle always-fix).**~~ Watch item CLOSED.
+- ~~**Stale worktrees: 20 total.**~~ **PR #266 MERGED (iter 676).** Event-driven teardown LIVE. Worktrees: **19** (−2 from iter 679). Hourly GC timer active. CLOSED. ✅
+- ~~**`build-step-digest-card.json` (N6).**~~ **PR #32 MERGED on ourliberty-dashboard (iter 677).** CLOSED. ✅
+- **NEW (iter 680): 4 new timer service groups auto-installed.** `ourliberty-ceo-digest-daily`, `ourliberty-ceo-digest-weekly`, `ourliberty-chain-events-retention`, `ourliberty-promote-alerts` — all timers active+waiting. Verification: timers fire on schedule. ⚠️ MONITOR.
 - **step-ops-alerts-ui BUILD DONE (Vercel preview live).** Deployed 03:12:11Z. marker-error-step-ops-alerts-ui-1.json retry queued (retry 1/3). UNCHANGED.
 - **MalformedForgeMarker — 8th total lifetime (iter 668).** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
 - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] escalation idx=9 stands).
-- **`heal-stale-daemon-code:auto-restarted:*` still untranslated.** idx 1206 (iter 677) + idx 1214 (iter 679) both untranslated beacon-bot restart alerts. G-rule dispatched 3/3 iter 592, Beacon consumed iter 594, Forge brief STILL MISSING. `alert-xlate-outbox-success-fyi-001` task status unclear. Close when PR covering `heal-stale-daemon-code` source merges.
+- **`heal-stale-daemon-code:auto-restarted:*` still untranslated.** G-rule dispatched 3/3 iter 592, Beacon consumed iter 594, Forge brief STILL MISSING. `alert-xlate-outbox-success-fyi-001` task status unclear. Close when PR covering `heal-stale-daemon-code` source merges.
 - **`mirror-dag-pass:*` G-rule** — included in PR #264 (merged iter 668). CLOSED. ✅
-- ~~**`medic-ratewindow-cooldown-primary-001.json` — in Forge preflight (iter 677).**~~ **PR #274 MERGED (iter 679, 05:54:17Z).** "fix(medic): gate `_rate_window_ok()` solely on `cooldown_until`; demote soft count to INFO." Medic false-deferral during interactive sessions ELIMINATED. Watch item CLOSED. ✅
+- ~~**`medic-ratewindow-cooldown-primary-001.json`.**~~ **PR #274 MERGED (iter 679, 05:54:17Z).** Medic false-deferral ELIMINATED. Watch item CLOSED. ✅
 - **PR #268 MERGED (iter 677, 05:36:47Z).** "fix(medic): correct escalation allowlist patterns + wire LARRY_CHAT_ID." Watch item CLOSED. ✅
-- **PR #273 MERGED (pre-iter-678).** "fix/reenable-rotation-deadlock-fixed" — Larry re-enabled account rotation post-PR-#269 drain fix. In main history. ✅
-- **PR #275 MERGED (pre-iter-678).** "fix(tier2): make agent_runner fallback gate setup-token aware (close last gap)." In main history. ✅
+- **PR #273 MERGED (pre-iter-678).** "fix/reenable-rotation-deadlock-fixed." In main history. ✅
+- **PR #275 MERGED (pre-iter-678).** "fix(tier2): make agent_runner fallback gate setup-token aware." In main history. ✅
 - **NEW calibration: `priority: "medium"` is NOT a valid dispatch priority.** Allowed values: `founder-vision | normal | low | urgent`. Always use `"normal"` for G-rule dispatches. Dead-letter recovery catches the rejection but adds latency. Write "normal" from the start.
 - **NEW calibration (iter 670): Pulse→Beacon `cycle-finding-*` dispatches must NOT include a `phase` field.** Validator allowed set: `['build', 'preflight', 'review', 'revision', 'routing-signal']` — none applies to a Beacon spec request; "spec" is explicitly rejected. Prior successful dispatches (stale-daemon, sentinel-inbox-stall) had no `phase`. **Rule: omit `phase` entirely in all Pulse→Beacon dispatches.**
 
@@ -101,6 +101,8 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 
 - **larry-alerts.jsonl path (confirmed iter 342).** File is at `~/agents/blackboard/larry-alerts.jsonl`, NOT `~/agents/larry-alerts.jsonl`. Check 0 commands must use the blackboard path. Using the wrong path silently fails (exit code 1, no output).
 
+- **`heal-systemd-install-drift` alerts are Tier 3 known-pattern in Check 0 (confirmed iter 680).** Both `install-drift:*` (severity URGENT) and `stuck-timer:*` (severity FYI) are registered in `config/alert-translations.json` under the `heal-systemd-install-drift` source key. Gate 1 in the Check 0 classification table (allowlist match → Tier 3 silence) fires for both. Do NOT classify these as Tier 4 novel — they're pre-approved. The "URGENT" severity in the JSON is the outbox-notifier delivery tier, not the Pulse Check 0 alert tier. When the healer auto-remediates install-drift, verify the units are active before logging as clean.
+
 - **beacon_telegram_sessions.json format (confirmed iter 396).** File is a flat dict `{chat_id: session_id}` — NOT `{sessions: {…}}`. Python read: `d = json.load(f); count = len(d)`. Checking `d.get('sessions', {})` returns empty dict and gives 0 sessions (wrong). File at `~/agents/state/beacon_telegram_sessions.json`.
 
 - **One-shot services: ActiveEnterTimestamp='' for stale-daemon-code healer (iter 478).** heal-stale-daemon-code healer checks `ActiveEnterTimestamp` to determine when a service last started. One-shot services (`Type=oneshot`) have empty `ActiveEnterTimestamp` after completing and going inactive — even if `ExecMainStartTimestamp` is populated. The healer classifies these as "unparseable" and skips the restart decision. **Implication:** stale-daemon-code auto-restart (and the associated WARNING log) only fires for persistent daemons. Predictions about G-rule 3/3 triggers must account for service type.
@@ -133,7 +135,7 @@ Pulse can only dispatch to Beacon — HARD_TOPOLOGY in `routing_validator.py` li
 - `heal-pr-auto-merge blind to CONFLICTING`: G-rule 2/3 (iters 127, 128). Next occurrence → dispatch to Beacon.
 - `heal-pipeline-stall "369 min" duration bug`: G-rule 1/3 (iter 128). Mirror PASS timestamp vs PR-creation timestamp mismatch.
 - `inbox-watcher rc=-1`: G-rule 2/3 (iters 117, 123). healer's 30s timeout shorter than service startup time. Next occurrence → dispatch to Beacon.
-- `daemon-reload triggers cycle.timer stuck (post-PR#225)`: G-rule 1/3 (iter 317, 06:00:20Z UTC). Healer auto-healed. Likely install-time daemon-reload side effect. 2 more occurrences → dispatch to Beacon: "install-drift healer should restart ourliberty-cycle.timer after daemon-reload."
+- `daemon-reload triggers cycle.timer stuck (post-PR#225)`: G-rule **2/3** (iter 317 = 1/3; iter 680 = 2/3; 06:00:24Z — rapid multi-daemon-reload from install-drift healer blanked cycle.timer anchor). Healer auto-healed both times. Next occurrence → dispatch to Beacon: "install-drift healer should checkpoint ourliberty-cycle.timer NextElapse after each daemon-reload and restart if anchor blanked."
 - `stale-daemon-healer missing daemon-reload guard before restart`: G-rule 1/3 (iter 361, 2026-06-01T10:08Z). Medic 20th run alerts 1108+1109: stale-daemon healer called `systemctl restart` without `daemon-reload` → rc=5 (unit not found). PR #212 added this guard for timer recovery; stale-daemon healer lacks it. 2 more occurrences → dispatch to Beacon: "add daemon-reload before restart in stale-daemon healer, per PR #212 pattern."
 - ~~`systemd install-drift`~~: G-rule **CLOSED iter 213** — PR #223 "feat(healer): auto-remediate install-drift missing-install case" merged 2026-05-31T17:18:50Z. Systemic fix live: healer now auto-remediates missing-install via `_remediate_missing_install` with post-verify gate. Future occurrences handled automatically.
 - ~~`cycle.timer stuck pattern`~~: G-rule **CLOSED iter 304**. PR #225 "Fix ourliberty-cycle.timer NextElapse=infinity wedge: oneshot→simple" merged. Timer switched from OnUnitActiveSec (infinity-trap susceptible) to `OnCalendar=*:0/5, Persistent=true` (wall-clock anchor, guaranteed next-fire). First automated cycle post-fix confirmed running 04:25:32Z UTC. Systemic fix recorded in permanent-fixes section.

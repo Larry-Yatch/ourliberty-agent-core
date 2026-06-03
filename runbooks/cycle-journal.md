@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration 680 — 2026-06-03 06:09 UTC (interactive)
+
+**Health:** ✅ Quiescent — Tier 1, consecutive_clean=0 (sync error structural; cooldown GC gap persists). Alert watermark: **1225** (+10 from 1215). Healer heartbeat: stale-daemon timer active+waiting (last beacon-bot restart 05:50:09Z — within 90-min threshold). Sync: ⚠️ status=error (SYNC-PUSH-REBASE-FALLBACK-001 37th total, 05:53:37Z; self-recovering; session HEAD=cb278a9 newer than sync commit). **7/7 core services active + 4 new timers auto-installed.** Forge inbox: **EMPTY**. Mirror inbox: **EMPTY**. Beacon inbox: **EMPTY**. **0 open PRs** (PR #270 merged 05:56:07Z — all PRs shipped). Worktrees: **19** (−2 from iter 679's 21; event-driven teardown working). Cooldown residue: **172** (+8).
+
+**Major pipeline advance since iter 679:**
+- **PR #270 MERGED** (05:56:07Z) — "docs(runbooks): orchestrator-bootstrap-runbook" — Mirror approved rev1 (single string fix: `dag-preflight-pass-kickoff`, matching outbox_notifier.py:2554). Auto-merged + branch deleted. `orchestrator-bootstrap-runbook` watch item CLOSED. ✅
+- **4 new timer service groups auto-installed** by heal-systemd-install-drift (06:00:13–06:00:21Z): `ourliberty-ceo-digest-daily`, `ourliberty-ceo-digest-weekly`, `ourliberty-chain-events-retention`, `ourliberty-promote-alerts`. All 4 timers confirmed active+waiting. ✅
+- **`ourliberty-cycle.timer` stuck-trap + auto-heal** (06:00:24Z): infinity trap fired during daemon-reload cascade; healer restarted. Timer now running (this session). G-rule `daemon-reload triggers cycle.timer stuck` advances to **2/3**. ⚠️
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1225 lines** (+10 from watermark 1215). All 10 are Tier 3 known-pattern (in `config/alert-translations.json`). **No tier-reset from Check 0.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ All 10 new alerts are Tier 3 known-pattern.**
+  - idx 1216: `outbox-notifier / intent=review-pass` (05:56:07Z) — Mirror approved PR #270 (orchestrator-bootstrap-runbook). **Tier 3 silenced** (`review-pass` in allowlist). ✅
+  - idx 1217–1224: `heal-systemd-install-drift / install-drift:*` (06:00:13–06:00:23Z) — 8 install-drift alerts for 4 new service groups (ceo-digest-daily, ceo-digest-weekly, chain-events-retention, promote-alerts). **Tier 3 known-pattern** (`heal-systemd-install-drift` in `config/alert-translations.json`; `install-drift` subject matches). Flood shape (8 alerts in <15 sec); root cause: 3 service groups shipped in recent PRs without install dance; healer auto-remediated all. All 4 timers verified `active+waiting` post-install. Note: healer logged promote-alerts.timer as "failed to auto-install" (idx 1224) but timer is now `active+waiting` at correct FragmentPath — resolved by subsequent daemon-reload from stuck-timer heal at 06:00:24Z. ✅
+  - idx 1225: `heal-systemd-install-drift / stuck-timer:ourliberty-cycle.timer` (06:00:24Z) — infinity trap during daemon-reload cascade (multiple `daemon-reload` calls from install-drift repairs). **Tier 3 FYI** (`stuck-timer` subject in allowlist; classified as near-false-alarm by translations). Timer now `SubState=running` (this cycle session). No action. ✅
+  - Watermark advances to **1225**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 172 (+8 from 164).** The 8 install-drift auto-install events each created a cooldown entry. GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. No new stall otherwise; healer substrate active. ⚠️ (structural; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline fully quiescent.**
+  - **0 open PRs** in both agent-core + ourliberty-dashboard. ✅
+  - **Forge inbox: EMPTY.** ✅
+  - **Mirror inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - This is the first fully-quiescent pipeline state observed in many iters — all build tasks consumed, all PRs merged.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code timer active+waiting. Last restart confirmed: beacon-bot at 05:50:09Z (~19 min before this iter; within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=cb278a9 ("Pulse cycle 20260603T060158Z" — iter 679 cycle commit). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 — 37th total (05:53:37Z).** "Auto-commit push failed; rolled back". Session HEAD cb278a9 (iter 679 cycle, 06:01:58Z) is newer than sync.json commit b9ee4a9 → wrapper already pushed; self-clears on next sync tick. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️ (self-recovering; no new action)
+
+- **(Check C) Agent liveness: ✅ 7/7+ active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. Additionally: ourliberty-ceo-digest-daily.timer, ourliberty-ceo-digest-weekly.timer, ourliberty-chain-events-retention.timer, ourliberty-promote-alerts.timer — all new, all active+waiting. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully quiescent.** 0 open PRs; all inboxes empty. First fully-quiescent state in many iters. ✅
+
+- **(Check F) Cost/quota: ✅ No new burn-rate alert.** Last known: 82%/10M at ~04:46:30Z (~85 min ago). Medic rate-window fix (PR #274) live; interactive load decreasing. Tier 3 — monitoring, no dispatch. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 weekly probe: PR #267 fix live + beacon-bot now running PR #267 code (post-restart at 05:50:09Z). Next probe at ~10:37Z UTC confirms end-to-end. ✅ (pending verification)
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All skip. ✅
+
+- **Worktrees: 19** (−2 from iter 679's 21). PR #270 + earlier teardowns working via event-driven mechanism (PR #266). Hourly GC timer (ourliberty-cleanup-stale-worktrees.timer) active since PR #266; next fire handles remaining stale entries. ✅
+
+- **G-rule watch:**
+  - **`daemon-reload triggers cycle.timer stuck`: now 2/3** (iter 317 = 1/3; this iter = 2/3). Cause: heal-systemd-install-drift ran 4+ daemon-reloads in rapid succession (install-drift remediation for 4 service groups); one of those reloads caught ourliberty-cycle.timer mid-period and blanked its anchor. At **3/3 → dispatch to Beacon**: "install-drift healer should checkpoint cycle.timer NextElapse after each daemon-reload + restart if anchor blanked." ⚠️
+  - **`medic:medic-diagnosis` G-rule: 1/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - **`cycle-blocked:dirty-tree-*` G-rule: 2/3** (no new occurrence). At 3/3 → dispatch Beacon.
+  - **`ledger/weekly 1/3, pulse/check-i 1/3`** — no new occurrences.
+  - **`heal-stale-daemon-code:auto-restarted:*` still untranslated.** Forge brief MISSING. Re-dispatch pending Larry. ⚠️
+  - Other G-rules stable.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7+ active; sync self-recovering; new timers installed by healer autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 680` → ts: 2026-06-03T06:09:22Z. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T06:09:25Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (37th). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. `ourliberty-promote-alerts.timer` — resolved automatically by daemon-reload sequence (active+waiting); no escalation needed.
+
+**Patterns:**
+- **Pipeline fully quiescent for first time in many iters.** 0 open PRs, all inboxes empty, 7 PRs shipped in the preceding 48h window. The system is in a steady-state holding pattern. Next build work will be healer-driven (medic G-rule at 1/3) or Larry-dispatched.
+- **4 service groups auto-installed by healer in one sweep.** ceo-digest-daily, ceo-digest-weekly, chain-events-retention, and promote-alerts were all shipped in recent PRs without the install dance; the heal-systemd-install-drift healer caught up on all of them autonomously. This is the install-drift healer working as designed. No operator action required.
+- **Cooldown residue trending up (+8 this iter = 172 total).** Each healer auto-install generates a cooldown file with no GC. The deploy-notifier GC fix (APPROVAL_REQUEST pending Larry) is the right long-term fix; the near-term trend will stabilize once the healer stops finding new install-drift targets.
+- **daemon-reload triggers cycle.timer stuck at 2/3.** The pattern is clear: rapid multi-daemon-reload sequences (as the install-drift healer does) reliably catch cycle.timer in the infinity-trap momentarily. The healer self-heals, so no system downtime. But at 3/3 a dispatch to Beacon will propose adding a "post-daemon-reload cycle.timer checkpoint" to the install-drift healer.
+
+**Learned:** `config/alert-translations.json` includes `heal-systemd-install-drift` with both `install-drift` (URGENT) and `stuck-timer` (FYI) subjects — these are Tier 3 known-pattern in Check 0. Previously I classified these as Tier 4 novel; correct classification is Tier 3 known-pattern. Future iters: treat install-drift + stuck-timer alerts from this source as Tier 3 silenced. The `ourliberty-promote-alerts.timer` "failed install" in the healer log resolved itself via the subsequent daemon-reload for cycle.timer — transient state artifact, not a real failure.
+
+---
+
 ## Iteration 679 — 2026-06-03 05:58 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Alert watermark: **1215** (+2 from 1213). Healer heartbeat: **05:50:08Z** (~8 min old; ✅ within 90-min threshold; beacon-bot auto-restarted with PR #267 code at this timestamp). Sync: ⚠️ status=error ("Auto-commit push failed; rolled back", 05:53:37Z) — SYNC-PUSH-REBASE-FALLBACK-001 **37th total**; self-recovering (session gitStatus: main+clean). **7/7 services active.** Forge inbox: **EMPTY** (medic task gone — PR #274 merged). Mirror inbox: **1 task** (`review-orchestrator-bootstrap-runbook-rev1.json`). Beacon inbox: EMPTY. **1 open PR** (#270 — orchestrator-bootstrap-runbook docs, Mirror reviewing rev1). Worktrees: **21** (−2 from iter 678; PR #269 + PR #274 auto-teardowns fired ✅).
