@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration 664 — 2026-06-03 03:44 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing: 2 PRs open (#262 + #263), Mirror reviewing #263. Alert watermark: **1191** (UNCHANGED from iter 663). Healer heartbeat: **03:19:40Z** (25 min old at 03:44Z; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (29th total)** — sync.json `status=error` at 03:40:04Z, commit=4a69d61b rolled back; HEAD=41117c8 (iter 663 wrapper) newer → self-recovering. **7/7 services active.** **PR #260 MERGED (03:42:25Z, always-fix).** 2 open PRs: #262 (Mirror revision dispatched; hold) + #263 (CLEAN/MERGEABLE ~3 min; Mirror reviewing). Forge inbox: `alert-xlate-outbox-success-fyi-001` NEW (Beacon brief for outbox-notifier:review-pass + mirror-dag-pass G-rule batch) + 3 marker-error retries (UNCHANGED) + `revision-sentinel-inbox-stall-translation-001-1.json` (Mirror revision for PR #262).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1191 lines** (UNCHANGED from iter 663). 0 new alerts since iter 663 watermark.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1191 lines (UNCHANGED). 0 new alerts since iter 663 watermark. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --since 03:37:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 03:37:00Z` → beacon-bot delivered alert idx=1190 at 03:39:28Z (sync-blocked); no Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (UNCHANGED).** alert-cooldown/warning/: **150 total** (UNCHANGED). 27 heal-pipeline-stall files (stable). No new stall alerts. ⚠️ (structural residue; GC gap ongoing)
+
+- **(Check 4) Pending directives: ⚠️ 2 open PRs; Mirror reviewing #263; revision queued for #262; 3 marker-errors + new Forge build brief.**
+  - **PR #260 MERGED (03:42:25Z).** "feat(retention): chain_events bookkeeping retention job (N2)" — always-fix at 32.7 min. ✅
+  - **PR #262 OPEN — Mirror revision dispatched.** "feat(alerts): translate sentinel inbox-stall as INFO/FYI" — CLEAN/MERGEABLE, created 03:20:19Z. Mirror finding (medium): test embeds production path literal `/home/larry/agents/inboxes/beacon/foo.json` (violates test-isolation-discipline.md). Fix: use tmp_path-derived value. `revision-sentinel-inbox-stall-translation-001-1.json` in Forge inbox. Do NOT auto-merge until revised + re-reviewed.
+  - **PR #263 OPEN — Mirror reviewing.** "fix(medic): delivery gate-at-emission + cooldown-primary rate window + CLI escalation path" — CLEAN/MERGEABLE, created 03:41:18Z (~3 min old). wt-mirror-medic-reliability-gate-delivery-cli-001 active. Threshold ~04:11:18Z. Medic build COMPLETE (~50 min; 4 defects; no escalation).
+  - **NEW: `alert-xlate-outbox-success-fyi-001` in Forge inbox.** Beacon processed G-rule 3/3 dispatch (outbox-notifier:review-pass 3/3 + mirror-dag-pass batched). Forge will add both as Tier-3 FYI to config/alert-translations.json. Watch for PR.
+  - **3 marker-error retries (UNCHANGED):** step-cleanup-review, step-ops-alerts-ui, step-retention (all retry-1/3). ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:19:40Z** (25 min old at 03:44Z; within 90-min threshold; next sweep ~04:19Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=41117c8 ("Pulse cycle 20260603T033941Z" — iter 663 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (29th total).** sync.json: `status=error`, `last_sync=2026-06-03T03:40:04Z`, commit=4a69d61b rolled back. Sync ran ~23s after iter 663 wrapper (03:39:41Z); failed non-FF; rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 2 open PRs; Forge 5 tasks; Mirror 2 worktrees active.** PR #260 MERGED (always-fix). PR #262: Mirror revision dispatched → hold. PR #263: CLEAN/MERGEABLE, Mirror reviewing, threshold ~04:11Z. Forge: `alert-xlate-outbox-success-fyi-001` + 3 marker-error retries + revision for #262. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Medic build ~50 min (complex; 4 defects; completed). PR #263 submitted. All within range. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - **`outbox-notifier:review-pass` 3/3 DISPATCHED (iter 663) → Beacon PROCESSED → Forge task `alert-xlate-outbox-success-fyi-001` queued.** `mirror-dag-pass:*` batched into same task. Close both when Forge PR merges.
+  - **`sentinel/inbox-stall` G-rule fix — PR #262 under revision (1/3).** Mirror found production path literal in test. Forge revising. Close when revised PR merges.
+  - **MalformedForgeMarker — 3 in Forge inbox (retry-1/3, UNCHANGED).** APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9).
+  - `deploy-notifier cooldown GC gap` — 150 files (UNCHANGED). APPROVAL_REQUEST pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I fired iter 637; all other periodic gates closed. Skip.
+3. **Always-fix: `gh pr merge 260 --auto --squash`** → PR #260 MERGED 03:42:25Z. Logged to cycle-actions.jsonl (Bash redirect blocked by session scope; entry recorded inline; wrapper will capture on commit). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 664` → ts: 2026-06-03T03:44:23.772751+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T03:44:24Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 29th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` (Larry approval needed).
+
+**Patterns:**
+- **Medic build COMPLETED (~50 min).** Complex 4-defect fix. PR #263 submitted at 03:41:18Z. Duration consistent with complexity; no escalation needed. Post-iter threshold ~04:11Z for auto-merge if Mirror approves.
+- **Mirror revision for PR #262 (revision-1/3).** Test embedded production path literal — caught by regression gate. Simple targeted fix. Regression gate working as designed; no G-rule warranted.
+- **SYNC-PUSH-REBASE-FALLBACK-001 advanced to 29th total.** Pattern: fires within ~23s of every wrapper push. 100% predictable, 100% self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` is still the highest-priority infra debt (fires every PR merge day, zero misses).
+- **Beacon batched review-pass + mirror-dag-pass G-rules** into one config-only Forge task. Correct behavior for related Tier-3 entries under the same source section.
+
+**Learned:** Beacon's approval-gate path (iter 663: Pulse approved `alert-xlate-outbox-success-fyi-001` as depth=1 gate) wrote the Forge preflight envelope correctly. Forge inbox shows the task. If Forge submits without marker-error, 2 G-rules close in one PR — good throughput. The regression gate in Mirror's review caught a test-isolation violation in PR #262 (production path in test string literal). This is the gate working correctly; no systemic issue.
+
+---
+
+## Iteration 663 — 2026-06-03 03:41 UTC (inter-agent notification)
+
+**Health:** ⚠️ Recovery in progress — Tier 1 (carry-forward from iter 662). Alert watermark: **1191** (+1 since iter 662 watermark of 1190; +2 since iter 662 check of 1189 — 1 sync-blocked:auto-commit-push-failed + 1 other). This iteration is a result-notification response, not a full cycle.
+
+**Event:** Beacon returned result for `cycle-finding-outbox-notifier-review-pass-alert-translations-20260603T033000Z`. This was the G-rule-3/3 dispatch for `outbox-notifier:review-pass not in alert-translations.json` (hit 3/3 at iter 663 per MEMORY; Beacon inbox consumed it between iters 662–663).
+
+**Beacon's finding:**
+- Traced `review-pass` and `mirror-dag-pass:*` to ground truth: both are `source=outbox-notifier` success events. `review-pass` = Mirror-PASS-then-auto-merge (routine build-completion path). `mirror-dag-pass:<seq-id>` = Mirror DAG preflight PASS emitted at `scripts/outbox_notifier.py:2598` (prefix-strip rule matches bare `mirror-dag-pass`).
+- Confirmed both belong in existing `outbox-notifier` section of `config/alert-translations.json` (currently holding only `auto-merge-queue-corrupt`). Batched per Pulse's suggestion (two FYI entries, same source section, config-only).
+- Produced APPROVAL_REQUEST for a `doc-only` Forge PR (`task_type: doc-only`, routed back to Pulse as approval gate per ROUTING CONSTRAINT).
+- **Important nuance:** `review-pass` closing DM is queued via `append_notification` (intent-keyed, `kind: "notification"`, no `subject` field) → renders through intent path, not `translate_alert`. The allowlist entry stops Pulse's Check 0 from flagging the event but does NOT alter how the closing DM renders. If Larry later wants that DM suppressed/relabeled, that is a separate notification-render change.
+
+**Did:**
+1. Approved APPROVAL_REQUEST `alert-xlate-outbox-success-fyi-001` — Pulse is the depth=1 approval gate for this Pulse-originated Beacon task (doc-only, config-only; within authority).
+2. Dispatched Forge preflight envelope: `~/agents/inboxes/forge/alert-xlate-outbox-success-fyi-001.json`. Source=beacon, approved_by=pulse, phase=preflight. Forge will read `config/alert-translations.json`, emit PROCEED/CLARIFY_REQUEST/REJECT, then outbox-notifier handles build dispatch.
+3. Wrote this journal entry.
+
+**G-rule state updates:**
+- `outbox-notifier:review-pass not in alert-translations.json`: **3/3 → DISPATCHED**. Beacon spec produced; Forge preflight queued. Close this watch item when PR merges.
+- `outbox-notifier:mirror-dag-pass subject not in alert-translations.json`: **1/3 → DISPATCHED (batched)**. Beacon batched mirror-dag-pass with review-pass (same source, same section, config-only scope). Watch item advanced to DISPATCHED. Close when same PR merges.
+
+**Escalated:** None. This is a routine approval-gate action within Pulse's authority.
+
+---
+
 ## Iteration 662 — 2026-06-03 03:24 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline throughput continues post-OAuth restore: 4 PRs now open (#259 + #260 + #261 + #262). 2 new PRs since iter 661: #261 (fix-advancer reconcile gh-failure, Forge build COMPLETE, Mirror reviewing) + #262 (sentinel inbox-stall translation, Forge build COMPLETE). Alert watermark: **1189** (UNCHANGED — 0 new alerts). Healer heartbeat: **03:19:40Z** (ADVANCED from 02:49:19Z — swept as predicted; ~4.5 min old at check; next sweep ~04:19Z). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (27th total)** — sync.json `status=error` at 03:23:54Z, commit=b9779a53fe rolled back; session-start HEAD=2102904 (wrapper for iter 661, ~03:23:25Z) is newer → self-recovering. **7/7 services active.** Forge inbox: **4 tasks** (medic build still active + 3 marker-error retries). Mirror: **reviewing PR #261** (wt-mirror-fix-advancer-reconcile-gh-failure active).
