@@ -284,5 +284,13 @@
       "plain_language_summary": "The pre-push soft validator (validate_agent_core.py) flagged an error on the commit that was about to push to origin/main. This is a SOFT gate -- the push was NOT blocked, so the commit went through; this is a review-when-convenient signal, not a chain stop. The subject carries the short SHA of the flagged commit.",
       "recommended_action": "ssh ourliberty-vm, cd ~/agent-core, run `python3 scripts/validate_agent_core.py` to see what the validator flagged. Duplicate failures with the same fingerprint are suppressed, so a repeat means a new or changed failure. Fix on origin/main when convenient."
     }
+  },
+  "sentinel": {
+    "inbox-stall": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Sentinel detected an inbox task waiting longer than the stale threshold. This is expected during Tier 2 OAuth expiry -- agent processing is blocked and tasks accumulate. Beacon-bot delivers the DM, but no new action is needed beyond what is already pending.",
+      "recommended_action": "None. The task is waiting because agent processing is OAuth-blocked. Root cause: restore Tier 2 OAuth per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. Tasks will process automatically once OAuth is restored."
+    }
   }
 }
