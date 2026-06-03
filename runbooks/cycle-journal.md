@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 665 — 2026-06-03 03:57 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **2 new PR merges since iter 664:** PR #259 (03:34:10Z, auto-cycle always-fix) + PR #262 (03:53:38Z, Mirror approved revision-1). 1 open PR (#263 under Mirror revision). Alert watermark: **1192** (+1 from 1191). Healer heartbeat: **03:49:49Z** (fresh — confirmed by dashboard-api auto-restart event). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (30th total)** — sync.json `status=error`, `last_sync=2026-06-03T03:50:58Z`, commit=dfb2e958 rolled back; self-recovering. **7/7 services active.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1192 lines** (+1 from 1191). New alert: `auto-restarted:ourliberty-dashboard-api.service` at 03:49:51Z (heal-stale-daemon-code swept, found dashboard_api.py mtime newer than service-start by 4577 min post-PR-#259). Tier 4 (novel — `auto-restarted:*` not yet in alert-translations.json); however G-rule 3/3 was dispatched (iter 592), systemic fix Forge brief is MISSING pending Larry go-ahead (existing [yellow] idx=9). No duplicate DM. Journal note only; watermark advanced to 1192.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier 4 — by-design; no duplicate DM).** 1192 lines (+1). New: `auto-restarted:ourliberty-dashboard-api.service` (03:49:51Z) — heal-stale-daemon-code auto-restarted dashboard-api because `scripts/dashboard_api.py` mtime was newer than service-start by 4577 min (PR #259 shipped updated code). Correct healer behavior. `auto-restarted:*` NOT in alert-translations.json; G-rule 3/3 dispatched but Forge brief MISSING (pending Larry go-ahead; [yellow] idx=9 stands). Cooldown: 151 total (+1). No new DM — existing escalation covers. ⚠️ (by-design; systemic fix pending Larry approval)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 03:44:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon delivered alerts (PR #261 review-pass at 03:49Z). No Larry directives. No agent-distress keywords. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (+1).** alert-cooldown/warning/: **151 total** (+1 from 150 — new auto-restart cooldown). 27 heal-pipeline-stall files (UNCHANGED). GC gap ongoing (APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z`). ⚠️ (structural residue)
+
+- **(Check 4) Pending directives: ⚠️ Active pipeline; 1 open PR under revision.**
+  - **PR #259 MERGED (03:34:10Z).** "feat(dashboard): agent-reviewed cleanup-review button (N1/L8)" — merged by automated cycle always-fix at ~03:34:10Z (30-min threshold was ~03:33:56Z, 14s window). ✅ Watch item CLOSED.
+  - **PR #262 MERGED (03:53:38Z).** "feat(alerts): translate sentinel inbox-stall as INFO/FYI" — Mirror reviewed revision-1 (fixed production path literal per test-isolation-discipline) and approved; auto-merged. ✅ **`sentinel/inbox-stall:*` G-rule watch item CLOSED.**
+  - **PR #263 OPEN — under revision.** "fix(medic): delivery gate-at-emission + cooldown-primary rate window + CLI escalation path" (created 03:41:18Z). Mirror reviewed and sent `revision-medic-reliability-gate-delivery-cli-001-1.json` to Forge inbox. Forge worktree `wt-forge-medic-reliability-gate-delivery-cli-001` active. No auto-merge — hold until revised + re-approved.
+  - **Forge inbox: 3 tasks** — `build-alert-xlate-outbox-success-fyi-001.json` (building alert-translations config PR; 2 G-rules close when done) + `build-step-ops-alerts-ui.json` (step-ops-alerts-ui marker-error retry build) + `revision-medic-reliability-gate-delivery-cli-001-1.json` (Mirror revision for #263).
+  - **Mirror inbox: 3 tasks** — `review-sentinel-inbox-stall-translation-001-rev1.json` (stale — PR #262 merged) + `review-step-cleanup-review.json` (stale — PR #259 merged at 03:34:10Z) + `review-step-retention.json` (stale — PR #260 merged at 03:42:25Z). Mirror's handlers will detect merged-state and close gracefully. ⚠️ (active pipeline)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **03:49:49Z** (3 min old at 03:52Z; within 90-min threshold). Auto-restart of dashboard-api at 03:49:51Z confirms healer active + sweeping. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=ab7dc6f ("Pulse cycle 20260603T035120Z" — automated cycle wrapper for iter 664). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (30th total).** sync.json: `status=error`, `last_sync=2026-06-03T03:50:58Z`, commit=dfb2e958 rolled back. Sync ran after automated cycle wrapper push; created auto-commit, failed non-FF, rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 1 open PR under revision; Forge 3 tasks building; Mirror 3 stale review tasks.**  PR #263 under active revision. Forge building actively. Mirror stale tasks will self-clear. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Forge: 2 active builds (alert-xlate config-only + step-ops-alerts-ui retry; both expected < $2). Medic revision in queue. No runaway signals. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). CLAUDE_MAX_OAUTH Tier 2 restored. ✅
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - ~~**`source:sentinel / subject:inbox-stall:*` G-rule 3/3 — PR #262 MERGED (03:53:38Z).**~~ **Watch item CLOSED.** Sentinel inbox-stall → INFO/FYI translation live in config/alert-translations.json. Future alerts suppressed as Tier 3.
+  - **`auto-restarted:ourliberty-dashboard-api.service` — new occurrence.** G-rule 3/3 dispatched (iter 592). Forge brief MISSING (pending Larry go-ahead; [yellow] idx=9). Pattern repeating (dashboard-api restarted post-PR-#259 code update — correct healer behavior). Systemic fix (`heal-stale-daemon-warn-info-calibration-001`) needed to silence future occurrences.
+  - **`alert-xlate-outbox-success-fyi-001` Forge build in progress.** When PR merges: close `outbox-notifier:review-pass` + `outbox-notifier:mirror-dag-pass` G-rule watch items.
+  - **MalformedForgeMarker — 3 retries in progress** (step-cleanup-review, step-ops-alerts-ui [build-step-ops-alerts-ui.json active], step-retention [stale Mirror tasks]). APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands).
+  - `deploy-notifier cooldown GC gap` — 151 files (+1). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (PR #263 under revision — no auto-merge; 7/7 services active; sync self-recovering; Forge/Mirror building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 665` → ts: 2026-06-03T03:57:42.384490+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T03:57:43Z. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 30th (APPROVAL_REQUEST open; self-recovering). `forge-claude-md-preflight-self-check-bullet-001` pending Larry approval.
+
+**Patterns:**
+- **PR #262 revision cycle completed in < 10 min.** Mirror found production path literal (03:44Z iter 664); Forge revised (submitted revision-1); Mirror reviewed + approved; auto-merged at 03:53:38Z. Under 10 min from revision dispatch to merge. The regression gate caught a real test-isolation violation and the pipeline corrected it cleanly.
+- **SYNC-PUSH-REBASE-FALLBACK-001 advanced to 30th total.** Milestone: 30 occurrences, 100% self-recovering, 100% post-wrapper-push. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains highest-priority infra debt behind `forge-claude-md-preflight-self-check-bullet-001`.
+- **auto-restarted:dashboard-api — another occurrence.** Healer auto-restarted dashboard-api post-PR-#259 code update (correct behavior). The systemic silence entry (`auto-restarted:*` in alert-translations.json) can't land until `heal-stale-daemon-warn-info-calibration-001` Forge brief is re-dispatched. Larry's go-ahead is the blocker.
+- **Mirror inbox has 3 stale review tasks** for already-merged PRs. Mirror's handler should detect merged state and close gracefully. Watch: if these don't clear by next iter, investigate why the inbox-watcher didn't prevent the double-dispatch.
+
+**Learned:** The marker-error retry chain (step-cleanup-review + step-retention) correctly propagated to Mirror review tasks even for already-merged PRs. Mirror handles this gracefully (detects merged state, skips review). This is expected behavior per the retry chain design. No G-rule warranted unless it causes repeated confusion.
+
+---
+
 ## Iteration 664 — 2026-06-03 03:44 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing: 2 PRs open (#262 + #263), Mirror reviewing #263. Alert watermark: **1191** (UNCHANGED from iter 663). Healer heartbeat: **03:19:40Z** (25 min old at 03:44Z; within 90-min threshold). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (29th total)** — sync.json `status=error` at 03:40:04Z, commit=4a69d61b rolled back; HEAD=41117c8 (iter 663 wrapper) newer → self-recovering. **7/7 services active.** **PR #260 MERGED (03:42:25Z, always-fix).** 2 open PRs: #262 (Mirror revision dispatched; hold) + #263 (CLEAN/MERGEABLE ~3 min; Mirror reviewing). Forge inbox: `alert-xlate-outbox-success-fyi-001` NEW (Beacon brief for outbox-notifier:review-pass + mirror-dag-pass G-rule batch) + 3 marker-error retries (UNCHANGED) + `revision-sentinel-inbox-stall-translation-001-1.json` (Mirror revision for PR #262).
