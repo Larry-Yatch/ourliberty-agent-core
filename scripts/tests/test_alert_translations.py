@@ -545,5 +545,73 @@ class TranslationCacheReloadTest(unittest.TestCase):
                 {'severity': 'INFO'})
 
 
+class OutcomeLanguageTest(unittest.TestCase):
+    """Fix-first/notify-on-outcome (2026-06-03): translation entries for
+    SUCCESSFUL-heal subjects describe a completed outcome, so they must NOT
+    carry an operator imperative ("go run X"). The heal already happened —
+    a "sudo ..." line would tell Larry to redo work the team already did.
+
+    These subjects are the closure/digest-routed ones whose translation is the
+    fallback render (`_render_outcome_alert` prefers the producer's own message,
+    but the table entry is the safety net). Scanning the table here keeps the
+    no-imperative contract enforced at the config layer."""
+
+    # (source, subject) pairs that describe a heal that already succeeded.
+    _OUTCOME_SUBJECTS = [
+        ('heal-systemd-install-drift', 'install-healed'),
+        ('heal-systemd-install-drift', 'stuck-timer-healed'),
+    ]
+
+    # Tokens that signal an operator imperative — none belongs in an
+    # already-healed outcome entry.
+    _IMPERATIVE_TOKENS = ('sudo ', 'run `', 'systemctl restart', 'git ')
+
+    @classmethod
+    def setUpClass(cls):
+        cls.data = json.loads(TRANSLATIONS_FILE.read_text(encoding='utf-8'))
+
+    def test_outcome_entries_exist(self):
+        for source, subject in self._OUTCOME_SUBJECTS:
+            self.assertIn(source, self.data, f'missing source {source!r}')
+            self.assertIn(
+                subject, self.data[source],
+                f'missing outcome entry {source}:{subject}')
+
+    def test_outcome_entries_have_no_imperative(self):
+        offenders: list[str] = []
+        for source, subject in self._OUTCOME_SUBJECTS:
+            entry = self.data.get(source, {}).get(subject, {})
+            blob = (
+                f"{entry.get('plain_language_summary', '')} "
+                f"{entry.get('recommended_action', '')}"
+            ).lower()
+            for token in self._IMPERATIVE_TOKENS:
+                if token in blob:
+                    offenders.append(f'{source}:{subject} contains {token!r}')
+        if offenders:
+            self.fail(
+                'Outcome (already-healed) translation entries must not carry '
+                'an operator imperative:\n  - ' + '\n  - '.join(offenders))
+
+    def test_outcome_entries_render_without_imperative_via_format_dm(self):
+        """End-to-end: a closure/digest record renders the self-healed shape
+        with NO 'Run:' line and NO 'sudo', even when the producer wrote a
+        message (the message wins) AND when it didn't (table summary is the
+        fallback)."""
+        larry_alerts._TRANSLATIONS_CACHE = None  # noqa: SLF001
+        # No producer message → falls back to the table summary.
+        text = larry_alerts.format_dm({
+            'source': 'heal-systemd-install-drift',
+            'subject': 'install-healed:my-daemon.service',
+            'severity': 'warning',
+            'route': 'closure',
+            'suggested_action': 'sudo cp systemd/x /etc/systemd/system/',
+        })
+        self.assertIn('Self-healed', text)
+        self.assertIn('No action needed', text)
+        self.assertNotIn('Run:', text)
+        self.assertNotIn('sudo', text.lower())
+
+
 if __name__ == '__main__':
     unittest.main()

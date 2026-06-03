@@ -50,6 +50,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import chain_event_emit as cee  # noqa: E402
+import larry_alerts  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 APPROVALS_FILE = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
@@ -287,6 +288,33 @@ def collect_attention(events: list[dict]) -> list[str]:
     return seen
 
 
+def collect_self_healed(start_utc: datetime, end_utc: datetime) -> list[str]:
+    """One-line outcome summaries of routine heals that fixed themselves.
+
+    These are `route: "digest"` alerts the bot deliberately did NOT DM (the
+    fix-first/notify-on-outcome routing, 2026-06-03): something broke, the team
+    fixed it, and it wasn't significant enough to interrupt Larry. They belong
+    in the digest as proof-of-work, not in his DMs.
+
+    Each line is the producer's own outcome `message` (written at emit time when
+    the real outcome is known). Records without a usable message are skipped
+    rather than rendered as an empty bullet. Deduped, newest-window order
+    preserved. Best-effort — any read failure yields []."""
+    try:
+        records = larry_alerts.read_digest_window(start_utc, end_utc)
+    except Exception as e:  # noqa: BLE001 — digest must not crash on this
+        log(f'self-healed digest read failed: {type(e).__name__}: {e}', 'WARN')
+        return []
+    seen: list[str] = []
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        summary = str(rec.get('message') or '').strip()
+        if summary and summary not in seen:
+            seen.append(summary)
+    return seen
+
+
 def fetch_decisions_waiting() -> list[str]:
     """Plain-English summaries of decisions still pending Larry (point-in-time)."""
     if not APPROVALS_FILE.exists():
@@ -351,6 +379,7 @@ def gather_activity(
         'decisions_waiting': fetch_decisions_waiting(),
         'spend_usd': sum_spend(start_utc, end_utc),
         'attention': collect_attention(events),
+        'self_healed': collect_self_healed(start_utc, end_utc),
     }
 
 
@@ -370,6 +399,8 @@ def render_raw(period: str, label: str, activity: dict) -> str:
     waiting_n = len(waiting)
     spend = activity['spend_usd']
     attention = activity['attention']
+    self_healed = activity.get('self_healed', [])
+    healed_n = len(self_healed)
 
     lines = [f'{span} ({label}):']
     if ship_n:
@@ -388,6 +419,16 @@ def render_raw(period: str, label: str, activity: dict) -> str:
             f"  • {cleared_n} {_plural(cleared_n, 'item')} resolved on "
             f"{'its' if cleared_n == 1 else 'their'} own — no action needed "
             f"from you.")
+
+    if healed_n:
+        lines.append(
+            f"  • {healed_n} {_plural(healed_n, 'thing')} broke and got fixed "
+            f"automatically — no action needed:")
+        for s in self_healed[:5]:
+            lines.append(f"      – {s}")
+        extra = healed_n - 5
+        if extra > 0:
+            lines.append(f"      – (+{extra} more)")
 
     if waiting_n:
         lines.append(
@@ -428,6 +469,7 @@ def build_prompt(period: str, label: str, activity: dict) -> str:
         'things_shipped': [i.get('title') for i in activity['shipped']],
         'things_shipped_count': activity['shipped_count'],
         'items_resolved_automatically': activity['auto_cleared_count'],
+        'things_that_broke_and_self_fixed': activity.get('self_healed', []),
         'decisions_waiting_on_you': activity['decisions_waiting'],
         'amount_spent_usd': activity['spend_usd'],
         'worth_a_look': activity['attention'],
@@ -554,6 +596,7 @@ def write_digest(
             'decisions_waiting_count': len(activity['decisions_waiting']),
             'spend_usd': activity['spend_usd'],
             'attention_count': len(activity['attention']),
+            'self_healed_count': len(activity.get('self_healed', [])),
         },
     }
     return cee.emit_event(
@@ -584,7 +627,8 @@ def run(period: str, now_utc: Optional[datetime] = None,
         f'auto_cleared={activity["auto_cleared_count"]} '
         f'waiting={len(activity["decisions_waiting"])} '
         f'spend=${activity["spend_usd"]} '
-        f'attention={len(activity["attention"])}')
+        f'attention={len(activity["attention"])} '
+        f'self_healed={len(activity["self_healed"])}')
 
     summary_text, llm_cost = generate_ceo_voice(build_prompt(period, label, activity))
     used_fallback = summary_text is None

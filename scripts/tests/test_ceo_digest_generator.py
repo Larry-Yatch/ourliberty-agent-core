@@ -36,6 +36,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import ceo_digest_generator as cdg  # noqa: E402
 import chain_event_shipper as ces  # noqa: E402
+import larry_alerts  # noqa: E402
 
 DENVER = ZoneInfo('America/Denver')
 
@@ -182,6 +183,7 @@ class RenderRawTest(unittest.TestCase):
             'decisions_waiting': ['approve the budget'],
             'spend_usd': 4.20,
             'attention': ['token expiring'],
+            'self_healed': [],
         }
         base.update(over)
         return base
@@ -199,11 +201,88 @@ class RenderRawTest(unittest.TestCase):
     def test_raw_handles_empty(self):
         raw = cdg.render_raw('weekly', 'May 25–May 31', self._activity(
             shipped=[], shipped_count=0, auto_cleared_count=0,
-            decisions_waiting=[], spend_usd=0.0, attention=[],
+            decisions_waiting=[], spend_usd=0.0, attention=[], self_healed=[],
         ))
         self.assertIn('Nothing new shipped', raw)
         self.assertIn('Nothing waiting on you', raw)
         self.assertIn('$0.00', raw)
+
+    def test_raw_renders_self_healed_section(self):
+        raw = cdg.render_raw('daily', 'Monday, June 1', self._activity(
+            self_healed=[
+                'A background service had stale code and restarted itself.',
+                'The shared workspace had drifted and was re-synced.',
+            ],
+        ))
+        self.assertIn('broke and got fixed automatically', raw)
+        self.assertIn('no action needed', raw.lower())
+        self.assertIn('restarted itself', raw)
+        self.assertIn('re-synced', raw)
+        # Outcome language only — no imperative leaking into the digest.
+        lowered = raw.lower()
+        for banned in ('healer', 'systemd', 'sudo ', 'run `'):
+            self.assertNotIn(banned, lowered, f'jargon/imperative leaked: {banned!r}')
+
+    def test_raw_omits_self_healed_section_when_empty(self):
+        raw = cdg.render_raw('daily', 'Monday, June 1', self._activity(
+            self_healed=[]))
+        self.assertNotIn('broke and got fixed automatically', raw)
+
+    def test_raw_truncates_long_self_healed_list(self):
+        raw = cdg.render_raw('weekly', 'May 25–May 31', self._activity(
+            self_healed=[f'self-heal {i}' for i in range(8)]))
+        self.assertIn('(+3 more)', raw)
+
+
+class CollectSelfHealedTest(unittest.TestCase):
+    """collect_self_healed reads route=digest alerts in the window, dedups,
+    and yields each producer's own outcome message — never a DM."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._alerts = Path(self._tmp.name) / 'larry-alerts.jsonl'
+        self._patch = mock.patch.object(larry_alerts, 'ALERTS_FILE', self._alerts)
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def _write(self, records):
+        self._alerts.write_text(
+            '\n'.join(json.dumps(r) for r in records) + '\n')
+
+    def test_collects_only_digest_messages_in_window(self):
+        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 6, 2, tzinfo=timezone.utc)
+        self._write([
+            {'ts': '2026-06-01T08:00:00+00:00', 'route': 'digest',
+             'message': 'service A self-healed'},
+            {'ts': '2026-06-01T09:00:00+00:00', 'route': 'closure',
+             'message': 'significant heal — should be DM not digest'},
+            {'ts': '2026-06-01T10:00:00+00:00', 'route': 'escalate',
+             'message': 'failed heal — should escalate'},
+            {'ts': '2026-05-30T10:00:00+00:00', 'route': 'digest',
+             'message': 'before the window'},
+        ])
+        out = cdg.collect_self_healed(start, end)
+        self.assertEqual(out, ['service A self-healed'])
+
+    def test_dedups_repeated_messages(self):
+        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 6, 2, tzinfo=timezone.utc)
+        self._write([
+            {'ts': '2026-06-01T08:00:00+00:00', 'route': 'digest',
+             'message': 'same message'},
+            {'ts': '2026-06-01T09:00:00+00:00', 'route': 'digest',
+             'message': 'same message'},
+        ])
+        self.assertEqual(cdg.collect_self_healed(start, end), ['same message'])
+
+    def test_missing_file_yields_empty(self):
+        start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+        end = datetime(2026, 6, 2, tzinfo=timezone.utc)
+        self.assertEqual(cdg.collect_self_healed(start, end), [])
 
 
 class PromptTest(unittest.TestCase):
@@ -212,12 +291,15 @@ class PromptTest(unittest.TestCase):
             'shipped': [{'title': 'thing'}], 'shipped_count': 1,
             'auto_cleared_count': 0, 'decisions_waiting': [],
             'spend_usd': 1.0, 'attention': [],
+            'self_healed': ['a background service fixed itself'],
         }
         prompt = cdg.build_prompt('daily', 'Monday, June 1', activity)
         self.assertIn('CEO', prompt)
         self.assertIn('NEVER use', prompt)
         self.assertIn('"healer"', prompt)
         self.assertIn('amount_spent_usd', prompt)
+        self.assertIn('things_that_broke_and_self_fixed', prompt)
+        self.assertIn('a background service fixed itself', prompt)
 
 
 class GenerateCeoVoiceTest(unittest.TestCase):
@@ -288,6 +370,9 @@ class RunEndToEndTest(unittest.TestCase):
             cdg, 'COSTS_FILE', costs or Path('/nonexistent/costs.jsonl')))
         stack.enter_context(mock.patch.object(
             cdg, 'ACTIVE_TIER_FILE', Path('/nonexistent/tier.json')))
+        # Isolate the self-healed digest read from the live alerts queue.
+        stack.enter_context(mock.patch.object(
+            larry_alerts, 'ALERTS_FILE', Path('/nonexistent/larry-alerts.jsonl')))
 
     def test_voice_path(self):
         client = _FakeClient(events=[{'event_type': 'clarify_response'}])

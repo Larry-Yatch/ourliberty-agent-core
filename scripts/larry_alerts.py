@@ -42,10 +42,26 @@ OFFSET_FILE = AGENTS_ROOT / 'state' / 'beacon-alerts-offset.txt'
 # so silence-on-unmatched is impossible.
 TRANSLATIONS_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-translations.json'
 
+# Significance table (fix-first/notify-on-outcome routing, 2026-06-03). Decides
+# whether a SUCCESSFUL heal earns a `closure` DM (significant subject) or routes
+# `digest` (routine). Subject-prefix keyed; default = routine. Pulse-tunable.
+SIGNIFICANCE_FILE = Path(__file__).resolve().parent.parent / 'config' / 'alert-significance.json'
+
 CRITICAL_COOLDOWN_SEC = 10 * 60       # 10 min — terse and load-bearing
 WARNING_COOLDOWN_SEC = 60 * 60        # 60 min — Larry's Dial 3 pick
 
 VALID_SEVERITIES = ('warning', 'critical')
+
+# Routing destinations (fix-first / notify-on-outcome, 2026-06-03). Orthogonal
+# to severity (severity still buckets cooldown; route decides destination):
+#   escalate — DM Larry now. DEFAULT (fail-loud: a missed migration over-notifies
+#              rather than silently dropping). Carries the action Larry takes.
+#   closure  — DM Larry one line: was broken, fixed it, no action needed. Only for
+#              SIGNIFICANT successful heals.
+#   digest   — NOT DM'd; the daily CEO digest surfaces it as a self-healed line.
+#              Routine successful heals.
+VALID_ROUTES = ('escalate', 'closure', 'digest')
+DEFAULT_ROUTE = 'escalate'
 
 
 # ---------- cooldown machinery ----------
@@ -94,6 +110,7 @@ def append_alert(
     message: str,
     subject: Optional[str] = None,
     suggested_action: Optional[str] = None,
+    route: str = DEFAULT_ROUTE,
 ) -> bool:
     """Append one alert if not in cooldown.
 
@@ -107,6 +124,10 @@ def append_alert(
         subject: optional dedup-key suffix. Recommended — without it, all
             alerts from one source share a single cooldown bucket.
         suggested_action: optional shell command the operator can run.
+        route: 'escalate' (DM now — DEFAULT), 'closure' (DM a one-line
+            self-healed confirmation), or 'digest' (no DM; surfaced in the
+            daily CEO digest). An unknown value falls back to 'escalate' so a
+            mistake over-notifies rather than silently drops.
     """
     if severity not in VALID_SEVERITIES:
         # Don't raise — surface as a no-op with a stderr hint.
@@ -118,6 +139,10 @@ def append_alert(
         except Exception:
             pass
         return False
+    if route not in VALID_ROUTES:
+        # Fail-loud: an invalid route degrades to escalate (a DM), never to a
+        # silent drop.
+        route = DEFAULT_ROUTE
     key = f'{source}:{subject}' if subject else source
     if in_cooldown(severity, key):
         return False
@@ -126,6 +151,7 @@ def append_alert(
         'source': source,
         'severity': severity,
         'message': message,
+        'route': route,
     }
     if subject:
         record['subject'] = subject
@@ -142,6 +168,81 @@ def append_alert(
         return False
     _mark_cooldown(severity, key)
     return True
+
+
+# ---------- significance gate + route classification (fix-first routing) ----------
+
+
+_SIGNIFICANCE_CACHE: Optional[dict] = None
+_SIGNIFICANCE_MTIME: Optional[float] = None
+
+
+def _load_significance() -> dict:
+    """Read config/alert-significance.json, reloading on mtime change (same
+    long-running-process rationale as the translations cache). Returns the
+    parsed dict, or {} if the file is missing/malformed — in which case every
+    subject is treated as routine (the conservative default: routine heals go
+    to the digest, not a DM)."""
+    global _SIGNIFICANCE_CACHE, _SIGNIFICANCE_MTIME
+    try:
+        mtime: Optional[float] = SIGNIFICANCE_FILE.stat().st_mtime
+    except OSError:
+        mtime = None
+    if _SIGNIFICANCE_CACHE is not None and mtime == _SIGNIFICANCE_MTIME:
+        return _SIGNIFICANCE_CACHE
+    try:
+        with open(SIGNIFICANCE_FILE, encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    _SIGNIFICANCE_CACHE = data
+    _SIGNIFICANCE_MTIME = mtime
+    return data
+
+
+def is_significant(source: str, subject: Optional[str]) -> bool:
+    """True if (source, subject) is in the significant set.
+
+    Match rule: each entry in `significant_subjects` is a prefix tested against
+    the composite key `f'{source}:{subject}'` (or bare `source` when subject is
+    None). A trailing '*' or ':' on an entry is cosmetic and stripped before the
+    prefix test, so 'heal-credential-registry-drift:*' and
+    'heal-credential-registry-drift' both match any subject under that source.
+    Default (no match) = routine."""
+    data = _load_significance()
+    entries = data.get('significant_subjects')
+    if not isinstance(entries, list):
+        return False
+    composite = f'{source}:{subject}' if subject else source
+    for raw in entries:
+        if not isinstance(raw, str) or not raw:
+            continue
+        prefix = raw.rstrip('*').rstrip(':')
+        if not prefix:
+            continue
+        if composite == prefix or composite.startswith(prefix + ':') \
+                or composite.startswith(prefix):
+            return True
+    return False
+
+
+def classify_route(source: str, subject: Optional[str], healed: bool) -> str:
+    """Single-source route decision for outcome-aware emitters.
+
+    - A heal that did NOT succeed (healed=False) always routes 'escalate' — it
+      must DM Larry with the action he takes (and un-healable detections land
+      here too).
+    - A SUCCESSFUL heal (healed=True) routes 'closure' if its subject is
+      significant (would have stalled/broken the chain, touched
+      money/credentials/secrets, or was user-facing) and 'digest' otherwise.
+
+    Keep this the only place the significance list is consulted so no per-healer
+    copy of the membership logic can drift."""
+    if not healed:
+        return 'escalate'
+    return 'closure' if is_significant(source, subject) else 'digest'
 
 
 # ---------- notification writer (D3.5 5a-followup: chain-completion DMs) ----------
@@ -272,6 +373,45 @@ def read_pending(offset: int) -> list[tuple[int, dict]]:
                     out.append((idx, json.loads(line)))
                 except json.JSONDecodeError:
                     out.append((idx, {'_malformed': True, 'raw': line[:200]}))
+    except OSError:
+        return []
+    return out
+
+
+def read_digest_window(start, end) -> list[dict]:
+    """Return route=='digest' alert records with `ts` in [start, end).
+
+    Used by the CEO digest to surface self-healed-no-action events that the bot
+    deliberately did NOT DM. `start`/`end` are timezone-aware UTC datetimes
+    (the digest's period_window returns UTC bounds; the records' `ts` is UTC
+    ISO-8601). Records with a missing/unparseable `ts` are skipped (they can't
+    be windowed). Never raises — returns [] on any read error."""
+    if not ALERTS_FILE.exists():
+        return []
+    out: list[dict] = []
+    try:
+        with open(ALERTS_FILE, encoding='utf-8') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(rec, dict) or rec.get('route') != 'digest':
+                    continue
+                ts_raw = rec.get('ts')
+                if not isinstance(ts_raw, str):
+                    continue
+                try:
+                    ts = datetime.fromisoformat(ts_raw.replace('Z', '+00:00'))
+                except ValueError:
+                    continue
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                if start <= ts < end:
+                    out.append(rec)
     except OSError:
         return []
     return out
@@ -441,6 +581,33 @@ _NO_TRANSLATION_FOOTER = (
 )
 
 
+def _render_outcome_alert(record: dict) -> str:
+    """Render a route=closure|digest alert as a self-healed confirmation.
+
+    Outcome language ONLY — this is a heal that already succeeded, so the DM
+    must never carry a "go run <command>" imperative. The summary is the
+    producer's own outcome message (written at emit time, when the real outcome
+    is known and accurate); a translation-table summary is only a fallback for
+    producers that emit no message. Any `suggested_action` on the record is
+    deliberately dropped."""
+    subject = record.get('subject') or ''
+    source = record.get('source', '?')
+    summary = (record.get('message') or '').strip()
+    if not summary:
+        translation = translate_alert(source, subject) if source != '?' else None
+        if translation is not None:
+            summary = (translation.get('plain_language_summary') or '').strip()
+    head = '✅ Self-healed'
+    if subject:
+        head += f' — {subject}'
+    lines = [head]
+    if summary:
+        lines.append(summary)
+    lines.append('')
+    lines.append('No action needed.')
+    return '\n'.join(lines)
+
+
 _NOTIFICATION_INTENT_EMOJI = {
     'review-pass': '✓',
     'review-revision': '⚠',
@@ -478,6 +645,12 @@ def format_dm(record: dict) -> str:
     # the degraded-fallback path (entry vanished between append and read).
     if record.get('kind') == 'approval_request':
         return record.get('body', '🪔 (approval request — entry not found)')
+    # Outcome routing (fix-first, 2026-06-03): a closure/digest alert is a heal
+    # that already succeeded — render the self-healed confirmation with NO
+    # imperative. (digest alerts are normally skipped by the bot and surfaced in
+    # the daily digest instead; this render is the fallback / closure path.)
+    if record.get('route') in ('closure', 'digest'):
+        return _render_outcome_alert(record)
     # Alert rendering. First try the translation layer (stopgap; see
     # operating-manual.md #68): if (source, subject) matches an entry in
     # config/alert-translations.json, render the layered form with severity
@@ -503,6 +676,7 @@ def _cli_append_alert(args) -> int:
         message=args.message,
         subject=args.subject,
         suggested_action=args.suggested_action,
+        route=args.route,
     )
     return 0 if ok else 1
 
@@ -544,6 +718,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     aa.add_argument('--message', required=True)
     aa.add_argument('--subject', default=None)
     aa.add_argument('--suggested-action', dest='suggested_action', default=None)
+    aa.add_argument(
+        '--route', default=DEFAULT_ROUTE, choices=list(VALID_ROUTES),
+        help='escalate (DM now — default), closure (one-line self-healed DM), '
+             'or digest (no DM; surfaced in the daily digest).',
+    )
 
     # Notification + approval-request subcommands let the Medic operator
     # escalate via a stable CLI shape its bash allowlist can match, instead of

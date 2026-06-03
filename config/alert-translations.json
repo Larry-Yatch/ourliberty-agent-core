@@ -68,10 +68,22 @@
     }
   },
   "heal-systemd-install-drift": {
+    "install-healed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A systemd unit was shipped in the repo but missing from /etc/systemd/system/; the healer installed it, daemon-reloaded, and confirmed it is running. No action needed — surfaced for the record.",
+      "recommended_action": "None — the unit was installed and verified active. Self-healed; details appear in the daily digest."
+    },
+    "stuck-timer-healed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A systemd timer had lost its next-fire anchor and the healer restarted it (daemon-reload + restart); it is firing on schedule again. No action needed — surfaced for the record.",
+      "recommended_action": "None — the timer was restarted and verified. Self-healed; details appear in the daily digest."
+    },
     "install-drift": {
       "severity": "URGENT",
       "tier": "NOW",
-      "plain_language_summary": "A systemd unit is shipped in the repo's `systemd/` directory but is NOT installed at /etc/systemd/system/. The unit isn't running on this droplet — whatever the unit does (a daemon, a timer, a healer) is silently absent.",
+      "plain_language_summary": "A systemd unit is shipped in the repo's `systemd/` directory but is NOT installed at /etc/systemd/system/, and the healer could NOT auto-install it (auto-remediation is disabled for this class, or the install attempt failed). The unit isn't running on this droplet — whatever it does (a daemon, a timer, a healer) is silently absent until you install it by hand.",
       "recommended_action": "Run `sudo cp systemd/<unit-name> /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now <unit-name>` from the repo root. Verify with `systemctl status <unit-name>`. Runbook: runbooks/heal-systemd-install-drift.md."
     },
     "stuck-timer": {

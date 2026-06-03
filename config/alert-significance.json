@@ -1,0 +1,16 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Significance gate for fix-first/notify-on-outcome alert routing (docs/fix-first-alert-routing-brief.md). A SUCCESSFUL heal earns a 'closure' DM only if its subject is significant; everything else routes 'digest' (surfaced in the daily CEO digest, not DM'd). Failed heals always 'escalate' regardless of significance — significance never silences an escalation.",
+    "match_rule": "Each entry in significant_subjects is a prefix tested against the composite key '<source>:<subject>' (or bare '<source>' when no subject). A trailing '*' or ':' is cosmetic and stripped before the prefix test, so 'heal-credential-registry-drift:*' matches any subject under that source. Default (no match) = routine.",
+    "default": "routine",
+    "tunable_note": "Membership is Pulse-tunable: add or remove prefixes here to promote/demote a subject without a code change. Routine subjects (install-drift re-installs, sync auto-commit-push retries, daemon-restart heals) are NOT listed — they route 'digest' by omission.",
+    "consumed_by": "scripts/larry_alerts.py is_significant() / classify_route()"
+  },
+  "significant_subjects": [
+    "heal-credential-registry-drift:*",
+    "heal-pipeline-stall:pipeline-stall:*",
+    "heal-claude-max-burn-rate:*",
+    "beacon-telegram-bot:claude_tier1_failed*"
+  ]
+}

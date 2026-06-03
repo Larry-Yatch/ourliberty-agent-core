@@ -821,6 +821,18 @@ def _check_pending_alerts() -> None:
             larry_alerts.write_offset(idx + 1)
             continue
 
+        # Fix-first routing (2026-06-03): route=digest events are successful
+        # routine heals that need no DM — they're surfaced in the daily CEO
+        # digest instead. Advance the offset and skip (no DM). closure +
+        # escalate fall through and DM as before. This is the ONLY no-DM
+        # advance besides malformed; the non-digest failed-DM path below still
+        # does NOT advance the offset (M2 per-line-ack invariant intact).
+        if alert.get('route') == 'digest':
+            log(f"alert idx={idx} route=digest; skipping DM "
+                f"(source={alert.get('source')}, subject={alert.get('subject', '-')})")
+            larry_alerts.write_offset(idx + 1)
+            continue
+
         # Determine target chats: notifications + approval-requests go to
         # the originating chat_id only; alerts broadcast to all authorized
         # chats. Both targeted shapes share the chat_id validation path.

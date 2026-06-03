@@ -71,9 +71,13 @@ alert_larry() {
 # for hours. This is the belt-and-suspenders second channel that Beacon's
 # Telegram bot polls. Best-effort: failure to enqueue never blocks the sync
 # flow's existing exit semantics.
+# Optional third arg `route` (escalate|closure|digest); defaults to escalate
+# (fail-loud — a genuine block still DMs). Pass `digest` for transient
+# self-healing conditions that need no action (the auto-commit-push retry).
 emit_larry_alert_envelope() {
     local subject="$1"
     local message="$2"
+    local route="${3:-escalate}"
     local cli="${SCRIPTS_DIR}/larry_alerts.py"
     if [ ! -f "$cli" ]; then
         return 0
@@ -82,7 +86,8 @@ emit_larry_alert_envelope() {
         --source sync.service \
         --severity warning \
         --subject "$subject" \
-        --message "$message" >/dev/null 2>&1 || true
+        --message "$message" \
+        --route "$route" >/dev/null 2>&1 || true
 }
 
 write_status() {
@@ -172,7 +177,10 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
                 git reset --hard "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
                 write_status "error" "Auto-commit push failed; rolled back"
                 alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
-                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8}. Recovery: cd ${REPO_DIR}; investigate push failure (non-FF, auth, network); resolve, then sync will retry on next tick."
+                # Routine self-healing transient: the rollback restored a clean,
+                # pushable tree and sync retries the push on the next tick — no
+                # action required, so route to the digest, not a DM (fix-first).
+                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8} (clean tree restored). Self-heals on the next sync tick; no action needed." "digest"
                 exit 1
             fi
         else

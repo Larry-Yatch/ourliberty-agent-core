@@ -684,11 +684,16 @@ def dm_larry_auto_restarted(
             body += '\n\nCommits since pre-restart active-start:\n' + '\n'.join(
                 f'  {line}' for line in pr_lines
             )
+        # Successful auto-restart → route on outcome (fix-first): a routine
+        # recovery goes to the digest; a significant one would DM a closure.
+        subject = f'auto-restarted:{unit}'
+        route = la.classify_route('heal-stale-daemon-code', subject, healed=True)
         return la.append_alert(
             source='heal-stale-daemon-code',
             severity='warning',
-            subject=f'auto-restarted:{unit}',
+            subject=subject,
             message=body,
+            route=route,
         )
     except Exception as e:
         log(f'dm_larry_auto_restarted failed: {type(e).__name__}: {e}', 'WARN')

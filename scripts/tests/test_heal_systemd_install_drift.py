@@ -143,10 +143,12 @@ class OrchestrationTest(_IsolatedAgentsRoot):
         super().setUp()
         self._dm_calls: list[dict] = []
 
-        def fake_dm(message, subject, suggested_action, severity='warning'):
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
             self._dm_calls.append({
                 'message': message, 'subject': subject,
                 'suggested_action': suggested_action, 'severity': severity,
+                'route': route,
             })
             return True
 
@@ -473,10 +475,12 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
         super().setUp()
         self._dm_calls: list[dict] = []
 
-        def fake_dm(message, subject, suggested_action, severity='warning'):
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
             self._dm_calls.append({
                 'message': message, 'subject': subject,
                 'suggested_action': suggested_action, 'severity': severity,
+                'route': route,
             })
             return True
 
@@ -582,9 +586,11 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
             )
             stuck_dms = [
                 c for c in self._dm_calls
-                if c['subject'] == 'stuck-timer:ourliberty-cycle.timer'
+                if c['subject'] == 'stuck-timer-healed:ourliberty-cycle.timer'
             ]
             self.assertEqual(len(stuck_dms), 1)
+            # Routine successful heal → digest (not DM'd; surfaced in digest).
+            self.assertEqual(stuck_dms[0]['route'], 'digest')
             self.assertIn('Auto-healed', stuck_dms[0]['message'])
             self.assertIn(
                 'Sat 2026-05-30 18:00:00 MDT', stuck_dms[0]['message'],
@@ -937,10 +943,12 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         super().setUp()
         self._dm_calls: list[dict] = []
 
-        def fake_dm(message, subject, suggested_action, severity='warning'):
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
             self._dm_calls.append({
                 'message': message, 'subject': subject,
                 'suggested_action': suggested_action, 'severity': severity,
+                'route': route,
             })
             return True
 
@@ -990,7 +998,9 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         # Exactly one DM, the healed one — no manual-dance alert.
         self.assertEqual(len(self._dm_calls), 1)
         dm = self._dm_calls[0]
-        self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        self.assertEqual(dm['subject'], 'install-healed:ourliberty-x.timer')
+        # Routine successful heal → digest (surfaced in the daily digest, no DM).
+        self.assertEqual(dm['route'], 'digest')
         self.assertIn('Auto-installed', dm['message'])
         self.assertIn('Sun 2026-05-31 18:00:00 MDT', dm['message'])
         self.assertIn('systemctl status', dm['suggested_action'])
@@ -1024,6 +1034,8 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         self.assertEqual(len(self._dm_calls), 1)
         dm = self._dm_calls[0]
         self.assertEqual(dm['subject'], 'install-drift:ourliberty-x.timer')
+        # Failed heal → escalate (DM Larry the manual action).
+        self.assertEqual(dm['route'], 'escalate')
         # Manual-dance fallback: cp + daemon-reload + enable --now in suggested.
         self.assertIn('cp', dm['suggested_action'])
         self.assertIn('daemon-reload', dm['suggested_action'])

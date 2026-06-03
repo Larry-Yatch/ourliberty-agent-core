@@ -138,7 +138,7 @@ def _record_dm(
 
 def dm_larry(
     message: str, subject: str, suggested_action: str,
-    severity: str = 'warning',
+    severity: str = 'warning', route: str = 'escalate',
 ) -> bool:
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -149,10 +149,24 @@ def dm_larry(
             message=message,
             subject=subject,
             suggested_action=suggested_action,
+            route=route,
         )
     except Exception as e:
         log(f'dm_larry failed: {type(e).__name__}: {e}', 'WARN')
         return False
+
+
+def _classify_route(subject: str, healed: bool) -> str:
+    """Delegate to larry_alerts.classify_route (single-source significance).
+
+    Falls back to 'escalate' (fail-loud) if the import fails for any reason."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+        return la.classify_route('heal-systemd-install-drift', subject, healed)
+    except Exception as e:
+        log(f'_classify_route failed: {type(e).__name__}: {e}', 'WARN')
+        return 'escalate'
 
 
 # -------------------- drift detection --------------------
@@ -524,7 +538,10 @@ def _render_stuck_timer_heal(unit: str, next_fire: str) -> tuple[str, str, str]:
         f'empty + `NextElapseUSecMonotonic=infinity` (timer never fires). '
         f'Recovery: daemon-reload + restart. Next fire now: {next_fire}.'
     )
-    subject = f'stuck-timer:{unit}'
+    # Distinct subject from the dry-run/manual `stuck-timer:` so the healed
+    # outcome and the manual-action copy are separate translation entries
+    # (fix-first routing: healed events carry no imperative).
+    subject = f'stuck-timer-healed:{unit}'
     suggested = (
         f'Verify on the droplet: '
         f'`systemctl show {unit} --property=NextElapseUSecRealtime`.'
@@ -560,7 +577,10 @@ def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
         f'from /etc/systemd/system/. Installed, daemon-reloaded, and '
         f'{enable_phrase}. Next fire: {next_fire}.'
     )
-    subject = f'install-drift:{unit}'
+    # Distinct subject from the failed/manual `install-drift:` so the healed
+    # outcome and the manual install-dance copy are separate translation
+    # entries (fix-first routing: healed events carry no imperative).
+    subject = f'install-healed:{unit}'
     suggested = f'Verify on the droplet: `systemctl status {unit}`.'
     return message, subject, suggested
 
@@ -669,7 +689,9 @@ def run_once(
                 next_fire = post.get('NextElapseUSecRealtime') or 'unknown'
                 counts['install_healed'] += 1
                 msg, subj, sug = _render_install_healed(unit, next_fire)
-                ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+                route = _classify_route(subj, healed=True)
+                ok = dm_larry(message=msg, subject=subj, suggested_action=sug,
+                              route=route)
                 if ok:
                     counts['dm_sent'] += 1
                     _record_dm(state, unit, now=now)
@@ -751,7 +773,9 @@ def run_once(
             counts['dm_suppressed_dedup'] += 1
             continue
         msg, subj, sug = _render_stuck_timer_heal(unit, next_fire)
-        ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+        route = _classify_route(subj, healed=True)
+        ok = dm_larry(message=msg, subject=subj, suggested_action=sug,
+                      route=route)
         if ok:
             counts['dm_sent'] += 1
             _record_dm(state, unit, now=now, bucket='stuck_timers')
