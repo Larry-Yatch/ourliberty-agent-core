@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 771 — 2026-06-03 17:27 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Tier-4 novel alert — expected-by-design; DM suppressed per feedback). Alert watermark: **1186 lines / anchor 17:22:34Z** (+1 new from iter 770 anchor 1185/17:10:39Z). Sync: ✅ status=no-change, commit=702080d, last_sync=17:04:24Z. Healer heartbeat: **17:22:33Z** (<5 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). All 3 inboxes EMPTY.** Worktrees: **3** (all stale; hourly GC pending).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (novel), DM suppressed per feedback.** `larry-alerts.jsonl`: **1186 lines** — +1 from iter 770 anchor 1185/17:10:39Z. New entry at **17:22:34Z**: `source=heal-stale-daemon-code / severity=warning / subject=auto-restarted:ourliberty-beacon-bot.service`. Classification path: (1) known-pattern allowlist? — NO (`heal-stale-daemon-code` NOT in `config/alert-translations.json` sources; `auto-restarted:*` untranslated); (2) guarded-category? — NO; (3) action-template 3+ prior? — NO; (4) fallthrough → **Tier 4 (novel)**. DM suppressed per `feedback_alerts_actionable_only.md` — this is expected-by-design auto-remediation: healer restarted beacon-bot 41.8 min after PR #281 merge (commit e928f18, `beacon_telegram_bot.py` mtime 17:04:08Z; prior active-since was 16:22:19Z from PR #277 restart). New code now live. Watermark: **1186 lines / anchor 17:22:34Z**. ⚠️ Tier-reset: YES (Tier 4 = non-clean iter). G-rule already at 3/3 DISPATCHED (iter 592); Beacon consumed (iter 594); Forge brief still MISSING; re-dispatch pending Larry go-ahead (unchanged).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (unchanged from iters 768–770). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 4) Pending directives: ✅ ALL CLEAR.** 0 open PRs (both repos). Forge EMPTY. Mirror EMPTY. Beacon EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: **17:22:33Z** (<5 min old; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=f26f91a "Pulse cycle 20260603T172000Z". ✅
+
+- **(Check B) Sync health: ✅ status=no-change.** last_sync=17:04:24Z (~23 min at iter start; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot (just restarted 17:22:34Z with PR #281 code), ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ ALL CLEAR.** 0 open PRs (both repos). All 3 agent inboxes EMPTY. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 3 (all stale)** — `wt-forge-alert-fix-first-outcome-routing-001`, `wt-mirror-alert-fix-first-outcome-routing-001` (both stale post-PR#277-merge), `wt-forge-pulse-triage-phase-a-foundation-001` (stale post-preflight-rejection). Awaiting hourly GC. ✅
+
+- **G-rule watch (unchanged from iter 770):**
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. G-rule 3/3 DISPATCHED (iter 592); Beacon consumed (iter 594); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=654, systemic_fixes=4, verification_pending=2, ratio≈109.0, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Periodic: Check I sentinel exists (fired 00:22Z); skip. Check VIII/IX/X Monday only; skip. Check III next 2026-06-14; skip. ✅
+3. No always-allowed auto-fixes triggered — 0 open PRs; 7/7 active; sync clean; no duplicate tasks; new alert Tier 4 expected-by-design (no dispatch needed). ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 771` → ts: 2026-06-03T17:27:34.342604+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T17:27:34Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. Beacon-bot auto-restart is expected-by-design (PR #281 code pickup). No Larry action needed this iter.
+
+**Patterns:**
+- **Beacon-bot restarts twice today (16:22Z + 17:22Z).** Each restart correctly picks up new code from a merged PR (PR #277 → PR #281). The healer is working exactly as designed. The friction: each restart fires an untranslated `auto-restarted:*` alert from `heal-stale-daemon-code`, producing a Tier-4 novel alert each time. The fix (add `heal-stale-daemon-code` source to alert-translations.json with `auto-restarted:*` as Tier-3/FYI) has been dispatched to Beacon (iter 592); Beacon consumed the spec (iter 594); but the Forge brief is still missing. Until the fix lands, every PR-merge-day with beacon_telegram_bot.py in the diff will produce one of these Tier-4 alerts. Today's rate (2 in one afternoon) is driven by the PR #277/PR #281 back-to-back merges.
+- **System in steady-state post-burst.** Three back-to-back PR merges today (PR #279 + PR #281 + preflight-rejected task) have all resolved. The pipeline is quiescent again: 0 open PRs, all inboxes EMPTY, all services active. The only structural noise is the 182 cooldown-residue files and the 3 stale worktrees awaiting GC.
+
+**Learned:** Nothing new structurally. The Beacon-bot restart pattern on PR-merge-days continues to produce Tier-4 noise pending the Forge brief. The system handles it cleanly (suppressed DM, journal-only).
+
+---
+
 ## Iteration 770 — 2026-06-03 17:18 UTC (interactive)
 
 **Health:** ✅ Pipeline clear — Tier 1, consecutive_clean=0 (structural: cooldown residue 182). Alert watermark: **1185 lines / anchor 17:10:39Z** (unchanged — no new alerts since iter 769). Sync: ✅ status=no-change, commit=702080d, last_sync=17:04:24Z. Healer heartbeat: **16:52:19Z** (~26 min old; ✅ within 90-min threshold). **7/7 core services active.** **0 open PRs (both repos). All 3 inboxes EMPTY.** Beacon consumed `notify-pulse-triage-phase-a-foundation-001.json` between iters 769–770 (pipeline proceeding normally). Worktrees: **3** (all stale; hourly GC pending).
