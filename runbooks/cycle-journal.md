@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 672 — 2026-06-03 04:50 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **PR #30 (ourliberty-dashboard, step-ops-alerts-ui N4) MERGED 03:54:14Z** — stall watch item CLOSED (was misclassified as stall; PR submitted and merged before iter 671). Alert watermark: **1203** (+2 from 1201 — both Tier 3). Healer heartbeat: **04:19:52Z** (30 min old; ✅ within 90-min threshold). Sync: ✅ status=no-change, last_sync=04:38:12Z. **7/7 services active.** Forge inbox: 2 tasks (`step-digest-card.json` actively building + `stale-worktree-teardown-001.json` queued from Beacon spec). Mirror inbox: EMPTY. Beacon inbox: EMPTY (stale-worktrees dispatch consumed; spec delivered to Forge).
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1203 lines** (+2 from 1201). New alerts (2):
+- idx 1202: `deploy-notifier:READY` for `main` branch (04:42:10Z) — Tier 3, by-design Vercel post-merge deploy. Cooldown +1.
+- idx 1203: `heal-claude-max-burn-rate:claude_max_5h_burn_threshold_breached` (04:46:30Z) — **Tier 3** per translations.json (INFO/FYI). Content: 82% of 10M token gate, 125 rate-limit events in trailing 2h. High-cadence interactive session load. Cooldown +1.
+Cooldown: **160 total** (+1 from 159; heal-claude-max-burn-rate cooldown added).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 2 new alerts (both Tier 3 — known-pattern silence).** 1203 lines (+2). idx 1202: deploy-notifier:READY/main (Tier 3, by-design). idx 1203: claude_max_5h_burn_threshold_breached (Tier 3, per `heal-claude-max-burn-rate` entry in alert-translations.json). No action. **Notable context: 125 rate-limit events in 2h reflects high interactive session cadence; Tier 3 means no dispatch, but worth monitoring.** ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since "30 min ago" --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id active). Burn-rate alert Tier 3 — no DM. No Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue (+1).** alert-cooldown/warning/: **160 total** (+1 from 159 — heal-claude-max-burn-rate cooldown). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ (structural residue; no new action)
+
+- **(Check 4) Pending directives: ✅ Pipeline flowing. step-ops-alerts-ui stall CLOSED.**
+  - **PR #30 MERGED (03:54:14Z) — ourliberty-dashboard.** "feat: re-home alerts in Ops/System with dedup rollup (N4)" — `forge/step-ops-alerts-ui`. **Watch item CLOSED.** The stall was a diagnostic artifact: PR submitted and merged before iter 671 but not visible via `gh pr list` (which defaults to agent-core context). Required `--state all --search "step-ops-alerts-ui" -R Larry-Yatch/ourliberty-dashboard` to surface. ✅
+  - **PR #31 MERGED (04:40:31Z).** Already closed in iter 671. ✅
+  - **0 open PRs** in both repos. ✅
+  - **Forge inbox: 2 tasks.**
+    - `step-digest-card.json` (source: beacon) — "N6 — add a glanceable daily/weekly digest card to the Approvals page in ourliberty-dashboard." `wt-forge-step-digest-card` worktree active — build in progress. ✅
+    - `stale-worktree-teardown-001.json` (source: beacon) — **NEW spec from Beacon** for worktree GC (produced from G-rule dispatch `cycle-finding-stale-worktrees-cleanup-20260603T043835Z`). Queued, not yet started. ✅
+  - **Mirror inbox: EMPTY.** ✅ **Beacon inbox: EMPTY.** ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **04:19:52Z** (30 min old at 04:50Z; ✅ within 90-min threshold). Next sweep ~04:49Z. ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=9e37797 ("Pulse cycle 20260603T044721Z" — iter 671 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-03T04:38:12Z (~12 min ago; within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 self-cleared iter 671 and remains cleared. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) Inboxes + PRs: ✅ 0 open PRs; Forge building step-digest-card; stale-worktree-teardown-001 queued.** Clean pipeline. ✅
+
+- **(Check F) Cost/quota: ⚠️ Burn rate at 82%/10M, 125 rate-limit events in 2h.** Tier 3 alert — no dispatch. High interactive session cadence driving the load. Monitor. If pace continues and rate-limit events cluster further, may warrant ask-then-do to pause dispatches. For now: nominal per alert classification. ⚠️ (monitored)
+
+- **Credential rotations: ✅/⚠️.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, no action). Tier 2 OAuth broken (weekly probe idx 1201 confirmed; APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open). ⚠️ (known, no new action)
+
+- **Periodic checks (Wednesday UTC):** Check I fired iter 637. Check VIII/IX/X (Monday only). Check III (next 2026-06-14). All skip. ✅
+
+- **G-rule watch:**
+  - ~~**step-ops-alerts-ui stall — 4th iter (from iter 671 perspective).**~~ **CLOSED.** PR #30 MERGED 03:54:14Z. The "stall" was a diagnostic gap: `gh pr list` without `--repo Larry-Yatch/ourliberty-dashboard` misses dashboard PRs. Confirmed resolution pattern: use `--state all --search "<task>" -R Larry-Yatch/ourliberty-dashboard` to verify dashboard build completion. ✅
+  - **Stale-worktrees G-rule → Beacon dispatch consumed → Forge spec queued.** `cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json` in Beacon archive (processed). `stale-worktree-teardown-001.json` now in Forge inbox. Watch for PR that adds worktree teardown to task-completion flow. 18 worktrees currently. ⚠️ (in pipeline)
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING.** Re-dispatch pending Larry go-ahead ([yellow] idx=9 stands). No change.
+  - `deploy-notifier cooldown GC gap` — **160 files** (+1). APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry.
+  - **MalformedForgeMarker.** 9th total lifetime. No new occurrences this iter. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry.
+  - Other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: all gates closed. All skip. ✅
+3. No always-allowed auto-fixes triggered (0 open PRs; 7/7 active; sync nominal; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 672` → ts: 2026-06-03T04:52:30.128313+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T04:52:30.839219+00:00. ✅
+6. Updated MEMORY.md. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch pending Larry go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 APPROVAL_REQUEST open (self-recovered; recurring). `forge-claude-md-preflight-self-check-bullet-001` pending Larry. Burn-rate at 82% — monitoring (Tier 3 no-action).
+
+**Patterns:**
+- **step-ops-alerts-ui diagnostic gap closed.** The "stall" watch carried through 4+ iters was a false classification: the PR merged at 03:54:14Z but wasn't visible via the default `gh pr list` (agent-core context). Root cause: dashboard PRs require explicit `--repo Larry-Yatch/ourliberty-dashboard`. Calibration: in all future Check 4 sweeps, include a dashboard-repo PR check alongside agent-core. This is the same calibration as the `gh pr list` system assumption in MEMORY.md — it needs to be practiced consistently.
+- **Burn-rate at 82% with 125 rate-limit events.** The high interactive session cadence since ~iter 657 (post-OAuth-restore) correlates. Each interactive Pulse cycle is billable on Opus 4.6; the rate-limit events mean the 5h rolling window is bumping limits. Tier 3 classification is correct per translations.json, but the underlying pressure is real.
+- **Stale-worktrees pipeline working correctly.** Dispatch → Beacon consumed → Forge spec queued in one cycle. 18 worktrees is the current steady-state. Once `stale-worktree-teardown-001` ships as a PR, new builds will self-clean.
+
+**Learned:** Check 4's dashboard PR sweep needs to explicitly query `--repo Larry-Yatch/ourliberty-dashboard` on every iter (not just when I suspect a dashboard build). The `review-task.pr_url` field is reliable when reviewing Mirror's tasks, but for proactive stall-detection, an explicit dashboard-repo query is required. Adding this as a persistent calibration: every Check 4 must include both `gh pr list -R Larry-Yatch/ourliberty-agent-core` AND `gh pr list -R Larry-Yatch/ourliberty-dashboard`.
+
+---
+
 ## Iteration 671 — 2026-06-03 04:45 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. **PR #31 (ourliberty-dashboard, step-approvals-rescope N5) MERGED 04:40:31Z** — watch item CLOSED. **Sync RECOVERED** (status=no-change, 04:38:12Z; SYNC-PUSH-REBASE-FALLBACK-001 self-cleared). Alert watermark: **1201** (+3 from 1198 — all known-pattern). Healer heartbeat: **04:19:52Z** (25 min old; ✅ within 90-min threshold). **7/7 services active.** Forge inbox: EMPTY. Mirror inbox: EMPTY. Beacon inbox: 1 task (G-rule dispatch `cycle-finding-stale-worktrees-cleanup`, pending inbox-watcher pickup).
@@ -71,6 +142,34 @@ Cooldown: **159 total** (+4 from 155 — new deploy-notifier events from PR #31 
 - **Tier 2 OAuth weekly probe confirming ongoing broken state.** The weekly cadence probe at 04:37:49Z is working as designed — it's confirming the known state. The APPROVAL_REQUEST for the Medic fix has been pending since iter 346. If this isn't actioned soon, the weekly probe will keep generating alerts.
 
 **Learned:** PR #31 merged before hitting the 30-min auto-merge threshold — Mirror's approval is the efficient path. The Vercel deploy for `mirror/step-approvals-rescope` (idx 1199 deploy-notifier alert) signals Mirror ran its own build to verify the UI, which is the correct review discipline for dashboard PRs.
+
+---
+
+## Iteration 670 — 2026-06-03 ~04:48Z (inter-agent result notification — Beacon → Pulse)
+
+**Event:** Received result notification from Beacon for `cycle-finding-stale-worktrees-cleanup-20260603T043835Z` (status=SUCCESS, cost=$0.83, 235s).
+
+**Beacon diagnosis (verified ground truth):**
+- `cleanup_stale_worktrees.py` works correctly — removed 20 worktrees at 02:43Z, kept 4.
+- Root cause is cadence gap: systemd timer runs once daily (`OnUnitActiveSec=1d`), so 4h grace is cosmetic — merged-PR worktrees sit 24h before GC.
+- No merge-time teardown: `outbox_notifier.py` auto-merge path (`gh pr merge --squash --delete-branch`) doesn't remove corresponding forge/mirror worktrees.
+
+**Beacon spec (APPROVAL_REQUEST `stale-worktree-teardown-001`):**
+- **Mechanism 1 (primary):** New `_teardown_worktrees_for_task(task_id)` helper in `outbox_notifier.py`, called at `_attempt_auto_merge_with_gates` merged/already_merged success branch alongside `_signal_sequence_step_merged`. Removes both `wt-forge-<id>` and `wt-mirror-<id>` via existing `worktree_manager._remove_worktree`. Defensive guard: skip if task_id still in-flight registry.
+- **Mechanism 2 (GC backstop):** Flip `ourliberty-cleanup-stale-worktrees.timer` from daily → hourly (`OnUnitActiveSec=1h`). MAX_AGE stays 4h. Catches REJECT/ESCALATE/abandoned tasks that never reach auto-merge.
+- Design decision: teardown in the notifier (not Forge/Mirror self-removal) — agents can't reliably remove their own running worktree.
+
+**APPROVAL_REQUEST routing gap confirmed:** As Beacon anticipated, the `=== APPROVAL_REQUEST ===` marker in the Beacon result did not auto-route to Forge's inbox (Pulse-originated G-rule dispatch, not a Telegram session). Forge inbox at time of check: only `step-digest-card.json`.
+
+**Did:**
+1. Read complete Beacon result from `outboxes/beacon/.archive/cycle-finding-stale-worktrees-cleanup-20260603T043835Z.json` to get full prompt (notification display was truncated).
+2. Verified `stale-worktree-teardown-001.json` absent from Forge's live inbox.
+3. Dispatched `stale-worktree-teardown-001.json` to Forge inbox as Pulse-as-approval-gate (source=beacon, dispatched_by=pulse, approved_by=pulse, approval_chain: pulse-originated → beacon-spec → pulse-gate → forge-preflight). Phase=preflight.
+4. Updated MEMORY.md: stale-worktrees G-rule watch item updated (Forge task dispatched; watch for PR).
+
+**Escalated:** None. Forge now has preflight task. Standard chain: Forge preflight → build → Mirror review → auto-merge.
+
+**Learned:** Beacon's APPROVAL_REQUEST marker never auto-routes from cycle-finding sessions (confirmed 2nd time, matching MEMORY calibration note). The correct path is always Pulse manually forwarding via the Pulse-as-approval-gate pattern. MEMORY already documents this — no new calibration needed.
 
 ---
 
