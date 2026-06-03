@@ -1011,8 +1011,15 @@ class SharedLibWatchlistTests(_IsolatedAgentsRoot):
     library imported by multiple long-running units changes on disk."""
 
     def _patch_watchlist(self, mapping):
-        """Replace `h.SHARED_LIB_WATCHLIST` with the given dict (Path → set)."""
-        return mock.patch.object(h, 'SHARED_LIB_WATCHLIST', mapping)
+        """Drive `check_shared_lib_watchlist` from the given dict (Path → set).
+
+        check_shared_lib_watchlist iterates `build_effective_watchlist()`
+        (hardcoded constant unioned with the committed manifest), so we patch
+        that seam to isolate the iteration/restart logic under test from the
+        real manifest's entries. The union itself is covered by
+        test_daemon_restart_manifest.py.
+        """
+        return mock.patch.object(h, 'build_effective_watchlist', lambda: mapping)
 
     def _stub_systemctl(self, properties_per_unit):
         """systemctl_show stub keyed by (unit, prop)."""

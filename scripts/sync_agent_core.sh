@@ -339,19 +339,6 @@ RSYNC_EXCLUDES+=(
     --exclude "node_modules/"
 )
 
-# Track whether orchestrator-imported scripts changed (to decide if restart needed)
-# F55: narrow trigger from "any script changed" to "orchestrator.py specifically
-# changed" since other scripts run as separate timers and don't require an
-# orchestrator restart to pick up changes.
-ORCHESTRATOR_PY_CHANGED=false
-if [ -f "${STAGING_ROOT}/scripts/orchestrator.py" ] && [ -f "${LIVE_ROOT}/scripts/orchestrator.py" ]; then
-    if ! diff -q "${STAGING_ROOT}/scripts/orchestrator.py" "${LIVE_ROOT}/scripts/orchestrator.py" >/dev/null 2>&1; then
-        ORCHESTRATOR_PY_CHANGED=true
-    fi
-fi
-# Keep SCRIPTS_CHANGED as alias for backward compatibility with other gates.
-SCRIPTS_CHANGED=$ORCHESTRATOR_PY_CHANGED
-
 # Sync agents/ — merge, don't delete agent-local files
 if [ -d "${STAGING_ROOT}/agents" ]; then
     for agent_dir in "${STAGING_ROOT}/agents"/*/; do
@@ -403,14 +390,50 @@ if [ -d "${STAGING_ROOT}/config" ]; then
     log "  Synced config/"
 fi
 
-# ── Step 7: Restart orchestrator if scripts changed ────────────────
-if [ "$SCRIPTS_CHANGED" = true ]; then
-    log "Scripts changed — restarting ourliberty-orchestrator..."
-    if systemctl is-active ourliberty-orchestrator.service >/dev/null 2>&1; then
-        sudo systemctl restart ourliberty-orchestrator.service
-        log "  ourliberty-orchestrator restarted"
+# ── Step 7: Restart long-running daemons whose deployed code changed ──
+# deploy-restart-gap-001 (2026-06-03): Type=simple daemons hold their
+# imported modules in memory, so a sync that changes a module they import
+# leaves them running stale code until restart. The committed manifest
+# config/daemon-restart-manifest.json maps each daemon to its watched
+# paths; we restart exactly the active units whose watched paths changed
+# across OLD_HEAD..NEW_HEAD. (The prior orchestrator-only restart targeted
+# ourliberty-orchestrator.service, which no longer exists, and is removed.)
+MANIFEST_CLI="${SCRIPTS_DIR}/daemon_restart_manifest.py"
+DAEMON_RESTART_STORM_THRESHOLD="${DAEMON_RESTART_STORM_THRESHOLD:-5}"
+if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$MANIFEST_CLI" ]; then
+    CHANGED_PATHS="$(cd "$REPO_DIR" && git diff --name-only "$OLD_HEAD" "$NEW_HEAD" 2>/dev/null || true)"
+    UNITS_TO_RESTART="$(printf '%s\n' "$CHANGED_PATHS" | python3 "$MANIFEST_CLI" units-for-changed 2>/dev/null || true)"
+    if [ -n "$UNITS_TO_RESTART" ]; then
+        UNIT_COUNT="$(printf '%s\n' "$UNITS_TO_RESTART" | grep -c .)"
+        STORM=false
+        if [ "$UNIT_COUNT" -gt "$DAEMON_RESTART_STORM_THRESHOLD" ]; then
+            STORM=true
+            log "Deploy-restart: $UNIT_COUNT daemons affected (storm — likely a shared base module changed); restarting all, summary only."
+            emit_larry_alert_envelope "deploy-restart-storm" "ourliberty-sync.service restarting ${UNIT_COUNT} daemons after ${OLD_HEAD:0:8}->${NEW_HEAD:0:8} (a widely-imported module changed). Units: $(printf '%s ' $UNITS_TO_RESTART)." digest
+        else
+            log "Deploy-restart: $UNIT_COUNT daemon(s) affected by changed paths."
+        fi
+        RESTARTED=0
+        SKIPPED=0
+        FAILED=0
+        while IFS= read -r unit; do
+            [ -z "$unit" ] && continue
+            if systemctl is-active "$unit" >/dev/null 2>&1; then
+                if sudo -n systemctl restart "$unit" >/dev/null 2>&1; then
+                    RESTARTED=$((RESTARTED + 1))
+                    [ "$STORM" = false ] && log "  restarted $unit"
+                else
+                    FAILED=$((FAILED + 1))
+                    log "  WARN: restart failed for $unit (manual: sudo systemctl restart $unit)"
+                fi
+            else
+                SKIPPED=$((SKIPPED + 1))
+                [ "$STORM" = false ] && log "  $unit not active, skipping"
+            fi
+        done <<< "$UNITS_TO_RESTART"
+        log "Deploy-restart summary: restarted=$RESTARTED skipped-inactive=$SKIPPED failed=$FAILED of $UNIT_COUNT affected."
     else
-        log "  ourliberty-orchestrator not active, skipping restart"
+        log "Deploy-restart: no long-running daemon affected by this sync."
     fi
 fi
 
