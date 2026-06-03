@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 788 — 2026-06-03 19:57 UTC (interactive)
+
+**Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: auto-restarted Tier-4 novel alert + Check B SYNC-PUSH-REBASE-FALLBACK 50th total). Alert watermark: **1219 lines / anchor 19:53:48Z** (+2 from iter 787's 1217/19:48:21Z). Cooldown residue: **199** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=7d0d94b, last_sync=19:53:00Z. Healer heartbeat: **19:53:24Z** (fresh — just fired; ✅ well within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: Mirror-approved, auto-merge HELD behind PR #289 on overlap files; #289: Mirror rev1 review in progress). **Forge: EMPTY.** Mirror: 1 task (review-pulse-check-liveness-watcher-001-rev1). Beacon: EMPTY. Worktrees: **7** (3 stale + 4 active; unchanged from iter 787).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts since iter 787 watermark (1217/19:48:21Z).** New watermark: **1219 lines / anchor 19:53:48Z**.
+  - 19:53:25Z: `heal-stale-daemon-code` → `auto-restarted:ourliberty-dashboard-api.service` — healer detected `dashboard_api.py` mtime 958.5 min newer than service active-since; restarted service so PR #290 code ("feat(rotation): dashboard Auto/Off switch") goes live. By-design post-merge healer behavior. NOT in Tier-3 allowlist (same `auto-restarted:*` family as G-rule 3/3 DISPATCHED iter 592; Forge brief MISSING). **Tier-4 novel → tier-reset.** ⚠️
+  - 19:53:48Z: `outbox-notifier:review-pass` for PR #285 (install-drift-emission-fix-001) — Tier-3 FYI (allowlist, PR #264 merged iter 668). ✅ Nominal.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 199** (unchanged from iter 787). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. Structural carry-forward.
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **19:53:24Z** (fresh — healer just fired to restart dashboard-api.service post-PR #290 merge). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, status=(clean), HEAD=27f1e40 "Pulse cycle 20260603T195510Z". Newer than iter 787 HEAD (f4337bb); wrapper committed iter 787's journal entry. ✅
+
+- **(Check B) Sync health: ⚠️ status=error.** message="Auto-commit push failed; rolled back", commit=7d0d94b, last_sync=19:53:00Z. Session-start HEAD (27f1e40) newer than sync.json commit (7d0d94b) → wrapper push succeeded after sync service raced and rolled back. **SYNC-PUSH-REBASE-FALLBACK — 50th total occurrence.** Self-recovering: hourly `ourliberty-sync.timer` will self-clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (structural). **Tier-reset: yes.** ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. dashboard-api.service auto-restarted by healer at 19:53:24Z (new code live). ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing.**
+  - **PR #285 Mirror-approved (19:53:48Z), auto-merge HELD.** ("fix(heal-install-drift): non-imperative healed subject + 3-way unit classifier"): CLEAN/MERGEABLE. Mirror approved `install-drift-emission-fix-001` review. Auto-merge held by outbox-notifier behind PR #289 (overlap files: config/alert-translations.json, runbooks/heal-systemd-install-drift.md, scripts/heal_systemd_install_drift.py +1 more). "Will retry automatically when the blocker resolves." No Pulse action needed — outbox-notifier manages the sequencing. ✅
+  - **PR #289 OPEN** ("feat(pulse): pulse-check liveness watcher"): CLEAN/MERGEABLE, created 19:27:01Z (~30 min old). Mirror inbox has `review-pulse-check-liveness-watcher-001-rev1.json` — rev1 review in progress. When #289 merges, outbox-notifier will automatically retry PR #285 auto-merge. ✅
+  - Forge: EMPTY. Mirror: 1 task (review-pulse-check-liveness-watcher-001-rev1). Beacon: EMPTY. Dashboard repo: 0 open PRs. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts since iter 787 watermark. Healer restart + Mirror review expected cost. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):**
+  - **Check I**: Sentinel `check-i-2026-06-03.json` exists (fired 00:22Z) → skip (idempotent). ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Worktrees: 7** (unchanged from iter 787) — stale: `wt-forge-harden-ledger-intervention-tagging-001`, `wt-forge-pulse-triage-phase-a-foundation-001`, `wt-mirror-alert-fix-first-outcome-routing-001`; active: `wt-forge-install-drift-emission-fix-001`, `wt-forge-pulse-check-liveness-watcher-001`, `wt-mirror-install-drift-emission-fix-001`, `wt-mirror-pulse-check-liveness-watcher-001`. ✅
+
+- **G-rule watch (all unchanged from iter 787, except dashboard-api auto-restart noted):**
+  - `pulse-check-stale:*` not in alert-translations.json: **1/3** (iter 784). Unchanged.
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784). Unchanged.
+  - `medic:medic-diagnosis not in alert-translations.json`: **2/3** (iter 776). Unchanged.
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776). Unchanged.
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775). Unchanged.
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769). Unchanged.
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). Unchanged.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). Unchanged.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. dashboard-api.service is the latest `auto-restarted:*` occurrence (iter 788). ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=671, systemic_fixes=4, verification_pending=2, ratio=167.75, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: +2 new alerts since iter 787. `auto-restarted:ourliberty-dashboard-api.service` = Tier-4 novel (by-design post-merge healer); `review-pass` for PR #285 = Tier-3 FYI. Watermark updated 1217/19:48:21Z → 1219/19:53:48Z. Tier-reset from Tier-4 novel alert.
+3. Check E: PR #285 Mirror-approved; auto-merge sequenced behind PR #289 by outbox-notifier (first observation of merge dependency sequencing in action — new outbox-notifier behavior). PR #289 under Mirror rev1 review. Forge EMPTY. Pipeline advancing. ✅
+4. No always-allowed auto-fixes triggered: PRs in active review/merge pipeline; sync self-recovering; 7/7 active; healer heartbeat fresh. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 788 --template pulse-cycle-check --detail iter-788` → intervention_id=pulse-cycle-check:iter-788, ts=2026-06-03T19:57:36Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T19:57:37Z. ✅
+7. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** None. SYNC-PUSH-REBASE-FALLBACK structural (50th, APPROVAL_REQUEST open). `auto-restarted:ourliberty-dashboard-api.service` is by-design post-PR #290-merge healer behavior — no Larry DM warranted. Pipeline advancing normally with merge-sequencing in effect. No new blocking conditions.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK (50th).** Structural. Same self-recovering race on every interactive cycle session. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the fix.
+- **heal-stale-daemon-code auto-restarting post-PR-merge (dashboard-api.service).** This is the third distinct session this has been observed for different services (iter 784: forge-bot, mirror-bot, pulse-bot, chain-event-shipper; iter 788: dashboard-api). The pattern is: PR merges → code updated on disk → healer fires within ~5 min → WARNING-level alert (should be INFO). G-rule 3/3 DISPATCHED iter 592; Forge brief MISSING since Beacon OAuth-block (iter 594). Re-dispatch pending Larry go-ahead.
+- **Merge-dependency sequencing first observed (PR #285 HELD behind PR #289).** outbox-notifier now automatically holds PR merges when a higher-priority (or earlier in review) PR has overlapping files. Prevents merge conflicts. New capability, working as designed. No Pulse action needed. This explains why PR #285 will not auto-merge until PR #289 clears.
+
+**Learned:** Outbox-notifier has merge-dependency sequencing: when a PR is approved but shares modified files with an open PR (#289), the merge is held with "Will retry automatically when the blocker resolves." This is a new systemic behavior not previously observed in journal. Records the first confirmed instance of this sequencing in production. Pattern is desirable — prevents merge conflicts without Pulse intervention.
+
+---
+
 ## Iteration 787 — 2026-06-03 19:53 UTC (interactive)
 
 **Health:** ⚠️ Sync error (structural carry-forward) — Tier 1 (tier-reset: Check B SYNC-PUSH-REBASE-FALLBACK 49th total). Alert watermark: **1217 lines / anchor 19:48:21Z** (+1 from iter 786's 1216/19:26:06Z — 1 new Tier 3 FYI). Cooldown residue: **199** (unchanged). Sync: ⚠️ status=error "Auto-commit push failed; rolled back", commit=86b716c, last_sync=19:47:44Z. Healer heartbeat: **19:23:21Z** (~30 min old; ✅ within 90-min threshold). **7/7 core services active.** **2 open PRs** (#285: Mirror review dispatched; #289: Mirror rev1 review dispatched). **Forge: EMPTY** (all 3 iter-786 tasks consumed). Mirror: 2 tasks (review-install-drift-emission-fix-001, review-pulse-check-liveness-watcher-001-rev1). Beacon: EMPTY. Worktrees: **7** (net 0: wt-forge-dashboard-rotation-switch-001 torn down on PR #290 merge; wt-mirror-install-drift-emission-fix-001 added).
