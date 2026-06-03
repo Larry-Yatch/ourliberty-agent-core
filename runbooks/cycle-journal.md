@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 759 — 2026-06-03 16:02 UTC (interactive)
+
+**Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines / anchor 15:43:33Z** (unchanged). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 **#41** at 16:00:38Z ("Auto-commit push failed; rolled back"); self-recovering. Healer heartbeat: **15:52:17Z** (~10 min old; ✅ within 90-min threshold). **7/7 core services active.** **PR #277 OPEN/CLEAN/MERGEABLE** (6 min old — within 30-min threshold; Mirror reviewing). Forge inbox: 1 task (`build-extend-install-drift-healer-content-drift.json` queued). Mirror inbox: 1 task (`review-alert-fix-first-outcome-routing-001.json` active). Beacon inbox: EMPTY. Worktrees: **3** (forge phase-1 remnant + forge extend-install-drift build + mirror PR-277 review).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1180 lines** — unchanged from iter 758 watermark. Last alert still 15:43:33Z (`heal-systemd-install-drift / install-drift:ourliberty-larry-alerts-retention.timer`). No new alerts since anchor. SYNC-PUSH-REBASE-FALLBACK-001 #41 ("auto-commit-push-failed" variant) did NOT append a new `sync-blocked:*` alert — likely cooldown-suppressed (same pattern fires very frequently; cooldown is active). No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session (chat_id 7998341473). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Cooldown residue 182 total** (176 warning + 6 critical; unchanged from iter 758). GC APPROVAL_REQUEST `cycle-finding-deploy-notifier-gc-20260531T170000Z` pending Larry. ⚠️ structural.
+
+- **(Check 4) Pending directives: ⚠️ Pipeline active.**
+  - **PR #277** "feat(alerts): fix-first/notify-on-outcome routing — route field + significance gate + digest ingestion" (created 15:56:06Z, age=6 min): CLEAN/MERGEABLE/OPEN. Mirror reviewing (task `review-alert-fix-first-outcome-routing-001.json` in Mirror inbox, worktree `wt-mirror-alert-fix-first-outcome-routing-001` present). Within 30-min auto-merge threshold — no action yet. ⚠️ in-progress.
+  - **`build-extend-install-drift-healer-content-drift.json`** in Forge inbox: queued (Forge is building in `wt-forge-extend-install-drift-healer-content-drift`). ⚠️ in-progress.
+  - Beacon inbox: EMPTY. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **15:52:17Z** (~10 min old at 16:02Z; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #41.** `agent-core-sync.json`: `status=error / "Auto-commit push failed; rolled back" / commit=e2e3cac234a2` at 16:00:38Z. Session-start gitStatus: branch=main, clean (wrapper committed iter 758 journal). Self-recovering per pattern (41 total occurrences, every one self-resolved). APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open. ⚠️
+
+- **(Check B) Sync health: ⚠️ status=error.** Same 16:00:38Z error. Will self-clear on next sync service tick (~5 min). ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline active.** 1 open PR (#277, 6 min old, within threshold). Forge + Mirror both have active tasks. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts. Watermark unchanged. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I (Monday only), Check VIII/IX/X (Monday only), Check III (next 2026-06-14). All gates closed. ✅
+
+- **Worktrees: 3** — forge phase-1 remnant (`wt-forge-alert-fix-first-outcome-routing-001`) + active Forge build (`wt-forge-extend-install-drift-healer-content-drift`) + Mirror review (`wt-mirror-alert-fix-first-outcome-routing-001`). Normal in-flight state. ✅
+
+- **G-rule watch (unchanged from iter 758):**
+  - `deploy-notifier:READY:* not in alert-translations.json`: **1/3** (iter 756). No new deploys this window. Unchanged.
+  - `changed-systemd-unit-not-propagated-by-install-drift-healer`: **1/3** (iter 684). `build-extend-install-drift-healer-content-drift` in Forge inbox — fix in pipeline.
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680). Unchanged.
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716). `wt-fix` still GONE (iter 757). Monitoring.
+  - `cycle-blocked:dirty-tree-*`: **2/3**. Unchanged.
+  - `medic:medic-diagnosis`: **1/3** (iter 678). Unchanged.
+  - `ledger/weekly 1/3, pulse/check-i 1/3` — unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*` still untranslated. Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=641, systemic_fixes=4, verification_pending=2, ratio=160.25, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations + periodic gate evaluations.
+2. Periodic: all gates closed (Wednesday; Check I/VIII/IX/X = Monday only; Check III next 2026-06-14). All skip. ✅
+3. No always-allowed auto-fixes triggered — PR #277 at 6 min (below 30-min threshold); 7/7 active; sync self-recovering; no duplicate tasks; watermark unchanged. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 759` → ts: 2026-06-03T16:03:13.840326+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T16:03:14.728346+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None. All findings are expected in-flight pipeline activity. SYNC-PUSH-REBASE-FALLBACK-001 #41 self-recovering per pattern. PR #277 within normal review window. No Larry action needed.
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001 #41** (16:00:38Z) — "auto-commit-push-failed" variant. This occurrence (unlike #40 in iter 758 which was "Wrong branch: chore/foo") did NOT append a `sync-blocked:*` alert to larry-alerts.jsonl — cooldown appears to be suppressing the alert. Consistent with the pattern: error fires ~every interactive rapid-cycle session, but the alert-cooldown system limits DM noise. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the standing fix.
+- **`alert-fix-first-outcome-routing-001` build complete → PR #277 opened.** Forge completed Phase 1 build right at end of iter 758 (PR created 15:56:06Z). Mirror is actively reviewing. Fast build-to-review handoff. 
+- **`extend-install-drift-healer-content-drift` build started.** New Forge worktree active while Mirror handles PR #277 review. Concurrent builds continuing normally.
+
+---
+
 ## Iteration 758 — 2026-06-03 15:56 UTC (interactive)
 
 **Health:** ⚠️ Pipeline active — Tier 1, consecutive_clean=0. Alert watermark: **1180 lines / anchor 15:43:33Z** (unchanged — no new alerts since iter 757). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 #40 at 15:53:36Z ("Wrong branch: chore/foo"); self-recovering (session-start gitStatus: main+clean). Healer heartbeat: **15:52:17Z** (~4 min old; ✅ within 90-min threshold). **7/7 core services active.** Forge inbox: 2 tasks (`build-alert-fix-first-outcome-routing-001` 28 min = active build, worktree present; `extend-install-drift-healer-content-drift` 9 min = queued). Beacon/Mirror inboxes: EMPTY. **0 open PRs** (both repos). Worktrees: **1** (`wt-forge-alert-fix-first-outcome-routing-001`).
