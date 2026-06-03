@@ -80,6 +80,12 @@
       "plain_language_summary": "A systemd timer had lost its next-fire anchor and the healer restarted it (daemon-reload + restart); it is firing on schedule again. No action needed — surfaced for the record.",
       "recommended_action": "None — the timer was restarted and verified. Self-healed; details appear in the daily digest."
     },
+    "content-healed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A systemd unit's installed copy under /etc/systemd/system/ had drifted from the repo; the healer re-copied it, daemon-reloaded, and (for a long-running daemon) restarted it so the new content is live. No action needed — surfaced for the record.",
+      "recommended_action": "None — already reconciled; verify with `systemctl status <unit>`. Self-healed; details appear in the daily digest. Runbook: runbooks/heal-systemd-install-drift.md."
+    },
     "install-drift": {
       "severity": "URGENT",
       "tier": "NOW",
