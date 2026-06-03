@@ -1144,4 +1144,5 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from pulse_check_heartbeat import run_check
+    raise SystemExit(run_check("i", main))

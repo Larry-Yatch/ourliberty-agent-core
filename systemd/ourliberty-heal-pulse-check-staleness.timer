@@ -1,0 +1,15 @@
+[Unit]
+Description=Pulse-check liveness watcher — alert if a check (I-X) heartbeat goes stale
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow.
+# Every 6 hours is ample — the checks themselves fire daily-to-monthly, and
+# larry_alerts' per-subject cooldown dedups repeats within a window anyway.
+OnCalendar=*-*-* 00/6:00:00
+Persistent=true
+RandomizedDelaySec=120
+Unit=ourliberty-heal-pulse-check-staleness.service
+
+[Install]
+WantedBy=timers.target
