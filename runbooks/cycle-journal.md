@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 660 — 2026-06-03 03:12 UTC (interactive)
+
+**Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. Pipeline flowing rapidly post-OAuth restore: 2 PRs now open (#259 + #260), step-ops-alerts-ui building, 3 more briefs queued. Alert watermark: **1188** (UNCHANGED — 0 new alerts). Healer heartbeat: **02:49:19Z** (UNCHANGED — ~23 min old; within 90-min threshold; next sweep ~03:19Z). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (25th total)** — sync.json: `status=error`, `last_sync=2026-06-03T03:03:06Z`, commit=9c166456 rolled back; pattern: sync service ran just after iter 659 wrapper push (58c7ad9 at ~03:02:38Z), created auto-commit, failed non-FF, rolled back; self-recovering. **7/7 services active.** **2 open PRs** (#259 + #260, both CLEAN+MERGEABLE, < 30-min threshold; no auto-merge action yet). Forge inbox: **6 tasks** (3 queued briefs + 2 marker-error retries + step-ops-alerts-ui in-flight). Beacon inbox: **0 tasks.** Mirror inbox: **0 tasks.**
+
+**Triage:** Check 0 — larry-alerts.jsonl: **1188 lines** (UNCHANGED). 0 new alerts. Nominal.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1188 lines (UNCHANGED). 0 new alerts since watermark. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since 2026-06-03T03:02:00Z --priority warning` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** `journalctl -u ourliberty-beacon-bot --since 2026-06-03T03:02:00Z` → "-- No entries --". No Larry directives, no agent-distress signals. beacon-bot ENETUNREACH G-rule (1/3, iter 654) — no new occurrence. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ Legacy cooldown residue (UNCHANGED).** alert-cooldown/warning/: **149 total** (UNCHANGED). 27 heal-pipeline-stall keyed files (stable). Legacy artifacts from OAuth-blocked period; pipeline actively flowing. No new stall alerts. ⚠️ (structural residue only)
+
+- **(Check 4) Pending directives: ⚠️ 2 new PRs open; Forge actively building; 3 briefs queued.** PR #259 "feat(dashboard): agent-reviewed cleanup-review button (N1/L8)" — CLEAN+MERGEABLE, created 03:03:56Z, auto-merge=null; ~9 min old at check time (< 30-min threshold). PR #260 "feat(retention): chain_events bookkeeping retention job (N2)" — CLEAN+MERGEABLE, created 03:09:44Z, auto-merge=null; ~3 min old (< 30-min threshold). Forge inbox: `build-fix-advancer-reconcile-gh-failure.json`, `build-medic-reliability-gate-delivery-cli-001.json`, `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` (3 queued, not yet dispatched); `marker-error-step-cleanup-review-1.json` (PR #259 retry-1/3); `marker-error-step-retention-1.json` (PR #260 retry-1/3); `step-ops-alerts-ui.json` (active, started 03:10:02Z, targeting ourliberty-dashboard). Mirror inbox empty — review dispatches pending Forge marker-error resolution. ⚠️ (active progress)
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: **02:49:19Z** (UNCHANGED — ~23 min old at 03:12Z; within 90-min threshold; next sweep ~03:19Z). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** Session-start gitStatus: branch=main, clean, HEAD=58c7ad9 ("Pulse cycle 20260603T030238Z" — iter 659 wrapper). Working-copy discipline intact. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK-001 (25th total).** sync.json: `status=error`, `last_sync=2026-06-03T03:03:06Z`, commit=9c166456 rolled back. Sync service ran ~1 min after iter 659 wrapper push (58c7ad9 at ~03:02:38Z); created auto-commit, failed non-FF, rolled back. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 7/7 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer — all `active`. ✅
+
+- **(Check E) Inboxes + PRs: ⚠️ 2 open PRs (sub-threshold); Forge active + queued.** PR #259 (9 min old) + PR #260 (3 min old) — both CLEAN+MERGEABLE, no auto-merge, well below the 30-min threshold. Next iter will reassess for auto-merge. Forge step-ops-alerts-ui active (started 03:10:02Z, targeting ourliberty-dashboard). 3 briefs queued. 2 marker-error retries queued (self-resolving via retry chain). Beacon inbox: 0. Mirror inbox: 0. ⚠️
+
+- **(Check F) Cost/quota: ✅ Nominal.** Recent build costs per inbox-watcher: step-cleanup-review $3.24, step-retention $1.48, fix-advancer-recovery $0.62, medic-recovery $0.73. step-ops-alerts-ui active (~$1-2 expected). Normal throughput range. ✅
+
+- **Credential rotations: ✅ Nominal.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~80d; outside 60d window). CLAUDE_MAX_OAUTH: Tier 2 restored (iter 656). ✅
+
+- **Periodic checks (Wednesday UTC):** Check I already fired iter 637 (00:22Z today) — skip. Check VIII/IX/X (Monday only) — skip. Check III (next 2026-06-14) — skip. ✅
+
+- **G-rule watch:**
+  - **NEW: MalformedForgeMarker — 2 occurrences this iter.** `marker-error-step-cleanup-review-1.json` + `marker-error-step-retention-1.json` both present in Forge inbox. Both are retry-1/3. Pattern: Forge sessions for step-cleanup-review AND step-retention both opened PRs successfully but omitted the preflight marker block (PROCEED/CLARIFY_REQUEST/REJECT). Retry mechanism handles automatically (outbox-notifier sends marker-error back to Forge inbox; Forge re-runs on the marker-error task). APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` already in queue — doc-fix still pending Larry's go-ahead. No new dispatch needed. Occurrence count: pre-iter = 4 self-resolved; +2 this iter = 6 total instances observed.
+  - **`source:sentinel / subject:inbox-stall:*`: 3/3 — DISPATCHED (iter 650). Beacon COMPLETE.** `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` in Forge inbox (queued). ✅ watch for PR.
+  - **`heal-stale-daemon-warn-info-calibration-001` Forge brief MISSING (carry-forward).** Pipeline unblocked; re-dispatch pending Larry's go-ahead ([yellow] escalation idx=9 stands). No change.
+  - All other G-rules stable (ledger/weekly 1/3, pulse/check-i 1/3, review-pass 2/3, mirror-dag-pass 1/3, cycle-blocked 1/3, beacon-ENETUNREACH 1/3).
+
+**Did:**
+1. Ran full mandatory checks (0, 1–5) + additive checks (A–F) + credential rotations.
+2. Periodic: Check I already fired iter 637; all other periodic gates closed. All skip.
+3. No always-allowed auto-fixes triggered (both PRs < 30-min threshold; 7/7 services active; sync self-recovering; Forge building autonomously).
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 660` → ts: 2026-06-03T03:11:53.494559+00:00. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-03T03:11:54.338767+00:00. ✅
+6. Wrote journal entry.
+
+**Escalated:** None new. Carry-forward: `heal-stale-daemon-warn-info-calibration-001` re-dispatch awaiting Larry's go-ahead ([yellow] idx=9). SYNC-PUSH-REBASE-FALLBACK-001 25th total (APPROVAL_REQUEST open; self-recovering).
+
+**Patterns:**
+- **SYNC-PUSH-REBASE-FALLBACK-001 advanced to 25th total.** Fired again at 03:03:06Z after iter 659 wrapper push at 03:02:38Z. Identical mechanism to prior 24. Pattern is 100% predictable and 100% self-recovering. APPROVAL_REQUEST open — systemic fix remains highest-priority infra debt.
+- **MalformedForgeMarker: 2 new instances this iter (#259 + #260).** Both step-cleanup-review and step-retention Forge sessions opened PRs but missed their preflight markers. Retry-1/3 queued. Previous count was 4 self-resolved; now 6 total. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` still in Larry's queue. Given 2 occurrences in a single cycle (simultaneous builds both failing marker), this may reflect the preflight discipline degrading under high concurrency. Larry's approval of the doc-fix would unblock the systemic resolution.
+- **Pipeline throughput record post-OAuth restore.** In ~31 min since restore: fix-advancer-recovery (3.4 min, $0.62), medic-recovery (3.5 min, $0.73), step-cleanup-review (15.8 min, $3.24), step-retention (5.8 min, $1.48), step-ops-alerts-ui (active). 4 builds done, 1 active, 3 queued. System burning down the 36h stall backlog at maximum throughput.
+
+**Learned:** Forge builds in rapid succession (4 builds in 28 min) both produced marker-errors on two consecutive sessions. This is stronger evidence that the preflight check failure is correlated with high-throughput concurrent build mode, not just isolated incidents. The retry mechanism handles it, but the double-occurrence in one iter supports elevating `forge-claude-md-preflight-self-check-bullet-001` as the single most actionable open APPROVAL_REQUEST right now.
+
+---
+
 ## Iteration 659 — 2026-06-03 03:00 UTC (interactive)
 
 **Health:** ⚠️ Recovery in progress — Tier 1, consecutive_clean=0. 3 Forge builds still in flight (~10–19 min); 0 open PRs yet. Alert watermark: **1188** (UNCHANGED — 0 new alerts since iter 658). Healer heartbeat: **02:49:19Z** (UNCHANGED — ~11 min old at 03:00Z check; within 90-min threshold; next sweep ~03:19Z). Sync: ⚠️ **SYNC-PUSH-REBASE-FALLBACK-001 (24th total)** — sync.json: `status=error`, `last_sync=2026-06-03T02:57:37Z`, commit=34cb98a rolled back; sync service ran post-iter-658-wrapper, tried to push a new auto-commit, failed non-FF, rolled back; self-recovering. **7/7 services active.** **0 open PRs.** Beacon inbox: **0 tasks** (CLEARED). Forge inbox: **6 tasks** (UNCHANGED from iter 658 — `build-fix-advancer-reconcile-gh-failure.json` + `build-medic-reliability-gate-delivery-cli-001.json` + `build-sentinel-inbox-stall-translation-001-20260603T024607Z.json` + `step-cleanup-review.json` + `step-ops-alerts-ui.json` + `step-retention.json`). Forge worktrees: **4 active** — `wt-forge-fix-advancer-reconcile-gh-failure` + `wt-forge-medic-reliability-gate-delivery-cli-001` + `wt-forge-step-cleanup-review` + `wt-fix` (legacy). Cooldown files: **149 total, 27 pipeline-stall** (UNCHANGED).
