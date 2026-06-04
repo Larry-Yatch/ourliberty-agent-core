@@ -4,6 +4,108 @@
 
 ---
 
+## Notification receipt — 2026-06-04 ~06:14 UTC | task=cycle-finding-daemon-reload-cycle-timer-stuck-20260604T061451Z | from=beacon | status=SUCCESS
+
+**Summary:** Beacon confirmed root cause and produced an implementation-ready spec for the `ourliberty-cycle.timer` blank-anchor issue observed across at least 3 incidents.
+
+**Root cause (verified by Beacon against source):**
+- `heal_systemd_install_drift.py:_cp_and_reload` runs `daemon-reload` (lines 540–548), which blanks `cycle.timer`'s `NextElapseUSecRealtime` anchor.
+- The stuck-timer pass (`detect_stuck_timers` line 359, `_heal_stuck_timer` line 414 — PR #212 / `7b499d6`) EXISTS and DOES heal this, but is gated by `JUST_FIRED_GRACE_S = 120` (lines 339–356, 399–406). When `_cp_and_reload` fires near the top of a period (e.g., 06:00 incident), the detector sees `LastTriggerUSec` within 120s and skips it as a transient post-fire recompute — intentionally. This delays recovery by up to one sweep period → the ~6-min gap that delayed PR #306.
+
+**Proposed fix (Beacon's architect decision):**
+- Add `_checkpoint_cycle_timer()` helper: `systemctl show ourliberty-cycle.timer --property=NextElapseUSecRealtime`; if empty/`0`, `sudo -n systemctl restart ourliberty-cycle.timer`; log checkpoint restart.
+- Call at the **end of `_cp_and_reload`** (after successful daemon-reload). Guard: skip if the unit being remediated IS `ourliberty-cycle.timer` itself (its path already re-anchors via `enable --now`/restart).
+- Test: mock subprocess returning blank anchor → assert restart fires within same `_cp_and_reload` call.
+- This is complementary to, not redundant with, the stuck-timer pass.
+
+**Dispatch status:** Blocked on channel. Beacon queued a Telegram alert. To ship: **Larry pings Beacon in chat with "go: cycle-timer checkpoint"** → Beacon fires Forge marker from chat-mode (where dispatch pipeline engages). Spec complete; no further refinement needed.
+
+**Action pending:** Larry's "go: cycle-timer checkpoint" ping to Beacon.
+
+---
+
+## Iteration 848 — 2026-06-04 06:14 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: pipeline-stall:no-mirror-dispatch Tier-4 novel [confirmed false positive]; Check E: PR #306 auto-merge applied) — **1 auto-fix (PR #306 auto-merge). 1 G-rule dispatch (daemon-reload→cycle.timer 3/3 → Beacon — spec already received above). PR #310 MERGED ✅ (deploy-notifier:READY G-rule CLOSED). cycle.timer stuck+healed 06:00Z. 4 open PRs. Forge inbox: 4. Mirror inbox: 2. 8/8 services active.**
+
+Alert watermark: **1279 lines / anchor 06:06:48Z** (+6 since iter 847 anchor 1273/05:56:17Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #58 — sync.json: status=error, last_sync=06:12:12Z, commit=abfb9463e55e. Session HEAD e7f22f9 "Pulse cycle 20260604T060648Z"; self-recovering. Healer heartbeat: **06:06:42Z** (~8 min; ✅). Stale-daemon heartbeat: **05:56:15Z** (~18 min; ✅). **8/8 services active.** **4 open PRs (agent-core).** **Dashboard: 0 open PRs.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 novel (tier-reset) + 5 Tier-3 silences.** larry-alerts.jsonl: 1279 lines (+6 since iter 847). New watermark: 1279 lines / 06:06:48Z.
+  - Alert 1: `install-healed:ourliberty-heal-wedged-review-sessions.service` (06:00:04Z) — Tier 3 (allowlist FYI). install-drift healer auto-installed service. ✅
+  - Alert 2: `install-drift:ourliberty-heal-wedged-review-sessions.timer` (06:00:07Z) — Tier 3 (allowlist NOW delivery). ⚠️ Timer NOT auto-installed — `ourliberty-heal-wedged-review-sessions` healer won't fire on schedule. Healer escalate-DM sent via beacon-bot. Manual install: `sudo cp ~/agent-core/systemd/ourliberty-heal-wedged-review-sessions.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-heal-wedged-review-sessions.timer`.
+  - Alert 3: `stuck-timer-healed:ourliberty-cycle.timer` (06:00:08Z) — Tier 3 (allowlist FYI). **3rd occurrence → G-rule 3/3 MET.** install-drift daemon-reload blanked cycle.timer anchor; healer auto-healed. 6-min cycle gap (06:00–06:06Z) caused PR #306 to miss 30-min threshold. G-rule dispatch sent (Beacon responded in <5 min with implementation-ready spec — see Notification receipt above).
+  - Alert 4: `tier2_weekly_probe_failed` (06:01:02Z) — Tier 3 (allowlist SOON delivery). Healer escalate-DM sent. Tier 2 probe output=''. Pipeline unaffected (Forge/Mirror active). Larry: verify Tier 2 re-auth status.
+  - Alert 5: `pipeline-stall:no-mirror-dispatch:PR#306` (06:06:48Z) — **Tier 4 novel (tier-reset).** NOT in alert-translations. **Confirmed false positive:** Mirror inbox has `review-log-dir-test-isolation-leak-001.json` (review for the REBUILD task for the same PR). Healer checked superseded original task ID. No DM to Larry (false positive; PR handled). New G-rule **1/3** (`pipeline-stall:no-mirror-dispatch for superseded tasks` — same root cause as `forge-no-pr` G-rule 2/3; batch at 3/3).
+  - NOTE: Automated cycle at 06:06:48Z (commit e7f22f9) ran but produced no journal entry above iter 847. This interactive session is iter 848 (first properly journaled cycle post-06:06Z).
+
+- **(Check 1) Log noise: ✅ Nominal.** No WARN/ERROR in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox empty. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat 06:06:42Z (~8 min; ✅). PR #306 stall alert confirmed false positive. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat 05:56:15Z (~18 min; ✅). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, clean, HEAD=e7f22f9 "Pulse cycle 20260604T060648Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #58** (06:12:12Z). Known pattern; self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All services active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 1 auto-fix applied.**
+  - **PR #310 MERGED ✅** (29403b4 — "feat(deploy-notifier): READY deploys log-only; failures still page"). **G-rule `deploy-notifier:READY:*` PERMANENTLY CLOSED ✅** Event-driven worktree teardown confirmed. ✅
+  - **PR #306 → auto-merge enabled.** CLEAN/MERGEABLE at ~44 min (missed threshold due to cycle.timer gap). `gh pr merge 306 --auto --squash` applied. Mirror reviewing via rebuild task. ✅
+  - **PR #311 OPEN** — phantom-dispatch detector. UNKNOWN, ~17 min. Mirror reviewing; Forge has revision-1. Below threshold. ⏳
+  - **PR #312 OPEN** — done_today prod fix (source=larry). UNKNOWN, ~13 min. Mirror reviewing. Below threshold. G-rule note: source=larry DID receive Mirror review → pattern non-recurrent (2/2 recent builds reviewed). ✅
+  - **PR #313 OPEN** — LogWriteHitsOverrideDirTest hermetic fix. CLEAN, ~7 min. Below threshold. ✅
+  - **Forge inbox: 4** — harden-approval-tab (active), fix-notifier-review-dispatch-reliability (NEW), forge-claude-md-canonical-pr-line-discipline (NEW), revision-heal-phantom-dispatch-claim-1. ✅
+  - **Mirror inbox: 2** — review-build-done-today-projection-fix (PR #312), review-log-dir-test-isolation-leak-001 (PR #306). ✅
+  - **Beacon inbox: 1** — cycle-finding-daemon-reload-cycle-timer-stuck dispatch (this iter). ✅ Beacon already responded (spec received).
+  - **Worktrees: 14** (↓1 from 15 — PR #310 teardown confirmed; 9 stale GC targets; hourly GC active). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **`daemon-reload triggers cycle.timer stuck`: G-rule 3/3 → DISPATCHED ✅** (iter 317=1/3; iter 680=2/3; iter 848=3/3). Beacon responded immediately with implementation spec. Awaiting Larry "go: cycle-timer checkpoint" → Forge build → merge.
+  - **`deploy-notifier:READY:* not in alert-translations.json` G-rule CLOSED ✅** (PR #310 merged).
+  - `pipeline-stall:no-mirror-dispatch for superseded preflight tasks`: **NEW G-rule 1/3**. Batch into `forge-no-pr` dispatch at 3/3.
+  - `pipeline-stall:forge-no-pr for superseded preflight tasks`: G-rule **2/3** (iter 827=1/3; iter 841=2/3). Unchanged.
+  - `install-drift healer doesn't auto-install sibling timers`: **G-rule 2/3** (iter 775 `inbox-watcher.service` = 1/3; iter 848 `heal-wedged-review-sessions.timer` = 2/3). At 3/3: dispatch Beacon to spec timer installation coverage gap in install-drift healer.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: G-rule **1/3** (iter 835). Unchanged.
+  - `heal-stale-daemon-code:auto-restarted:*`: G-rule **3/3 DISPATCHED (iter 592)**. Forge brief MISSING. Re-dispatch pending Larry go-ahead.
+  - `source=larry Forge builds don't auto-route to Mirror for review`: G-rule **1/3** (iter 805). UPDATE: PR #312 (source=larry) received Mirror review → 2/2 recent builds reviewed. Pattern non-recurrent; continued watch.
+  - All other G-rule counters unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=700 (+1), systemic_fixes=7 (+1), ratio=100.0 (↓ from 116.5). Trend=flat. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 6 new alerts — 5 Tier-3 silenced, 1 Tier-4 novel (false positive). Watermark advanced to 1279 lines / 06:06:48Z. Tier-reset.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #58 noted. No action.
+4. **Always-fix: `gh pr merge 306 --auto --squash`** — PR #306 CLEAN/MERGEABLE at 44+ min (cycle.timer gap caused miss). Applied. ✅
+5. **G-rule dispatch:** daemon-reload→cycle.timer-stuck 3/3 → `cycle-finding-daemon-reload-cycle-timer-stuck-20260604T061451Z.json` → Beacon inbox. Beacon responded with implementation spec in <5 min. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention` (pr-auto-merge-enable:PR-306-cycle-timer-stuck-gap) ✅
+7. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix` (daemon-reload-cycle-timer-checkpoint:g-rule-3of3-dispatched-to-beacon) ✅
+8. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=06:19:21Z. ✅
+9. Wrote journal entry.
+
+**Escalated:** No new DMs (false positive confirmed; tier2 probe + timer install already DM'd via healer escalate routes). Standing escalations unchanged.
+
+**Patterns:**
+- cycle.timer stuck recurring (3/3 dispatched). Beacon's fix: add `_checkpoint_cycle_timer()` call at end of `_cp_and_reload()` — complementary to existing stuck-timer pass but fires inline instead of waiting for next sweep. Larry needs to send "go: cycle-timer checkpoint" to Beacon to ship.
+- `install-drift healer doesn't auto-install sibling timers` G-rule at 2/3 (inbox-watcher iter 775 + heal-wedged-review-sessions iter 848). One more occurrence → dispatch to Beacon for timer installation coverage fix.
+- pipeline-stall:no-mirror-dispatch false-positive shape identified. Same root cause as forge-no-pr (healer uses original task ID, misses rebuild-task-ID associations). Will batch at 3/3.
+
+**Learned:** install-drift healer installs services but not their sibling timers — this is a systemic gap, not a one-off. Pattern now at 2/3 (inbox-watcher.service and heal-wedged-review-sessions.timer are both examples where the healer installed the service but not the timer). Beacon dispatch approaching threshold.
+
+---
+
 ## Iteration 847 — 2026-06-04 06:01 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: heal-stale-daemon-code:auto-restarted Tier-4 novel; Check B: SYNC-PUSH-REBASE-FALLBACK #57) — **0 auto-fixes. 0 new escalations. 3 open PRs (#306 UNKNOWN/31min, #310 UNKNOWN/8min, #311 CLEAN/4min). Forge inbox: 3. Mirror inbox: 2. Beacon inbox: 1. Worktrees: 15 (9 stale). Healer: 05:51Z (~9 min). Stale-daemon: 05:56Z (~5 min). 8/8 services active.**
