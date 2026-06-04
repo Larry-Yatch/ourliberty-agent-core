@@ -58,6 +58,20 @@ import larry_alerts
 STATE_REL = 'state/alert-triage.json'
 LOG_REL = 'logs/alert-triage-state.log'
 
+# Phase C — the per-template execution track-record store. Distinct from the
+# per-alert lifecycle state above: keyed by action-template, it accrues one
+# record per acted fix so Check V can compute a per-template clean streak. This
+# is the streak INPUT that Phase B left unbuilt (docs/pulse-triage-phase-c-brief.md
+# "the missing streak INPUT"). Shape:
+#   {"action_templates": {"<template>": {"executions": [
+#       {"outcome": "success"|"failure", "larry_correction_signal": bool, "ts": iso8601}
+#   ]}}}
+ACTION_TEMPLATE_EXEC_REL = 'state/action-template-executions.json'
+
+# A recorded execution's outcome is one of these. "success" + a falsy
+# larry_correction_signal is the only "clean" combination (the streak input).
+VALID_OUTCOMES = ('success', 'failure')
+
 # Config inputs for the data-driven § 6.6 decision table. Both are the same
 # files Phase A (#279) shipped + #277 added; read at classify time, never copied.
 _CONFIG_DIR = Path(__file__).resolve().parent.parent / 'config'
@@ -205,6 +219,106 @@ def mark_resolved(alert_id: str, resolved_ts: str,
     return True
 
 
+# -------------------- per-template execution track record (Phase C) --------------------
+
+
+def _exec_path() -> Path:
+    root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
+    return root / ACTION_TEMPLATE_EXEC_REL
+
+
+def _read_executions_doc() -> dict[str, Any]:
+    """Read the raw executions document. Returns the canonical empty shape on a
+    missing/corrupt file — a lost track record degrades to "no streak" (the
+    conservative direction: nothing graduates on missing data) rather than
+    crashing the recorder."""
+    path = _exec_path()
+    if not path.exists():
+        return {'action_templates': {}}
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        _log(f'{path.name} unreadable; treating executions as empty', 'WARN')
+        return {'action_templates': {}}
+    if not isinstance(data, dict) or not isinstance(data.get('action_templates'), dict):
+        return {'action_templates': {}}
+    return data
+
+
+def _write_executions_doc(doc: dict[str, Any]) -> None:
+    path = _exec_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + '.tmp')
+    tmp.write_text(json.dumps(doc, indent=2, sort_keys=True))
+    tmp.replace(path)
+
+
+def load_executions() -> dict[str, list[dict[str, Any]]]:
+    """Return ``{template: [execution, ...]}`` — the authoritative track-record
+    source Check V reads to compute per-template clean streaks. Empty dict on a
+    missing/corrupt store."""
+    doc = _read_executions_doc()
+    out: dict[str, list[dict[str, Any]]] = {}
+    for template, rec in doc.get('action_templates', {}).items():
+        if not isinstance(template, str) or not isinstance(rec, dict):
+            continue
+        execs = rec.get('executions')
+        out[template] = [e for e in execs if isinstance(e, dict)] \
+            if isinstance(execs, list) else []
+    return out
+
+
+def record_action_template_execution(
+    template: str, *, outcome: str = 'success',
+    larry_correction_signal: bool = False,
+    ts: Optional[str] = None,
+) -> dict[str, Any]:
+    """Append one execution record for ``template`` and return it.
+
+    This is the streak INPUT (docs/pulse-triage-phase-c-brief.md): Check 0 calls
+    it for BOTH Tier-1 auto-fixes AND Tier-2 approved-probation fixes so a
+    probation pattern accrues a track record at all. A "clean" execution is
+    ``outcome == "success"`` AND ``larry_correction_signal`` falsy.
+
+    Side effect — auto-demotion (single-sourced in ``pulse_check_v``): when this
+    is an ADVERSE execution (``outcome == "failure"`` OR ``larry_correction_signal``)
+    against a currently-``graduated`` registry template, the recorder triggers an
+    immediate, ungated demotion ``graduated → probation``. Losing trust is never
+    gated, so it fires here at record time rather than waiting for the next Check V
+    cycle. The demotion is lazy-imported to avoid an import cycle and is
+    best-effort — a recording must never fail because the demotion hook errored."""
+    if not isinstance(template, str) or not template:
+        raise ValueError('template must be a non-empty string')
+    if outcome not in VALID_OUTCOMES:
+        raise ValueError(f'invalid outcome={outcome!r}; expected one of {VALID_OUTCOMES}')
+    record = {
+        'outcome': outcome,
+        'larry_correction_signal': bool(larry_correction_signal),
+        'ts': ts or _now_iso(),
+    }
+    doc = _read_executions_doc()
+    templates = doc.setdefault('action_templates', {})
+    rec = templates.setdefault(template, {})
+    execs = rec.setdefault('executions', [])
+    if not isinstance(execs, list):
+        execs = rec['executions'] = []
+    execs.append(record)
+    _write_executions_doc(doc)
+
+    adverse = outcome == 'failure' or bool(larry_correction_signal)
+    if adverse:
+        try:
+            import pulse_check_v
+            pulse_check_v.demote_on_adverse_execution(
+                template, reason=('failed execution' if outcome == 'failure'
+                                  else 'Larry-correction'),
+                correction=bool(larry_correction_signal))
+        except Exception as e:  # never let the demotion hook break recording
+            _log(f'demotion hook for {template!r} failed: '
+                 f'{type(e).__name__}: {e}', 'WARN')
+    return record
+
+
 # -------------------- data-driven § 6.6 classification (Phase B) --------------------
 
 
@@ -344,24 +458,41 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
 def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
                  registry: Optional[dict[str, dict[str, Any]]] = None,
                  translations: Optional[dict[str, Any]] = None,
-                 route_fn: Optional[Callable[[str, Optional[str], bool], str]] = None
+                 route_fn: Optional[Callable[[str, Optional[str], bool], str]] = None,
+                 outcome: str = 'success',
+                 larry_correction_signal: bool = False,
+                 apply_approved_fix: bool = False,
                  ) -> dict[str, Any]:
     """Durable, idempotent Check 0 orchestration for one signal.
 
     classify → persist the lifecycle row → act per tier:
-      - Tier 1: record a TAGGED ``cycle_prime_ledger`` intervention
-        (``template = pattern id`` — the B→C track-record link) and advance the
-        row to ``action-dispatched``. The remediation itself is acted by Pulse /
-        existing healers; Phase B records the decision + the ledger tag.
+      - Tier 1 (auto-fix): record a TAGGED ``cycle_prime_ledger`` intervention
+        (``template = pattern id`` — the B→C track-record link), record a Phase-C
+        execution (``outcome`` / ``larry_correction_signal``) so the per-template
+        streak accrues, and advance the row to ``action-dispatched``. The
+        remediation itself is acted by Pulse / existing healers.
+      - Tier 2 WITH ``apply_approved_fix`` (Larry approved this probation
+        proposal and the fix is being applied THIS call): record a Phase-C
+        execution + advance to ``action-dispatched``. This is what lets a
+        probation pattern earn a clean streak toward graduation.
+      - Tier 2 WITHOUT ``apply_approved_fix`` / Tier 4: leave at
+        ``triaged-tier-N`` awaiting Larry (the default Phase-B behavior).
       - Tier 3: silence IS the resolution → advance directly to ``resolved``.
-      - Tier 2 / Tier 4: leave at ``triaged-tier-N`` awaiting Larry.
+
+    ``outcome`` (``success``|``failure``) and ``larry_correction_signal`` describe
+    the acted fix's result; the defaults (success, uncorrected) are the clean
+    common case. A recorded failure/correction of a graduated template
+    auto-demotes it immediately (handled inside
+    ``record_action_template_execution``).
 
     Idempotency: if the alert is already ``action-dispatched`` or ``resolved``,
     return the existing row unchanged — no re-classify, no re-record, no second
-    ledger write. Re-running an iter never double-acts.
+    ledger/execution write. Re-running an iter never double-acts.
 
     ``registry`` / ``translations`` default to the live config files; tests
     inject fixtures. Returns the post-mutation row."""
+    if outcome not in VALID_OUTCOMES:
+        raise ValueError(f'invalid outcome={outcome!r}; expected one of {VALID_OUTCOMES}')
     existing = read_state().get(alert_id)
     if existing and existing.get('status') in ('action-dispatched', 'resolved'):
         return existing
@@ -380,8 +511,19 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
         iid = cpl.canonical_intervention_id(result['template'], detail)
         cpl.append_action(tier=1, kind='intervention',
                           payload={'intervention_id': iid}, iter_num=iter_num)
+        record_action_template_execution(
+            result['template'], outcome=outcome,
+            larry_correction_signal=larry_correction_signal, ts=now)
         mark_dispatched(alert_id, dispatch_ts=now,
                         target_agent=AUTO_FIX_AGENT, task_id=iid)
+    elif result['tier'] == 2 and apply_approved_fix and result['template']:
+        record_action_template_execution(
+            result['template'], outcome=outcome,
+            larry_correction_signal=larry_correction_signal, ts=now)
+        mark_dispatched(alert_id, dispatch_ts=now,
+                        target_agent=AUTO_FIX_AGENT,
+                        task_id=cpl.canonical_intervention_id(
+                            result['template'], str(alert.get('subject') or alert_id)))
     elif result['tier'] == 3:
         mark_resolved(alert_id, resolved_ts=now,
                       resolution='tier-3 silence (known pattern)')

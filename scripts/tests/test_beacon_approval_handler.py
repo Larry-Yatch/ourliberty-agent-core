@@ -82,6 +82,24 @@ class ParseUserReplyTest(unittest.TestCase):
             r = ah.parse_user_reply(text)
             self.assertEqual(r['action'], 'none')
 
+    def test_approve_graduation_parses_template(self):
+        """Phase C: the dedicated graduation grammar parses to a template-
+        targeted action (never a generic approve)."""
+        for text in ['approve graduation restart-daemon',
+                     'Approve Graduation restart-daemon',
+                     '  approve   graduation   restart-daemon  ']:
+            r = ah.parse_user_reply(text)
+            self.assertEqual(r['action'], 'approve_graduation', f'text={text!r}')
+            self.assertEqual(r['template'], 'restart-daemon')
+
+    def test_bare_approve_is_not_graduation(self):
+        self.assertEqual(ah.parse_user_reply('approve')['action'], 'approve')
+
+    def test_approve_graduation_bad_template_bounces(self):
+        # missing template, or non-kebab garbage -> not a graduation command
+        self.assertEqual(ah.parse_user_reply('approve graduation')['action'],
+                         'none')
+
 
 class ExtractApprovalRequestTest(unittest.TestCase):
     """Marker extraction. Strict on missing fields + malformed JSON."""
@@ -191,6 +209,30 @@ class StateCrudTest(unittest.TestCase):
         self.assertIsNone(ah.most_recent_pending())
         ah.add_pending(_good_payload(task_id='t-normal'), chat_id=1)
         self.assertEqual(ah.most_recent_pending()['id'], 't-normal')
+
+    def test_most_recent_excludes_graduation(self):
+        """Phase C: a graduation entry (kind=='graduation') must NEVER be
+        resolved by a bare `approve` / most_recent_pending — only by its
+        explicit named approval."""
+        grad = _good_payload(task_id='graduation-restart-daemon')
+        grad['kind'] = 'graduation'
+        grad['template'] = 'restart-daemon'
+        ah.add_pending(grad, chat_id=1)
+        # a graduation alone -> nothing for a bare approve to pick up
+        self.assertIsNone(ah.most_recent_pending())
+        # a normal entry alongside is still returned; the graduation is skipped
+        ah.add_pending(_good_payload(task_id='t-normal'), chat_id=1)
+        self.assertEqual(ah.most_recent_pending()['id'], 't-normal')
+
+    def test_find_graduation_pending_exact_template(self):
+        grad = _good_payload(task_id='graduation-restart-daemon')
+        grad['kind'] = 'graduation'
+        grad['template'] = 'restart-daemon'
+        ah.add_pending(grad, chat_id=1)
+        self.assertEqual(
+            ah.find_graduation_pending('restart-daemon')['id'],
+            'graduation-restart-daemon')
+        self.assertIsNone(ah.find_graduation_pending('retry-sync-push'))
 
     def test_resolve_moves_to_history(self):
         ah.add_pending(_good_payload(task_id='t-r'), chat_id=1)

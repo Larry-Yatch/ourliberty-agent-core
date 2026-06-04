@@ -337,6 +337,65 @@ class TestTriageAlert(_ATSTestBase):
         self.assertEqual(self._ledger_rows(), [])
 
 
+class TestTriageExecutionRecording(_ATSTestBase):
+    """Phase C streak INPUT: triage_alert must append an executions record for
+    BOTH Tier-1 auto-fixes AND Tier-2 approved-probation fixes, persisting the
+    clean/adverse signal so a probation pattern can accrue a track record."""
+
+    def _triage(self, alert_id, alert, **kw):
+        return ats.triage_alert(alert_id, alert, registry=_FIXTURE_REGISTRY,
+                               translations=_FIXTURE_TRANSLATIONS,
+                               route_fn=_route_stub, **kw)
+
+    def _execs(self, template):
+        path = self.tmp / ats.ACTION_TEMPLATE_EXEC_REL
+        if not path.exists():
+            return []
+        doc = json.loads(path.read_text())
+        return doc.get('action_templates', {}).get(template, {}).get(
+            'executions', [])
+
+    def test_tier1_records_one_clean_execution(self):
+        self._triage('a-grad', {'source': 's', 'subject': 'sub',
+                                'template': 'reinstall-systemd-unit'})
+        execs = self._execs('reinstall-systemd-unit')
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'success')
+        self.assertFalse(execs[0]['larry_correction_signal'])
+
+    def test_tier2_approved_records_execution_and_dispatches(self):
+        row = self._triage('a-prob', {'source': 's', 'subject': 'sub',
+                                      'template': 'restart-daemon'},
+                           apply_approved_fix=True)
+        self.assertEqual(row['status'], 'action-dispatched')
+        execs = self._execs('restart-daemon')
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'success')
+        self.assertFalse(execs[0]['larry_correction_signal'])
+
+    def test_tier2_without_approval_records_nothing(self):
+        row = self._triage('a-prob', {'source': 's', 'subject': 'sub',
+                                      'template': 'restart-daemon'})
+        self.assertEqual(row['status'], 'triaged-tier-2')
+        self.assertEqual(self._execs('restart-daemon'), [])
+
+    def test_tier2_approved_correction_persists_signal(self):
+        self._triage('a-prob', {'source': 's', 'subject': 'sub',
+                                'template': 'restart-daemon'},
+                     apply_approved_fix=True, larry_correction_signal=True)
+        execs = self._execs('restart-daemon')
+        self.assertEqual(len(execs), 1)
+        self.assertTrue(execs[0]['larry_correction_signal'])
+
+    def test_tier2_approved_failure_persists_outcome(self):
+        self._triage('a-prob', {'source': 's', 'subject': 'sub',
+                                'template': 'restart-daemon'},
+                     apply_approved_fix=True, outcome='failure')
+        execs = self._execs('restart-daemon')
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'failure')
+
+
 class TestLoaders(_ATSTestBase):
 
     def test_missing_registry_is_empty(self):

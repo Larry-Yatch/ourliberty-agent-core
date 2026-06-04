@@ -604,6 +604,28 @@ def handle_user_command(chat_id: int, action: dict) -> bool:
             log(f"dispatch failed for {entry['id']}: {e}")
         return True
 
+    if kind == 'approve_graduation':
+        template = action.get('template', '')
+        entry = approval.find_graduation_pending(template)
+        if entry is None:
+            telegram_send(chat_id,
+                          f"No graduation pending for {template!r}.")
+            return True
+        try:
+            dest = approval.dispatch_approved(entry)
+            approval.resolve(entry['id'], 'approved')
+            telegram_send(chat_id,
+                          f"✅ Graduation approved: {template} is now auto-fix. "
+                          f"Config PR dispatched to {entry.get('target_agent', 'forge')}.")
+            log(f"graduation approved for {template} -> dispatched to {dest}")
+        except (safe_write_inbox.DispatchRejected,
+                safe_write_inbox.RoutingDenied) as e:
+            telegram_send(chat_id,
+                f"Graduation dispatch FAILED for {template}: "
+                f"{type(e).__name__}: {e}. Entry remains pending — retry approval.")
+            log(f"graduation dispatch failed for {template}: {e}")
+        return True
+
     if kind == 'modify':
         entry = approval.most_recent_pending()
         if entry is None:
