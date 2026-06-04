@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 893 — 2026-06-04 16:21 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check E — 2 auto-fixes: auto-merge enabled PR #322 + PR #323). **2 auto-fixes. 8/8 services active. 3 open agent-core PRs (2 now pending auto-merge, 1 under threshold). 1 dashboard PR (under threshold). Forge: 3 build tasks (~10-12 min old). Sync: residual from iter 892 58th SYNC-PUSH-REBASE-FALLBACK-001 (known; self-clears ~16:48Z UTC hourly timer).**
+
+Alert watermark: **1272 lines / 16:12:49Z** (unchanged — 0 new alerts since iter 892). Sync: sync.json status=error, last_sync=16:11:44Z, commit=6ed81d675 (same 58th SYNC-PUSH-REBASE-FALLBACK-001 residual as iter 892; HEAD=3665f14 > sync commit → wrapper push succeeded; hourly timer ~16:48Z UTC). **8/8 services active.** Pipeline-stall heartbeat: 16:19:49Z (✅ ~2 min ago). Stale-daemon heartbeat: 15:59:42Z (✅ ~22 min ago).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: **1272 lines** — unchanged from iter 892 watermark (1272 / 16:12:49Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** All inboxes (Beacon, Mirror, Pulse): 0. Standing G-rule: cycle-timer-checkpoint DM forwarded to Beacon at 07:12 UTC; Beacon awaiting "go" — no new activity. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:19:49Z (~2 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No new directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 15:59:42Z (~22 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=3665f14 "Pulse cycle 20260604T162015Z" (iter 892 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Known residual.** sync.json: status=error, last_sync=16:11:44Z, commit=6ed81d675 — same 58th SYNC-PUSH-REBASE-FALLBACK-001 residual from iter 892. Session HEAD=3665f14 > sync commit 6ed81d675 (rolled-back commit, not in chain) → iter 892 wrapper push succeeded; sync.json just hasn't been refreshed yet. Self-clears on hourly timer ~16:48Z UTC. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (systemic fix pending Larry). ✅ (known residual, not new failure)
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ 3 build tasks (~10-12 min old, all under 1-hour threshold).**
+  - `build-tune-unregistered-approval-reconcile.json` (~12 min old, 16:09Z UTC)
+  - `build-forge-marker-error-retry-fillin-001.json` (~11 min old, 16:10Z UTC)
+  - `build-pulse-marker-discipline-signal-001.json` (~10 min old, 16:11Z UTC)
+  Inbox-watcher active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ 2 auto-fixes applied; 2 remaining under threshold.**
+  - agent-core **3 open PRs:**
+    - **#322** "fix(healers): out-of-band resolution check" (15:47Z, ~34 min, CLEAN/MERGEABLE, no auto-merge) — **always-fix: `gh pr merge 322 --auto --squash` ✅**
+    - **#323** "feat(pulse): add preflight-marker-discipline signal to Check I" (15:50Z, ~31 min, CLEAN/MERGEABLE, no auto-merge) — **always-fix: `gh pr merge 323 --auto --squash` ✅**
+    - **#324** "feat(dashboard): generalize agent-queue endpoint" (15:56Z, ~25 min, CLEAN/MERGEABLE) — under threshold. ✅
+  - ourliberty-dashboard **1 open PR:**
+    - **#39** "feat(auth): enforce sign-in across the whole dashboard" (16:14Z, ~7 min, CLEAN/MERGEABLE) — under threshold. ✅
+  - Beacon inbox: 0 ✅ Mirror inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 892. `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=706 (+1), systemic_fixes=9, ratio≈78.44. Ledger row appended: `enable-pr-auto-merge:PR-322-and-PR-323`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. **Always-fix: `gh pr merge 322 --auto --squash`** — auto-merge enabled on PR #322 (CLEAN, 34 min over 30-min threshold). Logged to cycle-actions.jsonl.
+3. **Always-fix: `gh pr merge 323 --auto --squash`** — auto-merge enabled on PR #323 (CLEAN, 31 min over 30-min threshold). Logged to cycle-actions.jsonl.
+4. Check 0: 0 new alerts. Watermark confirmed at 1272 / 16:12:49Z (unchanged from iter 892).
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 893 --template enable-pr-auto-merge --detail PR-322-and-PR-323` → row appended. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=16:23:18Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go" — send "go: cycle-timer checkpoint" to Beacon bot to proceed).
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 58th total; self-recovers every occurrence).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- 3 Forge build tasks (~10-12 min old) unchanged from iter 892 — Forge is building actively. Normal throughput; all well under 1-hour stale threshold.
+- Dashboard PR #39 is new (created 16:14Z — appeared between iter 892 end and this iter start). CLEAN already. Will cross 30-min threshold in ~23 min.
+- PR #322 and #323 both crossed 30-min threshold simultaneously this iter (consistent with the busy-build-day pattern noted iter 891). Two auto-merges applied in one iter again.
+- 58th SYNC-PUSH-REBASE-FALLBACK-001 residual persisting through this iter — expected (hourly timer hasn't fired since 16:11Z; will clear ~16:48Z).
+
+**Learned:** Nothing structurally new.
+
+---
+
 ## Iteration 892 — 2026-06-04 16:13 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check B — 58th SYNC-PUSH-REBASE-FALLBACK-001 at 16:11:44Z, self-recovered). **0 auto-fixes. 8/8 services active. 3 open agent-core PRs (all CLEAN, none >30-min threshold). 0 dashboard PRs. Forge: 3 fresh build tasks. PR #325 merged 16:12:48Z (Mirror auto-merge).**
