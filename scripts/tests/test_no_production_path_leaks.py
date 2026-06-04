@@ -92,10 +92,10 @@ WHITELIST: dict[tuple[str, int], str] = {
     # but does NOT open the path (the file's content isn't loaded;
     # only the agent name is parsed from it). Refactoring to a tmpdir
     # would not change behavior; the string is a label, not a target.
-    ('test_outbox_notifier.py', 70): (
+    ('test_outbox_notifier.py', 71): (
         'input fixture: source_task_file metadata field (not opened)'
     ),
-    ('test_outbox_notifier.py', 315): (
+    ('test_outbox_notifier.py', 316): (
         'input fixture: source_task_file metadata field (not opened)'
     ),
 }

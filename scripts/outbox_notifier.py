@@ -111,6 +111,19 @@ AGENT_IDS = ['beacon', 'forge', 'mirror', 'pulse']
 
 POLL_INTERVAL_SECONDS = 5
 DEAD_LETTER_STATE_CAP = 1000
+
+# fix-notifier-review-dispatch-reliability (Part B): self-healing reconciliation
+# sweep for Forge build-phase outboxes that opened a PR but never got a Mirror
+# review-request dispatched (the PR #303 incident). The sweep re-scans
+# forge/.archive for recent build results and idempotently re-dispatches any
+# missed review. Bounded two ways so it's a cheap no-op in steady state:
+#   - WINDOW: only archive files modified within the last RECONCILE_WINDOW_HOURS
+#     are considered (the archive holds ~700 files; the window keeps the scan
+#     small and avoids re-examining long-settled history).
+#   - CADENCE: the sweep runs at most once per RECONCILE_INTERVAL_SECONDS, not
+#     every POLL_INTERVAL_SECONDS poll, tracked via _last_reconcile_ts.
+RECONCILE_WINDOW_HOURS = 6
+RECONCILE_INTERVAL_SECONDS = 60
 MAX_RESULT_TEXT_CHARS = 8000  # truncate huge claude outputs in notify prompts
 
 # Maximum notify-cascade depth. Hop 0 = original dispatch; hop 1 = first notify
@@ -178,12 +191,41 @@ _BEACON_AUTO_DISPATCH_SOURCES = frozenset({'pulse-auto-dispatch'})
 # 5c fill-in dispatch live test 2026-05-14. Forge's CLAUDE.md updated in the
 # same commit with the explicit `PR updated:` example so the discipline rule
 # matches the regex contract.
+#
+# fix-notifier-review-dispatch-reliability (Part A): broadened to recognize
+# Forge's natural phrasing without weakening the false-match protection.
+# Two additions over the prior line-start-anchored form:
+#   1. An OPTIONAL short leading clause before `PR`, BUT only when that clause
+#      ends in a clause terminator (`.` or `:`) immediately followed by
+#      whitespace and then `PR`. This catches `Done. PR #303 opened: <url>`
+#      and `Result: PR opened: <url>` (the literal shape of the PR #303
+#      incident outbox, which the strict line-start anchor dropped) while
+#      STILL rejecting `I considered PR opened: <stale> from last week` — that
+#      mid-sentence form has no clause terminator directly before `PR`, so the
+#      optional group can't bridge to it. The m-2 false-match guarantee holds.
+#   2. An OPTIONAL `#<digits>` issue/PR-number token between `PR` and the verb,
+#      so `PR #303 opened:` / `PR #12 updated:` match.
+# Canonical `PR opened: <url>` / `PR updated: <url>` lines (with or without
+# leading horizontal whitespace, on any line) match with byte-for-byte
+# identical group(1) results to the prior regex — both new groups are
+# optional and the regex engine skips them when the line already starts with
+# `PR`. Verified against the existing PrUrlRegexAnchored/AcceptsBothPrefixes
+# suites plus the new Part A cases.
 _PR_URL_RE = re.compile(
     # HIGH-2 (PR #10 review): use `[ \t]` not `\s` so newlines between `PR`
     # and the verb DON'T match. `\s+` would let Forge accidentally split
     # `PR\nopened: <url>` across lines and still satisfy the regex even
     # though it violates the CLAUDE.md "FIRST LINE unconditional" rule.
-    r'^[ \t]*PR[ \t]+(?:opened|updated):[ \t]*(https://github\.com/[^\s]+/pull/\d+)',
+    r'^[ \t]*'
+    # Optional short leading clause, terminated by `.`/`:` + whitespace so it
+    # only bridges to `PR` across a real clause boundary (`Done. `, `Result: `)
+    # — never across a mid-sentence run like `I considered `. `[^\n]` keeps it
+    # on one line.
+    r'(?:[^\n]*?[.:][ \t]+)?'
+    r'PR[ \t]+'
+    # Optional issue/PR-number token, e.g. `#303 `.
+    r'(?:#\d+[ \t]+)?'
+    r'(?:opened|updated):[ \t]*(https://github\.com/[^\s]+/pull/\d+)',
     re.MULTILINE,
 )
 
@@ -1108,6 +1150,10 @@ def _maybe_dm_larry_direct_synth(
 
 
 _running = True
+
+# Monotonic-ish last-run marker for the reconciliation sweep throttle (Part B).
+# 0.0 means "never run", so the first poll after startup runs the sweep once.
+_last_reconcile_ts = 0.0
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -2784,6 +2830,24 @@ def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
     return m.group(1)
 
 
+def _review_request_already_dispatched(review_filename: str) -> bool:
+    """True if a review-request with this filename is already in Mirror's
+    inbox, its `.archive/`, or its `.invalid/`.
+
+    Single source of truth for the review-request idempotency presence check
+    so `_dispatch_mirror_review` (inline build-phase dispatch) and the
+    reconciliation sweep can't diverge. Guards against re-dispatching a Mirror
+    review for a PR she's already (or previously) reviewing — including a
+    prior dispatch that was validator-rejected into `.invalid/`.
+    """
+    mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
+    return (
+        (mirror_inbox / review_filename).exists()
+        or (mirror_inbox / '.archive' / review_filename).exists()
+        or (mirror_inbox / '.invalid' / review_filename).exists()
+    )
+
+
 def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     """Write a review-request task to Mirror's inbox after Forge opens a PR.
 
@@ -2905,19 +2969,15 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     else:
         review_filename = f'review-{task_id}.json'
     # Idempotency check (same pattern as _dispatch_build_phase): if the
-    # review task is already in Mirror's inbox OR archived, skip. Guards
-    # against the notifier crashing between dispatch and archive of the
+    # review task is already in Mirror's inbox OR archived OR .invalid, skip.
+    # Guards against the notifier crashing between dispatch and archive of the
     # build-phase outbox — re-processing would otherwise spawn a duplicate
-    # Mirror review of a PR she's already started reviewing.
-    mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
-    if (
-        (mirror_inbox / review_filename).exists()
-        or (mirror_inbox / '.archive' / review_filename).exists()
-        # D3.5 5a M-1 review fix: also check .invalid/ — a prior dispatch
-        # that was validator-rejected lives there. Don't re-dispatch a
-        # duplicate that will hit the same rejection.
-        or (mirror_inbox / '.invalid' / review_filename).exists()
-    ):
+    # Mirror review of a PR she's already started reviewing. The .invalid/
+    # leg (D3.5 5a M-1 review fix) catches a prior dispatch that was
+    # validator-rejected — don't re-dispatch a duplicate that hits the same
+    # rejection. Shared with the reconciliation sweep via the helper so the
+    # two checks can't drift.
+    if _review_request_already_dispatched(review_filename):
         log(
             f'review-request already dispatched for task {task_id} '
             f'(file or archive or .invalid present); skipping duplicate write'
@@ -2950,6 +3010,111 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
             f'PR opened; Larry must manually re-dispatch review.',
             'WARN',
         )
+
+
+def _reconcile_missed_mirror_reviews() -> None:
+    """Self-healing sweep: re-dispatch Mirror reviews the inline path dropped.
+
+    fix-notifier-review-dispatch-reliability (Part B). The inline dispatch in
+    `process_outbox` fires the Forge->Mirror review-request exactly once, when
+    the build-phase outbox is first read. If PR-URL extraction returned None
+    (the PR #303 incident — non-canonical phrasing the old regex missed) or
+    the dispatch otherwise failed, nothing ever re-examines the outbox and the
+    PR stalls unreviewed. This sweep is the defense-in-depth net: it re-scans
+    recently-archived Forge build outboxes and idempotently re-dispatches any
+    review that's genuinely missing.
+
+    Bounded so it's a cheap no-op in steady state:
+      - Only archive files with mtime within RECONCILE_WINDOW_HOURS are read.
+      - Candidate filter is all-cheap (JSON parse, agent/phase/target_repo,
+        the now-robust extractor) BEFORE any gh shell-out.
+      - The idempotency presence check (shared with `_dispatch_mirror_review`)
+        runs before the gh open-state check, so a PR whose review already
+        exists costs zero gh calls.
+      - With zero in-window misses the sweep does zero dispatches and zero
+        gh calls.
+
+    Never raises into the caller's expectation of cleanliness, but the
+    main_loop hook also wraps this in try/except as a daemon-never-wedge
+    backstop.
+    """
+    archive_dir = OUTBOXES_ROOT / 'forge' / '.archive'
+    if not archive_dir.exists():
+        return
+
+    cutoff = time.time() - RECONCILE_WINDOW_HOURS * 3600
+    for outbox_file in sorted(archive_dir.glob('*.json')):
+        if outbox_file.name.startswith('.'):
+            continue
+        try:
+            if outbox_file.stat().st_mtime < cutoff:
+                continue
+        except OSError:
+            continue
+
+        try:
+            data = json.loads(outbox_file.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+
+        # Cheap candidate filters first — no gh, no inbox stat until these pass.
+        if data.get('agent') != 'forge' or data.get('phase') != 'build':
+            continue
+        target_repo = data.get('target_repo')
+        if not target_repo:
+            continue
+        pr_url = _extract_pr_url_from_build_result(data.get('result', ''))
+        if not pr_url:
+            continue
+
+        task_id = data.get('task_id') or 'unknown'
+        # Idempotency: reuse the EXACT presence check _dispatch_mirror_review
+        # performs. The incident PR's review file now exists (manual recovery),
+        # so it's correctly skipped here. We key on the unkeyed review filename
+        # — a missed FIRST dispatch is the failure shape this sweep heals;
+        # replan re-reviews are dispatched/keyed elsewhere.
+        review_filename = f'review-{task_id}.json'
+        if _review_request_already_dispatched(review_filename):
+            continue
+
+        # Don't review merged/closed PRs. Only reached for genuine misses
+        # (review file absent), so the gh cost is incurred ~never in steady
+        # state. Unknown state (None) -> skip this tick; a later sweep retries.
+        parsed = _parse_pr_url(pr_url)
+        if parsed is None:
+            log(
+                f'reconcile: candidate task={task_id} has unparseable '
+                f'pr_url={pr_url}; skipping',
+                'INFO',
+            )
+            continue
+        repo_coords, pr_number = parsed
+        is_open = _gh_pr_is_open(repo_coords, pr_number)
+        if is_open is None:
+            log(
+                f'reconcile: could not determine state of PR {pr_url} '
+                f'(task={task_id}); leaving for next sweep',
+                'INFO',
+            )
+            continue
+        if not is_open:
+            log(
+                f'reconcile: PR {pr_url} (task={task_id}) is not OPEN '
+                f'(merged/closed); skipping review re-dispatch',
+                'INFO',
+            )
+            continue
+
+        # Genuine miss: loud sentinel BEFORE dispatching so the gap is
+        # greppable in the notifier log.
+        log(
+            f'RECONCILE_MISSING_REVIEW task={task_id} pr={pr_url} — notifier '
+            f'dropped the build-phase review-request; re-dispatching',
+            'WARN',
+        )
+        _dispatch_mirror_review(data, pr_url)
 
 
 def _extract_revision_summary_from_result(
@@ -7351,6 +7516,23 @@ def main_loop() -> int:
                 f'auto-merge queue sweep error: {type(e).__name__}: {e}',
                 'ERROR',
             )
+
+        # fix-notifier-review-dispatch-reliability (Part B) — reconciliation
+        # sweep for dropped Forge->Mirror review-requests. Throttled to at most
+        # once per RECONCILE_INTERVAL_SECONDS (not every poll). Gated on the
+        # same halt check as the sweeps above and wrapped in try/except so any
+        # error logs and the loop continues — never wedge the daemon.
+        global _last_reconcile_ts
+        now = time.time()
+        if now - _last_reconcile_ts >= RECONCILE_INTERVAL_SECONDS:
+            _last_reconcile_ts = now
+            try:
+                _reconcile_missed_mirror_reviews()
+            except Exception as e:  # noqa: BLE001
+                log(
+                    f'reconcile sweep error: {type(e).__name__}: {e}',
+                    'ERROR',
+                )
 
         # Sleep in short slices so SIGTERM is responsive.
         slept = 0.0
