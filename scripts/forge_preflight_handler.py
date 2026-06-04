@@ -157,6 +157,52 @@ def render_marker(marker_type: str, **payload: Any) -> str:
     return f'=== {keyword} ===\n{json_body}\n=== END_{keyword} ===\n'
 
 
+def render_marker_skeleton(
+    marker_type: str,
+    field_values: Optional[dict[str, str]] = None,
+) -> str:
+    """Build a fill-in-the-blank marker block for `marker_type`.
+
+    Produces canonical, PARSER-SYNCED grammar: the same delimiters and field
+    set `render_marker` emits, but with a `<field_name>` placeholder for any
+    required field not supplied in `field_values`. Because it routes through
+    `render_marker` (which derives delimiters from MARKER_KEYWORDS and fields
+    from REQUIRED_FIELDS), the embedded example cannot drift from what
+    `parse_forge_marker` accepts — there are no hand-typed bare-literal
+    delimiters to rot.
+
+    Supply known values (e.g. the real `task_id`) via `field_values` so the
+    skeleton Forge pastes back already carries them; unsupplied fields stay as
+    `<field_name>` for her to fill.
+    """
+    if marker_type not in MARKER_TYPES:
+        raise ValueError(
+            f'unknown marker type: {marker_type!r}. '
+            f'Valid types: {sorted(MARKER_TYPES)}'
+        )
+    field_values = field_values or {}
+    payload = {
+        field: field_values.get(field, f'<{field}>')
+        for field in sorted(REQUIRED_FIELDS[marker_type])
+    }
+    return render_marker(marker_type, **payload)
+
+
+def render_all_marker_skeletons(
+    field_values: Optional[dict[str, str]] = None,
+) -> str:
+    """Concatenate fill-in-the-blank skeletons for every preflight marker type.
+
+    Blocks are emitted in MARKER_TYPES order (proceed, clarify_request,
+    reject). Used by the outbox notifier to embed the full preflight marker
+    grammar in a none-found marker-error retry prompt so the bounce is a
+    paste-and-fill task rather than a scold.
+    """
+    return '\n'.join(
+        render_marker_skeleton(mtype, field_values) for mtype in MARKER_TYPES
+    )
+
+
 # -------------------- marker extraction --------------------
 
 def parse_forge_marker(
