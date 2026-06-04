@@ -67,23 +67,36 @@ LEAK_PATTERNS: tuple[str, ...] = (
     '/home/larry/agents/state/',
 )
 
-# Whitelist: (filename, lineno) → one-line reason. Each entry must be
-# justified — input fixture metadata, defensive anti-leak assertion, etc.
-# Adding a new entry requires the reason to be readable by the next
+# Whitelist: (filename, leak_literal) → one-line reason. Each entry must
+# be justified — input fixture metadata, defensive anti-leak assertion,
+# etc. Adding a new entry requires the reason to be readable by the next
 # operator who runs the test. Prefer refactoring (tmpdir + monkeypatch)
 # over whitelisting; whitelist only when the literal is not a write
 # target (input metadata, assertion-of-absence, or canonical example).
-WHITELIST: dict[tuple[str, int], str] = {
+#
+# Keyed on CONTENT (the exact leak literal), NOT line number. Line-number
+# keying is brittle: any edit that shifts lines in a scanned test file
+# (e.g. PR #321) breaks the gate even though nothing leaked. Content keys
+# are immune to line shifts.
+#
+# Tradeoff of content-keying: if the SAME literal appeared twice in one
+# file — one a real leak, one whitelisted — a content key would exempt
+# both. Guarded by test_whitelisted_literals_unique_per_file below, which
+# asserts every whitelisted literal occurs exactly once in its file, so a
+# second (leaking) occurrence forces a deliberate re-review.
+WHITELIST: dict[tuple[str, str], str] = {
     # test_beacon_plan_synthesis_discipline.py — INPUT fixtures: the
-    # test feeds bash-command strings to a discipline-checker parser
+    # test feeds command/path strings to a discipline-checker parser
     # under test. The strings are inputs (parser arguments), not paths
     # the test reads/writes. Refactoring would defeat the test's
     # purpose (it must check the parser's handling of these exact
     # strings).
-    ('test_beacon_plan_synthesis_discipline.py', 361): (
+    ('test_beacon_plan_synthesis_discipline.py',
+     'ls ~/agents/state/in-flight/'): (
         'input fixture: bash-command string fed to parser-under-test'
     ),
-    ('test_beacon_plan_synthesis_discipline.py', 384): (
+    ('test_beacon_plan_synthesis_discipline.py',
+     '/home/larry/agents/state/beacon-pending-approvals.json'): (
         'input fixture: bash-command string fed to parser-under-test'
     ),
     # test_outbox_notifier.py — INPUT fixtures: source_task_file fields
@@ -92,10 +105,12 @@ WHITELIST: dict[tuple[str, int], str] = {
     # but does NOT open the path (the file's content isn't loaded;
     # only the agent name is parsed from it). Refactoring to a tmpdir
     # would not change behavior; the string is a label, not a target.
-    ('test_outbox_notifier.py', 72): (
+    ('test_outbox_notifier.py',
+     '/home/larry/agents/inboxes/beacon/real-001.json'): (
         'input fixture: source_task_file metadata field (not opened)'
     ),
-    ('test_outbox_notifier.py', 317): (
+    ('test_outbox_notifier.py',
+     '/home/larry/agents/inboxes/beacon/notify-prior.json'): (
         'input fixture: source_task_file metadata field (not opened)'
     ),
 }
@@ -176,7 +191,7 @@ class ProductionPathLeakTest(unittest.TestCase):
         for hit in _scan_all_test_files():
             if hit['in_docstring']:
                 continue
-            key = (hit['file'], hit['line'])
+            key = (hit['file'], hit['literal'])
             if key in WHITELIST:
                 continue
             violations.append(
@@ -195,26 +210,95 @@ class ProductionPathLeakTest(unittest.TestCase):
             )
 
     def test_whitelist_entries_still_exist(self):
-        """Stale-whitelist guard: if a whitelisted (file, line) no longer
-        contains a leak literal (because the file was refactored), the
-        whitelist entry must be removed. Otherwise the whitelist drifts
-        and silently allows future leaks at that line number."""
+        """Stale-whitelist guard: if a whitelisted (file, literal) no
+        longer matches a leak literal in the source file (because the
+        file was refactored or the literal removed), the whitelist entry
+        must be removed. Otherwise the whitelist drifts and silently
+        allows a future leak that reuses the same literal. Keyed on
+        content, so a pure line shift does NOT make an entry stale."""
         current_hits = {
-            (h['file'], h['line']) for h in _scan_all_test_files()
+            (h['file'], h['literal']) for h in _scan_all_test_files()
             if not h['in_docstring']
         }
         stale = sorted(
-            f'{f}:{ln} (reason: {WHITELIST[(f, ln)]})'
-            for (f, ln) in WHITELIST
-            if (f, ln) not in current_hits
+            f'{f}: {lit!r} (reason: {WHITELIST[(f, lit)]})'
+            for (f, lit) in WHITELIST
+            if (f, lit) not in current_hits
         )
         if stale:
             self.fail(
                 'WHITELIST contains entries that no longer match a leak '
-                'literal in the source file (the line may have moved or '
-                'the literal may have been removed). Remove or update:\n'
+                'literal in the source file (the literal may have been '
+                'removed or edited). Remove or update:\n'
                 '  - ' + '\n  - '.join(stale)
             )
+
+    def test_whitelisted_literals_unique_per_file(self):
+        """Content-keying tradeoff guard: a (file, literal) whitelist key
+        exempts EVERY occurrence of that literal in the file. If the same
+        literal appeared twice — one a real leak — both would be silently
+        allowed. Assert each whitelisted literal occurs exactly once in
+        its file, so a second occurrence trips this test and forces a
+        deliberate re-review rather than slipping through."""
+        from collections import Counter
+        counts: Counter = Counter(
+            (h['file'], h['literal']) for h in _scan_all_test_files()
+            if not h['in_docstring']
+        )
+        dupes = sorted(
+            f'{f}: {lit!r} occurs {counts[(f, lit)]}x (reason: {reason})'
+            for (f, lit), reason in WHITELIST.items()
+            if counts[(f, lit)] > 1
+        )
+        if dupes:
+            self.fail(
+                'Whitelisted literal appears more than once in its file — '
+                'content-keying would exempt all occurrences, including a '
+                'possible real leak. Disambiguate (rename the fixture) or '
+                'refactor:\n  - ' + '\n  - '.join(dupes)
+            )
+
+    def test_gate_survives_line_shift_of_whitelisted_literal(self):
+        """Robustness proof (PR #321 class of breakage): inserting blank
+        lines above whitelisted literals shifts their line numbers but
+        MUST keep the gate green, because the whitelist is keyed on
+        content, not line. Clone a real scanned file with a leading blank
+        line and confirm every leak literal still resolves to a WHITELIST
+        entry at its new (shifted) line."""
+        import tempfile
+        src = _TESTS_DIR / 'test_outbox_notifier.py'
+        orig_hits = [
+            h for h in _scan_file_for_literals(src)
+            if not h['in_docstring']
+        ]
+        self.assertTrue(orig_hits, 'expected leak literals in fixture file')
+        with tempfile.TemporaryDirectory() as td:
+            clone = Path(td) / 'test_outbox_notifier.py'
+            clone.write_text(
+                '\n' + src.read_text(encoding='utf-8'), encoding='utf-8'
+            )
+            shifted_hits = [
+                h for h in _scan_file_for_literals(clone)
+                if not h['in_docstring']
+            ]
+        self.assertEqual(
+            len(shifted_hits), len(orig_hits),
+            'line shift changed the number of detected literals',
+        )
+        for h in shifted_hits:
+            self.assertIn(
+                (h['file'], h['literal']), WHITELIST,
+                msg=(
+                    f'line-shifted literal {h["literal"]!r} at line '
+                    f'{h["line"]} fell out of WHITELIST — keying is not '
+                    'line-independent'
+                ),
+            )
+        # Confirm the shift actually moved lines (else the test is vacuous).
+        self.assertNotEqual(
+            sorted(h['line'] for h in orig_hits),
+            sorted(h['line'] for h in shifted_hits),
+        )
 
 
 class GateSelfCheckTest(unittest.TestCase):
