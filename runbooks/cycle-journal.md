@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 915 — 2026-06-04 20:08 UTC (interactive)
+
+**Health:** ⚠️ **Tier 2→1 RESET. 1 Tier-4 novel alert (medic-diagnosis, benign confirmed). 8/8 services active. 0 open PRs (agent-core + dashboard). All inboxes empty. Sync: ✅ Clean (wrapper-push-after-sync, normal).**
+
+Alert watermark: **1291 lines / 19:54:05Z** (+1 from iter 914's 1290/19:49:44Z). New alert at 19:54:05Z: `medic / medic-diagnosis` — **Tier 4 novel** (`medic` key absent from `config/alert-translations.json`). Medic self-diagnosed fingerprint `pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` as **confirmed benign false positive** (4th attempt: dead-letter clarify1 archived exit_code=-1 but downstream PR #324 fully shipped; PR #327 translation live suppresses future alerts of this class at source). Medic recommends adding `pipeline-stall:pr-create-inferred-failure:` to `config/medic-reversible-targets.json::silenceable_subjects` to enable Medic-level silencing of this fingerprint class. Tier-reset: Tier 2→1 (consecutive_clean=0). No DM to Larry — G-rule `medic:medic-diagnosis not in alert-translations.json` 3/3 dispatched iter 804; engine fix pending Larry (`deploy-notifier-alert-xlate-split-fix` engine-scope); Medic finding is informational only (benign confirmed, no new action). Pipeline-stall heartbeat: 19:49:39Z (✅ ~19 min at cycle start). Stale-daemon heartbeat: 20:00:17Z (✅ ~8 min at cycle start). Sync: status=no-change, last_sync=2026-06-04T19:48:39Z, commit=a7aa64cf. Session-start HEAD=455f375 "Pulse cycle 20260604T195409Z" (iter 914 wrapper, 1 commit ahead of sync.json — wrapper pushed after last sync tick; self-clears on next hourly timer). Tier state at start: tier=2, consecutive_clean=2. Tier state at end: **tier=1, consecutive_clean=0** (reset by Tier-4 finding).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ Tier-4 novel → tier-reset.** Watermark 1290→1291. New alert at 19:54:05Z: `medic / medic-diagnosis`. Gate 1: `medic` key absent from alert-translations.json — no match. Gate 2: not a guarded category (no credential, no prod config). Gate 3: no recognized action-template with 3+ prior successful executions. Gate 4: **Tier 4 (novel/ambiguous)**. Content: Medic self-diagnosed clarify1 dead-letter fingerprint as confirmed benign false positive (PR #324 shipped, PR #327 translation live). Medic blocked from silencing because `pipeline-stall:pr-create-inferred-failure:` not in `medic-reversible-targets.json::silenceable_subjects`. **No DM** — G-rule 3/3 already dispatched (iter 804); engine fix pending Larry; Medic diagnosis is informational. Tier-reset: yes. ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. Pulse inbox = 0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 19:49:39Z (~19 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:00:17Z (~8 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=455f375 "Pulse cycle 20260604T195409Z" (iter 914 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T19:48:39Z, commit=a7aa64cf. Session-start HEAD (455f375) is 1 commit ahead — wrapper pushed iter 914 commit after last sync tick. Normal wrapper-push-after-sync pattern; self-clears on next `ourliberty-sync.timer` fire. No error. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ All empty.** Forge=0, Mirror=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged except note):**
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry. This iter: 4th occurrence noted; no new G-rule action (already dispatched). Medic also flagged `medic-reversible-targets.json::silenceable_subjects` gap as minor future improvement (no separate G-rule; subsumed by engine-fix dispatch).
+
+- **Regression status:** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry (DM'd 17:03:46Z, ~3h ago). Awaiting approval.
+
+- **PRIME DIRECTIVE ratio:** interventions=714, systemic_fixes=11, ratio≈64.9 (intervention row appended this iter for medic-diagnosis-tier4 Tier-4 finding). Ledger ts: 2026-06-04T20:08:57Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `cycle_tier_state.py record --checks-clean false` → tier reset 2→1, consecutive_clean=0. ✅
+3. `cycle_prime_ledger.py append --tier 2 --kind intervention --template medic-diagnosis-tier4 --detail forge-queue-api-preflight-clarify1-fingerprint` → ledger row appended. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions) — APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` with Larry since 17:03:46Z. Awaiting approval.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 62nd+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (resolves `medic-diagnosis` Tier-4 recurrences when it lands).
+
+**Patterns:** Tier 2 promotion blocked at consecutive_clean=2 by a recurring medic-diagnosis Tier-4 noise alert. Root cause: `deploy-notifier-alert-xlate-split-fix` engine-scope still pending Larry — when it lands, medic-diagnosis and 4 other G-rule patterns get translations and stop causing tier-resets. This is now ~4 consecutive occurrences where medic-diagnosis recurrence has disrupted the Tier 2→3 de-escalation path. Note: the underlying task (clarify1 dead-letter) is fully resolved; this is pure translation-gap noise.
+
+**Learned:** Medic's diagnosis confirms that `medic-reversible-targets.json::silenceable_subjects` lacks a `pipeline-stall:pr-create-inferred-failure:` entry, preventing Medic from self-silencing confirmed benign recurrences of this class. This is a minor config gap separate from the engine-fix. Will monitor: if `deploy-notifier-alert-xlate-split-fix` engine-scope ships and silences medic-diagnosis at the translation level, this silenceable_subjects gap becomes moot for this fingerprint class.
+
+---
+
 ## Iteration 914 — 2026-06-04 19:52 UTC (interactive)
 
 **Health:** ✅ **Tier 2 clean. consecutive_clean=2. 0 actions. 8/8 services active. 0 open PRs (agent-core + dashboard). All inboxes empty. Sync: ✅ Clean (no-change).**
