@@ -1486,5 +1486,366 @@ class AppendJournalIdempotencyTests(unittest.TestCase):
         self.assertEqual(text.count("plain note"), 2)
 
 
+class MarkerErrorRetryDepthTests(unittest.TestCase):
+    """The retry-depth helper recovers N from both flat and legacy-nested
+    marker-error stems (the trailing integer is the cumulative count in both).
+    """
+
+    def test_flat_form_depths(self):
+        self.assertEqual(pci._marker_error_retry_depth("marker-error-task-a-1"), 1)
+        self.assertEqual(pci._marker_error_retry_depth("marker-error-task-a-2"), 2)
+        self.assertEqual(pci._marker_error_retry_depth("marker-error-task-a-3"), 3)
+
+    def test_nested_legacy_form_depths(self):
+        self.assertEqual(
+            pci._marker_error_retry_depth("marker-error-marker-error-task-a-1-2"),
+            2,
+        )
+        self.assertEqual(
+            pci._marker_error_retry_depth(
+                "marker-error-marker-error-marker-error-task-a-1-2-3"
+            ),
+            3,
+        )
+
+    def test_no_trailing_int_returns_none(self):
+        self.assertIsNone(pci._marker_error_retry_depth("marker-error-task-a"))
+        self.assertIsNone(pci._marker_error_retry_depth("plain-task"))
+
+
+# Window math anchors: WEEK_ENDING 2026-05-18 is a Monday; the Check-I window
+# is [2026-05-11, 2026-05-18).
+_WE_DT = datetime(2026, 5, 18, tzinfo=timezone.utc)
+_IN_WINDOW = datetime(2026, 5, 14, 12, 0, 0, tzinfo=timezone.utc)
+_OUT_WINDOW = datetime(2026, 5, 5, 12, 0, 0, tzinfo=timezone.utc)
+
+
+class MarkerDisciplineComputeTests(unittest.TestCase):
+    """Lock the preflight-marker-discipline computation: windowed retry-depth
+    distribution, escalation rate, trailing-week baseline + alert, and trend.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.outbox = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.output_dir.mkdir(parents=True)
+
+    def _marker_error(self, base: str, depth: int, when: datetime,
+                      agent: str = "forge") -> None:
+        archive = self.outbox / agent / ".archive"
+        archive.mkdir(parents=True, exist_ok=True)
+        path = archive / f"marker-error-{base}-{depth}.json"
+        path.write_text("{}")
+        ts = when.timestamp()
+        os.utime(path, (ts, ts))
+
+    def _write_prior_audit(self, week_ending: str, misses: int) -> None:
+        # Firing-date filename is arbitrary for prior weeks; the loader keys on
+        # the persisted top-level week_ending.
+        path = self.output_dir / f"check-i-{week_ending}.json"
+        path.write_text(json.dumps({
+            "week_ending": week_ending,
+            "engineering_signals": {
+                "marker_discipline": {"misses": misses},
+            },
+        }))
+
+    def _compute(self):
+        return pci.compute_marker_discipline(
+            outbox_root=self.outbox,
+            week_ending=_WE_DT,
+            output_dir=self.output_dir,
+        )
+
+    def test_distribution_and_escalation_rate(self):
+        # base-a escalated all the way (depth 1/2/3); base-b and base-c only
+        # tripped the first retry. depth-1 files = 3 misses; depth-2 = 1; depth-3 = 1.
+        for d in (1, 2, 3):
+            self._marker_error("base-a", d, _IN_WINDOW)
+        self._marker_error("base-b", 1, _IN_WINDOW)
+        self._marker_error("base-c", 1, _IN_WINDOW)
+        md = self._compute()
+        self.assertEqual(md["misses"], 3)
+        self.assertEqual(md["retry_depth_distribution"], {"1": 3, "2": 1, "3": 1})
+        self.assertEqual(md["total_events"], 5)
+        self.assertEqual(md["retry_2_plus"], 1)
+        self.assertAlmostEqual(md["escalation_rate"], round(1 / 3, 4))
+        self.assertEqual(md["near_forfeit"], 1)
+        self.assertEqual(md["agent"], "forge")
+        self.assertEqual(md["window_start"], "2026-05-11")
+        self.assertEqual(md["window_end"], "2026-05-18")
+
+    def test_out_of_window_and_non_forge_excluded(self):
+        self._marker_error("in-win", 1, _IN_WINDOW)
+        self._marker_error("too-old", 1, _OUT_WINDOW)  # before window
+        self._marker_error("mirror-task", 1, _IN_WINDOW, agent="mirror")
+        md = self._compute()
+        self.assertEqual(md["misses"], 1)
+        self.assertEqual(md["total_events"], 1)
+
+    def test_excludes_dead_letter_notify_and_fixtures(self):
+        # dead-letter terminal artifact, notify-* workflow, and fixture task_ids
+        # must not contaminate the signal (shared parser exclusions).
+        self._marker_error("real-task", 1, _IN_WINDOW)
+        # notify-* base
+        self._marker_error("notify-thing", 1, _IN_WINDOW)
+        # dead-letter prefix
+        archive = self.outbox / "forge" / ".archive"
+        dl = archive / "dead-letter-marker-marker-error-real-task-1-2.json"
+        dl.write_text("{}")
+        ts = _IN_WINDOW.timestamp()
+        os.utime(dl, (ts, ts))
+        md = self._compute()
+        self.assertEqual(md["misses"], 1)
+
+    def test_ramp_up_suspends_alert(self):
+        # Three prior weeks only (< RAMP_UP_WEEKS) → baseline inactive, no alert
+        # even with a big current spike.
+        for d in (1, 2, 3):
+            self._marker_error(f"spike-{d}", 1, _IN_WINDOW)
+        self._marker_error("spike-4", 1, _IN_WINDOW)
+        self._write_prior_audit("2026-05-11", 0)
+        self._write_prior_audit("2026-05-04", 0)
+        self._write_prior_audit("2026-04-27", 0)
+        md = self._compute()
+        self.assertEqual(md["misses"], 4)
+        self.assertFalse(md["baseline"]["active"])
+        self.assertEqual(md["baseline"]["weeks_observed"], 3)
+        self.assertFalse(md["alert"])
+
+    def test_alert_off_flat_zero_baseline(self):
+        # Four clean prior weeks (mean 0, stdev 0) → any current regression fires.
+        self._marker_error("regress-a", 1, _IN_WINDOW)
+        self._marker_error("regress-b", 1, _IN_WINDOW)
+        for wk in ("2026-05-11", "2026-05-04", "2026-04-27", "2026-04-20"):
+            self._write_prior_audit(wk, 0)
+        md = self._compute()
+        self.assertEqual(md["misses"], 2)
+        self.assertTrue(md["baseline"]["active"])
+        self.assertTrue(md["alert"])
+        self.assertIn("flat baseline", md["alert_reason"])
+
+    def test_no_alert_within_variance(self):
+        # Noisy baseline [2,3,2,3]: mean 2.5, stdev≈0.577, threshold≈3.65.
+        # current 3 → below threshold → no alert.
+        self._marker_error("m1", 1, _IN_WINDOW)
+        self._marker_error("m2", 1, _IN_WINDOW)
+        self._marker_error("m3", 1, _IN_WINDOW)
+        for wk, m in (("2026-05-11", 2), ("2026-05-04", 3),
+                      ("2026-04-27", 2), ("2026-04-20", 3)):
+            self._write_prior_audit(wk, m)
+        md = self._compute()
+        self.assertEqual(md["misses"], 3)
+        self.assertTrue(md["baseline"]["active"])
+        self.assertFalse(md["alert"])
+
+    def test_alert_above_variance_threshold(self):
+        # Same noisy baseline, current 5 → above threshold≈3.65 → alert.
+        for i in range(5):
+            self._marker_error(f"big-{i}", 1, _IN_WINDOW)
+        for wk, m in (("2026-05-11", 2), ("2026-05-04", 3),
+                      ("2026-04-27", 2), ("2026-04-20", 3)):
+            self._write_prior_audit(wk, m)
+        md = self._compute()
+        self.assertEqual(md["misses"], 5)
+        self.assertTrue(md["alert"])
+        self.assertIn("σ", md["alert_reason"])
+
+    def test_trend_vs_prior_week(self):
+        # Current 2 misses; immediately prior week recorded 10 → trend down -8.
+        self._marker_error("t1", 1, _IN_WINDOW)
+        self._marker_error("t2", 1, _IN_WINDOW)
+        for wk, m in (("2026-05-11", 10), ("2026-05-04", 8),
+                      ("2026-04-27", 9), ("2026-04-20", 11)):
+            self._write_prior_audit(wk, m)
+        md = self._compute()
+        self.assertIsNotNone(md["trend"])
+        self.assertEqual(md["trend"]["prior_week"], "2026-05-11")
+        self.assertEqual(md["trend"]["prior_misses"], 10)
+        self.assertEqual(md["trend"]["misses_delta"], -8)
+        self.assertEqual(md["trend"]["direction"], "down")
+
+    def test_empty_archive_no_alert(self):
+        md = self._compute()
+        self.assertEqual(md["misses"], 0)
+        self.assertEqual(md["retry_depth_distribution"], {"1": 0, "2": 0, "3": 0})
+        self.assertFalse(md["alert"])
+        self.assertIsNone(md["trend"])
+
+
+class MarkerDisciplineProposalTests(unittest.TestCase):
+    """Alert → digest proposal, but NOT auto-dispatch eligible."""
+
+    def _alert_md(self) -> dict:
+        return {
+            "misses": 30,
+            "retry_depth_distribution": {"1": 30, "2": 11, "3": 3},
+            "escalation_rate": 0.3667,
+            "baseline": {"weeks_observed": 4, "mean_misses": 5.0,
+                         "stdev_misses": 1.2},
+            "alert": True,
+            "alert_reason": "30 misses ≥ baseline mean 5.0 + 2σ (7.4)",
+        }
+
+    def test_alert_yields_proposal(self):
+        proposals = pci.synthesize_proposals(
+            _sidecar(), repeats=[], marker_discipline=self._alert_md(),
+        )
+        self.assertEqual(len(proposals), 1)
+        self.assertIn("marker-discipline", proposals[0]["title"].lower())
+
+    def test_no_alert_no_proposal(self):
+        md = self._alert_md()
+        md["alert"] = False
+        self.assertEqual(
+            pci.synthesize_proposals(_sidecar(), repeats=[], marker_discipline=md),
+            [],
+        )
+
+    def test_proposal_not_auto_dispatch_eligible(self):
+        # The proposal is small-effort but its impact line carries no `$<digit>`
+        # token, so it surfaces in the digest without auto-opening a Beacon spec.
+        proposals = pci.synthesize_proposals(
+            _sidecar(), repeats=[], marker_discipline=self._alert_md(),
+        )
+        p = proposals[0]
+        self.assertEqual(p["effort"], "small")
+        self.assertFalse(pci._is_auto_dispatch_eligible(p))
+        self.assertNotRegex(p["impact"], r"\$\d")
+
+    def test_none_marker_discipline_is_safe(self):
+        self.assertEqual(
+            pci.synthesize_proposals(_sidecar(), repeats=[], marker_discipline=None),
+            [],
+        )
+
+
+class MarkerDisciplineAssembleRenderTests(unittest.TestCase):
+    def _alert_md(self) -> dict:
+        return {
+            "misses": 30,
+            "retry_depth_distribution": {"1": 30, "2": 11, "3": 3},
+            "escalation_rate": 0.3667,
+            "total_events": 44,
+            "retry_2_plus": 11,
+            "trend": {"prior_week": "2026-05-11", "prior_misses": 5,
+                      "misses_delta": 25, "direction": "up"},
+            "baseline": {"weeks_observed": 4, "mean_misses": 5.0,
+                         "stdev_misses": 1.2, "active": True},
+            "alert": True,
+            "alert_reason": "elevated",
+        }
+
+    def _quiet_md(self) -> dict:
+        md = self._alert_md()
+        md["alert"] = False
+        md["misses"] = 1
+        md["retry_depth_distribution"] = {"1": 1, "2": 0, "3": 0}
+        md["escalation_rate"] = 0.0
+        return md
+
+    def test_assemble_persists_marker_discipline(self):
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+            marker_discipline=self._quiet_md(),
+        )
+        md = result["engineering_signals"]["marker_discipline"]
+        self.assertEqual(md["misses"], 1)
+        # Quiet (non-alert) signal does not by itself force a digest.
+        self.assertEqual(result["mode"], "no-signal")
+
+    def test_assemble_alert_forces_digest(self):
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+            marker_discipline=self._alert_md(),
+        )
+        self.assertEqual(result["mode"], "digest")
+        self.assertTrue(result["has_signal"])
+        titles = [p["title"] for p in result["proposals"]]
+        self.assertTrue(any("marker-discipline" in t.lower() for t in titles))
+
+    def test_journal_block_includes_discipline_line(self):
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+            marker_discipline=self._alert_md(),
+        )
+        block = pci.render_journal_block(result)
+        self.assertIn("Forge marker-discipline", block)
+        self.assertIn("[ELEVATED]", block)
+
+    def test_dm_digest_includes_elevated_line(self):
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(retry_pct=25.0, retry_usd=3.0), repeats=[],
+            week_ending=WEEK_ENDING, sidecar_filename="weekly-2026-05-18.json",
+            fired_at=FIRED_AT, marker_discipline=self._alert_md(),
+        )
+        body = pci.render_dm(result)
+        self.assertIn("marker-discipline ELEVATED", body)
+
+    def test_backward_compatible_without_marker_discipline(self):
+        # Existing callers that omit marker_discipline get a None entry, no crash.
+        result = pci.assemble_check_i(
+            sidecar=_sidecar(), repeats=[], week_ending=WEEK_ENDING,
+            sidecar_filename="weekly-2026-05-18.json", fired_at=FIRED_AT,
+        )
+        self.assertIsNone(result["engineering_signals"]["marker_discipline"])
+        block = pci.render_journal_block(result)
+        self.assertNotIn("Forge marker-discipline", block)
+
+
+class MarkerDisciplineEndToEndTests(unittest.TestCase):
+    """main() persists the marker_discipline block to the audit sidecar."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.sidecar_dir.mkdir(parents=True)
+        (self.sidecar_dir / f"weekly-{WEEK_ENDING}.json").write_text(
+            json.dumps(_sidecar())
+        )
+        # Two forge marker-error events inside the Check-I window.
+        archive = self.outbox_root / "forge" / ".archive"
+        archive.mkdir(parents=True, exist_ok=True)
+        for base, depth in (("base-a", 1), ("base-a", 2), ("base-b", 1)):
+            p = archive / f"marker-error-{base}-{depth}.json"
+            p.write_text("{}")
+            ts = _IN_WINDOW.timestamp()
+            os.utime(p, (ts, ts))
+
+    def _argv(self) -> list[str]:
+        return [
+            "--week-ending", WEEK_ENDING,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            "--no-dm", "--no-journal", "--no-auto-dispatch", "--force",
+        ]
+
+    def test_e2e_persists_marker_discipline(self):
+        rc = pci.main(self._argv())
+        self.assertEqual(rc, 0)
+        today = datetime.now(timezone.utc).date().isoformat()
+        with open(self.output_dir / f"check-i-{today}.json") as f:
+            audit = json.load(f)
+        md = audit["engineering_signals"]["marker_discipline"]
+        self.assertEqual(md["misses"], 2)  # base-a depth1 + base-b depth1
+        self.assertEqual(md["retry_depth_distribution"], {"1": 2, "2": 1, "3": 0})
+        self.assertEqual(md["window_end"], WEEK_ENDING)
+
+
 if __name__ == "__main__":
     unittest.main()
