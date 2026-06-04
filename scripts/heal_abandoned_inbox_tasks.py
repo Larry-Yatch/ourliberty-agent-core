@@ -59,6 +59,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
@@ -135,6 +136,32 @@ def has_lease(task_id: str) -> bool:
     return (LEASE_DIR / f"{task_id}.lock").exists()
 
 
+def task_already_resolved(task_id: str, since_ts: datetime) -> Optional[str]:
+    """If the task already shipped or was resolved out-of-band since
+    `since_ts`, return the reason; else None.
+
+    Guards the documented failure mode in reverse: a forge task can COMPLETE
+    and merge its PR, then have its completion handler crash before moving the
+    file out of the inbox. The lease is released and the worker is gone, so
+    all three structural gates pass and the healer would re-dispatch
+    already-shipped work. A merged PR matching the task (or a `larry_action` /
+    later `session_start` chain_event) means the work is done -- skip recovery.
+
+    Failsafe: any infra error returns None so a genuinely-abandoned task is
+    still recovered (never block recovery on a reconciliation hiccup)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import task_resolution as tr
+        resolved, reason = tr.resolved_out_of_band(
+            task_id, since_ts, check_pr=True,
+            log_fn=lambda m: log("INFO", m),
+        )
+        return reason if resolved else None
+    except Exception as exc:  # noqa: BLE001 -- never block recovery on error
+        log("WARN", f"resolution check failed for {task_id}: {exc}")
+        return None
+
+
 def is_recovery_filename(filename: str) -> bool:
     """Skip files we've already renamed (avoid infinite recovery loop)."""
     return "-recovery-" in filename
@@ -179,6 +206,16 @@ def scan_agent_inbox(agent: str, active_cwds: set[str]) -> tuple[int, int]:
             continue  # actively dispatched
         if has_active_worker(task_id, active_cwds):
             continue  # worker grinding
+        since_ts = datetime.fromtimestamp(mtime, tz=timezone.utc)
+        resolved_reason = task_already_resolved(task_id, since_ts)
+        if resolved_reason:
+            log(
+                "SKIP",
+                f"{agent}/{task_file.name} action=skip-already-resolved "
+                f"reason={resolved_reason} — work shipped/resolved "
+                f"out-of-band; not re-dispatching",
+            )
+            continue
         age_min = int((datetime.now(timezone.utc).timestamp() - mtime) / 60)
         if recover_task(task_file, agent, age_min):
             healed += 1
