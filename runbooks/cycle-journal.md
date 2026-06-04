@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 903 — 2026-06-04 17:49 UTC (interactive)
+
+**Health:** ⚠️ Tier 2→1 (non-clean: 3 new alerts, G-rules advance). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
+
+Alert watermark: **1286 lines / 17:44:36Z** (+3 from iter 902's 1283/17:03:46Z). Pipeline-stall heartbeat: 17:39:33Z (✅ ~10 min at cycle start). Stale-daemon heartbeat: 17:30:15Z (✅ ~19 min at cycle start). Sync: status=no-change, last_sync=2026-06-04T16:48:18Z (~61 min at cycle start; ✅ within 2h; updated to 17:48:20Z during cycle — sync timer fired).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts.** Watermark advanced 1283→1286. Three new alerts at 17:39:39Z and 17:44:36Z:
+  1. `heal-pipeline-stall / pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` (17:39:39Z) — Not in alert-translations.json → Tier 4 novel. Context: preflight clarify task for the forge-queue-api build (June 3, source=larry). Forge archive confirms all related tasks archived (`forge-queue-api-preflight-20260603T231401Z-clarify1.json` present). False alarm on stale archive entry. **G-rule `pipeline-stall:pr-create-inferred-failure not in alert-translations.json` 1/3 → 2/3.** No DM (recurring known pattern; G-rule tracking).
+  2. `heal-pipeline-stall / pipeline-stall:forge-no-pr:build-forge-queue-api-20260603T234656Z` (17:39:39Z) — alert-translations.json maps this as tier=NOW/URGENT. But verified: same task_id as iter 896 G-rule `forge-no-pr-false-alarm-for-source-larry-tasks`. Task archived in Forge outbox; pr_url=null is a source=larry archive gap (PR existed but wasn't written to archive). **G-rule `forge-no-pr-false-alarm-for-source-larry-tasks` 1/3 → 2/3.** No DM (confirmed false alarm, G-rule tracking).
+  3. `medic / intent=medic-diagnosis` (17:44:36Z) — Not in alert-translations.json (medic source has no entry). G-rule 3/3 already dispatched (iter 804); fix requires Python engine change (hyphen-suffix wildcards + intent field fallback); pending engine PR. **No DM** (recurring expected pattern, fix already in pipeline). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → no output. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. All inboxes empty: Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 17:39:33Z (~10 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 17:30:15Z (~19 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2ec96bf "Pulse cycle 20260604T172736Z" (iter 902 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync started at 2026-06-04T16:48:18Z; sync timer fired mid-cycle and updated to 17:48:20Z — both within 2h. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Empty.** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry; Forge receives task only after approval. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **1/3 → 2/3** (iter 896=1/3, iter 903=2/3). At 3/3: dispatch Beacon to classify and add translation.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **1/3 → 2/3** (iter 896=1/3, iter 903=2/3). Same underlying task: `build-forge-queue-api-20260603T234656Z`. At 3/3: dispatch Beacon to spec pr_url population for source=larry builds OR add Tier-3 FYI translation for this false-alarm pattern.
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (iter 899, unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (iter 898, unchanged).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **Regression status:** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry (DM'd 17:03:46Z). System at human-gate pause. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=711, systemic_fixes=9, ratio≈78.89 (unchanged — no new dispatch this iter; G-rules advanced but not yet at 3/3 threshold).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 3 new alerts triaged — 2× pipeline-stall false alarms (G-rules 1/3→2/3), 1× medic-diagnosis (G-rule 3/3 already dispatched, no new action). No DMs (recurring known patterns; Larry-feedback: suppress non-actionable recurring noise).
+3. `cycle_tier_state.py record --checks-clean false` → **tier reset 2→1** (consecutive_clean=0, last_signal_at=17:49:30Z). ✅
+4. Updated MEMORY.md G-rule counters.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions) — APPROVAL_REQUEST with Larry since 17:03:46Z. Awaiting approval.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 62nd total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** The forge-queue-api-20260603T234656Z task has now triggered false-alarm pipeline-stall alerts in at least 2 iters (iter 896 + iter 903). The stale archive entry (pr_url=null for source=larry builds) is a persistent healer false-alarm source. G-rules `forge-no-pr-false-alarm-for-source-larry-tasks` and `pipeline-stall:pr-create-inferred-failure not in alert-translations.json` both at 2/3. One more occurrence → dispatch both to Beacon as a batched fix.
+
+**Learned:** Alert-translations.json maps `pipeline-stall:forge-no-pr` as tier=NOW (actionable), not Tier-3 silence. The false-alarm classification is contextual (source=larry, known archive gap), not allowlist-driven. Until the healer is fixed to suppress false alarms for source=larry tasks, these will continue to force Tier 1 resets every time the healer sweeps the stale entry.
+
+---
+
 ## Iteration 902 — 2026-06-04 17:26 UTC (interactive)
 
 **Health:** ✅ Tier 1→2 de-escalation (consecutive_clean=3→0 reset). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
