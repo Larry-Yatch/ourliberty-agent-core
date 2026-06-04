@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 916 — 2026-06-04 20:13 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean. consecutive_clean=1. 0 actions. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge inbox: 1 fresh task (regression fix, just dispatched). Sync: ✅ Clean (no-change).**
+
+Alert watermark: **1291 lines / 19:54:05Z** (unchanged from iter 915 — no new alerts). Pipeline-stall heartbeat: 20:06:19Z (✅ ~7 min at cycle start). Stale-daemon heartbeat: 20:00:17Z (✅ ~13 min at cycle start). Sync: status=no-change, last_sync=2026-06-04T19:48:39Z, commit=a7aa64cf. Session-start HEAD=b7dadd8 "Pulse cycle 20260604T201048Z" (iter 915 wrapper, newer than sync.json commit — wrapper-push pattern, self-clears on next hourly timer). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark unchanged at 1291 lines / 19:54:05Z. No new alerts since iter 915. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. Pulse inbox = 0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 20:06:19Z (~7 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:00:17Z (~13 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=b7dadd8 "Pulse cycle 20260604T201048Z" (iter 915 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T19:48:39Z, commit=a7aa64cf. HEAD newer than sync.json commit → wrapper-push pattern, no error. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=1 (`build-forge-marker-error-retry-fillin-001-replan1.json`, arrived ~20:09Z, <5 min old — well under 1h stale threshold). Mirror=0, Beacon=0, Pulse=0. Notable: regression-fix build task is live in Forge's inbox, dispatched post-Larry-approval (APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` approved between 20:08Z and 20:09Z). Source=beacon, phase=build, replan_count=1, max_replans=2. PR title: `fix(tests): repin leak-gate whitelist to test_outbox_notifier.py lines 72/317 after PR #321 line shift`. Forge-bot active; task should be picked up by inbox-watcher. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 915):**
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **Regression status:** `forge-marker-error-retry-fillin-001` APPROVED by Larry (between iters 915 and 916). Replan1 build task dispatched to Forge inbox at 20:09Z. Watch for PR open.
+
+- **PRIME DIRECTIVE ratio:** interventions=714, systemic_fixes=11, ratio≈64.9 (iter_clean recorded; no new interventions). Ledger ts: 2026-06-04T20:13:28Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → ledger entry recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 62nd+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Regression fix `forge-marker-error-retry-fillin-001` approved and dispatched to Forge (replan1). If Forge completes without another replan, PR will open and watch item closes. Consecutive_clean restored to 1 (from 0 after iter 915 medic-diagnosis reset).
+
+**Learned:** Nothing new. APPROVAL_REQUEST approval pipeline working as expected (17:03Z DM → Larry approval → 20:09Z Forge dispatch, ~3h turnaround).
+
+---
+
 ## Iteration 915 — 2026-06-04 20:08 UTC (interactive)
 
 **Health:** ⚠️ **Tier 2→1 RESET. 1 Tier-4 novel alert (medic-diagnosis, benign confirmed). 8/8 services active. 0 open PRs (agent-core + dashboard). All inboxes empty. Sync: ✅ Clean (wrapper-push-after-sync, normal).**
