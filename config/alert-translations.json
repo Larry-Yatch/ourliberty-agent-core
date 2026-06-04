@@ -66,6 +66,12 @@
       "tier": "FYI",
       "plain_language_summary": "Tier 1 OAuth hit a 401 (expired refresh token) and the Tier 2 fallback was SKIPPED (short-circuited, not attempted) because the Tier 2 directory is missing or unprovisioned. Same root cause as tier2-fallback-unavailable-auth_401, surfaced as a pre-attempt skip rather than an unavailable-after-attempt. Informational; the chain pauses on this task until an account is re-authed.",
       "recommended_action": "Re-auth Tier 1 via python3 scripts/auth_orchestrator.py, or provision Tier 2 via python3 scripts/auth_orchestrator_tier2.py. Full recovery steps: docs/runbooks/restore-larry-personal-claude-oauth-tier2.md."
+    },
+    "pipeline-stall:pr-create-inferred-failure": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A preflight/clarify task pointer was consumed but its archived outbox shows no PR (exit_code != 0 / error / auth_401), so the healer INFERRED a PR-create failure and routed it to this distinct lower-urgency subject (own cooldown) rather than the URGENT forge-no-pr build-gap alarm. In practice this is almost always a FALSE ALARM on a source=larry task: the source=larry outbox path does not populate `pr_url` after the PR is actually created, so a clarify pointer whose sibling build already shipped looks like a loss. The translation layer cannot tell a false alarm from a genuine source=forge infra crash because it keys only on (healer-source, subject), so this is conservatively classified FYI with a verify-first action.",
+      "recommended_action": "Verify before acting: check whether the sibling build PR for this task family already merged (gh pr list --search <task-family>, or the Missions tab). If it shipped, this is the known source=larry pr_url-unset artifact -- no action. ONLY if there is genuinely no sibling PR AND the archived outbox (~/agents/outboxes/forge/.archive/<task>.json) shows a real infra/auth crash before PR-create is a re-dispatch warranted. Root-cause fix is healer-side (populate pr_url on the source=larry outbox path, or extend _preflight_family_shipped correlation); this translation is a stopgap. Runbook: runbooks/heal-pipeline-stall.md."
     }
   },
   "heal-systemd-install-drift": {
