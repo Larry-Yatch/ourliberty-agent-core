@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 806 — 2026-06-04 00:30 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **persistent: PR #294 ask-then-do pending Larry's call (escalation delivered 00:27Z). 1 new alert: pulse-escalation echo (already-handled).** Alert watermark: **1233 lines / anchor 00:23:13Z** (+1 from iter 805's own escalation echoed back). Cooldown residue: **199** (structural; unchanged). Sync: ✅ post-wrapper lag (last_sync=23:46:04Z; HEAD=74d72b1, ahead — normal). Healer heartbeat: **00:25:13Z** (~5 min old; ✅). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, 35+ min old — Mirror review still not dispatched, ask-then-do escalation delivered, pending Larry). **0 open PRs in ourliberty-dashboard.** Forge: 4 tasks active (Phase C: build-001/002 ~18–19 min, resume-003-r1 ~13 min, spec-004 ~12 min — all in normal processing window). Mirror: EMPTY. Beacon: EMPTY. Worktrees: 6 (3 active Phase C + 1 PR#294 + 2 stale from PR#293 — hourly GC ~01:00Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4 (already-handled).** `larry-alerts.jsonl`: **1233 lines** (+1 from iter-805 watermark at 1232/00:10:01Z).
+  - **Line 1233** — 00:23:13Z `pulse-escalation` / `PR #294 Mirror review gap — source=larry routing miss` → **Tier 4** (novel; `pulse-escalation` source not in `alert-translations.json`). BUT: this is Pulse's own escalation echoed back into the alert stream — it was appended to larry-alerts.jsonl by Pulse itself in iter 805. The action is already done: beacon-bot delivered alert idx=1232 to Larry at 00:27Z UTC. No re-escalation; row marked already-handled. `alert_triage_state.py` returned `triaged-tier-4 / ask` as expected (no prior template). No new DM triggered — the underlying escalation is already in Larry's hands.
+  - **NEW G-rule: `pulse-escalation` not in alert-translations.json: 1/3** (iter 806; first observation). Every Pulse escalation (`append_alert` source=pulse-escalation) echoes back as a Tier-4 novel on the next iter. The correct tier is 3 (by-design: escalation already delivered by beacon-bot; Pulse re-actioning its own output is double-handling). At 3/3: batch into next alert-translations dispatch (add `pulse-escalation` as Tier 3/FYI — same treatment as `pulse-cycle`).
+  - Watermark advanced to 1233 / 00:23:13Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. TIER2_FALLBACK entries at 17:43 MDT are pre-existing (from forge-queue-api-preflight clarify1 task at iter 803; self-resolved). Alert idx=1232 delivered to Larry at 18:27 MDT (00:27Z UTC) — confirmed delivery. APPROVAL_REQUEST (Beacon alert-translations split) still pending Larry's direction from iter 804. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 00:25:13Z (~5 min old at check; ✅ well within 90-min threshold). No active stalls. Phase C pipeline healthy. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** APPROVAL_REQUEST (Beacon alert-translations split) already escalated iter 804; no new orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: 00:25:13Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: HEAD=74d72b1 "Pulse cycle 20260604T002556Z" (post-805 wrapper commit), branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** last_sync=23:46:04Z, status=success, commit=1fe0a66. HEAD=74d72b1 ahead — normal. Hourly ourliberty-sync.timer backstop active. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon/forge/mirror/pulse bots + inbox-watcher/cycle.timer/outbox-notifier/sync.timer all active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Persistent — PR #294 ask-then-do (no change from iter 805).**
+  - **agent-core: 1 open PR — #294** `feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint`, CLEAN/MERGEABLE (confirmed fresh via `gh pr view`), created 23:55:22Z (~35 min old at check). Mirror inbox EMPTY; no review dispatch in the intervening automated cycle. Escalation delivered to Larry at 00:27Z UTC. **Ask-then-do discipline holds: do not auto-merge without Mirror review given the pipeline gap.** Larry can either: (a) reply "dispatch Mirror review" — Pulse dispatches; (b) reply "merge direct" — Pulse enables auto-merge; (c) take no action — PR sits until Mirror review gap is resolved systemically.
+  - **Forge Phase C inbox: 4 tasks.** Archive shows 001 had 2 retries (001.1, 001.2) before `build-pulse-triage-phase-c-promotion-001.json` landed; 002 had 1 retry (002.1). Resume-003-r1 and spec-004 are fresh. All worktrees active. Phase C throughput healthy: 3 active builds + 1 spec in parallel. ✅
+  - **ourliberty-dashboard:** 0 open PRs. ✅
+  - **Mirror: EMPTY.** ✅
+  - **Beacon: EMPTY.** APPROVAL_REQUEST from iter 804 pending Larry. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - **NEW `pulse-escalation` not in alert-translations.json: 1/3** (iter 806; first observation).
+  - `source=larry Forge builds don't auto-route to Mirror for review`: **1/3** (iter 805).
+  - `pulse/beacon-result not in alert-translations.json`: **1/3** (iter 804).
+  - `stale-session-ID resume failures (no TTL on resume session IDs)`: **1/3** (iter 804).
+  - All other G-rules: unchanged from iter 805.
+
+- **PRIME DIRECTIVE ratio:** interventions=686, systemic_fixes=5, ratio=137.2 (+1 intervention this iter: pulse-escalation Tier-4 novel).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert (line 1233). Called `alert_triage_state.py triage-alert` → Tier 4/already-handled. Watermark advanced to 1233/00:23:13Z. No re-escalation.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 806` → ts=2026-06-04T00:30:20Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=00:30:21Z. ✅
+5. No always-allowed auto-fixes triggered. PR #294 < 30-min always-fix threshold is exceeded but ask-then-do overrides (pipeline gap). ✅
+6. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** Nothing new. PR #294 escalation already delivered to Larry (iter 805). Beacon APPROVAL_REQUEST already delivered (iter 804). No additional DMs warranted this iter.
+
+**Patterns:** The `pulse-escalation` echo pattern (Pulse's own escalations appearing as novel Tier-4 alerts on the next iter) is a recurring nuance of the alert stream design. It will fire every time Pulse escalates — G-rule 1/3 now tracking. The PR #294 routing gap (source=larry builds not auto-routed to Mirror) persists; this is the 2nd consecutive iter noting it without resolution. Larry holds the key: either dispatch Mirror review directly, merge without review, or accept the gap until the systemic fix lands (G-rule 1/3 → will be 3/3 on the 3rd source=larry PR that skips review).
+
+**Learned:** `pulse-escalation` source rows in larry-alerts.jsonl are Pulse's own output. They should be Tier 3 (by-design, already delivered by beacon-bot) once added to alert-translations.json. The echo is expected but creates spurious Tier-4 classifications until the translation entry is added. At G-rule 3/3, batch into the next alert-translations dispatch.
+
+---
+
 ## Iteration 805 — 2026-06-04 00:22 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 finding: PR #294 Mirror review dispatch gap (source=larry routing miss — ask-then-do escalated).** Alert watermark: **1232 lines / anchor 00:10:01Z** (0 new alerts — clean). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success (last_sync=23:46:04Z, post-wrapper lag; HEAD=c514a6e). Healer heartbeat: **23:55:09Z** (~27 min old at check; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, 26m 47s old — Mirror review NEVER dispatched; see finding below). **0 open PRs in ourliberty-dashboard.** Forge: 4 tasks active (C-001 build + C-002 build + C-003 resume-r1 + C-004 new spec). Mirror: EMPTY. Beacon: EMPTY (APPROVAL_REQUEST pending Larry from iter 804).
