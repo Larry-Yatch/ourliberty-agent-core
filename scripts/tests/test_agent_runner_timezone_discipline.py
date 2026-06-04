@@ -137,6 +137,76 @@ def _call_uses_utc_arg(call: ast.Call) -> bool:
     return False
 
 
+def _const_str(node: ast.AST | None) -> str | None:
+    """Return the string value of a constant AST node, else None."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _isoformat_now_receiver(value: ast.AST | None) -> ast.Call | None:
+    """If `value` is `<expr>.now(...).isoformat()`, return the inner
+    `now(...)` Call; otherwise None."""
+    if not isinstance(value, ast.Call):
+        return None
+    func = value.func
+    if not (isinstance(func, ast.Attribute) and func.attr == 'isoformat'):
+        return None
+    receiver = func.value
+    if not isinstance(receiver, ast.Call):
+        return None
+    r_func = receiver.func
+    if isinstance(r_func, ast.Attribute) and r_func.attr == 'now':
+        return receiver
+    if isinstance(r_func, ast.Name) and r_func.id == 'now':
+        return receiver
+    return None
+
+
+def _find_function(tree: ast.AST, name: str) -> ast.FunctionDef | None:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    return None
+
+
+def _now_isoformat_for_target(
+    func_node: ast.FunctionDef,
+    *,
+    name: str | None = None,
+    subscript_key: str | None = None,
+    dict_key: str | None = None,
+) -> ast.Call | None:
+    """Locate the `datetime.now(...).isoformat()` call bound to a specific
+    target inside `func_node`, returning the inner `now(...)` Call.
+
+    Robust against line drift: callsites are found by their enclosing
+    function plus the assignment target (a bare variable `name`, an
+    `obj[subscript_key]` assignment, or a `{dict_key: ...}` literal entry),
+    never by a hardcoded line number.
+    """
+    for node in ast.walk(func_node):
+        candidates: list[ast.AST] = []
+        if name is not None and isinstance(node, ast.Assign):
+            if any(isinstance(t, ast.Name) and t.id == name
+                   for t in node.targets):
+                candidates.append(node.value)
+        if subscript_key is not None and isinstance(node, ast.Assign):
+            for t in node.targets:
+                if (isinstance(t, ast.Subscript)
+                        and _const_str(t.slice) == subscript_key):
+                    candidates.append(node.value)
+        if dict_key is not None and isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if _const_str(k) == dict_key:
+                    candidates.append(v)
+        for value in candidates:
+            receiver = _isoformat_now_receiver(value)
+            if receiver is not None:
+                return receiver
+    return None
+
+
 class AgentRunnerSourceTimezoneTest(unittest.TestCase):
     """Catches the original bug by static analysis: every
     `datetime.now(...).isoformat()` in agent_runner.py must pass
@@ -147,6 +217,13 @@ class AgentRunnerSourceTimezoneTest(unittest.TestCase):
     def setUp(self):
         self.source = Path(ar.__file__)
         self.calls = _datetime_now_isoformat_calls(self.source)
+        self.tree = ast.parse(self.source.read_text(), filename=str(self.source))
+
+    def _function(self, name: str) -> ast.FunctionDef:
+        fn = _find_function(self.tree, name)
+        self.assertIsNotNone(
+            fn, f'function {name!r} not found in agent_runner.py')
+        return fn
 
     def test_at_least_five_isoformat_callsites(self):
         # Sanity: if this drops, somebody removed a callsite without
@@ -169,33 +246,53 @@ class AgentRunnerSourceTimezoneTest(unittest.TestCase):
             )
 
     def test_meta_started_at_uses_utc(self):
-        # _meta_started_at assignment inside run_claude.
-        self._assert_callsite_uses_utc(target_line=807)
+        # `_meta_started_at = datetime.now(...).isoformat()` inside run_claude.
+        fn = self._function('run_claude')
+        call = _now_isoformat_for_target(fn, name='_meta_started_at')
+        self.assertIsNotNone(
+            call,
+            "'_meta_started_at = datetime.now(...).isoformat()' not found in "
+            'run_claude — callsite removed or renamed; update this test',
+        )
+        self.assertTrue(
+            _call_uses_utc_arg(call),
+            '_meta_started_at datetime.now(...).isoformat() does not pass '
+            'timezone.utc',
+        )
 
     def test_completed_at_uses_utc(self):
-        # out_meta['completed_at'] inside run_claude's success branch.
-        self._assert_callsite_uses_utc(target_line=1305)
+        # `out_meta['completed_at'] = datetime.now(...).isoformat()` inside
+        # run_claude's success branch.
+        fn = self._function('run_claude')
+        call = _now_isoformat_for_target(fn, subscript_key='completed_at')
+        self.assertIsNotNone(
+            call,
+            "out_meta['completed_at'] = datetime.now(...).isoformat() not "
+            'found in run_claude — callsite removed or renamed; update this '
+            'test',
+        )
+        self.assertTrue(
+            _call_uses_utc_arg(call),
+            "completed_at datetime.now(...).isoformat() does not pass "
+            'timezone.utc',
+        )
 
     def test_process_task_timestamp_uses_utc(self):
-        # result['timestamp'] inside process_task.
-        self._assert_callsite_uses_utc(target_line=1771)
-
-    def _assert_callsite_uses_utc(self, target_line: int) -> None:
-        # Tolerate ±3 lines of drift from upstream edits before failing
-        # with a "callsite moved" message — easier to update than to
-        # chase a brittle line number.
-        nearby = [c for c in self.calls if abs(c.lineno - target_line) <= 3]
-        self.assertTrue(
-            nearby,
-            f'no datetime.now(...).isoformat() within 3 lines of {target_line} — '
-            f'callsite may have moved; update this test',
+        # result['timestamp'] dict entry in the inbox task loop. This callsite
+        # historically lived in process_task; it now lives in process_inbox —
+        # located by enclosing function + dict key, not by line number.
+        fn = self._function('process_inbox')
+        call = _now_isoformat_for_target(fn, dict_key='timestamp')
+        self.assertIsNotNone(
+            call,
+            "result {'timestamp': datetime.now(...).isoformat()} not found in "
+            'process_inbox — callsite removed or renamed; update this test',
         )
-        for call in nearby:
-            self.assertTrue(
-                _call_uses_utc_arg(call),
-                f'datetime.now(...).isoformat() at line {call.lineno} does '
-                f'not pass timezone.utc',
-            )
+        self.assertTrue(
+            _call_uses_utc_arg(call),
+            "result['timestamp'] datetime.now(...).isoformat() does not pass "
+            'timezone.utc',
+        )
 
 
 if __name__ == '__main__':

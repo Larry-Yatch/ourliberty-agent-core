@@ -13,8 +13,12 @@ Covers docs/forge-queue-brief.md § Tests:
   - building: filtered to agent + is_in_flight
   - in_review: review_request with no terminal event appears; one WITH a
     later auto_merge does not
-  - done_today: merged vs failed classification; an event from yesterday is
-    excluded (UTC boundary)
+  - done_today: the mirror-attribution join — the building agent's
+    session_start/session_done define today's taskset; Mirror's review_pass =>
+    merged, review_revision / review_escalate => changes_requested, the
+    building agent's marker_error / preflight_reject / cost_budget => failed; a
+    review_pass whose task_id is NOT in the taskset is excluded; an event from
+    yesterday is excluded (UTC boundary); dedup keeps the latest ts per task
   - supabase-None degradation: in_review / done_today empty, no 500
   - auth: 401 without the token
 
@@ -66,21 +70,30 @@ class _ChainEventsClient:
     """Answers the dashboard's chain_events read chain:
     table('chain_events').select(cols).eq('agent', agent).execute().
 
-    Pre-seeded with a flat list of rows; execute() returns the rows whose
-    'agent' matches the eq filter.
+    Pre-seeded with a flat list of rows; execute() filters by the eq('agent')
+    predicate and then projects each row to EXACTLY the selected columns when
+    cols != '*'. Honoring the projection is deliberate: the WHERE clause runs
+    against full rows (like Postgres) but the result only carries the selected
+    columns, so a query that forgets to select a column the deriver depends on
+    fails here the same way it fails in production. (This is the flaw that let
+    PR #303 ship done_today broken — the prior stub returned full rows, so the
+    missing 'agent' column went unnoticed.)
     """
 
     def __init__(self, rows: Optional[list[dict[str, Any]]] = None):
         self.rows = rows or []
         self._table: Optional[str] = None
         self._filters: dict[str, Any] = {}
+        self._cols: str = '*'
 
     def table(self, name: str):
         self._table = name
         self._filters = {}
+        self._cols = '*'
         return self
 
     def select(self, cols: str = '*'):
+        self._cols = cols
         return self
 
     def eq(self, col: str, val: Any):
@@ -90,6 +103,9 @@ class _ChainEventsClient:
     def execute(self):
         agent = self._filters.get('agent')
         data = [r for r in self.rows if r.get('agent') == agent]
+        if self._cols != '*':
+            keep = [c.strip() for c in self._cols.split(',')]
+            data = [{k: r.get(k) for k in keep} for r in data]
         return _Resp(data)
 
 
@@ -287,27 +303,55 @@ class InReviewLaneTest(_Base):
 # ==================== done_today lane ====================
 
 class DoneTodayLaneTest(_Base):
-    def test_merged_failed_classification_and_utc_boundary(self):
+    def _session(self, task_id: str, ts) -> dict[str, Any]:
+        return {'agent': 'forge', 'task_id': task_id,
+                'event_type': 'session_start', 'pr_url': None,
+                'ts': ts.isoformat()}
+
+    def test_mirror_join_three_outcomes_and_exclusions(self):
         now = datetime.now(timezone.utc)
         yesterday = now - timedelta(days=1)
         rows = [
-            {'agent': 'forge', 'task_id': 'merged1',
-             'event_type': 'auto_merge', 'pr_url': 'https://pr/1',
+            # forge's sessions today define the taskset.
+            self._session('merged1', now - timedelta(hours=3)),
+            self._session('changed1', now - timedelta(hours=3)),
+            self._session('escalated1', now - timedelta(hours=3)),
+            self._session('failed1', now - timedelta(hours=3)),
+            self._session('failed2', now - timedelta(hours=3)),
+            self._session('boundary1', now - timedelta(hours=3)),
+
+            # MERGED: mirror review_pass for a forge task. An earlier
+            # review_revision on the SAME task must lose to the later pass.
+            {'agent': 'mirror', 'task_id': 'merged1',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/1',
+             'ts': (now - timedelta(hours=1)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'merged1',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/1',
              'ts': now.isoformat()},
+            # CHANGES_REQUESTED via review_revision and review_escalate.
+            {'agent': 'mirror', 'task_id': 'changed1',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/2',
+             'ts': now.isoformat()},
+            {'agent': 'mirror', 'task_id': 'escalated1',
+             'event_type': 'review_escalate', 'pr_url': 'https://pr/3',
+             'ts': now.isoformat()},
+            # FAILED: the building agent's own failure markers.
             {'agent': 'forge', 'task_id': 'failed1',
-             'event_type': 'marker_error', 'pr_url': 'https://pr/2',
+             'event_type': 'marker_error', 'pr_url': None,
              'ts': now.isoformat()},
             {'agent': 'forge', 'task_id': 'failed2',
              'event_type': 'cost_budget', 'pr_url': None,
              'ts': now.isoformat()},
-            # yesterday's terminal event -> excluded by UTC boundary.
-            {'agent': 'forge', 'task_id': 'old1',
-             'event_type': 'auto_merge', 'pr_url': 'https://pr/old',
-             'ts': yesterday.isoformat()},
-            # non-terminal event today -> excluded.
-            {'agent': 'forge', 'task_id': 'noise',
-             'event_type': 'review_request', 'pr_url': 'https://pr/n',
+
+            # EXCLUDED: review_pass whose task_id is NOT in forge's taskset
+            # (e.g. a build mirror reviewed for another agent).
+            {'agent': 'mirror', 'task_id': 'notmine',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/x',
              'ts': now.isoformat()},
+            # EXCLUDED: yesterday's verdict for an in-set task (UTC boundary).
+            {'agent': 'mirror', 'task_id': 'boundary1',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/b',
+             'ts': yesterday.isoformat()},
         ]
         c = _client(self.agents_root, self.worktrees_root,
                     _ChainEventsClient(rows))
@@ -315,13 +359,92 @@ class DoneTodayLaneTest(_Base):
         self.assertEqual(r.status_code, 200)
         done = r.json()['done_today']
         by_task = {d['task_id']: d for d in done}
-        self.assertEqual(set(by_task), {'merged1', 'failed1', 'failed2'})
+        self.assertEqual(
+            set(by_task),
+            {'merged1', 'changed1', 'escalated1', 'failed1', 'failed2'},
+        )
         self.assertEqual(by_task['merged1']['outcome'], 'merged')
-        self.assertIsNone(by_task['merged1']['reason'])
+        self.assertEqual(by_task['merged1']['reason'], 'review_pass')
+        self.assertEqual(by_task['merged1']['pr_url'], 'https://pr/1')
+        self.assertEqual(by_task['changed1']['outcome'], 'changes_requested')
+        self.assertEqual(by_task['changed1']['reason'], 'review_revision')
+        self.assertEqual(by_task['escalated1']['outcome'], 'changes_requested')
+        self.assertEqual(by_task['escalated1']['reason'], 'review_escalate')
         self.assertEqual(by_task['failed1']['outcome'], 'failed')
         self.assertEqual(by_task['failed1']['reason'], 'marker_error')
         self.assertEqual(by_task['failed2']['outcome'], 'failed')
         self.assertEqual(by_task['failed2']['reason'], 'cost_budget')
+        # sorted by `at` descending: merged1's review_pass (now) is newest.
+        self.assertEqual(done[0]['task_id'], 'merged1')
+
+    def test_populates_through_production_column_projection(self):
+        # Regression guard for PR #303: done_today only populates if the
+        # production select(...) projection carries the 'agent' column the
+        # taskset/failure gating depends on. The stub now honors the
+        # projection, so a query that drops 'agent' yields an empty taskset
+        # and this test fails — exactly as production did.
+        now = datetime.now(timezone.utc)
+        rows = [
+            self._session('m1', now - timedelta(hours=2)),
+            self._session('c1', now - timedelta(hours=2)),
+            self._session('f1', now - timedelta(hours=2)),
+            # merged: a review_pass whose task_id IS in forge's taskset.
+            {'agent': 'mirror', 'task_id': 'm1',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/m1',
+             'ts': now.isoformat()},
+            # changes_requested.
+            {'agent': 'mirror', 'task_id': 'c1',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/c1',
+             'ts': now.isoformat()},
+            # failed: forge's own marker.
+            {'agent': 'forge', 'task_id': 'f1',
+             'event_type': 'preflight_reject', 'pr_url': None,
+             'ts': now.isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        done = r.json()['done_today']
+        by_task = {d['task_id']: d['outcome'] for d in done}
+        self.assertEqual(by_task, {
+            'm1': 'merged',
+            'c1': 'changes_requested',
+            'f1': 'failed',
+        })
+
+    def test_stub_honors_column_projection(self):
+        # Direct contract check on the fixture: select(cols) must drop columns
+        # not in `cols`, and select('*') must keep them. If this regresses, the
+        # done_today tests stop exercising the real fetch path.
+        rows = [{'agent': 'forge', 'event_type': 'session_start',
+                 'task_id': 't', 'pr_url': None, 'ts': '2026-06-04T00:00:00+00:00'}]
+        stub = _ChainEventsClient(rows)
+        projected = stub.table('chain_events').select(
+            'agent,event_type,task_id,pr_url,ts').eq('agent', 'forge').execute()
+        self.assertEqual(set(projected.data[0]), {
+            'agent', 'event_type', 'task_id', 'pr_url', 'ts'})
+        dropped = stub.table('chain_events').select(
+            'event_type,task_id,pr_url,ts').eq('agent', 'forge').execute()
+        self.assertNotIn('agent', dropped.data[0])
+        full = stub.table('chain_events').select('*').eq(
+            'agent', 'forge').execute()
+        self.assertIn('agent', full.data[0])
+
+    def test_review_pass_not_in_taskset_excluded(self):
+        # A lone mirror review_pass with no matching forge session today must
+        # NOT appear — the taskset join is what attributes builds to forge.
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'mirror', 'task_id': 'orphan',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/o',
+             'ts': now.isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['done_today'], [])
 
 
 # ==================== supabase-None degradation ====================

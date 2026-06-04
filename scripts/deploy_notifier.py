@@ -5,7 +5,8 @@ Every 2 min via systemd timer. Polls Vercel's `/v6/deployments?state=READY,ERROR
 endpoint, filters by the GitHub repos in `config/deploy_targets.json`, and DMs
 Larry via the existing `larry_alerts.append_alert` queue when:
 
-  - state=READY: a preview build is live (DM with the preview URL).
+  - state=READY: a preview build is live (log-only — the preview URL is
+    written to the deploy-notifier log; no DM).
   - state=ERROR: a preview build failed (DM with the Vercel inspect link).
 
 Skipped states: BUILDING, QUEUED, INITIALIZING, CANCELED (transient or
@@ -463,6 +464,11 @@ def _gh_pr_for_branch(branch: str, github_repo: str) -> Optional[int]:
 
 # -------------------- DM body rendering --------------------
 
+def _preview_url(deployment: dict[str, Any]) -> str:
+    url = deployment.get('url') or ''
+    return f'https://{url}' if url and not url.startswith('http') else url
+
+
 def _pr_field(pr_number: Optional[int], pr_title: str = '') -> str:
     if pr_number is None:
         return 'PR #(unknown)'
@@ -477,8 +483,7 @@ def _render_ready(
 ) -> tuple[str, str, str]:
     project = target.get('name') or deployment.get('name') or '(unknown)'
     branch = _deployment_branch(deployment) or '(unknown)'
-    url = deployment.get('url') or ''
-    preview_url = f'https://{url}' if url and not url.startswith('http') else url
+    preview_url = _preview_url(deployment)
     pr = _pr_field(pr_number, _commit_message_first_line(deployment))
     body = (
         f'Vercel preview live\n'
@@ -751,16 +756,23 @@ def run_once(
             save_state(state)
         return counts
 
-    # Live mode: actually DM each pending deployment.
+    # Live mode: ERROR DMs at critical; READY is log-only (preview URL to the
+    # log, no DM). Both record the uid:state dedup key so they fire once.
     for d, target, vstate in pending_dms:
         uid = d['uid']
         pr_number, source = _resolve_pr_number(d, target, gh_runner=gh_runner)
         log(f'PR resolution for uid={uid}: {source} -> {pr_number}')
 
+        if vstate == 'READY':
+            log(f'READY preview live (log-only, no DM) uid={uid} '
+                f'project={target.get("name")} branch={_deployment_branch(d)} '
+                f'{_pr_field(pr_number)} URL: {_preview_url(d)}')
+            _record_notified(state, uid, vstate, now=now)
+            continue
+
         msg, subj, sug = _render_for_state(vstate, target, d, pr_number)
-        severity = 'critical' if vstate == 'ERROR' else 'warning'
         ok = dm_larry(message=msg, subject=subj, suggested_action=sug,
-                      severity=severity)
+                      severity='critical')
         if ok:
             counts['dm_sent'] += 1
             _record_notified(state, uid, vstate, now=now)

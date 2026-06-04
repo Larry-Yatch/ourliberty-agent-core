@@ -1,0 +1,16 @@
+[Unit]
+Description=Phantom-dispatch watcher — alert if a Beacon dispatch-claim left no real Forge dispatch
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow. Every
+# 5 min so each claim is re-checked several times inside its eligible band (a
+# claim is evaluated once it is older than the 10-min grace but still within the
+# 30-min scan window), and the dedup state file makes repeats idempotent.
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=ourliberty-heal-phantom-dispatch-claim.service
+
+[Install]
+WantedBy=timers.target

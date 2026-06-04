@@ -1,0 +1,23 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Conservative, editable pattern list for heal_phantom_dispatch_claim.py. An outbound Beacon message (beacon_telegram_bot.log '-> <chat>: <repr>' line, truncated to 120 chars by the bot) is a dispatch CLAIM if it matches any phrase in dispatch_claim_phrases. If a task_id is also extractable it is a CONCRETE claim (verified by task_id); if not it is an AMBIGUOUS claim, which only alerts when it also matches a strong_dispatch_phrase AND no Forge activity followed (see decision 5 in docs/phantom-dispatch-reconciliation-brief.md). Phrases are matched case-insensitively as substrings. Keep them dispatch-specific so routine messages never match."
+  },
+  "dispatch_claim_phrases": [
+    "dispatches to forge",
+    "dispatched to forge",
+    "dispatching to forge",
+    "goes to forge now",
+    "approved —",
+    "approved -"
+  ],
+  "strong_dispatch_phrases": [
+    "dispatches to forge",
+    "dispatched to forge",
+    "dispatching to forge",
+    "goes to forge now"
+  ],
+  "grace_minutes": 10,
+  "scan_window_minutes": 30,
+  "min_bare_kebab_hyphens": 2
+}
