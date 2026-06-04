@@ -1,0 +1,60 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Conservative pattern list for beacon_approval_handler.is_completion_claim(). Used at EMISSION time by the bot's prose guard (beacon_telegram_bot._send_beacon_response) to catch a Beacon chat reply that asserts a COMPLETED dispatch/approval when NO APPROVAL_REQUEST marker was emitted in that turn (the 2026-06-03 deploy-notifier-ready-logonly phantom). Distinct from config/phantom-dispatch-claim-patterns.json: that file feeds the AFTER-THE-FACT detector (heal_phantom_dispatch_claim.py, ~10 min grace, task_id verification); this file feeds the PREVENT guard that intercepts before Larry sees the prose. Tuned tighter than the detector so it does not muzzle normal talk or brief-protected intent ('I'm dispatching X now'). All matches are case-insensitive substring. Revisit the pattern set if the detector logs real firings with phrasing these miss.",
+    "validated_against": "Approved — `deploy-notifier-ready-logonly` dispatches to Forge now"
+  },
+  "completion_claim_phrases": [
+    "dispatched to forge",
+    "dispatches to forge",
+    "goes to forge now",
+    "approved and dispatched",
+    "approved + dispatched",
+    "shipped to forge",
+    "sent to forge",
+    "handed off to forge",
+    "handed to forge",
+    "now in forge",
+    "in forge's inbox",
+    "in forge now",
+    "is in forge"
+  ],
+  "approval_triggers": [
+    "approved —",
+    "approved -",
+    "approved:"
+  ],
+  "approval_target_words": [
+    "forge",
+    "dispatch"
+  ],
+  "conditional_exemptions": [
+    "if you approve",
+    "once you approve",
+    "after you approve",
+    "when you approve",
+    "if approved",
+    "once approved",
+    "pending approval",
+    "for approval",
+    "for your approval",
+    "awaiting approval"
+  ],
+  "intent_exemptions": [
+    "i'll",
+    "i will",
+    "i'm going to",
+    "i am going to",
+    "about to",
+    "ready to",
+    "want me to",
+    "shall i",
+    "should i",
+    "would dispatch",
+    "should dispatch",
+    "could dispatch",
+    "plan to",
+    "planning to",
+    "considering"
+  ]
+}
