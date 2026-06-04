@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration 825 — 2026-06-04 03:00 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=0 — **0 auto-fixes. 2 new Tier-3 (known-pattern) alerts. SYNC-PUSH-REBASE-FALLBACK #57 at 02:51Z (self-recovering). 8/8 services active. 0 open PRs (PR #301 MERGED ~02:53Z). All inboxes empty. 11 worktrees (PR #301 worktrees cleaned by Mirror event-driven teardown; 2 fewer than iter 824).**
+
+Alert watermark: **1252 lines / anchor 02:56:59Z** (2 new since iter 824's 1250/02:28:17Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57 at 02:51:22Z (status=error, commit=24cb5563; session HEAD=2aa1034 newer → wrapper push for iter 824 succeeded post-sync; self-recovering; hourly sync.timer will clear). Healer heartbeat: **02:55:37Z** (~5 min at check; ✅ within 90-min threshold). **8/8 services active.** **0 open PRs in agent-core** (PR #301 merged 02:53Z). **0 open PRs in ourliberty-dashboard.** **Worktrees: 11.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 2 new alerts, both Tier-3 known-pattern (no tier-reset).**
+  - `02:53:16Z` `outbox-notifier:review-pass` — Mirror approved and auto-merged PR #301 "fix(pulse): harden the pulse-check liveness watcher (glob, baseline, translation, seed)." Message: "All 6 locked decisions from the Larry-approved hardening brief are implemented with proving tests. Full relevant suite 96/96 green." Branch deleted. **Classification: Tier-3** (`outbox-notifier:review-pass` → INFO/FYI per alert-translations.json). Silence + journal note. No tier-reset. **PR #301 MERGED.** ✅
+  - `02:56:59Z` `heal-claude-max-burn-rate:claude_max_5h_burn_threshold_breached` — "Trailing 5h quota pace at 80% of token gate (8,006,927 / 10,000,000 tokens). Recent rate-limit events (trailing 2h): 117." **Classification: Tier-3** (`heal-claude-max-burn-rate:claude_max_5h_burn_threshold_breached` → INFO/FYI per alert-translations.json). Silence + journal note. No tier-reset. Context: heavy interactive-cycle cluster (iters 819–824 all in rapid succession with multiple Forge builds); pace will reduce with inboxes now drained. ✅
+  - Watermark advanced to 1252 / anchor 02:56:59Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 02:55:37Z (~5 min; ✅ within 90-min threshold). All inboxes empty — no active builds. System fully drained. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 02:55:37Z (fresh). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2aa1034 "Pulse cycle 20260604T025424Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57.** sync.json: status=error, message="Auto-commit push failed; rolled back", commit=24cb5563, last_sync=02:51:22Z. Session HEAD (2aa1034) newer than sync commit (24cb5563) → wrapper push for iter 824 succeeded independently before sync service's failed attempt at 02:51:22Z. Self-recovering per established calibration (MEMORY). Hourly sync.timer is the authoritative backstop. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. No additional action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core** (PR #301 merged 02:53Z via Mirror auto-merge). ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **Forge inbox: 0** — empty. ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Mirror inbox: 0** — empty. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal (Tier-3 FYI).** Burn-rate alert classified Tier-3 per translations — informational pace indicator. 117 rate-limit events in 2h reflects the heavy interactive-session cluster. With inboxes now drained and no active builds, pace should reduce naturally over the rolling 5h window. No dispatch pause needed. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 11** (down from 13 in iter 824; PR #301 worktrees both cleaned):
+  - `wt-forge-harden-pulse-check-liveness-watcher` — **GONE.** Mirror's event-driven teardown fired correctly at PR #301 merge (Mirror-triggered merge path). Distinct from G-rule (which concerns Pulse-triggered `gh pr merge --auto`). ✅
+  - `wt-mirror-harden-pulse-check-liveness-watcher` — **GONE.** Same. ✅
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — stale post-merge (PR #294, ~27h+). G-rule teardown-gap. Hourly GC. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — post-merge PR #35, Pulse-triggered iter 820. G-rule teardown-gap instance. Hourly GC. ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — post-merge PR #297, Pulse-triggered iter 819. Hourly GC. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale preflight (~8h+). Hourly GC. ✅
+  - `wt-forge-heal-retry-exhausted-taskid-resolution` — post-merge PR #299, Pulse-triggered iter 822. Hourly GC. ✅
+  - `wt-forge-orchestrator-engine-hardening-spec` — post-merge PR #298, Pulse-triggered iter 821. Hourly GC. ✅
+  - `wt-mirror-build-forge-queue-ui-20260604T013719Z` — Mirror review worktree for PR #35. Hourly GC. ✅
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — Mirror worktree for PR #297 marker-error retry. Self-clearing. ✅
+  - `wt-mirror-heal-retry-exhausted-taskid-resolution` — Mirror review worktree for PR #299. Hourly GC. ✅
+  - `wt-mirror-orchestrator-engine-hardening-spec` — Mirror review worktree for PR #298. Hourly GC. ✅
+
+- **G-rule watch:**
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — 3/3 DISPATCHED (iter 821). Beacon brief complete. Larry dispatches from Telegram. No new instances this iter (PR #301 was Mirror-triggered, not Pulse-triggered → teardown worked correctly). Close when Forge PR merges. ✅
+  - All other G-rule counters: unchanged from iter 824.
+
+- **PRIME DIRECTIVE ratio:** interventions=695, systemic_fixes=6, ratio=115.8. No new rows this iter (no auto-fixes, no new G-rule dispatches, no new systemic fixes dispatched). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 2 new Tier-3 alerts silenced per alert-translations.json (outbox-notifier:review-pass, heal-claude-max-burn-rate:claude_max_5h_burn_threshold_breached). Watermark advanced to 1252 / anchor 02:56:59Z. No tier-reset. ✅
+3. No auto-fixes executed.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (Check B sync error is a non-clean signal). ✅
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs unchanged (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`). Beacon brief for Pulse-triggered worktree-teardown-fix still waiting on Larry's Telegram dispatch.
+
+**Patterns:** System is in a quiet post-sprint state. The PR #301 merge closes the pulse-check liveness watcher hardening work. All inboxes drained; 0 open PRs. The burn-rate alert is an expected consequence of the heavy interactive-cycle cluster (iters 819–824) and will resolve as the rolling 5h window clears. Mirror event-driven teardown confirmed working for Mirror-triggered merges (PR #301 both worktrees cleaned correctly) — further evidence that the G-rule is specifically about Pulse-triggered `gh pr merge --auto`.
+
+**Learned:** The burn-rate Tier-3 FYI translation is working — 80% token gate crossed without noise (no DM, no tier-reset). The 117 rate-limit events in 2h context validates that interactive-cycle clusters are the driver. Informational only.
+
+---
+
 ## Iteration 824 — 2026-06-04 02:51 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=0 — **0 auto-fixes. 0 new alerts. SYNC-PUSH-REBASE-FALLBACK #56 at 02:49Z (self-recovering). 8/8 services active. 1 open PR (#301 CLEAN/MERGEABLE ~6 min — Mirror reviewing; threshold ~03:14Z). 0 open PRs in dashboard. Forge inbox: 0 (build-harden-pulse-check-liveness-watcher completed; PR #301 submitted). 13 worktrees (hourly GC backstop active).**
