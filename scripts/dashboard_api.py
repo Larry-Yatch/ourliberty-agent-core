@@ -391,6 +391,9 @@ class ReviewItem(BaseModel):
 class DoneItem(BaseModel):
     task_id: Optional[str]
     pr_url: Optional[str]
+    # outcome is 'merged' | 'changes_requested' | 'failed'; reason carries the
+    # raw chain_events event_type (review_pass / review_revision /
+    # review_escalate / marker_error / preflight_reject / cost_budget).
     outcome: str
     reason: Optional[str]
     at: Optional[str]
@@ -1636,38 +1639,97 @@ def _derive_in_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+# Build-completion signals (verified against live chain_events 2026-06-04).
+# Mirror — NOT the building agent — emits the review verdicts, carrying the
+# build's task_id + pr_url. The building agent emits its own failure markers.
+_DONE_FAILURE_EVENT_TYPES = ('marker_error', 'preflight_reject', 'cost_budget')
+_DONE_SESSION_EVENT_TYPES = ('session_start', 'session_done')
+
+
 def _derive_done_today(
-    rows: list[dict[str, Any]], now: Optional[datetime] = None,
+    agent_rows: list[dict[str, Any]],
+    verdict_rows: list[dict[str, Any]],
+    agent: str,
+    now: Optional[datetime] = None,
 ) -> list[dict[str, Any]]:
-    """DONE_TODAY lane: today's terminal events only (UTC day boundary, per
-    `_reader_costs_today`). auto_merge => merged; the failure types => failed
-    (carrying the event_type as `reason`). Rolling daily window — no storage,
-    self-clears at UTC midnight."""
+    """DONE_TODAY lane: today's build outcomes for `agent` (UTC day boundary,
+    per `_reader_costs_today`). Rolling daily window — no storage, self-clears
+    at UTC midnight.
+
+    The join: `agent`'s own session_start/session_done events define today's
+    taskset. Mirror's review verdicts (`verdict_rows`) are attributed back to
+    `agent` via task_id membership in that taskset:
+      - review_pass                      => merged
+      - review_revision / review_escalate => changes_requested
+    Plus `agent`'s own failure markers (agent==<agent> OR task_id in taskset):
+      - marker_error / preflight_reject / cost_budget => failed
+    `reason` carries the raw event_type. Dedup by task_id keeping the latest
+    ts; sort by `at` descending."""
     now = now or datetime.now(timezone.utc)
     today = now.date()
-    out: list[dict[str, Any]] = []
-    for r in rows:
-        et = r.get('event_type')
-        if et not in _QUEUE_TERMINAL_EVENT_TYPES:
-            continue
+
+    def today_dt(r: dict[str, Any]) -> Optional[datetime]:
         dt = _ts_to_dt(r.get('ts'))
-        if dt is None:
-            continue
-        if dt.astimezone(timezone.utc).date() != today:
-            continue
-        if et == 'auto_merge':
-            outcome, reason = 'merged', None
-        else:
-            outcome, reason = 'failed', et
-        out.append({
+        if dt is None or dt.astimezone(timezone.utc).date() != today:
+            return None
+        return dt.astimezone(timezone.utc)
+
+    taskset: set[str] = set()
+    for r in agent_rows:
+        if (r.get('agent') == agent
+                and r.get('event_type') in _DONE_SESSION_EVENT_TYPES):
+            tid = r.get('task_id')
+            if tid and today_dt(r) is not None:
+                taskset.add(tid)
+
+    candidates: list[tuple[datetime, dict[str, Any]]] = []
+
+    def add(r: dict[str, Any], dt: datetime, outcome: str, reason: str) -> None:
+        candidates.append((dt, {
             'task_id': r.get('task_id'),
             'pr_url': r.get('pr_url'),
             'outcome': outcome,
             'reason': reason,
             'at': r.get('ts'),
-        })
-    out.sort(key=lambda x: x.get('at') or '')
-    return out
+        }))
+
+    for r in verdict_rows:
+        tid = r.get('task_id')
+        if tid not in taskset:
+            continue
+        dt = today_dt(r)
+        if dt is None:
+            continue
+        et = r.get('event_type')
+        if et == 'review_pass':
+            add(r, dt, 'merged', et)
+        elif et in ('review_revision', 'review_escalate'):
+            add(r, dt, 'changes_requested', et)
+
+    for r in agent_rows:
+        et = r.get('event_type')
+        if et not in _DONE_FAILURE_EVENT_TYPES:
+            continue
+        if not (r.get('agent') == agent or r.get('task_id') in taskset):
+            continue
+        dt = today_dt(r)
+        if dt is None:
+            continue
+        add(r, dt, 'failed', et)
+
+    # Dedup by task_id keeping the latest ts; None task_ids never collapse.
+    best: dict[str, tuple[datetime, dict[str, Any]]] = {}
+    extras: list[tuple[datetime, dict[str, Any]]] = []
+    for dt, item in candidates:
+        tid = item['task_id']
+        if not tid:
+            extras.append((dt, item))
+            continue
+        if tid not in best or dt > best[tid][0]:
+            best[tid] = (dt, item)
+    merged = list(best.values()) + extras
+    merged.sort(key=lambda x: x[0], reverse=True)
+    return [item for _dt, item in merged]
 
 
 def _reader_agent_queue(
@@ -1680,10 +1742,18 @@ def _reader_agent_queue(
     """Assemble one agent's four-lane dispatch lifecycle.
 
     queued + building are filesystem-only; in_review + done_today come from
-    chain_events and degrade to [] when `supabase_client` is None.
+    chain_events and degrade to [] when `supabase_client` is None. done_today
+    joins the agent's own session/failure events against Mirror's review
+    verdicts (a separate fetch, since Mirror — not the building agent — emits
+    them); in_review keeps using only the agent's own rows so its terminal
+    detection is unchanged.
     """
     now = now or datetime.now(timezone.utc)
     rows = _fetch_chain_events_for_agent(supabase_client, agent)
+    verdict_rows = (
+        rows if agent == 'mirror'
+        else _fetch_chain_events_for_agent(supabase_client, 'mirror')
+    )
     return {
         'agent': agent,
         'queued': _reader_agent_queue_queued(agents_root, agent, now=now),
@@ -1691,7 +1761,7 @@ def _reader_agent_queue(
             agents_root, worktrees_root, agent, now=now,
         ),
         'in_review': _derive_in_review(rows),
-        'done_today': _derive_done_today(rows, now=now),
+        'done_today': _derive_done_today(rows, verdict_rows, agent, now=now),
         'captured_at': _now_utc_iso(now),
     }
 
