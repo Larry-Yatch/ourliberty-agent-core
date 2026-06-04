@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration 897 — 2026-06-04 16:55 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check 0 — 3 Tier-4 alerts). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge inbox: 0 (revision task processed; whitelist repin committed by Forge). Mirror inbox: 1 (rev2 review for PR #321 — in pipeline). Beacon inbox: 1 (stale ack-proceed notify for merged PR #321 — monitoring). ✅ Sync CLEAN (62nd SYNC-PUSH-REBASE-FALLBACK-001 self-resolved at 16:48:18Z).**
+
+Alert watermark: **1280 lines / 16:49:02Z** (+3 from iter 896 watermark 1277/16:36:20Z). Sync: **CLEAN** — sync.json status=no-change, last_sync=2026-06-04T16:48:18Z, commit=ac34652 (origin/main). 62nd SYNC-PUSH-REBASE-FALLBACK-001 self-resolved via hourly timer. Pipeline-stall heartbeat: 16:52:49Z (✅ ~3 min at cycle start). Stale-daemon heartbeat: 16:29:57Z (✅ ~26 min at cycle start).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts (Tier-4×3). tier-reset.**
+  - `ts=16:43:56Z, source=medic, intent=medic-diagnosis, subject=pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` — Medic diagnosis of iter 896 false-positive alert. Diagnosis confirms: build-forge-queue-api task completed + PR #294 merged 2026-06-04T01:11:22Z; clarify1 task failure pre-dispatch did not indicate a real PR-create failure. Recommended fix: update FORGE_NO_PR_RECLASSIFY in scripts/heal_pipeline_stall.py to skip reclassification when a build from the same preflight family has a merged PR. **Tier-4 novel** — `source:medic / intent:medic-diagnosis` NOT in alert-translations.json (G-rule 3/3 dispatched iter 804; engine fix still pending). Known-recurring; standing items cover systemic path. G-rule `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: now **1/3** (no change — this is the same Medic echo as the original iter 896 alert; G-rule counts distinct occurrences of the pipeline-stall alert, not Medic echoes).
+  - `ts=16:44:05Z, source=medic, intent=medic-diagnosis, subject=pipeline-stall:forge-no-pr:build-forge-queue-api-20260603T234656Z` — Medic diagnosis of iter 896 false-positive forge-no-pr alert. Confirmed: build completed, PR #294 merged. Healer checked open PRs only; missed already-merged state. Medic provides silence command: `python3 medic_actions.py silence-false-positive --fingerprint heal-pipeline-stall:pipeline-stall:forge-no-pr:build-forge-queue-api-20260603T234656Z`. Not in auto-fix allowlist; silencing fingerprint suppresses future healer re-fires on this stale archive entry but is outside my always-allowed scope. **Ask-then-do: Larry, approve silence command if desirable.** **Tier-4 novel** — same source/intent as above.
+  - `ts=16:49:02Z, source=pulse-escalation, subject=ask-then-do:stale-revision-and-test-regression-in-main` — Echo of iter 896 escalation. **Tier-4 novel** — `source:pulse-escalation` NOT in alert-translations.json (G-rule 3/3 threshold met iter 836; batched into `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry). Known-recurring; no new DM — standing escalation covers content.
+  - Watermark advanced: **1280 / 16:49:02Z**. ✅
+  - → tier-reset (3 Tier-4 alerts)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ / monitoring.** beacon_telegram_sessions.json: 1 active session ✅. Beacon inbox: 1 (`notify-forge-marker-error-retry-fillin-001.json` — ack-proceed notification from Forge for PR #321, which is already merged at 16:08:29Z; intent=ack-proceed, stale; Beacon will process and discard gracefully). Mirror inbox: 1 (`review-forge-marker-error-retry-fillin-001-rev2.json` — revision 2 review for PR #321; Forge applied whitelist repin commit `16e3852` and recommends REVIEW_ESCALATE to Beacon; Mirror will emit REVIEW_ESCALATE → outbox-notifier → Beacon will spec new build for regression fix; pipeline in motion). Forge inbox: 0 ✅. Pulse inbox: 0 ✅.
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:52:49Z (~3 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 16:29:57Z (~26 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=eee9e81 "Pulse cycle 20260604T165218Z" (iter 896 wrapper). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=2026-06-04T16:48:18Z, commit=ac34652. **62nd SYNC-PUSH-REBASE-FALLBACK-001 self-resolved via hourly timer.** APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (root fix still pending Larry — the pattern self-recovers every occurrence but fires again on next interactive-session PR merge day). → **no tier-reset from Check B** (clean this iter). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Empty.** Forge processed the stale revision task `revision-forge-marker-error-retry-fillin-001-1.json` (present iter 896). Forge computed the whitelist repin fix (commit `16e3852`, lines 71→72 and 316→317) and sent a rev2 review task to Mirror. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** 
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - All inboxes nominal per Check 2 above. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 896):**
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **1/3** (unchanged — Medic echoes don't increment; counting distinct healer-fired occurrences only).
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **1/3** (unchanged, same reasoning).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **Regression status update:** Test regression from PR #321 (test_no_production_path_leaks.py whitelist lines 71→72, 316→317) is STILL in main. Forge computed the fix locally (commit `16e3852`) but no new PR is open yet. Mirror's REVIEW_ESCALATE on the rev2 task will route to Beacon → new build dispatch → new PR. Standing [yellow] escalation from iter 896 covers this. No additional escalation sent (same state, same standing items).
+
+- **PRIME DIRECTIVE ratio:** interventions=709 (+1), systemic_fixes=9, ratio≈78.78. Ledger row appended: `alert-triage:3-tier4-alerts:medic-diagnosis×2+pulse-escalation-echo`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 3 new alerts triaged (Tier-4×3: 2 medic-diagnosis echoes + 1 pulse-escalation echo). Watermark advanced to **1280 / 16:49:02Z**.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=16:55:40Z. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 897 --template alert-triage --detail 3-tier4-alerts` → row appended. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions from PR #321 import shift). Fix in Forge local commit `16e3852`; no PR yet. Mirror rev2 review → REVIEW_ESCALATE → Beacon dispatch expected. Suggested action: (a) if Mirror's REVIEW_ESCALATE doesn't produce a Beacon dispatch within next 2 iters, dispatch manually; (b) optionally run `python3 medic_actions.py silence-false-positive` for the forge-queue-api false-positive fingerprint.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 62nd total; self-recovers; now resolved this iter).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- 62nd SYNC-PUSH-REBASE-FALLBACK-001 self-resolved this iter — no new occurrence. The hourly timer reliably clears the residual within ~36 min of any interactive-session race. Pattern holds.
+- Medic is now echoing diagnoses for iter 896's false-positive alerts. The Medic diagnoses confirm both were false positives (PR #294 merged). The `source:medic/intent:medic-diagnosis` translation gap (G-rule 3/3, engine fix pending) means these generate Tier-4 noise each time Medic runs a diagnosis. No new G-rule increment — same standing pattern.
+- Forge successfully processed the revision task despite the PR being merged and branch deleted. The whitelist repin commit `16e3852` was produced. The REVIEW_ESCALATE path is the correct escalation route to get a new PR opened for the regression fix.
+- 0 open PRs in both repos for the first time in several iters. Pipeline is at a momentary idle.
+
+**Learned:** Medic's diagnoses confirm both iter 896 pipeline-stall false positives. The recommended `medic_actions.py silence-false-positive` command is a precision suppression tool — running it would prevent healer re-fires on the specific stale forge-queue-api archive entry without affecting other genuine stalls. At 3/3 for the forge-no-pr-false-alarm G-rule, I'd dispatch Beacon to spec the proper root fix (update forge-no-pr check to include merged PRs).
+
+---
+
 ## Iteration 896 — 2026-06-04 16:44 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-resets: Check 0 — 2 pipeline-stall alerts [Tier NOW + Tier 4 novel]; Check B — 62nd SYNC-PUSH-REBASE-FALLBACK-001). **1 auto-fix (auto-merge dashboard PR #39 → merged 16:47:25Z). 8/8 services active. 0 open agent-core PRs. 0 dashboard PRs post-merge. Ask-then-do escalation sent: stale revision task + test regression in main.**
