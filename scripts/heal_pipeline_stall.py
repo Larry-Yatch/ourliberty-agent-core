@@ -570,6 +570,50 @@ def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
     return None
 
 
+# Preflight/clarify tasks (task_ids containing `-preflight`) never open a
+# PR themselves -- they emit a PROCEED that spawns a *separate* build task
+# with a fresh timestamp. Example (the 2026-06-04 false-fire that drove
+# this): preflight `forge-queue-api-preflight-20260603T231401Z-clarify1`
+# produced build branch `forge/build-forge-queue-api-20260603T234656Z`,
+# merged as PR #294. `_pr_matches_task` can't correlate the two -- the
+# build branch suffix is a different task_id and the PR title doesn't carry
+# the preflight task_id -- so the build looks "missing" and the healer
+# escalated four times (02:07/03:11/04:17/05:18Z). When the build for the
+# same task *family* has already shipped (open OR merged), the preflight
+# stall is a false positive. The 12-char floor avoids matching short,
+# ambiguous stems (e.g. `build-` / `fix-` families).
+_PREFLIGHT_FAMILY_MIN_LEN = 12
+
+
+def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:
+    """If `task_id` is a preflight/clarify task whose build *family* has
+    already shipped as a PR in `prs`, return that PR; else None.
+
+    Family = the task_id stem before `-preflight`. A build PR for the same
+    family carries a branch like `forge/build-<family>-<ts>` (or
+    `forge/<family>-...`). We strip the `forge/`|`larry/` prefix and an
+    optional leading `build-` segment, then require the remainder to equal
+    `<family>` or start with `<family>-`. Only applies to task_ids that
+    contain `-preflight`; non-preflight tasks fall through unchanged.
+    """
+    idx = task_id.find('-preflight')
+    if idx <= 0:
+        return None
+    family = task_id[:idx]
+    if len(family) < _PREFLIGHT_FAMILY_MIN_LEN:
+        return None
+    for pr in prs:
+        branch_task = _task_id_from_branch(pr.get('headRefName') or '')
+        if not branch_task:
+            continue
+        stem = branch_task
+        if stem.startswith('build-'):
+            stem = stem[len('build-'):]
+        if stem == family or stem.startswith(family + '-'):
+            return pr
+    return None
+
+
 def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
     """Classify the archived Forge outbox as a clean preflight non-PROCEED.
     Returns a short label string if so, else None.
@@ -638,6 +682,11 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
       a) `_pr_matches_task` against open + merged PRs across both
          tracked repos. Matches exact branch, truncated branch, or
          title substring.
+      a2) `_preflight_family_shipped` for preflight/clarify task_ids:
+         the build for the same task *family* shipped under a fresh
+         timestamp branch (`forge/build-<family>-<ts>`) that (a) can't
+         correlate. Fixes the 2026-06-04 forge-queue-api 4-escalation
+         false-fire (preflight task -> merged PR #294).
       b) `_forge_preflight_non_proceed` against the archived outbox.
          Returns `'CLARIFY_REQUEST'` / `'REJECT_REQUEST'` when the
          `result` field carries the marker delimiter, OR
@@ -689,6 +738,21 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'FORGE_NO_PR_SKIP task={task} reason=pr_exists '
                 f'match={match_reason} pr=#{matched_pr.get("number")} '
                 f'repo={matched_pr.get("_repo")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 1b: preflight/clarify task whose build
+        # *family* already shipped under a fresh-timestamp branch that
+        # `_pr_matches_task` cannot correlate (different task_id). Covers
+        # the preflight -> build re-keying (e.g. `...-preflight-...` task
+        # -> `forge/build-<family>-<ts>` PR). See `_preflight_family_shipped`.
+        family_pr = _preflight_family_shipped(task, all_prs)
+        if family_pr is not None:
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=preflight_family_shipped '
+                f'pr=#{family_pr.get("number")} repo={family_pr.get("_repo")} '
+                f'branch={family_pr.get("headRefName")!r}',
                 'INFO',
             )
             seen_tasks.add(task)

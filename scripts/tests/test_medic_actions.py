@@ -189,6 +189,95 @@ class GateTest(_IsolatedActions):
         restart_m.assert_not_called()
 
 
+class SilenceFalsePositiveTest(_IsolatedActions):
+    """silence-false-positive handler: reversible, allowlist-gated, no DM.
+    The 2026-06-04 forge-no-pr backstop -- Medic durably quiets a confirmed
+    benign fingerprint instead of escalating attempt N+1 to Larry."""
+
+    SILENCEABLE_FP = ('heal-pipeline-stall:pipeline-stall:forge-no-pr:'
+                      'forge-queue-api-preflight-20260603T231401Z-clarify1')
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Re-seed the allowlist with a silenceable_subjects pattern.
+        (self.repo_dir / 'config' / 'medic-reversible-targets.json').write_text(
+            json.dumps({
+                '$schema_version': '1',
+                'restart_daemon_units': [ALLOWED_DAEMON],
+                'retrigger_inbox_targets': [ALLOWED_DAEMON],
+                'silenceable_subjects': ['pipeline-stall:forge-no-pr:'],
+            }))
+        # Isolate larry_alerts paths into the same tmp tree so silence files
+        # never touch the real ~/agents.
+        la = medic_actions.larry_alerts
+        self._la_patches = [
+            mock.patch.object(la, 'AGENTS_ROOT', self.agents_root),
+            mock.patch.object(la, 'ALERTS_FILE',
+                              self.agents_root / 'blackboard' / 'larry-alerts.jsonl'),
+            mock.patch.object(la, 'COOLDOWN_ROOT',
+                              self.agents_root / 'state' / 'alert-cooldown'),
+            mock.patch.object(la, 'SILENCE_ROOT',
+                              self.agents_root / 'state' / 'alert-silenced'),
+        ]
+        for p in self._la_patches:
+            p.start()
+
+    def tearDown(self) -> None:
+        for p in self._la_patches:
+            p.stop()
+        super().tearDown()
+
+    def test_silences_allowlisted_fingerprint_and_suppresses_alert(self) -> None:
+        la = medic_actions.larry_alerts
+        res = medic_actions.silence_false_positive(
+            self.SILENCEABLE_FP, reason='build shipped as PR #294')
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['reason'], 'silenced')
+        self.assertTrue(la.is_silenced(self.SILENCEABLE_FP))
+        # The healer's next append_alert for this fingerprint is now dropped.
+        src, subj = self.SILENCEABLE_FP.split(':', 1)
+        self.assertFalse(la.append_alert(src, 'warning', 'stall', subject=subj))
+        # Ledger shows an 'acted' record (reversible classification).
+        recs = self._ledger_records()
+        self.assertEqual(recs[-1]['outcome'], 'acted')
+        self.assertEqual(recs[-1]['classification'], 'reversible')
+
+    def test_fingerprint_not_in_allowlist_is_refused(self) -> None:
+        res = medic_actions.silence_false_positive(
+            'watchdog:disk-full-critical', reason='nope')
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        self.assertFalse(
+            medic_actions.larry_alerts.is_silenced('watchdog:disk-full-critical'))
+        self.assertEqual(self._ledger_records()[-1]['outcome'], 'skipped')
+
+    def test_idempotent_second_silence(self) -> None:
+        medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='a')
+        res = medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='b')
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['reason'], 'already-silenced')
+
+    def test_enable_flag_off_refuses_silence(self) -> None:
+        os.environ['OURLIBERTY_MEDIC_ENABLED'] = '0'
+        res = medic_actions.silence_false_positive(self.SILENCEABLE_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'gate-enable-flag-off')
+        self.assertFalse(medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FP))
+
+    def test_empty_fingerprint_refused(self) -> None:
+        res = medic_actions.silence_false_positive('', reason='x')
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'no-target')
+
+    def test_cli_silence_returns_zero_on_success(self) -> None:
+        rc = medic_actions._main(
+            ['silence-false-positive', '--fingerprint', self.SILENCEABLE_FP,
+             '--reason', 'shipped'])
+        self.assertEqual(rc, 0)
+        self.assertTrue(
+            medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FP))
+
+
 class RestartSuccessTest(_IsolatedActions):
     def test_restart_daemon_success_records_acted(self) -> None:
         restart_p, active_p = self._patch_subprocess(rc=0, active='active')

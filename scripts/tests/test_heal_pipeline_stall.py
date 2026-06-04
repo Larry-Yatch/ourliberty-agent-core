@@ -232,6 +232,52 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, open_prs, [], {})
         self.assertEqual(alerts, [])
 
+    def test_skips_when_preflight_family_shipped_as_build_pr(self) -> None:
+        """Preflight/clarify tasks don't open a PR themselves — they emit a
+        PROCEED that spawns a separate build task with a fresh timestamp.
+        Production 2026-06-04: preflight task
+        `forge-queue-api-preflight-20260603T231401Z-clarify1` shipped as
+        merged PR #294 on branch `forge/build-forge-queue-api-20260603T234656Z`.
+        Branch/title match miss (different task_id); family match catches it.
+        This was the 4-escalation false-fire (02:07/03:11/04:17/05:18Z)."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        merged_prs = [{
+            'headRefName': 'forge/build-forge-queue-api-20260603T234656Z',
+            'number': 294,
+            'title': 'feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint',
+            '_repo': 'Larry-Yatch/ourliberty-dashboard',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_preflight_family_does_not_match_unrelated_build_pr(self) -> None:
+        """Family reconciliation must not silence a genuine preflight stall:
+        a build PR for a *different* family must leave the alert intact."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        merged_prs = [{
+            'headRefName': 'forge/build-done-today-fix-20260604T045743Z',
+            'number': 303, 'title': 'Fix done_today lane',
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(len(alerts), 1)
+
+    def test_preflight_family_floor_blocks_short_stem(self) -> None:
+        """A short family stem (< _PREFLIGHT_FAMILY_MIN_LEN) must not match
+        a coincidental build branch."""
+        self.assertIsNone(self.hps._preflight_family_shipped(
+            'ab-preflight-x', [{'headRefName': 'forge/build-ab-x'}],
+        ))
+
+    def test_preflight_family_ignores_non_preflight_tasks(self) -> None:
+        """Non-preflight task_ids fall through unchanged (None)."""
+        self.assertIsNone(self.hps._preflight_family_shipped(
+            'build-done-today-fix-20260604T045743Z',
+            [{'headRefName': 'forge/build-done-today-fix-20260604T045743Z'}],
+        ))
+
     def test_branch_truncation_min_length_floor(self) -> None:
         """A 5-char shared prefix must NOT match — only branch suffixes
         >= _BRANCH_TRUNCATION_MIN_LEN (30) chars long are trusted as

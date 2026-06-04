@@ -9,6 +9,7 @@
     "kick-stuck-timer": "reversible",
     "clear-stale-lock": "reversible",
     "redispatch-chain-leg": "reversible",
+    "silence-false-positive": "reversible",
     "rotate-credential": "privileged",
     "force-git-op": "privileged",
     "delete-file": "privileged",
