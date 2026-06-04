@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 918 — 2026-06-04 20:30 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean. consecutive_clean=1. 0 actions. 8/8 services active. PR #328 open (CLEAN/MERGEABLE, Mirror marker-error retry 1/3 in progress ~7 min). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
+
+Alert watermark: **1292 lines / 20:20:26Z** (unchanged from iter 917 — no new alerts). Pipeline-stall heartbeat: 20:22:19Z (✅ ~8 min at cycle start). Stale-daemon heartbeat: 20:00:17Z (✅ ~30 min at cycle start). Sync: status=error, last_sync=2026-06-04T20:26:30Z, commit=58b490e (rolled-back auto-commit). Session-start HEAD=08e0564 "Pulse cycle 20260604T202630Z" (iter 917 wrapper) — SYNC-PUSH-REBASE-FALLBACK pattern; self-clears on next hourly timer. Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark unchanged at 1292 / 20:20:26Z. No new alerts since iter 917. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago" -u ourliberty-*` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. Pulse inbox = 0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 20:22:19Z (~8 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:00:17Z (~30 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=08e0564 "Pulse cycle 20260604T202630Z" (iter 917 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean (SYNC-PUSH-REBASE-FALLBACK pattern).** sync.json: status=error, last_sync=2026-06-04T20:26:30Z, commit=58b490e (rolled-back auto-commit; sync race with iter 917 wrapper). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-clears on next hourly timer. No action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=0, Pulse=0. Mirror=1 (`marker-error-forge-marker-error-retry-fillin-001-1.json`, retry 1/3, written ~20:23Z — ~7 min old, well within stale threshold; expected active pipeline flow). Beacon=1 (`cycle-finding-heal-wedged-review-sessions-xlate-20260604T202254Z.json`, iter 917 G-rule dispatch, ~8 min old; awaiting Beacon pickup). Both tasks fresh; no stale condition. ✅
+
+  Pipeline context: Mirror processed `review-forge-marker-error-retry-fillin-001-replan1.json` at ~20:22Z but produced a MalformedMirrorMarker (no canonical verdict block — prose verdict). Outbox-notifier auto-kickback fired at 20:23Z (retry 1/3). Standard retry path; 2 retries remaining before dead-letter. PR #328 remains open and CLEAN/MERGEABLE pending valid Mirror verdict.
+
+- **(Check E) PRs: ✅ Nominal (in-progress, not stale).** PR #328 open: `fix(tests): repin leak-gate whitelist to test_outbox_notifier.py lines 72/317 after PR #321 line shift` — CLEAN/MERGEABLE, no review decision yet (Mirror marker-error retry 1/3 in progress). PR age ~10 min; well under 30-min auto-merge threshold. Dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 917):**
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **3/3 DISPATCHED iter 917** — Beacon inbox task present; awaiting Beacon processing.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **Regression status:** PR #328 open (Mirror retry 1/3 in progress). APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` approved by Larry (between iters 915 and 916); replan1 build complete; review underway.
+
+- **PRIME DIRECTIVE ratio:** interventions=715, systemic_fixes=12, ratio≈59.6 (unchanged; iter_clean recorded to ledger, no new rows). Ledger ts: 2026-06-04T20:30:11Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → ledger entry recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 63rd+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Mirror MalformedMirrorMarker on the PR #328 review (retry 1/3). This has occurred before (10th+ lifetime MalformedForgeMarker lifetime count in MEMORY, but Mirror markers are tracked separately — PR #316 doc-fix merged to require canonical markers). The retry mechanism handles automatically; no G-rule (not at 3/3 for this new instance). If Mirror fails all 3 retries, dead-letter back to Beacon — watch Check D on next iters for resolution or escalation.
+
+**Learned:** MalformedMirrorMarker on replan1 review is a routine known-risk. The PR #316 doc-fix was supposed to reduce this. If this recurs in the next 2 Mirror review invocations (2/3, 3/3), dispatch G-rule to Beacon for further hardening.
+
+---
+
 ## Iteration 917 — 2026-06-04 20:22 UTC (interactive)
 
 **Health:** ⚠️ **Tier 1 reset. consecutive_clean=0. G-rule 3/3 dispatch (heal-wedged-review-sessions translation). 8/8 services active. PR #328 open (Mirror reviewing). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
