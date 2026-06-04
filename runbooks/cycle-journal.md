@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration 821 — 2026-06-04 02:29 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **2 always-allowed auto-fixes (PR #298 agent-core MERGED 02:29:32Z; G-rule 3/3 Beacon dispatch sent for Pulse-triggered worktree teardown gap). 2 new Tier-4 alerts (deploy-notifier:READY main branch post-PR#35 merge; heal-stale-daemon-code auto-restarted dashboard-api.service after PR#297 code). G-rule `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — 3/3 threshold met; Beacon dispatch sent. 8/8 services active.**
+
+Alert watermark: **1249 lines / anchor 02:25:33Z** (2 new since iter 820's 1247/02:07:14Z). Sync: ✅ status=no-change, commit=16f7e90, last_sync=01:45:39Z (~46 min; not stale). Healer heartbeat: **02:25:32Z** (~4 min at check; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (PR #299 CLEAN/MERGEABLE ~22 min old at check; PR #298 merged 02:29:32Z). **0 open PRs in ourliberty-dashboard** (PR #35 merged iter 820). **Worktrees: 8** (`wt-mirror-dashboard-inbox-pending-filter-fix-001` GONE — Mirror event-driven teardown worked; Forge worktrees for Pulse-merged PRs persist, confirming G-rule).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts since iter 820 watermark (1247→1249).**
+  - `02:24:17Z` `deploy-notifier:READY:dpl_F8mLoxxutDfTZGPMoz6exFvAZvjD` — Vercel main branch deploy after PR #35 merge (ourliberty-dashboard). Expected post-merge artifact. G-rule 3/3 dispatched iter 803; fix pending Larry's APPROVAL_REQUEST `deploy-notifier-alert-xlate-split-fix`. **Classification: Tier-4** — not in alert-translations.json. → **Tier-reset.** No Pulse DM. ✅
+  - `02:25:33Z` `heal-stale-daemon-code / auto-restarted:ourliberty-dashboard-api.service` — Dashboard API auto-restarted after detecting PR #297's new code (commit 4661a6a) live ~40.6 min after merge. Healer working correctly. Per WARN-vs-INFO calibration: successful enforcement event → should be INFO, not WARNING. Fix still in-flight (G-rule 3/3 dispatched iter 592, Beacon consumed, Forge brief STILL MISSING for `alert-xlate-outbox-success-fyi-001`). Healer heartbeat 02:25:32Z confirms healer alive. **Classification: Tier-4** — `auto-restarted:*` not in alert-translations.json. → **Tier-reset.** No Pulse DM. ✅
+  - Watermark advanced to 1249 / anchor 02:25:33Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. pending-approvals.json: {} (empty). Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix` Beacon DM'd Larry 00:10Z June 4; `forge-claude-md-preflight-self-check-bullet-001`) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 02:25:32Z. `build-harden-pulse-check-liveness-watcher` active build in Forge inbox. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 02:25:32Z (fresh). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=56eb96b "Pulse cycle 20260604T022603Z". ✅
+
+- **(Check B) Sync health: ✅ Fresh.** sync.json: status=no-change, commit=16f7e90, last_sync=01:45:39Z (~46 min old). HEAD (56eb96b) newer — wrapper push succeeded post-iter-820. Hourly sync.timer fires ~02:45Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ PR #298 at 35m45s threshold → auto-merge applied.**
+  - **PR #298 CLEAN/MERGEABLE** (agent-core) — "docs(orchestrator): engine-hardening spec — close the silent-failure class end-to-end" — created 01:53:47Z, **35m45s old** at 02:29:32Z. `autoMergeRequest: null`. **Always-allowed auto-fix applied: `gh pr merge 298 --auto --squash`. MERGED 02:29:32Z.** ✅
+  - **PR #299 CLEAN/MERGEABLE** (agent-core) — "fix(heal): Check 5 resolves real task_id, suppress unidentifiable retry-exhaustion ghost" — created 02:07:44Z, **~22 min old** at check. Mirror has `review-heal-retry-exhausted-taskid-resolution.json`. Not at threshold yet. Watch next cycle. ✅
+  - **Forge inbox: 1** — `build-harden-pulse-check-liveness-watcher.json` (active build; worktree `wt-forge-harden-pulse-check-liveness-watcher` in-flight). ✅
+  - **Beacon inbox: 1** — **NEW: `cycle-finding-pulse-automerge-worktree-teardown-20260604T022929Z.json`** (G-rule 3/3 dispatch written this iter). ✅
+  - **Mirror inbox: 4** — `marker-error-dashboard-inbox-pending-filter-fix-001-1.json` (NEW: retry for PR #297 review, now moot — PR merged; Mirror will reconcile); `review-build-forge-queue-ui-20260604T013719Z.json` (PR #35, merged iter 820 — will self-clear); `review-heal-retry-exhausted-taskid-resolution.json` (PR #299); `review-orchestrator-engine-hardening-spec.json` (PR #298, just merged). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 8** (composition shift from iter 820):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — stale, PR #294 post-merge. G-rule 3/3 instance 1. Hourly GC ~02:45Z. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — PR #35 post-merge (Pulse-triggered, iter 820). **G-rule 3/3 instance 3** — this worktree persisting confirms the 3/3 threshold. ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — PR #297 post-merge (Pulse-triggered, iter 819). G-rule 3/3 instance 2 evidence still present. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale preflight (~5h+; within hourly GC). ✅
+  - `wt-forge-harden-pulse-check-liveness-watcher` — active Forge build (in-flight). ✅
+  - `wt-forge-heal-retry-exhausted-taskid-resolution` — Forge build for PR #299. ✅
+  - `wt-forge-orchestrator-engine-hardening-spec` — Forge build for PR #298 (now merged; watch for teardown). ✅
+  - ~~`wt-mirror-dashboard-inbox-pending-filter-fix-001`~~ — **GONE.** Mirror's event-driven teardown fired correctly for this worktree (Mirror-processed PR). Contrast: Forge worktrees for Pulse-triggered merges persist → confirms G-rule is about Pulse→GitHub direct merge path, not Mirror's cleanup path. ✅
+
+- **G-rule watch:**
+  - **`Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — G-rule 3/3 threshold MET (iter 812=1/3, iter 820=2/3, iter 821=3/3).** Evidence: `wt-forge-build-forge-queue-ui-20260604T013719Z` (PR #35, Pulse-merged iter 820 ~02:19Z) still present 10+ min post-merge. Three confirmed instances across PRs #294, #297, #35. **Dispatch sent to Beacon:** `cycle-finding-pulse-automerge-worktree-teardown-20260604T022929Z.json`. Systemic fix: spec a Pulse-side worktree cleanup call (or outbox-notifier teardown signal) after `gh pr merge --auto` succeeds. G-rule watch item: **DISPATCHED.** Close when Forge PR merges.
+  - `source=larry Forge builds don't auto-route to Mirror for review` — G-rule 1/3. No new occurrence this iter. Counter unchanged.
+  - `deploy-notifier:READY:*` — G-rule 3/3 DISPATCHED (iter 803); occurrence #7 this iter (main deploy post-PR#35). Fix still pending Larry's APPROVAL_REQUEST `deploy-notifier-alert-xlate-split-fix`.
+  - `heal-stale-daemon-code:auto-restarted:*` — G-rule 3/3 DISPATCHED (iter 592); occurrence this iter (dashboard-api auto-restart). Forge brief still MISSING for `alert-xlate-outbox-success-fyi-001`. Long-standing gap. Note: this iter's occurrence is by-design (correct healer behavior after PR #297 code landed). No new dispatch.
+  - All other G-rule counters: unchanged from iter 820.
+
+- **PRIME DIRECTIVE ratio:** interventions=694 (+2: PR #298 auto-merge + G-rule 3/3 finding), systemic_fixes=6 (+1: G-rule 3/3 Beacon dispatch), ratio=115.7 (↓ from 138.4 — systemic fix improved the ratio). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 2 new alerts (deploy-notifier:READY Tier-4; auto-restarted Tier-4). Watermark advanced to 1249 / anchor 02:25:33Z. Both tier-reset. ✅
+3. **Always-allowed auto-fix: `gh pr merge 298 --auto --squash`.** PR #298 MERGED 02:29:32Z. Logged to cycle-actions.jsonl. ✅
+4. **G-rule 3/3 dispatch: `cycle-finding-pulse-automerge-worktree-teardown-20260604T022929Z.json` → Beacon inbox.** Spec: wire Pulse-side worktree teardown after `gh pr merge --auto` to eliminate 45-60 min residency gap. ✅
+5. `cycle_prime_ledger.py append` ×3: intervention (PR-298 auto-merge), intervention (G-rule-3/3-threshold), systemic_fix (beacon-dispatch). ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+7. Wrote journal entry. Will update MEMORY.md.
+
+**Escalated:** Nothing new requiring Larry's direct attention. Standing APPROVAL_REQUESTs unchanged (Beacon's `deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`). PR #299 reaches 30-min threshold ~02:37Z — next automated cycle will catch it if Mirror hasn't approved by then.
+
+**Patterns:**
+- `wt-mirror-dashboard-inbox-pending-filter-fix-001` being GONE confirms Mirror's own cleanup path works (event-driven teardown fires when Mirror posts its verdict). The Pulse-triggered merge path is the specific gap — Pulse acts directly on GitHub API without going through the outbox-notifier merge pipeline, so the teardown hook doesn't fire. Beacon dispatch will spec the fix.
+- Dashboard API auto-restart after PR #297 code merge is the healer working correctly. The WARNING log level (vs. INFO) is the calibration gap — the G-rule dispatch from iter 592 should have fixed this but the Forge brief is still missing. This is a persistent dead-letter in the pipeline worth noting on next system review.
+- PR throughput remains high: PR #298 (docs) and PR #299 (heal fix) both CLEAN/MERGEABLE with Mirror reviewing; `build-harden-pulse-check-liveness-watcher` active Forge build. Pipeline healthy.
+
+**Learned:** Confirming that `wt-mirror-*` worktrees DO get cleaned by Mirror's event-driven teardown path when Mirror processes its review task (even post-merge). The teardown gap is specific to the Pulse→`gh pr merge` path, not a system-wide teardown failure. This makes the fix scope narrower: only need to wire teardown for Pulse-triggered merges, not fix Mirror's path.
+
+### Result notification — 2026-06-04 (post-iter-821) — Beacon / cycle-finding-pulse-automerge-worktree-teardown-20260604T022929Z
+
+**Status: SUCCESS.** Beacon consumed the G-rule 3/3 dispatch from iter 821 and produced a Forge-ready brief.
+
+**Brief location:** `/home/larry/agents/memory/beacon/pulse-merge-worktree-teardown-brief.md` (persistent mount).
+
+**Architect call (Beacon-refined Option B):**
+- Two files change: (1) `scripts/cleanup_stale_worktrees.py` — add targeted teardown mode reusing existing `remove_worktree()` + in-flight guard (stdlib-only, no notifier import); (2) `agents/pulse/TOOLS.md` (new rule) + `agents/pulse/.claude/settings.json` (add `Bash(gh pr view:*)` — `python3` + `gh pr merge` already allowed).
+- Pulse must confirm `gh pr view <num> --json state` is `MERGED` before tearing down (because `--auto` only *queues* the merge when checks are pending). Branch name → worktree stem derivation documented in brief. Async case (checks still pending) falls back gracefully to hourly GC.
+- G-rule's original Option B had two errors corrected: `cleanup_stale_worktrees.py` has no `--task-stem` flag today (age-based sweep only); Forge must add the targeted mode. Brief is explicit about this so Forge doesn't assume an existing flag.
+
+**Next action:** Larry dispatches from Telegram. This Pulse session cannot emit an APPROVAL_REQUEST that fires in the dispatch pipeline (queued-task session marker visibility constraint). Beacon did not send a Telegram alert (low-urgency disk-hygiene item; actionable-only alert discipline). Hourly GC is the unconditional backstop so a missed teardown costs ≤1 GC cycle, never a leak — low urgency is correct.
+
+**Watch item:** close when Forge PR merges the targeted teardown mode + TOOLS.md/settings.json updates.
+
+---
+
 ## Iteration 820 — 2026-06-04 02:19 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 always-allowed auto-fix (PR #35 ourliberty-dashboard MERGED ~02:19Z). 1 new Tier-4 alert (medic/medic-diagnosis for forge-queue-api-preflight clarify1 routing gap — G-rule 3/3 fix already dispatched iter 804, pending Larry approval). New Forge build in-flight: `harden-pulse-check-liveness-watcher` (post-PR #300 spec). G-rule `Pulse-triggered gh pr merge --auto doesn't fire event-driven teardown` now 2/3 (PR #294 + PR #297 worktrees still present). PR #298 CLEAN/MERGEABLE ~25 min old, approaching threshold. 8/8 services active.**
