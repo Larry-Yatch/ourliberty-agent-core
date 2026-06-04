@@ -345,5 +345,326 @@ class DashboardRoutingTest(unittest.TestCase):
         self.assertEqual(row['payload']['proposing_agent'], 'beacon')
 
 
+# -------------------- reconciler fixtures (skip / dedup / retire) -----------
+
+# An ask whose referenced PR is the resolution anchor. PR #294 was MERGED.
+PR294_ALERT = {
+    'ts': _ts(3),
+    'source': 'pulse/beacon-result',
+    'severity': 'warning',
+    'route': 'escalate',
+    'subject': 'PR #294 Mirror review gap — source=larry routing miss',
+    'message': 'PR #294 Mirror review gap needs your call before I proceed.',
+    'suggested_action': 'Reply with how to close the mirror review gap',
+}
+
+# Two phrasings of ONE decision (the real 2026-06-04 deploy-notifier pair).
+DEPLOY_NOTIFIER_A = {
+    'ts': _ts(2),
+    'source': 'pulse/beacon-result',
+    'route': 'escalate',
+    'subject': 'Beacon needs your call: deploy-notifier alert-translations',
+    'message': 'Beacon needs your call on the deploy-notifier alert-translations.',
+    'suggested_action': 'Choose ship-now or hold',
+}
+DEPLOY_NOTIFIER_B = {
+    'ts': _ts(1),
+    'source': 'pulse/beacon-result',
+    'route': 'escalate',
+    'subject': 'deploy-notifier:READY alert-translations — Beacon needs your call',
+    'message': 'deploy-notifier READY; Beacon needs your call on alert-translations.',
+    'suggested_action': 'Choose ship-now or hold',
+}
+
+# A live, unresolved direction-ask with no machine resolution signal.
+CYCLE_TIMER_ALERT = {
+    'ts': _ts(2),
+    'source': 'pulse/beacon-result',
+    'route': 'escalate',
+    'subject': 'cycle-timer-daemon-reload-checkpoint',
+    'message': 'Beacon needs your call: reload the cycle-timer daemon now, or wait?',
+    'suggested_action': 'Choose reload-now or wait-for-window',
+}
+
+
+def _gh_merged(numbers):
+    """Fake gh probe: True for the given resolved PR/issue numbers, else None
+    (undetermined — the conservative default)."""
+    wanted = set(numbers)
+    return lambda n: True if n in wanted else None
+
+
+class DecisionIdentityTest(unittest.TestCase):
+    def test_two_phrasings_share_identity(self):
+        self.assertEqual(
+            h.decision_identity(DEPLOY_NOTIFIER_A),
+            h.decision_identity(DEPLOY_NOTIFIER_B),
+        )
+
+    def test_referenced_pr_anchors_identity(self):
+        self.assertEqual(h.decision_identity(PR294_ALERT), 'ref:294')
+
+    def test_distinct_decisions_dont_collapse(self):
+        self.assertNotEqual(
+            h.decision_identity(CYCLE_TIMER_ALERT),
+            h.decision_identity(DEPLOY_NOTIFIER_A),
+        )
+
+    def test_no_subject_is_deterministic_hash(self):
+        ident = h.decision_identity({'source': 'x', 'message': 'y'})
+        self.assertTrue(ident.startswith('nosubject:'))
+
+
+class ResolutionSignalTest(unittest.TestCase):
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def test_merged_pr_is_a_signal(self):
+        reason = h.resolution_signal(
+            PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=_gh_merged([294]))
+        self.assertIsNotNone(reason)
+        self.assertIn('294', reason)
+
+    def test_undetermined_gh_is_no_signal(self):
+        # Conservative: gh can't confirm -> promote/keep, never skip/retire.
+        reason = h.resolution_signal(
+            PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n: None)
+        self.assertIsNone(reason)
+
+    def test_open_pr_is_no_signal(self):
+        reason = h.resolution_signal(
+            PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n: False)
+        self.assertIsNone(reason)
+
+    def test_resolved_beacon_history_is_a_signal(self):
+        state = {'pending': [], 'history': [{
+            'id': 'beacon-deploy-notifier-001',
+            'status': 'approved',
+            'plan_summary': 'Shipped the deploy-notifier alert-translations fix.',
+            'dispatch_payload': {},
+        }]}
+        reason = h.resolution_signal(
+            DEPLOY_NOTIFIER_A, state, [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n: None)
+        self.assertIsNotNone(reason)
+        self.assertIn('history', reason)
+
+    def test_pending_beacon_entry_is_not_a_signal(self):
+        # A still-pending (unresolved) beacon entry must NOT count as resolved.
+        state = {'pending': [{
+            'id': 'beacon-deploy-notifier-001',
+            'status': 'pending',
+            'plan_summary': 'deploy-notifier alert-translations',
+        }], 'history': []}
+        reason = h.resolution_signal(
+            DEPLOY_NOTIFIER_A, state, [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n: None)
+        self.assertIsNone(reason)
+
+    def test_later_resolution_alert_is_a_signal(self):
+        resolved = {
+            'ts': _ts(0),
+            'route': 'digest',
+            'subject': 'deploy-notifier:READY alert-translations — Beacon needs your call',
+            'message': 'deploy-notifier alert-translations shipped; resolved.',
+        }
+        reason = h.resolution_signal(
+            DEPLOY_NOTIFIER_A, self._empty(), [resolved], DEFAULT_HEURISTICS,
+            after_ts=DEPLOY_NOTIFIER_A['ts'], gh_probe=lambda n: None)
+        self.assertIsNotNone(reason)
+
+    def test_live_ask_has_no_signal(self):
+        reason = h.resolution_signal(
+            CYCLE_TIMER_ALERT, self._empty(), [CYCLE_TIMER_ALERT],
+            DEFAULT_HEURISTICS, gh_probe=lambda n: None)
+        self.assertIsNone(reason)
+
+
+class SkipBeforePromoteTest(unittest.TestCase):
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def _check(self, state, alerts, gh_probe):
+        return lambda rec: h.resolution_signal(
+            rec, state, alerts, DEFAULT_HEURISTICS,
+            after_ts=rec.get('ts'), gh_probe=gh_probe)
+
+    def test_merged_pr_ask_not_promoted(self):
+        # ACCEPTANCE: an ask whose referenced PR is merged -> not promoted.
+        state = self._empty()
+        check = self._check(state, [PR294_ALERT], _gh_merged([294]))
+        out = h.evaluate([PR294_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(out, [])
+
+    def test_undetermined_pr_ask_still_promoted(self):
+        # Conservative branch: gh can't confirm -> still surfaced.
+        state = self._empty()
+        check = self._check(state, [PR294_ALERT], lambda n: None)
+        out = h.evaluate([PR294_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(len(out), 1)
+
+    def test_two_phrasings_promote_one_card(self):
+        # ACCEPTANCE: two phrasings of one decision -> exactly one card.
+        out = h.evaluate([DEPLOY_NOTIFIER_A, DEPLOY_NOTIFIER_B],
+                         DEFAULT_HEURISTICS, self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+
+    def test_live_ask_promoted_once(self):
+        state = self._empty()
+        check = self._check(state, [CYCLE_TIMER_ALERT], lambda n: None)
+        out = h.evaluate([CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(len(out), 1)
+
+
+class ReconcileRetireTest(unittest.TestCase):
+    def test_merged_pr_card_is_retired(self):
+        # ACCEPTANCE: previously promoted ask whose PR is merged -> retired.
+        subject = PR294_ALERT['subject']
+        task_id = h.derive_task_id(subject)  # legacy ledger key == subject
+        state = {'pending': [{
+            'id': task_id, 'status': 'pending',
+            'plan_summary': 'promoted #294 card',
+        }], 'history': []}
+        promoted = {subject: _ts(1)}  # legacy {key: ts} shape
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([294]))
+        self.assertEqual([t for t, _ in retired], [task_id])
+        self.assertEqual(remaining, {})
+        # dropped from pending, moved to history as auto-retired ('expired')
+        self.assertEqual(state['pending'], [])
+        self.assertTrue(any(
+            e['id'] == task_id and e['status'] == 'expired'
+            for e in state['history']))
+
+    def test_live_ask_card_not_retired(self):
+        # ACCEPTANCE (regression): a live unresolved ask is NOT retired.
+        subject = CYCLE_TIMER_ALERT['subject']
+        task_id = h.derive_task_id(subject)
+        state = {'pending': [{
+            'id': task_id, 'status': 'pending', 'plan_summary': 'live ask',
+        }], 'history': []}
+        promoted = {subject: _ts(1)}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS,
+            now=NOW, gh_probe=lambda n: None)
+        self.assertEqual(retired, [])
+        self.assertEqual(remaining, promoted)
+        self.assertEqual(len(state['pending']), 1)  # still live
+
+    def test_retire_is_idempotent(self):
+        # Second pass over an already-retired ledger is a no-op (no thrash).
+        subject = PR294_ALERT['subject']
+        task_id = h.derive_task_id(subject)
+        state = {'pending': [{'id': task_id, 'status': 'pending'}], 'history': []}
+        promoted = {subject: _ts(1)}
+        _, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([294]))
+        retired2, remaining2 = h.reconcile_retire(
+            remaining, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([294]))
+        self.assertEqual(retired2, [])
+        self.assertEqual(remaining2, {})
+
+    def test_rich_ledger_entry_retired(self):
+        # The new ledger value shape ({task_id, subject, promoted_at}) retires too.
+        subject = PR294_ALERT['subject']
+        identity = h.decision_identity(PR294_ALERT)  # 'ref:294'
+        task_id = h.derive_task_id(identity)
+        state = {'pending': [{'id': task_id, 'status': 'pending'}], 'history': []}
+        promoted = {identity: {
+            'task_id': task_id, 'subject': subject, 'promoted_at': _ts(1)}}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([294]))
+        self.assertEqual([t for t, _ in retired], [task_id])
+        self.assertEqual(remaining, {})
+
+
+class EvaluateIdempotencyTest(unittest.TestCase):
+    def test_promoted_ledger_blocks_second_promotion(self):
+        # ACCEPTANCE: run twice -> no duplicate cards.
+        empty = {'pending': [], 'history': []}
+        out1 = h.evaluate([CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS, empty, {},
+                          now=NOW, resolution_check=lambda r: None)
+        self.assertEqual(len(out1), 1)
+        identity = h.decision_identity(CYCLE_TIMER_ALERT)
+        ledger = {identity: {
+            'task_id': out1[0]['task_id'],
+            'subject': CYCLE_TIMER_ALERT['subject'],
+            'promoted_at': _ts(0),
+        }}
+        out2 = h.evaluate([CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS, empty, ledger,
+                          now=NOW, resolution_check=lambda r: None)
+        self.assertEqual(out2, [])
+
+    def test_legacy_subject_ledger_still_dedups(self):
+        empty = {'pending': [], 'history': []}
+        legacy = {CYCLE_TIMER_ALERT['subject']: _ts(0)}  # old {subject: ts}
+        out = h.evaluate([CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS, empty, legacy,
+                         now=NOW, resolution_check=lambda r: None)
+        self.assertEqual(out, [])
+
+
+class ClearResolvedByTaskIdTest(unittest.TestCase):
+    """The read_at clear path the retire pass reuses (no raw Supabase write)."""
+
+    class _FakeTable:
+        def __init__(self, store):
+            self.store = store
+            self._op = None
+            self._payload = None
+            self._ids = None
+
+        def update(self, payload):
+            self._op, self._payload = 'update', payload
+            return self
+
+        def in_(self, _col, ids):
+            self._ids = ids
+            return self
+
+        def execute(self):
+            for r in self.store['rows']:
+                if r['event_id'] in (self._ids or []):
+                    r['read_at'] = self._payload['read_at']
+            return self
+
+    class _FakeClient:
+        def __init__(self, rows):
+            self.store = {'rows': rows}
+
+        def table(self, _name):
+            return ClearResolvedByTaskIdTest._FakeTable(self.store)
+
+    def test_clears_only_matching_task_ids(self):
+        import heal_stale_approvals as stale
+        rows = [
+            {'event_id': 'e1', 'event_type': 'approval_request',
+             'task_id': 'unreg-approval-keep', 'ts': _ts(1), 'read_at': None},
+            {'event_id': 'e2', 'event_type': 'approval_request',
+             'task_id': 'unreg-approval-retire', 'ts': _ts(1), 'read_at': None},
+        ]
+        client = self._FakeClient(rows)
+        with mock.patch.object(stale, 'fetch_pending', return_value=list(rows)), \
+             mock.patch.object(stale, '_backup', return_value=Path('/tmp/x.json')):
+            cleared = stale.clear_resolved_by_task_id(
+                client, ['unreg-approval-retire'], now=NOW)
+        self.assertEqual(cleared, 1)
+        self.assertIsNone(rows[0]['read_at'])           # kept
+        self.assertEqual(rows[1]['read_at'], NOW.isoformat())  # cleared
+
+    def test_no_task_ids_is_noop(self):
+        import heal_stale_approvals as stale
+        self.assertEqual(stale.clear_resolved_by_task_id(None, [], now=NOW), 0)
+
+
 if __name__ == '__main__':
     unittest.main()
