@@ -308,19 +308,69 @@ def terminal_markers_for_tier(tier: str) -> tuple[str, ...]:
     return ()
 
 
+def _assistant_text_from_jsonl_line(obj: Any) -> str:
+    """Return assistant-authored text from one parsed JSONL record, or '' for
+    any non-assistant record (user, tool_result, system, summary).
+
+    The session JSONL is one JSON object per line. The emitted terminal marker
+    lives in an *assistant* message; everything else — including the agent's
+    own CLAUDE.md read back as a user/tool_result at startup — must be ignored.
+    """
+    if not isinstance(obj, dict):
+        return ''
+    msg = obj.get('message')
+    role = msg.get('role') if isinstance(msg, dict) else None
+    if obj.get('type') != 'assistant' and role != 'assistant':
+        return ''
+    content = msg.get('content') if isinstance(msg, dict) else None
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = [
+            block['text']
+            for block in content
+            if isinstance(block, dict)
+            and block.get('type') == 'text'
+            and isinstance(block.get('text'), str)
+        ]
+        return '\n'.join(parts)
+    return ''
+
+
 def jsonl_has_terminal_marker(jsonl: Path, tier: str) -> bool:
-    """True if the session JSONL body contains any terminal marker for the
-    tier. Reads the whole file (session logs are modest); tolerates decode
-    errors. On read failure returns False (conservative: no proof of done →
-    not a Case-1 reap)."""
+    """True if an ASSISTANT-authored message in the session JSONL contains any
+    terminal marker for the tier.
+
+    Role filtering is load-bearing, not cosmetic: every Mirror/Forge session
+    reads its own CLAUDE.md at startup, and that operating manual contains the
+    literal marker delimiters (e.g. '=== REVIEW_PASS ===', 'PR opened:') in its
+    examples. The Read tool-result persists into the JSONL as a user line, so a
+    whole-file substring grep matches from startup onward — long before any
+    verdict is emitted, which would let a benignly-idle review (e.g. running the
+    foreground regression gate) be auto-reaped mid-flight. The emitted marker
+    lives in an assistant line; only those count as proof of completion.
+
+    Parses line-by-line; tolerates non-JSON / decode errors. On read failure
+    returns False (conservative: no proof of done → not a Case-1 reap)."""
     markers = terminal_markers_for_tier(tier)
     if not markers:
         return False
     try:
-        text = jsonl.read_text(errors='replace')
+        with jsonl.open('r', errors='replace') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except (ValueError, TypeError):
+                    continue
+                text = _assistant_text_from_jsonl_line(obj)
+                if text and any(m in text for m in markers):
+                    return True
     except OSError:
         return False
-    return any(m in text for m in markers)
+    return False
 
 
 # ==================== pure classification ====================

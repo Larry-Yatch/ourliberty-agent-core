@@ -28,8 +28,12 @@ is trying to free.
 `claude` processes whose cwd is `~/agent-worktrees/wt-mirror-*` or `wt-forge-*`.
 For each, the activity log is the Claude Code session JSONL under
 `~/.claude/projects/<slug>/<session>.jsonl` (slug = cwd with `/` → `-`). The
-JSONL mtime is last-activity; the body is grepped for the tier's terminal
-markers (reused from the handler modules so renames propagate):
+JSONL mtime is last-activity; only **assistant-authored** lines are matched for
+the tier's terminal markers (reused from the handler modules so renames
+propagate). Role filtering is essential: every session reads its own CLAUDE.md
+at startup, and that manual's examples contain the literal marker delimiters,
+which persist as user/tool_result lines — a whole-file grep would treat them as
+a verdict from startup onward. Markers matched:
 
 - **Mirror:** `REVIEW_PASS` / `REVIEW_REVISION` / `REVIEW_ESCALATE` /
   `REVIEW_EMERGENCY_HALT` (`mirror_review_handler.MARKER_KEYWORDS`).

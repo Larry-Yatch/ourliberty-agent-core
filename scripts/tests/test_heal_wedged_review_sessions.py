@@ -209,7 +209,8 @@ class TestFalsePositiveDemote(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             jsonl = Path(td) / 'fp.jsonl'
-            jsonl.write_text('... === REVIEW_PASS === {"ok":1} === END_REVIEW_PASS === ...')
+            jsonl.write_text(_assistant_line(
+                '=== REVIEW_PASS ===\n{"ok":1}\n=== END_REVIEW_PASS ===') + '\n')
             state = h.ConfidenceState(
                 mode=h.MODE_AUTO_REAP,
                 executions=[{'outcome': h.TRUE_POSITIVE, 'session_id': s}
@@ -364,12 +365,28 @@ class TestStreakHelpers(unittest.TestCase):
 
 # ---------------------- jsonl marker detection ----------------------
 
+def _assistant_line(text: str) -> str:
+    return json.dumps({
+        'type': 'assistant',
+        'message': {'role': 'assistant', 'content': [{'type': 'text', 'text': text}]},
+    })
+
+
+def _user_line(text: str) -> str:
+    """A user/tool_result line — e.g. the agent reading its own CLAUDE.md."""
+    return json.dumps({
+        'type': 'user',
+        'message': {'role': 'user', 'content': [{'type': 'text', 'text': text}]},
+    })
+
+
 class TestMarkerDetection(unittest.TestCase):
     def test_mirror_marker_detected(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 's.jsonl'
-            p.write_text('blah === REVIEW_ESCALATE === {"x":1} === END_REVIEW_ESCALATE ===')
+            p.write_text(_assistant_line(
+                'blah === REVIEW_ESCALATE === {"x":1} === END_REVIEW_ESCALATE ===') + '\n')
             self.assertTrue(h.jsonl_has_terminal_marker(p, 'mirror'))
             self.assertFalse(h.jsonl_has_terminal_marker(p, 'forge'))
 
@@ -377,15 +394,49 @@ class TestMarkerDetection(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 's.jsonl'
-            p.write_text('... PR opened: https://github.com/x/y/pull/9 ...')
+            p.write_text(_assistant_line(
+                'PR opened: https://github.com/x/y/pull/9') + '\n')
             self.assertTrue(h.jsonl_has_terminal_marker(p, 'forge'))
 
     def test_no_marker(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / 's.jsonl'
-            p.write_text('just some working output, no terminal marker')
+            p.write_text(_assistant_line('just some working output, no terminal marker') + '\n')
             self.assertFalse(h.jsonl_has_terminal_marker(p, 'mirror'))
+
+    def test_marker_in_user_line_is_not_a_verdict(self):
+        # The contamination Mirror flagged: the marker delimiter appears in a
+        # user/tool_result line because the agent read its own CLAUDE.md at
+        # startup. That is NOT proof of completion and must not match.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 's.jsonl'
+            p.write_text('\n'.join([
+                _user_line('CLAUDE.md says emit `=== REVIEW_PASS ===` when you accept the PR.'),
+                _assistant_line('Reviewing the diff now; running the regression gate.'),
+            ]) + '\n')
+            self.assertFalse(h.jsonl_has_terminal_marker(p, 'mirror'))
+
+    def test_marker_in_assistant_after_user_contamination_still_detected(self):
+        # Real session shape: startup CLAUDE.md read (user line, contaminated)
+        # followed by the genuine emitted verdict (assistant line). Must match.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 's.jsonl'
+            p.write_text('\n'.join([
+                _user_line('manual example: === REVIEW_PASS ==='),
+                _assistant_line('Looks good.\n=== REVIEW_PASS ===\n{"ok":1}\n=== END_REVIEW_PASS ==='),
+            ]) + '\n')
+            self.assertTrue(h.jsonl_has_terminal_marker(p, 'mirror'))
+
+    def test_forge_preamble_in_user_line_is_not_a_verdict(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 's.jsonl'
+            p.write_text(_user_line(
+                "forge/CLAUDE.md: start your result with 'PR opened:'") + '\n')
+            self.assertFalse(h.jsonl_has_terminal_marker(p, 'forge'))
 
 
 if __name__ == '__main__':
