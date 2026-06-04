@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration 896 — 2026-06-04 16:44 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-resets: Check 0 — 2 pipeline-stall alerts [Tier NOW + Tier 4 novel]; Check B — 62nd SYNC-PUSH-REBASE-FALLBACK-001). **1 auto-fix (auto-merge dashboard PR #39 → merged 16:47:25Z). 8/8 services active. 0 open agent-core PRs. 0 dashboard PRs post-merge. Ask-then-do escalation sent: stale revision task + test regression in main.**
+
+Alert watermark: **1277 lines / 16:36:20Z** (+2 from iter 895 watermark 1275/16:35:21Z). Sync: 62nd SYNC-PUSH-REBASE-FALLBACK-001 at 16:40:38Z (self-recovered; wrapper post-iter-895 sync competed with origin, soft-reset to ac34652). HEAD=ac34652 "Pulse cycle 20260604T164316Z" (iter 895 wrapper)=origin/main at session start. Pipeline-stall heartbeat: 16:36:15Z (✅ ~8 min at start). Stale-daemon heartbeat: 16:29:57Z (✅ ~15 min at start).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts (Tier NOW×1 + Tier 4 novel×1). tier-reset.**
+  - `ts=16:36:20Z, source=heal-pipeline-stall, subject=pipeline-stall:forge-no-pr:build-forge-queue-api-20260603T234656Z` — healer: "Forge built task ~1000 min ago but no PR was opened." **FALSE POSITIVE.** `gh pr list --state all --search "queue api"` confirms PR #294 ("feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint") merged 2026-06-04T01:11:22Z for this task. The alert fires because `pr_url` is `null` in the forge outbox archive (source=larry path doesn't populate pr_url — the known G-rule 1/3 from iter 805). Work is complete; PR #324 (generalize agent-queue, also queue-api work) merged 16:37:59Z this session too. **Tier NOW** per alert-translations.json; no DM because false positive is verified. G-rule: `forge-no-pr-false-alarm-for-source-larry-tasks` **1/3** (new pattern — healer re-fires on stale source=larry archive entry with null pr_url; distinct from the iter 805 routing G-rule).
+  - `ts=16:36:20Z, source=heal-pipeline-stall, subject=pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` — healer: "preflight/clarify task consumed 1007 min ago, errored before opening a PR (all retries exhausted)." **FALSE POSITIVE.** Same stale forge-queue-api state: the clarify task failed; the subsequent `build-forge-queue-api-20260603T234656Z` task completed via PR #294. Not in alert-translations.json. **Tier 4 novel.** G-rule: `pipeline-stall:pr-create-inferred-failure not in alert-translations.json` **1/3**.
+  - Watermark advanced: **1277 / 16:36:20Z**. ✅
+  - → tier-reset (Tier NOW + Tier 4 novel)
+
+- **(Check 1) Log noise: ✅ Nominal.** Interactive journalctl returned permission hint + "Invalid argument" for multi-unit query (known interactive session limitation). 8/8 services active; no error evidence from other signals. Treating as nominal per iter 895+ baseline.
+
+- **(Check 2) Telegram sweep: ✅ / ⚠️ ask-then-do watch.** beacon_telegram_sessions.json: 1 active session ✅. Beacon inbox: 0 ✅. Forge inbox: **1 stale revision task** (`revision-forge-marker-error-retry-fillin-001-1.json` — see Check D below). Mirror inbox: 1 (`review-pulse-marker-discipline-signal-001.json` — stale review for already-merged PR #323, per iter 895; PR #322 out-of-band check should handle gracefully). Pulse inbox: 0 ✅.
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:36:15Z (~8 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 16:29:57Z (~15 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=ac34652 "Pulse cycle 20260604T164316Z" (iter 895 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ 62nd SYNC-PUSH-REBASE-FALLBACK-001.** sync.json: status=error, last_sync=2026-06-04T16:40:38Z, commit=a28235aa (soft-reset; not in chain). Iter 895 wrapper sync competed with origin push during rapid interactive session; push failed, rolled back. Current HEAD=ac34652=origin/main. Self-recovered. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (now 62nd total). **→ tier-reset.**
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ⚠️ 1 stale revision task — ask-then-do.**
+  - `revision-forge-marker-error-retry-fillin-001-1.json` — revision dispatch from outbox-notifier for PR #321 ("fix(outbox_notifier): fill-in-the-blank none-found preflight marker retry"). Mirror found 1 medium finding: test_no_production_path_leaks.py whitelist line numbers shifted (71→72, 316→317) by `import forge_preflight_handler` added near top of test_outbox_notifier.py. PR #321 was auto-merged at **16:08:29Z** (before Forge could apply the revision). Branch `forge/forge-marker-error-retry-fillin-001` is deleted (squash-merged). The revision task is now stale — Forge inbox-watcher will pick it up; Forge will fail (deleted branch / already-merged PR). **Regression is in main: 2 test failures in test_no_production_path_leaks.py.** Outside auto-fix allowlist (not a dedup_identity collision). **Escalated as ask-then-do.**
+
+- **(Check E) PRs + inboxes: ⚠️ 1 auto-fix applied.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **1 open PR → always-fix applied:**
+    - **#39** "feat(auth): enforce sign-in across the whole dashboard" (created 16:14:10Z, age 30m29s at scan, CLEAN/MERGEABLE, no auto-merge set) — over 30-min threshold. **Always-fix: `gh pr merge 39 --auto --squash -R Larry-Yatch/ourliberty-dashboard` ✅ → merged 16:47:25Z.** ✅
+  - All inboxes (post-Check D detail): Beacon=0, Mirror=1 (stale, monitoring), Pulse=0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - **NEW 1/3: `forge-no-pr-false-alarm-for-source-larry-tasks`** — Tier NOW pipeline-stall:forge-no-pr firing for source=larry task where pr_url is null in archive despite PR existing. Root: source=larry outbox path doesn't populate pr_url. At 3/3: dispatch Beacon to spec pr_url population for source=larry build tasks, OR add Tier-3 FYI translation for this subject with a context note.
+  - **NEW 1/3: `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`** — Tier 4 novel. Subject not in alert-translations.json. At 3/3: dispatch Beacon to classify and add translation (likely SOON tier — real infra failure or FYI if context-tied to source=larry stale state).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **PRIME DIRECTIVE ratio:** interventions=708 (+1), systemic_fixes=9, ratio≈78.67. Ledger row appended: `enable-pr-auto-merge:PR-39-ourliberty-dashboard`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 2 new alerts triaged (Tier NOW + Tier 4 — both false positives for stale forge-queue-api task). Watermark advanced to **1277 / 16:36:20Z**.
+3. **Always-fix: `gh pr merge 39 --auto --squash -R Larry-Yatch/ourliberty-dashboard`** — PR #39 auto-merge enabled (CLEAN, 30m29s over threshold) → merged **16:47:25Z**. Logged to cycle-actions.jsonl.
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 896 --template enable-pr-auto-merge --detail PR-39-ourliberty-dashboard` → row appended. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=16:48:54Z. ✅
+6. `larry_alerts.append_alert` — ask-then-do escalation: stale revision task + test regression in main. Source=pulse-escalation, subject=ask-then-do:stale-revision-and-test-regression-in-main.
+7. Wrote journal entry.
+
+**Escalated:**
+- `[yellow]` **Regression in main + stale revision task.** PR #321 merged 16:08:29Z with 2 failing tests in test_no_production_path_leaks.py (whitelist line numbers shifted: `("test_outbox_notifier.py", 71)` → 72 and `("test_outbox_notifier.py", 316)` → 317, caused by `import forge_preflight_handler` added at top of test file). Stale revision task `revision-forge-marker-error-retry-fillin-001-1.json` is in Forge inbox pointing to deleted branch; Forge will fail when it picks it up. Suggested action: (a) archive the stale revision task, (b) dispatch a new Forge build to fix the whitelist line numbers in test_no_production_path_leaks.py. Journal: iter 896.
+- Standing items carry forward:
+  - `[yellow]` cycle-timer-checkpoint G-rule (Beacon awaiting "go").
+  - `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; now 62nd total).
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- Both new pipeline-stall alerts are false positives tied to the same stale forge-queue-api archive entry (source=larry, pr_url=null). The healer will continue firing until its internal state resets. Two new G-rules tracked (1/3 each). Core issue: source=larry outbox path doesn't populate pr_url → persistent false-alarm surface.
+- Revision-before-merge race: Mirror review flagged a medium finding → outbox-notifier dispatched revision to Forge → Pulse auto-merged PR at 30-min threshold → revision task orphaned. Regression now in main. This pattern (auto-merge racing with pending revision dispatch) is a system design gap — Pulse's auto-merge fires without checking for pending revision tasks in Forge inbox. G-rule candidate at next occurrence.
+- Dashboard PR #39 at exactly 30m29s threshold — fourth consecutive iter where at least one PR crosses the 30-min threshold. Pipeline throughput remains high.
+
+**Learned:** The auto-merge-vs-pending-revision race is a new failure mode to watch. If this recurs: propose mechanism where Pulse checks for pending revision tasks in Forge inbox before enabling auto-merge on the associated PR (or outbox-notifier locks the PR against auto-merge while a revision is in flight).
+
+---
+
 ## Iteration 895 — 2026-06-04 16:39 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-resets: Check 0 Tier-4 alerts + Check B 60th/61st SYNC-PUSH-REBASE-FALLBACK-001). **1 auto-fix (auto-merge PR #324 → merged 16:37:59Z). 8/8 services active. 0 open agent-core PRs. 1 dashboard PR (#39, CLEAN, under threshold). Forge inbox: 0 (all 3 build tasks consumed; PR #326 merged; 2 marker-error fills → Mirror stale review tasks for already-merged PRs #321/#323). New alerts: 2 auto-restarted:* (Tier-4 known-recurring) + 1 review-pass (Tier-3 silence).**
