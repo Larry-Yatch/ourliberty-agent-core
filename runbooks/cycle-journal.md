@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 908 — 2026-06-04 18:49 UTC (interactive)
+
+**Health:** ⚠️ Tier 2→1 (G-rule 3/3: pipeline-stall:pr-create-inferred-failure → dispatched to Beacon). **1 dispatch. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
+
+Alert watermark: **1287 lines / 18:44:20Z** (+1 from iter 907's 1286/17:44:36Z). New alert: `heal-pipeline-stall / pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` at 18:44:20Z. Pipeline-stall heartbeat: 18:44:15Z (✅ ~1 min at cycle start). Stale-daemon heartbeat: 18:30:15Z (✅ ~15 min at cycle start). Sync: status=no-change, last_sync=2026-06-04T18:48:30Z (hourly timer fired during cycle; ✅). Session-start HEAD=546a49a "Pulse cycle 20260604T182740Z" (iter 907 wrapper). Tier state at start: tier=2, consecutive_clean=1 → reset to tier=1, consecutive_clean=0.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** Watermark advanced 1286→1287. New alert at 18:44:20Z: `heal-pipeline-stall / pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1`. Subject not in alert-translations.json → Tier 4 novel. Confirmed false alarm: same stale source=larry archive entry from iters 896 (1/3) and 903 (2/3). **G-rule `pipeline-stall:pr-create-inferred-failure not in alert-translations.json` 2/3 → 3/3 — threshold met. Dispatched to Beacon.** No Larry DM (known false alarm pattern; permanent-fix pipeline now active). tier-reset fired.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → no output. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. All inboxes empty: Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 18:44:15Z (~1 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 18:30:15Z (~15 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=546a49a "Pulse cycle 20260604T182740Z" (iter 907 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T18:48:30Z (hourly timer fired mid-cycle; HEAD now matches 546a49a; ✅). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Empty.** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry; Forge receives task only after approval. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **3/3 → DISPATCHED** (`cycle-finding-pr-create-inferred-failure-xlate-20260604T184500Z.json` → Beacon inbox). Close when config PR merges.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged; same root cause as dispatched G-rule — may batch in Beacon spec).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **Regression status:** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry (DM'd 17:03:46Z). System at human-gate pause. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=712, systemic_fixes=10, ratio≈71.2 (improved from 79.0 — +1 intervention, +1 systemic_fix this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: watermark 1286→1287 (+1). G-rule 3/3 threshold met for `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`. Dispatched `cycle-finding-pr-create-inferred-failure-xlate-20260604T184500Z.json` → Beacon inbox.
+3. `cycle_prime_ledger.py append --tier 2 --kind intervention` → `g-rule-dispatch:pipeline-stall-pr-create-inferred-failure-xlate` recorded.
+4. `cycle_prime_ledger.py append --tier 2 --kind systemic_fix` → systemic_fix row recorded.
+5. `cycle_tier_state.py record --checks-clean false` → tier 2→1 reset, consecutive_clean=0. ✅
+6. Wrote journal entry.
+
+**Escalated:** No new Larry DMs (G-rule dispatch to Beacon; known false-alarm pattern — no Larry gate needed). Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions) — APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` with Larry since 17:03:46Z. Awaiting approval.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 62nd total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** G-rule 3/3 for `pipeline-stall:pr-create-inferred-failure` completed across iters 896, 903, 908 — all from the same stale source=larry forge-queue-api archive entry where pr_url=null. Root cause shared with `forge-no-pr-false-alarm-for-source-larry-tasks` (2/3) — Beacon spec should address both. PRIME DIRECTIVE ratio improved 79.0→71.2 (10 systemic fixes now in trailing 30d window).
+
+**Learned:** Both `pipeline-stall:pr-create-inferred-failure` and `forge-no-pr-false-alarm-for-source-larry-tasks` G-rules share the same root: source=larry outbox path doesn't populate pr_url. A single Beacon spec covering both subjects would be more efficient than two separate PRs. Noted for next iter if `forge-no-pr-false-alarm` hits 3/3.
+
+---
+
 ## Iteration 907 — 2026-06-04 18:26 UTC (interactive)
 
 **Health:** ✅ Tier 2 clean, consecutive_clean=1. **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
