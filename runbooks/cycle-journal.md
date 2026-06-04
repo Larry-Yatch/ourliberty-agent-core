@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 860 — 2026-06-04 07:44 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 1 Tier-4 pulse-escalation carry-forward; no new action) — **0 auto-fixes. Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. SYNC-PUSH-REBASE-FALLBACK carry-forward (self-recovering). Inbox-watcher fix brief ready — Larry Telegram action still needed.**
+
+Alert watermark: **1295 lines / 07:39:33Z** (+1 from iter 859 watermark 1294/07:37:21Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (sync.json: status=error, last_sync=07:32:48Z, commit=d25e6534; self-recovering). Healer heartbeat: **07:26:19Z** (~18 min; ✅ within 90-min threshold). Stale-daemon heartbeat: **07:26:20Z** (~18 min; ✅). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 (tier-reset); 0 Tier-3 silenced.**
+  - Line 1295: `pulse-escalation` / `beacon-result:inbox-watcher-restart-timeout-fix-ready` (07:39:33Z) — written by iter 859's own `larry_alerts.append_alert` escalation path. Content: Beacon brief for inbox-watcher restart-timeout fix is ready; dispatch gap blocks auto-fire to Forge. Source `pulse-escalation` NOT in `alert-translations.json` → **Tier 4**; tier-reset. No new action — this is iter 859's carry-forward [yellow]. G-rule `pulse-escalation not in alert-translations.json` already at 3/3 (iter 836); fix batched into pending `deploy-notifier-alert-xlate-split-fix` APPROVAL_REQUEST (engine-fix scope pending Larry). ⚠️
+  - New watermark: **1295 lines / 07:39:33Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:26:19Z (~18 min; ✅ fresh, well within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 07:26:20Z (~18 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=19a7ae1 "Pulse cycle 20260604T074216Z" (iter 859 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward.** sync.json: status=error, last_sync=07:32:48Z, commit=d25e6534. Session HEAD=19a7ae1 > sync.json commit → wrapper push succeeded after sync service race. Self-recovering (hourly `ourliberty-sync.timer` backstop). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Forge inbox: 0 ✅ Mirror inbox: 0 ✅ Beacon inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 859.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+  - All other G-rule counters unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=703, systemic_fixes=9, ratio≈78.11. No new ledger rows this iter — the pulse-escalation carry-forward is a self-generated alert from iter 859, not a new incident; G-rule dispatch already accounted for in iter 858.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert (line 1295: pulse-escalation carry-forward from iter 859). Tier 4; no new action. Watermark → 1295 lines / 07:39:33Z. Tier-reset.
+3. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=07:44:32Z. ✅
+4. Wrote journal entry.
+
+**Escalated:** None new. Standing [yellow] from iter 859 still applies: Larry must trigger Forge dispatch for inbox-watcher fix via Telegram chat with Beacon bot (re-emit APPROVAL_REQUEST for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`).
+
+**Patterns:**
+- Pulse-escalation alerts echo back through larry-alerts.jsonl on every escalation call, producing Tier-4 novel noise at each iter. G-rule 3/3 met iter 836; fix batched but engine-scope pending Larry. This iter is the 3rd+ consecutive iter where this self-echo pattern appears. Until the `deploy-notifier-alert-xlate-split-fix` engine-scope ships, every Pulse escalation will produce a Tier-4 on the next iter.
+- All 5 mandatory checks + additive checks otherwise clean. System is healthy: pipeline clear, all services active, healer heartbeats fresh.
+
+**Learned:** Nothing new. System state is stable post-PR-#317/#318 flush from iter 859. The only remaining blocker is the inbox-watcher fix dispatch gap, which Larry controls via Telegram.
+
+---
+
 ## Iteration 859 — 2026-06-04 07:39 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 1 Tier-4 medic-diagnosis; 2 Tier-3 silenced) — **0 auto-fixes. PRs #317 and #318 BOTH MERGED ✅. Pipeline fully clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Beacon brief for inbox-watcher fix ready — Larry action needed.**
