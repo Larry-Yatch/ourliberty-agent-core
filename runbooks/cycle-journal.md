@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 920 — 2026-06-04 20:45 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean → TIER 2 PROMOTED. consecutive_clean=3→0. 0 actions. 8/8 services active. PR #329 MERGED 20:41:55Z. Forge: 1 active session (debrittle-leak-gate-whitelist-001, ~9 min). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
+
+Alert watermark: **1294 lines / 20:41:55Z** (+1 from iter 919's 1293/20:28:59Z — outbox-notifier/review-pass for PR #329, Tier-3 FYI known-pattern). Pipeline-stall heartbeat: 20:38:28Z (✅ ~7 min at cycle start, within 90-min threshold). Stale-daemon heartbeat: 20:30:18Z (✅ ~15 min at cycle start, within 60-min threshold). Sync: status=error, last_sync=2026-06-04T20:39:07Z, commit=0e81ce4. SYNC-PUSH-REBASE-FALLBACK pattern; self-clears on next hourly timer. Tier state at start: tier=1, consecutive_clean=2. Tier state at end: **tier=2, consecutive_clean=0** (3 consecutive clean iters → Tier 2 promotion).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (Tier-3 silence).** Watermark 1293→1294. New alert at 20:41:55Z: `src=outbox-notifier, subj=review-pass` for PR #329 heal-wedged-review-xlate-001. Gate 1: `review-pass` IS in alert-translations.json (PR #264 merged, iter 668 — Tier-3 FYI). Tier-3 silence; no tier-reset. PR #329 auto-merge confirmed (outbox-notifier log: `AUTO_MERGE outcome=merged`). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. Beacon bot log shows TIER2_FALLBACK rate-limit at 20:40Z (`You've hit your limit · resets 11:30am`) — `claude_max_5h_burn_threshold_breached` Tier-3 known pattern per MEMORY (iter 863), self-clears as rolling 5h window resets. Alert delivery failure (idx=0, source=heal-x) — test-fixture delivery path in Beacon bot alert sweep. Mirror/Forge bot logs: last restart 06:02Z June 4, normal idle. No untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 20:38:28Z (~7 min; ✅ within 90-min threshold). Active pipeline: Forge `debrittle-leak-gate-whitelist-001` session running (inbox-watcher: started 20:35:54Z, attempt=1/5, active=1/10 at ~20:43Z). Normal preflight session age (~9 min). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:30:18Z (~15 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean (with note).** Session-start gitStatus: branch=main, clean, HEAD=7443505 "Pulse cycle 20260604T203957Z". PR #329 merged at 20:41:55Z (outbox-notifier AUTO_MERGE confirmed) → origin/main is now ahead by 1 commit. SYNC-PUSH-REBASE-FALLBACK pattern (wrapper will ff-main on next cycle). No always-fix action taken (git blocked in interactive session; wrapper handles sync). ✅
+
+- **(Check B) Sync health: ✅ Clean (SYNC-PUSH-REBASE-FALLBACK pattern).** sync.json: status=error, last_sync=2026-06-04T20:39:07Z, commit=0e81ce4. Self-clears on next hourly sync timer. No action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=1 (`debrittle-leak-gate-whitelist-001.json`, source=larry, phase=preflight, active session since 20:35:54Z — ~9 min, well under 1h stale threshold; Forge worktree `wt-forge-debrittle-leak-gate-whitelist-001` live per inbox-watcher log). Mirror=0 (review-heal-wedged-review-xlate-001 archived after Mirror PASS at 20:41:48Z). Beacon=0. Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** PR #329 MERGED 20:41:55Z (`fix(alerts): Tier-3 FYI translation for wedged-review-reaped + colon subject delimiter` — Mirror PASS 20:41:48Z → AUTO_MERGE 20:41:55Z → worktrees torn down). `G-rule heal-wedged-review-sessions source not in alert-translations.json` **CLOSED** — systemic fix live in main. Dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - ~~**`heal-wedged-review-sessions source not in alert-translations.json`**~~: **CLOSED** — PR #329 MERGED 2026-06-04T20:41:55Z ✅. Colon-delimiter fix + alert-translations.json entry live in main. Future wedged-review-reaped alerts → Tier-3 silenced.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=715, systemic_fixes=12, ratio≈59.6 (iter_clean row appended this iter; G-rule close + PR #329 verification pending but no new ledger rows needed this iter — verification_pending row was appended in iter 919). Ledger ts: 2026-06-04T20:45:23Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → ledger entry recorded. ✅
+3. `cycle_tier_state.py record --checks-clean true` → **tier promoted 1→2**, consecutive_clean=0. ✅
+4. Wrote journal entry. MEMORY.md update follows.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 65th+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** The two blocking Tier-4 noise sources (medic-diagnosis and heal-wedged-review-sessions) are now resolved or in-flight: (1) PR #329 lands the wedged-review-sessions translation fix — Tier 2→3 cadence path is now unblocked by that source. (2) medic-diagnosis engine-fix still pending Larry. If medic-diagnosis engine fix ships, the cadence ladder can reach Tier 3 during quiet stretches. Tier 2 promotion achieved this iter (consecutive_clean=3).
+
+**Active pipeline watch:** `debrittle-leak-gate-whitelist-001` (Larry-direct, Forge preflight, ~9 min). Larry dispatched this after PR #328 fixed the symptom (repin lines) and wants the systemic fix (content-keyed whitelist). Expect: Forge completes preflight → outbox-notifier dispatches build-phase → Mirror review → PR. Normal velocity. No stall signal yet. NOTE: source=larry Forge builds don't auto-route to Mirror (G-rule 1/3 iter 805) — watch for G-rule 2/3 after this task's build completes. But per iter 805 pattern, the outbox-notifier's routing handles source=larry tasks the same as source=beacon for build-phase dispatch; the G-rule was about the _review routing_ not the _build dispatch_. Watch for PR merge to confirm.
+
+**Learned:** Tier 2 promotion achieved after 3 consecutive clean Tier-1 iters (iters 918, 919, 920). The Tier 1 cadence since iter 917 G-rule event produced three consecutive clean iters including a PR merge + G-rule close. System is responsive and fast-moving.
+
+---
+
 ## Iteration 919 — 2026-06-04 20:37 UTC (interactive)
 
 **Health:** ✅ **Tier 1 clean. consecutive_clean=2. 0 actions. 8/8 services active. 0 open PRs (PR #328 MERGED). Forge: 1 fresh task (heal-wedged-review-xlate-001 preflight). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
