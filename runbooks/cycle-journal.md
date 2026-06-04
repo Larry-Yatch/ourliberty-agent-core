@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 854 — 2026-06-04 07:03 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: Tier-4 novel [heal-wedged-review-sessions #2/3]; G-rule advanced) — **0 auto-fixes. 1 open PR (#314 CLEAN/MERGEABLE, in revision retry). 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
+
+Alert watermark: **1286 lines / 06:55:53Z** (+1 from iter 853 anchor 1285/06:46:20Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (06:46:20Z — no new occurrence). sync.json: status=error, last_sync=06:46:20Z, commit=469a414. Session HEAD=fce3948 "Pulse cycle 20260604T065941Z" is NEWER → wrapper push succeeded; sync service race. Self-recovering. Healer heartbeat: **06:54:10Z** (~9 min; ✅). Stale-daemon heartbeat: **06:56:17Z** (~7 min; ✅). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 novel (tier-reset).** larry-alerts.jsonl: 1286 lines (+1 from iter 853).
+  - Alert 1: `heal-wedged-review-sessions:wedged-review-reaped-wt-forge-harden-approval-tab-direction-ask-coverage` at 06:55:53Z — healer reaped wedged Forge review session (pid 4001364) working on PR #314 revision (idle 464s > grace 300s, worktree removed). Route=closure. Source NOT in alert-translations.json (confirmed 0 matches). **Tier 4 (novel source).** G-rule `heal-wedged-review-sessions source not in alert-translations.json` → **2/3** (iter 835=1/3, iter 854=2/3). Not yet at 3/3 dispatch threshold. No Larry DM (by-design closure event). Tier-reset.
+  - New watermark: **1286 lines / 06:55:53Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 06:54:10Z (~9 min at check; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:56:17Z (~7 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=fce3948 "Pulse cycle 20260604T065941Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence).** sync.json: status=error, last_sync=06:46:20Z, commit=469a414. HEAD=fce3948 > sync.json commit (469a414) → wrapper push succeeded. Self-recovering (hourly backstop). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline stable — 0 auto-fixes this iter.**
+  - **PR #315 MERGED ✅** — "fix(healers): reconcile false-positive alert classes before paging Larry" — commit 4f704fa confirmed in session-start git log. Iter 853 auto-merge applied. ✅
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." CLEAN/MERGEABLE per `gh pr view`. Created 06:21:31Z. In revision: Forge has `marker-error-harden-approval-tab-direction-ask-coverage-1.json` (retry 1 of 3). The wedged Forge review session (pid 4001364, idle 464s) was reaped by the healer at 06:55:53Z; outbox-notifier sent the retry marker-error to Forge. Forge will re-emit the revision marker. **Hold — not eligible for auto-merge while revision retry is in progress.** ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 3** — `build-fix-notifier-review-dispatch-reliability.json` (active build); `heal-forge-no-pr-preflight-superseded-suppression-001.json` (systemic fix in pipeline); `marker-error-harden-approval-tab-direction-ask-coverage-1.json` (PR #314 revision retry 1/3). ✅
+  - **Mirror inbox: 0.** ✅ **Beacon inbox: 0.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions source not in alert-translations.json`: G-rule NOW 2/3** (iter 835=1/3; iter 854=2/3). Pattern: healer fires `wedged-review-reaped-*` closure alerts on both Forge and Mirror wedged sessions; source not in alert-translations.json so each fires Tier-4. At 3/3: dispatch to Beacon to add `source:heal-wedged-review-sessions` with subject pattern `wedged-review-reaped-*` as Tier 3/FYI (closure, by-design).
+  - All other G-rule counters unchanged from iter 853.
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8 (unchanged), ratio≈87.75. No new ledger rows this iter (Check 0 Tier-4 journal-only; no dispatches taken).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert — Tier-4 novel (heal-wedged-review-sessions wedged-review-reaped). G-rule → 2/3. No dispatch. Watermark advanced to 1286 lines / 06:55:53Z. Tier-reset.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence). No action.
+4. Check E: PR #314 in revision retry (Forge marker-error retry 1/3). Hold confirmed. No auto-fix actions.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=07:03:48Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` (Medic recommends re-queue from scratch). `sync-push-rebase-fallback-001` APPROVAL_REQUEST open. "go: cycle-timer checkpoint" pending Larry's Telegram trigger.
+
+**Patterns:**
+- PR #314 revision cycle: Forge session wedged mid-revision → healer reaped (06:55:53Z) → marker-error retry 1/3 now in Forge inbox. Normal recovery path; Forge will re-emit on next pick-up.
+- `heal-wedged-review-sessions` G-rule at 2/3. One more occurrence → dispatch to Beacon to silence `wedged-review-reaped-*` as Tier-3/FYI in alert-translations.json.
+- SYNC-PUSH-REBASE-FALLBACK: no new occurrence this iter (last was 06:46:20Z, same as iter 853). Rate appears stable — not accelerating during this interactive window.
+- All healers fresh, all services active. System otherwise nominal.
+
+**Learned:** The `heal-wedged-review-sessions` healer correctly reaped the stalled Forge revision session and triggered the retry mechanism (marker-error → Forge re-work). This is the healer working as designed — the only gap is the missing Tier-3 allowlist entry in alert-translations.json. The 2/3 G-rule pattern is the data needed to justify the batch addition.
+
+---
+
 ## Iteration 853 — 2026-06-04 06:57 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check E: PR #315 auto-merge applied) — **1 auto-fix. PR #315 CLEAN/MERGEABLE→auto-merge enabled. PR #314 CLEAN/MERGEABLE but Mirror revision pending in Forge inbox (hold). Check 0: 0 new alerts. 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK #62 (carry-forward, no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
