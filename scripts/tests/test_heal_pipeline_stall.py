@@ -608,6 +608,82 @@ class TestCheckRetryExhausted(_TempAgentsRootMixin, unittest.TestCase):
             alerts = self.hps.check_retry_exhausted({})
         self.assertEqual(alerts, [])
 
+    def test_resolves_task_id_from_adjacent_done_line_and_suppresses(self) -> None:
+        # The exhaustion line carries no inline `task=`; the real id lives
+        # on adjacent structured lines in the same journal batch. The id
+        # must be extracted from those, and a resolved/superseded real id
+        # must then suppress via the resolution-signal path (no alert).
+        fake_journal = (
+            'Jun 03 09:00:00 host inbox_watcher: [forge] start task=phase-c-promo-002\n'
+            'Jun 03 09:00:01 host inbox_watcher: [forge] [ERROR] All retries exhausted\n'
+            'Jun 03 09:00:02 host inbox_watcher: [forge] done task=phase-c-promo-002 success=False\n'
+        )
+        seen: dict = {}
+
+        def fake_resolution(task_id, since_ts, **kw):
+            seen['task_id'] = task_id
+            return (True, 'superseded_session')
+
+        with patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps, '_resolution_signal_present',
+                          side_effect=fake_resolution):
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(seen.get('task_id'), 'phase-c-promo-002')
+        self.assertEqual(alerts, [])
+
+    def test_resolves_task_id_from_worktree_path_when_no_done_line(self) -> None:
+        # Fallback: no done/start line, but a preceding traceback line
+        # carries the worktree path `wt-forge-<id>`.
+        fake_journal = (
+            'Jun 03 09:00:00 host inbox_watcher: Exception in '
+            '/home/larry/agent-worktrees/wt-forge-stuck-task-007/run.py\n'
+            'Jun 03 09:00:01 host inbox_watcher: [forge] [ERROR] All retries exhausted\n'
+        )
+        seen: dict = {}
+
+        def fake_resolution(task_id, since_ts, **kw):
+            seen['task_id'] = task_id
+            return (False, None)
+
+        with patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps, '_resolution_signal_present',
+                          side_effect=fake_resolution):
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(seen.get('task_id'), 'stuck-task-007')
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('stuck-task-007', alerts[0]['subject'])
+
+    def test_unidentifiable_batch_emits_no_unknown_alert(self) -> None:
+        # A truly unidentifiable exhaustion is un-actionable and
+        # un-resolvable: it must be suppressed, never emitted as a literal
+        # `unknown` subject, and the resolution-signal path is not reached.
+        fake_journal = (
+            'Jun 03 09:00:00 host inbox_watcher: [forge] unrelated chatter\n'
+            'Jun 03 09:00:01 host inbox_watcher: [forge] [ERROR] All retries exhausted\n'
+            'Jun 03 09:00:02 host inbox_watcher: [forge] more chatter no id\n'
+        )
+        captured: list[str] = []
+        with patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps, '_resolution_signal_present') as mock_res, \
+             patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(alerts, [])
+        mock_res.assert_not_called()
+        self.assertFalse(any('unknown' in a.get('subject', '') for a in alerts))
+        skip = [m for m in captured
+                if 'RETRY_EXHAUSTED_SKIP' in m and 'no_task_id' in m]
+        self.assertEqual(len(skip), 1)
+
 
 class TestDedup(_TempAgentsRootMixin, unittest.TestCase):
 
