@@ -66,6 +66,13 @@ DEFAULT_DECISION_PHRASES = (
     'your direction',
     'which option',
 )
+# Resolution-announcement phrases for signal (c): a LATER alert about the same
+# decision carrying one of these means the ask was settled out-of-band. Kept
+# conservative — must co-occur with a decision-identity match, never alone.
+DEFAULT_RESOLUTION_PHRASES = (
+    'resolved', 'merged', 'shipped', 'closed', 'landed',
+    'no longer needed', 'already done', 'superseded',
+)
 
 # Source label stamped on promoted approvals + self-failure alerts.
 HEALER_SOURCE = 'heal-unregistered-approval'
@@ -167,6 +174,7 @@ def load_heuristics(path: Optional[Path] = None) -> dict[str, Any]:
         'scan_window_hours': DEFAULT_SCAN_WINDOW_HOURS,
         'suggested_action_prefixes': list(DEFAULT_SUGGESTED_ACTION_PREFIXES),
         'decision_phrases': list(DEFAULT_DECISION_PHRASES),
+        'resolution_phrases': list(DEFAULT_RESOLUTION_PHRASES),
     }
     cfg_path = path or CONFIG_FILE
     try:
@@ -189,6 +197,11 @@ def load_heuristics(path: Optional[Path] = None) -> dict[str, Any]:
         clean = [p for p in phrases if isinstance(p, str) and p.strip()]
         if clean:
             out['decision_phrases'] = clean
+    res_phrases = data.get('resolution_phrases')
+    if isinstance(res_phrases, list):
+        clean = [p for p in res_phrases if isinstance(p, str) and p.strip()]
+        if clean:
+            out['resolution_phrases'] = clean
     return out
 
 
@@ -293,6 +306,223 @@ def derive_task_id(dedup_key: str) -> str:
     return f'{PROMOTED_TASK_PREFIX}-{digest}'
 
 
+# -------------------- decision identity (dedup of rephrasings) --------------------
+
+# Phrasing tokens stripped before computing a decision identity, so two alerts
+# that say the SAME thing in different words ("Beacon needs your call: X" vs
+# "X — Beacon needs your call") collapse to one card. Kept SPECIFIC to ask-
+# phrasing words; content words (the actual subject of the decision) are never
+# in here, or distinct decisions would wrongly merge.
+_IDENTITY_STOPWORDS = frozenset({
+    'beacon', 'needs', 'need', 'your', 'you', 'call', 'direction', 'ask',
+    'asks', 'question', 'ready', 'please', 'now', 'the', 'for', 'and', 'a',
+    'an', 'to', 'of', 're', 'is', 'are', 'on', 'or', 'vs',
+})
+_IDENTITY_TOKEN_RE = re.compile(r'[a-z0-9]+')
+# Pull PR/issue numbers out of a subject. 'PR #294' and a bare '#294' both
+# contain '#294', so a single '#<n>' pattern catches both forms.
+_REF_NUM_RE = re.compile(r'#(\d+)')
+
+
+def parse_ref_numbers(text: Any) -> list[int]:
+    """Return the PR/issue numbers referenced as '#<n>' in `text` (subject)."""
+    if not isinstance(text, str):
+        return []
+    return [int(m) for m in _REF_NUM_RE.findall(text)]
+
+
+def decision_identity(record: dict[str, Any]) -> str:
+    """Normalized identity for the DECISION an alert is about (decision 2).
+
+    Not the exact alert string: two phrasings of one decision must yield the
+    same identity so they collapse to a single card. Priority:
+      1. A referenced PR/issue number ('ref:<n>') — the most stable anchor.
+      2. The sorted set of content tokens from the subject (phrasing words
+         stripped), joined with '-'.
+      3. The raw subject lowercased (no content tokens survived stripping).
+    Falls back to the no-subject hash key when there is no subject at all, so
+    identity is always deterministic.
+    """
+    subject = record.get('subject')
+    if not isinstance(subject, str) or not subject.strip():
+        return alert_dedup_key(record)
+    s = subject.strip()
+    refs = parse_ref_numbers(s)
+    if refs:
+        return f'ref:{min(refs)}'
+    tokens = [
+        t for t in _IDENTITY_TOKEN_RE.findall(s.lower())
+        if t not in _IDENTITY_STOPWORDS and not t.isdigit()
+    ]
+    if not tokens:
+        return s.lower()
+    return '-'.join(sorted(set(tokens)))
+
+
+# -------------------- resolution signals (skip-before-promote / retire) -----
+
+# Beacon-pending-approvals statuses that mean a decision was actually resolved
+# (mirrors beacon_approval_handler.resolve's accepted statuses).
+RESOLVED_STATUSES = frozenset({'approved', 'rejected', 'modified', 'expired'})
+
+# Default GitHub repo the referenced PR/issue numbers belong to. The healer
+# scans alerts produced by ourliberty-agent-core work, so refs resolve there
+# unless an env override points elsewhere.
+DEFAULT_REF_REPO = 'Larry-Yatch/ourliberty-agent-core'
+GH_VIEW_TIMEOUT_SEC = 15
+
+
+def ref_repo() -> str:
+    return os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO') or DEFAULT_REF_REPO
+
+
+def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str]:
+    """Return the `state` field from `gh <kind> view <number>` or None on any
+    failure (timeout, gh missing, non-PR/issue number, bad JSON)."""
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ['gh', kind, 'view', str(number), '--repo', repo, '--json', 'state'],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    state = data.get('state') if isinstance(data, dict) else None
+    return state if isinstance(state, str) else None
+
+
+def gh_ref_resolved(number: int) -> Optional[bool]:
+    """True if PR/issue #number is MERGED or CLOSED, False if open, None if
+    undetermined (gh unavailable / no auth / number is neither). Mirrors
+    build_sequence_advancer.gh_pr_says_merged's tri-state contract so an
+    undetermined probe is a SOFT result — never a wrongful skip/retire."""
+    repo = ref_repo()
+    for kind in ('pr', 'issue'):
+        state = _gh_state(kind, number, repo, GH_VIEW_TIMEOUT_SEC)
+        if state is None:
+            continue
+        return state in ('MERGED', 'CLOSED')
+    return None
+
+
+def _decision_content_tokens(subject: str, identity: str) -> set[str]:
+    """Content tokens that identify a decision, for matching against prose.
+
+    A ref-based identity contributes just its number ('ref:294' -> {'294'}).
+    Otherwise the subject's content tokens (phrasing words stripped). Empty
+    when there is nothing specific to anchor on."""
+    if identity.startswith('ref:'):
+        return {identity.split(':', 1)[1]}
+    return {
+        t for t in _IDENTITY_TOKEN_RE.findall((subject or '').lower())
+        if t not in _IDENTITY_STOPWORDS and not t.isdigit()
+    }
+
+
+def history_resolution_match(
+    subject: str, identity: str, state: dict[str, Any],
+) -> bool:
+    """True iff beacon-pending-approvals `history` holds a RESOLVED entry for
+    the same decision (signal b). Conservative: matches only when ALL of the
+    decision's content tokens (>=2, so a single common word can't over-fire)
+    appear in a resolved entry's searchable text — or, for a single-token /
+    ref-based identity, when the exact subject or '#<n>' appears. Never matches
+    a no-subject key by substring (too weak to anchor)."""
+    needle = (subject or '').strip().lower()
+    tokens = _decision_content_tokens(subject, identity)
+    ref_token = identity.split(':', 1)[1] if identity.startswith('ref:') else None
+    for entry in state.get('history', []) or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('status') not in RESOLVED_STATUSES:
+            continue
+        payload = entry.get('dispatch_payload') or {}
+        hay = ' '.join(str(p) for p in [
+            entry.get('id'),
+            entry.get('plan_summary'),
+            payload.get('summary') if isinstance(payload, dict) else None,
+            payload.get('prompt') if isinstance(payload, dict) else None,
+            payload.get('promoted_from_alert') if isinstance(payload, dict) else None,
+        ] if p).lower()
+        if ref_token is not None:
+            if f'#{ref_token}' in hay:
+                return True
+            continue
+        if len(tokens) >= 2 and all(tok in hay for tok in tokens):
+            return True
+        if needle and not needle.startswith('nosubject:') and needle in hay:
+            return True
+    return False
+
+
+def later_resolution_alert(
+    subject: str,
+    identity: str,
+    alerts: list[dict[str, Any]],
+    after_ts: Optional[str],
+    heuristics: dict[str, Any],
+) -> bool:
+    """True iff another alert about the SAME decision, dated after `after_ts`,
+    announces a resolution (signal c). Conservative: requires BOTH a decision-
+    identity match AND a resolution phrase, so an unrelated later alert never
+    hides a live ask."""
+    phrases = heuristics.get('resolution_phrases') or list(DEFAULT_RESOLUTION_PHRASES)
+    after = _parse_ts(after_ts) if after_ts else None
+    for rec in alerts:
+        if decision_identity(rec) != identity:
+            continue
+        rec_ts = _parse_ts(rec.get('ts'))
+        if after is not None and rec_ts is not None and rec_ts <= after:
+            continue
+        text = ' '.join(
+            str(rec.get(f, '')) for f in ('message', 'subject', 'suggested_action')
+        ).lower()
+        if any(p.lower() in text for p in phrases):
+            return True
+    return False
+
+
+def resolution_signal(
+    record_or_key: Any,
+    state: dict[str, Any],
+    alerts: list[dict[str, Any]],
+    heuristics: dict[str, Any],
+    *,
+    after_ts: Optional[str] = None,
+    gh_probe: Any = gh_ref_resolved,
+) -> Optional[str]:
+    """Return a human-readable reason a decision is RESOLVED, else None.
+
+    `record_or_key` may be a full alert dict (promote path) or a bare subject
+    string (retire path, where only the ledger key survives). Conservative by
+    construction: an undetermined gh probe (None) is NOT a signal, so the
+    caller favors surfacing/keeping a real decision over hiding it.
+    """
+    if isinstance(record_or_key, dict):
+        subject = alert_dedup_key(record_or_key)
+        identity = decision_identity(record_or_key)
+    else:
+        subject = str(record_or_key)
+        identity = decision_identity({'subject': subject})
+    # (a) referenced PR/issue merged or closed
+    for n in parse_ref_numbers(subject):
+        if gh_probe(n) is True:
+            return f'referenced #{n} is merged/closed'
+    # (b) a resolved entry for the same decision in beacon history
+    if history_resolution_match(subject, identity, state):
+        return 'resolved entry in beacon-pending-approvals history'
+    # (c) an explicit later resolution alert for the same subject
+    if later_resolution_alert(subject, identity, alerts, after_ts, heuristics):
+        return 'later resolution alert for same subject'
+    return None
+
+
 def parse_binary_options(suggested_action: Any) -> Optional[tuple[str, str]]:
     """Reconstruct (option_a, option_b) from a suggested_action like
     'Choose ship-now or scope-the-fix'. Returns None when it does not parse
@@ -365,6 +595,10 @@ def build_approval_payload(
         'prompt': prompt,
         'task_type': 'direction-ask',
         'promoted_from_alert': dedup_key,
+        # Transient: the raw subject, stashed so main() can record it in the
+        # promoted ledger (for the retire pass's subject-based signals).
+        # Stripped before the payload reaches add_pending / the chain helper.
+        '_subject': subject,
     }
 
 
@@ -460,16 +694,27 @@ def evaluate(
     alerts: list[dict[str, Any]],
     heuristics: dict[str, Any],
     state: dict[str, Any],
-    promoted: dict[str, str],
+    promoted: dict[str, Any],
     now: Optional[datetime] = None,
+    resolution_check: Any = None,
 ) -> list[dict[str, Any]]:
     """Return the list of approval payloads to register this tick.
 
     An alert is promoted iff: in-window, approval-class, not already promoted
-    (state file), and not already registered (pending/history match). Pure — no
-    I/O, no side effects; main() does the registration + persistence."""
+    (by decision identity OR legacy subject key), not already registered
+    (pending/history match), AND not already resolved out-of-band
+    (skip-before-promote, decision 1). Rephrasings collapse to one card via
+    `decision_identity` (decision 2). Pure — no I/O, no side effects; main()
+    does the registration + persistence.
+
+    `resolution_check` is an injected `callable(record) -> Optional[str]` that
+    returns a reason when the decision is already resolved (so it is skipped),
+    else None. Defaults to a no-op so existing pure-logic callers keep
+    promoting; main() wires the live gh/history/alert probe.
+    """
     now = now or datetime.now(timezone.utc)
     window = heuristics['scan_window_hours']
+    check = resolution_check or (lambda rec: None)
     out: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
     for record in alerts:
@@ -477,17 +722,112 @@ def evaluate(
             continue
         if not is_approval_class(record, heuristics):
             continue
-        dedup_key = alert_dedup_key(record)
-        if dedup_key in promoted or dedup_key in seen_keys:
+        subject = alert_dedup_key(record)
+        identity = decision_identity(record)
+        if identity in promoted or subject in promoted or identity in seen_keys:
             continue
-        task_id = derive_task_id(dedup_key)
-        if is_already_registered(dedup_key, task_id, state):
+        task_id = derive_task_id(identity)
+        if is_already_registered(subject, task_id, state):
             continue
-        payload = build_approval_payload(record, dedup_key)
+        # Skip-before-promote: a decision that has already resolved out-of-band
+        # (referenced PR merged, resolved in beacon history, later resolution
+        # alert) must NOT be promoted. Probed last so gh is only consulted for
+        # genuinely unregistered candidates.
+        reason = check(record)
+        if reason:
+            log(f'skip-before-promote: {identity!r} ({reason})')
+            seen_keys.add(identity)
+            continue
+        payload = build_approval_payload(record, identity)
         payload['_source_ts'] = record.get('ts')
         out.append(payload)
-        seen_keys.add(dedup_key)
+        seen_keys.add(identity)
     return out
+
+
+# -------------------- retire-on-resolution (decision 3) --------------------
+
+def _ledger_entry_fields(key: str, value: Any) -> tuple[str, str, Optional[str]]:
+    """Unpack a promoted-ledger entry into (subject, task_id, promoted_at),
+    tolerating BOTH the legacy `{key: iso_ts}` shape (key is the raw subject)
+    and the richer `{key: {task_id, subject, promoted_at}}` shape."""
+    if isinstance(value, dict):
+        subject = value.get('subject') or key
+        task_id = value.get('task_id') or derive_task_id(key)
+        return subject, task_id, value.get('promoted_at')
+    # Legacy: the key WAS the dedup key (raw subject), value is the promote ts.
+    return key, derive_task_id(key), (value if isinstance(value, str) else None)
+
+
+def reconcile_retire(
+    promoted: dict[str, Any],
+    state: dict[str, Any],
+    alerts: list[dict[str, Any]],
+    heuristics: dict[str, Any],
+    now: Optional[datetime] = None,
+    gh_probe: Any = gh_ref_resolved,
+) -> tuple[list[tuple[str, str]], dict[str, Any]]:
+    """Retire previously-promoted cards whose decision is now resolved.
+
+    For each ledger entry, if a resolution signal (decision 1) now exists,
+    `resolve` its pending beacon entry to history (drop-from-pending) and mark
+    its task_id for a read_at clear; drop it from the ledger. An entry with NO
+    signal is left untouched — a still-live unresolved ask is NEVER retired.
+
+    Mutates `state` in place (via approval.resolve with state passed, so it does
+    not self-save) and returns `(retired, remaining_ledger)` where `retired` is
+    a list of `(task_id, reason)`. The caller persists state + ledger and clears
+    read_at for the retired task_ids.
+    """
+    retired: list[tuple[str, str]] = []
+    remaining: dict[str, Any] = {}
+    for key, value in promoted.items():
+        if not isinstance(key, str):
+            continue
+        subject, task_id, promoted_at = _ledger_entry_fields(key, value)
+        reason = resolution_signal(
+            subject, state, alerts, heuristics,
+            after_ts=promoted_at, gh_probe=gh_probe,
+        )
+        if not reason:
+            remaining[key] = value
+            continue
+        # Drop from pending -> history (status 'expired' = auto-retired, not a
+        # user reject). resolve returns None if it was never in pending (e.g.
+        # already cleared); we still retire it from the ledger + clear read_at.
+        approval.resolve(
+            task_id, 'expired',
+            note=f'auto-retired by {HEALER_SOURCE}: {reason}',
+            state=state,
+        )
+        retired.append((task_id, reason))
+        log(f'retire-on-resolution: {key!r} task={task_id} ({reason})')
+    return retired, remaining
+
+
+def _clear_retired_read_at(task_ids: list[str]) -> int:
+    """Set read_at on the chain_events rows for retired task_ids, reusing the
+    existing heal_stale_approvals clear path (backup-first, batched). Returns
+    the count cleared; 0 (with a WARN) if Supabase is unreachable — the
+    heal_stale_approvals timer then finishes the clear on its next tick, since
+    each retired entry is now resolved in beacon history. No raw Supabase write
+    lives here."""
+    if not task_ids:
+        return 0
+    import heal_stale_approvals as stale
+    try:
+        client = stale._connect_supabase()
+    except Exception as e:  # noqa: BLE001
+        log(f'retire read_at clear deferred (Supabase unavailable: '
+            f'{type(e).__name__}: {e}); heal_stale_approvals will finish it',
+            'WARN')
+        return 0
+    try:
+        return stale.clear_resolved_by_task_id(client, task_ids)
+    except Exception as e:  # noqa: BLE001
+        log(f'retire read_at clear failed: {type(e).__name__}: {e}; '
+            f'heal_stale_approvals will finish it', 'WARN')
+        return 0
 
 
 # -------------------- registration (side-effectful) --------------------
@@ -498,10 +838,11 @@ def register_approval(payload: dict[str, Any], chat_id: Optional[int]) -> bool:
     chain_event upsert succeeded (the tab write); the pending write is
     best-effort and not gating. Strips the internal helper keys before handing
     the payload to the helpers."""
-    # Only the transient _source_ts is stripped. promoted_from_alert stays on
-    # the payload so add_pending persists it under dispatch_payload, where the
+    # Transient helper keys are stripped. promoted_from_alert stays on the
+    # payload so add_pending persists it under dispatch_payload, where the
     # collision guard can find it on later ticks.
     source_ts = payload.pop('_source_ts', None)
+    payload.pop('_subject', None)
     approval.add_pending(payload, chat_id=chat_id)
     kwargs = approval.build_approval_request_chain_event(payload, ts=source_ts)
     return chain_event_emit.emit_event(**kwargs)
@@ -538,10 +879,39 @@ def main() -> int:
     state = approval.load_state()
     promoted = load_promoted()
 
+    # Resolution probe shared by skip-before-promote (decision 1) and retire
+    # (decision 3): consults gh for referenced PRs/issues, beacon history, and
+    # later resolution alerts. Conservative — an undetermined probe is no signal.
+    def _resolution_check(record: dict[str, Any]) -> Optional[str]:
+        return resolution_signal(
+            record, state, alerts, heuristics, after_ts=record.get('ts'),
+        )
+
+    # --- RETIRE-ON-RESOLUTION (decision 3) ---
+    # Runs every tick regardless of whether anything is promoted, so a card
+    # whose decision resolved out-of-band is cleared promptly.
+    ledger_changed = False
     try:
-        to_promote = evaluate(alerts, heuristics, state, promoted)
+        retired, promoted = reconcile_retire(promoted, state, alerts, heuristics)
+    except Exception as e:  # noqa: BLE001
+        log(f'retire pass failed: {type(e).__name__}: {e}', 'ERROR')
+        retired = []
+    if retired:
+        ledger_changed = True
+        approval.save_state(state)  # persist the pending -> history moves
+        _clear_retired_read_at([tid for tid, _ in retired])
+        log(f'retired {len(retired)} resolved card(s) off the tab')
+
+    # --- SKIP-BEFORE-PROMOTE + PROMOTE (decisions 1 + 2) ---
+    try:
+        to_promote = evaluate(
+            alerts, heuristics, state, promoted,
+            resolution_check=_resolution_check,
+        )
     except Exception as e:  # noqa: BLE001
         log(f'evaluate failed: {type(e).__name__}: {e}', 'ERROR')
+        if ledger_changed:
+            save_promoted(promoted)
         _emit_self_failure(
             message=(
                 f'{HEALER_SOURCE} failed while scanning larry-alerts for '
@@ -556,13 +926,17 @@ def main() -> int:
         return 1
 
     if not to_promote:
-        log(f'tick: scanned {len(alerts)} alert(s); nothing to promote')
+        if ledger_changed:
+            save_promoted(promoted)
+        log(f'tick: scanned {len(alerts)} alert(s); nothing to promote; '
+            f'retired {len(retired)}')
         return 0
 
     chat_id = _chat_id()
     promoted_count = 0
     for payload in to_promote:
-        dedup_key = payload.get('promoted_from_alert', '')
+        identity = payload.get('promoted_from_alert', '')
+        subject = payload.get('_subject', identity)
         task_id = payload['task_id']
         try:
             emitted = register_approval(dict(payload), chat_id)
@@ -583,15 +957,22 @@ def main() -> int:
         # add_pending already registered it in Beacon's state, and the
         # event_id is deterministic over the source ts, so a retry would
         # upsert the same row. Recording prevents a duplicate pending entry on
-        # the next tick if Supabase was briefly down.
-        promoted[dedup_key] = datetime.now(timezone.utc).isoformat()
+        # the next tick if Supabase was briefly down. Keyed on the decision
+        # identity; the entry carries task_id + subject so the retire pass can
+        # later resolve + clear it without re-deriving from the raw alert.
+        promoted[identity] = {
+            'task_id': task_id,
+            'subject': subject,
+            'promoted_at': datetime.now(timezone.utc).isoformat(),
+        }
         promoted_count += 1
         log(f'promoted {task_id} (tab-write={"ok" if emitted else "deferred"}) '
-            f'from alert key={dedup_key!r}',
+            f'from decision identity={identity!r}',
             'WARN' if not emitted else 'INFO')
 
     save_promoted(promoted)
-    log(f'done: promoted {promoted_count} direction-ask(s) onto the tab')
+    log(f'done: promoted {promoted_count} direction-ask(s); '
+        f'retired {len(retired)}')
     return 0
 
 

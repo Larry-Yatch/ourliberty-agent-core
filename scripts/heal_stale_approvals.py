@@ -239,6 +239,36 @@ def _apply_clears(client, rows: list[dict[str, Any]], now: datetime) -> int:
     return cleared
 
 
+def clear_resolved_by_task_id(
+    client,
+    task_ids,
+    now: Optional[datetime] = None,
+    backup_dir: Path = BACKUP_DIR,
+) -> int:
+    """Set read_at on the pending approval_request rows for these task_ids.
+
+    The shared, signal-driven clear path other reconcilers reuse instead of
+    hand-writing a Supabase update: it backs the rows up FIRST (reversible),
+    then clears in batches via `_apply_clears`. Caller is responsible for the
+    resolution decision; this only mechanizes the read_at write. Returns the
+    number of rows cleared (0 if none match)."""
+    wanted = {t for t in (task_ids or []) if t}
+    if not wanted:
+        return 0
+    now = now or datetime.now(timezone.utc)
+    rows = [
+        r for r in fetch_pending(client, 'approval_request')
+        if r.get('task_id') in wanted
+    ]
+    if not rows:
+        return 0
+    backup_path = _backup(rows, now, backup_dir)
+    cleared = _apply_clears(client, rows, now)
+    log(f'cleared {cleared} retired decision row(s) by task_id; '
+        f'backup -> {backup_path}')
+    return cleared
+
+
 # -------------------- orchestration --------------------
 
 def run_once(
