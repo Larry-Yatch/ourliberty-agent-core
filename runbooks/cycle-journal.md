@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 853 — 2026-06-04 06:57 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check E: PR #315 auto-merge applied) — **1 auto-fix. PR #315 CLEAN/MERGEABLE→auto-merge enabled. PR #314 CLEAN/MERGEABLE but Mirror revision pending in Forge inbox (hold). Check 0: 0 new alerts. 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK #62 (carry-forward, no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
+
+Alert watermark: **1285 lines / 06:46:20Z** (unchanged — 0 new alerts since iter 852). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #62 carry-forward (06:46:20Z). sync.json: status=error, commit=469a414 (iter 850 wrapper). Session HEAD=24a07d5 (iter 852 wrapper) is NEWER → wrapper push succeeded; sync service race. Self-recovering (hourly backstop). Healer heartbeat: **06:54:10Z** (~3 min at check; ✅). Stale-daemon heartbeat: **06:26:17Z** (~31 min; ✅ within 90-min threshold). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 0 new alerts. Nominal.** larry-alerts.jsonl: 1285 lines — unchanged from iter 852 watermark (1285 / 06:46:20Z). No new alerts this iter. ✅ Watermark unchanged.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 06:54:10Z (~3 min at check; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:26:17Z (~31 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=24a07d5 "Pulse cycle 20260604T065333Z" (iter 852 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #62 carry-forward.** sync.json: status=error, last_sync=06:46:20Z, commit=469a414. No NEW sync failure this iter (0 new alerts). Wrapper push succeeded (HEAD=24a07d5 > sync.json commit). Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ 1 auto-fix applied.**
+  - **PR #315 → auto-merge enabled.** CLEAN/MERGEABLE (confirmed `gh pr view`), created 06:25:51Z, age=31m34s at auto-merge. `gh pr merge 315 --auto --squash` applied. "fix(healers): reconcile false-positive alert classes before paging Larry." ✅
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." CLEAN/MERGEABLE per `gh pr view`. Created 06:21:31Z, age=~35 min. BUT `revision-harden-approval-tab-direction-ask-coverage-1.json` still in Forge inbox (unarchived → Mirror revision not yet applied). **In revision — hold. Not eligible for auto-merge.** ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 3** — `build-fix-notifier-review-dispatch-reliability.json` (active build), `heal-forge-no-pr-preflight-superseded-suppression-001.json` (systemic fix in pipeline), `revision-harden-approval-tab-direction-ask-coverage-1.json` (Mirror revision for PR #314). Unchanged. ✅
+  - **Mirror inbox: 0.** ✅
+  - **Beacon inbox: 0.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All G-rule counters unchanged from iter 852. No new occurrences this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8, ratio≈87.75. No new ledger rows (1 auto-fix action; intervention count unchanged — auto-merges are allow-listed, not intervention rows).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark unchanged (1285 lines / 06:46:20Z). ✅
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #62 carry-forward. No new occurrence. Self-recovering.
+4. Check E: PR #315 CLEAN/MERGEABLE at 31m34s → `gh pr merge 315 --auto --squash`. Action logged to `runbooks/cycle-actions.jsonl`.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=06:57:25Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` (Medic attempt 5 recommends re-queue from scratch). `sync-push-rebase-fallback-001` APPROVAL_REQUEST open. "go: cycle-timer checkpoint" pending Larry's Telegram trigger.
+
+**Patterns:**
+- PR #315 auto-merge applied — if Mirror approved, this resolves the "reconcile false-positive alert classes" healer fix.
+- PR #314 holding in revision (Forge has Mirror's revision task). CLEAN/MERGEABLE on GitHub but system policy requires revision-task resolution first.
+- 0 new alerts this iter — first clean Check 0 since iter 851.
+- Pipeline otherwise stable: all healers fresh, all services active.
+
+**Learned:** PR #314 showing CLEAN/MERGEABLE on `gh pr view` while revision task remains in Forge inbox confirms the calibration note: GitHub CLEAN/MERGEABLE reflects GitHub's merge-state only, not the agent system's Mirror-approval workflow. Always cross-reference Forge inbox for pending revision tasks before applying auto-merge.
+
+---
+
 ## Iteration 852 — 2026-06-04 06:50 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: Tier-4 novel [sync-blocked:auto-commit-push-failed #62]; Check B: SYNC-PUSH-REBASE-FALLBACK #62) — **0 auto-fixes. 2 open PRs (#315 CLEAN/24min→approaching threshold, #314 UNKNOWN/29min in revision). Forge inbox: 3 (unchanged). Mirror inbox: 0. Beacon inbox: 0. 8/8 services active.**
