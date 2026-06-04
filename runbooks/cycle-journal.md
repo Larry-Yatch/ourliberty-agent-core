@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 813 — 2026-06-04 01:24 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=2 — **All checks nominal. PR #295 CONFIRMED MERGED (01:20:39Z — Mirror approved rev1, auto-merged + branch deleted). Phase C-005 "feat(pulse): Phase C — experience-driven promotion loop" LIVE in main. 0 open PRs. All inboxes empty. Pipeline clean.** Alert watermark: **1240 lines / anchor 01:20:39Z** (1 new alert: outbox-notifier:review-pass Tier-3 known-pattern → nominal). Cooldown residue: **206** (unchanged). Sync: ✅ post-wrapper lag (commit=3290042, HEAD=610b43c "Pulse cycle 20260604T012133Z"). Healer heartbeat: **00:55:15Z** (~29 min at check; ✅). **8/8 services active.** **0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard.** Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1240 lines** (was 1239 at iter 812 anchor 01:03:21Z). 1 new alert:
+  - `01:20:39Z` `outbox-notifier / intent:review-pass` — Mirror approved PR #295 rev1, auto-merged + branch deleted. Pattern `review-pass` is Tier-3 known-pattern (PR #264, iter 668). → **silenced, no DM.** ✅
+  Watermark advanced to 1240 / anchor 01:20:39Z. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Standing APPROVAL_REQUESTs (Beacon iter 804 alert-translations split, forge-claude-md-preflight-self-check-bullet-001) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat 00:55:15Z (~29 min; ✅ within 90-min threshold). No active pipeline stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No new orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat 00:55:15Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start: HEAD=610b43c "Pulse cycle 20260604T012133Z", branch=main, tree=clean. Note: PR #295 merged at 01:20:39Z after session-start snapshot; will appear in next iter's HEAD. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=3290042, last_sync=00:45:36Z. HEAD=610b43c ahead — normal. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core.** PR #295 merged 01:20:39Z (Mirror rev1 approved). PR #294 was already merged (iter 811 always-fix; confirmed in iter 812 git log). ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY.** ✅
+  - **Phase C pipeline:** 005/005 complete. All Phase C promotion tasks shipped. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 3.**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — PR #294 post-merge worktree STILL present (~75 min post auto-merge enable at iter 811). Event-driven teardown confirmed NOT firing for Pulse-triggered `gh pr merge --auto` path. G-rule 1/3 (same occurrence as iter 812, not a new one). Will clear on hourly GC at ~02:00Z. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale PR #293 worktrees (~2.5h old; within 24h GC threshold). Will clear ~23:14Z June 4. ✅
+  - **PR #295 worktrees GONE** — `wt-forge-pulse-triage-phase-c-promotion-005` and `wt-mirror-pulse-triage-phase-c-promotion-005` both cleared via event-driven teardown on Mirror-approved auto-merge. Confirms: standard pipeline auto-merge path triggers teardown correctly; the gap is specific to Pulse's manual `gh pr merge --auto --squash` path. ✅
+
+- **G-rule watch:**
+  - `PR worktree persists post GitHub-native auto-merge`: Nuance refined this iter — PR #295's Mirror-pipeline teardown worked correctly; PR #294's Pulse-direct `gh pr merge --auto` did NOT trigger teardown. G-rule is now more precisely: **"Pulse-triggered `gh pr merge --auto --squash` doesn't fire event-driven worktree teardown."** Still 1/3 (same incident). At 3/3: dispatch Beacon to spec adding a teardown call in the Pulse always-fix auto-merge path.
+  - All other G-rule counters unchanged from iter 812.
+
+- **PRIME DIRECTIVE ratio:** interventions=687, systemic_fixes=5, ratio=137.4. No new rows this iter — all checks nominal.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert (outbox-notifier:review-pass, Tier-3 known-pattern). Watermark advanced to 1240 / anchor 01:20:39Z. ✅
+3. Confirmed PR #295 MERGED (01:20:39Z). Phase C-005 complete; all Phase C tasks shipped. ✅
+4. Confirmed Phase C worktrees torn down correctly (event-driven teardown working for standard pipeline path). ✅
+5. Refined G-rule hypothesis for `PR worktree persists post GitHub-native auto-merge` — now scoped to Pulse-direct `gh pr merge` path specifically. G-rule stays 1/3.
+6. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2, last_updated=01:24:01Z. ✅
+7. No new intervention rows to cycle-prime-ledger.jsonl — no new findings.
+8. No always-allowed auto-fixes triggered. ✅
+9. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing escalations from prior iters pending Larry (Beacon APPROVAL_REQUEST iter 804, alert-translations split). Larry has the ball.
+
+**Patterns:**
+- Phase C pipeline completed all 5 tasks (001–005). The promotion loop is live. PR #295's Mirror review cycle (build → review → revision → rev1 review → auto-merge) took ~15 min total. Phase C operational discipline is working.
+- G-rule `PR worktree persists post Pulse-direct gh pr merge --auto` refined: the event-driven teardown fires correctly for standard pipeline merges; only Pulse's explicit `gh pr merge` invocation skips it. The hourly GC backstop handles the cleanup (the pattern is inconvenient but not harmful).
+
+**Learned:** PR #295 Mirror rev1 verdict: "both prior findings resolved cleanly and verified end-to-end. Finding 1 (medium) — graduation dispatch payload in emit_graduation_proposals now carries target_repo=ourliberty-agent-core, task_type=doc-only, and pr_title, fixing the routing path. All 144 tests pass." Phase C promotion loop fully wired.
+
+---
+
 ## Iteration 812 — 2026-06-04 01:18 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 — **All checks nominal. PR #294 CONFIRMED MERGED (iter 811 always-fix succeeded). PR #295 active in Phase C pipeline: Mirror rev1 review in progress (dispatched 01:14:29 UTC). Pipeline healthy.** Alert watermark: **1239 lines / anchor 01:03:21Z** (unchanged — 0 new alerts). Cooldown residue: **206** (unchanged). Sync: ✅ post-wrapper lag (commit=3290042, HEAD=ea110b5 "Pulse cycle 20260604T011426Z"). Healer heartbeat: **01:15:09 UTC** (~3 min at check; ✅). **8/8 services active.** **1 open PR in agent-core** (#295 OPEN/MERGEABLE — Mirror rev1 review active). **0 open PRs in ourliberty-dashboard.**
