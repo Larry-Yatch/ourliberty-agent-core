@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 889 — 2026-06-04 15:32 UTC (interactive)
+
+**Health:** ✅ Tier 1 → **Tier 2 PROMOTION** (consecutive_clean=3) — **0 auto-fixes. All checks nominal. 0 open PRs. 8/8 services active. Sync: residual error from iter 886 SYNC-PUSH-REBASE-FALLBACK-001 (57th; self-clears on hourly timer ~15:48Z UTC). 4 fresh Forge inbox tasks arrived post-iter-888 (all < 10 min old; inbox-watcher active).**
+
+Alert watermark: **1271 lines / 14:48:16Z** (unchanged from iter 888 — 0 new alerts). Sync: sync.json status=error, last_sync=14:48:16Z, commit=f7f1d14e — same residual from iter 886 57th SYNC-PUSH-REBASE-FALLBACK; session HEAD=6849611 (iter 888 wrapper) > f7f1d14e → wrapper push confirmed succeeded. **8/8 services active.** Pipeline-stall heartbeat: 15:15:51Z (✅ ~16 min ago). Stale-daemon heartbeat: 15:29:23Z (✅ ~3 min ago).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: **1271 lines** — unchanged from iter 888 watermark (1271 / 14:48:16Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** All inboxes: Beacon=0, Mirror=0, Pulse=0. Forge=4 (fresh, all < 10 min old — see Check D). Standing G-rule: cycle-timer-checkpoint DM forwarded to Beacon at 07:12 UTC; Beacon awaiting "go" — no new activity. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 15:15:51Z (~16 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No new directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 15:29:23Z (~3 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6849611 "Pulse cycle 20260604T152245Z" (iter 888 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Known residual.** sync.json: status=error, last_sync=14:48:16Z, commit=f7f1d14e. Same residual from iter 886 SYNC-PUSH-REBASE-FALLBACK-001 (57th total). Session HEAD=6849611 > f7f1d14e — iter 888 wrapper push succeeded. Self-clears on hourly timer ~15:48Z UTC. ✅ (residual known state, not new failure)
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ 4 fresh tasks (all < 10 min old, not stale).**
+  - `forge-marker-error-retry-fillin-001` (source=larry, phase=preflight, age=~6 min): Fix MalformedForgeMarker retry churn — embed fill-in-the-blank canonical marker grammar in retry prompt.
+  - `pulse-marker-discipline-signal-001` (source=larry, phase=preflight, age=~6 min): Add 'preflight-marker-discipline' signal to Pulse Check I to trend MalformedForgeMarker miss rate.
+  - `build-agent-queue-generalize-backend-20260604T152823Z` (source=larry, phase=build, age=~3 min): Generalize agent-queue endpoint to all 4 agents (WORKER lanes for beacon/mirror/pulse).
+  - `build-harden-authoritative-dispatch-confirmation` (source=beacon, phase=build, age=~2 min): Build phase for authoritative dispatch confirmation fix (preflight PROCEED'd).
+  All four are below the 1-hour stale threshold; inbox-watcher is active and processing. No escalation needed. ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Beacon inbox: 0 ✅ Mirror inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 888. `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=704, systemic_fixes=9, ratio≈78.22. No new ledger rows — clean iter, no interventions.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark confirmed at 1271 lines / 14:48:16Z (unchanged from iter 888).
+3. `cycle_tier_state.py record --checks-clean true` → **tier promoted 1 → 2**, consecutive_clean=0, last_updated=15:32:21Z. ✅
+
+**Escalated:** Nothing new. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go" — send "go: cycle-timer checkpoint" to Beacon bot to proceed).
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 57th total; self-recovers every occurrence).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- 3rd consecutive clean iter at Tier 1 → de-escalated to Tier 2 (15-min cadence). System steady-state since tier-reset at 15:11Z (iter 886).
+- 4 Forge inbox tasks arrived in a ~4-minute burst post-iter-888 (15:25–15:29Z): 2 from Larry (preflight) + 1 from Larry (build) + 1 from Beacon (build). Normal pipeline throughput; inbox-watcher processing.
+- Alert watermark static for 3 consecutive iters (886, 887, 888, 889 all 1271 / 14:48:16Z). System quiet.
+
+**Learned:** Nothing new.
+
+---
+
 ## Iteration 888 — 2026-06-04 15:21 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=2 — **0 auto-fixes. All checks nominal. 0 open PRs. 8/8 services active. Sync: residual error from iter 886 SYNC-PUSH-REBASE-FALLBACK-001 (57th; session HEAD=0cb182c > sync.json commit f7f1d14e → iter 887 wrapper push confirmed succeeded; self-clears on next hourly timer).**
