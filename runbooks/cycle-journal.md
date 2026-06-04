@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 863 — 2026-06-04 08:03 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 2 Tier-4 auto-restarted:* [known pattern, G-rule fix in pipeline]; 1 Tier-3 FYI silenced [claude_max_5h_burn_threshold_breached, 102% of 5h gate]) — **0 auto-fixes. Pipeline fully clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Sync: ✅ CLEAN.**
+
+Alert watermark: **1298 lines / 07:59:19Z** (+3 from iter 862 watermark 1295/07:39:33Z). Sync: ✅ sync.json status=no-change, last_sync=07:46:24Z, commit=e854d72; session HEAD=6f1fbf1 > sync.json commit → iter 862 wrapper pushed after last sync timer fire; no SYNC-PUSH-REBASE-FALLBACK. **8/8 services active.** Healer heartbeat: 07:59:39Z (✅ very fresh). Stale-daemon heartbeat: 07:56:28Z (✅ within 90-min threshold).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 Tier-4 novel (tier-reset); 1 Tier-3 silenced.**
+  - Line 1296: `heal-stale-daemon-code` / `auto-restarted:ourliberty-outbox-notifier.service` (07:56:31Z, route=digest) — outbox-notifier restarted after PR #317 code rollout (outbox_notifier.py mtime 07:42:17Z newer than active-since 07:27:53Z). By-design post-deploy restart. Subject NOT in `alert-translations.json` → **Tier 4**; tier-reset. No new action — G-rule 3/3 dispatched iter 592, Beacon consumed iter 594; Forge brief MISSING (same ongoing pipeline gap). ⚠️
+  - Line 1297: `heal-stale-daemon-code` / `auto-restarted:ourliberty-pulse-bot.service` (07:56:33Z, route=digest) — pulse-bot restarted due to larry_alerts.py mtime (PR #315). By-design. → **Tier 4**; no new action; same G-rule pipeline. ⚠️
+  - Line 1298: `heal-claude-max-burn-rate` / `claude_max_5h_burn_threshold_breached` (07:59:19Z, route=escalate) — trailing 5h token pace at 102% of gate (10,194,325 of 10,000,000 tokens); 270 rate-limit events in trailing 2h. **alert-translations.json match: `tier: "FYI"`, `severity: "INFO"` → Tier 3 silence.** No money involved (OAuth Max; no per-token billing). Rolling 5h window clears as rapid interactive session ends. ✅ Silenced per translations.
+  - New watermark: **1298 lines / 07:59:19Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:59:39Z (very fresh; ✅). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 07:56:28Z (~7 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6f1fbf1 "Pulse cycle 20260604T075859Z" (iter 862 wrapper). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=07:46:24Z, commit=e854d72. Session HEAD=6f1fbf1 > sync.json commit → wrapper push succeeded after last sync timer; no SYNC-PUSH-REBASE-FALLBACK this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. (outbox-notifier + pulse-bot were restarted by stale-daemon healer at 07:56Z with updated code from PRs #317 and #315 respectively.) ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Forge inbox: 0 ✅ Mirror inbox: 0 ✅ Beacon inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 862.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+  - `auto-restarted:* not in alert-translations.json` G-rule: already at 3/3 dispatched (iter 592). Fix in pipeline pending Forge brief. Lines 1296-1297 are more occurrences of the same pattern. No counter increment (G-rule already dispatched). ✅
+
+- **Burn rate note (FYI):** 270 rate-limit events in trailing 2h; 102% of 5h token gate. Driven by the rapid interactive session (iters 856-863 this morning). Rolling 5h window will clear as this session ends. No dispatch — Tier 3 per translations. Note for Larry: if additional heavy sessions are planned today, the 5h token pace may continue to press against the gate.
+
+- **PRIME DIRECTIVE ratio:** interventions=703, systemic_fixes=9, ratio≈78.11. No new ledger rows — the Tier-4 auto-restarted:* alerts are a carry-forward of an already-dispatched G-rule (no new intervention/systemic_fix rows warranted); the burn-rate is Tier 3 FYI.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 3 new alerts. 2 Tier 4 (auto-restarted:* — by-design, G-rule fix in pipeline; no new action). 1 Tier 3 (burn-rate FYI silenced per translations). Watermark → 1298 lines / 07:59:19Z. Tier-reset.
+3. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=08:03:09Z. ✅
+4. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing items carry forward:
+- `[yellow]` Inbox-watcher restart timeout fix (Beacon brief ready; Larry must trigger Forge dispatch via Telegram chat with Beacon bot for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix, not emergency — sync self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- The `auto-restarted:*` Tier-4 pattern will continue firing after every code-rollout deploy until the Forge brief for `auto-restarted:*` → alert-translations.json lands. G-rule 3/3 was dispatched iter 592; Beacon consumed it iter 594; Forge brief still MISSING. This is the single biggest source of recurring Tier-4 noise in the current system state.
+- Burn-rate gate (102% of 5h): this is a morning-session artifact. 9 interactive cycles (iters 855-863) in ~1h is above the normal automated-cycle rate. The 5h rolling window will self-clear. No dispatch warranted; pattern is expected during active development days.
+- Sync stayed clean this iter — no SYNC-PUSH-REBASE-FALLBACK. Positive signal: the hourly sync timer at 07:46Z + the inter-iter gap (~6 min between iters 862 and 863) avoided the wrapper race.
+
+**Learned:** `claude_max_5h_burn_threshold_breached` is in alert-translations.json as Tier 3 FYI (confirmed today). Calibration note: future Check 0 scans can confirm this alert silences cleanly without needing to look it up again.
+
+---
+
 ## Iteration 862 — 2026-06-04 07:57 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=2 — **0 auto-fixes. All checks nominal. Pipeline clear: 0 open PRs, all inboxes empty. 8/8 services active. Sync: ✅ clean. Healer heartbeat: 07:43:19Z (✅). Stale-daemon heartbeat: 07:26:20Z (✅).**
