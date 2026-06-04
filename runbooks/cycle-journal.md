@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 847 — 2026-06-04 06:01 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: heal-stale-daemon-code:auto-restarted Tier-4 novel; Check B: SYNC-PUSH-REBASE-FALLBACK #57) — **0 auto-fixes. 0 new escalations. 3 open PRs (#306 UNKNOWN/31min, #310 UNKNOWN/8min, #311 CLEAN/4min). Forge inbox: 3. Mirror inbox: 2. Beacon inbox: 1. Worktrees: 15 (9 stale). Healer: 05:51Z (~9 min). Stale-daemon: 05:56Z (~5 min). 8/8 services active.**
+
+Alert watermark: **1273 lines / anchor 05:56:17Z** (+2 since iter 846 anchor 1271/05:47:22Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57 — sync.json: status=error, last_sync=05:57:07Z, commit=ed5d78b5. Session HEAD 795f8bd (iter 846 wrapper at ~05:56:50Z) — sync service ran at 05:57:07Z, attempted auto-commit push, failed, rolled back. Session HEAD is the actual current state; self-recovering. Healer heartbeat: **05:51:39Z** (~9 min; ✅). Stale-daemon heartbeat: **05:56:15Z** (~5 min; ✅ very fresh). **8/8 services active.** **3 open PRs (agent-core).** **Dashboard: 0 open PRs.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 novel (tier-reset) + 1 Tier-3 silence.** larry-alerts.jsonl: 1273 lines (+2 since iter 846).
+  - New alert 1: `outbox-notifier:review-pass` at 05:53:58Z — Mirror approved PR #309 (`stale-test-sweep-timezone-medic-001`) + auto-merged + branch deleted. Tier-3 allowlist (PR #264). Silenced. ✅
+  - New alert 2: `heal-stale-daemon-code:auto-restarted:ourliberty-dashboard-api.service` at 05:56:17Z — healer auto-restarted dashboard-api (script mtime 196.8 min newer than active-since; PR #303 "Fix done_today lane" code now LIVE in production). Tier-4 novel — `auto-restarted:*` subject NOT in alert-translations.json allowlist yet. G-rule 3/3 dispatched iter 592; Beacon consumed iter 594; Forge brief MISSING (OAuth-block casualty). Re-dispatch pending Larry go-ahead per standing [yellow] escalation idx=9. **Tier-reset applied.** New anchor: 1273 lines / 05:56:17Z.
+  - **Notable: PR #303 "Fix done_today lane" code confirmed live in production at 05:56:17Z** — dashboard-api restarted with the join fix; done_today lane should now return results correctly.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 05:51:39Z (~9 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 05:56:15Z (~5 min; ✅ very fresh). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=795f8bd "Pulse cycle 20260604T055650Z" (iter 846 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57** (05:57:07Z). sync.json: status=error, message="Auto-commit push failed; rolled back", commit=ed5d78b5, last_sync=05:57:07Z. Session HEAD 795f8bd is the actual state (sync service rolled back; local repo clean). Timing race: sync service fired immediately after iter 846 wrapper push (~05:56:50Z); both attempted to push; sync service lost; rolled back. Self-recovering (next hourly sync timer will reconcile). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open for root code fix. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 0 auto-fixes (PR #306 state unclear).**
+  - **PR #309 MERGED ✅** (58a9f9c — "test: sweep 5 stale timezone/medic-allowlist test failures") — confirmed from git log + alert at 05:53:58Z. 5 stale tests fixed; 1 pre-existing failure (test_log_dir_resolution.LogWriteHitsOverrideDirTest) correctly untouched. ✅
+  - **PR #306 (agent-core) OPEN** — "test(isolation): drift guard between conftest and __init__ test bootstraps." Created 05:29:30Z, age ~32 min. `gh pr list` showed CLEAN/MERGEABLE; `gh pr view` returned UNKNOWN/UNKNOWN (fresher read, per MEMORY.md calibration always use `gh pr view` before acting). Deferred auto-merge — state not confirmed clean. Forge inbox has `build-log-dir-test-isolation-leak-001.json` (rebuild active; may have pushed new commits to branch causing recheck). Will re-evaluate next iter. autoMergeRequest=null. ⏳
+  - **PR #310 (agent-core) OPEN** — "feat(deploy-notifier): READY deploys log-only; failures still page." Created 05:51:42Z, age ~10 min. UNKNOWN/UNKNOWN (GitHub computing). Mirror reviewing (`review-deploy-notifier-ready-logonly.json`). Well below 30-min threshold. ✅ **This is the deploy-notifier-ready-logonly config-only PR — when merged, closes `deploy-notifier:READY:* not in alert-translations.json` G-rule permanently.**
+  - **PR #311 (agent-core) OPEN** — "feat(heal): phantom-dispatch detector — flag Beacon dispatch-claims with no real Forge dispatch." Created 05:57:50Z, age ~4 min. CLEAN/MERGEABLE. Mirror reviewing (`review-heal-phantom-dispatch-claim.json`). Way below threshold. ✅
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 3 tasks** — `build-done-today-projection-fix-20260604T054838Z.json` (source=larry, active — production hotfix: SELECT projection missing 'agent' column); `build-harden-approval-tab-direction-ask-coverage.json` (active build); `build-log-dir-test-isolation-leak-001.json` (rebuild for task producing PR #306).
+  - **Mirror inbox: 2 tasks** — `review-deploy-notifier-ready-logonly.json` (PR #310), `review-heal-phantom-dispatch-claim.json` (PR #311).
+  - **Beacon inbox: 1 task** — `notify-heal-phantom-dispatch-claim.json` (pipeline completion notification from Forge; normal cascade). ✅
+  - **Pulse inbox: 0.** ✅
+  - **Worktrees: 15** (unchanged from iter 846). Stale GC targets: wt-forge-build-done-today-fix-20260604T045743Z (PR #303 merged), wt-forge-build-forge-queue-ui-013719Z, wt-forge-build-forge-queue-ui-move-042018Z (PR #36 merged), wt-forge-heal-retry-exhausted-taskid-resolution (PR #299 merged), wt-forge-orchestrator-engine-hardening-spec (PR #304 merged), wt-mirror-build-done-today-fix-20260604T045743Z (PR #303 merged), wt-mirror-build-forge-queue-ui-013719Z, wt-mirror-heal-retry-exhausted-taskid-resolution (PR #299 merged), wt-mirror-orchestrator-engine-hardening-spec (9 stale). Hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). Outside 60d window. ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - `pipeline-stall:forge-no-pr for superseded preflight tasks`: G-rule **2/3** (iter 827=1/3; iter 841=2/3). No new occurrence. Counter unchanged.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: G-rule **1/3** (iter 835). No new occurrence. ✅
+  - `source=larry Forge builds don't auto-route to Mirror for review`: G-rule **1/3** (iter 805). `build-done-today-projection-fix` (source=larry) active in Forge inbox — watch for Mirror auto-route when PR opens. ✅
+  - `heal-stale-daemon-code:auto-restarted:*`: G-rule **3/3 DISPATCHED (iter 592)** — N+th occurrence (ourliberty-dashboard-api this iter). Forge brief still MISSING. Re-dispatch pending Larry go-ahead per [yellow] escalation idx=9. Counter stays at dispatched status.
+  - All other G-rule counters unchanged from iter 846.
+
+- **PRIME DIRECTIVE ratio:** interventions=699, systemic_fixes=6, ratio≈116.5 (unchanged). 0 interventions this iter (no auto-fixes applied). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 2 new alerts — 1 Tier-3 silenced (review-pass/PR#309), 1 Tier-4 novel (auto-restarted:dashboard-api). Tier-reset applied; new watermark 1273 lines / 05:56:17Z.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #57 at 05:57:07Z. Self-recovering. No action.
+4. Check E: PR #306 at 32 min but `gh pr view` returned UNKNOWN/UNKNOWN — deferred auto-merge. PRs #310 and #311 below threshold.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=06:02:20Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing escalations unchanged: [yellow] idx=9 for `heal-stale-daemon-code:auto-restarted:*` re-dispatch; APPROVAL_REQUEST `sync-push-rebase-fallback-001`; APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001`.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK #57 fired immediately after iter 846 wrapper (~05:56:50Z wrapper, 05:57:07Z sync service). This is now 2 occurrences within this session (also #56 at iter 845). Pattern: rapid interactive sessions have near-100% SYNC-PUSH-REBASE-FALLBACK rate because every wrapper push immediately races the hourly sync timer during dense session windows. Root code fix (APPROVAL_REQUEST `sync-push-rebase-fallback-001`) remains the correct long-term path.
+- `heal-stale-daemon-code:auto-restarted:*` continues to cause tier-resets on every post-merge cycle where the healer detects updated scripts. Dashboard-api restarted this iter with PR #303 code. The alert IS good news (code deployed) but the Tier-4 classification persists until the config PR merges. Re-dispatch to Beacon still needs Larry's go-ahead.
+- PR #310 (deploy-notifier:READY log-only) under Mirror review now. When merged, it closes the `deploy-notifier:READY:* not in alert-translations.json` G-rule permanently — that's been open since iter 756 (3/3 dispatched iter 803, approved by Larry 05:01Z June 4, Forge build complete).
+
+**Learned:** `gh pr view` can return UNKNOWN/UNKNOWN even for PRs that were recently CLEAN/MERGEABLE in `gh pr list` — likely caused by Forge pushing updated commits to the branch that reset GitHub's merge-state computation. Per MEMORY.md calibration ("always use gh pr view before acting"), UNKNOWN from `gh pr view` = defer, not act.
+
+---
+
 ## Iteration 846 — 2026-06-04 05:52 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 (all checks clean — SYNC-PUSH-REBASE-FALLBACK #56 SELF-RECOVERED; PR #308 MERGED) — **0 auto-fixes. 0 new escalations. 2 open PRs (#306 CLEAN/23min, #309 CLEAN/10min) — both below threshold. Forge inbox: 5 (NEW: done_today-projection-fix from Larry). Mirror inbox: 1. Worktrees: 15 (↓1). Healer: 05:51:39Z (~1 min). 8/8 services active.**
