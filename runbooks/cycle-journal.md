@@ -4,6 +4,99 @@
 
 ---
 
+## Iteration 805 — 2026-06-04 00:22 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 finding: PR #294 Mirror review dispatch gap (source=larry routing miss — ask-then-do escalated).** Alert watermark: **1232 lines / anchor 00:10:01Z** (0 new alerts — clean). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success (last_sync=23:46:04Z, post-wrapper lag; HEAD=c514a6e). Healer heartbeat: **23:55:09Z** (~27 min old at check; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, 26m 47s old — Mirror review NEVER dispatched; see finding below). **0 open PRs in ourliberty-dashboard.** Forge: 4 tasks active (C-001 build + C-002 build + C-003 resume-r1 + C-004 new spec). Mirror: EMPTY. Beacon: EMPTY (APPROVAL_REQUEST pending Larry from iter 804).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1232 lines** — unchanged from iter 804 watermark (00:10:01Z). No new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session. No new Larry directives. APPROVAL_REQUEST from iter 804 (alert-translations split) still pending Larry's direction ("deploy-notifier only" or "scope engine fix too"). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 23:55:09Z (~27 min old at 00:22Z; ✅ within 90-min threshold). No active stalls. Phase C pipeline healthy. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: 23:55:09Z (~27 min; ✅). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: HEAD=c514a6e "Pulse cycle 20260604T001647Z", branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** last_sync=23:46:04Z, status=success, commit=1fe0a66. HEAD ahead — normal. Hourly ourliberty-sync.timer will catch up. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All services confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Pipeline gap — PR #294 Mirror review never dispatched.**
+  - **agent-core:** 1 open PR — **#294** `feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint`, CLEAN/MERGEABLE, created 23:55:22Z (~26m 47s at check time). Mirror inbox EMPTY; **review-request was never dispatched.** Root cause confirmed via outbox-notifier logs + archive: task `build-forge-queue-api-20260603T234656Z` carries `source=larry`; the outbox-notifier only dispatches `mirror-review` when the source is `beacon`. For source=larry tasks, the proceed marker is detected but no review target is routable — the notifier silently completes without dispatching. Forge's result text said "Mirror review follows on the PR per the standard flow" — that expectation was incorrect for a source=larry task. PR contains new dashboard API endpoint + 10 tests; should be Mirror-reviewed. **Classified ask-then-do. Escalated to Larry.**
+  - PR is approaching 30-min always-allowed auto-merge threshold but this is classified ask-then-do (not always-fix) because: (a) Mirror review was never dispatched — this is a pipeline gap, not just a delay; (b) auto-merging code without review violates the spirit of the sandbox merge policy; (c) Larry-dispatched Forge builds don't currently flow through the standard review pipeline.
+  - **NEW G-rule: `source=larry Forge builds don't auto-route to Mirror for review`: G-rule 1/3** (iter 805; first formal tracking). At 3/3: dispatch Beacon to spec a review routing path for source=larry Forge builds (either: outbox-notifier routes to Mirror same as source=beacon; or Pulse explicitly dispatches a Mirror review task when it detects a Larry-sourced PR). Batch with other routing G-rules.
+  - **ourliberty-dashboard:** 0 open PRs. ✅
+  - **Forge inbox: 4 tasks** — all within normal processing window:
+    - `build-pulse-triage-phase-c-promotion-001.json` (~10 min old; build phase)
+    - `build-pulse-triage-phase-c-promotion-002.json` (~11 min old; build phase)
+    - `resume-pulse-triage-phase-c-promotion-003-r1.json` (~5 min old; clarification response)
+    - `pulse-triage-phase-c-promotion-004.json` (seconds old; new spec dispatch — Phase C-004)
+  - **Mirror: EMPTY.** ✅
+  - **Beacon: EMPTY.** APPROVAL_REQUEST pending Larry from iter 804. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):**
+  - Check I: Monday only → skip. ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **MalformedForgeMarker (side observation):** `Jun 03 18:11:08 [WARN] forge marker error in pulse-triage-phase-c-promotion-001.json: MalformedForgeMarker: marker task_id ('pulse-triage-phase-c-promotion-002') does not match envelope task_id ('pulse-triage-phase-c-promotion-001')`. Retry 1/3 triggered → Forge re-ran → correct proceed marker detected at 18:12:38 → build-phase dispatched successfully. Same cross-contamination pattern under concurrent Phase C builds. G-rule already at 3/3 DISPATCHED (APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` pending Larry). No new action. ✅
+
+- **Phase C pipeline status:** C-001 in build phase; C-002 in build phase; C-003 clarification round 1 dispatched (resume at 00:17Z); C-004 new spec just arrived in Forge inbox. 3 active worktrees: `wt-forge-pulse-triage-phase-c-promotion-{001,002,003}`. Healthy throughput. ✅
+
+- **Worktrees: 6 total.**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — active (PR #294 pending merge/teardown)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` — **stale** (PR #293 merged; hourly GC ~01:00Z)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z-clarify` — **stale** (same; hourly GC)
+  - `wt-forge-pulse-triage-phase-c-promotion-001` — active (build phase)
+  - `wt-forge-pulse-triage-phase-c-promotion-002` — active (build phase)
+  - `wt-forge-pulse-triage-phase-c-promotion-003` — active (clarification/revision)
+
+- **G-rule watch (updated this iter):**
+  - **NEW `source=larry Forge builds don't auto-route to Mirror for review`: G-rule 1/3** (iter 805). First formal tracking.
+  - `pulse/beacon-result not in alert-translations.json`: **1/3** (iter 804).
+  - `stale-session-ID resume failures (no TTL on resume session IDs)`: **1/3** (iter 804).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3** — fix needs engine change; in Beacon pipeline.
+  - `pulse-check-stale:* not in alert-translations.json`: **1/3** (iter 784).
+  - 19:21:44Z test-cluster not in alert-translations.json: **1/3** (iter 784).
+  - `heal-pipeline-stall "unknown" metadata resolution bug`: **1/3** (iter 776).
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775).
+  - `outbox-notifier:reject not in alert-translations.json`: **1/3** (iter 769).
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680).
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716).
+  - `cycle-blocked:dirty-tree-*`: **2/3**.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=685, systemic_fixes=5, ratio=137.0 (+1 intervention this iter: PR #294 source=larry routing gap).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark unchanged at 1232 / anchor 00:10:01Z. ✅
+3. Check E: Confirmed PR #294 routing gap. Traced root cause via outbox-notifier logs and forge archive. Classified ask-then-do.
+4. `larry_alerts.py append_alert` — source=pulse-escalation, subject="PR #294 Mirror review gap — source=larry routing miss", route=escalate. Escalation written. ✅
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 805` → ts=2026-06-04T00:23:04Z. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T00:23:05Z. ✅
+7. No always-allowed auto-fixes triggered. ✅
+8. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** `[yellow]` PR #294 Mirror review gap — source=larry routing miss. Larry can dispatch Mirror review manually or approve direct auto-merge. Alert queued via larry_alerts.
+
+**Patterns:** The source=larry routing gap is a design gap in the outbox-notifier: when Forge builds are dispatched by Larry (directly rather than via Beacon spec pipeline), the proceed marker has no routable target, and Mirror review is silently skipped. This is the first time Pulse has formally tracked this as a G-rule. At 3/3 occurrences, the systemic fix is to route source=larry Forge build proceeds to Mirror the same way source=beacon does. Phase C builds are progressing at healthy throughput — 4 parallel tasks across 3 worktrees.
+
+**Learned:** `build-forge-queue-api-20260603T234656Z` confirms the routing rule: source=larry + proceed marker → "no routable target" → archived. The outbox-notifier does NOT default to routing source=larry Forge proceeds to Mirror. Larry-dispatched Forge builds need an explicit review dispatch step.
+
+---
+
 ## Iteration 804 — 2026-06-04 00:09 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **5 new alerts: 3 Tier-4 (medic:medic-diagnosis ×2 + pulse/beacon-result ×2, tier-reset), 1 Tier-3 (pipeline-stall silenced via translations). Beacon responded to iter-803 dispatch — APPROVAL_REQUEST pending Larry's direction.** Alert watermark: **1232 lines / anchor 00:10:01Z** (+5 new: 2× medic-diagnosis, 2× pulse/beacon-result, 1× pipeline-stall Tier-3). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success (post-wrapper lag; HEAD=0891d62 ahead of last_sync=23:46:04Z, commit=1fe0a66). Healer heartbeat: **23:55:09Z** (~15 min old at check time; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, created 23:55:22Z, ~17 min old — Mirror review not yet dispatched; watch item). **0 open PRs in ourliberty-dashboard.** Forge: 2 tasks (Phase C: `pulse-triage-phase-c-promotion-002.json` + `resume-pulse-triage-phase-c-promotion-001-r1.json`, both ~5 min old, active builds). Mirror: EMPTY. Beacon: 1 task (`cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json`, consumed ✅ — response in journal notification above). Worktrees: **5** (3 active: Queue API + Phase C-001 + Phase C-002; 2 stale preflight from PR #293 — hourly GC at ~01:00Z).
