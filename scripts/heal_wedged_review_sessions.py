@@ -779,7 +779,7 @@ def reap(cand: Candidate, *, case: str, reason: str,
     closure_notify(
         (f'Reaped wedged {cand.tier} review session (pid {cand.pid}) — '
          f'{reason}. Worktree removed: {removed}.'),
-        f'wedged-review-reaped-{Path(cand.cwd).name}',
+        f'wedged-review-reaped:{Path(cand.cwd).name}',
     )
 
 
