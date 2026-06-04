@@ -76,6 +76,15 @@ REPO_ROOT = _SCRIPT_DIR.parent
 PENDING_APPROVALS_PATH = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
 APPROVALS_PAUSED_FLAG = AGENTS_ROOT / 'blackboard' / 'APPROVALS_PAUSED'
 
+# Prose-guard pattern config (harden-authoritative-dispatch-confirmation,
+# 2026-06-04). Lives in the repo (read-only at runtime is fine — patterns are
+# config, not state). Distinct from config/phantom-dispatch-claim-patterns.json:
+# that file feeds the after-the-fact detector; this one feeds the bot's
+# emission-time prose guard via is_completion_claim().
+COMPLETION_CLAIM_PATTERNS_PATH = (
+    REPO_ROOT / 'config' / 'dispatch-completion-claim-patterns.json'
+)
+
 HISTORY_CAP = 1000
 
 # Strict positive-confirmation whitelist. The user's *entire* trimmed
@@ -203,6 +212,134 @@ def parse_user_reply(text: str) -> dict[str, Any]:
         return {'action': 'approve'}
 
     return {'action': 'none'}
+
+
+# -------------------- completion-claim prose guard --------------------
+#
+# harden-authoritative-dispatch-confirmation (2026-06-04). The bot's
+# _send_beacon_response forwards a Beacon chat reply verbatim when it carries
+# NO APPROVAL_REQUEST marker. On 2026-06-03 Beacon free-texted "Approved —
+# `deploy-notifier-ready-logonly` dispatches to Forge now" with no marker, so
+# nothing dispatched, yet Larry saw a completed-dispatch claim. is_completion_claim
+# lets the bot intercept that exact shape and kick it back to Beacon (re-prompt
+# for a real marker) instead of forwarding the phantom. The deterministic dispatch
+# path stays the ONLY authoritative emitter of "dispatched".
+#
+# Conservative by design: hard fait-accompli phrases gate unconditionally; the
+# softer "approved —" + target pair gates only when no intent/conditional marker
+# is present, so brief-protected intent ("I'm dispatching X now", "I'll send this
+# once you approve") is NOT muzzled. Complements (does not replace)
+# heal_phantom_dispatch_claim.py, which nets anything the guard's tighter set misses.
+
+# Embedded fallback so the guard keeps working if the config file is missing or
+# unreadable. Failing to this built-in set (rather than off, or all-gating) keeps
+# the prevention live without risking muzzling Beacon's whole voice on a bad file.
+_DEFAULT_COMPLETION_CLAIM_PATTERNS = {
+    'completion_claim_phrases': [
+        'dispatched to forge', 'dispatches to forge', 'goes to forge now',
+        'approved and dispatched', 'approved + dispatched', 'shipped to forge',
+        'sent to forge', 'handed off to forge', 'handed to forge',
+        'now in forge', "in forge's inbox", 'in forge now', 'is in forge',
+    ],
+    'approval_triggers': ['approved —', 'approved -', 'approved:'],
+    'approval_target_words': ['forge', 'dispatch'],
+    # Conditional exemptions negate a completion even against a hard phrase:
+    # "if you approve, this dispatches to Forge" has not happened yet.
+    'conditional_exemptions': [
+        'if you approve', 'once you approve', 'after you approve',
+        'when you approve', 'if approved', 'once approved', 'pending approval',
+        'for approval', 'for your approval', 'awaiting approval',
+    ],
+    # Intent exemptions only soften the approval-pair tier (not hard phrases):
+    # first-person/future framing around "approved —" + a target.
+    'intent_exemptions': [
+        "i'll", 'i will', "i'm going to", 'i am going to', 'about to',
+        'ready to', 'want me to', 'shall i', 'should i',
+        'would dispatch', 'should dispatch', 'could dispatch', 'plan to',
+        'planning to', 'considering',
+    ],
+}
+
+# Loaded once and cached. None means "not yet loaded"; load_completion_claim_patterns
+# populates it. Tests can reset by setting _completion_claim_patterns = None.
+_completion_claim_patterns: Optional[dict[str, Any]] = None
+
+
+def load_completion_claim_patterns(
+    path: Optional[Path] = None,
+    *,
+    force: bool = False,
+) -> dict[str, Any]:
+    """Return the completion-claim pattern config, cached after first load.
+
+    Falls back to _DEFAULT_COMPLETION_CLAIM_PATTERNS if the file is missing,
+    unreadable, or shape-invalid — the guard must never crash the bot's
+    response path over a config issue. `force=True` (or a non-default `path`)
+    bypasses the cache so tests can swap configs.
+    """
+    global _completion_claim_patterns
+    if path is None and not force and _completion_claim_patterns is not None:
+        return _completion_claim_patterns
+    cfg_path = path or COMPLETION_CLAIM_PATTERNS_PATH
+    try:
+        data = json.loads(cfg_path.read_text(encoding='utf-8'))
+        if not isinstance(data, dict):
+            raise ValueError('completion-claim config is not a JSON object')
+        cfg = {
+            key: list(data.get(key, _DEFAULT_COMPLETION_CLAIM_PATTERNS[key]))
+            for key in _DEFAULT_COMPLETION_CLAIM_PATTERNS
+        }
+    except (OSError, ValueError, json.JSONDecodeError):
+        cfg = {k: list(v) for k, v in _DEFAULT_COMPLETION_CLAIM_PATTERNS.items()}
+    if path is None:
+        _completion_claim_patterns = cfg
+    return cfg
+
+
+def is_completion_claim(text: str, cfg: Optional[dict[str, Any]] = None) -> bool:
+    """True if `text` asserts a COMPLETED dispatch/approval as a fait accompli.
+
+    Used by the bot's prose guard on a NO-marker reply: a True result means the
+    reply claims a dispatch already happened, so it must be kicked back to Beacon
+    for a real APPROVAL_REQUEST marker rather than forwarded to Larry.
+
+    Two tiers:
+      1. Hard completion phrases ("dispatched to forge", "goes to forge now",
+         ...) — fire unless a CONDITIONAL exemption ("if you approve", "pending
+         approval", ...) negates the completion. "If you approve, this dispatches
+         to Forge" has not happened yet, so it is not a completion claim.
+      2. Approval-pair ("approved —"/"approved:" + a target word like "forge"/
+         "dispatch") — fires only if no conditional AND no intent exemption
+         ("i'll", "about to", "ready to", ...) is present. Catches "Approved —
+         X dispatches to Forge now" while leaving "Approved — I'll dispatch this
+         once tests pass" (intent) untouched.
+
+    Intent like "I'm dispatching X now" is deliberately NOT gated (no hard
+    phrase matches the present-progressive first-person form); the detector net
+    backstops that residual.
+    """
+    if not isinstance(text, str) or not text:
+        return False
+    c = cfg or load_completion_claim_patterns()
+    t = text.lower()
+
+    def _hit(key: str) -> bool:
+        return any(
+            isinstance(p, str) and p and p.lower() in t for p in c.get(key, [])
+        )
+
+    has_conditional = _hit('conditional_exemptions')
+
+    # Tier 1: hard fait-accompli phrases. A conditional clause negates them.
+    if _hit('completion_claim_phrases'):
+        return not has_conditional
+
+    # Tier 2: "approved —" + a dispatch target, unless framed as intent/future.
+    if _hit('approval_triggers') and _hit('approval_target_words'):
+        if not has_conditional and not _hit('intent_exemptions'):
+            return True
+
+    return False
 
 
 # -------------------- marker rendering --------------------

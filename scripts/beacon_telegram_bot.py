@@ -128,6 +128,13 @@ CLAUDE_TIMEOUT_SEC = 600  # 10 min — long enough for Beacon to think hard
 # writing dead-letter inbox files. Same cap (3) keeps the budgets aligned.
 MAX_APPROVAL_MARKER_RETRIES = 3
 
+# harden-authoritative-dispatch-confirmation (2026-06-04). Cap on the prose-guard
+# kickback: a no-marker reply that asserts a COMPLETED dispatch is re-prompted up
+# to this many times before the bot intercepts loudly (Larry sees a "no real
+# dispatch happened" notice, never the phantom prose). Mirrors the malformed-marker
+# budget above.
+MAX_COMPLETION_CLAIM_RETRIES = 3
+
 # D3 reminder cadence — check at most every REMINDER_INTERVAL_SEC. With our
 # 30s getUpdates long-poll this means roughly every ~5 minutes of wall clock,
 # which is more than fine for 6h/24h/72h schedule granularity.
@@ -705,6 +712,13 @@ def _send_beacon_response(
     DM the formatted request (force_ask). The marker block is stripped
     from the narrative shown to Larry.
 
+    harden-authoritative-dispatch-confirmation (2026-06-04): if Beacon's reply
+    carries NO marker but asserts a COMPLETED dispatch/approval
+    (`approval.is_completion_claim`), it's the 2026-06-03 phantom shape — the
+    prose claims a dispatch that never went through the deterministic path. The
+    bot intercepts and re-prompts for a real marker (bounded by
+    MAX_COMPLETION_CLAIM_RETRIES), never forwarding the phantom to Larry.
+
     D3.5 5c-followup-3 (audit 3.A): `inherited_replan_count` /
     `inherited_max_replans` carry the system-controlled replan budget
     forward when this response is Beacon's chat-mode re-plan after Larry
@@ -725,10 +739,10 @@ def _send_beacon_response(
     payload = None
     narrative = None
     marker_errors = 0
+    claim_errors = 0
     while True:
         try:
             payload, narrative = approval.extract_approval_request(reply)
-            break
         except approval.MalformedApprovalMarker as e:
             marker_errors += 1
             if marker_errors > MAX_APPROVAL_MARKER_RETRIES:
@@ -762,6 +776,58 @@ def _send_beacon_response(
             if new_session and new_session != session_id:
                 _bot_state['sessions'][str(chat_id)] = new_session
                 save_sessions(_bot_state['sessions'])
+            continue
+
+        # Extract succeeded. harden-authoritative-dispatch-confirmation
+        # (2026-06-04): if there is NO marker but the reply asserts a COMPLETED
+        # dispatch/approval ("Approved — X dispatches to Forge now"), it's the
+        # phantom — no pending entry, no safe_write_inbox happened this turn, yet
+        # the prose claims one did. Intercept and re-prompt Beacon for a real
+        # APPROVAL_REQUEST marker (the deterministic path is the ONLY authoritative
+        # "dispatched" emitter); never forward the phantom to Larry. Bounded like
+        # the malformed-marker kickback above, then loud-intercept on exhaust.
+        if payload is None and approval.is_completion_claim(reply):
+            claim_errors += 1
+            if claim_errors > MAX_COMPLETION_CLAIM_RETRIES:
+                telegram_send(
+                    chat_id,
+                    "⚠ Beacon asserted a dispatch/approval completed, but emitted "
+                    f"no APPROVAL_REQUEST marker {MAX_COMPLETION_CLAIM_RETRIES}x in "
+                    "a row — so NOTHING was dispatched. Intercepted: the claim was "
+                    "not forwarded. Nothing reached Forge; re-issue when ready.",
+                )
+                log(
+                    "completion-claim with no marker from beacon — kickback "
+                    f"exhausted ({MAX_COMPLETION_CLAIM_RETRIES}/"
+                    f"{MAX_COMPLETION_CLAIM_RETRIES}); phantom suppressed"
+                )
+                return
+            log(
+                "completion-claim with no marker from beacon — kickback "
+                f"{claim_errors}/{MAX_COMPLETION_CLAIM_RETRIES}; re-prompting"
+            )
+            correction = (
+                "Your previous response told Larry a dispatch/approval already "
+                "COMPLETED (e.g. 'Approved — X dispatches to Forge now'), but you "
+                "emitted no APPROVAL_REQUEST marker — so NOTHING was actually "
+                "dispatched. The system, not your prose, is the only authoritative "
+                "source of a 'dispatched' confirmation.\n\n"
+                "If you intend to dispatch: re-emit with EXACTLY ONE canonical "
+                "`=== APPROVAL_REQUEST ===` block (JSON only inside, narrative "
+                "above; prefer marker.py) so the bot actually performs the "
+                "dispatch and confirms it.\n\n"
+                "If you only meant to describe intent or status: rephrase so it "
+                "does NOT claim a completed dispatch (no 'dispatched', no "
+                "'approved — goes to Forge now')."
+            )
+            session_id = _bot_state['sessions'].get(str(chat_id))
+            reply, new_session = call_beacon(correction, session_id)
+            if new_session and new_session != session_id:
+                _bot_state['sessions'][str(chat_id)] = new_session
+                save_sessions(_bot_state['sessions'])
+            continue
+
+        break
 
     if payload is None:
         telegram_send(chat_id, reply)

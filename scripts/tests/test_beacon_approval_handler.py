@@ -987,5 +987,149 @@ class BuildApprovalRequestChainEventTest(unittest.TestCase):
         self.assertEqual(row['payload']['target_agent'], 'forge')
 
 
+class IsCompletionClaimTest(unittest.TestCase):
+    """Prose guard: gate fait-accompli dispatch claims, not intent/normal talk.
+
+    harden-authoritative-dispatch-confirmation (2026-06-04). The defining
+    sample is the 2026-06-03 phantom Beacon DM'd Larry with no marker behind it.
+    """
+
+    PHANTOM = "Approved — `deploy-notifier-ready-logonly` dispatches to Forge now"
+
+    def setUp(self):
+        # Use the embedded defaults so the test never depends on the repo file
+        # state (and never poisons the module cache for other tests).
+        self.cfg = ah.load_completion_claim_patterns(force=True)
+        ah._completion_claim_patterns = None
+
+    def tearDown(self):
+        ah._completion_claim_patterns = None
+
+    # ---- the documented phantom must gate ----
+
+    def test_documented_phantom_gates(self):
+        self.assertTrue(ah.is_completion_claim(self.PHANTOM, self.cfg))
+
+    def test_hard_completion_phrases_gate(self):
+        for text in [
+            'Done — dispatched to Forge.',
+            'It dispatches to Forge now.',
+            'That goes to Forge now.',
+            'Approved and dispatched.',
+            'Shipped to Forge — Mirror will review.',
+            'Sent to Forge.',
+            'The task is now in Forge.',
+            "It's in Forge's inbox.",
+        ]:
+            self.assertTrue(
+                ah.is_completion_claim(text, self.cfg),
+                f'should gate: {text!r}',
+            )
+
+    def test_approval_pair_gates_with_target(self):
+        # "approved —" + a target word, no intent marker → fait accompli.
+        self.assertTrue(
+            ah.is_completion_claim('Approved — sending this to Forge.', self.cfg)
+        )
+
+    # ---- intent / normal talk must NOT gate (don't muzzle Beacon) ----
+
+    def test_brief_protected_intent_not_gated(self):
+        # The brief explicitly protects present-progressive first-person intent.
+        for text in [
+            "I'm dispatching deploy-notifier now.",
+            "I'm about to dispatch this to Forge.",
+            "I'll send this to Forge once you approve.",
+            "Ready to dispatch — want me to send it to Forge?",
+            "If you approve, this dispatches to Forge.",
+        ]:
+            self.assertFalse(
+                ah.is_completion_claim(text, self.cfg),
+                f'should NOT gate (intent): {text!r}',
+            )
+
+    def test_approval_pair_with_intent_marker_not_gated(self):
+        # "approved —" present but framed as future/conditional intent.
+        self.assertFalse(
+            ah.is_completion_claim(
+                'Approved — I will dispatch this to Forge once tests pass.',
+                self.cfg,
+            )
+        )
+
+    def test_normal_talk_not_gated(self):
+        for text in [
+            'Forge handles deploy tasks; Mirror reviews the PR.',
+            'I considered dispatching this but it needs more scope first.',
+            "Here's the plan. Approve and it'll go out.",
+            'The PR is open and Mirror is reviewing.',
+            'What would you like me to focus on?',
+        ]:
+            self.assertFalse(
+                ah.is_completion_claim(text, self.cfg),
+                f'should NOT gate (normal): {text!r}',
+            )
+
+    def test_non_string_and_empty(self):
+        self.assertFalse(ah.is_completion_claim('', self.cfg))
+        self.assertFalse(ah.is_completion_claim(None, self.cfg))  # type: ignore[arg-type]
+
+    def test_case_insensitive(self):
+        self.assertTrue(
+            ah.is_completion_claim('DISPATCHED TO FORGE.', self.cfg)
+        )
+
+
+class LoadCompletionClaimPatternsTest(unittest.TestCase):
+    """Config loader caches, accepts overrides, and fails safe to defaults."""
+
+    def tearDown(self):
+        ah._completion_claim_patterns = None
+
+    def test_missing_file_falls_back_to_defaults(self):
+        missing = Path(tempfile.gettempdir()) / 'does-not-exist-completion.json'
+        cfg = ah.load_completion_claim_patterns(missing)
+        self.assertEqual(
+            sorted(cfg['completion_claim_phrases']),
+            sorted(ah._DEFAULT_COMPLETION_CLAIM_PATTERNS['completion_claim_phrases']),
+        )
+
+    def test_corrupt_file_falls_back_to_defaults(self):
+        with tempfile.NamedTemporaryFile(
+            'w', suffix='.json', delete=False
+        ) as fh:
+            fh.write('{ not json')
+            bad = Path(fh.name)
+        try:
+            cfg = ah.load_completion_claim_patterns(bad)
+            self.assertIn('dispatched to forge', cfg['completion_claim_phrases'])
+        finally:
+            bad.unlink()
+
+    def test_custom_path_not_cached(self):
+        with tempfile.NamedTemporaryFile(
+            'w', suffix='.json', delete=False
+        ) as fh:
+            json.dump({'completion_claim_phrases': ['zzz only']}, fh)
+            custom = Path(fh.name)
+        try:
+            ah._completion_claim_patterns = None
+            cfg = ah.load_completion_claim_patterns(custom)
+            self.assertEqual(cfg['completion_claim_phrases'], ['zzz only'])
+            # A custom path must not poison the module cache.
+            self.assertIsNone(ah._completion_claim_patterns)
+        finally:
+            custom.unlink()
+
+    def test_repo_config_loads_and_gates_phantom(self):
+        # The shipped config file must itself gate the documented phantom.
+        cfg = ah.load_completion_claim_patterns(
+            ah.COMPLETION_CLAIM_PATTERNS_PATH, force=True
+        )
+        self.assertTrue(
+            ah.is_completion_claim(IsCompletionClaimTest.PHANTOM, cfg)
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
