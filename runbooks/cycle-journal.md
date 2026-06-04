@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 837 — 2026-06-04 04:49 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=1 — **0 auto-fixes. 0 new alerts. Sync CLEAR. 8/8 services active. 2 open PRs (both too young: PR #302 17 min, PR #36 12 min). Mirror revision sent to Forge at 04:48Z. Healer: 04:25:55Z (~24 min, ✅).**
+
+Alert watermark: **1265 lines / anchor 04:38:16Z** (unchanged — 0 new alerts since iter 836). Sync: ✅ CLEAR — sync.json status=no-change, last_sync=04:46:16Z. Healer heartbeat: **04:25:55Z** (~24 min; ✅ within 90-min threshold). **8/8 services active.** **2 open PRs.** **Worktrees: 9** (unchanged from iter 836).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since iter 836 watermark (1265 lines, anchor 04:38:16Z). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active beacon session. Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs unchanged. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 04:25:55Z (~24 min; ✅). Forge inbox: 1 revision task (revision-heal-wedged-review-sessions-reaper-1.json, created 04:48Z — Mirror's review result for PR #302). Mirror inbox: 1 notify task. Pipeline advancing normally. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 04:25:55Z (~24 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=5be0684 "Pulse cycle 20260604T044811Z" (iter 836 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ CLEAR.** sync.json: status=no-change, last_sync=04:46:16Z. No SYNC-PUSH-REBASE-FALLBACK this iter. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open for root code fix. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline active.**
+  - **PR #302 (agent-core) OPEN** — "Add heal_wedged_review_sessions: reap wedged Mirror/Forge review sessions." CLEAN/MERGEABLE. Created 04:32:40Z — age ~17 min. Too young for 30-min auto-merge. Mirror sent revision to Forge at 04:48Z. ✅
+  - **PR #36 (ourliberty-dashboard) OPEN** — "ux(system): move Forge Queue panel below Active Sessions." CLEAN/MERGEABLE. Created 04:37:40Z — age ~12 min. Too young for auto-merge. Auto-merge eligible at ~05:07Z. ✅
+  - **Forge inbox: 1** — revision-heal-wedged-review-sessions-reaper-1.json (Mirror revision, created 04:48Z). ✅
+  - **Mirror inbox: 1** — notify-heal-wedged-review-sessions-reaper.json. ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Worktrees: 9** — unchanged; hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** No new instances. All counters unchanged from iter 836. `pulse-escalation` G-rule 3/3 awaiting `deploy-notifier-alert-xlate-split-fix` approval. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=697, systemic_fixes=6, ratio=116.2. No new rows this iter. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark unchanged at 1265 / 04:38:16Z. ✅
+3. No auto-fixes executed. PR #302 (17 min) and PR #36 (12 min) both below 30-min threshold.
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1, remain Tier 1. ✅
+5. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged.
+
+**Patterns:** Mirror completed review of PR #302 and sent revision to Forge at 04:48Z — normal pipeline cadence. PR #36 (dashboard) will reach 30-min auto-merge eligibility at ~05:07Z; next automated cycle handles it. Both PRs CLEAN/MERGEABLE on GitHub. First clean iter since alerts in iter 835 (consecutive_clean now 1).
+
+**Learned:** Nothing new. Pipeline advancing normally post-sprint.
+
+---
+
 ## Iteration 836 — 2026-06-04 04:46 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **0 auto-fixes. 4 new alerts (1261→1265). 0 new escalations. 8/8 services active. 2 open PRs (both < 30 min, not yet auto-merge eligible). Mirror reviewing PR #302. Sync: SYNC-PUSH-REBASE-FALLBACK #58 (self-recovering). 9 worktrees.**
