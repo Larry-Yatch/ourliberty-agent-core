@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration 819 — 2026-06-04 02:07 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 always-allowed auto-fix (PR #297 merged at 02:09:50Z). 1 new alert (pipeline-stall:forge-no-pr, Tier-3 known-pattern, beacon-bot DM'd Larry). PR #299 NEW — "fix(heal): Check 5 resolves real task_id, suppress unidentifiable retry-exhaustion ghost" (systemic fix for pipeline-stall:retry-exhausted:unknown G-rule, iter 811=2/3→3/3 hit between 811–819). 8/8 services active. Mirror inbox: 4 active reviews.**
+
+Alert watermark: **1246 lines / anchor 02:02:20Z** (1 new). Sync: ✅ post-wrapper lag, status=no-change, commit=16f7e90, last_sync=01:45:39Z. Healer heartbeat: **01:55:24Z** (~12 min at 02:07Z; ✅ within 90-min threshold). **8/8 services active.** **2 open PRs in agent-core** (PR #298 ~13 min; PR #299 ~0 min at check). **1 open PR in ourliberty-dashboard** (PR #35 ~20 min). **PR #297 MERGED 02:09:50Z.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert since watermark (1245→1246, anchor 02:02:20Z).**
+  - `02:02:20Z` `heal-pipeline-stall / pipeline-stall:forge-no-pr:forge-queue-api-preflight-20260603T231401Z-clarify1` — healer flagged the forge-queue-api preflight clarify round as built 133 min ago without a PR (worktrees `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` still present at ~2.5h). Route=escalate.
+  - **Classification: Tier-3** — subject `pipeline-stall:forge-no-pr` IS in `config/alert-translations.json` (tier=NOW/URGENT). Beacon-bot DM'd Larry (route=escalate). Context: stale preflight-clarify artifact from the forge-queue-api pipeline; PR #294 (the actual Forge build) was already merged — the clarify worktrees are orphaned preflight artifacts, not a stalled build. 24h GC (hourly, ~02:45Z) will clean the worktrees. No Pulse DM, no tier-reset from Check 0 (Tier-3 carve-out). Watermark advanced to 1246 / anchor 02:02:20Z. ✅ Journal note only.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Standing APPROVAL_REQUESTs (Beacon iter 804 alert-translations split; `forge-claude-md-preflight-self-check-bullet-001`) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 01:55:24Z (~12 min; ✅ within 90-min threshold). No active stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 01:55:24Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=e451e3c "Pulse cycle 20260604T020117Z". ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=16f7e90, last_sync=01:45:39Z. HEAD (e451e3c) is newer — wrapper pushed independently after 01:45Z sync. Expected. Hourly sync.timer fires ~02:45Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ PR #297 at 30-min threshold → auto-merge applied.**
+  - **PR #297** — "fix(dashboard): count non-task--prefixed inbox dispatches as in-flight" — created 01:35:25Z, **31m55s old** at 02:07:20Z. `gh pr view` confirmed CLEAN/MERGEABLE. **Always-allowed auto-fix applied: `gh pr merge 297 --auto --squash`. Merged at 02:09:50Z.** ✅
+  - **PR #298 CLEAN/MERGEABLE** (agent-core) — "docs(orchestrator): engine-hardening spec" — created 01:53:47Z, ~13 min old. Mirror has `review-orchestrator-engine-hardening-spec.json`. Not at threshold. ✅
+  - **PR #299 OPEN — NEW since iter 818** (agent-core) — "fix(heal): Check 5 resolves real task_id, suppress unidentifiable retry-exhaustion ghost" — created 02:07:44Z. Forge build for `heal-retry-exhausted-taskid-resolution`. Mirror received `review-heal-retry-exhausted-taskid-resolution.json`. This is the permanent fix for the `pipeline-stall:retry-exhausted:unknown` G-rule (iter 776=1/3, iter 811=2/3; hit 3/3 between iters 811–819, Beacon dispatched, Forge built PR). Systemic-fix path working correctly. ✅
+  - **PR #35 CLEAN/MERGEABLE** (ourliberty-dashboard) — "feat(system): Forge Queue swimlane panel on System tab" — created 01:46:59Z, ~20 min old at check (reaches 30-min threshold ~02:17Z). Mirror has `review-build-forge-queue-ui-20260604T013719Z.json`. Not at threshold yet. Watch. ✅
+  - **Mirror inbox: 4 tasks** (up from 3 at iter 818 — PR #299 review added): `review-dashboard-inbox-pending-filter-fix-001.json` (PR #297, now merged), `review-build-forge-queue-ui-20260604T013719Z.json` (PR #35), `review-heal-retry-exhausted-taskid-resolution.json` (PR #299), `review-orchestrator-engine-hardening-spec.json` (PR #298). ✅
+  - **Forge inbox: EMPTY. Beacon inbox: EMPTY.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 8** (up from 7 at iter 818):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — stale, PR #294 post-merge. G-rule 1/3 (`Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown`). Hourly GC ~02:45Z. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — Forge post-build for PR #35. ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — Forge post-build for PR #297 (now merged). Event-driven teardown may clear. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale preflight artifact (~2.5h+; within 24h GC). ✅
+  - `wt-forge-heal-retry-exhausted-taskid-resolution` — **NEW.** Forge build for PR #299. ✅
+  - `wt-forge-orchestrator-engine-hardening-spec` — Forge build for PR #298. ✅
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — Mirror review worktree for PR #297 (now merged). Awaiting event-driven teardown. ✅
+
+- **G-rule watch:**
+  - `pipeline-stall:retry-exhausted:unknown` — **G-rule HIT 3/3 (between iters 811–819; confirmed by PR #299 opening).** Dispatch sent to Beacon; Forge built `heal-retry-exhausted-taskid-resolution`; PR #299 open for Mirror review. PRIME DIRECTIVE `verification_pending` logged. Watch: PR #299 merge → close this G-rule.
+  - `source=larry Forge builds don't auto-route to Mirror` — G-rule 1/3 (iter 805). PR #299 source=beacon → not a test case. Counter unchanged. 1/3.
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — G-rule 1/3 (iter 812). `wt-forge-build-forge-queue-api-20260603T234656Z` (PR #294 merge, iter 812) still present. PR #297 merge (this iter, Pulse-triggered `--auto`) — check if `wt-forge-dashboard-inbox-pending-filter-fix-001` clears at next iter. If it persists → 2/3 → approaching dispatch threshold.
+  - All other G-rule counters: unchanged from iter 818.
+
+- **PRIME DIRECTIVE ratio:** interventions=691 (+1 this iter: PR-297 auto-merge), systemic_fixes=5, ratio=138.2. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert (pipeline-stall:forge-no-pr, Tier-3 known-pattern). Watermark advanced to 1246 / anchor 02:02:20Z. No Pulse DM (beacon-bot handled route=escalate). ✅
+3. **Always-allowed auto-fix: `gh pr merge 297 --auto --squash`.** PR #297 merged at 02:09:50Z. Logged to cycle-actions.jsonl. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --template enable-pr-auto-merge --detail PR-297-dashboard-inbox-pending-filter-fix-merged-20260604T020950Z` → row written (intervention_id: enable-pr-auto-merge:PR-297-...). ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:13:10Z. ✅
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing escalations pending Larry: Beacon iter 804 APPROVAL_REQUEST (alert-translations split: "deploy-notifier only" vs "scope engine fix too"); `forge-claude-md-preflight-self-check-bullet-001`. Larry has the ball. New note: beacon-bot DM'd Larry re `pipeline-stall:forge-no-pr` for `forge-queue-api-preflight-20260603T231401Z-clarify1` (stale preflight artifact; worktrees clear via 24h GC at ~02:45Z; no code intervention needed).
+
+**Patterns:**
+- The `pipeline-stall:retry-exhausted:unknown` G-rule completing its 3/3→dispatch→build→PR cycle (iters 776→811→?→819) is the teach-to-fish loop working exactly as designed. PR #299 will eliminate the "unknown" task_id ghost alerts from Check 5 permanently.
+- PR #297 auto-merge via Pulse `gh pr merge --auto --squash` worked cleanly (merge at 02:09:50Z). Whether event-driven worktree teardown fires for this path (vs. outbox-notifier-triggered merges) is being tracked as G-rule 1/3 (iter 812). Next iter: check if `wt-forge-dashboard-inbox-pending-filter-fix-001` + `wt-mirror-dashboard-inbox-pending-filter-fix-001` cleared.
+- Pipeline throughput high: 4 parallel Mirror review tracks (PR #297 merged, PR #298 docs, PR #299 heal fix, PR #35 dashboard UI). All healthy.
+
+**Learned:** `pipeline-stall:forge-no-pr` alert for a preflight-clarify worktree (stale post-merge artifact) is expected noise now that build pipelines regularly leave clarify rounds orphaned. At 3/3 recurrences → propose Beacon dispatch to add an explicit Tier-3 FYI translation for `pipeline-stall:forge-no-pr:*forge-queue-api-preflight*` or similar preflight-clarify pattern. For now: by-design, beacon-bot handles, 24h GC cleans.
+
+---
+
 ## Iteration 818 — 2026-06-04 01:59 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 — **All checks nominal. 0 new alerts. 3 PRs open (PR #297 at ~24 min approaching 30-min auto-merge threshold; PR #298 at ~5 min; PR #35/dashboard at ~12 min). Mirror inbox: 3 active review tasks. 8/8 services active. Healer heartbeat fresh.**
