@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 927 — 2026-06-04 22:08 UTC (interactive)
+
+**Health:** ✅ **Tier 2 clean. consecutive_clean=1→2. 0 actions. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ CLEARED (status=no-change at eb25920).**
+
+Alert watermark: **1300 lines / 22:01:53Z** (2 new alerts since iter 926 watermark 1298/21:14:18Z — both Tier-3 silenced). Pipeline-stall heartbeat: 21:59:36Z (✅ ~8 min at cycle start). Stale-daemon heartbeat: 22:00:23Z (✅ ~8 min at cycle start). Sync: status=no-change, commit=eb25920 — SYNC-PUSH-REBASE-FALLBACK CLEARED (hourly sync.timer fired between iters 926 and 927; self-resolved as expected). Session-start gitStatus: branch=main, clean, HEAD=eb25920 "Pulse cycle 20260604T214817Z". Tier state at start: tier=2, consecutive_clean=1. Tier state at end: **tier=2, consecutive_clean=2**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (2 new alerts, both Tier-3 silenced).** Watermark advanced 1298→1300. Two new alerts:
+  - **Alert 1299 (21:59:41Z):** `heal-pipeline-stall` / `pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1` / route=escalate. **Classification: Tier 3** — PR #327 (merged iter 911) added `pipeline-stall:pr-create-inferred-failure` FYI/INFO translation to `config/alert-translations.json`. Known-pattern allowlist match → silence + journal. No DM, no dispatch. ✅
+  - **Alert 1300 (22:01:53Z):** `medic` / `medic-diagnosis` attempt 6 / same fingerprint as prior. Content confirms PR #324 (merged 2026-06-04T16:37Z) covered the clarify work under a re-keyed branch. **Classification: Tier 3 (actionable-only discipline)** — G-rule `medic:medic-diagnosis not in alert-translations.json` at 3/3, dispatched iter 804, engine-fix pending Larry; Medic diagnosis produces no new Larry-actionable information (work shipped, clarify task is a stale archive artifact). Per `feedback_alerts_actionable_only.md`: suppress expected-by-design noise. Journal-note only. No DM. ✅
+  - Triage: 2 alerts, 0 Tier-1 dispatched, 0 Tier-2 DMed, 2 Tier-3 silenced. No tier-reset (Tier-3 carve-out per spec § 3.0). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 21:59:36Z (~8 min; ✅ within 90-min threshold). All inboxes empty — nothing in flight. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes (Forge=0, Beacon=0, Mirror=0, Pulse=0) empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 22:00:23Z (~8 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=eb25920 "Pulse cycle 20260604T214817Z". Not behind, not ahead. ✅
+
+- **(Check B) Sync health: ✅ CLEARED.** sync.json: status=no-change, commit=eb25920, already up to date. SYNC-PUSH-REBASE-FALLBACK self-resolved via hourly `ourliberty-sync.timer`. Standing APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (root code bug; current clean state doesn't close the fix request). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ All empty.** Forge=0, Mirror=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Mon/Wed/Fri/Sun only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 926):**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 retry succeeded`: **1/3** (iter 922). Alert 1299 is another fire of the same root instance (task `forge-queue-api-preflight-20260603T231401Z-clarify1`); same fingerprint, not a new distinct occurrence. G-rule count holds at 1/3. At 3/3 (distinct new task showing the pattern): dispatch Beacon.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=716, systemic_fixes=12, ratio≈59.7 (iter_clean row appended 22:08:04Z; no new interventions this iter). Ledger ts: 2026-06-04T22:08:04Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Triaged 2 new alerts: both Tier-3 silenced per known-pattern discipline. No DMs, no dispatches.
+3. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → ledger entry recorded. ✅
+4. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 65th+ total; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** System at Tier 2 (15-min cadence), consecutive_clean=2. One more clean Tier-2 iter → consecutive_clean=3 → de-escalate to Tier 3 (30-min cadence). Sync pattern improved: SYNC-PUSH-REBASE-FALLBACK self-resolved between iters 926→927. APPROVAL_REQUEST to fix root code remains open.
+
+---
+
 ## Iteration 926 — 2026-06-04 21:46 UTC (interactive)
 
 **Health:** ✅ **Tier 2 clean. consecutive_clean=0→1. 0 actions. 8/8 services active. All inboxes empty. 0 open PRs. Sync: SYNC-PUSH-REBASE-FALLBACK (self-recovers).**
