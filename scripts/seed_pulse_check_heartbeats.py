@@ -7,7 +7,11 @@ checks (V, VI) is weeks away. This bootstrap gives the watcher an honest
 starting signal immediately, without ever taking a side effect a check would
 normally take on its real firing day.
 
-Two outcomes per check, and only two:
+Before probing, we load any MISSING vars from /home/larry/credentials/.env.larry
+(the same creds production loads via systemd) so the DB-backed checks (iii/iv/x)
+can authenticate instead of tripping their missing-env guard. See load_env_file.
+
+Three outcomes per check:
 
   * RUN (provably side-effect-free).  Every check except I exposes a --dry-run
     mode that computes its analysis but returns before it POSTs a mission, sends
@@ -16,6 +20,13 @@ Two outcomes per check, and only two:
     and a non-zero exit emits a pulse-check-failed:<id> alert. The non-zero path
     is the point for IX/X: a check still broken from the 06-01 stall surfaces
     its status NOW instead of after a staleness window.
+
+  * UNVALIDATED (env absent).  If a check fails ONLY because a required env var
+    is still unset after the .env.larry load (its missing-env guard raises), we
+    classify it as "unvalidated: env absent" — a neutral outcome that emits NO
+    pulse-check-failed and writes NO heartbeat. We could not authenticate the
+    check, so we make no claim about its health either way. A genuine non-env
+    failure still surfaces as a failure via the RUN path above.
 
   * BASELINE-SEED (cannot prove safe).  If a check has no --dry-run we do NOT
     fake a heartbeat — faking success is the one thing a liveness layer must
@@ -37,6 +48,8 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -46,6 +59,77 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import heal_pulse_check_staleness as watcher  # noqa: E402
 from pulse_check_heartbeat import run_check as _real_run_check  # noqa: E402
+
+
+# Production loads these creds from this file via systemd's EnvironmentFile; a
+# bare-shell seed run must do the same or the DB-backed checks (iii/iv/x) hit
+# their missing-env guard and the seed cries wolf. See load_env_file.
+ENV_FILE = Path('/home/larry/credentials/.env.larry')
+
+# A check's env guard raises e.g. RuntimeError('SUPABASE_URL /
+# SUPABASE_SERVICE_ROLE_KEY missing — cannot run Check III'). The dash style
+# varies across checks, so we key on the stable "<VARS> missing" shape, not the
+# whole message.
+_ENV_MISSING_RE = re.compile(
+    r'\b([A-Z][A-Z0-9_]+(?:\s*/\s*[A-Z][A-Z0-9_]+)*)\s+missing\b'
+)
+
+
+class _EnvAbsent(SystemExit):
+    """Sentinel: a check failed only because a required env var was unset.
+
+    Subclassing SystemExit is deliberate. run_check re-raises SystemExit
+    untouched (it never emits a pulse-check-failed alert for it), so wrapping a
+    check's env-guard RuntimeError as _EnvAbsent lets the neutral "env absent"
+    outcome propagate through run_check without firing the alert — while leaving
+    run_check, the checks, and the --dry-run-only contract unchanged.
+    """
+
+
+def load_env_file(path: Path = ENV_FILE) -> int:
+    """Load MISSING vars from a KEY=value env-file into os.environ.
+
+    Mirrors the stdlib parser in deploy_notifier.load_vercel_token (no
+    python-dotenv). Never overrides an already-set var, so an explicit
+    environment always wins. Returns the count of vars loaded.
+    """
+    if not path.exists():
+        return 0
+    loaded = 0
+    try:
+        for raw in path.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            key = key.strip()
+            if not key or key in os.environ:
+                continue
+            os.environ[key] = value.strip().strip("'").strip('"').strip()
+            loaded += 1
+    except OSError:
+        pass
+    return loaded
+
+
+def _env_absent_reason(exc: BaseException) -> Optional[str]:
+    """Return a reason string iff ``exc`` is a missing-required-env failure.
+
+    A failure counts as env-absent only when the message names env vars in the
+    "<VARS> missing" shape AND those vars are genuinely unset in os.environ.
+    Requiring real absence keeps a non-env RuntimeError that merely mentions
+    "missing" from being misclassified as neutral.
+    """
+    if not isinstance(exc, RuntimeError):
+        return None
+    match = _ENV_MISSING_RE.search(str(exc))
+    if not match:
+        return None
+    names = [n.strip() for n in match.group(1).split('/') if n.strip()]
+    absent = [n for n in names if not os.environ.get(n)]
+    if not absent:
+        return None
+    return 'env absent: ' + ', '.join(absent)
 
 
 def seed_one(
@@ -63,7 +147,8 @@ def seed_one(
     """Seed a single check. Mutates ``baseline`` in place when it baseline-seeds.
 
     Returns a result row: {check, action, detail, rc, baseline_changed}.
-    ``action`` is one of skipped | would-run | ran | baseline-seeded.
+    ``action`` is one of
+    skipped | would-run | ran | baseline-seeded | unvalidated.
     """
     if isinstance(entry, dict) and entry.get('event_driven'):
         return {
@@ -90,10 +175,31 @@ def seed_one(
         detail = f'cannot import a runnable main ({type(exc).__name__}); '
         return _baseline_seed(check_id, bb, now, baseline, detail)
 
+    # Wrap main so a missing-required-env failure becomes _EnvAbsent. run_check
+    # re-raises that (a SystemExit subclass) without emitting an alert, so the
+    # neutral "env absent" outcome never trips a false pulse-check-failed.
+    def env_aware_main(argv: Optional[list] = None) -> int:
+        try:
+            return main_fn(argv)
+        except RuntimeError as exc:
+            reason = _env_absent_reason(exc)
+            if reason is not None:
+                raise _EnvAbsent(reason) from exc
+            raise
+
     try:
         rc = run_check_fn(
-            check_id, main_fn, argv=['--dry-run'], log_fn=check_log,
+            check_id, env_aware_main, argv=['--dry-run'], log_fn=check_log,
         )
+    except _EnvAbsent as exc:
+        # Check ran but only failed for lack of a required env var (prod loads
+        # it; this shell did not). Neutral: no heartbeat, no alert, no baseline.
+        return {
+            'check': check_id, 'action': 'unvalidated', 'rc': None,
+            'baseline_changed': False,
+            'detail': (f'unvalidated: {exc} — check could not authenticate, so '
+                       'no heartbeat and no pulse-check-failed emitted'),
+        }
     except SystemExit:
         # argparse rejected --dry-run before doing any work (Check I): safe, but
         # not runnable side-effect-free, so seed the baseline instead.
@@ -188,6 +294,13 @@ def main(argv: Optional[list[str]] = None) -> int:
              'file (no heartbeat, no baseline, no alert).',
     )
     args = parser.parse_args(argv)
+
+    # Match the production auth path before probing: load any missing creds from
+    # .env.larry so the DB-backed checks (iii/iv/x) can actually validate. A
+    # --plan preview stays read-only, but loading env touches no seed artifact.
+    loaded = load_env_file()
+    if loaded:
+        print(f'loaded {loaded} env var(s) from {ENV_FILE}')
 
     try:
         cadence = watcher.load_cadence_config()

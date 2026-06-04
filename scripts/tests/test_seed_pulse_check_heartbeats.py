@@ -9,6 +9,9 @@ The contract the seed script must honour:
     argv of every call.
   - A check it cannot prove safe to run (no --dry-run => argparse SystemExit) is
     baseline-seeded, not run, and never gets a fake heartbeat.
+  - A check that fails ONLY because a required env var is unset is classified
+    "unvalidated: env absent" — no heartbeat, no pulse-check-failed alert. A
+    non-env failure still surfaces as a failure.
   - Event-driven checks are skipped (the watcher does not track their staleness).
   - --plan / execute=False writes nothing at all.
 
@@ -21,10 +24,12 @@ Run:
 """
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -169,6 +174,151 @@ class SeedSafetyTest(unittest.TestCase):
         vii = next(r for r in rows if r['check'] == 'vii')
         self.assertEqual(vii['action'], 'skipped')
         self.assertIn('event-driven', vii['detail'])
+
+
+class _FaithfulRunCheck:
+    """Emulates pulse_check_heartbeat.run_check closely enough to test the seed's
+    env-awareness: it actually calls main_fn, re-raises SystemExit untouched (so
+    the seed's _EnvAbsent sentinel can propagate), turns any other exception into
+    a recorded failure alert, and records a heartbeat on a clean rc==0 exit.
+    """
+
+    def __init__(self):
+        self.alerts = []
+        self.heartbeats = []
+
+    def __call__(self, check_id, main_fn, *, argv=None, log_fn=None):
+        try:
+            rc = main_fn(argv)
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001 — mirrors run_check's guard
+            self.alerts.append((check_id, f'{type(exc).__name__}: {exc}'))
+            return 1
+        if rc == 0:
+            self.heartbeats.append(check_id)
+        else:
+            self.alerts.append((check_id, f'exited {rc}'))
+        return rc
+
+
+_ENV_GUARD_MSG = (
+    'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — cannot run Check III.'
+)
+
+
+class EnvAwarenessTest(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.bb = Path(self._td.name) / 'blackboard'
+        self.bb.mkdir(parents=True)
+
+    def tearDown(self):
+        self._td.cleanup()
+
+    def test_env_absent_is_unvalidated_no_alert_no_heartbeat(self):
+        # A check that fails solely because required env is unset must be
+        # neutral: classified 'unvalidated', no heartbeat, no pulse-check-failed,
+        # and no baseline write.
+        runner = _FaithfulRunCheck()
+        modules = {
+            f'pulse_check_{c}': _SpyModule(raises=RuntimeError(_ENV_GUARD_MSG))
+            for c in w.CANONICAL_CHECKS
+        }
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('SUPABASE_URL', None)
+            os.environ.pop('SUPABASE_SERVICE_ROLE_KEY', None)
+            rows = seed.seed_all(
+                _full_cadence(), self.bb, NOW,
+                run_check_fn=runner,
+                import_fn=lambda name: modules[name],
+            )
+        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        unvalidated = {r['check'] for r in rows if r['action'] == 'unvalidated'}
+        self.assertEqual(unvalidated, non_vii)
+        for r in rows:
+            if r['check'] in non_vii:
+                self.assertIsNone(r['rc'])
+                self.assertFalse(r['baseline_changed'])
+                self.assertIn('env absent', r['detail'])
+        self.assertEqual(runner.alerts, [], 'env-absent must emit no alert')
+        self.assertEqual(runner.heartbeats, [], 'env-absent writes no heartbeat')
+        self.assertEqual(list(self.bb.glob('*.heartbeat')), [])
+        self.assertEqual(w.load_baseline(self.bb), {})
+
+    def test_nonenv_runtimeerror_still_surfaces_as_failure(self):
+        # A genuine (non-env) failure must still surface exactly as today: run,
+        # rc==1, pulse-check-failed alert emitted — NOT swallowed as unvalidated.
+        runner = _FaithfulRunCheck()
+        modules = {
+            f'pulse_check_{c}': _SpyModule(raises=RuntimeError('boom'))
+            for c in w.CANONICAL_CHECKS
+        }
+        rows = seed.seed_all(
+            _full_cadence(), self.bb, NOW,
+            run_check_fn=runner,
+            import_fn=lambda name: modules[name],
+        )
+        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        for r in rows:
+            if r['check'] in non_vii:
+                self.assertEqual(r['action'], 'ran')
+                self.assertEqual(r['rc'], 1)
+        self.assertEqual({c for c, _ in runner.alerts}, non_vii)
+        self.assertEqual(runner.heartbeats, [])
+
+    def test_missing_message_but_env_present_is_not_unvalidated(self):
+        # A RuntimeError that mentions "missing" while the named vars ARE set is
+        # a real failure, not env-absence — the os.environ check guards this.
+        runner = _FaithfulRunCheck()
+        modules = {
+            f'pulse_check_{c}': _SpyModule(raises=RuntimeError(_ENV_GUARD_MSG))
+            for c in w.CANONICAL_CHECKS
+        }
+        with mock.patch.dict(
+            os.environ,
+            {'SUPABASE_URL': 'https://x', 'SUPABASE_SERVICE_ROLE_KEY': 'k'},
+        ):
+            rows = seed.seed_all(
+                _full_cadence(), self.bb, NOW,
+                run_check_fn=runner,
+                import_fn=lambda name: modules[name],
+            )
+        non_vii = set(w.CANONICAL_CHECKS) - {'vii'}
+        for r in rows:
+            if r['check'] in non_vii:
+                self.assertEqual(r['action'], 'ran')
+                self.assertEqual(r['rc'], 1)
+        self.assertEqual({c for c, _ in runner.alerts}, non_vii)
+
+
+class LoadEnvFileTest(unittest.TestCase):
+    def test_loads_missing_vars_without_override(self):
+        with tempfile.TemporaryDirectory() as td:
+            env_path = Path(td) / '.env.larry'
+            env_path.write_text(
+                '# a comment\n'
+                '\n'
+                'NEW_SEED_VAR=fresh\n'
+                "QUOTED_VAR='with-quotes'\n"
+                'EXISTING_SEED_VAR=from-file\n'
+                'not-a-kv-line\n'
+            )
+            with mock.patch.dict(
+                os.environ, {'EXISTING_SEED_VAR': 'from-env'}, clear=False,
+            ):
+                os.environ.pop('NEW_SEED_VAR', None)
+                os.environ.pop('QUOTED_VAR', None)
+                loaded = seed.load_env_file(env_path)
+                self.assertEqual(os.environ['NEW_SEED_VAR'], 'fresh')
+                self.assertEqual(os.environ['QUOTED_VAR'], 'with-quotes')
+                # Already-set var is never overridden.
+                self.assertEqual(os.environ['EXISTING_SEED_VAR'], 'from-env')
+                self.assertEqual(loaded, 2)
+
+    def test_missing_file_is_a_noop(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.assertEqual(seed.load_env_file(Path(td) / 'nope.env'), 0)
 
 
 if __name__ == '__main__':
