@@ -101,6 +101,80 @@ def _mark_cooldown(severity: str, key: str) -> None:
         pass
 
 
+# ---------- durable silence layer (Medic self-silence backstop) ----------
+#
+# Distinct from cooldown. Cooldown is a short, self-expiring throttle (10/60
+# min) that every repeat alert refreshes -- it slows a recurring alert but
+# never stops it. A *silence* is a deliberate, durable suppression written by
+# Medic (scripts/medic_actions.py) AFTER its read-only investigation confirmed
+# a specific fingerprint is a benign false positive -- e.g. a forge-no-pr
+# alert whose build already shipped under a re-keyed branch (the 2026-06-04
+# case). While a silence is in force `append_alert` drops the matching alert
+# with NO DM, so Larry never sees attempt N+1 of a stall that is already
+# resolved. Silences are keyed by the same `source:subject` cooldown key, are
+# reversible (delete the file / call `unsilence` to restore), and may carry an
+# optional TTL. `ttl_sec=None` means "until manually cleared" -- the correct
+# default for task-id-specific subjects, which can never legitimately recur.
+
+SILENCE_ROOT = AGENTS_ROOT / 'state' / 'alert-silenced'
+
+
+def _silence_path(key: str) -> Path:
+    return SILENCE_ROOT / _safe_key(key)
+
+
+def is_silenced(key: str, now: Optional[float] = None) -> bool:
+    """True if `key` has an active silence (no TTL, or TTL not yet expired)."""
+    path = _silence_path(key)
+    if not path.exists():
+        return False
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        # An explicitly-written silence file that is unreadable still
+        # suppresses -- fail toward quiet, since something deliberately wrote it.
+        return True
+    until = data.get('until')
+    if until in (None, 0):
+        return True
+    try:
+        return (now if now is not None else time.time()) < float(until)
+    except (TypeError, ValueError):
+        return True
+
+
+def silence(key: str, reason: str = '', ttl_sec: Optional[float] = None,
+            by: str = 'medic', now: Optional[float] = None) -> bool:
+    """Write a durable silence for `key`. Returns True on success, never
+    raises. `ttl_sec=None` -> permanent (until the file is removed)."""
+    path = _silence_path(key)
+    base = now if now is not None else time.time()
+    record = {
+        'key': key,
+        'reason': reason,
+        'by': by,
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'until': (base + float(ttl_sec)) if ttl_sec else None,
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(record, f, ensure_ascii=False)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def unsilence(key: str) -> bool:
+    """Remove a silence (un-suppress). Returns True iff a file was removed."""
+    try:
+        _silence_path(key).unlink()
+        return True
+    except (FileNotFoundError, OSError):
+        return False
+
+
 # ---------- writer side ----------
 
 
@@ -144,6 +218,10 @@ def append_alert(
         # silent drop.
         route = DEFAULT_ROUTE
     key = f'{source}:{subject}' if subject else source
+    # Durable silence (Medic-confirmed false positive) takes precedence over
+    # the short cooldown: a silenced fingerprint never reaches Larry.
+    if is_silenced(key):
+        return False
     if in_cooldown(severity, key):
         return False
     record = {

@@ -61,6 +61,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import medic_ledger  # noqa: E402
+import larry_alerts  # noqa: E402
 
 HOME = Path.home()
 REPO_DIR = Path(os.environ.get('OURLIBERTY_REPO_DIR', str(HOME / 'agent-core')))
@@ -81,6 +82,13 @@ ACTION_RETRIGGER_INBOX = 'retrigger-inbox'
 # retrigger-watcher is an alias of retrigger-inbox (same mechanism, same
 # allowlist) -- the action-policy lists both action_type names.
 ACTION_RETRIGGER_WATCHER = 'retrigger-watcher'
+# silence-false-positive: the reversible "quiet a confirmed benign alert"
+# handler. Unlike the restart handlers it mutates NOTHING on the system --
+# it writes a durable suppression file (larry_alerts.silence) so a recurring
+# false-positive fingerprint stops DMing Larry. Gated by the
+# `silenceable_subjects` allowlist so Medic can only silence proven-benign
+# alert CLASSES, never an arbitrary alert. Reversible via larry_alerts.unsilence.
+ACTION_SILENCE = 'silence-false-positive'
 
 
 def _log(level: str, msg: str) -> None:
@@ -126,7 +134,8 @@ def _gates_ok() -> tuple[bool, str]:
 def _load_reversible_targets() -> dict:
     """Read config/medic-reversible-targets.json. Fail safe: missing or
     malformed -> empty lists (Medic can act on nothing). Never raises."""
-    empty = {'restart_daemon_units': [], 'retrigger_inbox_targets': []}
+    empty = {'restart_daemon_units': [], 'retrigger_inbox_targets': [],
+             'silenceable_subjects': []}
     try:
         with open(REVERSIBLE_TARGETS_FILE, encoding='utf-8') as f:
             data = json.load(f)
@@ -152,6 +161,7 @@ def _load_reversible_targets() -> dict:
     return {
         'restart_daemon_units': _clean_list('restart_daemon_units'),
         'retrigger_inbox_targets': _clean_list('retrigger_inbox_targets'),
+        'silenceable_subjects': _clean_list('silenceable_subjects'),
     }
 
 
@@ -343,6 +353,91 @@ def retrigger_inbox(target: str, fingerprint: str, attempt: int = 1) -> dict:
                         allowed)
 
 
+def silence_false_positive(fingerprint: str, reason: str = '',
+                           attempt: int = 1,
+                           ttl_sec: Optional[float] = None) -> dict:
+    """Durably suppress a confirmed benign false-positive alert so it stops
+    DMing Larry. Reversible (writes a suppression file only; mutates nothing
+    on the system). Strict order, mirroring _act_restart:
+
+      (a) gates  -- enable flag + both kill switches.
+      (b) allowlist -- the fingerprint must match a `silenceable_subjects`
+          pattern (substring). A fingerprint matching no pattern is REFUSED:
+          Medic may only auto-silence proven-benign CLASSES, never an
+          arbitrary alert.
+      (c) idempotence -- if already silenced, succeed as a no-op.
+      (d) perform -- larry_alerts.silence(fingerprint, ...).
+      (e) verify  -- larry_alerts.is_silenced(fingerprint) is now True.
+      (f) record  -- ledger outcome='acted' (classification='reversible').
+
+    Deliberately emits NO notification: the whole point is that a benign
+    false positive should reach neither Larry nor a diagnose-only DM. The
+    silence is logged to medic-dispatcher.log for the audit trail and is
+    reversible via larry_alerts.unsilence(fingerprint).
+    """
+    try:
+        fp = fingerprint if isinstance(fingerprint, str) and fingerprint else ''
+        if not fp:
+            return _result(ACTION_SILENCE, '', str(fingerprint), ok=False,
+                           outcome='skipped', reason='no-target',
+                           detail='No fingerprint supplied; refusing.')
+        try:
+            attempt_int = int(attempt)
+        except (TypeError, ValueError):
+            attempt_int = 1
+
+        # (a) gates
+        ok, gate_reason = _gates_ok()
+        if not ok:
+            return _refuse(ACTION_SILENCE, fp, fp, attempt_int, gate_reason,
+                           'A Medic gate (enable flag or a kill switch) is not '
+                           'satisfied; no silence written.')
+
+        # (b) allowlist -- only proven-benign false-positive classes
+        patterns = _load_reversible_targets().get('silenceable_subjects', [])
+        if not any(p in fp for p in patterns):
+            return _refuse(
+                ACTION_SILENCE, fp, fp, attempt_int, 'not-permitted',
+                f'Fingerprint {fp} matches no silenceable_subjects pattern; '
+                f'refusing to auto-silence. Escalate diagnose-only instead.')
+
+        # (c) idempotence
+        if larry_alerts.is_silenced(fp):
+            return _result(ACTION_SILENCE, fp, fp, ok=True, outcome='acted',
+                           reason='already-silenced',
+                           detail=f'{fp} was already silenced; no-op.')
+
+        # (d) perform -- reversible: writes a suppression file only
+        wrote = larry_alerts.silence(
+            fp, reason=(reason or 'medic-confirmed false positive'),
+            ttl_sec=ttl_sec, by='medic')
+
+        # (e) verify
+        if not (wrote and larry_alerts.is_silenced(fp)):
+            return _refuse(
+                ACTION_SILENCE, fp, fp, attempt_int, 'silence-write-failed',
+                f'Could not persist a silence for {fp}; escalate diagnose-only.')
+
+        # (f) record
+        rec_source, rec_subject = _fp_parts(fp)
+        notes = f'silenced {fp}: {reason}'[:300]
+        medic_ledger.append_record(
+            source=rec_source, subject=rec_subject, classification='reversible',
+            outcome='acted', attempt=attempt_int, notes=notes)
+        _log('INFO', notes)
+        ttl_note = 'permanent' if not ttl_sec else f'ttl={ttl_sec}s'
+        return _result(
+            ACTION_SILENCE, fp, fp, ok=True, outcome='acted', reason='silenced',
+            detail=(f'{fp} silenced ({ttl_note}); no DM sent. Reversible: '
+                    f'larry_alerts.unsilence("{fp}") restores it.'))
+    except Exception as e:  # never raise -- fail safe
+        _log('ERROR', f'{ACTION_SILENCE} unexpected exception for '
+                      f'{fingerprint}: {type(e).__name__}: {e}')
+        return _result(ACTION_SILENCE, str(fingerprint), str(fingerprint),
+                       ok=False, outcome='skipped', reason='exception',
+                       detail=f'Unexpected error: {type(e).__name__}: {e}')
+
+
 # ---------- CLI ----------
 
 
@@ -355,27 +450,37 @@ def _main(argv: Optional[list] = None) -> int:
     parser.add_argument(
         'action',
         help='reversible action type: restart-daemon | retrigger-inbox | '
-             'retrigger-watcher')
+             'retrigger-watcher | silence-false-positive')
     parser.add_argument('--unit', '--target', dest='target', default='',
                         help='the daemon unit / inbox-watcher target')
     parser.add_argument('--fingerprint', default='', help='alert fingerprint')
     parser.add_argument('--attempt', type=int, default=1,
                         help='attempt number (prior_attempts + 1)')
+    parser.add_argument('--reason', default='',
+                        help='silence-false-positive: why this fingerprint is '
+                             'a confirmed benign false positive')
+    parser.add_argument('--ttl-sec', dest='ttl_sec', type=float, default=None,
+                        help='silence-false-positive: optional TTL in seconds; '
+                             'omit for a permanent silence')
     args = parser.parse_args(argv)
 
     if args.action == ACTION_RESTART_DAEMON:
         result = restart_daemon(args.target, args.fingerprint, args.attempt)
     elif args.action in (ACTION_RETRIGGER_INBOX, ACTION_RETRIGGER_WATCHER):
         result = retrigger_inbox(args.target, args.fingerprint, args.attempt)
+    elif args.action == ACTION_SILENCE:
+        result = silence_false_positive(args.fingerprint, args.reason,
+                                        args.attempt, args.ttl_sec)
     else:
         # Privileged / judgment / unknown action types never reach a handler.
         result = _result(
             args.action, args.target, args.fingerprint, ok=False,
             outcome='skipped', reason='unsupported-action',
-            detail=(f'Action type {args.action!r} is not a PR2 reversible '
-                    f'handler; medic_actions.py only performs restart-daemon '
-                    f'and retrigger-inbox/retrigger-watcher. Escalate via '
-                    f'larry_alerts.py instead.'))
+            detail=(f'Action type {args.action!r} is not a reversible '
+                    f'handler; medic_actions.py only performs restart-daemon, '
+                    f'retrigger-inbox/retrigger-watcher, and '
+                    f'silence-false-positive. Escalate via larry_alerts.py '
+                    f'instead.'))
         _log('INFO', f'rejected unsupported action type {args.action!r}')
 
     print(json.dumps(result, ensure_ascii=False))

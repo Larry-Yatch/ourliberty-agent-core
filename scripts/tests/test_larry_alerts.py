@@ -37,6 +37,8 @@ class _IsolatedQueueTest(unittest.TestCase):
                               self._tmp_path / 'blackboard' / 'larry-alerts.jsonl'),
             mock.patch.object(larry_alerts, 'COOLDOWN_ROOT',
                               self._tmp_path / 'state' / 'alert-cooldown'),
+            mock.patch.object(larry_alerts, 'SILENCE_ROOT',
+                              self._tmp_path / 'state' / 'alert-silenced'),
             mock.patch.object(larry_alerts, 'OFFSET_FILE',
                               self._tmp_path / 'state' / 'beacon-alerts-offset.txt'),
         ]
@@ -455,6 +457,71 @@ class CliSubcommandTest(_IsolatedQueueTest):
     def test_unknown_subcommand_rejected(self):
         with self.assertRaises(SystemExit):
             larry_alerts.main(['frobnicate'])
+
+
+class SilenceLayerTest(_IsolatedQueueTest):
+    """Durable silence layer: Medic-written suppression that append_alert
+    honors (the 2026-06-04 forge-no-pr false-positive backstop)."""
+
+    FP = ('heal-pipeline-stall:pipeline-stall:forge-no-pr:'
+          'forge-queue-api-preflight-20260603T231401Z-clarify1')
+
+    def _src_subj(self):
+        src, subj = self.FP.split(':', 1)
+        return src, subj
+
+    def test_silence_suppresses_append_alert(self):
+        src, subj = self._src_subj()
+        # Without a silence, the alert appends.
+        self.assertTrue(larry_alerts.append_alert(src, 'warning', 'stall',
+                                                  subject=subj))
+        # Silence the exact fingerprint, then the next alert is dropped.
+        self.assertTrue(larry_alerts.silence(self.FP, reason='shipped PR #294'))
+        self.assertTrue(larry_alerts.is_silenced(self.FP))
+        self.assertFalse(larry_alerts.append_alert(src, 'warning', 'stall',
+                                                   subject=subj))
+
+    def test_silence_is_independent_of_cooldown(self):
+        # A silence outlives the cooldown window: even with cooldown cleared,
+        # a silenced alert stays suppressed.
+        src, subj = self._src_subj()
+        larry_alerts.silence(self.FP)
+        key = f'{src}:{subj}'
+        # Force-clear any cooldown file so only the silence can suppress.
+        cd = larry_alerts._cooldown_path('warning', key)
+        if cd.exists():
+            cd.unlink()
+        self.assertFalse(larry_alerts.append_alert(src, 'warning', 'm',
+                                                   subject=subj))
+
+    def test_ttl_expiry(self):
+        larry_alerts.silence('a:b', ttl_sec=100, now=1000)
+        self.assertTrue(larry_alerts.is_silenced('a:b', now=1050))
+        self.assertFalse(larry_alerts.is_silenced('a:b', now=1200))
+
+    def test_permanent_silence_has_null_until(self):
+        larry_alerts.silence('a:b')
+        data = json.loads(larry_alerts._silence_path('a:b').read_text())
+        self.assertIsNone(data['until'])
+        self.assertTrue(larry_alerts.is_silenced('a:b'))
+
+    def test_unsilence_restores_delivery(self):
+        src, subj = self._src_subj()
+        larry_alerts.silence(self.FP)
+        self.assertTrue(larry_alerts.unsilence(self.FP))
+        self.assertFalse(larry_alerts.is_silenced(self.FP))
+        self.assertTrue(larry_alerts.append_alert(src, 'warning', 'm',
+                                                  subject=subj))
+
+    def test_unsilence_missing_is_false(self):
+        self.assertFalse(larry_alerts.unsilence('never:silenced'))
+
+    def test_unreadable_silence_file_fails_quiet(self):
+        # A silence file that exists but is unparseable still suppresses.
+        path = larry_alerts._silence_path('a:b')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('not json{')
+        self.assertTrue(larry_alerts.is_silenced('a:b'))
 
 
 if __name__ == '__main__':

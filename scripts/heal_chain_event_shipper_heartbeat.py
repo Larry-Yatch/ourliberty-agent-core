@@ -14,6 +14,7 @@ fire false alarms, short enough that a real crash is visible within
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -27,6 +28,17 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-chain-event-shipper-heartbeat.log'
 
 STALE_THRESHOLD_SEC = 10 * 60       # 10 min: shipper heartbeats every 30s
                                     # so 10 min == ~20 missed beats.
+
+# The shipper ships DEFAULT-OFF behind an activation gate: the service unit
+# carries `OURLIBERTY_CHAIN_SHIPPER_ENABLED=false` and the daemon exits early
+# WITHOUT writing a heartbeat when the gate is not truthy
+# (scripts/chain_event_shipper.py). So in the default config a stale heartbeat
+# is the EXPECTED state, not a crash -- alarming on it DMs Larry forever (the
+# 2026-06-04 false-positive audit). Before alerting we probe systemd,
+# read-only, to confirm the daemon is actually SUPPOSED to be running; if the
+# gate is closed or the service is disabled/masked we suppress.
+SHIPPER_SERVICE = 'ourliberty-chain-event-shipper.service'
+ACTIVATION_ENV = 'OURLIBERTY_CHAIN_SHIPPER_ENABLED'
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -81,6 +93,41 @@ def _dm_larry(message: str, subject: str, suggested_action: str) -> bool:
         return False
 
 
+def _systemctl(args: list[str]) -> tuple[int, str]:
+    """Run a read-only `systemctl` query. Returns (rc, stdout). rc=-1 on a
+    launch/timeout error so callers can treat it as 'unknown'. Patched in
+    tests so no real systemctl runs."""
+    try:
+        proc = subprocess.run(['systemctl', *args], capture_output=True,
+                              text=True, timeout=10)
+        return proc.returncode, (proc.stdout or '').strip()
+    except (OSError, subprocess.SubprocessError):
+        return -1, ''
+
+
+def intentionally_off() -> tuple[bool, str]:
+    """True iff the shipper is DELIBERATELY not running -- the activation gate
+    is closed, or the service is disabled/masked. All probes are read-only.
+    Any probe error or ambiguity returns (False, '') so an unexplained stale
+    heartbeat still DMs Larry (fail loud)."""
+    # 1. Activation gate -- the documented default-off mechanism. `systemctl
+    #    show <svc> -p Environment` prints `Environment=VAR=val VAR2=val2`.
+    rc, out = _systemctl(['show', SHIPPER_SERVICE, '-p', 'Environment'])
+    if rc == 0 and out:
+        env_blob = out.split('=', 1)[1] if out.startswith('Environment=') else out
+        for tok in env_blob.split():
+            if tok.startswith(ACTIVATION_ENV + '='):
+                val = tok.split('=', 1)[1].strip().lower()
+                if val not in ('true', '1', 'yes', 'on'):
+                    return True, f'activation gate closed ({ACTIVATION_ENV}={val})'
+                break  # gate explicitly open -> not this reason
+    # 2. Service deliberately disabled/masked.
+    rc, out = _systemctl(['is-enabled', SHIPPER_SERVICE])
+    if out in ('disabled', 'masked'):
+        return True, f'{SHIPPER_SERVICE} is-enabled={out}'
+    return False, ''
+
+
 def check_staleness(now: float | None = None) -> tuple[bool, float, str]:
     """Return (is_stale, age_seconds, reason)."""
     if not HEARTBEAT_FILE.exists():
@@ -104,6 +151,15 @@ def main() -> int:
     stale, age, reason = check_staleness()
     if not stale:
         log(f'tick: shipper heartbeat fresh ({int(age)}s)')
+        return 0
+
+    # A stale heartbeat is only a fault if the daemon is supposed to be
+    # running. Default-off via the activation gate (or a disabled service) is
+    # an EXPECTED, non-incident state -- suppress rather than DM Larry.
+    off, off_reason = intentionally_off()
+    if off:
+        log(f'STALE shipper heartbeat but daemon is intentionally off '
+            f'({off_reason}); suppressing DM')
         return 0
 
     log(f'STALE shipper heartbeat — {reason}', 'WARN')

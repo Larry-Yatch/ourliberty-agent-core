@@ -940,7 +940,9 @@ class MedicAllowlistShapeTest(unittest.TestCase):
             self.assertNotIn('larry_alerts.py append_alert', entry)
         # The broad entry that would permit ANY larry_alerts subcommand
         # (including append_alert) must be gone.
-        self.assertNotIn('Bash(python3:*scripts/larry_alerts.py:*)', self.allow)
+        self.assertNotIn(
+            'Bash(python3 /home/larry/agent-core/scripts/larry_alerts.py:*)',
+            self.allow)
 
     def test_no_inline_python_c_larry_alerts_entry(self) -> None:
         # The removed broad inline form for larry_alerts must be gone. The
