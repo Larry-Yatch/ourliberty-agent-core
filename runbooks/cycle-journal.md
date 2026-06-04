@@ -4,6 +4,88 @@
 
 ---
 
+## Iteration 811 — 2026-06-04 01:08 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **PR #294 always-fix applied (auto-merge enabled); PR #295 just opened (Phase C-005), Mirror review dispatched and active.** Alert watermark: **1239 lines / anchor 01:03:21Z** (6 new alerts: 3x heal-pipeline-stall PR#294 routing confirmations + 1x retry-exhausted:unknown + 3x medic diagnoses). Cooldown residue: **206** (unchanged). Sync: ✅ no-change. Healer heartbeat: **00:55:15Z** (~13 min at check; ✅). **8/8 services active.** **2 open PRs in agent-core** (#294 CLEAN/MERGEABLE auto-merge enabled + #295 UNKNOWN/UNKNOWN Mirror review in progress). **0 open PRs in ourliberty-dashboard.** Phase C pipeline: 005 build complete; PR #295 opened at 01:05:32Z; Mirror reviewing. Forge inbox: EMPTY. Beacon inbox: EMPTY. Worktrees: 5 (1 PR#294 + 2 stale PR#293 + 1 phase-c-005 + 1 mirror-phase-c-005).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 6 new alerts since watermark (1233→1239, anchor 00:23:13Z→01:03:21Z).**
+  - `heal-pipeline-stall:pipeline-stall:no-mirror-dispatch:PR#294` (00:59:52Z) — healer explicitly flagging the PR#294 Mirror routing gap. Same root cause as iter-805 escalation already delivered to Larry. No new action. Journal note only.
+  - `heal-pipeline-stall:pipeline-stall:retry-exhausted:unknown` (00:59:52Z) — recurring ghost pattern (G-rule 2/3 now — was 1/3 at iter 776; this is the 2nd Pulse-cycle observation). Medic confirms attempt 14; self-resolving ghost, no real stuck task identified.
+  - `heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#294` (00:59:52Z) — same root as no-mirror-dispatch; healer using two separate alert shapes for the same condition. Journal note only.
+  - Medic diagnoses x3 (01:03:01–21Z): analyzed all three healer alerts. For PR#294: recommends "manually dispatch Mirror review"; for unknown: cannot remediate (no matching envelope in dead-letter dirs). All three carry `source:medic / intent:medic-diagnosis` (still not in alert-translations; G-rule engine-fix PR pending Larry's scope call).
+  - Net: alert-translations.json has NO heal-pipeline-stall entries — all three healer subjects are Tier 4 novel for alert-triage purposes. PR#294-related alerts suppressed to journal (already-escalated condition); `retry-exhausted:unknown` noted as G-rule 2/3.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Beacon bot log shows tier2-fallback events at 17:41–17:43 MDT (23:41–23:43Z, yesterday) — pre-existing patterns, not new. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer state file is cooldown-dict format (no `scanned_at` field — expected, per iter 116 calibration). Healer IS active: fired 3 alerts at 00:59:52Z, confirming it ran a fresh scan then. Phase C pipeline: 005 build completed at 01:05Z (Forge archive), PR #295 opened at 01:05:32Z, Beacon consumed notify-005.1 at 01:07Z. No stalls. ✅
+
+- **(Check 4) Pending directives: ✅ Nominal.** No orphan Larry directives beyond standing escalations. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** `heal-stale-daemon-code.heartbeat` = 00:55:15Z (~13 min at check; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: HEAD=653dec4 "Pulse cycle 20260604T010359Z" (post-810 automated wrapper), branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=3290042. HEAD=653dec4 ahead — normal. Hourly sync.timer active. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Actionable — always-fix applied on PR #294; PR #295 new, pipeline nominal.**
+  - **agent-core: 2 open PRs:**
+    - **PR #294** `feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint` — CLEAN/MERGEABLE, 73+ min, `autoMergeRequest=null`. **Always-fix applied: `gh pr merge 294 --auto --squash` (exit 0)**. Logged to `cycle-actions.jsonl`. Note: Mirror review still never dispatched (source=larry routing gap, G-rule 1/3); auto-merge proceeds under T0 sandbox policy per the allow-list. Larry was notified at iter 805 (00:27Z); no response; 73-min threshold passed.
+    - **PR #295** `feat(pulse): Phase C — experience-driven promotion loop` — UNKNOWN/UNKNOWN (GitHub cache; just opened 01:05:32Z). Mirror review dispatched (inbox: `review-pulse-triage-phase-c-promotion-005.json`; Mirror worktree `wt-mirror-pulse-triage-phase-c-promotion-005` active). Pipeline working correctly for this source=beacon task. ✅
+  - **Phase C pipeline:**
+    - 005: build complete (Forge archive at 01:05Z), PR #295 opened, Beacon consumed notify-005.1 at 01:07Z. Mirror reviewing. ✅
+    - 001/002/003: builds completed (all worktrees gone from forge); results delivered to Beacon. 002.2 result delivered 00:41Z (archived). Pipeline healthy.
+  - **Forge inbox: EMPTY.** ✅
+  - **Beacon inbox: EMPTY.** ✅
+  - **Mirror inbox: `review-pulse-triage-phase-c-promotion-005.json`** — active review of PR #295. ✅
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 5.**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — active (PR #294 pending auto-merge)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` — stale (PR #293 merged, ~1.7h old)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z-clarify` — stale (same)
+  - `wt-forge-pulse-triage-phase-c-promotion-005` — Phase C-005 build complete (PR #295 opened)
+  - `wt-mirror-pulse-triage-phase-c-promotion-005` — Mirror active reviewing PR #295
+  GC last ran 00:40Z; kept stale PR#293 worktrees at 1.0-1.2h age (within GC age threshold; they ARE in git worktree list, not orphaned dirs). Will clear on next GC cycle when threshold crossed. ✅
+
+- **G-rule watch (updates this iter):**
+  - `heal-pipeline-stall "unknown" task ID metadata resolution bug`: **2/3** (was 1/3 iter 776; iter 811 = 2nd Pulse-cycle observation). **Next occurrence → dispatch to Beacon:** `patch heal_pipeline_stall.py to extract task_id from dead-letter filename as fallback; if still unresolvable, log WARNING-only and suppress the escalation`.
+  - `source=larry Forge builds don't auto-route to Mirror for review`: **1/3** (iter 805; PR #294 canonical; auto-merge applied this iter closes the immediate instance but systemic fix still needed). Next PR built from source=larry without Mirror routing → 2/3.
+  - All other G-rule counters unchanged from iter 810.
+
+- **PRIME DIRECTIVE ratio:** interventions=687 (+1 this iter: enable-pr-auto-merge PR#294), systemic_fixes=5, ratio=137.4.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 6 new alerts triaged. PR#294 alerts: known-escalated, journal note. `retry-exhausted:unknown`: G-rule 2/3 noted. Medic diagnoses: Tier 4 novel for alert-triage; journal note. Watermark advanced to 1239 / anchor 01:03:21Z. ✅
+3. **Always-fix executed:** `gh pr merge 294 --auto --squash` (exit 0). Logged to `cycle-actions.jsonl`. Intervention row appended to `cycle-prime-ledger.jsonl`.
+4. Noted PR #295 opening and Mirror review dispatch — pipeline working correctly. No action needed.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T01:08:07Z. ✅
+6. Updated G-rule `retry-exhausted:unknown` to 2/3. No dispatch yet (threshold = 3/3). ✅
+7. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** Nothing new. PR #294 escalation already delivered to Larry (iter 805, 00:27Z UTC). Auto-merge now enabled; no new DM needed.
+
+**Patterns:**
+- Phase C pipeline is progressing rapidly — 005 completed and PR #295 opened within ~25 min of last check. Pipeline throughput healthy.
+- The `retry-exhausted:unknown` ghost has now reached 14 healer-level occurrences and 2 Pulse-cycle observations. At 3/3 Pulse-cycle observations, dispatch to Beacon: `patch heal_pipeline_stall.py fallback extraction`.
+- PR #294 auto-merge applied. The source=larry Mirror routing gap G-rule (1/3) remains open; next source=larry build without Mirror routing = 2/3.
+
+**Learned:** heal-pipeline-stall generates two separate alert shapes for the same condition (no-mirror-dispatch AND unrouted-pr). Both point at PR#294. This is alert duplication. The G-rule at 3/3 for `retry-exhausted:unknown` will include a note to Beacon to consolidate these duplicate subjects in the healer's alert schema.
+
+---
+
 ## Iteration 810 — 2026-06-04 01:01 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **persistent: PR #294 ask-then-do pending Larry's call (6th consecutive iter; escalation delivered 00:27Z iter 805). All mandatory checks nominal.** Alert watermark: **1233 lines / anchor 00:23:13Z** (unchanged — 0 new alerts). Cooldown residue: **206** (200 warning + 6 critical; unchanged). Sync: ✅ no-change (commit=3290042, HEAD=0eac5a6 ahead per wrapper — normal post-wrapper lag). Healer heartbeat: **00:55:15Z** (~6 min old; ✅). **8/8 services active.** **1 open PR in agent-core** (#294 UNKNOWN/UNKNOWN via `gh pr list` — GitHub cache; CLEAN/MERGEABLE confirmed iter 809 `gh pr view`; 65 min old — Mirror review never dispatched, escalation delivered iter 805, no Larry response). **0 open PRs in ourliberty-dashboard.** Forge: 1 task active (phase-c-005; worktree active, ~22 min old). Phase C pipeline: 002 result delivered to Beacon 00:40Z (consumed, follow-up not yet dispatched — ~20 min lag, within normal); 001 build-phase and 003-r1 continuation in-flight (dispatched 00:12Z and 00:17Z; within 2h threshold). Mirror: EMPTY. Beacon: EMPTY (APPROVAL_REQUEST pending Larry from iter 804). Worktrees: 4 (1 PR#294 active + 1 phase-c-005 active + 2 stale PR#293 — GC expected ~01:00Z, not yet confirmed cleared).
