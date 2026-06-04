@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 928 — 2026-06-04 22:21 UTC (interactive)
+
+**Health:** ✅ **Tier 2 → Tier 3 de-escalation. consecutive_clean=2→3 (threshold met). 0 actions. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
+
+Alert watermark: **1300 lines / 22:01:53Z** (unchanged from iter 927 — no new alerts). Pipeline-stall heartbeat: 22:15:15Z (✅ ~6 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 22:00:23Z (✅ ~21 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=eb25920, last_sync=21:48:41Z (✅). Session-start gitStatus: branch=main, clean, HEAD=0998732 "Pulse cycle 20260604T220932Z". Tier state at start: tier=2, consecutive_clean=2. Tier state at end: **tier=3, consecutive_clean=0** (3rd consecutive clean Tier-2 iter → de-escalation, `cycle_tier_state.py` promoted 2→3).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1300 unchanged — no new alerts since iter 927's close at 22:08Z. Nothing to triage. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 22:15:15Z (~6 min; ✅ within 90-min threshold). All inboxes empty — nothing in flight. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes (Forge=0, Beacon=0, Mirror=0, Pulse=0) empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 22:00:23Z (~21 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=0998732 "Pulse cycle 20260604T220932Z". Not behind, not ahead. ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=eb25920, last_sync=21:48:41Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ All empty.** Forge=0, Mirror=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Mon/Wed/Fri/Sun only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 927):**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 retry succeeded`: **1/3** (iter 922).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=716, systemic_fixes=12, ratio≈59.7 (iter_clean row appended 22:21:22Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Triaged 0 new alerts — watermark unchanged. ✅
+3. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → ledger entry recorded (22:21:22Z). ✅
+4. `cycle_tier_state.py record --checks-clean true` → tier promoted 2→3, consecutive_clean=0. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** System de-escalated to Tier 3 (30-min cadence) after iters 925, 926, 927, 928 — four consecutive clean iters spanning two tier levels (925 completed 3× clean Tier-1 → Tier 2; 926+927+928 completed 3× clean Tier-2 → Tier 3). Last signal was iter 922. System is in deep steady-state. At Tier 3, Pulse runs every 30 min; any finding resets to Tier 1 immediately.
+
+---
+
 ## Iteration 927 — 2026-06-04 22:08 UTC (interactive)
 
 **Health:** ✅ **Tier 2 clean. consecutive_clean=1→2. 0 actions. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ CLEARED (status=no-change at eb25920).**
