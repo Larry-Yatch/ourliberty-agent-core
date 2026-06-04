@@ -142,6 +142,14 @@
       "recommended_action": "None — by-design success confirmation that a sequence kicked off cleanly. The sequence file is at ~/agents/blackboard/build-sequences/<seq-id>.json; advancer activity is in ~/agents/logs/outbox-notifier.log."
     }
   },
+  "heal-wedged-review-sessions": {
+    "wedged-review-reaped": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The wedged-review-session healer reaped an idle Forge/Mirror review session and removed its worktree — the routine self-heal success path. A review session sat idle past its threshold (commonly because a replan/retry task superseded the original review), so the healer killed the stale process tree and cleaned up the worktree. By-design FYI, not a failure. The raw subject carries the worktree name after a colon (wedged-review-reaped:<wt-name>); this bare key matches via the prefix-strip lookup rule.",
+      "recommended_action": "None — by-design success confirmation that a wedged review session was reaped and its worktree cleaned up. Audit trail: the HEALED lines in ~/agents/logs/heal-wedged-review-sessions.log. Runbook: runbooks/heal-wedged-review-sessions.md."
+    }
+  },
   "watchdog": {
     "bots:pulse:tmux": {
       "severity": "INFO",
