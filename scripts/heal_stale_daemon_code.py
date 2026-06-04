@@ -117,11 +117,27 @@ PER_SERVICE_COOLDOWN_SEC = 6 * 60 * 60
 # investigation DM instead of hammering the unit.
 RESTART_COOLDOWN_SEC = 30 * 60
 
-# Subprocess timeout for `sudo -n systemctl restart`. systemctl restart
-# can legitimately take a few seconds on heavier units (TimeoutStartSec
-# default is 90s in systemd); we cap at 30s to bound healer tick time
-# but stay above realistic restart duration.
+# Subprocess timeout for `sudo -n systemctl daemon-reload`. daemon-reload
+# is fast (re-parses unit files); 30s is comfortably above realistic
+# duration and bounds the healer tick time.
 RESTART_TIMEOUT_S = 30
+
+# The restart itself is issued with `--no-block` (returns as soon as the
+# job is enqueued, so it does NOT wait for a slow SIGTERM drain). After a
+# brief settle we verify the unit's state via `systemctl is-active`: a
+# unit that is `active`/`activating` is succeeding even if it's still
+# draining the old process, so we treat that as success and never emit a
+# false `auto-restart-failed:<unit>` DM. Only `failed`/`inactive` (or an
+# is-active error) is a genuine failure.
+RESTART_SETTLE_S = 3
+
+# States that mean the restart is succeeding or has succeeded. systemd's
+# `is-active` prints one of: active / activating / reloading / deactivating
+# / inactive / failed. `reloading` and `deactivating` are transient states
+# on the way to active, so they count as in-progress success too.
+_HEALTHY_ACTIVE_STATES = frozenset(
+    {'active', 'activating', 'reloading', 'deactivating'}
+)
 
 # Unit glob. `ourliberty-*.service` (NOT .timer; timers don't have
 # ExecStart pointing at code — they activate the underlying .service).
@@ -626,7 +642,7 @@ def is_stale(
 # -------------------- auto-restart + PR-inference helpers --------------------
 
 def auto_restart_unit(unit: str) -> tuple[int, str]:
-    """Run `sudo -n systemctl restart <unit>`. Return (returncode, stderr).
+    """Restart <unit> and verify it came back. Return (returncode, stderr).
 
     Prepended with `sudo -n systemctl daemon-reload` so a restart picks up
     unit-file edits that landed since systemd last parsed them. Without the
@@ -635,13 +651,25 @@ def auto_restart_unit(unit: str) -> tuple[int, str]:
     trap — `NextElapseUSecRealtime` empty, `NextElapseUSecMonotonic=infinity`.
 
     A failed daemon-reload is logged WARN but never blocks the restart: a
-    stale-but-running daemon is better than a stopped daemon. The returned
-    `(rc, stderr)` is always from the restart, not the daemon-reload.
+    stale-but-running daemon is better than a stopped daemon.
 
-    Returns (-1, descriptive) on FileNotFoundError / TimeoutExpired so the
-    caller can route to the failure DM uniformly. Sudoers contract on the
-    droplet is `(ALL) NOPASSWD: ALL`; -n errors immediately if that ever
-    changes rather than blocking the healer tick on a password prompt.
+    The restart is issued with `--no-block` and confirmed via `is-active`
+    after a short settle, NOT by waiting on the restart subprocess. Units
+    running Claude agent loops take ~90s to drain on SIGTERM, far past any
+    sane subprocess timeout; blocking on that drain produced false
+    `auto-restart-failed:<unit>` DMs even though systemd completed the
+    restart in the background. So the rc contract is now:
+      - (0, '')         — restart enqueued AND the unit is active/activating
+                          after the settle (success; no failure DM).
+      - (rc, stderr)    — the restart job itself was rejected (rc != 0,
+                          e.g. unit not found) — a genuine, drain-independent
+                          failure.
+      - (-1, descriptive) — restart enqueued but the unit is NOT
+                          active/activating after the settle, or the state
+                          couldn't be verified — genuine failure (DM fires).
+
+    Sudoers contract on the droplet is `(ALL) NOPASSWD: ALL`; -n errors
+    immediately if that ever changes rather than blocking on a prompt.
     """
     try:
         reload_result = subprocess.run(
@@ -669,16 +697,67 @@ def auto_restart_unit(unit: str) -> tuple[int, str]:
             'WARN',
         )
 
+    # Issue the restart with `--no-block` so the subprocess returns as soon
+    # as systemd enqueues the job, rather than blocking on a slow SIGTERM
+    # drain (units running Claude agent loops take ~90s to drain — well past
+    # any sane subprocess timeout). With --no-block, the restart rc no longer
+    # proves recovery, so the is-active verify below is the source of truth.
     try:
         result = subprocess.run(
-            ['sudo', '-n', 'systemctl', 'restart', unit],
+            ['sudo', '-n', 'systemctl', 'restart', '--no-block', unit],
             capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
         )
-        return result.returncode, (result.stderr or '').strip()
     except subprocess.TimeoutExpired:
-        return -1, f'systemctl restart timed out after {RESTART_TIMEOUT_S}s'
+        # Even --no-block timed out (systemd itself unresponsive). Fall
+        # through to the verify — the unit may still have come up.
+        result = None
     except FileNotFoundError:
         return -1, 'sudo or systemctl not found in PATH'
+
+    if result is not None and result.returncode != 0:
+        # The restart job was rejected up front (e.g. unit not found). This
+        # is a genuine failure independent of drain timing; report it.
+        return result.returncode, (result.stderr or '').strip()
+
+    # Brief settle, then verify the unit is (becoming) active. This is what
+    # makes a slow-draining restart report success instead of a false
+    # failure: systemd completes the restart in the background.
+    time.sleep(RESTART_SETTLE_S)
+    state = _unit_active_state(unit)
+    if state in _HEALTHY_ACTIVE_STATES:
+        log(
+            f'RESTART_SLOW_DRAIN: {unit} restart issued with --no-block; '
+            f'service is {state} after {RESTART_SETTLE_S}s settle — systemd '
+            f'completing restart in background, treating as success',
+            'INFO',
+        )
+        return 0, ''
+
+    # Not active/activating after the settle → genuine failure. Surface the
+    # observed state so the failure DM is actionable.
+    return -1, (
+        f'restart issued but unit is {state!r} after {RESTART_SETTLE_S}s '
+        f'(expected active/activating)'
+    )
+
+
+def _unit_active_state(unit: str) -> str:
+    """Return `systemctl is-active <unit>`'s state string (stdout).
+
+    `is-active` prints the unit's high-level state (active / activating /
+    failed / inactive / ...) to stdout and uses the exit code only as a
+    boolean for `active`. We parse stdout so transient states are visible.
+    Returns 'unknown' on timeout / missing binary so the caller treats an
+    unverifiable restart as a failure (DM fires) rather than a false success.
+    """
+    try:
+        result = subprocess.run(
+            ['systemctl', 'is-active', unit],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+        return (result.stdout or '').strip() or 'unknown'
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return 'unknown'
 
 
 def infer_recent_prs(script_path: Path, since_iso: str) -> list[str]:

@@ -1255,32 +1255,184 @@ class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
     reload is WARN-logged but must NEVER block the restart.
     """
 
-    def _make_completed(self, rc=0, stderr=''):
+    def setUp(self):
+        super().setUp()
+        # The restart settle is a real time.sleep in production; patch it to a
+        # no-op so the verify-path tests don't actually block for seconds.
+        self._sleep_patch = mock.patch.object(h.time, 'sleep')
+        self._sleep_patch.start()
+        self.addCleanup(self._sleep_patch.stop)
+
+    def _make_completed(self, rc=0, stderr='', stdout=''):
         cp = mock.MagicMock()
         cp.returncode = rc
         cp.stderr = stderr
+        cp.stdout = stdout
         return cp
+
+    @staticmethod
+    def _verb(cmd):
+        """The systemctl verb for a stubbed argv, ignoring the sudo prefix.
+
+        `sudo -n systemctl <verb> ...` → cmd[3]; `systemctl <verb> ...`
+        (is-active, run without sudo) → cmd[1].
+        """
+        if cmd[0] == 'sudo':
+            return cmd[3]
+        return cmd[1]
 
     def test_daemon_reload_runs_before_restart(self):
         calls: list[list[str]] = []
 
         def fake_run(cmd, **kwargs):
             calls.append(list(cmd))
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
             return self._make_completed(rc=0, stderr='')
 
         with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
             rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
 
-        self.assertEqual(len(calls), 2)
+        # daemon-reload → restart --no-block → is-active verify.
+        self.assertEqual(len(calls), 3)
         self.assertEqual(
             calls[0],
             ['sudo', '-n', 'systemctl', 'daemon-reload'],
         )
         self.assertEqual(
             calls[1],
-            ['sudo', '-n', 'systemctl', 'restart', 'ourliberty-cycle.timer'],
+            ['sudo', '-n', 'systemctl', 'restart', '--no-block',
+             'ourliberty-cycle.timer'],
+        )
+        self.assertEqual(
+            calls[2],
+            ['systemctl', 'is-active', 'ourliberty-cycle.timer'],
         )
         self.assertEqual((rc, stderr), (0, ''))
+
+    def test_restart_uses_no_block(self):
+        # The restart argv must carry --no-block so a slow SIGTERM drain
+        # doesn't block the subprocess past its timeout.
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(list(cmd))
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            h.auto_restart_unit('ourliberty-inbox-watcher.service')
+
+        restart_calls = [c for c in calls if self._verb(c) == 'restart']
+        self.assertEqual(len(restart_calls), 1)
+        self.assertIn('--no-block', restart_calls[0])
+
+    def test_daemon_reload_still_precedes_restart(self):
+        # Ordering regression (2026-05-30 timer-infinity-trap): daemon-reload
+        # must come before the restart even after the --no-block + verify
+        # rework.
+        calls: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(self._verb(cmd))
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            h.auto_restart_unit('ourliberty-cycle.timer')
+
+        self.assertLess(
+            calls.index('daemon-reload'), calls.index('restart'),
+            f'daemon-reload must precede restart; got {calls!r}',
+        )
+
+    def test_normal_fast_restart_unchanged(self):
+        # A unit that comes back up cleanly: restart rc=0, is-active=active →
+        # success path, no regression.
+        def fake_run(cmd, **kwargs):
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
+
+        self.assertEqual((rc, stderr), (0, ''))
+
+    def test_slow_drain_restart_verified_active_no_dm(self):
+        # The core fix: --no-block restart returns immediately while the old
+        # process is still draining; is-active reports 'active' → success, an
+        # INFO RESTART_SLOW_DRAIN log, and (crucially) NO failure indicator.
+        def fake_run(cmd, **kwargs):
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active\n')
+            return self._make_completed(rc=0, stderr='')
+
+        log_lines: list[tuple[str, str]] = []
+
+        def fake_log(msg, level='INFO'):
+            log_lines.append((level, msg))
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, 'log', side_effect=fake_log):
+            rc, stderr = h.auto_restart_unit(
+                'ourliberty-inbox-watcher.service')
+
+        self.assertEqual((rc, stderr), (0, ''))
+        info_lines = [m for lvl, m in log_lines if lvl == 'INFO']
+        self.assertTrue(
+            any('RESTART_SLOW_DRAIN' in m for m in info_lines),
+            f'expected a RESTART_SLOW_DRAIN INFO log, got {log_lines!r}',
+        )
+
+    def test_slow_drain_restart_activating_no_dm(self):
+        # Same as above but is-active reports the transient 'activating'
+        # state — still treated as success (restart in progress).
+        def fake_run(cmd, **kwargs):
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=3, stdout='activating')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit(
+                'ourliberty-inbox-watcher.service')
+
+        self.assertEqual((rc, stderr), (0, ''))
+
+    def test_restart_timeout_then_failed_state_dms(self):
+        # Genuine failure: the unit ends up 'failed' after the settle → the
+        # function returns a failure indicator (rc != 0) so the caller DMs.
+        # Real-failure detection is preserved.
+        def fake_run(cmd, **kwargs):
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=3, stdout='failed')
+            return self._make_completed(rc=0, stderr='')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-bogus.service')
+
+        self.assertNotEqual(rc, 0)
+        self.assertIn('failed', stderr)
+
+    def test_restart_job_rejected_returns_failure(self):
+        # The restart job itself is rejected up front (rc != 0, e.g. unit not
+        # found). That's a drain-independent failure: return it directly,
+        # don't bother verifying.
+        def fake_run(cmd, **kwargs):
+            if self._verb(cmd) == 'daemon-reload':
+                return self._make_completed(rc=0, stderr='')
+            if self._verb(cmd) == 'restart':
+                return self._make_completed(rc=1, stderr='Unit not found  ')
+            raise AssertionError('is-active should not run after a rejected '
+                                 'restart')
+
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, stderr = h.auto_restart_unit('ourliberty-bogus.service')
+
+        self.assertEqual(rc, 1)
+        self.assertEqual(stderr, 'Unit not found')
 
     def test_daemon_reload_failure_does_not_block_restart(self):
         # Load-bearing: reload rc != 0 is logged WARN and we CONTINUE to the
@@ -1289,8 +1441,10 @@ class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
 
         def fake_run(cmd, **kwargs):
             calls.append(list(cmd))
-            if cmd[3] == 'daemon-reload':
+            if self._verb(cmd) == 'daemon-reload':
                 return self._make_completed(rc=5, stderr='reload broke')
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
             return self._make_completed(rc=0, stderr='')
 
         log_lines: list[tuple[str, str]] = []
@@ -1302,8 +1456,7 @@ class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
                 mock.patch.object(h, 'log', side_effect=fake_log):
             rc, stderr = h.auto_restart_unit('ourliberty-cycle.timer')
 
-        self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[1][3], 'restart')
+        self.assertEqual(self._verb(calls[1]), 'restart')
         self.assertEqual((rc, stderr), (0, ''))
         warn_lines = [m for lvl, m in log_lines if lvl == 'WARN']
         self.assertTrue(
@@ -1311,24 +1464,12 @@ class AutoRestartUnitDaemonReloadTests(_IsolatedAgentsRoot):
             f'expected a WARN log mentioning daemon-reload, got {log_lines!r}',
         )
 
-    def test_restart_failure_returned_after_successful_reload(self):
-        # The (rc, stderr) contract returns the RESTART outcome, never the
-        # reload outcome.
-        def fake_run(cmd, **kwargs):
-            if cmd[3] == 'daemon-reload':
-                return self._make_completed(rc=0, stderr='')
-            return self._make_completed(rc=1, stderr='Unit not found  ')
-
-        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
-            rc, stderr = h.auto_restart_unit('ourliberty-bogus.service')
-
-        self.assertEqual(rc, 1)
-        self.assertEqual(stderr, 'Unit not found')
-
     def test_daemon_reload_timeout_does_not_block_restart(self):
         def fake_run(cmd, **kwargs):
-            if cmd[3] == 'daemon-reload':
+            if self._verb(cmd) == 'daemon-reload':
                 raise h.subprocess.TimeoutExpired(cmd=cmd, timeout=30)
+            if self._verb(cmd) == 'is-active':
+                return self._make_completed(rc=0, stdout='active')
             return self._make_completed(rc=0, stderr='')
 
         with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
