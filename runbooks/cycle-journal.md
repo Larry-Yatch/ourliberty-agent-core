@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 855 — 2026-06-04 07:08 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=1 (first clean iter since 854) — **0 auto-fixes. 1 open PR (#314 CLEAN/MERGEABLE, in revision retry → hold). 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
+
+Alert watermark: **1286 lines / 06:55:53Z** (unchanged — 0 new alerts since iter 854). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (06:46:20Z — no new occurrence). sync.json: status=error, last_sync=06:46:20Z, commit=469a414. Session HEAD=b8f3a7b "Pulse cycle 20260604T070537Z" is NEWER → wrapper push succeeded; sync service race. Self-recovering (hourly backstop). Healer heartbeat: **06:54:10Z** (~14 min; ✅). Stale-daemon heartbeat: **06:56:17Z** (~12 min; ✅ within 90-min threshold). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: 1286 lines — unchanged from iter 854 watermark (1286 / 06:55:53Z). No new alerts this iter. ✅ Watermark unchanged.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 06:54:10Z (~14 min; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:56:17Z (~12 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=b8f3a7b "Pulse cycle 20260604T070537Z" (iter 854 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence).** sync.json: status=error, last_sync=06:46:20Z, commit=469a414. HEAD=b8f3a7b > sync.json commit → wrapper push succeeded. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern — no new occurrence this iter.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline holding — 0 auto-fixes this iter.**
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." CLEAN/MERGEABLE (confirmed `gh pr view`). Created 06:21:31Z, age=~47 min — OVER 30-min threshold. BUT Forge inbox has `marker-error-harden-approval-tab-direction-ask-coverage-1.json` (revision retry 1/3) — **in revision, hold. Not eligible for auto-merge.** ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 3** — `build-fix-notifier-review-dispatch-reliability.json` (active build); `heal-forge-no-pr-preflight-superseded-suppression-001.json` (systemic fix in pipeline); `marker-error-harden-approval-tab-direction-ask-coverage-1.json` (PR #314 revision retry 1/3). Unchanged. ✅
+  - **Mirror inbox: 0.** ✅ **Beacon inbox: 0.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All G-rule counters unchanged from iter 854. No new occurrences this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8 (unchanged), ratio≈87.75. No new ledger rows this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark unchanged (1286 lines / 06:55:53Z). ✅
+3. Check B: SYNC-PUSH-REBASE-FALLBACK carry-forward. No new occurrence. Self-recovering.
+4. Check E: PR #314 at 47+ min but revision retry 1/3 in Forge inbox — hold confirmed. No auto-fix actions.
+5. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 1, last_signal_at=07:03:48Z (unchanged). ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` (Medic recommends re-queue from scratch). `sync-push-rebase-fallback-001` APPROVAL_REQUEST open. "go: cycle-timer checkpoint" pending Larry's Telegram trigger.
+
+**Patterns:**
+- First clean iter since iter 851. No new alerts, no auto-fixes, all checks nominal.
+- PR #314 holding in revision — Forge has the marker-error retry and the wedged session was reaped at 06:55:53Z. Next automated cycle should see Forge process the retry and emit a revised marker, then Mirror review.
+- `heal-wedged-review-sessions` G-rule remains at 2/3. One more occurrence → dispatch to Beacon.
+- SYNC-PUSH-REBASE-FALLBACK: no new occurrence this iter (rate consistent with prior interactive window — hourly backstop will self-clear).
+- Pipeline otherwise stable: all healers fresh, all services active, no new noise.
+
+**Learned:** Nothing new. System in expected hold state waiting on PR #314 revision cycle to complete.
+
+---
+
 ## Iteration 854 — 2026-06-04 07:03 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: Tier-4 novel [heal-wedged-review-sessions #2/3]; G-rule advanced) — **0 auto-fixes. 1 open PR (#314 CLEAN/MERGEABLE, in revision retry). 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
