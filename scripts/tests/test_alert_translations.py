@@ -383,6 +383,17 @@ class LookupRuleTest(unittest.TestCase):
         self.assertEqual(t['severity'], 'INFO')
         self.assertEqual(t['tier'], 'FYI')
 
+    def test_pulse_check_stale_id_suffix_translates(self):
+        # Decision 4: the watcher emits pulse-check-stale:<id>; the id-suffixed
+        # subject must strip back to the 'pulse-check-stale' entry and render.
+        t = larry_alerts.translate_alert(
+            'heal-pulse-check-staleness', 'pulse-check-stale:iv',
+        )
+        self.assertIsNotNone(t)
+        self.assertEqual(t['tier'], 'SOON')
+        self.assertTrue(t.get('never_silence'),
+                        'dark-check translation must carry never_silence')
+
     def test_unmatched_returns_none(self):
         t = larry_alerts.translate_alert(
             'heal-pipeline-stall', 'nonexistent:subject:here',

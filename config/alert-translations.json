@@ -15,7 +15,8 @@
       "FYI"
     ],
     "tier_note": "Operator-triage gradient (spec: agents/beacon/specs/operator-ux-alert-taxonomy.md). NOW = blocks the chain right now, requires immediate action. SOON = needs attention within hours. FYI = informational, no action required. Conservative classification — when uncertain, lean toward FYI rather than NOW. Unknown subjects (not in this table) default to SOON in the renderer per spec § 2.",
-    "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger."
+    "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger.",
+    "never_silence_note": "Optional per-entry boolean. By default a (source, subject) present in this table is a known pattern that Check 0 (alert_triage_state.classify) Tier-3-silences to digest. Set never_silence: true on an entry to keep its plain-language translation but force it to surface (Tier 4, route=escalate) instead of being muted — for detections like a dark pulse check, where the translation makes the alert clearer but silencing it would defeat the watcher's whole purpose."
   },
   "heal-pipeline-stall": {
     "pipeline-stall:forge-no-pr": {
@@ -327,18 +328,21 @@
     "pulse-check-stale": {
       "severity": "WARNING",
       "tier": "SOON",
+      "never_silence": true,
       "plain_language_summary": "A Pulse self-optimization check (I-X) has gone dark: its last success heartbeat is older than its expected cadence + grace, so it has silently stopped firing. The check itself is usually healthy -- the failure is in whatever is supposed to invoke it (the Pulse /cycle). This is exactly the failure that hid the IX/X stall for ~2 days. The subject carries the check id after the colon.",
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` to confirm the check exits 0 (it usually does), then investigate why the Pulse /cycle stopped invoking it. Heartbeats live at ~/agents/blackboard/pulse-check-<id>.heartbeat; cadences are in config/pulse-check-cadence.json; check logs are under ~/agents/logs/pulse-check-*.log."
     },
     "pulse-check-no-cadence": {
       "severity": "WARNING",
       "tier": "SOON",
+      "never_silence": true,
       "plain_language_summary": "The liveness watcher found a Pulse check it knows about that has no (or a malformed) entry in config/pulse-check-cadence.json, so that check's liveness is not being monitored. Fail-closed: it alerts rather than leaving the check silently unwatched. The subject carries the check id after the colon.",
       "recommended_action": "Add (or fix) a cadence_hours + grace_hours entry -- or an event_driven entry -- for the named check id in config/pulse-check-cadence.json, following the existing entries' shape."
     },
     "pulse-check-config-unreadable": {
       "severity": "WARNING",
       "tier": "SOON",
+      "never_silence": true,
       "plain_language_summary": "config/pulse-check-cadence.json could not be loaded (missing or invalid JSON), so the pulse-check liveness watcher is monitoring nothing until it is fixed. The watchers are unwatched.",
       "recommended_action": "Validate the file with `python3 -c \"import json; json.load(open('config/pulse-check-cadence.json'))\"` and repair the JSON. The watcher resumes on its next OnCalendar run once the file parses."
     }
@@ -347,6 +351,7 @@
     "pulse-check-failed": {
       "severity": "WARNING",
       "tier": "SOON",
+      "never_silence": true,
       "plain_language_summary": "A Pulse self-optimization check (I-X) ran but did not complete cleanly (it raised or exited nonzero), so it did NOT refresh its liveness heartbeat. This is the same-cycle complement to the staleness watcher -- it names the failing check immediately instead of waiting out the staleness window. The subject carries the check id after the colon.",
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
     }
