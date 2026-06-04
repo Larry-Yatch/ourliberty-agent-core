@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 851 — 2026-06-04 06:43 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check B: SYNC-PUSH-REBASE-FALLBACK #61) — **0 auto-fixes. PRs #313 ✅ and #316 ✅ merged since iter 850. APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` CLOSED ✅. 2 open PRs (#315 CLEAN/18min, #314 UNKNOWN/22min). Forge inbox: 3 (heal-forge-no-pr systemic fix IN PIPELINE). Mirror inbox: 0. Beacon inbox: 0. 8/8 services active.**
+
+Alert watermark: **1284 lines / 06:41:10Z** (+1 since iter 850 anchor 1283/06:26:01Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #61 — sync.json: status=error, last_sync=06:42:14Z, commit=02b05688. Self-recovering (hourly sync timer backstop). Healer heartbeat: **06:38:35Z** (~5 min; ✅). Stale-daemon heartbeat: **06:26:17Z** (~17 min; ✅). **8/8 services active.** **2 open PRs (agent-core).** **Dashboard: 0 open PRs.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 1 Tier-3 silence. No tier-reset.** larry-alerts.jsonl: 1284 lines (+1 since iter 850).
+  - Alert 1: `outbox-notifier:review-pass` at 06:41:10Z — Mirror approved PR #316 (`forge-claude-md-canonical-pr-line-discipline`), auto-merged + branch deleted. Tier-3 allowlist (outbox-notifier:review-pass from PR #264). **SILENCE ✅.** **PR #316 merged — APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` CLOSED ✅.**
+  - New watermark: **1284 lines / 06:41:10Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 06:38:35Z (~5 min; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:26:17Z (~17 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=469a414 "Pulse cycle 20260604T064210Z" (iter 850 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #61** (06:42:14Z). sync.json: status=error, message="Auto-commit push failed; rolled back", commit=02b05688. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. `ourliberty-heal-wedged-review-sessions.timer` remains active (manually installed iter 850). ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 0 auto-fixes this iter.**
+  - **PR #313 MERGED ✅** (06:38:22Z — "test(log-dir): make LogWriteHitsOverrideDirTest hermetic under unittest gate"). Auto-merge from iter 850 applied. ✅
+  - **PR #316 MERGED ✅** (06:41:09Z — "docs(forge): require canonical 'PR opened:/updated:' line in build responses"). Mirror approved + auto-merged. **APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` CLOSED ✅** — the long-pending doc-fix mandating canonical PR line discipline is now live in Forge's CLAUDE.md. MalformedForgeMarker G-rule (13th lifetime) now has doc-side guard live in codebase.
+  - **PR #315 (agent-core) OPEN** — "fix(healers): reconcile false-positive alert classes before paging Larry." Created 06:25:51Z, age=~18 min. CLEAN/MERGEABLE. Below 30-min threshold. ⏳
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." Created 06:21:31Z, age=~22 min. UNKNOWN/UNKNOWN. Forge has `revision-harden-approval-tab-direction-ask-coverage-1.json` (Mirror revision). Below threshold. ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 3 tasks** — `build-fix-notifier-review-dispatch-reliability.json` (active build); `heal-forge-no-pr-preflight-superseded-suppression-001.json` (NEW — Beacon's stem-matching systemic fix for superseded-preflight forge-no-pr, dispatched in iter 849 notification receipt; Forge preflight phase); `revision-harden-approval-tab-direction-ask-coverage-1.json` (Mirror revision for PR #314). ✅
+  - **Mirror inbox: 0 tasks** — all 3 prior items resolved (marker-error-heal-phantom-dispatch-claim-1 for merged PR #311, marker-error-log-dir-test-isolation-leak-001-1 for merged PR #313, review-forge-claude-md-canonical-pr-line-discipline for merged PR #316). Mirror handled all gracefully. ✅
+  - **Beacon inbox: 0 tasks.** G-rule dispatch from iter 849 consumed; pipeline notification consumed. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - `forge-claude-md-preflight-self-check-bullet-001` APPROVAL_REQUEST **CLOSED ✅** — PR #316 merged 06:41:09Z. Doc-fix live.
+  - `pipeline-stall:forge-no-pr for superseded preflight tasks`: G-rule **3/3 DISPATCHED (iter 849)**. Forge inbox now has `heal-forge-no-pr-preflight-superseded-suppression-001.json`. Systemic fix in pipeline. Medic-diagnosis Tier-4 noise continues until Forge PR merges.
+  - `pipeline-stall:no-mirror-dispatch for superseded preflight tasks`: G-rule **1/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: G-rule **2/3** (unchanged).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: G-rule **1/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: G-rule **3/3 DISPATCHED (iter 678)**. Config engine fix still pending. Medic escalations will continue until Forge's `heal-forge-no-pr-preflight-superseded-suppression-001` merges AND engine fix ships.
+  - All other G-rule counters unchanged from iter 850.
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8 (unchanged), ratio≈87.75. No new ledger rows this iter (no auto-fix actions taken).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert — Tier-3 silence (outbox-notifier:review-pass for PR #316). No tier-reset. Watermark advanced to 1284 lines / 06:41:10Z.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #61 at 06:42:14Z. No action. Self-recovering.
+4. No auto-fix actions this iter (PRs #315 and #314 below 30-min threshold).
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=06:46:09Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing ask-then-do: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` — Medic (attempt 5) recommends re-queuing from scratch after verifying Forge OAuth health. Forge now has the systemic fix in pipeline (`heal-forge-no-pr-preflight-superseded-suppression-001`) which will suppress future hourly alarms for this pattern class. Standing: "go: cycle-timer checkpoint" still pending Larry's trigger to ship PR. SYNC-PUSH-REBASE-FALLBACK root fix still pending (APPROVAL_REQUEST open).
+
+**Patterns:**
+- Pipeline is clearing rapidly: PRs #311, #312, #313, #316 all merged in this interactive session window. Mirror inbox cleared to 0.
+- `heal-forge-no-pr-preflight-superseded-suppression-001.json` is now in Forge's inbox — the stem-matching systemic fix that will suppress the recurring medic-diagnosis Tier-4 noise. When Forge builds and PRs this, the forge-no-pr G-rule can be closed.
+- PR #315 ("fix(healers): reconcile false-positive alert classes before paging Larry") is CLEAN/MERGEABLE. This PR may close some open G-rules about false-positive alert classes. Next cycle: check if it crosses 30-min threshold.
+- SYNC-PUSH-REBASE-FALLBACK rate during this rapid interactive session: #57 (iter 847), #58 (iter 848), #59 (iter 849), #60 (iter 850), #61 (iter 851) — 5 consecutive occurrences. Root code fix is the only long-term path.
+
+**Learned:** Mirror cleared its entire 3-item inbox in one sweep after PRs #311, #313, #316 all merged. The mirror-dag graceful handling of stale `marker-error-heal-phantom-dispatch-claim-1.json` (for already-merged PR #311) confirmed without incident — Mirror discarded cleanly as expected. PR #316 merge timing: outbox-notifier:review-pass alert arrived at 06:41:10Z, 32 seconds after PR merged at 06:41:09Z — fast pipeline response.
+
+---
+
 ## Iteration 850 — 2026-06-04 06:39 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: Tier-4 novel [medic-diagnosis attempt 5]; Check B: SYNC-PUSH-REBASE-FALLBACK #60; Check E: PR #313 auto-merge applied) — **1 auto-fix (PR #313 auto-merge). PR #311 ✅ merged. heal-wedged-review-sessions.timer NOW ACTIVE (manual install between iters). 4 open PRs (#313 CLEAN/30min→auto-merge, #314 UNKNOWN/16min, #315 UNKNOWN/12min, #316 UNKNOWN/5min). Forge inbox: 2. Mirror inbox: 3. Beacon inbox: 2. 8/8 services active.**
