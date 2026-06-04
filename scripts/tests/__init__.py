@@ -13,6 +13,12 @@ other becomes a no-op (because both check for an existing value). pytest
 flows get per-test isolation via the fixture; unittest flows get
 process-level isolation via this __init__.
 
+PARITY IS ENFORCED. scripts/tests/test_conftest_init_parity.py fails if a
+conftest.py autouse fixture has no mirror here — so a new pytest-only
+protection cannot silently skip the unittest regression gate. When you add a
+protection to conftest.py, add its env-var mirror below and register it in
+that test's MIRRORED_AUTOUSE_FIXTURES.
+
 Background — 2026-05-27 11:56–11:57 MDT incident: tests calling production
 functions (e.g., beacon_telegram_bot.call_beacon with a mocked subprocess)
 reached the bot's internal log() helper, which wrote test sentinel strings

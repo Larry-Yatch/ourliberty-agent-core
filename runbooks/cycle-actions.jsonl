@@ -42,3 +42,4 @@
 {"ts": "2026-06-04T02:29:32Z", "iteration": 821, "finding": "PR #298 CLEAN/MERGEABLE for 35m45s (>30min threshold); docs(orchestrator) engine-hardening spec", "action": "gh pr merge 298 --auto --squash", "result": "MERGED at 2026-06-04T02:29:32Z"}
 {"ts": "2026-06-04T02:40:16Z", "iter": 822, "finding": "PR-299-CLEAN-MERGEABLE-30min-threshold", "action": "gh pr merge 299 --auto --squash --repo Larry-Yatch/ourliberty-agent-core", "result": "MERGED"}
 {"ts": "2026-06-04T05:07:40Z", "iter": 839, "finding": "PR #36 ourliberty-dashboard CLEAN/MERGEABLE for 30m (ux: move Forge Queue panel)", "action": "gh pr merge 36 --auto --squash --repo Larry-Yatch/ourliberty-dashboard", "result": "MERGED"}
+{"ts": "2026-06-04T05:40:00Z", "iteration": 844, "finding": "PR #303 CLEAN/MERGEABLE, age>30min, autoMergeRequest null", "action": "gh pr merge 303 --auto --squash", "result": "auto-merge enabled", "auto_fix_id": "enable-pr-auto-merge"}

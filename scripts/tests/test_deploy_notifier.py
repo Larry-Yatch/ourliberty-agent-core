@@ -197,6 +197,15 @@ class OrchestrationBase(unittest.TestCase):
         self._dm_patch.start()
         self.addCleanup(self._dm_patch.stop)
 
+        self._log_lines = []
+
+        def fake_log(msg, level='INFO'):
+            self._log_lines.append(msg)
+
+        self._log_patch = mock.patch.object(dn, 'log', fake_log)
+        self._log_patch.start()
+        self.addCleanup(self._log_patch.stop)
+
 
 class EmptyRegistryTest(OrchestrationBase):
     def test_empty_targets_no_dm_no_api_call(self):
@@ -220,8 +229,8 @@ class NoMatchingDeploymentsTest(OrchestrationBase):
         self.assertEqual(self._dm_calls, [])
 
 
-class ReadyDmTest(OrchestrationBase):
-    def test_ready_with_meta_prid_fires_dm(self):
+class ReadyLogOnlyTest(OrchestrationBase):
+    def test_ready_logs_preview_url_no_dm(self):
         d = _deployment(uid='dpl_r1', project_id='prj_dash',
                         state='READY', pr_id=7)
         counts = dn.run_once(
@@ -230,16 +239,16 @@ class ReadyDmTest(OrchestrationBase):
             dry_run_override=False,
         )
         self.assertEqual(counts['ready'], 1)
-        self.assertEqual(counts['dm_sent'], 1)
-        call = self._dm_calls[0]
-        self.assertEqual(call['subject'], 'deploy-notifier:READY:dpl_r1')
-        self.assertEqual(call['severity'], 'warning')
-        self.assertIn('preview live', call['message'])
-        self.assertIn('PR #7', call['message'])
-        self.assertIn('https://ourliberty-dashboard-pr-7.vercel.app',
-                      call['message'])
+        # READY is log-only: no DM appended.
+        self.assertEqual(counts['dm_sent'], 0)
+        self.assertEqual(self._dm_calls, [])
+        # Preview URL is preserved in the log.
+        log_blob = '\n'.join(self._log_lines)
+        self.assertIn('log-only', log_blob)
+        self.assertIn('https://ourliberty-dashboard-pr-7.vercel.app', log_blob)
+        self.assertIn('PR #7', log_blob)
 
-    def test_ready_with_gh_fallback(self):
+    def test_ready_with_gh_fallback_logs_pr(self):
         d = _deployment(uid='dpl_r2', project_id='prj_dash',
                         state='READY', pr_id=None)
         runner = mock.Mock(return_value=11)
@@ -248,20 +257,24 @@ class ReadyDmTest(OrchestrationBase):
             state=_state(), vercel_deployments=[d],
             dry_run_override=False, gh_runner=runner,
         )
-        self.assertEqual(counts['dm_sent'], 1)
-        self.assertIn('PR #11', self._dm_calls[0]['message'])
+        self.assertEqual(counts['dm_sent'], 0)
+        self.assertEqual(self._dm_calls, [])
+        self.assertIn('PR #11', '\n'.join(self._log_lines))
 
-    def test_ready_unknown_pr(self):
+    def test_ready_log_only_dedups_across_ticks(self):
+        reg = _registry([_target('dash', 'prj_dash')])
+        state = _state()
         d = _deployment(uid='dpl_r3', project_id='prj_dash',
-                        state='READY', pr_id=None)
-        runner = mock.Mock(return_value=None)
-        counts = dn.run_once(
-            registry=_registry([_target('dash', 'prj_dash')]),
-            state=_state(), vercel_deployments=[d],
-            dry_run_override=False, gh_runner=runner,
-        )
-        self.assertEqual(counts['dm_sent'], 1)
-        self.assertIn('PR #(unknown)', self._dm_calls[0]['message'])
+                        state='READY', pr_id=7)
+        dn.run_once(registry=reg, state=state, vercel_deployments=[d],
+                    dry_run_override=False)
+        # Second tick on the same READY uid: deduped, still no DM.
+        self._log_lines.clear()
+        counts = dn.run_once(registry=reg, state=state, vercel_deployments=[d],
+                             dry_run_override=False)
+        self.assertEqual(counts['dm_sent'], 0)
+        self.assertEqual(counts['skipped_already_notified'], 1)
+        self.assertEqual(self._dm_calls, [])
 
 
 class ErrorDmTest(OrchestrationBase):
@@ -318,7 +331,7 @@ class BranchFilterTest(OrchestrationBase):
         self.assertEqual(self._dm_calls, [])
 
     def test_filter_forge_glob_matches(self):
-        d = _deployment(branch='forge/feature-x', pr_id=1)
+        d = _deployment(branch='forge/feature-x', state='ERROR', pr_id=1)
         counts = dn.run_once(
             registry=_registry([_target('dash', 'prj_x', branch_filter='forge/*')]),
             state=_state(), vercel_deployments=[d],
@@ -327,7 +340,7 @@ class BranchFilterTest(OrchestrationBase):
         self.assertEqual(counts['dm_sent'], 1)
 
     def test_filter_null_matches_any(self):
-        d = _deployment(branch='main', pr_id=1)
+        d = _deployment(branch='main', state='ERROR', pr_id=1)
         counts = dn.run_once(
             registry=_registry([_target('dash', 'prj_x', branch_filter=None)]),
             state=_state(), vercel_deployments=[d],
@@ -340,7 +353,7 @@ class DedupTest(OrchestrationBase):
     def test_same_uid_same_state_no_redm(self):
         reg = _registry([_target('dash', 'prj_x')])
         state = _state()
-        d = _deployment(uid='dpl_d1', project_id='prj_x', state='READY', pr_id=1)
+        d = _deployment(uid='dpl_d1', project_id='prj_x', state='ERROR', pr_id=1)
         dn.run_once(registry=reg, state=state, vercel_deployments=[d],
                     dry_run_override=False)
         self.assertEqual(len(self._dm_calls), 1)
