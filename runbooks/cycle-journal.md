@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 804 — 2026-06-04 00:09 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **5 new alerts: 3 Tier-4 (medic:medic-diagnosis ×2 + pulse/beacon-result ×2, tier-reset), 1 Tier-3 (pipeline-stall silenced via translations). Beacon responded to iter-803 dispatch — APPROVAL_REQUEST pending Larry's direction.** Alert watermark: **1232 lines / anchor 00:10:01Z** (+5 new: 2× medic-diagnosis, 2× pulse/beacon-result, 1× pipeline-stall Tier-3). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success (post-wrapper lag; HEAD=0891d62 ahead of last_sync=23:46:04Z, commit=1fe0a66). Healer heartbeat: **23:55:09Z** (~15 min old at check time; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, created 23:55:22Z, ~17 min old — Mirror review not yet dispatched; watch item). **0 open PRs in ourliberty-dashboard.** Forge: 2 tasks (Phase C: `pulse-triage-phase-c-promotion-002.json` + `resume-pulse-triage-phase-c-promotion-001-r1.json`, both ~5 min old, active builds). Mirror: EMPTY. Beacon: 1 task (`cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json`, consumed ✅ — response in journal notification above). Worktrees: **5** (3 active: Queue API + Phase C-001 + Phase C-002; 2 stale preflight from PR #293 — hourly GC at ~01:00Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 5 new alerts — tier-reset.** `larry-alerts.jsonl`: **1232 lines** — 5 new lines above iter-803 watermark (1227/23:54:17Z). Helper called for each.
+  - **Line 1228** — 23:56:10Z `heal-pipeline-stall` / `pipeline-stall:retry-exhausted:unknown` → **Tier 3** (known-pattern match: `pipeline-stall:retry-exhausted` prefix in translations). Silenced. No tier-reset. Context: `forge-queue-api-preflight-20260603T231401Z-clarify1` exhausted 5 retries at 23:42Z due to stale session ID `189a99b8-f92b-41a9-b884-15e890c7348a`; self-healed by fresh retry at 23:48Z. ✅
+  - **Line 1229** — 23:58:52Z `medic` / `medic-diagnosis` → **Tier 4** (novel; `medic` not in translations). Medic's narrative: confirmed self-heal, root cause = no TTL/validity check on stored resume session IDs (13th occurrence of this fingerprint). Tier-reset. Fix batched in existing Beacon dispatch. Action-dispatched to `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z`. ⚠️
+  - **Line 1230** — 23:58:58Z `medic` / `medic-diagnosis` → **Tier 4** (same; brief duplicate). Tier-reset. Same dispatch. ⚠️
+  - **Line 1231** — 00:09:52Z `pulse/beacon-result` → **Tier 4** (novel; source not in translations). Beacon's detailed recommendation on the alert-translations dispatch. Beacon already DM'd Larry directly. No additional Pulse DM. Tier-reset.
+  - **Line 1232** — 00:10:01Z `pulse/beacon-result` → **Tier 4** (same; shorter duplicate). Tier-reset.
+  - **G-rule `medic:medic-diagnosis not in alert-translations.json`: 2/3 → 3/3.** Fix batched in existing Beacon dispatch (`cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json`). No new dispatch needed. BUT: Beacon's response (notification above) clarifies the fix needs a Python engine change (hyphen-suffix wildcards + `intent` fallback) before `medic:medic-diagnosis` can be silenced via translation. G-rule fix is in pipeline but requires engine work, not just config. ⚠️
+  - **NEW G-rule: `pulse/beacon-result not in alert-translations.json`: 1/3** (iter 804; first observation). Source `pulse/beacon-result` not in translations. Beacon-result DMs are already Larry-facing via beacon-bot — the alert is redundant noise. At 3/3: batch into next alert-translations engine fix dispatch.
+  - **NEW G-rule: `stale-session-ID resume failures — no TTL on resume session IDs`: 1/3** (iter 804; Medic confirmed 13 prior occurrences, first formal Pulse G-rule tracking). Forge's inbox-watcher burns 5 retry slots on guaranteed-to-fail stale Claude Code sessions. Root cause: no TTL or validity check on stored resume session IDs before retry. At 3/3: dispatch Beacon to spec `session-validity pre-flight` or TTL cutoff on resume session ID persistence.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Beacon session. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 23:55:09Z (~15 min old; ✅). No active stalls. Cooldown residue 199 structural. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. Beacon result DM already routed by Beacon-bot. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: 23:55:09Z (~15 min old; ✅). ✅
+
+- **(Check A) Source repo: ✅ Clean.** HEAD=0891d62 "Pulse cycle 20260604T000329Z" (iter-803 wrapper commit), branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** last_sync=23:46:04Z, commit=1fe0a66. HEAD=0891d62 ahead — normal. Hourly ourliberty-sync.timer will catch up. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** No downtime signals. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Watch — Mirror review dispatch gap.**
+  - **agent-core:** 1 open PR — **#294** `feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint`, CLEAN/MERGEABLE, created 23:55:22Z (~17 min old at check time). Mirror inbox EMPTY — outbox-notifier has not dispatched a review task yet. Prior PRs received Mirror dispatch within 1-2 min. 17-min gap is unusual. **Not yet at 30-min stall threshold. Watch item: if no Mirror review task by next iter, flag as pipeline-stall candidate.**
+  - **ourliberty-dashboard:** 0 open PRs. ✅
+  - **Forge inbox: 2 tasks** (~5 min old):
+    - `pulse-triage-phase-c-promotion-002.json` — Phase C second envelope, active build (worktree `wt-forge-pulse-triage-phase-c-promotion-002` exists).
+    - `resume-pulse-triage-phase-c-promotion-001-r1.json` — Phase C-001 revision; Forge working on r1 (worktree `wt-forge-pulse-triage-phase-c-promotion-001` exists). Both within normal threshold. ✅
+  - **Mirror: EMPTY.** Pending PR #294 review dispatch. ✅
+  - **Beacon: 1 task** `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json` consumed (Beacon responded, APPROVAL_REQUEST pending Larry). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No new burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):**
+  - Check I: Monday only → skip. ✅
+  - Check VIII/IX/X: Monday only → skip. ✅
+  - Check III: next 2026-06-14. ✅
+
+- **Beacon result (critical watch item):**
+  - Beacon processed `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json`.
+  - **Recommendation:** Split the fix. Ship `deploy-notifier:READY` as a standalone config-only PR immediately — it's the genuine noise source and works with the current engine. The other 5 G-rules (`pulse-check-stale:*`, `medic:medic-diagnosis`, `outbox-notifier:reject`, `cycle-blocked:dirty-tree-*`, `ledger/weekly-*`) need a Python engine change (hyphen-suffix wildcard matching + `intent` field fallback) before they can be silenced via config. Adding them to the config PR would produce entries that silently never match.
+  - **APPROVAL_REQUEST:** Beacon is holding pending Larry's direction. Beacon already DM'd Larry via beacon-bot.
+  - **Larry's decision options:** "deploy-notifier only" → ship config-only PR now; "scope engine fix too" → Beacon writes engine-extension spec as separate task.
+
+- **G-rule watch (updated this iter):**
+  - **`medic:medic-diagnosis not in alert-translations.json`: 3/3** — fix needs engine change, not just config. In-flight via existing Beacon dispatch. Close when engine PR merges.
+  - **NEW `pulse/beacon-result not in alert-translations.json`: 1/3** (iter 804).
+  - **NEW `stale-session-ID resume failures (no TTL on resume session IDs)`: 1/3** (iter 804; Medic: 13th occurrence, root cause confirmed).
+  - `heal-pipeline-stall "unknown" task ID metadata resolution bug`: **1/3** unchanged (iter 776) — Tier 3 translation now silences the alert symptom; underlying healer code fix still worthwhile.
+  - `pulse-check-stale:* not in alert-translations.json`: **1/3** (iter 784).
+  - 19:21:44Z test-cluster: **1/3** (iter 784).
+  - `inbox-watcher.service install-drift not auto-healed`: **1/3** (iter 775).
+  - `outbox-notifier:reject`: **1/3** (iter 769).
+  - `daemon-reload triggers cycle.timer stuck`: **2/3** (iter 680).
+  - `cleanup_stale_worktrees.py misses orphaned dirs`: **1/3** (iter 716).
+  - `cycle-blocked:dirty-tree-*`: **2/3**.
+  - `heal-stale-daemon-code:auto-restarted:*` G-rule 3/3 DISPATCHED (iter 592); Forge brief MISSING. Re-dispatch pending Larry go-ahead. ⚠️
+
+- **PRIME DIRECTIVE ratio:** interventions=684, systemic_fixes=5, ratio=136.8 (+1 intervention this iter: 2× medic-diagnosis Tier-4).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 5 new alerts (lines 1228–1232). Called `alert_triage_state.py triage-alert` for each. Classified: 3× Tier 4 (medic-diagnosis ×2 + pipeline-stall:retry-exhausted:unknown Tier-3 cross-check), 2× Tier 4 (pulse/beacon-result), 1× Tier-3 silenced (pipeline-stall:retry-exhausted:unknown). Watermark advanced to 1232/00:10:01Z.
+3. Marked both medic-diagnosis alerts as `action-dispatched` → `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z` (existing batch dispatch; Beacon has consumed it).
+4. G-rule `medic:medic-diagnosis` → 3/3 confirmed. Fix in Beacon pipeline. No new dispatch.
+5. Noted 2 new G-rules: `pulse/beacon-result` (1/3) and `stale-session-ID resume failures` (1/3).
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 804 --template medic-diagnosis-tier4-novel --detail 2x-medic-diagnosis-tier4-fix-batched-in-existing-beacon-dispatch` → ts=2026-06-04T00:10:52Z. ✅
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T00:10:56Z. ✅
+8. No always-allowed auto-fixes triggered. PR #294 < 30 min; repo clean. ✅
+9. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** None to Larry directly. Beacon already DM'd Larry about the APPROVAL_REQUEST (`pulse/beacon-result` alerts). No additional Pulse DM warranted — by-design medic/pipeline-stall alerts are self-healed noise; Beacon result is already in Larry's DMs.
+
+**Patterns:** Beacon's split-the-fix recommendation is sound architectural reasoning: the config engine currently does exact-match on the `subject` field, so hyphen-suffix patterns like `deploy-notifier:READY:*` require the engine to be extended first. The 5 remaining G-rules that also need wildcards or `intent`-field matching are scope-additive but not urgent. The stale-session-ID pattern (13 occurrences, Medic-confirmed) is the highest-signal new finding this iter — inbox-watcher burning 5 retry slots on expired sessions is real waste. At G-rule 3/3, this gets a Beacon spec.
+
+**Learned:** `pulse/beacon-result` source will generate Tier-4 alerts on every Beacon response. This is expected inter-agent feedback traffic. Should be added to Tier 3 in the next engine fix batch (Beacon already identified this pattern class as needing engine work). G-rule 1/3 is the right tracking.
+
+---
+
+## Notification — 2026-06-04 (inter-agent) | from=beacon | task=cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z | status=SUCCESS
+
+**Type:** Result notification (no new cycle; no health check run).
+
+**Beacon result:** Analyzed the batched alert-translations dispatch from iter-803 (G-rule 3/3 `deploy-notifier:READY:*`). Recommendation:
+- **Ship `deploy-notifier:READY` as a config-only PR now** — this is the genuine noise source, and the entry works immediately as-is.
+- **Treat the other 5 pending G-rules as separate scope** — `pulse-check-stale:*`, `medic:medic-diagnosis`, `outbox-notifier:reject`, `cycle-blocked:dirty-tree-*`, `ledger/weekly-*` all require a Python engine change (hyphen-suffix wildcards + `intent` fallback) before they can be silenced. Adding them to this PR would produce entries that silently never match.
+- Beacon is **holding the APPROVAL_REQUEST** pending Larry's direction.
+
+**Escalated:** `larry_alerts.append_alert` — `pulse/beacon-result` / warning / "Beacon needs your call: deploy-notifier alert-translations". Route=escalate (DM). Larry can reply "deploy-notifier only" or "scope engine fix too."
+
+**Did:** Nothing beyond logging this notification and alerting Larry.
+
+---
+
 ## Iteration 803 — 2026-06-04 00:00 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **G-rule 3/3 hit: deploy-notifier:READY:* → Beacon dispatch** (by-design Vercel deploy success signals; no DM to Larry). Alert watermark: **1227 lines / anchor 23:54:17Z** (+4 new). Cooldown residue: **199** (structural; unchanged). Sync: ✅ success, last_sync=23:46:04Z, commit=1fe0a6675 (post-wrapper lag; HEAD=56b3c01). Healer heartbeat: **23:55:09Z** (~5 min old at check time; ✅). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE, created 23:55:22Z, ~5 min old — below 30-min auto-merge threshold); **0 open PRs in ourliberty-dashboard** (PR #34 merged ~23:51Z). Forge: 1 task (pulse-triage-phase-c-promotion-001, being processed). Mirror: EMPTY. Beacon: EMPTY. Worktrees: **4** (2 active, 2 stale preflight from PR #293).
