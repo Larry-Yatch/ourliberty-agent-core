@@ -19,6 +19,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -9985,6 +9986,233 @@ class EmissionPathFixtureGateTest(unittest.TestCase):
         self.assertEqual(
             len(list((on.INBOXES_ROOT / 'beacon').glob('notify-dead-letter-*.json'))), 1
         )
+
+
+class PrUrlRobustExtractionTest(unittest.TestCase):
+    """fix-notifier-review-dispatch-reliability (Part A): _PR_URL_RE now
+    tolerates a short leading clause (`Done. `, `Result: `) and a `#<num>`
+    token between `PR` and the verb, while STILL rejecting a URL merely
+    discussed mid-sentence. The PR #303 incident outbox read literally
+    `Done. PR #303 opened: <url>` and the old line-start anchor dropped it."""
+
+    def test_done_clause_with_number_token_extracted(self):
+        # The verbatim shape of the PR #303 incident outbox result.
+        result = (
+            'Done. PR #303 opened: https://github.com/Larry-Yatch/'
+            'ourliberty-agent-core/pull/303'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/303',
+        )
+
+    def test_result_label_clause_extracted(self):
+        result = 'Result: PR opened: https://github.com/x/y/pull/5'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/5',
+        )
+
+    def test_number_token_with_updated_verb_extracted(self):
+        result = 'PR #12 updated: https://github.com/x/y/pull/12'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/12',
+        )
+
+    def test_canonical_opened_unchanged(self):
+        # Byte-for-byte identical group(1) to the prior regex.
+        result = 'PR opened: https://github.com/x/y/pull/77\n\nDetails.'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/77',
+        )
+
+    def test_canonical_updated_unchanged(self):
+        result = 'PR updated: https://github.com/x/y/pull/8\n\nAdded a commit.'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/8',
+        )
+
+    def test_clause_with_number_then_multiline_body(self):
+        result = (
+            'Done. PR #41 opened: https://github.com/x/y/pull/41\n\n'
+            'Implemented the fix; all tests pass.\n- foo\n- bar'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/41',
+        )
+
+    def test_mid_sentence_discussion_still_returns_none(self):
+        # The Part A guarantee: a URL discussed mid-sentence (no clause
+        # terminator directly before `PR`) MUST NOT match.
+        result = (
+            'I considered PR opened: https://github.com/x/y/pull/99 '
+            'from last week, but built fresh instead.'
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+
+class ReconcileMissedMirrorReviewsTest(unittest.TestCase):
+    """fix-notifier-review-dispatch-reliability (Part B): the reconciliation
+    sweep re-dispatches Mirror reviews the inline path dropped, bounded by an
+    mtime window + idempotency, and never reviews a non-OPEN PR."""
+
+    _PR = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/303'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        on.ensure_dirs()
+        # Default: pretend every probed PR is OPEN. The gh layer is exercised
+        # separately; here we want to assert dispatch behavior, not shell out.
+        self._gh_open_orig = on._gh_pr_is_open
+        self._gh_open_calls = []
+
+        def _fake_open(repo_coords, pr_number):
+            self._gh_open_calls.append((repo_coords, pr_number))
+            return True
+        on._gh_pr_is_open = _fake_open
+
+    def tearDown(self):
+        on._gh_pr_is_open = self._gh_open_orig
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def _write_archived_build(self, name='prod-built.json', *, task_id='prod-built',
+                              result=None, recent=True, **overrides):
+        archive_dir = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        if result is None:
+            result = f'Done. PR #303 opened: {self._PR}'
+        body = _good_outbox(
+            agent='forge', source='beacon', task_id=task_id, phase='build',
+            target_repo='ourliberty-agent-core', branch=f'forge/{task_id}',
+            result=result,
+        )
+        body.update(overrides)
+        f = archive_dir / name
+        f.write_text(json.dumps(body))
+        if not recent:
+            old = time.time() - (on.RECONCILE_WINDOW_HOURS + 1) * 3600
+            os.utime(f, (old, old))
+        return f
+
+    def test_happy_path_redispatches_missing_review(self):
+        self._write_archived_build()
+        on._reconcile_missed_mirror_reviews()
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        review = json.loads(reviews[0].read_text())
+        self.assertEqual(review['task_id'], 'prod-built')
+        self.assertEqual(review['pr_url'], self._PR)
+        self.assertEqual(review['phase'], 'review')
+        # The non-canonical phrasing was extracted (Part A) AND re-dispatched.
+        self.assertEqual(len(self._gh_open_calls), 1)
+
+    def test_idempotent_when_review_in_inbox(self):
+        self._write_archived_build()
+        mirror_inbox = on.INBOXES_ROOT / 'mirror'
+        mirror_inbox.mkdir(parents=True, exist_ok=True)
+        (mirror_inbox / 'review-prod-built.json').write_text('{}')
+        on._reconcile_missed_mirror_reviews()
+        # The planted file is the only one; no fresh dispatch.
+        reviews = list(mirror_inbox.glob('review-*.json'))
+        self.assertEqual(len(reviews), 1)
+        # Idempotency short-circuits BEFORE the gh open-state check.
+        self.assertEqual(self._gh_open_calls, [])
+
+    def test_idempotent_when_review_in_archive(self):
+        self._write_archived_build()
+        archived = on.INBOXES_ROOT / 'mirror' / '.archive'
+        archived.mkdir(parents=True, exist_ok=True)
+        (archived / 'review-prod-built.json').write_text('{}')
+        on._reconcile_missed_mirror_reviews()
+        live = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(live, [])
+        self.assertEqual(self._gh_open_calls, [])
+
+    def test_window_bound_skips_old_archive_entry(self):
+        self._write_archived_build(recent=False)
+        on._reconcile_missed_mirror_reviews()
+        reviews = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(reviews, [])
+        # Out-of-window entries are filtered before any gh call.
+        self.assertEqual(self._gh_open_calls, [])
+
+    def test_no_op_when_no_pr_url(self):
+        # A build outbox with no PR URL is not a candidate — zero dispatch,
+        # zero gh calls.
+        self._write_archived_build(
+            result='Hit a compile error; need clarification.',
+        )
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+        self.assertEqual(self._gh_open_calls, [])
+
+    def test_skips_closed_or_merged_pr(self):
+        self._write_archived_build()
+        on._gh_pr_is_open = lambda repo, num: False
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+
+    def test_skips_when_pr_state_unknown(self):
+        self._write_archived_build()
+        on._gh_pr_is_open = lambda repo, num: None
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+
+    def test_non_build_phase_ignored(self):
+        self._write_archived_build(name='prefl.json', task_id='prefl',
+                                   phase='preflight')
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+        self.assertEqual(self._gh_open_calls, [])
+
+    def test_missing_target_repo_ignored(self):
+        f = self._write_archived_build(name='no-repo.json', task_id='no-repo')
+        body = json.loads(f.read_text())
+        body.pop('target_repo', None)
+        f.write_text(json.dumps(body))
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+
+    def test_no_archive_dir_is_noop(self):
+        # Nothing archived yet — sweep must not raise or dispatch.
+        on._reconcile_missed_mirror_reviews()
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
 
 
 if __name__ == '__main__':
