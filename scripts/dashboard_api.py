@@ -678,7 +678,7 @@ def _agent_inbox_pending(agents_root: Path, agent: str) -> tuple[int, list[str]]
             if not entry.is_file():
                 continue
             name = entry.name
-            if not name.startswith('task-') or not name.endswith('.json'):
+            if name.startswith('.') or not name.endswith('.json'):
                 continue
             task_ids.append(name[:-len('.json')])
     except OSError:
@@ -1524,8 +1524,8 @@ def _reader_agent_queue_queued(
     """QUEUED lane: inbox dispatches not yet picked up.
 
     Mirrors `inbox_watcher.scan_inbox`'s matching rule — non-dotfile
-    `*.json`, mtime-sorted oldest-first — rather than `_agent_inbox_pending`
-    (whose `task-` prefix filter misses real `<task_id>.json` dispatches).
+    `*.json` — but sorts mtime oldest-first and emits `waited_seconds`
+    per item, whereas `_agent_inbox_pending` returns lexically-sorted ids.
     Parameterized on `agents_root` so it stays tmpdir-testable like the
     other dashboard readers. `waited_seconds = now(UTC) - file mtime`.
     """

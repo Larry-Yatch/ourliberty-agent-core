@@ -243,13 +243,26 @@ class AgentsStatusTest(unittest.TestCase):
     def test_in_flight_counts(self):
         (self.tmp / 'inboxes/forge/task-29.json').write_text('{}')
         (self.tmp / 'inboxes/forge/task-30.json').write_text('{}')
-        # An invalid file (no task- prefix) must not count.
-        (self.tmp / 'inboxes/forge/marker-error.json').write_text('{}')
+        # marker-error-* is a real dispatch type and a non-prefixed id is the
+        # common case (safe_write_inbox writes caller-supplied filenames), so
+        # both must count, matching inbox_watcher.scan_inbox.
+        (self.tmp / 'inboxes/forge/marker-error-7.json').write_text('{}')
+        (self.tmp / 'inboxes/forge/build-install-drift-emission-fix-001.json').write_text('{}')
+        # Dotfiles (e.g. partial writes) must not count.
+        (self.tmp / 'inboxes/forge/.partial.json').write_text('{}')
         with mock.patch.object(da, '_systemctl_is_active', return_value=True):
             r = self.c.get('/agents/status', headers=AUTH)
         forge = next(a for a in r.json()['agents'] if a['name'] == 'forge')
-        self.assertEqual(forge['in_flight_count'], 2)
-        self.assertEqual(forge['in_flight_task_ids'], ['task-29', 'task-30'])
+        self.assertEqual(forge['in_flight_count'], 4)
+        self.assertEqual(
+            forge['in_flight_task_ids'],
+            [
+                'build-install-drift-emission-fix-001',
+                'marker-error-7',
+                'task-29',
+                'task-30',
+            ],
+        )
 
     def test_bot_model_disambiguates_mirror_pulse(self):
         with mock.patch.object(da, '_systemctl_is_active', return_value=True):
@@ -321,6 +334,15 @@ class TasksRecentTest(unittest.TestCase):
         r = self.c.get('/tasks/recent', headers=AUTH)
         rows = r.json()['tasks']
         in_flight = [t for t in rows if t['task_id'] == 'task-42']
+        self.assertEqual(len(in_flight), 1)
+        self.assertEqual(in_flight[0]['outcome'], 'in_flight')
+
+    def test_in_flight_detection_non_prefixed_task_id(self):
+        # Real dispatched inbox files have no task- prefix.
+        (self.tmp / 'inboxes/forge/build-install-drift-emission-fix-001.json').write_text('{}')
+        r = self.c.get('/tasks/recent', headers=AUTH)
+        rows = r.json()['tasks']
+        in_flight = [t for t in rows if t['task_id'] == 'build-install-drift-emission-fix-001']
         self.assertEqual(len(in_flight), 1)
         self.assertEqual(in_flight[0]['outcome'], 'in_flight')
 
@@ -652,13 +674,24 @@ class ReaderUnitTest(unittest.TestCase):
         rows = da._load_costs_jsonl(self.tmp)
         self.assertEqual(len(rows), 2)
 
-    def test_agent_inbox_pending_ignores_non_task_files(self):
+    def test_agent_inbox_pending_counts_all_json_excludes_dotfiles(self):
         (self.tmp / 'inboxes/forge/task-1.json').write_text('{}')
+        # marker-error-* and non-prefixed ids are real dispatch filenames.
         (self.tmp / 'inboxes/forge/marker-error-foo.json').write_text('{}')
+        (self.tmp / 'inboxes/forge/build-install-drift-emission-fix-001.json').write_text('{}')
+        # Non-.json and dotfiles must be skipped.
         (self.tmp / 'inboxes/forge/random.txt').write_text('')
+        (self.tmp / 'inboxes/forge/.partial.json').write_text('{}')
         count, ids = da._agent_inbox_pending(self.tmp, 'forge')
-        self.assertEqual(count, 1)
-        self.assertEqual(ids, ['task-1'])
+        self.assertEqual(count, 3)
+        self.assertEqual(
+            ids,
+            [
+                'build-install-drift-emission-fix-001',
+                'marker-error-foo',
+                'task-1',
+            ],
+        )
 
 
 if __name__ == '__main__':
