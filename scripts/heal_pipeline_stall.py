@@ -666,6 +666,75 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
     return None
 
 
+# Reconciliation step 4 / dispatch-spec "Step 5" (pr-create-inferred-failure).
+# Applies ONLY to preflight/clarify
+# task_ids -- those never open a PR of their own (the build is a separate,
+# fresh-timestamp dispatch). When such a pointer's archived outbox shows the
+# dispatch was *consumed but errored* (the worker started, then the run
+# bailed -- e.g. `exit_code=-1` with `error='All retries exhausted'`, or a
+# gh-pr-create auth_401), the `[forge] done success=True` line that triggers
+# Check 1 is a stale/optimistic signal: there is no build gap, the run died
+# at the infra/auth layer. That genuine loss should surface ONCE under a
+# distinct, lower-urgency subject -- not be mislabeled as a build gap that
+# re-alarms hourly. Production driver (2026-06-04): clarify task
+# `forge-queue-api-preflight-20260603T231401Z-clarify1` archived with
+# exit_code=-1, error='All retries exhausted'; Step 4 already suppresses it
+# (its sibling build shipped as PR #294), but the same shape with NO sibling
+# PR would otherwise repeat the build-gap alarm six times. The preflight/
+# clarify gating is what keeps a genuine *build*-phase crash (phase='build',
+# task_id without `-preflight`/`-clarify`) firing the original alert.
+def _is_preflight_or_clarify_task(task_id: str) -> bool:
+    """True if `task_id` is a preflight/clarify pointer (contains
+    `-preflight` or `-clarify`). These never open their own PR."""
+    return '-preflight' in task_id or '-clarify' in task_id
+
+
+def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
+    """If the archived Forge outbox for `task_id` shows the dispatch was
+    consumed but errored (no clean PR), return a short human-readable cause
+    string for the alert message; else None.
+
+    Reads only `<task_id>.json` (the first-attempt outbox; retry variants
+    inherit the outcome). Returns None on a missing/unreadable archive or a
+    clean (exit_code==0, no error) outbox -- the caller then proceeds with
+    the normal build-gap alert decision.
+
+    Errored signals (any one suffices):
+      * `exit_code` present and != 0 (e.g. -1 from 'All retries exhausted').
+      * a non-empty `error` field (string).
+      * a recognizable gh-pr-create auth_401 signal in `error` / `result`.
+    The returned string prefers the `error` field text, names an auth_401
+    when detected, and otherwise reports the non-zero exit code."""
+    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
+    if not archive.exists():
+        return None
+    try:
+        with open(archive, errors='replace') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    exit_code = data.get('exit_code')
+    error = data.get('error')
+    result = data.get('result')
+    error_str = error.strip() if isinstance(error, str) else ''
+    haystack = ' '.join(
+        s for s in (error_str, result if isinstance(result, str) else '') if s
+    ).lower()
+    auth_401 = 'auth_401' in haystack or '401' in haystack
+    errored = (
+        (isinstance(exit_code, int) and exit_code != 0)
+        or bool(error_str)
+        or auth_401
+    )
+    if not errored:
+        return None
+    if auth_401:
+        return 'gh pr create auth_401 (credentials lapsed)'
+    if error_str:
+        return error_str
+    return f'exit_code={exit_code}'
+
+
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                             merged_prs: list[dict], state: dict) -> list[dict]:
     """Find Forge build-done lines >FORGE_BUILT_NO_PR_MIN ago where no PR
@@ -697,8 +766,18 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
          emits the marker to its session log; `result` summarizes it
          in prose). All three labels mean Forge intentionally did not
          produce a PR.
-    Both reconciliation paths emit an INFO log on skip for forensic
-    visibility. Only if BOTH paths miss does this check DM Larry.
+      c) `_forge_pr_create_inferred_failure` for preflight/clarify
+         task_ids only: the archived outbox shows the dispatch was
+         consumed but errored (exit_code != 0, non-empty `error`, or a
+         gh-pr-create auth_401). This is an infra/auth loss, not a build
+         gap. Instead of the build-gap alert, emit ONE lower-urgency
+         `pipeline-stall:pr-create-inferred-failure:<task>` alert (own
+         cooldown). Ordered after (a2) so a sibling-shipped task is
+         fully suppressed and never reaches here.
+    The skip paths (a/a2/b) emit a FORGE_NO_PR_SKIP INFO log; the
+    reclassify path (c) emits a FORGE_NO_PR_RECLASSIFY INFO log and a
+    distinct-subject alert. Only if every path misses does this check
+    DM Larry with the original build-gap alert.
 
     Module-internal numbering: this is Check 1 (forge-no-pr). Some
     earlier dispatch narration referred to the same reconciliation as
@@ -782,6 +861,45 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             log(f'FORGE_NO_PR_SKIP task={task} reason={reason}', 'INFO')
             seen_tasks.add(task)
             continue
+        # Reconciliation step 4 (pr-create-inferred-failure): a preflight/
+        # clarify pointer (never opens its own PR) whose archived outbox
+        # shows the dispatch was consumed but errored (exit_code != 0,
+        # non-empty error, or gh-pr-create auth_401). The `success=True`
+        # line is stale — the run died at the infra/auth layer, not a
+        # build gap. Suppress the build-gap alarm and surface ONCE under a
+        # distinct lower-urgency subject (own cooldown), so a genuine loss
+        # stays visible without re-alarming hourly. Ordered AFTER step 1b
+        # so a task whose sibling build already shipped is fully suppressed
+        # and never reaches this branch.
+        if _is_preflight_or_clarify_task(task):
+            cause = _forge_pr_create_inferred_failure(task)
+            if cause is not None:
+                log(
+                    f'FORGE_NO_PR_RECLASSIFY task={task} '
+                    f'reason=pr_create_inferred_failure cause={cause!r} '
+                    f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
+                    'INFO',
+                )
+                elapsed_min = int(
+                    (datetime.now(timezone.utc) - ts).total_seconds() / 60)
+                subject = f'pipeline-stall:pr-create-inferred-failure:{task}'
+                alerts.append({
+                    'key': subject,
+                    'message': (
+                        f'Preflight/clarify task `{task}` was consumed '
+                        f'{elapsed_min} min ago but errored before opening a '
+                        f'PR ({cause}). Likely an infra/auth failure at or '
+                        f'after the PR-create step, not a build gap.'),
+                    'subject': subject,
+                    'suggested_action': (
+                        f'Inspect the archived outbox '
+                        f'`~/agents/outboxes/forge/.archive/{task}.json` and '
+                        f'the Forge session log for the failure cause. If it '
+                        f'was a transient infra/auth lapse, re-dispatch the '
+                        f'task; no manual `gh pr create` is expected here.'),
+                })
+                seen_tasks.add(task)
+                continue
         # No matching PR — stall
         elapsed_min = int((datetime.now(timezone.utc) - ts).total_seconds() / 60)
         key = f'forge_built_no_pr:{task}'

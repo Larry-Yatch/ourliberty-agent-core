@@ -530,6 +530,126 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(len(alerts), 1)
         self.assertIn(task, alerts[0]['message'])
 
+    def _write_archive(self, task: str, payload: dict) -> None:
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps(payload))
+
+    def test_reclassifies_consumed_but_errored_preflight_no_sibling_pr(self) -> None:
+        """Step 5: a preflight/clarify pointer with NO sibling PR whose
+        archived outbox shows consumed-but-errored (the production shape:
+        exit_code=-1, error='All retries exhausted') must NOT fire the
+        build-gap alarm. It surfaces exactly once under the distinct
+        `pipeline-stall:pr-create-inferred-failure:<task>` subject."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': -1,
+            'attempts': None,
+            'error': 'All retries exhausted',
+            'result': 'All retries exhausted',
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            f'pipeline-stall:pr-create-inferred-failure:{task}',
+        )
+        # Build-gap subject must NOT be present.
+        self.assertNotIn('forge-no-pr', alerts[0]['subject'])
+        self.assertIn('All retries exhausted', alerts[0]['message'])
+        reclassify = [m for m in captured if 'FORGE_NO_PR_RECLASSIFY' in m]
+        self.assertEqual(len(reclassify), 1)
+        self.assertIn('reason=pr_create_inferred_failure', reclassify[0])
+
+    def test_reclassifies_on_auth_401_signal(self) -> None:
+        """Step 5 also recognizes a gh-pr-create auth_401 signal (exit_code
+        clean but the run carried an auth_401 error) and reclassifies."""
+        task = 'dashboard-x-preflight-20260604T010000Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': 0,
+            'error': 'gh pr create failed: auth_401 token expired',
+        })
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            f'pipeline-stall:pr-create-inferred-failure:{task}',
+        )
+
+    def test_step4_sibling_pr_wins_over_step5_reclassify(self) -> None:
+        """Ordering invariant: when the sibling build already shipped
+        (Step 4 / `_preflight_family_shipped`), a resolved task is fully
+        suppressed and never reaches the Step 5 infra-failure branch —
+        zero alerts, not a pr-create-inferred-failure alert. Uses the
+        exact production ids (clarify task + merged PR #294) PLUS the
+        errored archive so both paths could match; Step 4 must win."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': -1,
+            'error': 'All retries exhausted',
+        })
+        merged_prs = [{
+            'headRefName': 'forge/build-forge-queue-api-20260603T234656Z',
+            'number': 294,
+            'title': 'feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint',
+            '_repo': 'Larry-Yatch/ourliberty-dashboard',
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], merged_prs, {})
+        self.assertEqual(alerts, [])
+
+    def test_step5_does_not_apply_to_non_preflight_errored_task(self) -> None:
+        """Gating guard: a genuine build-phase crash (phase='build',
+        exit_code=1) on a task_id WITHOUT `-preflight`/`-clarify` is not a
+        Step 5 candidate — it still fires the original build-gap alert.
+        This is the same shape as
+        `test_alerts_on_build_phase_crash_no_preflight_skip`, asserted here
+        from the Step 5 angle: the preflight/clarify gate is what keeps the
+        regression green."""
+        task = 'real-build-phase-crash-002'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'build',
+            'exit_code': 1,
+            'attempts': 3,
+            'error': 'Forge crashed during gh pr create; no output.',
+        })
+        self.assertFalse(self.hps._is_preflight_or_clarify_task(task))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'], f'pipeline-stall:forge-no-pr:{task}')
+
+    def test_step5_skips_clean_preflight_exit(self) -> None:
+        """A clean preflight (exit_code=0, no error) is handled by Step 2
+        (`_forge_preflight_non_proceed` -> PREFLIGHT_EXIT) and must never
+        reach Step 5; `_forge_pr_create_inferred_failure` returns None on a
+        clean archive."""
+        task = 'clean-preflight-preflight-20260604T010000Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': 0,
+            'attempts': 1,
+            'result': 'CLARIFY emitted; awaiting Beacon.',
+        })
+        self.assertIsNone(self.hps._forge_pr_create_inferred_failure(task))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
 
 class TestCheckPrNoMirrorDispatch(_TempAgentsRootMixin, unittest.TestCase):
 
