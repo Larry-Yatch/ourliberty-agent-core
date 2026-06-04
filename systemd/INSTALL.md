@@ -113,6 +113,7 @@ sudo systemctl enable --now ourliberty-heal-recovery-already-merged.timer
 sudo systemctl enable --now ourliberty-heal-restart-dedup-obsolete.timer
 sudo systemctl enable --now ourliberty-heal-silent-loop-death.timer
 sudo systemctl enable --now ourliberty-heal-zombie-main-workers.timer
+sudo systemctl enable --now ourliberty-heal-wedged-review-sessions.timer  # reaps wedged Mirror/Forge review claude -p sessions (every 5 min; Case 1 auto-reap, Case 2 alert-only until promoted)
 sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — DRY-RUN by default; see service file for activation
 sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E1.5.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default

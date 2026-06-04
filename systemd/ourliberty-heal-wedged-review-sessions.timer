@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_wedged_review_sessions every 5 minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=5min
+Unit=ourliberty-heal-wedged-review-sessions.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,7 @@
+{
+  "_comment": "Tunable config for scripts/heal_wedged_review_sessions.py. Pulse-Check adjusts these values (no hand-picked constants in the healer). marker_grace_seconds: idle window after a terminal marker before a provably-done session is auto-reaped (Case 1). silent_grace_seconds: idle window with NO marker before a session is flagged as a silent-wedge candidate (Case 2). streak_to_promote: consecutive Case-2 true positives required to graduate Case 2 from alert-only to auto-reap.",
+  "enabled": true,
+  "marker_grace_seconds": 300,
+  "silent_grace_seconds": 900,
+  "streak_to_promote": 3
+}
