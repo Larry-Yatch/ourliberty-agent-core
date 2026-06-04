@@ -44,7 +44,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -219,6 +219,44 @@ def find_archived_envelope(task_stem: str,
 # -------------------- tier cooldown gate --------------------
 
 
+def _marker_since_ts(marker: dict[str, Any], in_flight_path: Path) -> datetime:
+    """The instant the task paused — the marker's `at`, else the in-flight
+    file mtime as a fallback for legacy markers without it."""
+    at = marker.get('at')
+    if isinstance(at, str):
+        try:
+            dt = datetime.fromisoformat(at.replace('Z', '+00:00'))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromtimestamp(
+            in_flight_path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return datetime.now(timezone.utc) - timedelta(days=1)
+
+
+def resolved_out_of_band(task_stem: str, since_ts: datetime
+                         ) -> tuple[bool, Optional[str]]:
+    """True if the paused task was already handled out-of-band since it
+    paused — Larry re-dispatched it via the Approvals tab (`larry_action`),
+    or the producing agent already started a fresh attempt (a later
+    `session_start` supersedes this pointer). chain_events match on the EXACT
+    task_id, so this is high-confidence; `check_pr=False` deliberately avoids
+    a weak title-substring PR match clearing a still-pending task. Failsafe:
+    any infra error returns (False, None) so a real paused task still
+    re-dispatches."""
+    try:
+        import task_resolution as tr  # noqa: E402
+        return tr.resolved_out_of_band(
+            task_stem, since_ts, check_pr=False,
+            log_fn=lambda m: log(m, 'INFO'))
+    except Exception as e:  # noqa: BLE001 -- never block resume on an error
+        log(f'resolution check failed for {task_stem}: '
+            f'{type(e).__name__}: {e}; proceeding', 'WARN')
+        return (False, None)
+
+
 def cooldown_cleared(tier: str) -> tuple[bool, Optional[str]]:
     """Return (cleared, until_iso). cleared=True iff no active cooldown
     is recorded for this tier (the recorded one already expired, or none
@@ -330,6 +368,19 @@ def process_one(in_flight_path: Path, task_stem: str, marker: dict[str, Any],
     failure_type = marker.get('failure_type') or 'unknown'
     agent_hint = marker.get('agent_id')
     tier = marker.get('tier') or 'tier1'
+
+    # Out-of-band resolution gate: if Larry already re-dispatched this task,
+    # or the producing agent already re-ran it, the paused marker is stale.
+    # Clear it silently rather than re-dispatch a duplicate (and never DM
+    # about it) — this is the false-positive the 2026-06-04 audit flagged.
+    since_ts = _marker_since_ts(marker, in_flight_path)
+    resolved, reason = resolved_out_of_band(task_stem, since_ts)
+    if resolved:
+        log(f'task={task_stem} resolved out-of-band ({reason}); clearing '
+            f'stale in-flight marker — no re-dispatch')
+        clear_in_flight_marker(in_flight_path)
+        state['tasks'].pop(task_stem, None)
+        return False
 
     cleared, until = cooldown_cleared(tier)
     if not cleared:

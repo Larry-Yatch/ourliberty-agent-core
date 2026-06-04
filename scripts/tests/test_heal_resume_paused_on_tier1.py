@@ -468,5 +468,67 @@ class AgentRunnerMarkerShapeTest(unittest.TestCase):
         self.assertNotIn('tier', data['paused_on_tier1'])
 
 
+class OutOfBandResolutionTest(_IsolatedAgentsRoot):
+    """The 2026-06-04 false-positive fix: a paused task already resolved
+    out-of-band (Larry re-dispatched, or a fresh session superseded it) must
+    NOT be re-dispatched — clear the stale marker silently instead."""
+
+    def setUp(self):
+        super().setUp()
+        os.environ[h.ENV_AUTORESUME_ENABLED] = 'true'
+
+    def _patch_swi_capture(self):
+        captured: dict = {}
+
+        def fake(target_agent, task_dict, source_agent, filename):
+            captured['called'] = True
+            return h.INBOXES_ROOT / target_agent / filename
+
+        import safe_write_inbox as swi
+        p = mock.patch.object(swi, 'safe_write_inbox', side_effect=fake)
+        p.start()
+        self.addCleanup(p.stop)
+        return captured
+
+    def test_resolved_clears_marker_without_redispatch(self):
+        self._write_marker('paused-resolved-001', tier='tier1')
+        self._write_archive('paused-resolved-001', agent='forge')
+        captured = self._patch_swi_capture()
+        with mock.patch.object(h, 'resolved_out_of_band',
+                               return_value=(True, 'larry_action')), \
+             mock.patch('active_tier.cooldown_until', return_value=None):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        # No re-dispatch, and the stale marker was cleared.
+        self.assertNotIn('called', captured)
+        self.assertFalse(
+            (h.IN_FLIGHT_DIR / 'paused-resolved-001.json').exists())
+
+    def test_not_resolved_proceeds_to_redispatch(self):
+        self._write_marker('paused-live-001', tier='tier1')
+        self._write_archive('paused-live-001', agent='forge')
+        captured = self._patch_swi_capture()
+        with mock.patch.object(h, 'resolved_out_of_band',
+                               return_value=(False, None)), \
+             mock.patch('active_tier.cooldown_until', return_value=None):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(captured.get('called'))
+
+    def test_resolution_check_failsafe_proceeds(self):
+        # The wrapper returns (False, None) on any infra error, so a real
+        # paused task still re-dispatches — verified via the live path.
+        self._write_marker('paused-failsafe-001', tier='tier1')
+        self._write_archive('paused-failsafe-001', agent='forge')
+        captured = self._patch_swi_capture()
+        with mock.patch('task_resolution.resolved_out_of_band',
+                        side_effect=RuntimeError('supabase down')), \
+             mock.patch('active_tier.cooldown_until', return_value=None):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        # Error swallowed -> treated as not-resolved -> re-dispatch proceeds.
+        self.assertTrue(captured.get('called'))
+
+
 if __name__ == '__main__':
     unittest.main()
