@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 875 — 2026-06-04 12:39 UTC (interactive)
+
+**Health:** ⚠️ Tier 1 (reset from Tier 3 by Check 0 signal) — **0 auto-fixes. 1 new alert (tier2_weekly_probe_failed, recurring, ask-then-do). Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Sync: ✅ wrapper ahead of sync timer (normal).**
+
+Alert watermark: **1269 lines / 12:01:08Z** (up from 1268 / 07:59:19Z — 1 new alert this iter). Sync: session HEAD=6a6a050 > sync.json commit=b9cd752 → wrapper push (iter 874) ahead of last sync timer fire (11:47Z); hourly timer catches up at ~12:47Z. No SYNC-PUSH-REBASE-FALLBACK. **8/8 services active.** Pipeline-stall heartbeat: 12:33:19Z (✅ very fresh). Stale-daemon heartbeat: 12:28:15Z (✅ ~11 min ago; within 90-min threshold).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** larry-alerts.jsonl: 1269 lines (up from 1268 / 07:59:19Z). New alert: `{"source": "heal-tier2-weekly-probe", "subject": "tier2_weekly_probe_failed", "ts": "2026-06-04T12:01:08Z", "route": "escalate"}`. Classification: **ask-then-do (SOON urgency)** per alert-translations.json `"tier": "SOON"` — this is NOT a Tier-3/FYI silence entry. Recurring pattern (Tier 2 OAuth still expired). Standing APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. Healer's `route:escalate` already delivered DM to Larry via beacon-bot. No additional Pulse DM needed — escalation already in standing queue. **Tier-reset: consecutive_clean reset to 0; Tier 3 → Tier 1.** ⚠️
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473). Pulse inbox: 0 tasks. Standing G-rule: cycle-timer-checkpoint DM forwarded to Beacon at 07:12 UTC; Beacon awaiting "go" — no new activity. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 12:33:19Z (✅ very fresh — fired within this cycle window). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No new directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 12:28:15Z (~11 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6a6a050 "Pulse cycle 20260604T120253Z" (iter 874 wrapper). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=11:47:20Z, commit=b9cd752. Session HEAD=6a6a050 > sync.json commit → wrapper push (iter 874) succeeded after last sync timer; hourly timer catches up at ~12:47Z. No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Forge inbox: 0 ✅ Mirror inbox: 0 ✅ Beacon inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 874. `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=704 (+1 this iter), systemic_fixes=9, ratio≈78.22. Ledger row: `tier2-weekly-probe-failed:20260604T120108Z-approval-request-open` (intervention, tier=1, iter=875).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert (tier2_weekly_probe_failed, 12:01:08Z). Classified ask-then-do (SOON urgency). Watermark advanced to 1269 lines / 12:01:08Z.
+3. `cycle_tier_state.py record --checks-clean false` → tier reset 3 → 1, consecutive_clean=0, last_signal_at=12:39:00Z. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 875 --template tier2-weekly-probe-failed --detail "20260604T120108Z-approval-request-open"` → row appended. ✅
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** Nothing new beyond standing items. Healer already DM'd Larry for tier2_weekly_probe_failed via beacon-bot.
+- `[yellow]` Inbox-watcher restart timeout fix (Beacon brief ready; Larry must trigger Forge dispatch via Telegram chat with Beacon bot for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`).
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go" — send "go: cycle-timer checkpoint" to Beacon bot to proceed).
+- `[yellow]` tier2_weekly_probe_failed recurring (healer DM'd Larry at 12:01:08Z; APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; self-recovers every occurrence).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- Alert watermark broke 11-iter streak of silence: tier2_weekly_probe_failed fired at 12:01:08Z (post-iter-874 wrapper). Tier 2 OAuth remains expired — weekly probe will continue failing until Larry re-auths. Not a new pattern; same standing item from prior iters.
+- All other substrates nominal: both healers fresh, 8/8 services active, 0 PRs, 0 inbox tasks.
+- Tier reset 3→1 by check 0 signal. Will climb back to Tier 2 after 3 consecutive clean iters, then Tier 3 after 3 more.
+
+**Learned:** Nothing new. tier2_weekly_probe_failed `"tier": "SOON"` in alert-translations.json is confirmed ask-then-do (not silence/FYI) — it generates a tier-reset unlike the `"tier": "FYI"` entries.
+
+---
+
 ## Iteration 874 — 2026-06-04 12:01 UTC (interactive)
 
 **Health:** ✅ Tier 3, consecutive_clean=5 — **0 auto-fixes. All checks nominal. Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Sync: ✅ fully synced (sync.json HEAD matches session HEAD).**
