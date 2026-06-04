@@ -925,12 +925,14 @@ class MedicAllowlistShapeTest(unittest.TestCase):
 
     def test_append_notification_permitted(self) -> None:
         self.assertIn(
-            'Bash(python3:*scripts/larry_alerts.py append_notification:*)',
+            'Bash(python3 /home/larry/agent-core/scripts/larry_alerts.py '
+            'append_notification:*)',
             self.allow)
 
     def test_append_approval_request_permitted(self) -> None:
         self.assertIn(
-            'Bash(python3:*scripts/larry_alerts.py append_approval_request:*)',
+            'Bash(python3 /home/larry/agent-core/scripts/larry_alerts.py '
+            'append_approval_request:*)',
             self.allow)
 
     def test_append_alert_not_permitted(self) -> None:
