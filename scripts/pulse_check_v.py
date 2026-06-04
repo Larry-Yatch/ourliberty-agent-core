@@ -587,6 +587,14 @@ def emit_graduation_proposals(
     created: list[dict[str, Any]] = []
     for cand in candidates:
         template = cand['template']
+        # Dedup guard: run_promotion_loop runs monthly and add_pending does not
+        # dedup by id, so a proposal Larry has left unactioned would otherwise be
+        # re-emitted (and re-DMd) on the next cycle under the same
+        # `graduation-<template>` id. Skip if one is already pending.
+        if approval.find_graduation_pending(template) is not None:
+            log(f'graduation proposal for {template} already pending — skipping '
+                f're-emit')
+            continue
         record = cand['record']
         streak = cand['clean_streak']
         body = render_graduation_approval(record, streak, cand.get('executions'))
@@ -595,6 +603,14 @@ def emit_graduation_proposals(
             'task_id': task_id,
             'summary': body,
             'target_agent': 'forge',
+            # target_repo is REQUIRED: forge is worktree_enabled, so
+            # inbox_watcher refuses any task whose target_repo has no canonical
+            # path (it can't create the worktree). Without this the approval DM
+            # claims success but no config PR ever opens. task_type mirrors the
+            # Check III/VIII config-only PR pattern the brief cites.
+            'target_repo': 'ourliberty-agent-core',
+            'task_type': 'doc-only',
+            'pr_title': f'chore(pulse): graduate auto-fix pattern {template}',
             'kind': 'graduation',
             'template': template,
             'prompt': (

@@ -171,6 +171,69 @@ class TestRender(unittest.TestCase):
             self.assertNotIn(tok.lower(), text.lower())
 
 
+class TestEmitProposals(unittest.TestCase):
+    """The dispatch envelope a graduation proposal carries — the path
+    `approve graduation <template>` -> dispatch_approved -> Forge's inbox.
+    Forge is worktree_enabled, so the envelope MUST carry target_repo or
+    inbox_watcher refuses the task and no config PR ever opens."""
+
+    def setUp(self):
+        import beacon_approval_handler as approval
+        import larry_alerts as la
+        self.approval = approval
+        self.la = la
+        self._orig_add = approval.add_pending
+        self._orig_find = approval.find_graduation_pending
+        self._orig_append = la.append_approval_request
+        self.added = []
+        self.pending_templates = set()
+
+        def _fake_add(payload, chat_id=0):
+            self.added.append(payload)
+            self.pending_templates.add(payload.get('template'))
+            return {'id': payload['task_id'], 'dispatch_payload': payload}
+
+        def _fake_find(template, state=None):
+            return ({'id': f'graduation-{template}'}
+                    if template in self.pending_templates else None)
+
+        approval.add_pending = _fake_add
+        approval.find_graduation_pending = _fake_find
+        la.append_approval_request = lambda *a, **k: None
+
+    def tearDown(self):
+        self.approval.add_pending = self._orig_add
+        self.approval.find_graduation_pending = self._orig_find
+        self.la.append_approval_request = self._orig_append
+
+    def _cand(self, template='restart-daemon'):
+        return {'template': template, 'clean_streak': 3,
+                'record': _pattern(template), 'executions': [_ex()]}
+
+    def test_envelope_carries_target_repo_and_config_pr_fields(self):
+        created = p5.emit_graduation_proposals([self._cand()], chat_id=42)
+        self.assertEqual(len(created), 1)
+        self.assertEqual(len(self.added), 1)
+        payload = self.added[0]
+        # The fix: without target_repo, forge's worktree dispatch refuses the
+        # task and the config PR never opens.
+        self.assertEqual(payload['target_repo'], 'ourliberty-agent-core')
+        self.assertEqual(payload['target_agent'], 'forge')
+        self.assertEqual(payload['task_type'], 'doc-only')
+        self.assertIn('restart-daemon', payload['pr_title'])
+        self.assertEqual(payload['template'], 'restart-daemon')
+        self.assertEqual(payload['task_id'], 'graduation-restart-daemon')
+
+    def test_dedup_skips_when_already_pending(self):
+        # First emit registers a pending entry; the second monthly run must not
+        # re-emit (add_pending has no id-dedup, and find_graduation_pending now
+        # returns the existing entry).
+        p5.emit_graduation_proposals([self._cand()], chat_id=42)
+        again = p5.emit_graduation_proposals([self._cand()], chat_id=42)
+        self.assertEqual(again, [])
+        self.assertEqual(len(self.added), 1)
+
+
 class _RegistryFileBase(unittest.TestCase):
 
     def setUp(self):
