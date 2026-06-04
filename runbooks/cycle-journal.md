@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 856 — 2026-06-04 07:20 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check B: SYNC-PUSH-REBASE-FALLBACK #63 at 07:12:49Z) — **0 auto-fixes. Pipeline advancing: Forge inbox cleared (0), Mirror inbox 3 (reviewing PRs #317, #314 rev1, #318). 8/8 services active.**
+
+Alert watermark: **1286 lines / 06:55:53Z** (unchanged — 0 new alerts since iter 855). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #63 (07:12:49Z, commit 940024da — new occurrence since iter 855). sync.json: status=error, last_sync=07:12:49Z. Session HEAD=047da70 "Pulse cycle 20260604T070904Z" (iter 855 wrapper). Not in larry-alerts.jsonl (wrapper-invoked path). Self-recovering (hourly backstop). Healer heartbeat: **07:11:09Z** (~9 min; ✅). Stale-daemon heartbeat: **06:56:17Z** (~24 min; ✅ within 90-min threshold). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: 1286 lines — unchanged from iter 855 watermark (1286 / 06:55:53Z). No new alerts this iter. ✅ Watermark unchanged.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:11:09Z (~9 min; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:56:17Z (~24 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=047da70 "Pulse cycle 20260604T070904Z" (iter 855 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #63** (07:12:49Z, commit 940024da — new occurrence). sync.json: status=error. Session HEAD=047da70 > sync.json commit (940024da is iter 855 wrapper's runtime auto-commit attempt, rolled back post-push-failure). Self-recovering. Not in larry-alerts.jsonl (wrapper-invoked path). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern, tier-reset.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 0 auto-fixes this iter.**
+  - **PR #318 (agent-core) OPEN** — "fix(heal): suppress forge-no-pr false-fires on superseded preflight tasks." Created 07:16:29Z, age=~4 min. MERGEABLE/CLEAN. **Below 30-min threshold.** Mirror inbox: `review-heal-forge-no-pr-preflight-superseded-suppression-001.json` (initial review). ⏳
+  - **PR #317 (agent-core) OPEN** — "fix(notifier): reliable Forge→Mirror review dispatch." Created 07:06:44Z, age=~14 min. UNKNOWN/UNKNOWN (list — likely stale cache; Mirror has rev1 review task). Mirror inbox: `review-fix-notifier-review-dispatch-reliability-rev1.json` (revision review). ⏳
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." Created 06:21:31Z, age=~59 min. MERGEABLE/CLEAN (confirmed `gh pr view`). **Over 30-min threshold BUT in Mirror revision review** (`review-harden-approval-tab-direction-ask-coverage-rev1.json` in Mirror inbox). In revision pipeline — not eligible for auto-merge. ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 0** — all 3 prior tasks consumed (build-fix-notifier-review-dispatch-reliability → PR #317; heal-forge-no-pr-preflight-superseded-suppression-001 → PR #318; marker-error-harden-approval-tab-direction-ask-coverage-1 → PR #314 revision). ✅ Pipeline cleared.
+  - **Mirror inbox: 3** — review-fix-notifier-review-dispatch-reliability-rev1, review-harden-approval-tab-direction-ask-coverage-rev1, review-heal-forge-no-pr-preflight-superseded-suppression-001. ✅ Active.
+  - **Beacon inbox: 0.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All G-rule counters unchanged from iter 855. No new occurrences this iter.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: still **2/3**. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8 (unchanged), ratio≈87.75. No new ledger rows this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark unchanged (1286 lines / 06:55:53Z). ✅
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #63 (07:12:49Z). New occurrence since iter 855. No action — self-recovering; APPROVAL_REQUEST open.
+4. Check E: Forge inbox cleared (3→0). Mirror inbox: 3 active reviews. PR #314 in revision review (MERGEABLE/CLEAN but hold). PRs #317 and #318 below threshold. No auto-fix actions.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=07:20:24Z. ✅
+6. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` (Medic recommends re-queue from scratch). `sync-push-rebase-fallback-001` APPROVAL_REQUEST open. "go: cycle-timer checkpoint" pending Larry's Telegram trigger.
+
+**Patterns:**
+- Forge cleared its 3-item inbox between iters 855 and 856: PR #317 (notifier review dispatch reliability) and PR #318 (forge-no-pr superseded-preflight suppression) opened; PR #314 revision retry processed. Good throughput.
+- Mirror now reviewing all three concurrently. If Mirror PASSes all three, next cycle should see 3 auto-merges in quick succession.
+- SYNC-PUSH-REBASE-FALLBACK at 07:12:49Z: occurrence #63. Pattern fires when sync service timer races with wrapper push. Rate consistent with prior interactive window behavior. Root fix APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the only long-term path.
+- All healers fresh, all services active, no alert noise. System processing normally.
+
+**Learned:** Forge processed all 3 inbox tasks in a single pass after iter 855, clearing the queue and advancing Mirror's review pipeline. The revision retry for PR #314 (wedged Forge session reaped at 06:55:53Z → marker-error → Forge re-work) completed successfully. Normal recovery path confirmed.
+
+---
+
 ## Iteration 855 — 2026-06-04 07:08 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 (first clean iter since 854) — **0 auto-fixes. 1 open PR (#314 CLEAN/MERGEABLE, in revision retry → hold). 8/8 services active. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (no new occurrence). Forge inbox: 3. Mirror inbox: 0. Beacon inbox: 0.**
