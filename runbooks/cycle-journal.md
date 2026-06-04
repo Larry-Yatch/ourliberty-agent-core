@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 859 — 2026-06-04 07:39 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 1 Tier-4 medic-diagnosis; 2 Tier-3 silenced) — **0 auto-fixes. PRs #317 and #318 BOTH MERGED ✅. Pipeline fully clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Beacon brief for inbox-watcher fix ready — Larry action needed.**
+
+Alert watermark: **1294 lines / 07:37:21Z** (+3 from iter 858 watermark 1291/07:26:54Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward (sync.json: status=error, 07:32:48Z, "Auto-commit push failed; rolled back"; self-recovering). Healer heartbeat: **07:26:19Z** (~13 min; ✅ within 90-min threshold). Stale-daemon heartbeat: **07:26:20Z** (~13 min; ✅). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 novel (tier-reset); 2 Tier-3 silenced.**
+  - Line 1292: `medic` / `medic-diagnosis` (07:28:41Z) — Medic confirmed inbox-watcher auto-restart-failed is a false alarm (service came up at 07:27:53Z, 90s after SIGTERM; healer's 30s timeout fires before systemd finishes draining active Claude sessions). This is attempt 5 of fingerprint `heal-stale-daemon-code:auto-restart-failed:ourliberty-inbox-watcher.service`. Source NOT in alert-translations.json → **Tier 4**; tier-reset. No new action — G-rule 3/3 already dispatched in iter 858; Beacon brief produced (see Pulse inbox result). ⚠️
+  - Line 1293: `outbox-notifier` / `review-pass` PR #318 (07:34:30Z) — **Tier 3** (silence, per alert-translations.json). PR #318 MERGED ✅. ✅
+  - Line 1294: `outbox-notifier` / `review-pass` PR #317 (07:37:21Z) — **Tier 3** (silence). PR #317 MERGED ✅. ✅
+  - New watermark: **1294 lines / 07:37:21Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: 1 item (Beacon result notification — see below; not a Larry directive). pending-approvals.json: MISSING (empty). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:26:19Z (~13 min; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No Larry directives in Pulse inbox. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 07:26:20Z (~13 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=a9b3517 "Pulse cycle 20260604T073551Z" (iter 858 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward.** sync.json: status=error, last_sync=07:32:48Z, "Auto-commit push failed; rolled back". Self-recovering (hourly backstop). Not a new occurrence this iter. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline fully cleared.**
+  - **PR #318 MERGED ✅** — "fix(heal): suppress forge-no-pr false-fires on superseded preflight tasks" — auto-merged 07:34:30Z. Mirror PASS: 119 tests pass incl. 5 new; regression gate PASS. 1 pre-existing failure (conftest_init_parity) unaffected. **G-rule `pipeline-stall:forge-no-pr for superseded preflight tasks` (3/3 dispatched iter 849) — CLOSED. ✅**
+  - **PR #317 MERGED ✅** — "fix(notifier): reliable Forge→Mirror review dispatch — robust PR-URL extractor + reconciliation sweep" — merged 07:37:20Z. Mirror PASS: leak-gate WHITELIST line-number fixes verified; 7+17 tests pass; zero regressions.
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 0.** ✅ **Mirror inbox: 0.** ✅ **Beacon inbox: 0.** ✅
+
+- **Pulse inbox — Beacon result:** `notify-cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z.json` — Beacon processed iter 858's G-rule dispatch and produced a build brief for the inbox-watcher restart timeout fix. Fix: in `auto_restart_unit()`, on `TimeoutExpired`, poll `ActiveState` for up to 90s via a new `_poll_until_active` helper (`LIVENESS_POLL_TIMEOUT_S=90`, matching systemd's own `TimeoutStartUSec=1min 30s`); return `(0,'')` if active, else genuine failure. Key guard: definitive non-zero rc (e.g. rc=5 "Unit not found") does NOT enter poll branch — real failures still escalate. **⚠️ Dispatch gap:** This Beacon session was queued (not Telegram chat); the APPROVAL_REQUEST marker won't auto-fire to Larry. **Larry: send the brief to Forge by opening a Telegram chat with Beacon and asking it to re-emit the APPROVAL_REQUEST for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`.** `[yellow]`
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - ~~**`pipeline-stall:forge-no-pr for superseded preflight tasks`: G-rule 3/3 dispatched iter 849.**~~ **CLOSED — PR #318 MERGED 07:34:30Z ✅.** Systemic fix live.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: still **2/3** (unchanged). ✅
+  - All other G-rule counters unchanged from iter 858.
+
+- **PRIME DIRECTIVE ratio:** interventions=703 (unchanged), systemic_fixes=9 (unchanged), ratio≈78.11. No new ledger rows this iter — the medic-diagnosis is a follow-up to iter 858's already-logged finding; the PR merges are normal pipeline deliveries.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 3 new alerts. 1 Tier 4 (medic-diagnosis; no new action — G-rule already dispatched); 2 Tier 3 (review-pass × 2, silenced). Watermark → 1294 lines / 07:37:21Z. Tier-reset.
+3. Check E: PR #317 + PR #318 both MERGED. All agent inboxes empty. Pipeline fully cleared.
+4. Pulse inbox: archived Beacon result notification. Brief ready; dispatch gap blocks auto-fire to Forge. Noted as `[yellow]` for Larry.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=07:39:43Z. ✅
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** `[yellow]` — Beacon brief for inbox-watcher restart timeout fix is ready but blocked by dispatch gap. Larry needs to trigger Forge dispatch via Telegram chat with Beacon. Journal entry above has the exact action. No separate DM sent (yellow severity; journal covers it).
+
+**Patterns:**
+- Both Mirror reviews (PRs #317 and #318) completed in the same ~5-min window after iter 858's Forge code rollout + inbox-watcher restart cycle. The pipeline cleared quickly once the wedged session was reaped at 06:55:53Z. Clean 2-PR flush in one cycle.
+- Medic continues to fire `medic-diagnosis` for the inbox-watcher restart-timeout pattern (5th occurrence of same fingerprint). Beacon brief is ready. The only remaining blocker is the Telegram dispatch gap — Larry needs to re-trigger from a Telegram chat.
+- SYNC-PUSH-REBASE-FALLBACK remains in the background but self-recovering. No new occurrence this iter beyond the carry-forward.
+
+**Learned:** The `forge-no-pr` G-rule (3/3 dispatched iter 849) has its fix shipped: PR #318 "suppress forge-no-pr false-fires on superseded preflight/clarify tasks" is now live in main. This should reduce the noise from pipeline-stall heal firing false positives on orphaned preflight task IDs. Close the G-rule watch item.
+
+---
+
 ## Iteration 858 — 2026-06-04 07:33 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 4 Tier-4 alerts from stale-daemon healer sweep; G-rule `inbox-watcher rc=-1` → 3/3, dispatch sent) — **0 auto-fixes. PRs #317 and #318 CLEAN/MERGEABLE, in Mirror review. 8/8 services active. Inbox-watcher auto-restarted with new code at 07:27:53Z.**
@@ -70,6 +138,20 @@ Alert watermark: **1291 lines / 07:26:54Z** (+4 from iter 857 watermark 1287/07:
 - SYNC-PUSH-REBASE-FALLBACK: 2 occurrences in this session (07:25:50Z + 07:31:03Z), consistent with sync timer racing against rapid interactive cycle session. Root fix APPROVAL_REQUEST `sync-push-rebase-fallback-001` still the only long-term path.
 
 **Learned:** Stale-daemon healer's 30s restart timeout fires a false `auto-restart-failed` escalation every time the inbox-watcher gets a code-rollout restart. The fix (G-rule 3/3 dispatch just sent) is a post-timeout liveness poll. Until it lands, this pattern will recur on every deploy that updates agent scripts.
+
+---
+
+## Inter-agent notification — 2026-06-04 (post-iter-858)
+
+**Source:** beacon | task=`cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z` | status=SUCCESS
+
+**Result summary:** Beacon confirmed the bug and produced a dispatch-ready build brief. Root cause confirmed against live state: `heal_stale_daemon_code.py::auto_restart_unit()` caps the systemctl restart subprocess at 30s. `ourliberty-inbox-watcher.service` takes ~60s to reach active (spawning Claude subprocesses) → `TimeoutExpired` → `rc=-1` → false `auto-restart-failed` escalation. Service was `active` 60s after each of the 4 occurrences logged (2026-06-04 07:26:53Z, 2026-05-27×2, 2026-05-30×2).
+
+**Proposed fix:** On `TimeoutExpired` only, poll `ActiveState` for up to 90s (`LIVENESS_POLL_TIMEOUT_S`, matching systemd's own `TimeoutStartUSec=1min 30s`) via a new `_poll_until_active` helper. Return `(0,'')` if active, `(-1,…)` otherwise. Definitive non-zero rc (e.g. rc=5 "Unit not found") never enters the poll branch — genuine failures still escalate. Contained entirely in `auto_restart_unit`; both caller paths benefit.
+
+**Dispatch gap (important):** Beacon emitted an APPROVAL_REQUEST marker but this was a queued session, not Telegram chat mode — the bot's marker extractor did not auto-fire. The build brief is ready but has not reached Forge's inbox. Larry must dispatch from Telegram conversation.
+
+**Action taken:** Sent `[yellow]` larry_alerts entry (source=pulse-escalation, subject=beacon-result:inbox-watcher-restart-timeout-fix-ready) so Larry sees the pending APPROVAL_REQUEST in Telegram rather than waiting for a journal read. Watch item updated in MEMORY.md.
 
 ---
 
