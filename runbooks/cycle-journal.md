@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 814 — 2026-06-04 01:36 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **3 new alerts (heal-stale-daemon-code `auto-restarted:*`): beacon-bot, dashboard-api, and outbox-notifier restarted by healer at 01:25Z after PR #295 and #294 code changes. Expected/by-design. All 8 services active post-restart. PR #296 "chore(rotation): re-enable account rotation" merged by Larry at 01:28:52Z. 0 open PRs. All inboxes empty.** Alert watermark: **1243 lines / anchor 01:25:24Z** (3 new Tier-4 alerts, known-untranslated pattern). Sync: ✅ no-change (00:45:36Z). Healer heartbeat: **01:25:19Z** (~11 min at check; ✅). **8/8 services active.** **0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard.** Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts since watermark (1240→1243, anchor 01:20:39Z→01:25:24Z).** All from heal-stale-daemon-code, subject `auto-restarted:*`:
+  - `01:25:20Z` `heal-stale-daemon-code / auto-restarted:ourliberty-beacon-bot.service` — beacon_telegram_bot.py mtime 01:21:34Z (PR #295: Phase C promotion loop); restarted, new code live. Route=digest.
+  - `01:25:21Z` `heal-stale-daemon-code / auto-restarted:ourliberty-dashboard-api.service` — dashboard_api.py mtime 01:14:28Z (PR #294: agent-queue endpoint); restarted, new code live. Route=digest.
+  - `01:25:24Z` `heal-stale-daemon-code / auto-restarted:ourliberty-outbox-notifier.service` — beacon_approval_handler.py mtime 01:21:34Z (PR #295); restarted, new code live. Route=digest.
+  - **Classification:** Tier-4 (subject `auto-restarted:*` NOT in alert-translations.json — fix pending). However, this is an expected/known-recurring pattern (G-rule 3/3 dispatched iter 592, Beacon processed iter 594, Forge brief still MISSING — re-dispatch pending Larry go-ahead per MEMORY). Healer worked correctly. No DM to Larry — by-design auto-restarts, no open action. → **Tier-reset: YES.** Watermark advanced to 1243 / anchor 01:25:24Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Beacon-bot restarted by healer at 01:25:20Z; log shows startup entry only. PR #296 was a Larry operator action (config flip, reverses #283 re-enabling rotation.enabled). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat `~/agents/blackboard/heal-stale-daemon-code.heartbeat` = 01:25:19Z (~11 min at check; ✅ within 90-min threshold). Pipeline stall state: PR#294-related cooldowns (`pr_no_mirror_dispatch`, `unrouted_open_pr:294`) expired at 00:59:52Z; PR #294 is merged so condition won't re-fire. `retry_exhausted:unknown` cooldown also expired — no new unrouted tasks visible. No active stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. PR #296 is a completed Larry operator action (merged at 01:28:52Z). Standing APPROVAL_REQUESTs (Beacon iter 804 alert-translations split) still pending Larry. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 01:25:19Z ✅. NOTE: correct path is `~/agents/blackboard/heal-stale-daemon-code.heartbeat`, NOT `~/agents/state/`. Prior Check 5 read from blackboard correctly. This check is calibrated. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start: HEAD=cdedd11 "Merge pull request #296 from Larry-Yatch/ops/reenable-rotation-dashboard", branch=main, tree=clean. Repo fast-forwarded by cycle wrapper to include PR #296 merge. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=3290042, last_sync=00:45:36Z. HEAD=cdedd11 ahead — normal. Hourly sync.timer backstop fires ~02:00Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All services confirmed active: ourliberty-beacon-bot (restarted 01:25:20Z), ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier (restarted 01:25:24Z), ourliberty-cycle.timer, ourliberty-sync.timer. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core.** PR #296 "chore(rotation): re-enable account rotation" merged 01:28:52Z by Larry. ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **All inboxes EMPTY.** Forge, Beacon, Mirror. ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 3** (unchanged from iter 813):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — PR#294 post-merge worktree; G-rule 1/3 (`Pulse-triggered gh pr merge --auto doesn't fire event-driven teardown`). Hourly GC fires ~02:00Z. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale PR#293 preflight (~2.5h old); clear ~23:14Z Jun 4 (within 24h GC). ✅
+
+- **PR #296 — operator action by Larry:** "chore(rotation): re-enable account rotation" — merged 01:28:52Z. Reverses PR #283. Re-enables `rotation.enabled` so the dashboard Auto/Off toggle (PR #290 + dashboard PR #34) is the live control. One-line config flip, reversible. No Pulse action required. ✅
+
+- **G-rule watch:**
+  - `auto-restarted:* not in alert-translations.json` — 3 new occurrences this iter (beacon-bot, dashboard-api, outbox-notifier). G-rule 3/3 was dispatched at iter 592; fix in-flight (Forge brief MISSING, re-dispatch pending Larry go-ahead). Each occurrence until the fix lands continues as Tier-4 but known-untranslated. No new dispatch needed.
+  - All other G-rule counters unchanged from iter 813.
+
+- **PRIME DIRECTIVE ratio:** interventions=688 (+1), systemic_fixes=5, ratio=137.6. Added one intervention row (`heal-stale-daemon-code:auto-restart-3svc-beacon-dashboard-outbox-pr294-pr295`).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 3 new alerts (heal-stale-daemon-code auto-restarted:*, Tier-4 known-untranslated). Watermark advanced to 1243 / anchor 01:25:24Z. No DM (by-design pattern, healer working correctly). ✅
+3. Confirmed all 3 restarted services active (beacon-bot, dashboard-api, outbox-notifier). ✅
+4. Noted PR #296 merged by Larry at 01:28:52Z (operator config flip, re-enable rotation). ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=01:36:05Z. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention --template heal-stale-daemon-code --detail auto-restart-3svc-beacon-dashboard-outbox-pr294-pr295` → iter=814 row written. ✅
+7. No always-allowed auto-fixes triggered. ✅
+8. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing escalations from prior iters pending Larry (Beacon APPROVAL_REQUEST iter 804, alert-translations split). Larry has the ball.
+
+**Patterns:**
+- Healer auto-restart after PR merge is a reliable, recurring pattern. Three services restarted this iter (beacon-bot + outbox-notifier after PR #295's Phase C code, dashboard-api after PR #294's agent-queue endpoint). All within ~5 min of the healer sweep. The `auto-restarted:*` translation fix is the active systemic fix path — just blocked on Forge brief delivery (re-dispatch pending Larry).
+- The Phase C promotion loop is now live with the fresh beacon-bot running the Phase C code.
+- Larry's PR #296 (re-enable rotation) landed cleanly within ~4 min of this cycle starting. System is stable.
+
+**Learned:** Healer heartbeat is at `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (not `~/agents/state/`). Check 5 reads the blackboard path correctly — no calibration needed. The stale daemon healer fired 01:25:19Z, confirming the heartbeat is current. All three auto-restarted services are running the latest code from PRs #294 and #295.
+
+---
+
 ## Iteration 813 — 2026-06-04 01:24 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=2 — **All checks nominal. PR #295 CONFIRMED MERGED (01:20:39Z — Mirror approved rev1, auto-merged + branch deleted). Phase C-005 "feat(pulse): Phase C — experience-driven promotion loop" LIVE in main. 0 open PRs. All inboxes empty. Pipeline clean.** Alert watermark: **1240 lines / anchor 01:20:39Z** (1 new alert: outbox-notifier:review-pass Tier-3 known-pattern → nominal). Cooldown residue: **206** (unchanged). Sync: ✅ post-wrapper lag (commit=3290042, HEAD=610b43c "Pulse cycle 20260604T012133Z"). Healer heartbeat: **00:55:15Z** (~29 min at check; ✅). **8/8 services active.** **0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard.** Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY.
