@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 898 — 2026-06-04 17:02 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check 0 — 1 Tier-4 novel alert: outbox-notifier:review-escalate). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge inbox: 0. Mirror inbox: 0. Beacon inbox: 1 (REVIEW_ESCALATE notification for forge-marker-error-retry-fillin-001 — pipeline in motion). Sync: ✅ Clean.**
+
+Alert watermark: **1281 lines / 16:57:55Z** (+1 from iter 897 watermark 1280/16:49:02Z). Sync: status=no-change, last_sync=2026-06-04T16:48:18Z (~14 min at cycle start; ✅ within 2h). Pipeline-stall heartbeat: 16:52:49Z (✅ ~9 min at cycle start). Stale-daemon heartbeat: 16:29:57Z (✅ ~32 min at cycle start).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert (Tier-4×1). tier-reset.**
+  - `ts=16:57:55Z, source=outbox-notifier, intent=review-escalate, task_id=forge-marker-error-retry-fillin-001` — Mirror's REVIEW_ESCALATE on PR #321 revision. Mirror rev2 found the code at commit d5da2d3 is CODE-CORRECT (whitelist lines 71→72 and 316→317 repin confirmed; full 476-test suite passes at d5da2d3). Structural blocker: GitHub's PR #321 head pointer is pinned at pre-revision 052a1fc while the branch ref is at d5da2d3; CI evaluates the stale code (leak gate RED). Since PR #321 is already merged (squash, 16:08:29Z), the correct resolution is a NEW PR carrying commit d5da2d3 (or equivalent fix). Notification is in Beacon's inbox (`notify-forge-marker-error-retry-fillin-001.json`); Beacon will spec the resolution path. **Tier-4 novel** — `outbox-notifier` source exists in alert-translations.json, but only for `review-pass`, `mirror-dag-pass`, and `auto-merge-queue-corrupt`; `review-escalate` intent is not registered. **New G-rule: `outbox-notifier:review-escalate not in alert-translations.json` 1/3.** At 3/3: dispatch Beacon to add `review-escalate` as Tier-3/FYI in config/alert-translations.json (batch with pending outbox-notifier G-rules). No DM — standing [yellow] escalation from iter 896 covers the regression; pipeline is in motion.
+  - Watermark advanced: **1281 / 16:57:55Z**. ✅
+  - → tier-reset (1 Tier-4 novel)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago" -q` → empty output (no warnings). ✅
+
+- **(Check 2) Telegram sweep: ✅ / monitoring.** beacon_telegram_sessions.json: 1 active session ✅. Beacon inbox: 1 (`notify-forge-marker-error-retry-fillin-001.json` — REVIEW_ESCALATE notification; Beacon will process and dispatch resolution). Forge inbox: 0 ✅. Mirror inbox: 0 ✅ (Mirror completed rev2 review, REVIEW_ESCALATE sent to Beacon via outbox-notifier). Pulse inbox: 0 ✅. Stale ack-proceed (`notify-forge-marker-error-retry-fillin-001.json` from iter 897 Beacon inbox) — same file now carries the REVIEW_ESCALATE intent; Beacon will process correctly.
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:52:49Z (~9 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 16:29:57Z (~32 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=5198ef0 "Pulse cycle 20260604T165830Z" (iter 897 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T16:48:18Z (~14 min at cycle start; within 2h threshold). No SYNC-PUSH-REBASE-FALLBACK this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Empty.** ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **NEW 1/3: `outbox-notifier:review-escalate not in alert-translations.json`** — First occurrence: Mirror REVIEW_ESCALATE on PR #321 revision reached outbox-notifier→Beacon pipeline. `review-escalate` intent not in alert-translations.json outbox-notifier entry. At 3/3: dispatch Beacon to add as Tier-3/FYI (batch with existing outbox-notifier G-rule for `reject`).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **1/3** (unchanged).
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **Regression status:** test_no_production_path_leaks.py (2 failing assertions: whitelist lines 71→72, 316→317) still in main. The fix exists at d5da2d3 on branch `forge/forge-marker-error-retry-fillin-001`. Beacon has the REVIEW_ESCALATE in inbox; will dispatch resolution. Expected path: Beacon → Forge new PR → Mirror review → merge. Standing [yellow] escalation from iter 896 covers; no new DM sent.
+
+- **PRIME DIRECTIVE ratio:** interventions=710 (+1), systemic_fixes=9, ratio≈78.89. Ledger row appended: `alert-triage:1-tier4-novel:outbox-notifier:review-escalate`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert triaged (Tier-4×1: outbox-notifier:review-escalate). Watermark advanced to **1281 / 16:57:55Z**.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T17:02:02Z. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 898 --template alert-triage --detail 1-tier4-novel:outbox-notifier:review-escalate` → row appended. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions). Fix at d5da2d3; REVIEW_ESCALATE in Beacon inbox → new PR expected. If Beacon inbox is still occupied in 2+ iters with no new PR, escalate manually.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 62nd total; self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- Mirror REVIEW_ESCALATE is a new pipeline path exercised for the first time (PR #321 revision hitting the merged-PR desynced-head edge case). Beacon→Forge resolution is the expected next step. G-rule 1/3 for the missing translation.
+- 0 open PRs, Forge inbox empty, no SYNC-PUSH-REBASE-FALLBACK this iter. System is in a momentary clean state except for the in-flight regression repair.
+
+**Learned:** The `review-escalate` outbox-notifier intent surfaces when Mirror finds code correct but the PR object has a structural/infra blocker. This is the right escalation path (Mirror → Beacon for spec). The intent is by-design and should be Tier-3/FYI once the translation is registered — it doesn't require a DM to Larry, only Beacon action. Batch this with the existing `outbox-notifier:reject` G-rule (1/3 iter 769) when that hits 3/3.
+
+---
+
 ## Iteration 897 — 2026-06-04 16:55 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check 0 — 3 Tier-4 alerts). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge inbox: 0 (revision task processed; whitelist repin committed by Forge). Mirror inbox: 1 (rev2 review for PR #321 — in pipeline). Beacon inbox: 1 (stale ack-proceed notify for merged PR #321 — monitoring). ✅ Sync CLEAN (62nd SYNC-PUSH-REBASE-FALLBACK-001 self-resolved at 16:48:18Z).**
