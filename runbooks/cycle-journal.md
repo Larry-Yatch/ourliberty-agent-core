@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 823 — 2026-06-04 02:45 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=0 — **0 auto-fixes. 0 new alerts. SYNC-PUSH-REBASE-FALLBACK #55 at 02:43:14Z (self-recovering). 8/8 services active. 0 open PRs in both repos. Forge active build: `build-harden-pulse-check-liveness-watcher`. 12 worktrees (GC accumulating; hourly backstop active).**
+
+Alert watermark: **1250 lines / anchor 02:28:17Z** (unchanged — no new alerts since iter 822). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #55 at 02:43:14Z (status=error, commit=c76fcf5; session HEAD=99dfcb5 newer → wrapper push for iter 822 succeeded post-sync; self-recovering). Healer heartbeat: **02:25:32Z** (~20 min at check; ✅ within 90-min threshold). **8/8 services active.** **0 open PRs in agent-core.** **0 open PRs in ourliberty-dashboard.** **Worktrees: 12.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl line count = 1250 (unchanged since iter 822 watermark 1250 / 02:28:17Z). No new alerts. Watermark unchanged. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 02:25:32Z (~20 min; ✅ within 90-min threshold). `build-harden-pulse-check-liveness-watcher` active Forge build in progress. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 02:25:32Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=99dfcb5 "Pulse cycle 20260604T024240Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #55.** sync.json: status=error, commit=c76fcf5, last_sync=02:43:14Z. Session HEAD (99dfcb5) newer than sync commit (c76fcf5) → wrapper push for iter 822 succeeded independently before sync service's failed attempt at 02:43:14Z. Self-recovering per established calibration (MEMORY). Hourly sync.timer is the authoritative backstop. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. No additional action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core.** ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **Forge inbox: 1** — `build-harden-pulse-check-liveness-watcher.json` (active build; worktree `wt-forge-harden-pulse-check-liveness-watcher` in-flight). ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Mirror inbox: 1** — `marker-error-dashboard-inbox-pending-filter-fix-001-1.json` (retry artifact for merged PR #297; self-clearing). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 12** (up from 11 in iter 822; `wt-mirror-dashboard-inbox-pending-filter-fix-001` now present — Mirror spun up a worktree for the `marker-error` retry):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — stale post-merge (PR #294). G-rule teardown-gap. Hourly GC. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — post-merge (PR #35, Pulse-triggered iter 820). G-rule teardown-gap instance. Hourly GC. ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — post-merge (PR #297, Pulse-triggered iter 819). G-rule teardown-gap instance. Hourly GC. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale preflight artifacts (5h+). Hourly GC. ✅
+  - `wt-forge-harden-pulse-check-liveness-watcher` — **active Forge build (in-flight).** ✅
+  - `wt-forge-heal-retry-exhausted-taskid-resolution` — post-merge (PR #299, Pulse-triggered iter 822). G-rule teardown-gap instance 4. Hourly GC. ✅
+  - `wt-forge-orchestrator-engine-hardening-spec` — post-merge (PR #298, Pulse-triggered iter 821). G-rule teardown-gap instance. Hourly GC. ✅
+  - `wt-mirror-build-forge-queue-ui-20260604T013719Z` — Mirror review worktree (PR #35, merged iter 820; moot post-merge). Hourly GC. ✅
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — **NEW since iter 822.** Mirror worktree for marker-error retry. Will self-clear when Mirror processes the retry artifact. ✅
+  - `wt-mirror-heal-retry-exhausted-taskid-resolution` — Mirror review (PR #299, merged iter 822; moot). Hourly GC. ✅
+  - `wt-mirror-orchestrator-engine-hardening-spec` — Mirror review (PR #298, merged iter 821; moot). Hourly GC. ✅
+
+- **G-rule watch:**
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — 3/3 DISPATCHED (iter 821). Beacon brief complete. Larry dispatches from Telegram. No new instances this iter (no new Pulse-triggered merges). Close when Forge PR merges. ✅
+  - All other G-rule counters: unchanged from iter 822.
+
+- **PRIME DIRECTIVE ratio:** interventions=695, systemic_fixes=6, ratio=115.8. No new rows this iter (no auto-fixes, no new G-rule dispatches). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark unchanged at 1250 / 02:28:17Z. ✅
+3. No auto-fixes executed.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (Check B sync error is a non-clean signal). ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs unchanged. Beacon brief for worktree-teardown-fix waiting on Larry's Telegram dispatch.
+
+**Patterns:** Pipeline throughput has been high (PRs #294–#299 all merged in the last cluster). The Forge `build-harden-pulse-check-liveness-watcher` is the only active build; system is quiet. 8 of the 12 worktrees are post-merge GC accumulation — the hourly backstop is the unconditional cleanup path; the Pulse-triggered teardown fix (once Forge builds it) will reduce residency from ≤1h to near-real-time.
+
+**Learned:** Nothing new this iter. System behaving per established calibration. The `wt-mirror-dashboard-inbox-pending-filter-fix-001` re-appearance is consistent with Mirror retrying the marker-error artifact — not a sign of a teardown failure (Mirror's own teardown path worked correctly in iter 821, but the retry re-spawned the worktree).
+
+---
+
 ## Iteration 822 — 2026-06-04 02:40 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 always-allowed auto-fix (PR #299 agent-core MERGED ~02:40Z). 1 new Tier-4 alert (deploy-notifier:READY Vercel post-PR#35 secondary deploy). SYNC-PUSH-REBASE-FALLBACK #54 at 02:34Z (self-recovering). 8/8 services active. Worktrees: 11 (Mirror reviews active; Forge post-merge worktrees awaiting GC per hourly backstop). Beacon brief complete for worktree-teardown-fix — Larry dispatches from Telegram to trigger Forge build.**
