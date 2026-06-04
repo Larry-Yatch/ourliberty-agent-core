@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration 891 — 2026-06-04 16:09 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset) — **2 auto-fixes (auto-merge enabled: PR #321 + dashboard PR #38). All mandatory checks nominal. 8/8 services active. Forge: 3 inbox tasks (all fresh). 4 PRs still under threshold (5 total agent-core + 1 dashboard). Sync: RESOLVED — 57th SYNC-PUSH-REBASE-FALLBACK-001 residual cleared at 15:48Z hourly timer.**
+
+Alert watermark: **1271 lines / 14:48:16Z** (unchanged — 0 new alerts). Sync: sync.json status=no-change, last_sync=15:48:17Z, commit=ba875878d4. **RESOLVED** — prior SYNC-PUSH-REBASE-FALLBACK-001 (57th, iter 886) residual cleared; the 15:48Z hourly timer ran cleanly with no-change (no push conflict; wrapper pushed f332e60 after 15:48Z). **8/8 services active.** Pipeline-stall heartbeat: 16:04:17Z (✅ ~5 min ago). Stale-daemon heartbeat: 15:59:42Z (✅ ~10 min ago).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: **1271 lines** — unchanged from iter 890 watermark (1271 / 14:48:16Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session. All inboxes: Beacon=0, Mirror=1 (review-harden-authoritative-dispatch-confirmation.json — expected Mirror review task), Forge=3 fresh (see Check D), Pulse=0. Standing G-rule: cycle-timer-checkpoint DM forwarded to Beacon at 07:12 UTC; Beacon awaiting "go" — no new activity. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:04:17Z (~5 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No new directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 15:59:42Z (~10 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=f332e60 "Pulse cycle 20260604T154904Z" (iter 890 wrapper). ✅
+
+- **(Check B) Sync health: ✅ RESOLVED.** sync.json: status=no-change, last_sync=2026-06-04T15:48:17Z, commit=ba875878d4. The 57th SYNC-PUSH-REBASE-FALLBACK-001 residual (iters 886–890) has CLEARED. The 15:48Z hourly sync timer ran with no-change (origin already had ba87587 at that moment; no push conflict). Iter 890 wrapper then pushed f332e60 independently. Session HEAD=f332e60 > sync.json commit=ba87587 — expected (wrapper pushed after last sync run; next sync will confirm no-change). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ 3 tasks (all fresh, under 1-hour stale threshold).**
+  - `tune-unregistered-approval-reconcile.json` (15:32Z UTC, ~37 min old — under threshold)
+  - `marker-error-forge-marker-error-retry-fillin-001-1.json` (15:35Z UTC, ~34 min old — under threshold)
+  - `marker-error-pulse-marker-discipline-signal-001-1.json` (15:50Z UTC, ~19 min old) — **NEW since iter 890** (marker-error retry generated when pulse-marker-discipline-signal-001 preflight failed to find a canonical marker)
+  Inbox-watcher active; `build-agent-queue-generalize-backend` and `build-harden-authoritative-dispatch-confirmation` from iter 890 have been consumed (corresponding PRs #324 and #325 are now open). ✅
+
+- **(Check E) PRs + inboxes: ⚠️ 2 auto-fixes applied; 4 remaining under threshold.**
+  - agent-core **5 open PRs:**
+    - **#321** "fix(outbox_notifier): fill-in-the-blank none-found preflight marker retry" (15:35Z, 32.6 min old) — **`gh pr list` returned UNKNOWN/UNKNOWN; `gh pr view` confirmed CLEAN/MERGEABLE** (GitHub API caching artifact per calibration note). NO auto-merge set → **always-fix: `gh pr merge 321 --auto --squash` ✅**
+    - **#322** "fix(healers): out-of-band resolution check" (15:47Z, ~22 min old, CLEAN) — under threshold. ✅
+    - **#323** "feat(pulse): add preflight-marker-discipline signal to Check I" (15:50Z, ~19 min old, CLEAN) — under threshold. ✅
+    - **#324** "feat(dashboard): generalize agent-queue endpoint" (15:56Z, ~13 min old, CLEAN) — under threshold. ✅
+    - **#325** "feat(beacon): authoritative dispatch confirmation" (16:05Z, ~4 min old, CLEAN) — under threshold. ✅
+  - ourliberty-dashboard **1 open PR:**
+    - **#38** "fix(rotation): surface the real GET-error cause; link to /login on 401" (15:37Z, 30.3 min old, CLEAN/MERGEABLE, no auto-merge) → **always-fix: `gh pr merge 38 -R Larry-Yatch/ourliberty-dashboard --auto --squash` ✅**
+  - Beacon inbox: 0 ✅ Mirror inbox: 1 (review task, expected) ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 890. `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=705 (+1), systemic_fixes=9, ratio≈78.33. Ledger row appended: `enable-pr-auto-merge:PR-321-and-dashboard-PR-38`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. **Always-fix: `gh pr merge 321 --auto --squash`** — auto-merge enabled on PR #321 (CLEAN, 32.6 min over 30-min threshold). Logged to cycle-actions.jsonl.
+3. **Always-fix: `gh pr merge 38 -R Larry-Yatch/ourliberty-dashboard --auto --squash`** — auto-merge enabled on dashboard PR #38 (CLEAN, 30.3 min over 30-min threshold). Logged to cycle-actions.jsonl.
+4. Check 0: 0 new alerts. Watermark confirmed at 1271 lines / 14:48:16Z (unchanged from iter 890).
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 891 --template enable-pr-auto-merge --detail PR-321-and-dashboard-PR-38` → row appended. ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier reset 2→1 (signal observed), consecutive_clean=0, last_signal_at=16:09:01Z. ✅
+7. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go" — send "go: cycle-timer checkpoint" to Beacon bot to proceed).
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 57th total; cleared in practice this iter via no-change; systemic fix still pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- Active pipeline day: 5 agent-core PRs + 1 dashboard PR open simultaneously. Forge is processing `build-agent-queue-generalize-backend` → PR #324 and `build-harden-authoritative-dispatch-confirmation` → PR #325 within a ~10-min window of being dispatched (iter 889 → 890 → 891 pipeline).
+- Sync residual (57th SYNC-PUSH-REBASE-FALLBACK-001) cleared cleanly at 15:48Z — no new race condition. The 15:48Z sync ran with no-change because origin was already in sync with ba87587, and the wrapper pushed f332e60 afterward without conflict.
+- marker-error retry envelopes accumulating in Forge inbox (pulse-marker-discipline-signal-001 → marker-error on 1st preflight attempt). These are within normal retry chain behavior.
+- `gh pr list` returning UNKNOWN for PR #321 while `gh pr view` returns CLEAN — per calibration note; trust `gh pr view`.
+- `enable-pr-auto-merge` triggered twice in one iter (both PRs crossed 30-min threshold in the same cycle). Pattern: busy build day means several PRs approaching threshold simultaneously.
+
+**Learned:** Nothing structurally new. The `gh pr list` UNKNOWN vs `gh pr view` CLEAN delta was confirmed again (PR #321) — existing calibration holds.
+
+---
+
 ## Iteration 890 — 2026-06-04 15:46 UTC (interactive)
 
 **Health:** ✅ Tier 2, consecutive_clean=1 — **0 auto-fixes. All checks nominal. 8/8 services active. 2 new PRs (both < 30-min threshold). 5 Forge inbox tasks (all fresh). Sync: residual error from iter 886 SYNC-PUSH-REBASE-FALLBACK-001 (57th; hourly timer expected ~15:48Z UTC).**
