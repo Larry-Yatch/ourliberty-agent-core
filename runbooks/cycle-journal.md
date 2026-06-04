@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 921 — 2026-06-04 20:58 UTC (interactive)
+
+**Health:** ✅ **Tier 2 clean. consecutive_clean=0→1. 0 actions. 8/8 services active. PR #330 open (CLEAN/MERGEABLE, Mirror reviewing). Forge: 0 inbox (build complete, PR open). Sync: ✅ no-change.**
+
+Alert watermark: **1295 lines / 20:55:07Z** (+1 from iter 920's 1294/20:41:55Z — heal-pipeline-stall/pr-create-inferred-failure, Tier-3 known-pattern silence). Pipeline-stall heartbeat: 20:55:01Z (✅ ~3 min at cycle start). Stale-daemon heartbeat: 20:30:18Z (✅ ~28 min at cycle start, within 60-min threshold). Sync: status=no-change, last_sync=2026-06-04T20:48:39Z, commit=70c23b3c ✅. Session-start gitStatus: branch=main, clean, HEAD=70c23b3 "Pulse cycle 20260604T204802Z". Tier state at start: tier=2, consecutive_clean=0. Tier state at end: **tier=2, consecutive_clean=1**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (Tier-3 silence).** Watermark 1294→1295. New alert at 20:55:07Z: `src=heal-pipeline-stall, subj=pipeline-stall:pr-create-inferred-failure:forge-queue-api-preflight-20260603T231401Z-clarify1`. Gate 1: `pipeline-stall:pr-create-inferred-failure` IS in alert-translations.json under `heal-pipeline-stall` source (PR #327 merged iter 911 — Tier-3 FYI). `alert_triage_state.py` returned tier=3 / decision=silence / rationale="known-pattern match in alert-translations.json". Tier-3 silence; no tier-reset. This is the same recurring dead-letter fingerprint for the fully-delivered `forge-queue-api-preflight-20260603T231401Z-clarify1` task (PR #324 merged 16:37Z June 4). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. Larry asked "is forge stuck?" at 20:49:52Z; Beacon responded "No — Forge is actively working" and PR #330 opened at 20:46Z confirms the build completed. Directive is fully resolved. Alert idx=0 delivery failures in Beacon bot log = test-fixture delivery path (known benign per iter 918). No untracked directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 20:55:01Z (~3 min; ✅ within 90-min threshold). Mirror inbox: `review-debrittle-leak-gate-whitelist-001.json` (PR #330, created 20:46:33Z) — expected active review. No stall signal. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. Larry's "is forge stuck?" query answered by Beacon + confirmed by PR #330 opening. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:30:18Z (~28 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=70c23b3 "Pulse cycle 20260604T204802Z". Sync: no-change at same commit. Not behind, not ahead. ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T20:48:39Z, commit=70c23b3c. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=0 (build complete, PR #330 opened). Mirror=1 (`review-debrittle-leak-gate-whitelist-001.json`, PR #330 created 20:46:33Z — fresh, expected review). Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 1 open (agent-core), 0 open (dashboard).** PR #330 open: `fix(tests): de-brittle leak-gate WHITELIST by keying on content not line number` — CLEAN/MERGEABLE, no review decision yet (Mirror review task fresh in inbox, ~12 min old at cycle start). Age ~12 min; well under 30-min auto-merge threshold. Dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (unchanged from iter 920):**
+  - ~~**`heal-wedged-review-sessions source not in alert-translations.json`**~~: **CLOSED** — PR #329 MERGED 2026-06-04T20:41:55Z ✅.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged). NOTE: PR #330 (source=larry) IS populating pr_url in the review task → may not hit this G-rule pattern for this task. Watch Check D on merge.
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=715, systemic_fixes=12, ratio≈59.6 (iter_clean row appended; no new interventions or fixes this iter). Ledger ts: 2026-06-04T20:58:03Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `alert_triage_state.py triage-alert` for new alert (line 1295) → Tier-3 silence confirmed. ✅
+3. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → ledger entry recorded. ✅
+4. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=1. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 65th+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Forge activity:** PR #330 opened 20:46:33Z — `fix(tests): de-brittle leak-gate WHITELIST by keying on content not line number`. CLEAN/MERGEABLE; Mirror reviewing. Build velocity: ~10 min from Forge inbox dispatch (20:35:54Z iter 920) to PR open (20:46:33Z). ✅
+
+**Patterns:** pipeline-stall:pr-create-inferred-failure continues to fire for the stale forge-queue-api-preflight clarify1 dead-letter (~1265 min old). PR #327 translation is silencing it correctly. Tier-3 classification confirmed by `alert_triage_state.py`. No new G-rule needed. Larry's "is forge stuck?" query confirms he is monitoring the pipeline; Forge delivered PR #330 on schedule.
+
+**Learned:** The `forge-no-pr-false-alarm-for-source-larry-tasks` G-rule (2/3) may not apply to this debrittle task — Mirror's review task `review-debrittle-leak-gate-whitelist-001.json` contains `pr_url=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/330`, which means the source=larry outbox path DID populate pr_url for this build. If the G-rule doesn't fire again, the 2/3 counter may reflect a healed behavior. Watch on next source=larry build.
+
+---
+
 ## Iteration 920 — 2026-06-04 20:45 UTC (interactive)
 
 **Health:** ✅ **Tier 1 clean → TIER 2 PROMOTED. consecutive_clean=3→0. 0 actions. 8/8 services active. PR #329 MERGED 20:41:55Z. Forge: 1 active session (debrittle-leak-gate-whitelist-001, ~9 min). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
