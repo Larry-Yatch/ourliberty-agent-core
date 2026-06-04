@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 827 — 2026-06-04 03:19 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **0 auto-fixes. 2 new Tier-4 alerts (stale forge-queue-api-preflight-*-clarify1 pipeline-stall + medic diagnosis; both superseded by PR #294 merge; no dispatch). SYNC-PUSH-REBASE-FALLBACK #57 ongoing (same instance as iters 825–826; self-recovering). 8/8 services active. 0 open PRs. All inboxes empty. 11 worktrees (unchanged; hourly GC backstop active).**
+
+Alert watermark: **1254 lines / anchor 03:11:01Z** (2 new since iter 826's 1252/02:56:59Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57 (unchanged from iter 826; sync.json status=error commit=24cb5563 last_sync=02:51:22Z; session HEAD=ffcac2d newer → wrapper push for iter 826 succeeded; self-recovering; hourly sync.timer next fire ~03:51Z). Healer heartbeat: **02:55:37Z** (~24 min at check; ✅ within 90-min threshold). **8/8 services active.** **0 open PRs.** **Worktrees: 11.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new Tier-4 alerts (tier-reset, no dispatch).**
+  - `03:07:15Z` `heal-pipeline-stall:pipeline-stall:forge-no-pr:forge-queue-api-preflight-20260603T231401Z-clarify1` — "Forge built task `forge-queue-api-preflight-20260603T231401Z-clarify1` 198 min ago but no PR was opened." **Classification: Tier-4 (novel subject; `pipeline-stall:forge-no-pr:*` not in alert-translations.json).** Root cause per medic diagnosis: Forge hit auth_401 + rate_limit failures at ~20:47-20:49Z June 3, exhausted all retries, never created a worktree. The `heal-pipeline-stall` "built 198 min ago" label is a false positive — Forge received the dispatch but never ran it. **Finding is effectively superseded: PR #294 (`build-forge-queue-api-20260603T234656Z`) already merged; the clarify1 task was a preflight clarification step that was obsoleted by the build completing.** No re-dispatch needed. No DM to Larry — problem is self-resolved. Journal note only. **Tier-reset.**
+  - `03:11:01Z` `medic:medic-diagnosis` — "DIAGNOSE-ONLY | pipeline-stall:forge-no-pr:forge-queue-api-preflight-20260603T231401Z-clarify1 — attempt 2. Forge exhausted retries on auth_401/rate_limit. No worktree created. Recommended: verify Forge auth, re-dispatch if recovered." **Classification: Tier-4 (medic:medic-diagnosis not in alert-translations.json; G-rule 3/3 already dispatched iter 804; engine fix in-flight via Beacon dispatch `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json`).** Medic's recommended re-dispatch is moot — PR #294 merged. No additional action. Note G-rule status unchanged (engine fix pending). **Tier-reset already triggered by alert 1.**
+  - Watermark advanced to 1254 / anchor 03:11:01Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 02:55:37Z (~24 min; ✅ within 90-min threshold). All inboxes empty — no active builds. The pipeline-stall alert is for a stale auth-failure task (clarify1), not a live stall. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 02:55:37Z (~24 min; ✅ within threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=ffcac2d "Pulse cycle 20260604T030922Z" (iter 826 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #57 (ongoing, same instance).** sync.json unchanged since iter 826 scan (status=error, commit=24cb5563, last_sync=02:51:22Z). Session HEAD (ffcac2d) newer → wrapper push for iter 826 succeeded. Hourly sync.timer is the authoritative backstop (next fire ~03:51Z). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. No additional action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core.** ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **Forge inbox: 0** — empty. ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Mirror inbox: 0** — empty. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 11** (unchanged from iter 826; hourly GC backstop active):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — stale post-merge PR #294. Hourly GC.
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — stale post-merge PR #35. Hourly GC.
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — stale post-merge PR #297. Hourly GC.
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale preflight artifacts (NOT the clarify1 task, which never created a worktree). Hourly GC.
+  - `wt-forge-heal-retry-exhausted-taskid-resolution` — stale post-merge PR #299. Hourly GC.
+  - `wt-forge-orchestrator-engine-hardening-spec` — stale post-merge PR #298. Hourly GC.
+  - `wt-mirror-build-forge-queue-ui-20260604T013719Z` — stale Mirror review for PR #35. Hourly GC.
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — stale Mirror review for PR #297. Hourly GC.
+  - `wt-mirror-heal-retry-exhausted-taskid-resolution` — stale Mirror review for PR #299. Hourly GC.
+  - `wt-mirror-orchestrator-engine-hardening-spec` — stale Mirror review for PR #298. Hourly GC.
+
+- **G-rule watch:**
+  - `pipeline-stall:forge-no-pr:forge-queue-api-preflight-*-clarify1`: **1st occurrence (1/3).** Root cause: Forge auth_401 + rate_limit failures on a preflight clarification task during a heavy rate-limit period. Task superseded by PR #294 merge. False-positive alarm. At 3/3: dispatch Beacon to investigate whether pipeline-stall healer should cross-reference merged PRs before alerting on orphan preflight tasks.
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — 3/3 DISPATCHED (iter 821). Beacon brief complete. Larry dispatches from Telegram. No new instances this iter. ✅
+  - All other G-rule counters: unchanged from iter 826.
+
+- **PRIME DIRECTIVE ratio:** interventions=695, systemic_fixes=6, ratio=115.8. No new rows this iter (no auto-fixes, no new G-rule dispatches, no new systemic fixes). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 2 new Tier-4 alerts (pipeline-stall + medic diagnosis for stale clarify1 task; both superseded by PR #294 merge). Watermark advanced to 1254 / anchor 03:11:01Z. Tier-reset recorded. No dispatch.
+3. No auto-fixes executed.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=03:19:27Z. ✅
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs unchanged (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`). Beacon brief for Pulse-triggered worktree-teardown-fix still waiting on Larry's Telegram dispatch.
+
+**Patterns:** The 2 new alerts are a false-positive pipeline-stall for a stale auth-failure task. Forge's clarify1 task for the forge-queue-api preflight exhausted retries due to auth_401 + rate_limit during the heavy interactive-cycle cluster at ~20:47Z June 3. By the time the alarm fired (03:07Z June 4, 6+ hours later), PR #294 had already merged — the clarify1 task was obsolete. No action needed. The stale-preflight worktrees (`wt-forge-forge-queue-api-preflight-20260603T231401Z` and `-clarify`) are pending hourly GC. New G-rule watch: `pipeline-stall:forge-no-pr` for superseded preflight tasks (1/3).
+
+**Learned:** heal-pipeline-stall can produce false-positive "no PR opened" alarms for preflight/clarification tasks that were superseded by a completed build. The healer doesn't cross-reference PR merge status before firing. At 3/3: dispatch Beacon to spec this cross-reference check.
+
+---
+
 ## Iteration 826 — 2026-06-04 03:08 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=0 — **0 auto-fixes. 0 new alerts. SYNC-PUSH-REBASE-FALLBACK #57 ongoing (same instance as iter 825; self-recovering). 8/8 services active. 0 open PRs. All inboxes empty. 11 worktrees (unchanged; hourly GC backstop active).**
