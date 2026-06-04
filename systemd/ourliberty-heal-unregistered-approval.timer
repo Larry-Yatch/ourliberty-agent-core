@@ -1,0 +1,16 @@
+[Unit]
+Description=Reconciliation net — promote stranded direction-asks onto the Approvals tab
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow.
+# Every 15 minutes so a missed marker reaches the tab within ~one tick; the
+# promoted-state ledger makes re-scans idempotent, and the scan is a cheap
+# read of larry-alerts.jsonl over a 24h window.
+OnCalendar=*-*-* *:00/15:00
+Persistent=true
+RandomizedDelaySec=60
+Unit=ourliberty-heal-unregistered-approval.service
+
+[Install]
+WantedBy=timers.target
