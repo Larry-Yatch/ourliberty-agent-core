@@ -100,9 +100,27 @@ class StalenessMathTest(unittest.TestCase):
         entry = {'event_driven': True, 'label': 'Cost ceiling'}
         self.assertIsNone(w.evaluate_check('vii', entry, self.bb, NOW))
 
-    def test_no_signal_at_all_alerts_stale(self):
+    def test_no_signal_first_observation_is_quiet(self):
+        # monitoring_since=None => the watcher only just started observing this
+        # check; it must warm up quietly rather than storm on first deploy.
         entry = {'cadence_hours': 168, 'grace_hours': 36}
-        alert = w.evaluate_check('x', entry, self.bb, NOW)
+        self.assertIsNone(
+            w.evaluate_check('x', entry, self.bb, NOW, monitoring_since=None))
+
+    def test_no_signal_inside_warmup_window_is_quiet(self):
+        # Observed recently (well inside cadence+grace) and still no signal:
+        # still warming up, so no alert.
+        entry = {'cadence_hours': 168, 'grace_hours': 36}
+        self.assertIsNone(
+            w.evaluate_check('x', entry, self.bb, NOW,
+                             monitoring_since=NOW - 10 * HOUR))
+
+    def test_no_signal_after_warmup_alerts_stale(self):
+        # Monitored for longer than the full cadence+grace window with still no
+        # signal => fail-closed escalation (a check that never came alive).
+        entry = {'cadence_hours': 168, 'grace_hours': 36}  # threshold 204h
+        alert = w.evaluate_check('x', entry, self.bb, NOW,
+                                 monitoring_since=NOW - 205 * HOUR)
         self.assertIsNotNone(alert)
         self.assertEqual(alert['subject'], 'pulse-check-stale:x')
         self.assertIn('never', alert['message'].lower())
@@ -147,6 +165,23 @@ class BootstrapFallbackTest(unittest.TestCase):
                         age_hours=10)
         entry = {'cadence_hours': 48, 'grace_hours': 24}
         self.assertIsNone(w.evaluate_check('i', entry, self.bb, NOW))
+
+    def test_unsuffixed_dir_artifact_keeps_check_fresh(self):
+        # Decision 1 / iii false-alarm regression: Check III writes to
+        # pulse-check-iii/ (NOT -proposals). The fallback must glob both
+        # namings for every id, so a fresh artifact in the unsuffixed dir keeps
+        # the check fresh instead of false-firing pulse-check-stale:iii.
+        _write_artifact(self.bb, 'pulse-check-iii/check-iii-2026.json',
+                        age_hours=20)
+        entry = {'cadence_hours': 336, 'grace_hours': 48}
+        self.assertIsNone(w.evaluate_check('iii', entry, self.bb, NOW))
+
+    def test_globs_cover_both_namings_for_every_id(self):
+        for cid in w.CANONICAL_CHECKS:
+            patterns = w.artifact_globs_for(cid)
+            self.assertIn(f'pulse-check-{cid}/check-{cid}-*.json', patterns)
+            self.assertIn(f'pulse-check-{cid}-proposals/check-{cid}-*.json',
+                          patterns)
 
 
 class HeartbeatParseTest(unittest.TestCase):
@@ -253,15 +288,36 @@ class MainEmitTest(unittest.TestCase):
         mod_patch.start()
         self.addCleanup(mod_patch.stop)
 
-    def test_main_emits_stale_alerts(self):
-        # Empty blackboard => every canonical check has no signal => stale,
-        # plus the real config drives them. main() should fire via larry_alerts.
+    def test_main_first_run_is_quiet(self):
+        # Empty blackboard + real config + no baseline yet => every check is on
+        # its very first observation, so the warm-up keeps main() silent (no
+        # storm on first deploy). It must also persist the baseline it set.
         rc = w.main()
         self.assertEqual(rc, 0)
-        self.assertTrue(self._fake.calls, 'expected at least one alert emitted')
+        self.assertEqual(self._fake.calls, [],
+                         'first run must warm up quietly, not storm')
+        bb = Path(self._td.name) / 'blackboard'
+        baseline = w.load_baseline(bb)
+        for cid in w.CANONICAL_CHECKS:
+            self.assertIn(cid, baseline,
+                          f'{cid} monitoring_since not persisted on first run')
+
+    def test_main_emits_stale_alerts_after_warmup(self):
+        # Pre-seed the baseline so every check has been "monitored" since the
+        # epoch — well past any cadence+grace window — then an empty blackboard
+        # means each non-event-driven check is genuinely dark and must escalate.
+        bb = Path(self._td.name) / 'blackboard'
+        w.save_baseline(bb, {cid: 0.0 for cid in w.CANONICAL_CHECKS})
+        rc = w.main()
+        self.assertEqual(rc, 0)
+        self.assertTrue(self._fake.calls, 'expected stale alerts after warm-up')
         for call in self._fake.calls:
             self.assertEqual(call['source'], 'heal-pulse-check-staleness')
             self.assertEqual(call['severity'], 'warning')
+        subjects = {c['subject'] for c in self._fake.calls}
+        # vii is event-driven => never time-stale; all others should fire.
+        self.assertIn('pulse-check-stale:ix', subjects)
+        self.assertNotIn('pulse-check-stale:vii', subjects)
 
     def test_kill_switch_short_circuits(self):
         (Path(self._td.name) / 'healers.disabled').write_text('')

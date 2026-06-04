@@ -61,3 +61,53 @@ scope-creep into the Pulse-cycle invoker.
 - The canonical `larry_alerts` envelope shape + that Beacon consumes the new subjects.
 - CLARIFY if any check is intentionally infrequent (e.g. III every other Sunday) so its grace window
   doesn't false-alarm.
+
+---
+
+## Hardening (2026-06-03, follow-up to PR #289)
+
+The watcher's first live run fired 8 raw escalations (i, iii, iv, v, vi, viii, ix, x). An audit
+(`docs/pulse-check-liveness-hardening-brief.md`) found a glob bug, a first-deploy baseline gap, a
+translation gap, and genuinely-dark checks. This build makes the watcher escalate ONLY a
+genuinely-dark check, in plain language, once.
+
+1. **Artifact-glob robustness.** The bootstrap-artifact fallback now globs BOTH
+   `pulse-check-<id>/check-<id>-*.json` and `pulse-check-<id>-proposals/check-<id>-*.json` for every
+   id, derived in `artifact_globs_for()` rather than a hardcoded per-id list. Check III writes to
+   `pulse-check-iii/` (not `-proposals`); the old per-id list globbed the wrong dir and false-alarmed.
+   Covering both namings for every id means a newly added check needs no edit here.
+
+2. **Monitoring-since baseline (kills the first-deploy storm).** The "never signalled" branch no
+   longer escalates during a check's first `cadence_hours + grace_hours` window. Each check's
+   `monitoring_since` epoch (when the watcher first observed it) is persisted to
+   `blackboard/pulse-check-staleness-baseline.json` (atomic). A never-signalled check escalates only
+   once `now - monitoring_since > cadence + grace`; before that it is a quiet warm-up log, no DM.
+   Fail-closed is preserved: a check that blows its entire first window with no signal still
+   escalates. Any future newly added check now deploys quietly too. Event-driven (vii) stays skipped.
+   The already-stale path (a signal exists but is older than cadence+grace) is unchanged.
+
+3. **Heartbeat seed (`scripts/seed_pulse_check_heartbeats.py`).** A one-time bootstrap that gives the
+   watcher an honest starting signal without waiting weeks for the monthly checks. For every check
+   that exposes a side-effect-free `--dry-run` (all but I), it runs the check ONCE through
+   `run_check` in dry-run mode: a clean exit self-seeds a genuine heartbeat, a non-zero exit emits a
+   `pulse-check-failed:<id>` alert — which is how IX/X surface their status immediately. Safety is
+   structural: the seed only ever invokes a check with `['--dry-run']` (proven POST/DM/config-free),
+   and anything it cannot prove safe (Check I has no `--dry-run`) is baseline-seeded instead of run —
+   never a fake heartbeat. `--plan` previews the per-check plan with zero writes.
+
+4. **Translation + routing.** The `pulse-check-stale`, `pulse-check-no-cadence`,
+   `pulse-check-config-unreadable`, and `pulse-check-failed` subjects already render via the
+   trailing-`:`-strip lookup in `translate_alert` (the engine needed no change). The real gap was in
+   Check 0 triage (`alert_triage_state.classify`): a translation match was Tier-3-SILENCED to digest,
+   which would have muted a genuinely-dark check. These entries now carry `"never_silence": true`;
+   `classify` honors it by skipping Tier 3 and letting the alert fall through to Tier 4
+   (`route=escalate`) with its translation intact. Translate + surface, never mute.
+
+5. **Heartbeat-emission enforcement.** `test_pulse_check_run_check_enforcement.py` fails if any
+   `pulse_check_<id>.py` `__main__` does not wrap `main()` with `run_check` imported from
+   `pulse_check_heartbeat` — so a new check cannot ship without a liveness heartbeat.
+
+6. **Systemd install.** The watcher's `.service`/`.timer` are in the repo. `heal_systemd_install_drift`
+   auto-INSTALLS missing units (cp + daemon-reload + `enable --now`), so after merge it will install
+   AND enable the timer on its own — no manual step required, but only AFTER the glob + baseline fixes
+   land so the watcher does not re-storm. See `systemd/INSTALL.md`.

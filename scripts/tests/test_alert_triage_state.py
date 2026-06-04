@@ -172,6 +172,8 @@ _FIXTURE_TRANSLATIONS = {
     '_schema': {'note': 'metadata, never a source'},
     'heal-known': {
         'known-subject': {'severity': 'INFO', 'tier': 'FYI'},
+        'surfaced-subject': {'severity': 'WARNING', 'tier': 'SOON',
+                             'never_silence': True},
     },
 }
 
@@ -199,6 +201,16 @@ class TestTranslationMatch(unittest.TestCase):
         self.assertFalse(ats._translation_match(
             _FIXTURE_TRANSLATIONS, 'heal-known', None))
 
+    def test_match_returns_entry_dict(self):
+        # The matcher returns the entry so callers can read directives like
+        # never_silence; a hit is a (truthy) dict, a miss is None.
+        entry = ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'surfaced-subject')
+        self.assertIsInstance(entry, dict)
+        self.assertTrue(entry.get('never_silence'))
+        self.assertIsNone(ats._translation_match(
+            _FIXTURE_TRANSLATIONS, 'heal-known', 'no-such-subject'))
+
 
 class TestClassify(unittest.TestCase):
 
@@ -219,6 +231,25 @@ class TestClassify(unittest.TestCase):
         r = self._classify({'source': 'heal-known', 'subject': 'known-subject',
                             'template': 'reinstall-systemd-unit'})
         self.assertEqual(r['tier'], 3)
+
+    def test_never_silence_match_escalates_not_silenced(self):
+        # A known pattern flagged never_silence (e.g. a dark pulse check) must
+        # NOT be Tier-3-muted to digest — it falls through to Tier 4 so it
+        # escalates with its translation intact.
+        r = self._classify({'source': 'heal-known',
+                            'subject': 'surfaced-subject'})
+        self.assertEqual(r['tier'], 4)
+        self.assertEqual(r['route'], 'escalate')
+        self.assertNotEqual(r['decision'], 'silence')
+        self.assertIn('never-silence', r['rationale'])
+
+    def test_never_silence_prefix_strip_still_escalates(self):
+        # The id-suffixed form (subject 'surfaced-subject:iv') strips back to the
+        # never_silence entry and still escalates rather than being muted.
+        r = self._classify({'source': 'heal-known',
+                            'subject': 'surfaced-subject:iv'})
+        self.assertEqual(r['tier'], 4)
+        self.assertEqual(r['route'], 'escalate')
 
     def test_tier2_probation_template_asks(self):
         r = self._classify({'source': 's', 'subject': 'sub',

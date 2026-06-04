@@ -357,28 +357,33 @@ def load_translations(path: Optional[Path] = None) -> dict[str, Any]:
 
 
 def _translation_match(translations: dict[str, Any], source: str,
-                       subject: Optional[str]) -> bool:
-    """True if (source, subject) is a known Tier-3 pattern.
+                       subject: Optional[str]) -> Optional[dict[str, Any]]:
+    """Return the matched translation entry, or ``None`` if no match.
 
     Mirrors the table's own lookup_rule: source must match a top-level key
     exactly; then exact subject, else strip trailing ``:``-segments one at a
     time and retry (longest-prefix, first match wins). ``_schema`` is metadata,
-    never a source."""
+    never a source.
+
+    Returns the entry dict so callers can inspect directives such as
+    ``never_silence``. A matched entry is always a (truthy) dict; a miss is
+    ``None`` — so existing ``assertTrue``/``assertFalse`` callers stay correct."""
     if not source or source == '_schema':
-        return False
+        return None
     by_subject = translations.get(source)
     if not isinstance(by_subject, dict):
-        return False
+        return None
     if subject is None:
-        return False
+        return None
     key = subject
     while key:
         if key in by_subject:
-            return True
+            entry = by_subject[key]
+            return entry if isinstance(entry, dict) else {}
         if ':' not in key:
             break
         key = key.rsplit(':', 1)[0]
-    return False
+    return None
 
 
 def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
@@ -412,7 +417,12 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
     template = str(template) if template is not None else None
 
     # Gate 1 — Tier 3: Larry already approved silence on this known pattern.
-    if _translation_match(translations, source, subject):
+    # Exception: an entry tagged ``never_silence`` is a known pattern Larry wants
+    # *translated but still surfaced* (e.g. a dark pulse check). Such an entry
+    # must not be muted to digest — it falls through to Tier 4 so it escalates
+    # with its translation intact.
+    match = _translation_match(translations, source, subject)
+    if match is not None and not match.get('never_silence'):
         return {
             'tier': 3,
             'route': 'digest',
@@ -446,11 +456,18 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
         }
 
     # Gate 4 — Tier 4: novel/ambiguous → ask Larry for triage guidance.
+    # A ``never_silence`` translation match lands here too: known pattern, but
+    # deliberately surfaced rather than muted.
+    if match is not None:
+        rationale = ('known never-silence pattern in alert-translations.json: '
+                     'translated but surfaced, not muted')
+    else:
+        rationale = 'novel: no registry template and no translation match'
     return {
         'tier': 4,
         'route': rf(source, subject, False),
         'decision': 'ask',
-        'rationale': 'novel: no registry template and no translation match',
+        'rationale': rationale,
         'template': None,
     }
 

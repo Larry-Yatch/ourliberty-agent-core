@@ -22,6 +22,16 @@ pulse-check-<id>.heartbeat present on disk) that has no cadence entry, or a
 malformed entry, gets a pulse-check-no-cadence:<id> alert rather than being
 silently unmonitored.
 
+First-deploy quiet: the "never signalled" case (no heartbeat AND no artifact)
+does NOT escalate during a check's first cadence_hours + grace_hours window.
+Each check's monitoring_since (the epoch the watcher first observed it) is
+persisted to blackboard/pulse-check-staleness-baseline.json; escalation of a
+never-signalled check waits until now - monitoring_since exceeds that window.
+This stops a first deploy (or any newly added check) from storming while
+preserving fail-closed: a check that blows its whole first window with no signal
+still escalates. The already-stale path (a signal exists but is older than
+cadence+grace) is unaffected.
+
 DETECTION ONLY. This does not fix WHY a scheduler stopped invoking a check —
 that root-cause is a separate follow-up. Stdlib only.
 """
@@ -46,17 +56,20 @@ CANONICAL_CHECKS = ['i', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
 # already-dark checks on first deploy (brief "Built-in validation") instead of
 # false-alarming every check for lack of a brand-new heartbeat file. Once
 # heartbeats exist they dominate (emitted every run, including clean skips).
-ARTIFACT_GLOBS = {
-    'i':    ['pulse-check-i/check-i-*.json'],
-    'iii':  ['pulse-check-iii-proposals/check-iii-*.json'],
-    'iv':   ['pulse-check-iv-proposals/check-iv-*.json'],
-    'v':    ['pulse-check-v-proposals/check-v-*.json'],
-    'vi':   ['pulse-check-vi-proposals/check-vi-*.json'],
-    'vii':  ['pulse-check-vii-proposals/check-vii-*.json'],
-    'viii': ['pulse-check-viii-proposals/check-viii-*.json'],
-    'ix':   ['pulse-check-ix-proposals/check-ix-*.json'],
-    'x':    ['pulse-check-x-proposals/check-x-*.json'],
-}
+#
+# The checks are inconsistent about which directory they write to: most use
+# pulse-check-<id>-proposals/, but Check I writes pulse-check-i/ and Check III
+# writes pulse-check-iii/ (NOT -proposals). A hardcoded per-id list silently
+# drifted on exactly that — the iii false alarm (2026-06-03) came from the
+# fallback globbing pulse-check-iii-proposals/ for a check that writes
+# pulse-check-iii/. So instead of a fragile per-id list, cover BOTH namings for
+# every check id; the union can never miss whichever directory a check actually
+# uses, and a newly-added check needs no edit here.
+def artifact_globs_for(check_id: str) -> list[str]:
+    return [
+        f'pulse-check-{check_id}/check-{check_id}-*.json',
+        f'pulse-check-{check_id}-proposals/check-{check_id}-*.json',
+    ]
 
 CONFIG_FILE = (
     Path(__file__).resolve().parent.parent / 'config' / 'pulse-check-cadence.json'
@@ -117,6 +130,57 @@ def load_cadence_config(path: Optional[Path] = None) -> dict:
     return checks
 
 
+def baseline_file(bb: Path) -> Path:
+    return bb / 'pulse-check-staleness-baseline.json'
+
+
+def load_baseline(bb: Path) -> dict[str, float]:
+    """Return {check_id: monitoring_since_epoch}. Missing or corrupt => {} so a
+    first run (or a clobbered file) simply re-baselines every check on this tick
+    rather than crashing the watcher. A re-baseline is the safe direction: it
+    grants a fresh warm-up window rather than false-firing."""
+    try:
+        data = json.loads(baseline_file(bb).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+    since = data.get('monitoring_since') if isinstance(data, dict) else None
+    if not isinstance(since, dict):
+        return {}
+    out: dict[str, float] = {}
+    for cid, ts in since.items():
+        if isinstance(cid, str) and isinstance(ts, (int, float)):
+            out[cid] = float(ts)
+    return out
+
+
+def save_baseline(bb: Path, since: dict[str, float]) -> None:
+    """Atomic tmp + replace of the monitoring_since map. Best-effort; never
+    raises (a watcher must not die because it could not persist a baseline)."""
+    payload = {
+        '_schema': {
+            'version': 1,
+            'purpose': (
+                'Per-check monitoring_since epoch: when this liveness watcher '
+                'first observed each Pulse check. The "never signalled" branch '
+                'suppresses escalation until now - monitoring_since exceeds '
+                'cadence_hours + grace_hours, so a first deploy (or any newly '
+                'added check) warms up quietly instead of storming. After that '
+                'window with still no signal it escalates (fail-closed).'
+            ),
+        },
+        'monitoring_since': since,
+    }
+    try:
+        path = baseline_file(bb)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + '.tmp')
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True),
+                       encoding='utf-8')
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
 def _read_heartbeat_ts(path: Path) -> Optional[float]:
     """Epoch seconds of the heartbeat's ts field; fall back to file mtime."""
     try:
@@ -147,7 +211,7 @@ def latest_signal_ts(check_id: str, bb: Path) -> tuple[Optional[float], str]:
         if ts is not None:
             candidates.append((ts, 'heartbeat'))
 
-    for pattern in ARTIFACT_GLOBS.get(check_id, []):
+    for pattern in artifact_globs_for(check_id):
         for artifact in bb.glob(pattern):
             try:
                 candidates.append((artifact.stat().st_mtime, 'artifact'))
@@ -179,9 +243,18 @@ def evaluate_check(
     entry: Optional[dict],
     bb: Path,
     now: float,
+    monitoring_since: Optional[float] = None,
 ) -> Optional[dict]:
     """Pure: return an alert dict ({key, subject, message, suggested_action})
-    for this check, or None if it is fresh / event-driven."""
+    for this check, or None if it is fresh / event-driven / still warming up.
+
+    ``monitoring_since`` is the epoch the watcher first observed this check (see
+    the baseline file). It only affects the never-signalled branch: a check with
+    no signal stays quiet until it has been monitored for a full
+    cadence_hours + grace_hours window, so a first deploy or a newly added check
+    does not storm. ``None`` means "first observation this tick" (still warming
+    up). Already-stale checks (a signal exists but is older than the threshold)
+    ignore monitoring_since and escalate as before."""
     if entry is None:
         return {
             'key': f'pulse-check-no-cadence:{check_id}',
@@ -222,13 +295,27 @@ def evaluate_check(
 
     ts, source = latest_signal_ts(check_id, bb)
     if ts is None:
+        # Never emitted a heartbeat and no artifact on disk. Distinguish "the
+        # watcher only just started monitoring this check" from "the check is
+        # actually dark": stay quiet during the first cadence+grace window after
+        # monitoring_since (warm-up), then escalate. monitoring_since=None means
+        # this is the very first observation, so it is by definition inside the
+        # warm-up window. This is what keeps a first deploy (and any future
+        # newly added check) from storming, while still firing a true positive
+        # for a check that blows its entire first window with no signal.
+        warming_up = (
+            monitoring_since is None or (now - monitoring_since) <= threshold
+        )
+        if warming_up:
+            return None
         return {
             'key': f'pulse-check-stale:{check_id}',
             'subject': f'pulse-check-stale:{check_id}',
             'message': (
                 f'Pulse check {check_id} ({label}) has never emitted a success '
-                'heartbeat and has no recent artifact — it may have never run, '
-                'or stopped before its first heartbeat under the new code.'
+                'heartbeat and has no recent artifact through its entire first '
+                f'{cadence_h:g}h cadence + {grace_h:g}h grace window — it has '
+                'most likely never run, or stops before its first heartbeat.'
             ),
             'suggested_action': (
                 f'Run python3 ~/agent-core/scripts/pulse_check_{check_id}.py '
@@ -261,16 +348,65 @@ def evaluate_check(
     }
 
 
-def evaluate_all(config: dict, bb: Path, now: Optional[float] = None) -> list[dict]:
-    """Pure: alert dicts for every stale / unmonitored check."""
+def evaluate_all(
+    config: dict,
+    bb: Path,
+    now: Optional[float] = None,
+    log_fn: Optional[callable] = None,
+) -> list[dict]:
+    """Alert dicts for every stale / unmonitored check.
+
+    Persists each check's monitoring_since on first observation (atomic write to
+    the baseline file under ``bb``) and threads it into evaluate_check so the
+    never-signalled branch warms up quietly before escalating. ``log_fn`` (set by
+    main()) gets a one-line warm-up note per suppressed-but-dark check; left None
+    in unit tests so the pure evaluation never writes to the real log."""
     now = now if now is not None else time.time()
     ids = set(CANONICAL_CHECKS) | discover_heartbeat_ids(bb) | set(config)
+    baseline = load_baseline(bb)
+    baseline_changed = False
     alerts: list[dict] = []
     for check_id in sorted(ids):
-        alert = evaluate_check(check_id, config.get(check_id), bb, now)
+        monitoring_since = baseline.get(check_id)
+        if monitoring_since is None:
+            monitoring_since = baseline[check_id] = now
+            baseline_changed = True
+        alert = evaluate_check(check_id, config.get(check_id), bb, now,
+                               monitoring_since=monitoring_since)
         if alert is not None:
             alerts.append(alert)
+        elif log_fn is not None and _is_warming_up(
+                check_id, config.get(check_id), bb, now, monitoring_since):
+            since_iso = datetime.fromtimestamp(
+                monitoring_since, timezone.utc).isoformat()
+            log_fn(f'warming up: {check_id} has no liveness signal yet but is '
+                   f'inside its first cadence+grace window (monitoring since '
+                   f'{since_iso}); no DM')
+    if baseline_changed:
+        save_baseline(bb, baseline)
     return alerts
+
+
+def _is_warming_up(
+    check_id: str,
+    entry: Optional[dict],
+    bb: Path,
+    now: float,
+    monitoring_since: Optional[float],
+) -> bool:
+    """True iff this check produced no alert specifically because it is a
+    time-cadenced check with no signal yet, still inside its first window. Used
+    only for the quiet warm-up log — never for routing."""
+    if not isinstance(entry, dict) or entry.get('event_driven'):
+        return False
+    cadence_h = entry.get('cadence_hours')
+    if not isinstance(cadence_h, (int, float)) or cadence_h <= 0:
+        return False
+    ts, _ = latest_signal_ts(check_id, bb)
+    if ts is not None:
+        return False
+    threshold = (cadence_h + (entry.get('grace_hours', 0) or 0)) * 3600.0
+    return monitoring_since is None or (now - monitoring_since) <= threshold
 
 
 def main() -> int:
@@ -300,9 +436,9 @@ def main() -> int:
         )
         return 1
 
-    alerts = evaluate_all(config, blackboard())
+    alerts = evaluate_all(config, blackboard(), log_fn=log)
     if not alerts:
-        log('tick: all pulse checks fresh')
+        log('tick: all pulse checks fresh (or warming up)')
         return 0
 
     fired = 0

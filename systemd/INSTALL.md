@@ -125,6 +125,16 @@ sudo systemctl enable --now ourliberty-heal-claude-max-burn-rate.timer  # claude
 sudo systemctl enable --now ourliberty-heal-tier2-weekly-health-probe.timer  # claude-quota-fixes-v2 (weekly Sun 06:00 MDT)
 sudo systemctl enable --now ourliberty-heal-droplet-git-drift.timer  # droplet-drift-discipline-v2 (every 30 min; observe + alert, no mutation)
 sudo systemctl enable --now ourliberty-heal-resume-paused-on-tier1.timer  # rate-limit-resilience step B — DRY-RUN by default; see service file for activation
+# pulse-check liveness watcher — ENABLE ONLY AFTER the glob + monitoring-since
+# hardening (PR "harden the pulse-check liveness watcher") has merged AND been
+# synced to the droplet, and after running the one-time seed below; otherwise
+# the pre-hardening watcher re-storms 8 first-run escalations.
+#   python3 ~/agent-core/scripts/seed_pulse_check_heartbeats.py   # seed real heartbeats / baseline (no POST/DM/config edit)
+sudo systemctl enable --now ourliberty-heal-pulse-check-staleness.timer  # liveness watcher (every 6h; OnCalendar)
+# NOTE: heal-systemd-install-drift auto-installs missing units (cp + daemon-reload
+# + enable --now for timers), so once the hardening PR is synced this timer will be
+# installed AND enabled by that healer on its next run even without the manual line
+# above. Run the seed first regardless.
 
 # Long-running ingestion daemon (not a timer; default disabled at activation gate)
 sudo systemctl enable ourliberty-chain-event-shipper.service  # E4.4d PR-B — service is OFF until OURLIBERTY_CHAIN_SHIPPER_ENABLED=true (see service file)
