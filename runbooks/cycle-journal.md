@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration 850 — 2026-06-04 06:39 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: Tier-4 novel [medic-diagnosis attempt 5]; Check B: SYNC-PUSH-REBASE-FALLBACK #60; Check E: PR #313 auto-merge applied) — **1 auto-fix (PR #313 auto-merge). PR #311 ✅ merged. heal-wedged-review-sessions.timer NOW ACTIVE (manual install between iters). 4 open PRs (#313 CLEAN/30min→auto-merge, #314 UNKNOWN/16min, #315 UNKNOWN/12min, #316 UNKNOWN/5min). Forge inbox: 2. Mirror inbox: 3. Beacon inbox: 2. 8/8 services active.**
+
+Alert watermark: **1283 lines / 06:26:01Z** (+1 since iter 849 anchor 1282/06:23:04Z). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #60 — sync.json: status=error, last_sync=06:36:09Z, commit=0baf6a3f. Self-recovering. Healer heartbeat: **06:22:58Z** (~16 min; ✅). Stale-daemon heartbeat: **06:26:17Z** (~13 min; ✅ fresh). **8/8 services active.** **4 open PRs (agent-core).** **Dashboard: 0 open PRs.** Worktrees: 18 (11 stale — PRs #303, #299, #304, #311 all merged; hourly GC active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 Tier-4 novel (tier-reset).** larry-alerts.jsonl: 1283 lines (+1 since iter 849).
+  - Alert 1: `medic:medic-diagnosis` at 06:26:01Z — **5th Medic escalation** (attempt 5 of 5) for `forge-queue-api-preflight-20260603T231401Z-clarify1`. Root cause (per Medic attempt 5): Forge built the task ~23:14Z June 3, then hit auth_401 on `gh pr create`; worktree cleaned up, branch and build artifact lost. No PR exists in any state (open/merged/closed). Medic recommends: re-queue task from scratch + verify Forge OAuth health before re-queuing. NOT in alert-translations.json (G-rule 3/3 dispatched iter 849 → Beacon inbox has `cycle-finding-forge-no-pr-superseded-preflight-20260604T062801Z.json`). **Tier 4. No new action** — systemic fix dispatched; Medic escalations will continue until fix merges or Larry resolves the orphaned task. Tier-reset.
+  - New watermark: **1283 lines / 06:26:01Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 06:22:58Z (~16 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:26:17Z (~13 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=d813474 "Pulse cycle 20260604T063551Z" (iter 849 wrapper). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #60** (06:36:09Z). sync.json: status=error, message="Auto-commit push failed; rolled back", commit=0baf6a3f. Self-recovering (hourly sync timer backstop). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. **Notable: `ourliberty-heal-wedged-review-sessions.timer` NOW ACTIVE** — was NOT INSTALLED since iter 848; manually installed between this iter and iter 849. Healer can now fire on schedule. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 1 auto-fix applied.**
+  - **PR #311 MERGED ✅** (06:30:12Z — "feat(heal): phantom-dispatch detector — flag Beacon dispatch-claims with no real Forge dispatch"). Auto-merge from iter 849 applied successfully. ✅
+  - **PR #313 → auto-merge enabled.** CLEAN/MERGEABLE (confirmed `gh pr view`), created 06:06:59Z, age=~30+ min. `gh pr merge 313 --auto --squash` applied. Mirror inbox has `marker-error-log-dir-test-isolation-leak-001-1.json` (MalformedForgeMarker retry — may be for a stale revision). ✅
+  - **PR #314 (agent-core) OPEN** — "fix(approvals): direction-asks reach the tab." Created 06:21:31Z, age=~18 min. UNKNOWN/UNKNOWN. Forge has `revision-harden-approval-tab-direction-ask-coverage-1.json` (Mirror revision request). Below threshold. ⏳
+  - **PR #315 (agent-core) OPEN** — "fix(healers): reconcile false-positive alert classes before paging Larry." Created 06:25:51Z, age=~14 min. UNKNOWN/UNKNOWN. Below threshold. ✅
+  - **PR #316 (agent-core) OPEN** — "docs(forge): require canonical 'PR opened:/updated:' line in build responses." Created 06:32:19Z, age=~7 min. UNKNOWN/UNKNOWN. Mirror reviewing (`review-forge-claude-md-canonical-pr-line-discipline.json`). **This is the long-pending APPROVAL_REQUEST `forge-claude-md-preflight-self-check-bullet-001` — now in the pipeline!** Way below threshold. ✅
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 2 tasks** — `build-fix-notifier-review-dispatch-reliability.json` (active build); `revision-harden-approval-tab-direction-ask-coverage-1.json` (revision from Mirror for PR #314). ✅
+  - **Mirror inbox: 3 tasks** — `marker-error-heal-phantom-dispatch-claim-1.json` (⚠️ potentially stale — PR #311 already merged at 06:30:12Z; Mirror should detect and discard gracefully); `marker-error-log-dir-test-isolation-leak-001-1.json` (PR #313 active); `review-forge-claude-md-canonical-pr-line-discipline.json` (PR #316). ✅
+  - **Beacon inbox: 2** — `cycle-finding-forge-no-pr-superseded-preflight-20260604T062801Z.json` (G-rule dispatch from iter 849, pending Beacon processing); `notify-forge-claude-md-canonical-pr-line-discipline.json` (pipeline completion notification). ✅
+  - **Worktrees: 18** (11 stale: done-today ×2, forge-queue-ui ×3, retry-exhausted ×2, orchestrator-engine ×2, phantom-dispatch ×2 — all merged PRs; hourly GC active). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - `pipeline-stall:forge-no-pr for superseded preflight tasks`: G-rule **3/3 DISPATCHED (iter 849)**. Beacon inbox has dispatch. 5th Medic escalation this iter. Alarms will continue until Forge fix merges. No counter change.
+  - `pipeline-stall:no-mirror-dispatch for superseded preflight tasks`: G-rule **1/3** (unchanged). 0 new occurrences.
+  - `install-drift healer doesn't auto-install sibling timers`: G-rule **2/3** (unchanged). `ourliberty-heal-wedged-review-sessions.timer` manually installed this session (now active) — manual fix doesn't close the G-rule; systemic gap persists. At 3/3: dispatch Beacon.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: G-rule **1/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: G-rule **3/3 DISPATCHED (iter 678)**. +1 occurrence this iter (attempt 5). Config engine fix still pending.
+  - `pulse/beacon-result not in alert-translations.json`: G-rule **1/3** (unchanged).
+  - All other G-rule counters unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (+1), systemic_fixes=8, ratio≈87.75. Trend: flat. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert — Tier-4 novel (medic-diagnosis attempt 5, forge-no-pr clarify1). No new dispatch. Watermark advanced to 1283 lines / 06:26:01Z. Tier-reset.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #60 at 06:36:09Z. No action. Self-recovering.
+4. Check C: Noted `ourliberty-heal-wedged-review-sessions.timer` now active (manually installed between iters).
+5. **Always-fix: `gh pr merge 313 --auto --squash`** — PR #313 CLEAN/MERGEABLE at ~30+ min. Applied. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention --detail pr-auto-merge-enable:PR-313-log-dir-hermetic-test` ✅
+7. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=06:39:49Z. ✅
+8. Wrote journal entry.
+
+**Escalated:** Nothing new via DM. Standing ask-then-do: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` — Medic (attempt 5) recommends re-queuing from scratch after verifying Forge OAuth health. Standing APPROVAL_REQUESTs unchanged. Beacon timer checkpoint (`go: cycle-timer checkpoint`) still pending Larry's trigger.
+
+**Patterns:**
+- `forge-queue-api-preflight-20260603T231401Z-clarify1` has alarmed via Medic 5 times since 02:07Z June 4 (~4.5h total). Beacon dispatch sent; systemic fix in pipeline. Until then, each healer sweep produces another Medic diagnosis → another Tier-4 tier-reset → continued Tier-1 cadence. Larry can short-circuit by re-queuing the task or explicitly marking it closed.
+- PR #316 (forge-claude-md-canonical-pr-line-discipline) opening closes a long-standing watch item (`forge-claude-md-preflight-self-check-bullet-001` APPROVAL_REQUEST). Pipeline is advancing.
+- Mirror inbox has `marker-error-heal-phantom-dispatch-claim-1.json` for PR #311 which is already merged. Mirror should detect and discard; watch for graceful handling.
+- SYNC-PUSH-REBASE-FALLBACK rate during this rapid interactive session: #57 (iter 847), #58 (iter 848), #59 (iter 849), #60 (iter 850) — 4 consecutive occurrences. Root code fix remains the only long-term path.
+
+**Learned:** `ourliberty-heal-wedged-review-sessions.timer` can be manually installed and activated between automated cycles — this is the correct interim path while the `install-drift healer doesn't auto-install sibling timers` G-rule awaits 3/3 and a permanent fix. The G-rule stays open because the systemic gap (healer auto-installs services but not their sibling timers) persists even after manual remediation.
+
+---
+
 ## Iteration 849 — 2026-06-04 06:28 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 3 Tier-4 novel alerts [medic-diagnosis, beacon-result, forge-no-pr]; Check B: SYNC-PUSH-REBASE-FALLBACK #59; Check E: PR #311 auto-merge enabled) — **1 auto-fix (PR #311 auto-merge). 1 G-rule dispatch (forge-no-pr-superseded-preflight 3/3 → Beacon). PRs #306 ✅ and #312 ✅ merged since iter 848. 4 open PRs (#311 CLEAN/30min, #313 UNKNOWN/21min, #314 UNKNOWN/6min, #315 CLEAN/2min). Forge inbox: 3. Mirror inbox: 2. Beacon inbox: 1. 8/8 services active.**
@@ -83,6 +160,25 @@ Alert watermark: **1282 lines / anchor 06:23:04Z** (+3 since iter 848 anchor 127
 - PR #315 "fix(healers): reconcile false-positive alert classes before paging Larry" — this title suggests the PR addresses some false-positive alert patterns. If it modifies alert-translations.json or the check classifications, some open G-rules may close when it merges.
 
 **Learned:** `forge-no-pr` for the same orphaned preflight task can alarm indefinitely (every hourly healer sweep) once the task is stuck. The healer has no aging-out or deduplication for this pattern — every sweep that finds "no PR, task > threshold age" fires a fresh alarm. The permanent fix (healer cross-reference) is now dispatched; the interim pain continues until the fix merges.
+
+---
+
+## Notification receipt — 2026-06-04 ~06:42 UTC | task=cycle-finding-forge-no-pr-superseded-preflight-20260604T062801Z | from=beacon | status=APPROVED→FORGE
+
+**Summary:** Beacon verified the G-rule against ground truth and produced a complete preflight spec. Pulse (approval gate for Pulse-originated Beacon dispatches) approved and forwarded to Forge inbox.
+
+**Beacon findings (verified against source files):**
+- Alarm task `forge-queue-api-preflight-20260603T231401Z-clarify1`: archive shows `phase=preflight, exit_code=-1, error='All retries exhausted'` — existing preflight-skip helper misses it (requires `exit_code==0`). Not a real build gap.
+- Real build: separate task `build-forge-queue-api-20260603T234656Z` → PR #294 MERGED 2026-06-04T01:11:22Z. Work shipped; orphaned clarify pointer alarms hourly.
+- Key Beacon refinement: parent build is NOT a suffix-strip of clarify task (different timestamp + prefix). Only reliable link is shared project stem `forge-queue-api`. Stem-matching baked into spec.
+
+**Fix spec dispatched to Forge (preflight phase):**
+- Task: `heal-forge-no-pr-preflight-superseded-suppression-001` → `~/agents/inboxes/forge/` ✅
+- Step 4: `_project_stem()` helper + branch-match sibling PRs → suppress as `parent_pr_exists` (INFO log)
+- Step 5: archived-but-errored (exit_code≠0 or non-empty `error`) → emit `pipeline-stall:pr-create-inferred-failure:<task>` once instead of repeating `forge-no-pr` hourly
+- Stem helper designed reusable for `no-mirror-dispatch` G-rule (1/3) when it crosses threshold
+
+**Watch:** Forge preflight → PROCEED → build → PR. Close G-rule `forge-no-pr for superseded preflight tasks` watch item when PR merges.
 
 ---
 
