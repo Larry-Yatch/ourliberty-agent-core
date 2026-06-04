@@ -34,10 +34,12 @@ Stdlib only.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import os
 import re
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -77,6 +79,18 @@ RETRY_OVERHEAD_PCT_THRESHOLD = 15.0
 HIGH_REPEAT_COUNT_THRESHOLD = 3  # >= N retry suffixes for same task_id
 SIGMA_ANOMALY_ESCALATE_THRESHOLD = 3.0
 MAX_PROPOSALS_PER_DIGEST = 3
+
+# preflight-marker-discipline signal (task forge-marker-error-retry-fillin-001).
+# Self-optimizing per the repo pattern: the alert condition is NOT a hand-picked
+# magic miss count — it's derived from a trailing-window baseline, exactly like
+# Ledger's σ-anomaly detector (ledger_weekly.py: SIGMA_THRESHOLD / BASELINE_WEEKS
+# / RAMP_UP_WEEKS). We mirror those values so the two self-optimizing signals
+# share one statistical convention.
+MARKER_DISCIPLINE_AGENT = "forge"
+MARKER_DISCIPLINE_BASELINE_WEEKS = 4
+MARKER_DISCIPLINE_RAMP_UP_WEEKS = 4  # alerting suspended until ≥ this many prior weeks
+MARKER_DISCIPLINE_SIGMA = 2.0  # current misses ≥ mean + σ·stdev ⇒ statistically elevated
+MARKER_DISCIPLINE_MAX_DEPTH = 3  # MAX_MARKER_ERROR_RETRIES — cascade caps here
 
 HOME = Path(os.environ.get("HOME", "/home/larry"))
 DEFAULT_SIDECAR_DIR = HOME / "agents" / "blackboard" / "ledger"
@@ -225,6 +239,80 @@ def _unwrap_marker_error_base(stem: str) -> str | None:
     return body
 
 
+def _marker_error_retry_depth(stem: str) -> Optional[int]:
+    """Retry depth (1-indexed) encoded in a marker-error archive stem.
+
+    The notifier names each retry `marker-error-<base>-<N>` where N is the
+    cumulative `marker_error_count` (1 on the first failed-marker round, 2 on
+    the second, 3 on the third — the cascade caps at MAX_MARKER_ERROR_RETRIES).
+    The trailing `-<N>` token is therefore the retry depth. This holds for the
+    current flat form AND the legacy nested wrapping
+    (`marker-error-marker-error-<base>-<N>-<M>`), where the final integer is
+    still the cumulative count. Returns None when no trailing integer is
+    present (caller treats that as depth 1 — at least a first attempt).
+    """
+    idx = stem.rfind("-")
+    if idx == -1:
+        return None
+    tail = stem[idx + 1:]
+    return int(tail) if tail.isdigit() else None
+
+
+# One marker-error retry event recovered from an outbox archive. `depth` is the
+# retry round (1/2/3); `mtime` is when the retry artifact was written (used to
+# window the preflight-marker-discipline signal to the Check-I week).
+_MarkerErrorEvent = collections.namedtuple(
+    "_MarkerErrorEvent", ["agent", "base", "depth", "mtime"]
+)
+
+
+def _iter_marker_error_events(outbox_root: Path):
+    """Yield one `_MarkerErrorEvent` per marker-error archive file.
+
+    Single source of truth for marker-error retry parsing. Both
+    `gather_retry_repeats` (aggregate repeat counts per base) and
+    `compute_marker_discipline` (retry-depth distribution + trend) consume this
+    generator, so there is exactly ONE parser with ONE set of exclusions — no
+    divergent second scan. Exclusions mirror the prior `gather_retry_repeats`
+    body verbatim:
+
+      - `dead-letter-marker-*` — terminal recovery artifact, not a retry.
+      - non-marker-error files (plain `<task>.json` / `<task>.N.json`) — skipped
+        via `_unwrap_marker_error_base` returning None.
+      - `notify-*` underlying base — inter-agent workflow noise.
+      - fixture-pattern task_ids — test artifacts must not contaminate signal.
+    """
+    if not outbox_root.exists():
+        return
+    for agent_dir in outbox_root.iterdir():
+        archive = agent_dir / ".archive"
+        if not archive.is_dir():
+            continue
+        for f in archive.iterdir():
+            name = f.name
+            if not name.endswith(".json"):
+                continue
+            stem = name[: -len(".json")]
+            if stem.startswith(_DEAD_LETTER_MARKER_PREFIX):
+                continue
+            base = _unwrap_marker_error_base(stem)
+            if base is None:
+                continue
+            if infer_task_type(base) == "notification":
+                continue
+            if is_fixture_task_id(base):
+                continue
+            try:
+                mtime = datetime.fromtimestamp(
+                    f.stat().st_mtime, tz=timezone.utc
+                )
+            except OSError:
+                mtime = None
+            yield _MarkerErrorEvent(
+                agent_dir.name, base, _marker_error_retry_depth(stem), mtime
+            )
+
+
 def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
     """Scan outbox archives for tasks with real retry signal.
 
@@ -261,37 +349,14 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
 
     Returns a list of {task_id, agent, retry_count} for entries meeting
     HIGH_REPEAT_COUNT_THRESHOLD, sorted desc by retry_count then task_id.
+
+    Parsing + exclusions live in the shared `_iter_marker_error_events` source
+    (also used by `compute_marker_discipline`) so the two signals never drift.
     """
     counts: dict[tuple[str, str], int] = {}
-    if not outbox_root.exists():
-        return []
-    for agent_dir in outbox_root.iterdir():
-        archive = agent_dir / ".archive"
-        if not archive.is_dir():
-            continue
-        for f in archive.iterdir():
-            name = f.name
-            if not name.endswith(".json"):
-                continue
-            stem = name[: -len(".json")]
-            # dead-letter-marker is a terminal recovery artifact, not a retry.
-            if stem.startswith(_DEAD_LETTER_MARKER_PREFIX):
-                continue
-            base = _unwrap_marker_error_base(stem)
-            if base is None:
-                # Plain canonical entry or `.N.json` rotation — not a retry
-                # event under v2 semantics.
-                continue
-            # Inherited exclusion: notify-* underlying base is workflow noise.
-            if infer_task_type(base) == "notification":
-                continue
-            # Fixture-pattern allowlist (2026-05-27): test artifacts must not
-            # contaminate self-optimizing Check signal. See
-            # scripts/fixture_patterns.py for rationale.
-            if is_fixture_task_id(base):
-                continue
-            key = (agent_dir.name, base)
-            counts[key] = counts.get(key, 0) + 1
+    for ev in _iter_marker_error_events(outbox_root):
+        key = (ev.agent, ev.base)
+        counts[key] = counts.get(key, 0) + 1
     repeats = [
         {"agent": agent, "task_id": tid, "retry_count": n}
         for (agent, tid), n in counts.items()
@@ -301,12 +366,195 @@ def gather_retry_repeats(outbox_root: Path) -> list[dict[str, Any]]:
     return repeats
 
 
+# --- preflight-marker-discipline signal ---
+
+
+def _marker_discipline_window_dist(
+    events: list[_MarkerErrorEvent],
+    start: datetime,
+    end: datetime,
+    agent: str,
+) -> dict[int, int]:
+    """Retry-depth histogram for `agent` marker-error events in [start, end).
+
+    Keys are retry depth (1..MARKER_DISCIPLINE_MAX_DEPTH); values are event
+    counts. Depth is clamped into [1, MAX_DEPTH] defensively — the cascade caps
+    at MAX_MARKER_ERROR_RETRIES so depths above that shouldn't occur.
+    """
+    dist: dict[int, int] = {}
+    for ev in events:
+        if ev.agent != agent or ev.mtime is None:
+            continue
+        if not (start <= ev.mtime < end):
+            continue
+        depth = ev.depth if isinstance(ev.depth, int) and ev.depth >= 1 else 1
+        depth = min(depth, MARKER_DISCIPLINE_MAX_DEPTH)
+        dist[depth] = dist.get(depth, 0) + 1
+    return dist
+
+
+def _load_prior_marker_discipline_misses(
+    output_dir: Path, week_ending: datetime, baseline_weeks: int,
+) -> dict[str, int]:
+    """{prior_week_iso: misses} read from persisted Check I audit sidecars.
+
+    The trailing-week baseline is built from what *prior* Check I runs recorded
+    (this is the "trend vs the prior week's sidecar" source). Reading persisted
+    audits — rather than recomputing prior windows from the archive — is what
+    lets a clean week (0 misses) count as a genuine observation: the audit's
+    existence proves Check I ran that week and saw zero, distinct from an empty
+    pre-history window that simply has no archive files yet.
+
+    Audits are named by firing date (4 firings/week) but every firing in a week
+    reads the same window, so the persisted `misses` is identical within a week;
+    last-write-wins per `week_ending` is therefore safe.
+    """
+    if not output_dir.is_dir():
+        return {}
+    by_week: dict[str, int] = {}
+    for p in output_dir.glob("check-i-*.json"):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        wk = data.get("week_ending")
+        sigs = data.get("engineering_signals") or {}
+        md = sigs.get("marker_discipline") if isinstance(sigs, dict) else None
+        if not isinstance(wk, str) or not isinstance(md, dict):
+            continue
+        misses = md.get("misses")
+        if isinstance(misses, bool) or not isinstance(misses, int):
+            continue
+        by_week[wk] = misses
+    out: dict[str, int] = {}
+    for i in range(1, baseline_weeks + 1):
+        prior_wk = (week_ending - timedelta(days=7 * i)).date().isoformat()
+        if prior_wk in by_week:
+            out[prior_wk] = by_week[prior_wk]
+    return out
+
+
+def compute_marker_discipline(
+    outbox_root: Path,
+    week_ending: datetime,
+    output_dir: Path,
+    agent: str = MARKER_DISCIPLINE_AGENT,
+    baseline_weeks: int = MARKER_DISCIPLINE_BASELINE_WEEKS,
+) -> dict[str, Any]:
+    """Trend the Forge preflight MalformedForgeMarker rate over the Check-I week.
+
+    Reuses the shared `_iter_marker_error_events` marker-error parser (same
+    source as `gather_retry_repeats`) and windows it by artifact mtime to the
+    Check-I week `[week_ending - 7d, week_ending)`. Reports:
+
+      - `misses` — depth-1 marker-error events in the window. Each dispatch that
+        trips the marker-error cascade writes exactly one depth-1 artifact, so
+        this is the count of distinct preflight marker-discipline failures.
+      - `retry_depth_distribution` — {1, 2, 3} event counts. A dispatch that
+        escalates to retry-2 writes a depth-2 artifact too (and depth-3 if it
+        nearly forfeits), so depth-2 count = dispatches that needed a 2nd
+        attempt, depth-3 = those that hit the cap (near-forfeit).
+      - `escalation_rate` — depth-2 / depth-1 (the retry-2+ escalation share).
+      - `trend` — delta vs the immediately prior week's persisted misses.
+      - `alert` — True iff misses are statistically elevated vs the trailing
+        baseline. Self-optimizing: no magic count. Mirrors Ledger's σ detector —
+        suspended until ≥ RAMP_UP_WEEKS prior weeks observed, then fires when
+        misses ≥ mean + σ·stdev. When the baseline is flat (stdev 0 — e.g. a run
+        of clean weeks after the retry-prompt fix lands) any strict increase
+        above the mean is elevated, so a regression off a zero baseline is still
+        caught.
+    """
+    events = list(_iter_marker_error_events(outbox_root))
+    end = week_ending
+    start = end - timedelta(days=7)
+
+    dist = _marker_discipline_window_dist(events, start, end, agent)
+    misses = dist.get(1, 0)
+    escalated = dist.get(2, 0)  # dispatches that reached retry-2 (⊇ those at 3)
+    near_forfeit = dist.get(3, 0)
+    total_events = sum(dist.values())
+    escalation_rate = (escalated / misses) if misses else 0.0
+    near_forfeit_rate = (near_forfeit / misses) if misses else 0.0
+
+    prior = _load_prior_marker_discipline_misses(output_dir, end, baseline_weeks)
+    prior_values = list(prior.values())
+    weeks_observed = len(prior_values)
+    ramp_active = weeks_observed >= MARKER_DISCIPLINE_RAMP_UP_WEEKS
+    mean = statistics.fmean(prior_values) if prior_values else 0.0
+    stdev = statistics.stdev(prior_values) if len(prior_values) >= 2 else 0.0
+
+    alert = False
+    alert_reason: Optional[str] = None
+    if ramp_active:
+        if stdev > 0.0:
+            threshold = mean + MARKER_DISCIPLINE_SIGMA * stdev
+            if misses >= threshold:
+                alert = True
+                alert_reason = (
+                    f"{misses} misses ≥ baseline mean {mean:.1f} + "
+                    f"{MARKER_DISCIPLINE_SIGMA:.0f}σ ({threshold:.1f}) over "
+                    f"{weeks_observed} trailing weeks"
+                )
+        elif misses > mean:
+            # Flat (zero-variance) baseline — typically a run of clean weeks.
+            # Any strict increase is a regression worth flagging.
+            alert = True
+            alert_reason = (
+                f"{misses} misses above flat baseline {mean:.1f} "
+                f"(zero-variance over {weeks_observed} trailing weeks)"
+            )
+
+    prior_week_iso = (end - timedelta(days=7)).date().isoformat()
+    trend: Optional[dict[str, Any]] = None
+    if prior_week_iso in prior:
+        prior_misses = prior[prior_week_iso]
+        delta = misses - prior_misses
+        trend = {
+            "prior_week": prior_week_iso,
+            "prior_misses": prior_misses,
+            "misses_delta": delta,
+            "direction": (
+                "up" if delta > 0 else "down" if delta < 0 else "flat"
+            ),
+        }
+
+    return {
+        "agent": agent,
+        "window_start": start.date().isoformat(),
+        "window_end": end.date().isoformat(),
+        "misses": misses,
+        "retry_depth_distribution": {
+            "1": misses,
+            "2": escalated,
+            "3": near_forfeit,
+        },
+        "total_events": total_events,
+        "retry_2_plus": escalated,
+        "escalation_rate": round(escalation_rate, 4),
+        "near_forfeit": near_forfeit,
+        "near_forfeit_rate": round(near_forfeit_rate, 4),
+        "baseline": {
+            "weeks_observed": weeks_observed,
+            "baseline_weeks": baseline_weeks,
+            "ramp_up_weeks": MARKER_DISCIPLINE_RAMP_UP_WEEKS,
+            "sigma": MARKER_DISCIPLINE_SIGMA,
+            "mean_misses": round(mean, 2),
+            "stdev_misses": round(stdev, 2),
+            "active": ramp_active,
+        },
+        "trend": trend,
+        "alert": alert,
+        "alert_reason": alert_reason,
+    }
+
+
 # --- proposal synthesis ---
 
 
 def synthesize_proposals(
     sidecar: dict[str, Any],
     repeats: list[dict[str, Any]],
+    marker_discipline: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """Build up to MAX_PROPOSALS_PER_DIGEST proposals from sidecar + signals.
 
@@ -361,6 +609,45 @@ def synthesize_proposals(
                 f"Read the chain archive and propose either: a fast-path "
                 f"for the shape, a prompt-discipline fix, or a model "
                 f"downgrade if the depth wasn't warranted."
+            ),
+        })
+
+    # preflight-marker-discipline regression — surfaced only when the trailing-
+    # window baseline flags misses as statistically elevated. Intentionally NOT
+    # auto-dispatch eligible: effort=small but the impact line carries no
+    # `$<digit>` token, so it surfaces in the digest for Larry to triage rather
+    # than auto-opening a Beacon spec (the retry-prompt fix already owns this
+    # area). Per-retry cost is written as a bare USD figure to keep that so.
+    if (
+        marker_discipline
+        and marker_discipline.get("alert")
+        and len(proposals) < MAX_PROPOSALS_PER_DIGEST
+    ):
+        md_dist = marker_discipline.get("retry_depth_distribution", {}) or {}
+        md_base = marker_discipline.get("baseline", {}) or {}
+        proposals.append({
+            "title": "Forge preflight marker-discipline regression",
+            "effort": "small",
+            "impact": (
+                f"{marker_discipline.get('misses', 0)} preflight marker-error "
+                f"misses this window (retry-depth "
+                f"{md_dist.get('1', 0)}/{md_dist.get('2', 0)}/"
+                f"{md_dist.get('3', 0)}); "
+                f"{marker_discipline.get('escalation_rate', 0.0) * 100:.0f}% "
+                f"escalated to retry-2+ (~0.60 USD per retry re-run + queue "
+                f"congestion)"
+            ),
+            "rationale": (
+                f"Forge preflight MalformedForgeMarker miss count is "
+                f"statistically elevated vs the trailing "
+                f"{md_base.get('weeks_observed', 0)}-week baseline (mean "
+                f"{md_base.get('mean_misses', 0.0)}, σ="
+                f"{md_base.get('stdev_misses', 0.0)}). "
+                f"{marker_discipline.get('alert_reason') or ''}. The retry-"
+                f"prompt fix (forge-marker-error-retry-fillin-001) should have "
+                f"driven this down — an upward regression means the fix needs a "
+                f"re-look or a new failure shape appeared. Audit recent "
+                f"`marker-error-*` outbox archives for the dominant parse error."
             ),
         })
 
@@ -705,6 +992,7 @@ def assemble_check_i(
     week_ending: str,
     sidecar_filename: Optional[str],
     fired_at: datetime,
+    marker_discipline: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Return the structured Check I result.
 
@@ -751,10 +1039,12 @@ def assemble_check_i(
     overhead_pct = float(retry_overhead.get("percent_of_total", 0.0) or 0.0)
     overhead_usd = float(retry_overhead.get("total_retry_cost_usd", 0.0) or 0.0)
 
-    proposals = synthesize_proposals(sidecar, repeats)
+    proposals = synthesize_proposals(sidecar, repeats, marker_discipline)
+    md_alert = bool(marker_discipline and marker_discipline.get("alert"))
     has_signal = bool(
         proposals or real_anoms or repeats
         or overhead_pct >= RETRY_OVERHEAD_PCT_THRESHOLD
+        or md_alert
     )
     if proposals:
         mode = "digest"
@@ -780,6 +1070,7 @@ def assemble_check_i(
             "retry_overhead_pct": overhead_pct,
             "sigma_anomalies": real_anoms,
             "high_repeat_tasks": repeats,
+            "marker_discipline": marker_discipline,
         },
         "proposals": proposals,
         "has_signal": has_signal,
@@ -841,6 +1132,14 @@ def render_dm(check_i: dict[str, Any]) -> str:
     overhead_pct = float(sigs.get("retry_overhead_pct", 0.0) or 0.0)
     if overhead_pct > 0:
         lines.append(f"Retry overhead: {_round2(overhead_pct):.1f}% of spend.")
+    md = sigs.get("marker_discipline")
+    if isinstance(md, dict) and md.get("alert"):
+        base = md.get("baseline", {}) or {}
+        lines.append(
+            f"Forge marker-discipline ELEVATED: {md.get('misses', 0)} misses, "
+            f"{md.get('escalation_rate', 0.0) * 100:.0f}% retry-2+ "
+            f"(baseline mean {base.get('mean_misses', 0.0)})."
+        )
     lines.append("")
     lines.append(f"Proposed optimizations ({len(check_i['proposals'])}):")
     for i, p in enumerate(check_i["proposals"], 1):
@@ -887,6 +1186,24 @@ def render_journal_block(check_i: dict[str, Any]) -> str:
             f"`{r['task_id']}`×{r['retry_count']}" for r in repeats[:5]
         )
         lines.append(f"- High-repeat tasks: {names}")
+
+    md = sigs.get("marker_discipline")
+    if isinstance(md, dict):
+        dist = md.get("retry_depth_distribution", {}) or {}
+        flag = " [ELEVATED]" if md.get("alert") else ""
+        trend = md.get("trend") or {}
+        trend_phrase = (
+            f", trend {trend.get('direction')} "
+            f"({trend.get('misses_delta'):+d} vs prior wk)"
+            if trend else ""
+        )
+        lines.append(
+            f"- Forge marker-discipline: {md.get('misses', 0)} misses "
+            f"(retry-depth {dist.get('1', 0)}/{dist.get('2', 0)}/"
+            f"{dist.get('3', 0)}, "
+            f"{md.get('escalation_rate', 0.0) * 100:.0f}% retry-2+)"
+            f"{trend_phrase}{flag}"
+        )
 
     if mode == "no-signal":
         lines.append("- Mode: no-signal — DM suppressed (scheduled run)")
@@ -1067,12 +1384,18 @@ def main(argv: Optional[list[str]] = None) -> int:
             sidecar_filename = None
 
     repeats = gather_retry_repeats(outbox_root)
+    marker_discipline = compute_marker_discipline(
+        outbox_root=outbox_root,
+        week_ending=week_ending_dt,
+        output_dir=output_dir,
+    )
     check_i = assemble_check_i(
         sidecar=sidecar,
         repeats=repeats,
         week_ending=week_ending,
         sidecar_filename=sidecar_filename,
         fired_at=now,
+        marker_discipline=marker_discipline,
     )
 
     # Audit filename uses firing date so the 4 weekly firings each get
