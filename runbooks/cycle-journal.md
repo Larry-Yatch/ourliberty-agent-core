@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 815 — 2026-06-04 01:40 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=1 — **All checks nominal. Pipeline active: Forge building `build-forge-queue-ui-20260604T013719Z` (new Larry-dispatched Forge Queue UI dashboard panel); Mirror reviewing PR #297 "fix(dashboard): count non-task--prefixed inbox dispatches as in-flight". 8/8 services active. 0 new alerts since watermark.** Alert watermark: **1243 lines / anchor 01:25:24Z** (unchanged — 0 new alerts). Sync: ✅ post-wrapper lag (HEAD=94786b5 "Pulse cycle 20260604T013822Z", last_sync=00:45:36Z). Healer heartbeat: **01:25:19Z** (~15 min at check; ✅). **8/8 services active.** **1 open PR in agent-core** (PR #297 OPEN/CLEAN/MERGEABLE, Mirror reviewing, ~5 min old — not at 30-min threshold). **0 open PRs in ourliberty-dashboard.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1243 lines** — unchanged from iter 814 watermark (anchor 01:25:24Z). 0 new alerts. Watermark unchanged. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Standing APPROVAL_REQUESTs (Beacon iter 804 alert-translations split; forge-claude-md-preflight-self-check-bullet-001) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat `~/agents/blackboard/heal-stale-daemon-code.heartbeat` = 01:25:19Z (~15 min at check; ✅ within 90-min threshold). No active pipeline stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 01:25:19Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start: HEAD=94786b5 "Pulse cycle 20260604T013822Z", branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=3290042, last_sync=00:45:36Z. HEAD ahead — normal. Hourly sync.timer backstop fires ~02:00Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal — active pipeline.**
+  - **PR #297 OPEN/CLEAN/MERGEABLE.** "fix(dashboard): count non-task--prefixed inbox dispatches as in-flight" — opened 01:35:25Z (~5 min old). Mirror has `review-dashboard-inbox-pending-filter-fix-001.json` in inbox. Not yet at 30-min clean+green threshold → no auto-merge action. Monitor. ✅
+  - **Forge inbox: 1 task.** `build-forge-queue-ui-20260604T013719Z.json` (source=larry, target=ourliberty-dashboard, phase=build). Task: implement Forge Queue UI panel on System tab, fed by the live GET `/api/system/agent-queue?agent=forge` endpoint from PR #294. Worktree `wt-forge-build-forge-queue-ui-20260604T013719Z` already created — Forge is actively building. ✅ (not stale, ~3 min old)
+  - **Mirror inbox: 1 task.** `review-dashboard-inbox-pending-filter-fix-001.json` for PR #297. Worktree `wt-mirror-dashboard-inbox-pending-filter-fix-001` active. ✅
+  - **Beacon inbox: EMPTY.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 6.**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — PR #294 post-merge stale worktree (~2h post-merge). G-rule 1/3 (Pulse-direct `gh pr merge --auto` misses event-driven teardown). Hourly GC at ~02:00Z will clear. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — **NEW.** Active Forge build for `build-forge-queue-ui-20260604T013719Z`. ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — Forge post-build worktree for PR #297. Mirror review active. Normal. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale PR #293 preflight worktrees (~2.5h old; within 24h GC). ✅
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — Mirror's active review worktree for PR #297. ✅
+
+- **G-rule watch:**
+  - `source=larry Forge builds don't auto-route to Mirror for review` — G-rule 1/3 (iter 805). New test case: `build-forge-queue-ui-20260604T013719Z` (source=larry) is now in Forge inbox. When Forge completes and opens a PR in ourliberty-dashboard, watch whether outbox-notifier auto-routes to Mirror. If not → 2/3 → approaching dispatch threshold.
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — G-rule 1/3 (iter 812). `wt-forge-build-forge-queue-api-20260603T234656Z` still present post-merge. GC backstop covers it; pattern not yet at 3/3.
+  - All other G-rule counters: unchanged from iter 814.
+
+- **PRIME DIRECTIVE ratio: interventions=688, systemic_fixes=5, ratio=137.6.** No new rows this iter — all checks nominal. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts since watermark. No action. ✅
+3. Confirmed PR #297 open and Mirror review dispatched. Normal pipeline. ✅
+4. Confirmed Forge actively building `build-forge-queue-ui-20260604T013719Z` in worktree. ✅
+5. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1, last_updated=01:40:33Z. ✅
+6. No new intervention rows to cycle-prime-ledger.jsonl — all nominal. ✅
+7. No always-allowed auto-fixes triggered. ✅
+8. Wrote journal entry.
+
+**Escalated:** Nothing new. Standing escalations from prior iters pending Larry (Beacon iter 804 APPROVAL_REQUEST alert-translations split; forge-claude-md-preflight-self-check-bullet-001). Larry has the ball.
+
+**Patterns:**
+- Two parallel pipeline tracks are now active: (1) Mirror reviewing PR #297 (dashboard inbox-pending filter fix); (2) Forge building the Forge Queue UI panel for the dashboard (source=larry task, will open a PR in ourliberty-dashboard). Both are healthy and progressing. The queue API (PR #294) provides the live backend; the UI panel will consume it.
+- The `source=larry Forge builds don't auto-route to Mirror` G-rule (1/3) gets its next observability window when `build-forge-queue-ui` completes. If the PR opens without a Mirror review dispatch firing automatically, that's 2/3 → one more occurrence to dispatch threshold.
+
+**Learned:** Nothing new this iter beyond pattern confirmation.
+
+---
+
 ## Iteration 814 — 2026-06-04 01:36 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **3 new alerts (heal-stale-daemon-code `auto-restarted:*`): beacon-bot, dashboard-api, and outbox-notifier restarted by healer at 01:25Z after PR #295 and #294 code changes. Expected/by-design. All 8 services active post-restart. PR #296 "chore(rotation): re-enable account rotation" merged by Larry at 01:28:52Z. 0 open PRs. All inboxes empty.** Alert watermark: **1243 lines / anchor 01:25:24Z** (3 new Tier-4 alerts, known-untranslated pattern). Sync: ✅ no-change (00:45:36Z). Healer heartbeat: **01:25:19Z** (~11 min at check; ✅). **8/8 services active.** **0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard.** Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY.
