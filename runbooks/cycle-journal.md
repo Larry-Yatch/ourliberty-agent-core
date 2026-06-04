@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 835 — 2026-06-04 04:37 UTC (interactive)
+
+**Health:** ⚠️ Tier 2→**1 (RE-ESCALATED)**, consecutive_clean=0 — **0 auto-fixes. 7 new alerts (1254→1261). 2 escalations sent. 8/8 services active. 0 open PRs. Forge inbox: 2 active builds. Sync CLEAR. 8 worktrees.**
+
+Alert watermark: **1261 lines / anchor 04:23:27Z** (7 new alerts since iter 834). Sync: ✅ CLEAR — sync.json status=no-change, last_sync=03:46:00Z, commit=7ba76ad. Healer heartbeat: **04:25:55Z** (≈12 min; ✅ within 90-min threshold). **8/8 services active.** **0 open PRs.** **Worktrees: 8** (↓1 from iter 834; `wt-mirror-build-x` reaped by heal-wedged-review-sessions at 04:23Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 7 new alerts (non-nominal — 2 escalations + tier-reset).** New alerts since iter 834 watermark (1254):
+  1. **`pulse-check-failed:iii`** (04:11:37Z, source=pulse-check): Check III invoked at 04:11Z but failed — `SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing`. Exited code 1. Heartbeat not refreshed. **Tier 4 / ask-then-do.** → Escalated [yellow] to larry_alerts.
+  2. **`pulse-check-failed:iv`** (04:11:37Z): Same root cause — Check IV failed with missing Supabase env vars. **Tier 4.** → Escalated as part of [yellow] above.
+  3. **`pulse-check-failed:x`** (04:11:38Z): Check X failing since at least 2026-06-02T00:03Z (Monday fire, predates PR #301). Same root cause: SUPABASE_URL/KEY missing in invocation context. PR #301 surfaced these as Tier-4 instead of prior muting. **Tier 4.** → Escalated.
+  4. **`pipeline-stall:forge-no-pr:forge-queue-api-preflight-20260603T231401Z-clarify1`** (04:14:03Z): 3rd Medic escalation (attempts at 02:07Z, 03:11Z, 04:14Z). Medic diagnosis: worktree gone, no PR for clarify1, PR #294 MERGED likely covers scope. Healer will keep firing. **Ask-then-do.** → Escalated [yellow] to larry_alerts.
+  5. `medic-diagnosis` (04:16:39Z, intent=medic-diagnosis): Medic 3rd escalation for clarify1. G-rule 3/3 dispatched (config-only PR pending). **Tier 3 known-pattern.** Journal only.
+  6. `medic-diagnosis` (04:16:46Z, duplicate DM path): Same. **Tier 3.** Journal only.
+  7. `wedged-review-reaped-wt-mirror-build-x` (04:23:27Z, source=heal-wedged-review-sessions, route=closure): heal-wedged-review-sessions reaped Mirror session (pid 4242, terminal marker present, idle 600s > grace 300s). Worktree removed. By-design closure. Source `heal-wedged-review-sessions` not in alert-translations.json. **New G-rule 1/3** (new source). Journal only (route=closure).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ (captured via Check 0).** Clarify1 stall (3rd Medic escalation) already classified and escalated under Check 0. Healer heartbeat fresh (04:25:55Z). No other stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Forge inbox contains `build-forge-queue-ui-move-20260604T042018Z` (source=larry, UI reorder task on ourliberty-dashboard, arrived 04:20Z) — actively being processed. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 04:25:55Z (~12 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2575994 "Pulse cycle 20260604T041105Z" (iter 834 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ CLEAR.** sync.json: status=no-change, last_sync=03:46:00Z, commit=7ba76ad. SYNC-PUSH-REBASE-FALLBACK #57 cleared iter 832; no new sync errors. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.**
+  - **0 open PRs in agent-core.** ✅
+  - **0 open PRs in ourliberty-dashboard.** ✅
+  - **Forge inbox: 2 tasks active** — `build-forge-queue-ui-move-20260604T042018Z` (source=larry; UI reorder, ourliberty-dashboard; arrived 04:20Z) + `heal-wedged-review-sessions-reaper.json` (source=beacon; phase=preflight; new healer spec for wedged review sessions; pipeline active). ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Mirror inbox: 0** — empty. ✅
+  - **Worktrees: 8** — active: `wt-forge-build-forge-queue-ui-20260604T013719Z`, `wt-forge-heal-wedged-review-sessions-reaper`, `wt-forge-heal-retry-exhausted-taskid-resolution`, `wt-forge-orchestrator-engine-hardening-spec`, `wt-mirror-build-forge-queue-ui-20260604T013719Z`, `wt-mirror-heal-retry-exhausted-taskid-resolution`, `wt-mirror-orchestrator-engine-hardening-spec`. Stale: `wt-forge-build-forge-queue-api-20260603T234656Z` (PR #294 MERGED). Hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Mon/Wed/Fri/Sun → skip Thursday), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **NEW G-rule 1/3: `pulse-check-failed:env-missing`** (iter 835). Check scripts III/IV/X invoked in context without SUPABASE_URL/KEY. Check X first confirmed failure June 2 (pre-PR-301). PR #301 surfaced via Tier-4 escalation instead of muting. Root cause unclear: env vars missing in invocation context. **At 3/3: dispatch Beacon to investigate env var availability in pulse check invocation path and add SUPABASE vars to the correct env file or service.**
+  - **NEW G-rule 1/3: `heal-wedged-review-sessions` source not in alert-translations.json** (iter 835). First observation. By-design closure event. **At 3/3: batch into next alert-translations dispatch as Tier 3/FYI (route=closure).**
+  - `pipeline-stall:forge-no-pr for superseded preflight tasks` — still **1/3** (iter 827). Same stall instance (clarify1) re-firing. Not a new G-rule occurrence; same task, 3rd Medic escalation.
+
+- **PRIME DIRECTIVE ratio:** interventions=697 (+2), systemic_fixes=6, ratio=116.2. 2 intervention rows appended (pulse-check-env-missing + pipeline-stall-clarify1-escalate). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 7 new alerts triaged. 3x `pulse-check-failed:iii/iv/x` → [yellow] escalation. 1x `pipeline-stall:clarify1` → [yellow] escalation. 2x `medic-diagnosis` → Tier 3 silence. 1x `wedged-review-reaped` → Tier 3/closure journal only.
+3. No auto-fixes executed.
+4. Appended 2 [yellow] escalations to larry_alerts (source=pulse-escalation).
+5. Appended 2 intervention rows to cycle-prime-ledger.jsonl via append_action.
+6. `cycle_tier_state.py record --checks-clean false` → tier reset **Tier 2 → Tier 1** (04:30:31Z, consecutive_clean=0). ✅
+7. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:**
+- **[yellow]** `pulse-check-failed:env-missing` — Checks III/IV/X missing SUPABASE_URL/KEY in invocation context; Check X failing since June 2; PR #301 surfaced via Tier-4. Confirm SUPABASE vars are in `/home/larry/credentials/.env.larry` or identify correct env setup for these check scripts.
+- **[yellow]** `pipeline-stall:clarify1-suppress-needed` — 3rd Medic escalation for forge-queue-api-preflight clarify1 stall. Medic: PR #294 MERGED likely covers scope. Confirm and suppress healer cursor OR re-dispatch clarify1.
+
+**Patterns:**
+- `pulse-check-failed:*` surfaced for the first time. Check X was silently failing since June 2; PR #301 changed muting → Tier-4 escalation. This is the correct behavior but indicates a long-running env issue. G-rule 1/3.
+- `heal-wedged-review-sessions` reaper working as designed (reaped wedged Mirror session post-terminal-marker + 600s idle). First production invocation observed. G-rule 1/3 for alert-translations coverage.
+- Pipeline active: 2 Forge builds in progress (Larry UI task + healer reaper spec from Beacon). 8 worktrees (1 stale post-PR-294).
+
+**Learned:** PR #301 ("harden-pulse-check-liveness-watcher") surfaced preexisting SUPABASE env issue for Checks III/IV/X. These checks had likely been silently failing or relying on a manual env setup. The Tier-4 escalation (instead of muting) is correct behavior — it exposed a real gap. heal-wedged-review-sessions healer is live and working post-build.
+
+---
+
 ## Iteration 834 — 2026-06-04 04:10 UTC (interactive)
 
 **Health:** ✅ Tier 1→**2 (DE-ESCALATED)**, consecutive_clean=0 (reset) — **0 auto-fixes. 0 new alerts. Sync CLEAR. 8/8 services active. 0 open PRs. All inboxes empty. 9 worktrees.**
