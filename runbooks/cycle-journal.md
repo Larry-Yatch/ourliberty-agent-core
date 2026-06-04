@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 861 — 2026-06-04 07:52 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=1 — **0 auto-fixes. All checks nominal. Pipeline clear: 0 open PRs, all inboxes empty. 8/8 services active. Check B CLEAN: SYNC-PUSH-REBASE-FALLBACK self-recovered (hourly timer fired 07:46:24Z).**
+
+Alert watermark: **1295 lines / 07:39:33Z** (unchanged — 0 new alerts since iter 860). Sync: ✅ **sync.json: status=no-change, last_sync=07:46:24Z, commit=e854d72** (hourly timer self-recovered after iter 860's wrapper race). Healer heartbeat: **07:43:19Z** (~9 min; ✅ very fresh). Stale-daemon heartbeat: **07:26:20Z** (~26 min; ✅ within 90-min threshold). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: 1295 lines — unchanged from iter 860 watermark (1295 / 07:39:33Z). 0 new alerts this iter. ✅ No tier-reset. Watermark unchanged.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Most recent Larry message: 2026-05-28 (>7 days ago). No new directives in last 4h. Pulse inbox: empty. pending-approvals.json: missing. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:43:19Z (~9 min; ✅ very fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. pending-approvals.json: missing. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 07:26:20Z (~26 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=e854d72 "Pulse cycle 20260604T074622Z" (iter 860 wrapper). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=07:46:24Z, commit=e854d72. Hourly `ourliberty-sync.timer` fired and found repo already at current HEAD — SYNC-PUSH-REBASE-FALLBACK carry-forward from iter 860 self-recovered as expected. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Forge inbox: 0 ✅ Mirror inbox: 0 ✅ Beacon inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 860.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). No new occurrences this iter. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=703, systemic_fixes=9, ratio≈78.11. No new ledger rows — clean iter, no interventions.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark unchanged at 1295 lines / 07:39:33Z. No tier-reset.
+3. Check B: SYNC-PUSH-REBASE-FALLBACK cleared. Hourly sync timer self-recovered at 07:46:24Z. ✅
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1, Tier 1, last_signal_at=07:44:32Z (unchanged). ✅
+5. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing. No new escalations. Standing items carry forward:
+- `[yellow]` Inbox-watcher restart timeout fix (Beacon brief ready; Larry must trigger Forge dispatch via Telegram chat with Beacon bot for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix, not emergency — sync self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- SYNC-PUSH-REBASE-FALLBACK self-recovered exactly as expected: iter 860's interactive session created a push race; the hourly `ourliberty-sync.timer` at 07:46Z found the repo already current and logged `no-change`. This is the documented self-recovery path. 66 total occurrences to date; root fix APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains the only permanent path to elimination.
+- First fully clean iter since at least iter 856. consecutive_clean=1. Two more clean iters would de-escalate to Tier 2 (15-min cadence).
+
+**Learned:** Sync self-recovery is reliable and fast — the hourly timer fires within <30 min of any wrapper race, consistently restoring clean state before the next cycle. This argues against treating SYNC-PUSH-REBASE-FALLBACK as urgency `[yellow]`; it's closer to `[blue]/info` when it appears without compounding symptoms. Pattern noted — if it stays at 1/3 this label will be proposed to Beacon for a WARN→INFO demotion on the sync-error path.
+
+---
+
 ## Iteration 860 — 2026-06-04 07:44 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check 0: 1 Tier-4 pulse-escalation carry-forward; no new action) — **0 auto-fixes. Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. SYNC-PUSH-REBASE-FALLBACK carry-forward (self-recovering). Inbox-watcher fix brief ready — Larry Telegram action still needed.**
