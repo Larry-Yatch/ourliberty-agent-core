@@ -1589,7 +1589,7 @@ def _fetch_chain_events_for_agent(
     try:
         resp = (
             supabase_client.table('chain_events')
-            .select('event_type,task_id,pr_url,ts')
+            .select('agent,event_type,task_id,pr_url,ts')
             .eq('agent', agent)
             .execute()
         )

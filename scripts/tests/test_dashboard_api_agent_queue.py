@@ -70,21 +70,30 @@ class _ChainEventsClient:
     """Answers the dashboard's chain_events read chain:
     table('chain_events').select(cols).eq('agent', agent).execute().
 
-    Pre-seeded with a flat list of rows; execute() returns the rows whose
-    'agent' matches the eq filter.
+    Pre-seeded with a flat list of rows; execute() filters by the eq('agent')
+    predicate and then projects each row to EXACTLY the selected columns when
+    cols != '*'. Honoring the projection is deliberate: the WHERE clause runs
+    against full rows (like Postgres) but the result only carries the selected
+    columns, so a query that forgets to select a column the deriver depends on
+    fails here the same way it fails in production. (This is the flaw that let
+    PR #303 ship done_today broken — the prior stub returned full rows, so the
+    missing 'agent' column went unnoticed.)
     """
 
     def __init__(self, rows: Optional[list[dict[str, Any]]] = None):
         self.rows = rows or []
         self._table: Optional[str] = None
         self._filters: dict[str, Any] = {}
+        self._cols: str = '*'
 
     def table(self, name: str):
         self._table = name
         self._filters = {}
+        self._cols = '*'
         return self
 
     def select(self, cols: str = '*'):
+        self._cols = cols
         return self
 
     def eq(self, col: str, val: Any):
@@ -94,6 +103,9 @@ class _ChainEventsClient:
     def execute(self):
         agent = self._filters.get('agent')
         data = [r for r in self.rows if r.get('agent') == agent]
+        if self._cols != '*':
+            keep = [c.strip() for c in self._cols.split(',')]
+            data = [{k: r.get(k) for k in keep} for r in data]
         return _Resp(data)
 
 
@@ -364,6 +376,60 @@ class DoneTodayLaneTest(_Base):
         self.assertEqual(by_task['failed2']['reason'], 'cost_budget')
         # sorted by `at` descending: merged1's review_pass (now) is newest.
         self.assertEqual(done[0]['task_id'], 'merged1')
+
+    def test_populates_through_production_column_projection(self):
+        # Regression guard for PR #303: done_today only populates if the
+        # production select(...) projection carries the 'agent' column the
+        # taskset/failure gating depends on. The stub now honors the
+        # projection, so a query that drops 'agent' yields an empty taskset
+        # and this test fails — exactly as production did.
+        now = datetime.now(timezone.utc)
+        rows = [
+            self._session('m1', now - timedelta(hours=2)),
+            self._session('c1', now - timedelta(hours=2)),
+            self._session('f1', now - timedelta(hours=2)),
+            # merged: a review_pass whose task_id IS in forge's taskset.
+            {'agent': 'mirror', 'task_id': 'm1',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/m1',
+             'ts': now.isoformat()},
+            # changes_requested.
+            {'agent': 'mirror', 'task_id': 'c1',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/c1',
+             'ts': now.isoformat()},
+            # failed: forge's own marker.
+            {'agent': 'forge', 'task_id': 'f1',
+             'event_type': 'preflight_reject', 'pr_url': None,
+             'ts': now.isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        done = r.json()['done_today']
+        by_task = {d['task_id']: d['outcome'] for d in done}
+        self.assertEqual(by_task, {
+            'm1': 'merged',
+            'c1': 'changes_requested',
+            'f1': 'failed',
+        })
+
+    def test_stub_honors_column_projection(self):
+        # Direct contract check on the fixture: select(cols) must drop columns
+        # not in `cols`, and select('*') must keep them. If this regresses, the
+        # done_today tests stop exercising the real fetch path.
+        rows = [{'agent': 'forge', 'event_type': 'session_start',
+                 'task_id': 't', 'pr_url': None, 'ts': '2026-06-04T00:00:00+00:00'}]
+        stub = _ChainEventsClient(rows)
+        projected = stub.table('chain_events').select(
+            'agent,event_type,task_id,pr_url,ts').eq('agent', 'forge').execute()
+        self.assertEqual(set(projected.data[0]), {
+            'agent', 'event_type', 'task_id', 'pr_url', 'ts'})
+        dropped = stub.table('chain_events').select(
+            'event_type,task_id,pr_url,ts').eq('agent', 'forge').execute()
+        self.assertNotIn('agent', dropped.data[0])
+        full = stub.table('chain_events').select('*').eq(
+            'agent', 'forge').execute()
+        self.assertIn('agent', full.data[0])
 
     def test_review_pass_not_in_taskset_excluded(self):
         # A lone mirror review_pass with no matching forge session today must
