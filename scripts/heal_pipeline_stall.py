@@ -146,6 +146,7 @@ PR_NO_MIRROR_DISPATCH_CODE_MIN = 60  # 60 min — same but for code PRs (regress
 MIRROR_PASS_UNMERGED_MIN = 30        # 30 min — PASS marker classified, PR still OPEN
 MIRROR_MARKER_INVISIBLE_MIN = 30     # 30 min — Mirror notified but no marker classified
 RETRY_EXHAUST_WINDOW_MIN = 30        # 30 min — All retries exhausted in this window
+RETRY_EXHAUST_TASK_SCAN = 12         # journal lines to scan around an exhaustion line for the real task_id
 LOG_LOOKBACK_HOURS = 24              # Read at most this far back into outbox-notifier.log
 JOURNAL_LOOKBACK_HOURS = 1           # Read at most this far back for retry-exhausted lines
 ALERT_DEDUP_HOURS = 1                # Same stall key not re-DMed within this window
@@ -915,6 +916,47 @@ def check_mirror_marker_invisible(notifier_lines: list[str], state: dict) -> lis
 
 # ---------- Check 5: Retry-cap exhausted in last 30 min ----------
 
+# The `All retries exhausted` log line carries no inline `task=` token
+# (observed shape: `[forge] [ERROR] All retries exhausted`). The real
+# task_id lives on adjacent structured lines emitted in the same journal
+# batch: `... [forge] done task=<id> success=False` / `start task=<id>`,
+# or the worktree path on a preceding traceback line
+# (`/agent-worktrees/wt-forge-<id>`). These resolve the nearest real id.
+_EXHAUST_TASK_RE = re.compile(r'\b(?:done|start)\s+task=(\S+)')
+_EXHAUST_WORKTREE_RE = re.compile(r'wt-(?:forge|larry|medic|mirror|pulse)-([\w.-]+?)(?=[/\s]|$)')
+
+
+def _resolve_exhausted_task_id(lines: list[str], idx: int) -> Optional[str]:
+    """Resolve the real task_id for an `All retries exhausted` line at
+    `lines[idx]`. Tries, in order: inline `task=<id>` on the line itself,
+    then a `done/start task=<id>` token on the nearest line in a bounded
+    look-back/look-ahead window, then a `wt-<agent>-<id>` worktree path on
+    the nearest such line. Returns None when nothing identifiable is found."""
+    inline = re.search(r'task=(\S+)', lines[idx])
+    if inline:
+        return inline.group(1)
+    lo = max(0, idx - RETRY_EXHAUST_TASK_SCAN)
+    hi = min(len(lines), idx + RETRY_EXHAUST_TASK_SCAN + 1)
+    # Nearest-first ordering: probe outward by distance so the closest
+    # structured line in the same batch wins. Type priority (done/start
+    # over worktree path) is applied within each distance ring.
+    for dist in range(1, RETRY_EXHAUST_TASK_SCAN + 1):
+        for j in (idx - dist, idx + dist):
+            if j < lo or j >= hi:
+                continue
+            m = _EXHAUST_TASK_RE.search(lines[j])
+            if m:
+                return m.group(1)
+    for dist in range(1, RETRY_EXHAUST_TASK_SCAN + 1):
+        for j in (idx - dist, idx + dist):
+            if j < lo or j >= hi:
+                continue
+            m = _EXHAUST_WORKTREE_RE.search(lines[j])
+            if m:
+                return m.group(1)
+    return None
+
+
 def check_retry_exhausted(state: dict) -> list[dict]:
     """Scan inbox-watcher journal for 'All retries exhausted' in the recent window."""
     cutoff_dt = datetime.now(timezone.utc) - timedelta(minutes=RETRY_EXHAUST_WINDOW_MIN)
@@ -934,12 +976,19 @@ def check_retry_exhausted(state: dict) -> list[dict]:
         return []
     alerts: list[dict] = []
     seen_tasks: set[str] = set()
-    for line in lines:
+    for idx, line in enumerate(lines):
         if 'All retries exhausted' not in line:
             continue
-        # Extract task_id where possible. inbox_watcher logs typically include task=<id>.
-        m = re.search(r'task=(\S+)', line)
-        task = m.group(1) if m else 'unknown'
+        # The exhaustion line itself carries no inline `task=`; the real id
+        # lives on adjacent structured lines in the same journal batch.
+        task = _resolve_exhausted_task_id(lines, idx)
+        if not task:
+            # Unidentifiable exhaustion: un-actionable (nothing to point a
+            # human at) and un-resolvable (no id for the resolution-signal
+            # path), so it would page forever. Suppress instead of emitting
+            # a literal `unknown` subject.
+            log('RETRY_EXHAUSTED_SKIP task=<unidentifiable> reason=no_task_id', 'INFO')
+            continue
         if task in seen_tasks:
             continue
         seen_tasks.add(task)
