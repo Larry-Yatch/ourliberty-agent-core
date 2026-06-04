@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 922 — 2026-06-04 21:14 UTC (interactive)
+
+**Health:** ⚠️ **Tier 2 → Tier 1 (tier-reset). Tier-4 medic-diagnosis finding. 1 action (DM Larry). 8/8 services active. PR #330 MERGED. All inboxes empty. Sync: SYNC-PUSH-REBASE-FALLBACK (self-recovers).**
+
+Alert watermark: **1298 lines / 21:14:18Z** (+3 from iter 921's 1295/20:55:07Z: line 1296=medic/medic-diagnosis Tier-4 tier-reset; line 1297=outbox-notifier/review-pass Tier-3 silence; line 1298=pulse-escalation/tier4-triage (this iter's DM)). Pipeline-stall heartbeat: 21:10:50Z (✅ ~3 min at cycle start). Stale-daemon heartbeat: 21:00:19Z (✅ ~14 min at cycle start, within 60-min threshold). Sync: status=error, last_sync=2026-06-04T20:59:26Z, commit=9fe491a3 — SYNC-PUSH-REBASE-FALLBACK pattern; wrapper push succeeded, sync service hasn't re-fired; self-clears on next hourly timer. Session-start gitStatus: branch=main, clean, HEAD=b3e6f7a "Pulse cycle 20260604T205955Z". Tier state at start: tier=2, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=0** (Tier-4 finding → tier-reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ Tier-4 finding (tier-reset).** Watermark 1295→1297 (2 new alerts; line 1298 is this iter's own DM):
+  - **Line 1296 (20:59:21Z): `src=medic, intent=medic-diagnosis` → Tier 4.** `alert_triage_state.py` returned `decision=ask, route=escalate, rationale="novel: no registry template and no translation match"`. Medic's 5th diagnosis of the forge-queue-api-preflight-20260603T231401Z-clarify1 dead-letter: **FALSE POSITIVE confirmed** — clarify1.json has exit_code=-1 but clarify1.1.json succeeded at 23:48Z June 3, triggering build-forge-queue-api-20260603T234656Z → PR #294 merged 01:11Z June 4. Root cause: heal-pipeline-stall doesn't reconcile *.1 marker-error retry success before classifying pr-create-inferred-failure. Medic cannot silence it (not in medic-reversible-targets.json silenceable_subjects). The STALL ALERT ITSELF is Tier-3 silenced by PR #327 translation — this medic-diagnosis is meta-signal about the healer's reconciliation gap. **Tier-4 → tier-reset; DM Larry queued.** G-rule 1/3 started (new distinct finding class).
+  - **Line 1297 (21:00:02Z): `src=outbox-notifier, intent=review-pass` → Tier 3 silence.** `alert_triage_state.py` returned `decision=silence, rationale="known-pattern match in alert-translations.json"`. Mirror approved PR #330 `fix(tests): de-brittle leak-gate WHITELIST by keying on content not line number` on task `debrittle-leak-gate-whitelist-001`. Auto-merged + branch deleted. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session. Larry's "is forge stuck?" (20:49:52Z) fully resolved in iter 921. No new untracked directives in last 4h. idx=0 delivery failures (source=heal-x, subject=fixed-something) are test-fixture delivery path (known benign). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 21:10:50Z (~3 min at cycle start; ✅ well within 90-min threshold). All inboxes empty — no in-flight Forge tasks to stall. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes (Pulse, Forge, Beacon, Mirror) = 0. No orphan directives in last 24h. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 21:00:19Z (~14 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=b3e6f7a "Pulse cycle 20260604T205955Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal (SYNC-PUSH-REBASE-FALLBACK pattern).** sync.json: status=error, last_sync=2026-06-04T20:59:26Z, commit=9fe491a3. Session HEAD b3e6f7a is newer than sync commit — wrapper push succeeded; sync service's last attempt raced and failed. Self-clears on next hourly `ourliberty-sync.timer` fire. No action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ All empty.** Forge=0, Mirror=0, Beacon=0, Pulse=0. PR #330 pipeline complete (Mirror PASS → auto-merge → branch deleted). ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** PR #330 MERGED 21:00:02Z (outbox-notifier review-pass confirmed auto-merge). `fix(tests): de-brittle leak-gate WHITELIST` — content-keying now immune to line shifts (the PR #321/#328 breakage class). Dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** No credentials within 60-day window. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Mon/Wed/Fri/Sun only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - **NEW G-rule 1/3: `heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 marker-error retry succeeded`** (first observation iter 922). Medic (attempt 5) confirmed clarify1 false positive: heal-pipeline-stall classifies the original exit_code=-1 outbox without reconciling whether a *.1 retry succeeded. At 3/3: dispatch Beacon to spec reconciliation logic in heal_pipeline_stall.py (check for successful *.1 retry outbox before classifying pr-create-inferred-failure).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged). NOTE: PR #330 (source=larry) completed without forge-no-pr alert — consistent with healed behavior for this task shape. Watch next source=larry build for confirmation.
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=716, systemic_fixes=12, ratio≈59.7 (1 new intervention row this iter). Ledger ts: 2026-06-04T21:14:03Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `alert_triage_state.py triage-alert` for outbox-notifier/review-pass → Tier-3 silence. ✅
+3. `alert_triage_state.py triage-alert` for medic/medic-diagnosis → Tier-4 (`decision=ask`). ✅
+4. `larry_alerts.py append_notification` — [yellow] DM queued for Tier-4 medic-diagnosis finding (clarify1 false positive + reconciliation gap). ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier 2→1 reset, consecutive_clean=0. ✅
+6. `cycle_prime_ledger.py append --tier 2 --kind intervention` → intervention row recorded. ✅
+7. Wrote journal entry + MEMORY.md update.
+
+**Escalated:**
+- **NEW [yellow]:** medic confirmed clarify1 dead-letter is FALSE POSITIVE (PR #294 merged); heal-pipeline-stall reconciliation gap identified. G-rule 1/3 started. DM queued (line 1298).
+- Standing items carry forward:
+  - `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+  - `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 65th+ total).
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Notable events:** PR #330 MERGED — `fix(tests): de-brittle leak-gate WHITELIST by keying on content not line number` (source=larry, Forge preflight → Mirror PASS → auto-merge). Content-keying now immune to line-number shifts; 9 gate tests pass. Task `debrittle-leak-gate-whitelist-001` complete. ✅
+
+**Patterns:** medic:medic-diagnosis Tier-4 triggers every time Medic produces a diagnosis, because medic-diagnosis source is not in alert-translations.json (engine-fix pending Larry). The underlying finding this iter is substantive: clarify1 false positive analysis + heal-pipeline-stall reconciliation gap. At 3/3 occurrences of this specific reconciliation-gap class → dispatch Beacon.
+
+**Learned:** PR #330 (source=larry) completing without forge-no-pr false alarm suggests the 2/3 G-rule may be in healed state. Watch for the G-rule to reach 3/3 before closing — one clean instance doesn't confirm the fix, but three consecutive source=larry builds without the false alarm would.
+
+---
+
 ## Iteration 921 — 2026-06-04 20:58 UTC (interactive)
 
 **Health:** ✅ **Tier 2 clean. consecutive_clean=0→1. 0 actions. 8/8 services active. PR #330 open (CLEAN/MERGEABLE, Mirror reviewing). Forge: 0 inbox (build complete, PR open). Sync: ✅ no-change.**
