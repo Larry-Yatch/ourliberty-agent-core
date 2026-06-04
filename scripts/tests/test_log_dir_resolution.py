@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -101,24 +102,38 @@ class BeaconBotResolveLogDirTest(unittest.TestCase):
 
 
 class LogWriteHitsOverrideDirTest(unittest.TestCase):
-    """End-to-end-ish: calling agent_runner.log() with the autouse fixture
-    active must write into the fixture's tmp_path, NOT the production
+    """End-to-end-ish: calling agent_runner.log() with OURLIBERTY_LOG_DIR
+    set must write into that override dir, NOT the production
     ~/agents/logs/. This is the regression that proves the 2026-05-27
     sentinel-leak class is closed.
 
-    Relies on the autouse conftest fixture having set OURLIBERTY_LOG_DIR
-    to a tmp dir — we just read it back, fire a log line, and assert the
-    file landed under that dir.
+    Hermetic by construction: setUp points OURLIBERTY_LOG_DIR at its own
+    fresh tmp dir (and tearDown restores the prior value). It must NOT
+    depend on the pytest autouse conftest fixture or on the package-import
+    isolation in scripts/tests/__init__.py — the latter does not run under
+    `python3 -m unittest discover -s scripts/tests` (the regression gate),
+    which loads test modules as top-level names and bypasses the package
+    __init__. Owning the env var here makes the test pass identically under
+    both the dotted-path and discover invocations, and order-independent.
     """
 
     def setUp(self):
         self.ar = importlib.import_module('agent_runner')
+        self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
+        self._tmp_log_dir = tempfile.mkdtemp(prefix='ourliberty-logwrite-test-')
+        os.environ['OURLIBERTY_LOG_DIR'] = self._tmp_log_dir
+
+    def tearDown(self):
+        if self._prev_log_dir is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = self._prev_log_dir
 
     def test_log_call_writes_to_overridden_dir(self):
         override = os.environ.get('OURLIBERTY_LOG_DIR')
         self.assertIsNotNone(
             override,
-            'conftest autouse fixture should have set OURLIBERTY_LOG_DIR',
+            'setUp should have set OURLIBERTY_LOG_DIR to a tmp dir',
         )
         self.ar.log('test-isolation-v3-canary', 'sentinel-write-from-test')
         expected = Path(override) / 'test-isolation-v3-canary.log'
