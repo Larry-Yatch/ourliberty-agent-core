@@ -39,12 +39,12 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.utils import get_authorization_scheme_param  # noqa: F401  # reserved
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
@@ -365,11 +365,19 @@ class SystemWorktreesResponse(BaseModel):
     worktrees: list[SystemWorktree]
 
 
-# ---- /api/system/agent-queue response models (Forge Queue panel, Phase 1) ----
+# ---- /api/system/agent-queue response models (Agent Queue panel) ----
 #
-# One agent's dispatch lifecycle as four lanes: queued (inbox files not yet
-# picked up), building (worktree in-flight), in_review (PR awaiting Mirror),
-# done_today (terminal outcomes from today, UTC). See docs/forge-queue-brief.md.
+# One agent's dispatch lifecycle, with lanes that fit its archetype
+# (docs/agent-queue-generalization-brief.md):
+#   - BUILDER (forge): queued / building / in_review /
+#     done_today(merged|changes_requested|failed). UNCHANGED from Phase 1.
+#   - WORKER (mirror, beacon, pulse): queued / active /
+#     done_today(succeeded|failed).
+# ALL lane keys are always present (empty when N/A); `archetype` tells the UI
+# which lanes to render. Builder lane item SHAPES stay byte-for-byte
+# compatible with Phase 1, so the deployed forge panel is unaffected until the
+# UI ships — hence the separate builder/worker done-item models below rather
+# than one widened model.
 
 class QueuedItem(BaseModel):
     task_id: str
@@ -388,7 +396,17 @@ class ReviewItem(BaseModel):
     since: Optional[str]
 
 
+class ActiveItem(BaseModel):
+    # WORKER active lane: one in-flight registry entry for this agent.
+    task_id: Optional[str]
+    age_seconds: Optional[float]
+
+
 class DoneItem(BaseModel):
+    # BUILDER done item. `extra='forbid'` keeps this shape exact so a worker
+    # done dict can never validate as a builder item under the response Union
+    # (and vice versa) — the two models discriminate purely by field set.
+    model_config = ConfigDict(extra='forbid')
     task_id: Optional[str]
     pr_url: Optional[str]
     # outcome is 'merged' | 'changes_requested' | 'failed'; reason carries the
@@ -399,12 +417,24 @@ class DoneItem(BaseModel):
     at: Optional[str]
 
 
+class WorkerDoneItem(BaseModel):
+    # WORKER done item, from today's session_done chain_events.
+    # outcome is 'succeeded' | 'failed' (payload.success True/False).
+    model_config = ConfigDict(extra='forbid')
+    task_id: Optional[str]
+    outcome: str
+    at: Optional[str]
+    message: Optional[str]
+
+
 class AgentQueueResponse(BaseModel):
     agent: str
+    archetype: str  # 'builder' | 'worker'
     queued: list[QueuedItem]
     building: list[BuildingItem]
     in_review: list[ReviewItem]
-    done_today: list[DoneItem]
+    active: list[ActiveItem]
+    done_today: list[Union[DoneItem, WorkerDoneItem]]
     captured_at: str
 
 
@@ -1583,13 +1613,17 @@ def _fetch_chain_events_for_agent(
     """Pull this agent's chain_events rows for the in_review / done_today
     lanes. Returns [] when the client is None (test env / no creds) or on
     any query error — the endpoint degrades to empty review/done lanes
-    rather than 500ing."""
+    rather than 500ing.
+
+    `payload` is selected so the WORKER done_today lane can read
+    `payload.success` / `payload.message`; the builder derivations ignore it.
+    """
     if supabase_client is None:
         return []
     try:
         resp = (
             supabase_client.table('chain_events')
-            .select('agent,event_type,task_id,pr_url,ts')
+            .select('agent,event_type,task_id,pr_url,ts,payload')
             .eq('agent', agent)
             .execute()
         )
@@ -1732,6 +1766,103 @@ def _derive_done_today(
     return [item for _dt, item in merged]
 
 
+# Only forge opens PRs / runs the worktree+review lifecycle today, so it is
+# the sole BUILDER. Everything else in AGENT_NAMES is a WORKER whose outcome
+# is its session result, not a merge. (Mirror uses worktrees but reviews
+# rather than ships — worker per the brief's DECIDED archetype model.)
+_BUILDER_AGENTS: tuple[str, ...] = ('forge',)
+
+# Worker done_today `message` is a free-text session summary; cap it so a
+# runaway payload can't bloat the lane.
+_WORKER_DONE_MESSAGE_MAXLEN = 280
+
+
+def _archetype_for(agent: str) -> str:
+    return 'builder' if agent in _BUILDER_AGENTS else 'worker'
+
+
+def _reader_agent_queue_active(
+    agents_root: Path, agent: str, now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """ACTIVE lane (WORKER only): in-flight registry entries for this agent.
+
+    Reads the dispatch-sentinel registry via `_load_in_flight_index`
+    (`<agents_root>/state/in-flight/*.json`, each `{task_stem, agent_id, pid,
+    started_at}`), filters to `agent_id == agent`, and emits
+    `{task_id: task_stem, age_seconds: now(UTC) - started_at}` newest-first
+    (most recently started first). Degrades to `[]` when the dir is absent
+    (handled by `_load_in_flight_index`). Never raises.
+    """
+    now = now or datetime.now(timezone.utc)
+    index = _load_in_flight_index(agents_root)
+    rows: list[tuple[Optional[datetime], dict[str, Any]]] = []
+    for stem, entry in index.items():
+        if entry.get('agent_id') != agent:
+            continue
+        started_raw = entry.get('started_at')
+        started_dt = (
+            _ts_to_dt(started_raw) if isinstance(started_raw, str) else None
+        )
+        age = (now - started_dt).total_seconds() if started_dt else None
+        rows.append((started_dt, {'task_id': stem, 'age_seconds': age}))
+    # Newest-first: most recently started at the top. Entries with an
+    # unparseable started_at sort last (treated as oldest).
+    _epoch = datetime.min.replace(tzinfo=timezone.utc)
+    rows.sort(key=lambda x: x[0] or _epoch, reverse=True)
+    return [item for _dt, item in rows]
+
+
+def _derive_worker_done_today(
+    rows: list[dict[str, Any]], agent: str, now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """DONE_TODAY lane (WORKER): today's `session_done` events for `agent`
+    (UTC day boundary, per `_reader_costs_today`), classified by
+    `payload.success`: True -> 'succeeded', else -> 'failed'. Item:
+    `{task_id, outcome, at, message}` (message truncated). Dedup by task_id
+    keeping the latest ts; sort by `at` descending."""
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
+    candidates: list[tuple[datetime, dict[str, Any]]] = []
+    for r in rows:
+        if r.get('agent') != agent or r.get('event_type') != 'session_done':
+            continue
+        dt = _ts_to_dt(r.get('ts'))
+        if dt is None:
+            continue
+        dt = dt.astimezone(timezone.utc)
+        if dt.date() != today:
+            continue
+        payload = r.get('payload')
+        payload = payload if isinstance(payload, dict) else {}
+        outcome = 'succeeded' if payload.get('success') else 'failed'
+        msg = payload.get('message')
+        if isinstance(msg, str):
+            if len(msg) > _WORKER_DONE_MESSAGE_MAXLEN:
+                msg = msg[:_WORKER_DONE_MESSAGE_MAXLEN]
+        else:
+            msg = None
+        candidates.append((dt, {
+            'task_id': r.get('task_id'),
+            'outcome': outcome,
+            'at': r.get('ts'),
+            'message': msg,
+        }))
+
+    # Dedup by task_id keeping the latest ts; None task_ids never collapse.
+    best: dict[str, tuple[datetime, dict[str, Any]]] = {}
+    extras: list[tuple[datetime, dict[str, Any]]] = []
+    for dt, item in candidates:
+        tid = item['task_id']
+        if not tid:
+            extras.append((dt, item))
+            continue
+        if tid not in best or dt > best[tid][0]:
+            best[tid] = (dt, item)
+    merged = list(best.values()) + extras
+    merged.sort(key=lambda x: x[0], reverse=True)
+    return [item for _dt, item in merged]
+
+
 def _reader_agent_queue(
     agents_root: Path,
     worktrees_root: Path,
@@ -1739,29 +1870,56 @@ def _reader_agent_queue(
     supabase_client: Any,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
-    """Assemble one agent's four-lane dispatch lifecycle.
+    """Assemble one agent's dispatch lifecycle, routed by archetype.
 
-    queued + building are filesystem-only; in_review + done_today come from
-    chain_events and degrade to [] when `supabase_client` is None. done_today
-    joins the agent's own session/failure events against Mirror's review
-    verdicts (a separate fetch, since Mirror — not the building agent — emits
-    them); in_review keeps using only the agent's own rows so its terminal
-    detection is unchanged.
+    ALL lane keys are always present (empty when N/A) so the response is
+    uniform; `archetype` tells the UI which lanes to render.
+
+    BUILDER (forge): queued + building are filesystem-only; in_review +
+    done_today come from chain_events and degrade to [] when
+    `supabase_client` is None. done_today joins the agent's own
+    session/failure events against Mirror's review verdicts (a separate
+    fetch, since Mirror — not the building agent — emits them). UNCHANGED
+    from Phase 1.
+
+    WORKER (mirror, beacon, pulse): queued (filesystem) + active (in-flight
+    registry, filesystem) + done_today (this agent's own session_done events,
+    classified by payload.success). building + in_review stay empty.
     """
     now = now or datetime.now(timezone.utc)
+    archetype = _archetype_for(agent)
+    queued = _reader_agent_queue_queued(agents_root, agent, now=now)
+
+    if archetype == 'builder':
+        rows = _fetch_chain_events_for_agent(supabase_client, agent)
+        verdict_rows = (
+            rows if agent == 'mirror'
+            else _fetch_chain_events_for_agent(supabase_client, 'mirror')
+        )
+        return {
+            'agent': agent,
+            'archetype': archetype,
+            'queued': queued,
+            'building': _reader_agent_queue_building(
+                agents_root, worktrees_root, agent, now=now,
+            ),
+            'in_review': _derive_in_review(rows),
+            'active': [],
+            'done_today': _derive_done_today(
+                rows, verdict_rows, agent, now=now,
+            ),
+            'captured_at': _now_utc_iso(now),
+        }
+
     rows = _fetch_chain_events_for_agent(supabase_client, agent)
-    verdict_rows = (
-        rows if agent == 'mirror'
-        else _fetch_chain_events_for_agent(supabase_client, 'mirror')
-    )
     return {
         'agent': agent,
-        'queued': _reader_agent_queue_queued(agents_root, agent, now=now),
-        'building': _reader_agent_queue_building(
-            agents_root, worktrees_root, agent, now=now,
-        ),
-        'in_review': _derive_in_review(rows),
-        'done_today': _derive_done_today(rows, verdict_rows, agent, now=now),
+        'archetype': archetype,
+        'queued': queued,
+        'building': [],
+        'in_review': [],
+        'active': _reader_agent_queue_active(agents_root, agent, now=now),
+        'done_today': _derive_worker_done_today(rows, agent, now=now),
         'captured_at': _now_utc_iso(now),
     }
 

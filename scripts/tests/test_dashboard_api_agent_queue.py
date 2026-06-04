@@ -199,6 +199,23 @@ class AgentParamTest(_Base):
                   headers=AUTH, params={'agent': 'bogus'})
         self.assertEqual(r.status_code, 400)
 
+    def test_archetype_per_agent_and_all_lane_keys_present(self):
+        # forge is the only builder; the other three are workers. Every
+        # response carries all five lanes regardless of archetype.
+        c = _client(self.agents_root, self.worktrees_root)
+        lanes = {'queued', 'building', 'in_review', 'active', 'done_today'}
+        for agent, archetype in (
+            ('forge', 'builder'), ('mirror', 'worker'),
+            ('beacon', 'worker'), ('pulse', 'worker'),
+        ):
+            r = c.get('/api/system/agent-queue',
+                      headers=AUTH, params={'agent': agent})
+            self.assertEqual(r.status_code, 200, agent)
+            body = r.json()
+            self.assertEqual(body['agent'], agent)
+            self.assertEqual(body['archetype'], archetype, agent)
+            self.assertTrue(lanes.issubset(body.keys()), agent)
+
 
 # ==================== queued lane ====================
 
@@ -447,6 +464,124 @@ class DoneTodayLaneTest(_Base):
         self.assertEqual(r.json()['done_today'], [])
 
 
+# ==================== builder byte-compat regression ====================
+
+class BuilderRegressionTest(_Base):
+    """Forge's lane SHAPES must stay byte-for-byte compatible with Phase 1
+    (UI Phase B ships separately). The only additive top-level changes are
+    `archetype` and the always-present (empty for builder) `active` lane."""
+
+    def test_forge_done_item_shape_unchanged_and_active_empty(self):
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'm1', 'event_type': 'session_start',
+             'pr_url': None, 'ts': (now - timedelta(hours=2)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'm1', 'event_type': 'review_pass',
+             'pr_url': 'https://pr/m1', 'ts': now.isoformat()},
+        ]
+        # A worker in-flight entry that must NOT leak into forge's (empty)
+        # active lane.
+        _write_in_flight(self.agents_root, task_stem='pulse-job',
+                         agent_id='pulse')
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'forge'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['archetype'], 'builder')
+        self.assertEqual(body['active'], [])
+        done = body['done_today']
+        self.assertEqual(len(done), 1)
+        # Exact builder done-item key set — no worker `message` field bleeds in.
+        self.assertEqual(set(done[0]), {'task_id', 'pr_url', 'outcome',
+                                        'reason', 'at'})
+        self.assertEqual(done[0]['outcome'], 'merged')
+
+
+# ==================== worker active lane ====================
+
+class WorkerActiveLaneTest(_Base):
+    def test_in_flight_entries_parsed_filtered_and_newest_first(self):
+        # REAL registry parse (no mock): write JSON sentinels under
+        # state/in-flight/ and assert the active lane reads them.
+        now = datetime.now(timezone.utc)
+        _write_in_flight(self.agents_root, task_stem='pulse-old',
+                         agent_id='pulse',
+                         started_at=(now - timedelta(minutes=30)).isoformat())
+        _write_in_flight(self.agents_root, task_stem='pulse-new',
+                         agent_id='pulse',
+                         started_at=(now - timedelta(minutes=2)).isoformat())
+        # Wrong-agent entry must be filtered out.
+        _write_in_flight(self.agents_root, task_stem='forge-build',
+                         agent_id='forge')
+        c = _client(self.agents_root, self.worktrees_root)
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'pulse'})
+        self.assertEqual(r.status_code, 200)
+        active = r.json()['active']
+        # Newest-started first; forge entry excluded.
+        self.assertEqual([a['task_id'] for a in active],
+                         ['pulse-new', 'pulse-old'])
+        self.assertGreater(active[1]['age_seconds'], active[0]['age_seconds'])
+        self.assertGreater(active[1]['age_seconds'], 1500)
+
+
+# ==================== worker done_today lane ====================
+
+class WorkerDoneTodayLaneTest(_Base):
+    def _done(self, task_id: str, success: bool, ts,
+              message: str = 'ok') -> dict[str, Any]:
+        return {'agent': 'pulse', 'task_id': task_id,
+                'event_type': 'session_done', 'pr_url': None,
+                'ts': ts.isoformat(),
+                'payload': {'success': success, 'message': message}}
+
+    def test_succeeded_and_failed_via_payload_success(self):
+        now = datetime.now(timezone.utc)
+        yesterday = now - timedelta(days=1)
+        rows = [
+            self._done('jobS', True, now - timedelta(hours=1), 'all good'),
+            self._done('jobF', False, now, 'boom'),
+            # A dupe for jobS earlier the same day must lose to the later ts.
+            self._done('jobS', False, now - timedelta(hours=5), 'stale'),
+            # Yesterday's session_done is excluded (UTC boundary).
+            self._done('jobOld', True, yesterday, 'old'),
+            # Another agent's row must not leak.
+            {'agent': 'mirror', 'task_id': 'notpulse',
+             'event_type': 'session_done', 'pr_url': None,
+             'ts': now.isoformat(), 'payload': {'success': True}},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'pulse'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['archetype'], 'worker')
+        done = body['done_today']
+        by_task = {d['task_id']: d for d in done}
+        self.assertEqual(set(by_task), {'jobS', 'jobF'})
+        self.assertEqual(by_task['jobS']['outcome'], 'succeeded')
+        self.assertEqual(by_task['jobS']['message'], 'all good')
+        self.assertEqual(by_task['jobF']['outcome'], 'failed')
+        # Exact worker done-item key set — no builder pr_url/reason fields.
+        self.assertEqual(set(done[0]), {'task_id', 'outcome', 'at', 'message'})
+        # sorted by `at` desc: jobF (now) is newest.
+        self.assertEqual(done[0]['task_id'], 'jobF')
+
+    def test_message_truncated(self):
+        now = datetime.now(timezone.utc)
+        long_msg = 'x' * 5000
+        rows = [self._done('jobL', True, now, long_msg)]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'pulse'})
+        msg = r.json()['done_today'][0]['message']
+        self.assertEqual(len(msg), da._WORKER_DONE_MESSAGE_MAXLEN)
+
+
 # ==================== supabase-None degradation ====================
 
 class SupabaseNoneDegradationTest(_Base):
@@ -461,6 +596,24 @@ class SupabaseNoneDegradationTest(_Base):
         self.assertEqual(body['in_review'], [])
         self.assertEqual(body['done_today'], [])
         self.assertIn('captured_at', body)
+
+    def test_worker_supabase_none_and_missing_in_flight_dir(self):
+        # Worker with no supabase client AND no in-flight dir: active +
+        # done_today degrade to [], never 500. queued still works.
+        import shutil
+        shutil.rmtree(self.agents_root / 'state' / 'in-flight')
+        _write_inbox_file(self.agents_root, 'pulse', 'ppp.json')
+        c = _client(self.agents_root, self.worktrees_root, supabase_client=None)
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'pulse'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['archetype'], 'worker')
+        self.assertEqual(len(body['queued']), 1)
+        self.assertEqual(body['active'], [])
+        self.assertEqual(body['done_today'], [])
+        self.assertEqual(body['building'], [])
+        self.assertEqual(body['in_review'], [])
 
 
 if __name__ == '__main__':
