@@ -387,5 +387,53 @@ class RenderMarkerTest(unittest.TestCase):
                 self.assertIn(mtype, fph.REQUIRED_FIELDS)
 
 
+# -------------------- render_marker_skeleton / render_all_marker_skeletons --------------------
+
+class RenderMarkerSkeletonTest(unittest.TestCase):
+    """Fill-in-the-blank skeleton renderer used by the none-found retry prompt.
+
+    The skeleton must stay parser-synced: it routes through render_marker, so
+    its delimiters and field set track MARKER_KEYWORDS + REQUIRED_FIELDS and
+    cannot drift into bare-literal rot.
+    """
+
+    def test_skeleton_contains_delimiters_and_required_fields(self):
+        for mtype in fph.MARKER_TYPES:
+            with self.subTest(mtype=mtype):
+                skel = fph.render_marker_skeleton(mtype)
+                keyword = fph.MARKER_KEYWORDS[mtype]
+                self.assertIn(f'=== {keyword} ===', skel)
+                self.assertIn(f'=== END_{keyword} ===', skel)
+                for field in fph.REQUIRED_FIELDS[mtype]:
+                    self.assertIn(f'"{field}"', skel)
+
+    def test_skeleton_placeholders_for_unfilled_fields(self):
+        skel = fph.render_marker_skeleton('proceed')
+        self.assertIn('<preflight_summary>', skel)
+        self.assertIn('<task_id>', skel)
+
+    def test_skeleton_injects_supplied_field_values(self):
+        skel = fph.render_marker_skeleton('proceed', field_values={'task_id': 'real-x'})
+        self.assertIn('"real-x"', skel)
+        self.assertNotIn('<task_id>', skel)
+        # Unsupplied field stays a placeholder.
+        self.assertIn('<preflight_summary>', skel)
+
+    def test_unknown_skeleton_type_raises(self):
+        with self.assertRaisesRegex(ValueError, 'unknown marker type'):
+            fph.render_marker_skeleton('bogus')
+
+    def test_all_skeletons_cover_every_marker_type(self):
+        combined = fph.render_all_marker_skeletons()
+        for mtype in fph.MARKER_TYPES:
+            with self.subTest(mtype=mtype):
+                self.assertIn(f'=== {fph.MARKER_KEYWORDS[mtype]} ===', combined)
+
+    def test_all_skeletons_injects_shared_field_values(self):
+        combined = fph.render_all_marker_skeletons(field_values={'task_id': 'shared-1'})
+        # task_id appears once per marker type, all carrying the injected value.
+        self.assertEqual(combined.count('"shared-1"'), len(fph.MARKER_TYPES))
+
+
 if __name__ == '__main__':
     unittest.main()

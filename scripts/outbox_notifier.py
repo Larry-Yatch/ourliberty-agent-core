@@ -1568,6 +1568,43 @@ def _emit_mirror_verdict_chain_event(
         )
 
 
+# Canonical "preflight response carried no marker block at all" error. Defined
+# as a constant (not an inline literal) so the none-found marker-error retry
+# enrichment in `_notify_forge_marker_error` can detect THIS specific failure
+# shape by exact match — distinct from malformed-JSON / missing-field / multi-
+# marker / task_id-mismatch errors, which already carry actionable messages and
+# must NOT get the fill-in grammar.
+PREFLIGHT_NO_MARKER_ERROR_MSG = (
+    'phase=preflight requires ONE marker block at end of response '
+    '(PROCEED / CLARIFY_REQUEST / REJECT) — none found. Re-read '
+    "agents/forge/CLAUDE.md 'Preflight discipline' — preflight "
+    'decides, it does not act.'
+)
+
+
+def _build_preflight_marker_grammar(task_id: str) -> str:
+    """Fill-in-the-blank grammar block for a none-found preflight retry.
+
+    Embeds the canonical block for all three preflight marker types
+    (PROCEED / CLARIFY_REQUEST / REJECT) — delimiters + a required-field JSON
+    skeleton — sourced from `fph.render_all_marker_skeletons` so the example
+    stays in lockstep with the parser. The real `task_id` is injected so the
+    pasted-back marker already satisfies the task_id-match check.
+    """
+    skeletons = fph.render_all_marker_skeletons(field_values={'task_id': task_id})
+    return (
+        'FILL-IN-THE-BLANK — your response omitted the marker block entirely. '
+        'End your response with EXACTLY ONE of the blocks below, with the JSON '
+        'values filled in (replace each <...> placeholder). The content between '
+        'the delimiters MUST be a single JSON object — put narrative ABOVE the '
+        'block, never inside it.\n\n'
+        f'{skeletons}\n'
+        'Choose PROCEED if the spec is buildable, CLARIFY_REQUEST if you need '
+        'one specific answer from Beacon, or REJECT if it is not buildable as '
+        'written. Paste exactly one block.'
+    )
+
+
 def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     """Inspect a Forge outbox for a preflight marker. Returns routing decision or None.
 
@@ -1626,12 +1663,7 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         # warning lets Forge keep fast-pathing; strict costs one extra
         # invocation, cheap insurance until Forge has 20+ disciplined runs).
         if data.get('phase') == 'preflight':
-            raise fph.MalformedForgeMarker(
-                'phase=preflight requires ONE marker block at end of response '
-                '(PROCEED / CLARIFY_REQUEST / REJECT) — none found. Re-read '
-                "agents/forge/CLAUDE.md 'Preflight discipline' — preflight "
-                'decides, it does not act.'
-            )
+            raise fph.MalformedForgeMarker(PREFLIGHT_NO_MARKER_ERROR_MSG)
         return None
 
     # Phase D3 commit 4b: tighten marker discipline. Forge's marker payload
@@ -1777,6 +1809,18 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
             'max_retries': MAX_MARKER_ERROR_RETRIES,
         },
     )
+    # Fill-in-the-blank enrichment for a Forge PREFLIGHT response that omitted
+    # the marker block entirely. The shared marker-error template is a scold
+    # ("re-emit a valid marker"), which Forge frequently answers with another
+    # omission — ~35% of these escalate to a 2nd retry, each a full preflight
+    # re-run. Embedding the parser-synced grammar for all three preflight
+    # markers turns the bounce into a paste-and-fill task. Scoped strictly to
+    # the none-found case (exact-match on the canonical message) so malformed-
+    # JSON / missing-field / multi-marker / task_id-mismatch retries are
+    # unchanged, and to phase=preflight so Mirror review and Forge revision
+    # marker-errors are untouched.
+    if data.get('phase') == 'preflight' and err_msg == PREFLIGHT_NO_MARKER_ERROR_MSG:
+        prompt = f'{prompt}\n\n{_build_preflight_marker_grammar(task_id)}'
     # D3.5 5b-followup Bug B: keep envelope task_id as the ORIGINAL task_id
     # across retries. The previous wrapped form (`marker-error-<orig>-<N>`)
     # broke the 4b task_id-mismatch check: Forge correctly emits her marker

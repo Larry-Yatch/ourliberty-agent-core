@@ -28,6 +28,7 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+import forge_preflight_handler as fph  # noqa: E402
 import outbox_notifier as on        # noqa: E402
 import routing_validator as rv      # noqa: E402
 import safe_write_inbox as swi      # noqa: E402
@@ -4957,6 +4958,144 @@ class RevisionFollowupFixesTest(unittest.TestCase):
         self.assertEqual(len(notifies), 1)
         notify = json.loads(notifies[0].read_text())
         self.assertNotIn('reply_chat_id', notify)
+
+
+class PreflightNoneFoundFillInGrammarTest(unittest.TestCase):
+    """Fill-in-the-blank enrichment: a none-found preflight marker-error retry
+    embeds the parser-synced grammar for all three preflight marker types so
+    Forge pastes-and-fills instead of getting a scold she re-omits."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _read_only_notify_prompt(self):
+        notifies = list((on.INBOXES_ROOT / 'forge').glob('marker-error-*.json'))
+        self.assertEqual(len(notifies), 1)
+        return json.loads(notifies[0].read_text())['prompt']
+
+    def test_none_found_preflight_retry_embeds_grammar(self):
+        # The exact none-found failure shape: phase=preflight, no marker block.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'real-fillin', 'phase': 'preflight',
+            'target_repo': 'ourliberty-agent-core',
+            'result': 'I read the spec and it looks fine, will build it.',
+        }
+        on._notify_forge_marker_error(data, on.PREFLIGHT_NO_MARKER_ERROR_MSG)
+        prompt = self._read_only_notify_prompt()
+        # Literal delimiters for every preflight marker type appear.
+        for keyword in ('PROCEED', 'CLARIFY_REQUEST', 'REJECT'):
+            self.assertIn(f'=== {keyword} ===', prompt)
+            self.assertIn(f'=== END_{keyword} ===', prompt)
+        # Required field names appear.
+        for field in ('task_id', 'preflight_summary', 'question', 'reason'):
+            self.assertIn(field, prompt)
+        # The real task_id is injected into the skeleton.
+        self.assertIn('real-fillin', prompt)
+
+    def test_grammar_is_parser_synced_drift_catch(self):
+        # Drift-catch: every preflight MARKER_KEYWORD (sourced from the parser
+        # module) must appear in the prompt. If a keyword is added/renamed in
+        # fph without the grammar tracking it, this fails.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'real-drift', 'phase': 'preflight',
+            'target_repo': 'ourliberty-agent-core',
+            'result': 'no marker here',
+        }
+        on._notify_forge_marker_error(data, on.PREFLIGHT_NO_MARKER_ERROR_MSG)
+        prompt = self._read_only_notify_prompt()
+        for keyword in fph.MARKER_KEYWORDS.values():
+            self.assertIn(f'=== {keyword} ===', prompt)
+        # And every required field across all marker types is named.
+        for fields in fph.REQUIRED_FIELDS.values():
+            for field in fields:
+                self.assertIn(field, prompt)
+
+    def test_non_none_found_marker_error_unchanged(self):
+        # A malformed-JSON marker error (delimiters present, bad JSON) is NOT a
+        # none-found case — the grammar must NOT be embedded.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'real-badjson', 'phase': 'preflight',
+            'target_repo': 'ourliberty-agent-core',
+            'result': '=== PROCEED ===\n{bad json}\n=== END_PROCEED ===',
+        }
+        on._notify_forge_marker_error(data, 'proceed marker has invalid JSON: x')
+        prompt = self._read_only_notify_prompt()
+        self.assertNotIn('FILL-IN-THE-BLANK', prompt)
+        self.assertNotIn('=== CLARIFY_REQUEST ===', prompt)
+
+    def test_revision_phase_none_found_not_enriched(self):
+        # The revision-preamble strict gate reuses _notify_forge_marker_error
+        # but phase=revision — preflight grammar must NOT leak in.
+        data = {
+            'agent': 'forge', 'source': 'beacon',
+            'task_id': 'real-rev', 'phase': 'revision',
+            'target_repo': 'ourliberty-agent-core',
+            'revision_count': 1, 'max_revisions': 3,
+            'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/9',
+            'result': 'Fixed the thing but forgot the preamble.',
+        }
+        on._notify_forge_marker_error(
+            data, on.PREFLIGHT_NO_MARKER_ERROR_MSG,  # message irrelevant; phase gates
+        )
+        prompt = self._read_only_notify_prompt()
+        self.assertNotIn('FILL-IN-THE-BLANK', prompt)
+
+    def test_enrichment_via_process_outbox_integration(self):
+        # End-to-end: a phase=preflight outbox with no marker flows through
+        # process_outbox → _classify_forge_marker raises none-found →
+        # _notify_forge_marker_error enriches.
+        outbox = _good_outbox(
+            agent='forge', source='beacon', task_id='real-e2e',
+            phase='preflight', target_repo='ourliberty-agent-core',
+            result='I started editing files directly, no marker emitted.',
+        )
+        outbox_dir = on.OUTBOXES_ROOT / 'forge'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / 'real-e2e.json'
+        f.write_text(json.dumps(outbox))
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'marker-error')
+        prompt = self._read_only_notify_prompt()
+        self.assertIn('FILL-IN-THE-BLANK', prompt)
+        self.assertIn('=== PROCEED ===', prompt)
 
 
 # -------------------- D3.5 5c — Beacon auto-replan loop --------------------
