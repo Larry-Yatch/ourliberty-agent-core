@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 857 — 2026-06-04 07:24 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (Check B: SYNC-PUSH-REBASE-FALLBACK #64 at 07:19:26Z) — **0 auto-fixes. PR #314 MERGED ✅. Mirror inbox 2 (reviewing PRs #317 rev1, #318 initial). 8/8 services active.**
+
+Alert watermark: **1287 lines / 07:20:42Z** (1 new alert: review-pass for PR #314 — Tier 3 silence per alert-translations.json). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #64 (07:19:26Z, commit ea7cd440 — new occurrence since iter 856). sync.json: status=error. Session HEAD=2c5604c "Pulse cycle 20260604T072219Z" > sync.json commit → wrapper push succeeded. Self-recovering (hourly backstop). Healer heartbeat: **07:11:09Z** (~13 min; ✅). Stale-daemon heartbeat: **06:56:17Z** (~28 min; ✅ within 90-min threshold). **8/8 services active.**
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (1 new, Tier 3 silenced).** larry-alerts.jsonl: 1287 lines (+1 since iter 856 watermark 06:55:53Z). New alert: `{"ts": "2026-06-04T07:20:42Z", "source": "outbox-notifier", "intent": "review-pass"}` — Mirror approved PR #314 (`harden-approval-tab-direction-ask-coverage`), auto-merged + branch deleted. `review-pass` classified Tier 3 per `config/alert-translations.json` ("by-design FYI"). **No tier-reset.** Watermark → 1287 lines / 07:20:42Z. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: MISSING (empty). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 07:11:09Z (~13 min; ✅ fresh). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 06:56:17Z (~28 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2c5604c "Pulse cycle 20260604T072219Z" (iter 856 wrapper). **PR #314 merged as 64025cc "fix(approvals): direction-asks reach the tab (#314)" — confirmed in session git log.** ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #64** (07:19:26Z, commit ea7cd440). sync.json: status=error. Session HEAD=2c5604c > sync.json commit → wrapper push succeeded; sync service race. Self-recovering. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ⚠️ Known pattern, tier-reset.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing — 0 auto-fixes this iter.**
+  - **PR #314 MERGED ✅** — "fix(approvals): direction-asks reach the tab (#314)" — commit 64025cc. Mirror approved re-review r1 at 07:20:42Z; auto-merged + branch deleted. ✅
+  - **PR #317 (agent-core) OPEN** — "fix(notifier): reliable Forge→Mirror review dispatch." Created 07:06:44Z, age=~18 min. UNKNOWN/UNKNOWN (list — stale cache for recently-opened PR). Mirror inbox: `review-fix-notifier-review-dispatch-reliability-rev1.json` (revision review). ⏳
+  - **PR #318 (agent-core) OPEN** — "fix(heal): suppress forge-no-pr false-fires on superseded preflight tasks." Created 07:16:29Z, age=~8 min. UNKNOWN/UNKNOWN (list — stale cache). Mirror inbox: `review-heal-forge-no-pr-preflight-superseded-suppression-001.json` (initial review). ⏳
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Forge inbox: 0.** ✅ **Mirror inbox: 2** (was 3; review-harden-approval-tab-direction-ask-coverage-rev1 consumed on PR #314 approve). Active. ✅ **Beacon inbox: 0.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All G-rule counters unchanged from iter 856.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: still **2/3**. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=702 (unchanged), systemic_fixes=8 (unchanged), ratio≈87.75. No new ledger rows this iter — PR #314 is a normal pipeline delivery (not a Pulse-dispatched systemic fix).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 1 new alert (review-pass for PR #314). Tier 3 silence per alert-translations.json. Watermark → 1287 lines / 07:20:42Z. ✅
+3. Check B: SYNC-PUSH-REBASE-FALLBACK #64 (07:19:26Z). New occurrence since iter 856. No action — self-recovering; APPROVAL_REQUEST open.
+4. Check E: PR #314 MERGED ✅. Mirror inbox 3→2. PRs #317/#318 below 30-min threshold — no auto-fix actions.
+5. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1, last_signal_at=07:24:24Z. ✅
+6. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing: Larry should resolve `forge-queue-api-preflight-20260603T231401Z-clarify1` (Medic recommends re-queue from scratch). `sync-push-rebase-fallback-001` APPROVAL_REQUEST open. "go: cycle-timer checkpoint" pending Larry's Telegram trigger.
+
+**Patterns:**
+- PR #314 merged cleanly after Mirror's re-review approved both findings. 3 PRs open → 2 open. Mirror now has 2 concurrent review tasks — if both pass, next cycle may see 2 rapid auto-merges (PRs #317 and #318).
+- SYNC-PUSH-REBASE-FALLBACK: 64th total occurrence. Consistent with interactive cycle rate. Root fix APPROVAL_REQUEST `sync-push-rebase-fallback-001` still the only path to elimination.
+- All healers fresh, all services active, no log noise. System processing normally.
+
+**Learned:** PR #314 ("direction-asks reach the tab") merged and auto-merged cleanly via Mirror re-review approval. The wedged-session recovery path (healer reaped the prior Forge session at 06:55:53Z → marker-error retry → Forge re-worked → Mirror re-reviewed) completed in one cycle. Recovery latency: ~58 min from wedge detection to merge (06:26:53Z wedge → 07:20:42Z auto-merge). Normal for a re-review cycle.
+
+---
+
 ## Iteration 856 — 2026-06-04 07:20 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (Check B: SYNC-PUSH-REBASE-FALLBACK #63 at 07:12:49Z) — **0 auto-fixes. Pipeline advancing: Forge inbox cleared (0), Mirror inbox 3 (reviewing PRs #317, #314 rev1, #318). 8/8 services active.**
