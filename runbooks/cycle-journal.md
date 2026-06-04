@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 840 — 2026-06-04 05:15 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: 2 Tier-4 deploy-notifier alerts) — **0 auto-fixes. 2 new alerts (Tier 4, known-pattern-pending-fix). PR #303 too young. PR #304 merged at 05:12:43Z. 8/8 services active. Forge inbox: 4 tasks. Worktrees: 11 (GC backstop active). Healer: 04:55:57Z (~19 min). Sync: no-change.**
+
+Alert watermark: **1265 lines / anchor 05:10:11Z** (2 new alerts since iter 839 anchor 04:54:55Z). Sync: ✅ CLEAR — sync.json: status=no-change, last_sync=04:46:16Z, commit=4da4ace (stale vs session HEAD 2fb475a; iter 839 wrapper pushed independently). Healer heartbeat: **04:55:57Z** (~19 min; ✅ within 90-min threshold). **8/8 services active.** **1 open PR (PR #303 agent-core).** **Worktrees: 11** (↑1 from iter 839: wt-forge-stale-test-sweep-timezone-medic-001 active; PR #304 worktrees pending GC teardown).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new Tier-4 alerts (known-pattern-pending-fix — no escalation).** New alerts since iter 839 anchor (1263 lines / 04:54:55Z):
+  1. **`deploy-notifier:READY:dpl_3RqzCABBwkC8W74TmfPyGKc89V9L`** (05:08:17Z): Vercel preview for `forge/build-done-today-ui-badge-20260604T045743Z` branch. Tier 4 — not yet in alert-translations.json. G-rule 3/3 dispatched iter 803; `deploy-notifier-alert-xlate-split-fix` APPROVAL partially actioned (deploy-notifier scope approved 05:01Z June 4; config-only PR in pipeline via Beacon dispatch). Fix in flight. No new escalation.
+  2. **`deploy-notifier:READY:dpl_5UxmnpPze2YUxjDP2L8vmrB6JgWG`** (05:10:11Z): Main-branch Vercel deploy — PR #36 merge to main triggered production deploy. Same pattern, same in-flight fix. No new escalation.
+  → **Tier-reset.** Both are expected pipeline artifacts. New anchor: 1265 lines / 05:10:11Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix` — deploy-notifier scope actioned, engine-fix scope pending; `forge-claude-md-preflight-self-check-bullet-001`) unchanged. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 04:55:57Z (~19 min; ✅). Forge inbox: 4 tasks active. No stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. pending-approvals.json missing (empty). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 04:55:57Z (~19 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2fb475a "Pulse cycle 20260604T051110Z" (iter 839 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=04:46:16Z, commit=4da4ace (stale vs session HEAD 2fb475a; wrapper for iter 839 pushed independently). No SYNC-PUSH-REBASE-FALLBACK this iter. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline advancing.**
+  - **PR #303 (agent-core) OPEN** — "Fix done_today lane: join Mirror review verdicts to building agent." CLEAN/MERGEABLE (confirmed via `gh pr view`). Created 05:07:02Z — age ~8 min at check time. Below 30-min auto-merge threshold. Source=larry (Mirror inbox empty, no review routing per G-rule 1/3 iter 805). Eligible at ~05:37Z UTC. ✅
+  - **PR #304 (agent-core) MERGED** — "docs: approvals-tab coverage gap brief." Created and merged at 05:12:43Z (docs-only; auto-merged by Mirror or outbox-notifier). Worktrees (`wt-forge-orchestrator-engine-hardening-spec`, `wt-mirror-orchestrator-engine-hardening-spec`) pending event-driven teardown / hourly GC backstop. ✅
+  - **Forge inbox: 4 tasks** — (1) `build-done-today-ui-badge-20260604T045743Z.json` (queued; Vercel preview live 05:08Z); (2) `build-harden-seed-pulse-check-env-aware.json` (build phase); (3) `log-dir-test-isolation-leak-001.json` (queued); (4) `marker-error-stale-test-sweep-timezone-medic-001-1.json` (retry 1/3). `stale-test-sweep-timezone-medic-001` consumed from inbox (in Forge .archive); worktree active — building. ✅
+  - **Mirror inbox: 0. Beacon inbox: 0. Pulse inbox: 0.** ✅
+  - **Worktrees: 11** — `wt-forge-build-done-today-fix` (PR #303 open), `wt-forge-build-done-today-ui-badge` (active), `wt-forge-build-forge-queue-ui-20260604T013719Z` (stale 3.5h — GC backstop target), `wt-forge-build-forge-queue-ui-move-20260604T042018Z` (PR #36 merged — GC backstop target), `wt-forge-harden-seed-pulse-check-env-aware`, `wt-forge-heal-retry-exhausted-taskid-resolution`, `wt-forge-orchestrator-engine-hardening-spec` (PR #304 merged — teardown pending), `wt-forge-stale-test-sweep-timezone-medic-001` (building), `wt-mirror-build-forge-queue-ui-20260604T013719Z` (stale 3.5h), `wt-mirror-heal-retry-exhausted-taskid-resolution`, `wt-mirror-orchestrator-engine-hardening-spec` (PR #304 merged — teardown pending). Hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** No new instances this iter. All counters unchanged from iter 839. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=698, systemic_fixes=6, ratio≈116.3. No new rows this iter (no auto-fix actions executed). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 2 new Tier-4 alerts triaged (both deploy-notifier:READY, known-pattern-pending-fix; no escalation — fix already in pipeline).
+3. No auto-fixes executed. PR #303 (~8 min) below 30-min threshold; no other eligible PRs.
+4. `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, Tier 1 (tier-reset from Tier-4 alerts). ✅
+5. Wrote journal entry. MEMORY.md status snapshot updated.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs unchanged.
+
+**Patterns:**
+- PR #304 "docs: approvals-tab coverage gap brief" merged at 05:12:43Z — fast pipeline turnaround. `orchestrator-engine-hardening-spec` docs complete.
+- `stale-test-sweep-timezone-medic-001` consumed from Forge inbox (now in archive); active build in progress (worktree present). Expect PR to appear within next 1–2 cycles.
+- Two stale worktrees from `build-forge-queue-ui-20260604T013719Z` (forge+mirror, 3.5h old) persisting through multiple iters — hourly GC backstop is the intended cleanup path. No action needed.
+- deploy-notifier:READY alerts continue at expected cadence (2 this iter for PR #36 merge cascade). Will stop generating Tier-4 noise once the config-only PR (Beacon-dispatched after Larry's 05:01Z approval) merges.
+
+**Learned:** Nothing new. System behavior consistent with MEMORY.md patterns.
+
+---
+
 ## Iteration 839 — 2026-06-04 05:08 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=0 (reset: auto-fix fired) — **1 auto-fix: PR #36 (ourliberty-dashboard) merged at 05:07:40Z. 0 new alerts. Larry approved `deploy-notifier only` at 05:01Z; Beacon dispatched. 8/8 services active. Forge inbox: 5 tasks. Worktrees: 10. Sync clear.**
