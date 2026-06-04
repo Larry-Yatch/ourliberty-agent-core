@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 809 — 2026-06-04 00:51 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **persistent: PR #294 ask-then-do pending Larry's call (5th consecutive iter; escalation delivered 00:27Z iter 805). All mandatory checks nominal.** Alert watermark: **1233 lines / anchor 00:23:13Z** (unchanged — 0 new alerts). Cooldown residue: **206** (200 warning + 6 critical; +7 from iter 808 structural; normal healer activity). Sync: ✅ no-change (commit=3290042, HEAD=d3f5f36 ahead per wrapper — normal post-wrapper lag). Healer heartbeat: **00:25:13Z** (~26 min old; ✅). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE confirmed fresh via `gh pr view`, 56 min old — Mirror review never dispatched, ask-then-do escalation delivered iter 805, no Larry response). **0 open PRs in ourliberty-dashboard.** Forge: 1 task active (phase-c-005; worktree active, ~13 min old — within normal window). Phase C 001/002/003 builds complete + worktrees gone; 002 build result routed back to Beacon at 00:40:06Z; Beacon inbox empty (consumed). No Phase C PRs yet — Beacon may be processing. Mirror: EMPTY. Beacon: EMPTY. Worktrees: 4 (1 PR#294 active + 1 phase-c-005 active + 2 stale PR#293 — hourly GC fires ~01:00Z, ~9 min).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** `larry-alerts.jsonl`: **1233 lines** — unchanged from iter 808 watermark (anchor 00:23:13Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. APPROVAL_REQUEST from iter 804 (alert-translations split: "deploy-notifier only" or "engine fix too") still pending Larry. PR #294 escalation from iter 805 still awaiting Larry's call. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat: 00:25:13Z (~26 min old at check; ✅ within 90-min threshold). No active stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No new orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat: 00:25:13Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: HEAD=d3f5f36 "Pulse cycle 20260604T004828Z" (post-808 wrapper commit), branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ✅ Post-wrapper lag.** sync.json: status=no-change, commit=3290042. HEAD=d3f5f36 ahead — normal (wrapper push succeeded; sync service hasn't re-fired yet; hourly backstop active). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ⚠️ Persistent — PR #294 ask-then-do (5th consecutive iter, no change).**
+  - **agent-core: 1 open PR — #294** `feat(dashboard): add read-only GET /api/system/agent-queue lifecycle endpoint`, CLEAN/MERGEABLE (confirmed fresh via `gh pr view`), created 23:55:22Z (~56 min old). Mirror inbox EMPTY; review still not dispatched. Escalation delivered to Larry 00:27Z (iter 805). No response. Ask-then-do discipline holds: do not auto-merge without Mirror review given routing gap.
+  - **Forge inbox: 1 task** — `pulse-triage-phase-c-promotion-005.json` (mtime 00:38Z, ~13 min old). Worktree `wt-forge-pulse-triage-phase-c-promotion-005` active. Within normal processing window. ✅
+  - **Phase C 001/002/003:** builds complete, worktrees gone. 002 result delivered to Beacon 00:40:06Z. Beacon inbox empty (result consumed by inbox-watcher). No Phase C PRs in GitHub yet (max=294). Beacon likely processing — normal pipeline delay. ✅
+  - **ourliberty-dashboard: 0 open PRs.** ✅
+  - **Mirror: EMPTY.** ✅
+  - **Beacon: EMPTY.** APPROVAL_REQUEST pending Larry (iter 804). ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 4.**
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — active (PR #294)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` — stale (PR #293 merged)
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z-clarify` — stale (PR #293 merged)
+  - `wt-forge-pulse-triage-phase-c-promotion-005` — active (~13 min, normal)
+  Hourly GC fires ~01:00Z (~9 min). 2 stale worktrees will clear automatically. ✅
+
+- **G-rule watch (unchanged from iter 808):** All G-rule counters unchanged. No new pattern occurrences this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=686, systemic_fixes=5, ratio=137.2 (no new intervention row this iter — all checks nominal; PR #294 already recorded iter 805).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 0 new alerts. Watermark confirmed unchanged at 1233 / anchor 00:23:13Z. ✅
+3. Confirmed Phase C-001/002/003 builds complete; 002 build result in Beacon's pipeline at 00:40:06Z. No anomaly — normal Beacon processing lag. Watch for Phase C PRs next iter.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T00:51:55Z. ✅
+5. No new intervention row appended to cycle-prime-ledger.jsonl — no new findings this iter.
+6. No always-allowed auto-fixes triggered. ✅
+7. Wrote journal entry. Updating MEMORY.md.
+
+**Escalated:** Nothing new. PR #294 escalation already delivered to Larry (iter 805, 00:27Z UTC). Beacon APPROVAL_REQUEST already delivered (iter 804). No additional DMs warranted — same standing state, Larry has the ball.
+
+**Patterns:** PR #294 now in its 5th consecutive iter without Mirror review or Larry direction. G-rule `source=larry Forge builds don't auto-route to Mirror for review` at 1/3 — needs 2 more occurrences. Phase C-005 building normally; 001/002/003 results in Beacon's pipeline. System otherwise stable.
+
+**Learned:** Phase C build pipeline functioning correctly (001/002/003 builds completed within ~30 min each; results routing back to Beacon via outbox-notifier). Cooldown file count increment (+7 to 206) is normal healer background activity, not a signal.
+
+---
+
 ## Iteration 808 — 2026-06-04 00:46 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 — **persistent: PR #294 ask-then-do pending Larry's call (4th consecutive iter; escalation delivered 00:27Z iter 805). All mandatory checks nominal.** Alert watermark: **1233 lines / anchor 00:23:13Z** (unchanged — 0 new alerts). Cooldown residue: **199** (structural; unchanged). Sync: ✅ post-wrapper lag (last_sync=23:46:04Z; HEAD=3290042 "Pulse cycle 20260604T003721Z", ahead — normal). Healer heartbeat: **00:25:13Z** (~21 min old; ✅). **8/8 services active.** **1 open PR in agent-core** (#294 CLEAN/MERGEABLE confirmed fresh, 51 min old — Mirror review never dispatched, ask-then-do escalation delivered iter 805, Larry has not responded). **0 open PRs in ourliberty-dashboard.** Forge: 1 task active (phase-c-005; worktree active). Phase C builds 001/002/003 worktrees gone — builds progressed; 002 build result notification received 00:40:06Z, PRs may materialize soon. Mirror: EMPTY. Beacon: EMPTY. Worktrees: 4 (1 PR#294 active + 1 phase-c-005 active + 2 stale PR#293 — hourly GC fires ~01:00Z, ~14 min).
