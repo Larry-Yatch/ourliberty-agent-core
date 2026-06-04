@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 816 — 2026-06-04 01:50 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **1 new alert (deploy-notifier:READY, Tier-4 known-untranslated, G-rule 3/3 fix pending). Forge completed `build-forge-queue-ui-20260604T013719Z` build — PR #35 opened in ourliberty-dashboard ("feat(system): Forge Queue swimlane panel on System tab"), Mirror auto-dispatched review. PR #297 still in Mirror review (~15 min, not at 30-min threshold). SYNC-PUSH-REBASE-FALLBACK (52nd, self-recovering). 8/8 services active.** Alert watermark: **1244 lines / anchor 01:40:17Z** (1 new deploy-notifier:READY alert). Sync: ⚠️ status=error, commit=49a210a, message="Auto-commit push failed; rolled back" (01:42:23Z) — SYNC-PUSH-REBASE-FALLBACK (52nd total); HEAD=16f7e90 ahead of sync commit → wrapper push succeeded, self-recovering. Healer heartbeat: **01:25:19Z** (~25 min at check; ✅ within 90-min threshold). **8/8 services active.** **1 open PR in agent-core** (PR #297 OPEN/CLEAN/MERGEABLE, Mirror reviewing). **1 open PR in ourliberty-dashboard** (PR #35 OPEN/CLEAN/MERGEABLE, Mirror reviewing, ~3 min old).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert since watermark (1243→1244, anchor 01:25:24Z→01:40:17Z).** 
+  - `01:40:17Z` `deploy-notifier / deploy-notifier:READY:dpl_HSW4WzL2V4ekJvpW1LpgSjYnUaer` — Forge's Vercel preview deploy live for branch `forge/build-forge-queue-ui-20260604T013719Z` on ourliberty-dashboard. Route=escalate.
+  - **Classification:** Tier-4 (subject `deploy-notifier:READY:*` NOT in alert-translations.json — G-rule 3/3 DISPATCHED iter 803; Beacon envelope `cycle-finding-deploy-notifier-alert-xlate-20260603T235900Z.json` sent; config-only PR still pending). Known-untranslated; expected occurrence while fix is in-flight. No DM to Larry. → **Tier-reset: YES.** Watermark advanced to 1244 / anchor 01:40:17Z. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 min ago"` → "-- No entries --". ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Standing APPROVAL_REQUESTs (Beacon iter 804 alert-translations split; forge-claude-md-preflight-self-check-bullet-001) still pending Larry. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat `~/agents/blackboard/heal-stale-daemon-code.heartbeat` = 01:25:19Z (~25 min at check; ✅ within 90-min threshold). No active pipeline stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 01:25:19Z. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start: HEAD=16f7e90 "Pulse cycle 20260604T014221Z", branch=main, tree=clean. ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK (52nd total).** sync.json: status=error, commit=49a210a, last_sync=01:42:23Z, message="Auto-commit push failed; rolled back". HEAD=16f7e90 is newer than sync commit 49a210a — wrapper push succeeded independently; sync service's concurrent attempt lost the race. Self-recovering: hourly sync.timer backstop fires ~02:00Z. No entry in larry-alerts.jsonl from this failure (push-failed variant did NOT write an alert this time). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. ✅ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Active pipeline (2 parallel tracks).**
+  - **PR #297 OPEN/CLEAN/MERGEABLE** (agent-core) — "fix(dashboard): count non-task--prefixed inbox dispatches as in-flight". ~15 min old. Mirror has `review-dashboard-inbox-pending-filter-fix-001.json` in inbox. Not at 30-min threshold. Normal. ✅
+  - **PR #35 OPEN/CLEAN/MERGEABLE** (ourliberty-dashboard) — "feat(system): Forge Queue swimlane panel on System tab". Created 01:46:59Z (~3 min old). Forge completed `build-forge-queue-ui-20260604T013719Z` build and opened this PR. Mirror auto-dispatched `review-build-forge-queue-ui-20260604T013719Z.json` — ROUTING DID FIRE automatically (see G-rule watch below). ✅
+  - **Forge inbox: 2 tasks.** `build-forge-queue-ui-20260604T013719Z.json` (build complete, not yet archived — normal). `orchestrator-engine-hardening-spec.json` (NEW since iter 815 — Beacon→Forge doc-only spec task, ~5 min old: "docs(orchestrator): engine-hardening spec — close the silent-failure class end-to-end"; inventories 4 fragility classes from 2026-05-29–06-02 incidents + proposes structural fixes). ✅ (not stale)
+  - **Mirror inbox: 2 tasks** — `review-dashboard-inbox-pending-filter-fix-001.json` (PR #297) + `review-build-forge-queue-ui-20260604T013719Z.json` (PR #35). Both active. ✅
+  - **Beacon inbox: EMPTY.** ✅
+
+- **(Check F) Cost/quota: ✅ Nominal.** No burn-rate alerts. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d). ✅
+
+- **Periodic checks (Wednesday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **Worktrees: 6** (unchanged from iter 815):
+  - `wt-forge-build-forge-queue-api-20260603T234656Z` — PR #294 post-merge stale. G-rule 1/3 (`Pulse-triggered gh pr merge --auto doesn't fire teardown`). Hourly GC fires ~02:00Z. ✅
+  - `wt-forge-build-forge-queue-ui-20260604T013719Z` — Forge's build worktree. PR #35 opened; worktree still present (normal until pipeline completes). ✅
+  - `wt-forge-dashboard-inbox-pending-filter-fix-001` — Forge post-build worktree for PR #297. ✅
+  - `wt-forge-forge-queue-api-preflight-20260603T231401Z` + `-clarify` — stale PR #293 preflight (~2.5h+; within 24h GC). ✅
+  - `wt-mirror-dashboard-inbox-pending-filter-fix-001` — Mirror review worktree for PR #297. ✅
+
+- **G-rule watch:**
+  - `source=larry Forge builds don't auto-route to Mirror for review` — G-rule 1/3 (iter 805). **THIS ITER: outbox-notifier DID dispatch `review-build-forge-queue-ui-20260604T013719Z.json` to Mirror for `build-forge-queue-ui-20260604T013719Z` (source=larry).** Routing fired correctly. Counter NOT incremented. Possible explanation: PR #295's Phase C code (deployed to outbox-notifier via healer restart at 01:25:20Z) includes a fix for this routing path. Watch next source=larry Forge build to confirm pattern is resolved. If it routes correctly again → close G-rule.
+  - `Pulse-triggered gh pr merge --auto doesn't fire event-driven worktree teardown` — G-rule 1/3 (iter 812). `wt-forge-build-forge-queue-api-20260603T234656Z` still present. GC covers it. Not yet 3/3.
+  - `deploy-notifier:READY:* not in alert-translations.json` — G-rule 3/3 DISPATCHED (iter 803). This occurrence #4 post-dispatch. Fix in-flight (config-only PR via Beacon dispatch). Ongoing until landed.
+  - All other G-rule counters: unchanged from iter 815.
+
+- **PRIME DIRECTIVE ratio:** interventions=689 (+1 this iter), systemic_fixes=5, ratio=137.8. Appended intervention row: `deploy-notifier:READY-preview-forge-queue-ui-20260604`. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, F) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert (deploy-notifier:READY, Tier-4 known-untranslated). Watermark advanced to 1244 / anchor 01:40:17Z. No DM. ✅
+3. Confirmed PR #35 opened in ourliberty-dashboard; Mirror review auto-dispatched. ✅
+4. Confirmed Forge inbox has new `orchestrator-engine-hardening-spec.json` from Beacon. ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=01:50:07Z. ✅
+6. `cycle_prime_ledger.py append --tier 1 --kind intervention --template deploy-notifier --detail READY-preview-forge-queue-ui-20260604` → row written. ✅
+7. No always-allowed auto-fixes triggered (no PR at 30-min threshold; all services active; no duplicate inbox tasks). ✅
+8. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing escalations pending Larry: Beacon iter 804 APPROVAL_REQUEST (alert-translations split: "deploy-notifier only" vs "scope engine fix too"); `forge-claude-md-preflight-self-check-bullet-001`. Larry has the ball.
+
+**Patterns:**
+- The G-rule `source=larry Forge builds don't auto-route to Mirror for review` (1/3) may be self-resolving via PR #295. The Phase C promotion loop shipped in PR #295 and the outbox-notifier was restarted with that new code at 01:25Z. The very next source=larry Forge build (`build-forge-queue-ui`) opened a PR and Mirror was auto-dispatched — in contrast to the PR #294 case (iter 805) which ran on the pre-PR#295 code and missed routing. If the next source=larry build also routes correctly, close the G-rule as a confirmed PR #295 fix.
+- Two PRs now open simultaneously in two repos (PR #297 agent-core + PR #35 dashboard), both under Mirror review. The 30-min auto-merge threshold watch runs in parallel for both.
+- The `orchestrator-engine-hardening-spec.json` task is a sign the Beacon→Forge doc-only pipeline is active again after the OAuth restoration. The spec addresses the four engine fragility classes (V6 silent-miss, reconcile gh-call failure, swallowed subprocess stderr, advancer.timer cadence). Doc-only → no code risk.
+
+**Learned:** SYNC-PUSH-REBASE-FALLBACK (52nd) did not write a `sync-blocked:auto-commit-push-failed` alert to larry-alerts.jsonl this occurrence. Either this failure variant (wrapper-invoked sync_agent_core.sh) doesn't write to larry-alerts.jsonl (only the sync SERVICE's timer-invoked path does), or the alert-retention healer pruned it before the check ran. Either way: the reliable signal is sync.json status=error, not a corresponding larry-alerts.jsonl entry. Calibration note: do not wait for an alert before flagging SYNC-PUSH-REBASE-FALLBACK — sync.json is the authoritative source.
+
+---
+
 ## Iteration 815 — 2026-06-04 01:40 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 — **All checks nominal. Pipeline active: Forge building `build-forge-queue-ui-20260604T013719Z` (new Larry-dispatched Forge Queue UI dashboard panel); Mirror reviewing PR #297 "fix(dashboard): count non-task--prefixed inbox dispatches as in-flight". 8/8 services active. 0 new alerts since watermark.** Alert watermark: **1243 lines / anchor 01:25:24Z** (unchanged — 0 new alerts). Sync: ✅ post-wrapper lag (HEAD=94786b5 "Pulse cycle 20260604T013822Z", last_sync=00:45:36Z). Healer heartbeat: **01:25:19Z** (~15 min at check; ✅). **8/8 services active.** **1 open PR in agent-core** (PR #297 OPEN/CLEAN/MERGEABLE, Mirror reviewing, ~5 min old — not at 30-min threshold). **0 open PRs in ourliberty-dashboard.**
