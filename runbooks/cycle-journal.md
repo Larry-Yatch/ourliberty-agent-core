@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 866 — 2026-06-04 08:21 UTC (interactive)
+
+**Health:** ✅ Tier 1→2 promoted — **0 auto-fixes. All checks nominal. Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Sync: ✅ CLEAN.**
+
+Alert watermark: **1298 lines / 07:59:19Z** (unchanged — 0 new alerts since iter 865 watermark). Sync: ✅ sync.json status=no-change, last_sync=07:46:24Z, commit=e854d72; session HEAD=624fbdc > sync.json commit → iter 865 wrapper pushed after last sync timer fire; no SYNC-PUSH-REBASE-FALLBACK. **8/8 services active.** Pipeline-stall heartbeat: 08:15:13Z (✅ ~6 min ago). Stale-daemon heartbeat: 07:56:28Z (✅ ~25 min; within 90-min threshold).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** larry-alerts.jsonl: 1298 lines — unchanged from iter 865 watermark (1298 / 07:59:19Z). 0 new alerts this iter. ✅ No tier-reset. Watermark unchanged.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session. pending-approvals.json: missing. Pulse inbox: empty. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 08:15:13Z (~6 min ago; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. pending-approvals.json: missing. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 07:56:28Z (~25 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=624fbdc "Pulse cycle 20260604T081741Z" (iter 865 wrapper). ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, last_sync=07:46:24Z, commit=e854d72. Session HEAD=624fbdc > sync.json commit → wrapper push succeeded after last sync timer; hourly timer will catch up at ~08:46Z. No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check E) PRs + inboxes: ✅ Fully clear.**
+  - agent-core: **0 open PRs.** ✅
+  - ourliberty-dashboard: **0 open PRs.** ✅
+  - Forge inbox: 0 ✅ Mirror inbox: 0 ✅ Beacon inbox: 0 ✅ Pulse inbox: 0 ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:** All counters unchanged from iter 865.
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=703, systemic_fixes=9, ratio≈78.11. No new ledger rows — clean iter, no interventions.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gate.
+2. Check 0: 0 new alerts. Watermark unchanged at 1298 lines / 07:59:19Z. No tier-reset.
+3. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **Tier promoted 1→2** (15-min cadence). consecutive_clean reset to 0. ✅
+4. Wrote journal entry. Updated MEMORY.md.
+
+**Escalated:** Nothing new. Standing items carry forward:
+- `[yellow]` Inbox-watcher restart timeout fix (Beacon brief ready; Larry must trigger Forge dispatch via Telegram chat with Beacon bot for `cycle-finding-inbox-watcher-restart-timeout-20260604T072800Z`).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix, not emergency — sync self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry (covers: medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, pulse-escalation).
+
+**Patterns:**
+- **Tier de-escalation to Tier 2.** Three consecutive clean iters at Tier 1 (iters 864, 865, 866) → promoted to Tier 2 (15-min cadence). First tier de-escalation since the active pipeline of this morning's session. Automated cycle fires will now run every 3rd 5-min tick.
+- No new alerts since 07:59:19Z burn-rate FYI in iter 863 — rolling 5h window fully cleared as expected.
+- Pipeline remains completely clear: 0 PRs, 0 inbox tasks. Healers active and fresh. System steady-state.
+
+**Learned:** Nothing new. Tier 2 cadence now active.
+
+---
+
 ## Iteration 865 — 2026-06-04 08:17 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=2 — **0 auto-fixes. All checks nominal. Pipeline clear: 0 open PRs, all agent inboxes empty. 8/8 services active. Sync: ✅ CLEAN.**
