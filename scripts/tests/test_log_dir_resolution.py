@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -121,6 +122,7 @@ class LogWriteHitsOverrideDirTest(unittest.TestCase):
         self.ar = importlib.import_module('agent_runner')
         self._prev_log_dir = os.environ.get('OURLIBERTY_LOG_DIR')
         self._tmp_log_dir = tempfile.mkdtemp(prefix='ourliberty-logwrite-test-')
+        self.addCleanup(shutil.rmtree, self._tmp_log_dir, ignore_errors=True)
         os.environ['OURLIBERTY_LOG_DIR'] = self._tmp_log_dir
 
     def tearDown(self):
