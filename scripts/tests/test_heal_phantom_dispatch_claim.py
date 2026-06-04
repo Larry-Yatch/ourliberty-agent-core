@@ -75,7 +75,7 @@ class LineParseTest(unittest.TestCase):
     def test_non_outbound_line_ignored(self):
         # The bot's own dispatch-confirmation line has no `-> <digits>:`.
         line = ('[2026-06-03T19:45:28-0600] approved orchestrator-spec -> '
-                'dispatched to /home/larry/agents/inboxes/forge/x.json')
+                'dispatched to /tmp/inboxes/forge/x.json')
         self.assertIsNone(h.parse_outbound_line(line))
 
     def test_bad_timestamp_dropped(self):
