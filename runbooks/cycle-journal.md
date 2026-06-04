@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration 899 — 2026-06-04 17:08 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check 0 — 2 Tier-4 alerts). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
+
+Alert watermark: **1283 lines / 17:03:46Z** (+2 from iter 898 watermark 1281/16:57:55Z). Sync: status=no-change, last_sync=2026-06-04T16:48:18Z (~20 min at cycle start; ✅ within 2h). Pipeline-stall heartbeat: 16:52:49Z (✅ ~15 min at cycle start). Stale-daemon heartbeat: 17:00:13Z (✅ ~8 min at cycle start).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts (Tier-4×2). tier-reset.**
+  - `ts=17:00:17Z, source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service` — Healer auto-restarted dashboard-api.service after detecting script mtime 281.1 min newer than active-since. Trigger commit: `3ec88cc feat(dashboard): generalize agent-queue endpoint to all agents (Phase A backend) (#324)`. **Expected-by-design success event.** `heal-stale-daemon-code` has no entry in `config/alert-translations.json` (confirmed) → **Tier-4 novel**. Known-recurring pattern: G-rule 3/3 dispatched iter 592, Beacon consumed iter 594, Forge brief still missing (standing watch item `alert-xlate-outbox-success-fyi-001`). No new DM — standing watchlist item covers systemic path. → tier-reset.
+  - `ts=17:03:46Z, source=outbox-notifier, kind=approval_request, approval_id=forge-marker-error-retry-fillin-001` — Beacon has spec'd the resolution for the test regression in main (whitelist repin lines 71→72 and 316→317 in test_no_production_path_leaks.py). Outbox-notifier packaged the plan and **DM'd Larry via Telegram** (chat_id=7998341473). Plan body: "Land the missing leak-gate WHITELIST repin on main: PR #321 merged at a stale head and dropped the 5th file of Mirror's verified changeset." Larry needs to reply "approve / go / ok / ship it" to dispatch Forge. `outbox-notifier:approval_request` is not in `config/alert-translations.json` → **Tier-4 novel**. Larry already received via Telegram; no additional Pulse DM needed. **NEW G-rule: `outbox-notifier:approval_request not in alert-translations.json` 1/3.** At 3/3: dispatch Beacon to classify `kind=approval_request` as Tier-2 (guarded/human-gate — it requires Larry action and must not be silenced as Tier-3; proper classification ensures it's counted as ask-then-do rather than novel). Batch with existing outbox-notifier G-rules. → tier-reset.
+  - Watermark advanced: **1283 / 17:03:46Z**. ✅
+  - → tier-reset (2 Tier-4 alerts)
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago" -q` → no output. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. All inboxes empty (Beacon processed `notify-forge-marker-error-retry-fillin-001.json` from iter 898 and dispatched the spec to outbox-notifier; approval_request now with Larry). Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 16:52:49Z (~15 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 17:00:13Z (~8 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=d31d3ce "Pulse cycle 20260604T170409Z" (iter 898 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T16:48:18Z (~20 min at cycle start; within 2h). No SYNC-PUSH-REBASE-FALLBACK this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Empty.** Approval_request pending Larry's "approve" response — Forge will receive the task only after Larry approves. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **NEW 1/3: `outbox-notifier:approval_request not in alert-translations.json`** — First occurrence: outbox-notifier emitted `kind=approval_request` for forge-marker-error-retry-fillin-001. Not in translations. At 3/3: dispatch Beacon to classify as Tier-2 (human-gate required, not silenceable). Batch with `outbox-notifier:review-escalate` (1/3) and `outbox-notifier:reject` (1/3).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged, iter 898).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **1/3** (unchanged).
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+
+- **Regression status:** APPROVAL_REQUEST for `forge-marker-error-retry-fillin-001` is now with Larry (Telegram DM sent by outbox-notifier at 17:03:46Z). Pipeline path: Larry approves → outbox-notifier dispatches to Forge → Forge opens new PR with whitelist repin → Mirror reviews → merge fixes regression in main. This is the expected resolution. Standing [yellow] escalation from iter 896 is EFFECTIVELY COVERED by the approval_request DM already in Larry's pocket. Will close the standing escalation when Forge PR merges and tests pass.
+
+- **Dashboard-api auto-restart: ✅ Healthy.** The heal-stale-daemon-code alert confirms the healer correctly detected commit `3ec88cc` (generalize agent-queue endpoint) and restarted the dashboard-api to pick up the new code. System is serving the updated endpoint. This is the expected stale-daemon operation.
+
+- **PRIME DIRECTIVE ratio:** interventions=711 (+1), systemic_fixes=9, ratio≈78.89 (approx). Ledger row appended: `alert-triage:2-tier4-alerts:auto-restart:ourliberty-dashboard-api+approval-request:forge-marker-error-retry-fillin-001`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 2 new alerts triaged (Tier-4×2: auto-restart echo + approval_request). Watermark advanced to **1283 / 17:03:46Z**.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-04T17:08:35Z. ✅
+4. `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 899 --template alert-triage --detail 2-tier4-alerts:auto-restart+approval-request` → row appended. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new Pulse escalations this iter. Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions) — APPROVAL_REQUEST now with Larry via Telegram (17:03:46Z). Pipeline is at the human-gate step. Expected to clear once Larry approves and Forge builds the fix.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead; Forge brief missing.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (root fix; 62nd total; self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- Dashboard-api restart confirms the stale-daemon healer is correctly picking up PR #324 deployment. New agent-queue endpoint is live on the droplet.
+- The approval_request pipeline path (Beacon → outbox-notifier → Larry DM → Forge) worked end-to-end for the regression fix: Beacon processed Mirror's REVIEW_ESCALATE and produced a properly-formatted approval_request. Positive signal on pipeline health.
+- All inboxes empty for the first time in several iters. System is at a momentary pause waiting only for Larry's approval of the regression fix.
+
+**Learned:** `outbox-notifier:approval_request` is a normal pipeline artifact that already DMs Larry via Telegram — Pulse's Check 0 role is to triage it (not to duplicate the DM). At G-rule 3/3, the right classification is Tier-2 (human-gate, requires Larry action) not Tier-3 (silence) — this ensures Check 0 counts approval_request iters as non-clean (Tier 1 retention is appropriate when there's a pending human gate) without Pulse generating redundant DMs.
+
+---
+
 ## Iteration 898 — 2026-06-04 17:02 UTC (interactive)
 
 **Health:** ⚠️ Tier 1, consecutive_clean=0 (tier-reset: Check 0 — 1 Tier-4 novel alert: outbox-notifier:review-escalate). **0 auto-fixes. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge inbox: 0. Mirror inbox: 0. Beacon inbox: 1 (REVIEW_ESCALATE notification for forge-marker-error-retry-fillin-001 — pipeline in motion). Sync: ✅ Clean.**
