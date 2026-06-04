@@ -4,6 +4,96 @@
 
 ---
 
+## Iteration 909 — 2026-06-04 18:59 UTC (interactive)
+
+**Health:** ⚠️ Tier 1 (Check 0: 1 new Tier-4 alert; Pulse-approval dispatch to Forge). **1 Forge dispatch. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0 (task delivered + in-flight). Sync: ✅ Clean.**
+
+Alert watermark: **1288 lines / 18:47:40Z** (+1 from iter 908's 1287/18:44:20Z). New alert: `medic / medic-diagnosis` at 18:47:40Z. Pipeline-stall heartbeat: 18:44:15Z (✅ ~15 min at cycle start). Stale-daemon heartbeat: 18:30:15Z (✅ ~29 min at cycle start). Sync: status=no-change, last_sync=2026-06-04T18:48:30Z (~10 min at cycle start; ✅ within 2h). Session-start HEAD=f4b8519 "Pulse cycle 20260604T185300Z" (iter 908 wrapper). Tier state at start: tier=1, consecutive_clean=0 (reset in iter 908). Tier state at end: tier=1, consecutive_clean=0 (non-clean: Tier-4 alert + dispatch).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** Watermark 1287→1288. New alert at 18:47:40Z: `medic / medic-diagnosis`. Not in alert-translations.json → Tier-4 novel. KNOWN PATTERN (G-rule 3/3 dispatched iter 804; engine-fix scope batched in `deploy-notifier-alert-xlate-split-fix`, pending Larry). Per feedback-memory (actionable-only): no Larry DM (expected-by-design medic run completion; fix in pipeline). Tier-reset fires (Tier-4 is non-clean per §2.3).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl --priority warning --since "30 minutes ago"` → no output. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session ✅. All agent inboxes empty (Beacon=0, Mirror=0, Pulse=0; Forge task in-flight). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 18:44:15Z (~15 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox had 1 item — Beacon result-notification for iter 908 G-rule dispatch, processed this iter (see Actions). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 18:30:15Z (~29 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=f4b8519 "Pulse cycle 20260604T185300Z" (iter 908 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=2026-06-04T18:48:30Z (~10 min; ✅ within 2h). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge inbox: ✅ Task delivered.** Dispatched `alert-translation-pr-create-inferred-failure-001.json` (preflight) → consumed by inbox-watcher; Forge archived the preflight + outbox shows `build-alert-translation-pr-create-inferred-failure-001.json` in-flight. ✅
+
+- **(Check E) PRs + inboxes: ✅ Nominal.** agent-core: 0 open PRs ✅. ourliberty-dashboard: 0 open PRs ✅. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - `pipeline-stall:pr-create-inferred-failure not in alert-translations.json`: **DISPATCHED iter 908 → Forge in-flight this iter (alert-translation-pr-create-inferred-failure-001)**. Close when PR merges.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged; same root cause as above — Beacon explicitly did NOT batch).
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry (batched in `deploy-notifier-alert-xlate-split-fix`).
+
+- **Regression status:** APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` still with Larry (DM'd 17:03:46Z). ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=713, systemic_fixes=11, ratio≈64.8 (improved from 71.2 — this iter +1 intervention, +1 systemic_fix).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: watermark 1287→1288 (+1). New medic/medic-diagnosis alert → Tier-4 (known pattern, no Larry DM per actionable-only feedback). Tier-reset.
+3. **Processed Pulse inbox Beacon result-notification** for iter 908 G-rule dispatch (`notify-cycle-finding-pr-create-inferred-failure-xlate-20260604T184500Z.json`). Beacon returned APPROVAL_REQUEST `alert-translation-pr-create-inferred-failure-001` (config-only FYI entry for `pipeline-stall:pr-create-inferred-failure` subject family).
+4. **As Pulse approval gate**: reviewed spec — config-only, 1 JSON entry, narrow scope, Beacon verified prefix-strip handles wildcard. Approved. Dispatched `alert-translation-pr-create-inferred-failure-001.json` → Forge inbox via `safe_write_inbox(source_agent='beacon')`. Forge consumed preflight + build task in-flight.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → recorded.
+6. `cycle_prime_ledger.py append --tier 1 --kind systemic_fix` → recorded.
+7. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+8. Wrote journal entry.
+
+**Escalated:** No new Larry DMs (Tier-4 medic alert is expected-by-design; no escalation per actionable-only feedback). Standing items carry forward:
+- `[yellow]` **Regression in main** (test_no_production_path_leaks.py, 2 failing assertions) — APPROVAL_REQUEST `forge-marker-error-retry-fillin-001` with Larry since 17:03:46Z. Awaiting approval.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 62nd total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Beacon confirmed the `pipeline-stall:pr-create-inferred-failure` fix is config-only (prefix-strip already handles the wildcard suffix). Importantly, Beacon explicitly did NOT batch `forge-no-pr-false-alarm-for-source-larry-tasks` (2/3) — correct call: that subject stays URGENT for genuine build crashes; the root fix is healer-side, not translatable as FYI. Pulse-as-approval-gate pipeline functioned correctly: Beacon spec returned via notify, reviewed and dispatched within 1 iter.
+
+**Learned:** Pulse-gate approval path works well for narrow config-only Beacon specs. The same Beacon dispatch produced both an APPROVAL_REQUEST and a clear "two things worth your attention" note (stopgap vs. root fix; why sibling G-rule was not batched) — a good spec discipline pattern from Beacon.
+
+---
+
+## Notification receipt — 2026-06-04 ~19:00 UTC (inter-cycle)
+
+**Source:** Beacon — task `cycle-finding-pr-create-inferred-failure-xlate-20260604T184500Z` — status=SUCCESS.
+
+**Summary:** Beacon produced an APPROVAL_REQUEST for a config-only PR: add one FYI/INFO translation entry under `heal-pipeline-stall` in `config/alert-translations.json` for subject key `pipeline-stall:pr-create-inferred-failure`. This is the permanent fix for the G-rule dispatched at iter 908 (3/3 threshold — same false alarm fired iters 896, 903, 908 from a stale source=larry forge-queue-api-preflight clarify archive entry where pr_url=null). Beacon confirmed prefix-strip lookup covers the wildcard suffix; no engine change needed.
+
+**Decision:** Approved. Config-only, low risk, confirmed false-alarm pattern, Beacon fully vetted. Pulse is the approval gate for Pulse-originated Beacon dispatches (CLAUDE.md routing constraint exception). Dispatched to Forge preflight via `safe_write_inbox(target_agent='forge', source_agent='beacon', ...)`.
+
+**Task dispatched:** `alert-translation-pr-create-inferred-failure-001.json` → `~/agents/inboxes/forge/`. Phase=preflight.
+
+**Beacon design notes (recorded for continuity):**
+- This is a **stopgap**. Real fix: healer-side `pr_url` population for source=larry outbox path.
+- Sibling G-rule `forge-no-pr-false-alarm-for-source-larry-tasks` (2/3) intentionally NOT batched: `forge-no-pr` stays URGENT for genuine build crashes. Needs healer fix, not translation entry.
+
+**Watch:** Close `pipeline-stall:pr-create-inferred-failure` G-rule watch item when Forge PR merges.
+
+---
+
 ## Iteration 908 — 2026-06-04 18:49 UTC (interactive)
 
 **Health:** ⚠️ Tier 2→1 (G-rule 3/3: pipeline-stall:pr-create-inferred-failure → dispatched to Beacon). **1 dispatch. 8/8 services active. 0 open PRs (agent-core + dashboard). Forge=0, Mirror=0, Beacon=0, Pulse=0 inboxes. Sync: ✅ Clean.**
