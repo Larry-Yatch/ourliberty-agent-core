@@ -95,6 +95,15 @@ REJECT_PREFIX_RE = re.compile(r'^\s*reject\s*:\s*(.+)$', re.IGNORECASE | re.DOTA
 PAUSE_RE = re.compile(r'^\s*/?pause\s*$', re.IGNORECASE)
 RESUME_RE = re.compile(r'^\s*/?resume\s*$', re.IGNORECASE)
 
+# Phase C — dedicated graduation-approval grammar. A graduation grants Pulse
+# NEW autonomy over an action class, so it must be resolved ONLY by its explicit
+# named approval: a bare `approve` / `most_recent_pending` must NOT resolve a
+# graduation entry. The template is the kebab-case registry id.
+APPROVE_GRADUATION_RE = re.compile(
+    r'^\s*approve\s+graduation\s+(?P<template>[a-z][a-z0-9-]*)\s*$',
+    re.IGNORECASE,
+)
+
 # Marker block in Beacon's response.
 APPROVAL_MARKER_RE = re.compile(
     r'===\s*APPROVAL_REQUEST\s*===\s*(\{.*?\})\s*===\s*END_APPROVAL_REQUEST\s*===',
@@ -155,6 +164,8 @@ def parse_user_reply(text: str) -> dict[str, Any]:
 
     Possible actions:
       - 'approve' — strict whitelist hit; bot resolves the most recent pending entry
+      - 'approve_graduation' — `approve graduation <template>`; bot resolves the
+        graduation pending entry for that exact template (never a generic approve)
       - 'modify'  — `modify: <reason>`; bot opens a re-plan loop with Beacon
       - 'reject'  — `reject: <reason>`; bot resolves as rejected
       - 'pause'   — toggle approvals pause
@@ -171,6 +182,14 @@ def parse_user_reply(text: str) -> dict[str, Any]:
         return {'action': 'pause'}
     if RESUME_RE.match(stripped):
         return {'action': 'resume'}
+
+    # Phase C — graduation approval is template-targeted and checked BEFORE the
+    # bare approve-token whitelist so `approve graduation <template>` never
+    # collapses into a generic `approve` of the most-recent pending entry.
+    m = APPROVE_GRADUATION_RE.match(stripped)
+    if m:
+        return {'action': 'approve_graduation',
+                'template': m.group('template').lower()}
 
     m = MODIFY_PREFIX_RE.match(stripped)
     if m:
@@ -382,17 +401,43 @@ def find_by_id_any_state(
     return None
 
 
+def _is_graduation_entry(entry: dict[str, Any]) -> bool:
+    """True iff this pending entry is a Phase-C graduation proposal. Graduations
+    carry ``kind == "graduation"`` in their dispatch_payload; they grant new
+    autonomy and may ONLY be resolved by their explicit named approval."""
+    payload = entry.get('dispatch_payload')
+    return isinstance(payload, dict) and payload.get('kind') == 'graduation'
+
+
 def most_recent_pending(state: Optional[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
     """Return the most-recently-created pending entry, or None.
 
     Ignores entries that were queued during pause (they shouldn't be approved
-    by a `/resume` follow-up unless the user picks them by id).
+    by a `/resume` follow-up unless the user picks them by id). Also EXCLUDES
+    graduation entries (Phase C): a bare `approve` must never grant Pulse new
+    autonomy — a graduation is resolved only by `approve graduation <template>`.
     """
     s = state if state is not None else load_state()
-    pending = [e for e in s.get('pending', []) if not e.get('queued_during_pause')]
+    pending = [e for e in s.get('pending', [])
+               if not e.get('queued_during_pause')
+               and not _is_graduation_entry(e)]
     if not pending:
         return None
     return max(pending, key=lambda e: e.get('created_at', ''))
+
+
+def find_graduation_pending(
+    template: str, state: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Find the pending graduation entry for an exact template, or None. The
+    dedicated `approve graduation <template>` route resolves a graduation only
+    by exact template match — never by recency."""
+    s = state if state is not None else load_state()
+    for entry in s.get('pending', []):
+        if _is_graduation_entry(entry) \
+                and entry.get('dispatch_payload', {}).get('template') == template:
+            return entry
+    return None
 
 
 def resolve(
