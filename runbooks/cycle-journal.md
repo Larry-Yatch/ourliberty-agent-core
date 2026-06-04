@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 836 — 2026-06-04 04:46 UTC (interactive)
+
+**Health:** ⚠️ Tier 1, consecutive_clean=0 — **0 auto-fixes. 4 new alerts (1261→1265). 0 new escalations. 8/8 services active. 2 open PRs (both < 30 min, not yet auto-merge eligible). Mirror reviewing PR #302. Sync: SYNC-PUSH-REBASE-FALLBACK #58 (self-recovering). 9 worktrees.**
+
+Alert watermark: **1265 lines / anchor 04:38:16Z** (4 new alerts since iter 835). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK #58 — sync.json status=error, commit=df735ca, last_sync=04:32:07Z. Session HEAD=4da4ace "Pulse cycle 20260604T043955Z" (04:39:55Z) > sync commit → wrapper push for iter 835 succeeded; self-recovering. Hourly sync.timer will clear. Healer heartbeat: **04:25:55Z** (~20 min; ✅ within 90-min threshold). **8/8 services active.** **2 open PRs** (PR #302 agent-core + PR #36 ourliberty-dashboard — both young). **Worktrees: 9** (↑1 from iter 835; new: wt-forge-build-forge-queue-ui-move-20260604T042018Z + wt-mirror-heal-wedged-review-sessions-reaper).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 4 new alerts (all known-pattern-pending-fix or by-design — no new escalations).** New alerts since iter 835 watermark (1261):
+  1. **`deploy-notifier:READY:dpl_C6jXmeDz8dVFJoLXwa5VKCZZtuBu`** (04:34:17Z): Vercel preview for PR #36 branch (before PR# assigned). Tier 4 (not yet in alert-translations.json). G-rule 3/3 dispatched iter 803; APPROVAL_REQUEST `deploy-notifier-alert-xlate-split-fix` pending Larry. No new escalation — fix already in pipeline. Journal only.
+  2. **`pulse-escalation`** (04:37:30Z, env-missing echo): Pulse's own iter-835 escalation echoing back via `append_alert`. source=pulse-escalation not in alert-translations.json. **G-rule advances: 1/3 → 2/3.** Journal only.
+  3. **`pulse-escalation`** (04:37:36Z, clarify1 echo): Same. **G-rule 3/3 threshold met.** Fix: add `source:pulse-escalation` as Tier 3/FYI to alert-translations.json. Batch into pending `deploy-notifier-alert-xlate-split-fix` config-only PR (when Larry approves). No new Beacon dispatch — fix channel already open. Journal + MEMORY update.
+  4. **`deploy-notifier:READY:dpl_3ukJmdcgK1Nm6UbFP5PrvLH8F7JT`** (04:38:16Z): Same deploy-notifier pattern for PR #36 (now with PR# assigned). Journal only.
+  → **Tier-reset** (non-Tier-3 findings). No new escalations to Larry.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 04:25:55Z (~20 min; ✅). Forge inbox empty. Mirror inbox: 1 active review (PR #302). No stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 04:25:55Z (~20 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=4da4ace "Pulse cycle 20260604T043955Z" (iter 835 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK #58.** sync.json: status=error, commit=df735ca, last_sync=04:32:07Z. Session HEAD (4da4ace, 04:39:55Z) newer → wrapper push for iter 835 succeeded after the sync failure. Self-recovering; hourly sync.timer (~05:32Z or next wrapper push) will clear. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open for root code fix. Same pattern as all prior instances.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all confirmed active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline active.**
+  - **PR #302 (agent-core) OPEN — Mirror reviewing.** "Add heal_wedged_review_sessions: reap wedged Mirror/Forge review sessions." CLEAN/MERGEABLE. Created 04:32:40Z — age ~13 min. Too young for auto-merge (need 30 min). Mirror reviewing: `review-heal-wedged-review-sessions-reaper.json` in inbox. ✅
+  - **PR #36 (ourliberty-dashboard) OPEN — source=larry, no Mirror review.** "ux(system): move Forge Queue panel below Active Sessions." CLEAN/MERGEABLE. Created 04:37:40Z — age ~8 min. Too young for auto-merge (need 30 min). Auto-merge eligible at ~05:08Z UTC. ✅
+  - **Forge inbox: 0** — empty. Both active builds completed (PR #302 + PR #36 opened). ✅
+  - **Mirror inbox: 1** — review-heal-wedged-review-sessions-reaper.json (active). ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Worktrees: 9** — new: wt-forge-build-forge-queue-ui-move-20260604T042018Z (PR #36 build, now stale), wt-mirror-heal-wedged-review-sessions-reaper (active Mirror review). Stale: wt-forge-build-forge-queue-ui-20260604T013719Z, wt-forge-build-forge-queue-ui-move-20260604T042018Z. Hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - **`pulse-escalation not in alert-translations.json`: G-rule 3/3 threshold met** (iter 806=1/3; iter 836=2/3 + 3/3). Fix: add `source:pulse-escalation` as Tier 3/FYI to alert-translations.json. Batching into pending `deploy-notifier-alert-xlate-split-fix` config-only PR — no new Beacon dispatch. MEMORY updated.
+  - All other G-rule counters unchanged from iter 835.
+
+- **PRIME DIRECTIVE ratio:** interventions=697, systemic_fixes=6, ratio=116.2. No new rows this iter (no new escalations dispatched). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 4 new alerts triaged. All journal-only — no new escalations (fixes already in pipeline or by-design). G-rule `pulse-escalation` advanced to 3/3; noted for inclusion in pending config PR.
+3. No auto-fixes executed. PR #302 and PR #36 both opened this cycle but too young for 30-min auto-merge threshold.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=04:46:01Z. ✅
+5. Wrote journal entry. Updating MEMORY.md status snapshot.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged.
+
+**Patterns:**
+- Two builds completed this cycle: heal-wedged-review-sessions-reaper (PR #302 agent-core) and Forge Queue UI move (PR #36 ourliberty-dashboard). Pipeline is active and producing output.
+- SYNC-PUSH-REBASE-FALLBACK #58 is the 58th occurrence of the race condition (sync.timer or wrapper push conflict). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open for root code fix — self-recovery confirmed every time.
+- `pulse-escalation` G-rule hit 3/3: Pulse's own escalation echoes appear as Tier-4 noise every time a [yellow]/[red] escalation is sent. Config fix: add Tier-3/FYI for `source:pulse-escalation` in alert-translations.json. Batching into the pending `deploy-notifier-alert-xlate-split-fix` approval.
+
+**Learned:** `pulse-escalation` echo pattern now at 3/3; same underlying cause as the deploy-notifier G-rule (config allowlist gap). Both fixes belong in the same config-only PR Larry is already being asked to approve. Including in MEMORY for when that gate opens.
+
+---
+
 ## Iteration 835 — 2026-06-04 04:37 UTC (interactive)
 
 **Health:** ⚠️ Tier 2→**1 (RE-ESCALATED)**, consecutive_clean=0 — **0 auto-fixes. 7 new alerts (1254→1261). 2 escalations sent. 8/8 services active. 0 open PRs. Forge inbox: 2 active builds. Sync CLEAR. 8 worktrees.**
