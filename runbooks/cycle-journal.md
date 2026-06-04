@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 838 — 2026-06-04 04:56 UTC (interactive)
+
+**Health:** ✅ Tier 1, consecutive_clean=2 — **0 auto-fixes. 1 new alert (Tier 3 known-pattern). PR #302 MERGED. 2 new Forge tasks in pipeline. 8/8 services active. PR #36 at 19 min (not yet auto-merge eligible). Healer: 04:55:57Z (✅ ~1 min).**
+
+Alert watermark: **1263 lines / anchor 04:54:55Z** (retention healer pruned 2 old entries; 1 new alert since iter 837 anchor 04:38:16Z). Sync: ✅ CLEAR — sync.json status=no-change, last_sync=04:46:16Z. Healer heartbeat: **04:55:57Z** (~1 min; ✅ within 90-min threshold). **8/8 services active.** **1 open PR (PR #36 dashboard, ~19 min old).** **Worktrees: 8** (↓1 from iter 837; wt-mirror-heal-wedged-review-sessions-reaper torn down on PR #302 merge; wt-forge-stale-test-sweep-timezone-medic-001 new).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1 new alert since iter 837 anchor (04:38:16Z):
+  1. **`outbox-notifier:review-pass`** (04:54:55Z): "Mirror approved PR #302 ... Auto-merged + branch deleted." Tier 3 known-pattern — `review-pass` under `outbox-notifier` source is in alert-translations.json (PR #264 landed iter 668). No DM, no tier-reset. Nominal. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u "ourliberty-*.service" --priority warning --since "1 hour ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Pulse inbox: empty. pending-approvals.json: missing (empty). No new Larry directives. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Healer heartbeat = 04:55:57Z (~1 min; ✅). Forge inbox: 2 tasks (pipeline actively advancing). No stalls. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. No orphan directives. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Healer heartbeat = 04:55:57Z (~1 min; ✅ within 90-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=70ba582 "Pulse cycle 20260604T045244Z" (iter 837 wrapper auto-commit). ✅
+
+- **(Check B) Sync health: ✅ CLEAR.** sync.json: status=no-change, last_sync=04:46:16Z (~10 min). No new SYNC-PUSH-REBASE-FALLBACK. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open for root code fix. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all active. ✅
+
+- **(Check E) PRs + inboxes: ✅ Pipeline active.**
+  - **PR #302 (agent-core) MERGED** — "Add heal_wedged_review_sessions: reap wedged Mirror/Forge review sessions." Mirror approved revision 1 at 04:54Z; auto-merged, branch deleted. Heal-wedged-review-sessions healer is now **live in main**. ✅
+  - **PR #36 (ourliberty-dashboard) OPEN** — "ux(system): move Forge Queue panel below Active Sessions." CLEAN/MERGEABLE. Created 04:37:40Z, age ~19 min. Below 30-min auto-merge threshold. Eligible at ~05:07Z UTC. Source=larry (no Mirror review — G-rule 1/3 at iter 805 unchanged). Next automated cycle handles auto-merge. ✅
+  - **Forge inbox: 2 tasks** — `harden-seed-pulse-check-env-aware.json` (source=beacon; env-aware seed fix addressing SUPABASE env-missing false alarms; phase=preflight) + `stale-test-sweep-timezone-medic-001.json` (source=larry; fix 5 stale timezone/allowlist tests; phase=preflight). Forge has a worktree for stale-test-sweep (already started). ✅
+  - **Mirror inbox: 0** — empty. ✅
+  - **Beacon inbox: 0** — empty. ✅
+  - **Worktrees: 8** — `wt-forge-build-forge-queue-ui-20260604T013719Z`, `wt-forge-build-forge-queue-ui-move-20260604T042018Z`, `wt-forge-heal-retry-exhausted-taskid-resolution`, `wt-forge-orchestrator-engine-hardening-spec`, `wt-forge-stale-test-sweep-timezone-medic-001` (new), `wt-mirror-build-forge-queue-ui-20260604T013719Z`, `wt-mirror-heal-retry-exhausted-taskid-resolution`, `wt-mirror-orchestrator-engine-hardening-spec`. Hourly GC backstop active. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch:**
+  - `heal-wedged-review-sessions source not in alert-translations.json` — still **1/3** (iter 835). Healer now live (PR #302 merged); watching for next production invocation. At 3/3: batch into alert-translations.json as Tier 3/FYI.
+  - `pulse-check-failed:env-missing` — still **1/3** (iter 835). Beacon addressed root cause: `harden-seed-pulse-check-env-aware` now in Forge inbox. Watching for PR + verification.
+  - All other G-rule counters unchanged from iter 837.
+
+- **PRIME DIRECTIVE ratio:** interventions=697, systemic_fixes=6, ratio=116.2. No new rows this iter. PR #302 is a systemic fix landing; no prior verification_pending row tracked in ledger — no append. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotations + periodic gate evaluations.
+2. Check 0: 1 new alert triaged (outbox-notifier:review-pass, Tier 3, nominal). PR #302 auto-merge confirmed from alert content + gh pr view 302 (state=MERGED).
+3. No auto-fixes executed. PR #36 at ~19 min — below 30-min threshold; next automated cycle (~05:05Z) handles.
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2, remain Tier 1.
+5. Wrote journal entry. Updated MEMORY.md status snapshot.
+
+**Escalated:** Nothing new. Standing APPROVAL_REQUESTs (`deploy-notifier-alert-xlate-split-fix`, `forge-claude-md-preflight-self-check-bullet-001`) unchanged.
+
+**Patterns:**
+- PR #302 (heal-wedged-review-sessions reaper) merged and live. Mirror's r1 revision caught a real bug: the original JSONL parser whole-file-substring-grepped for terminal markers, meaning the CLAUDE.md startup read could flip `marker_present=True` and trigger an irreversible auto-reap on a non-wedged session. The fix correctly isolates assistant-authored text only. Good catch by Mirror.
+- Pipeline resupplied: 2 new Forge tasks replacing the just-merged PR #302 build. Forge appears to have started stale-test-sweep immediately (worktree visible). harden-seed-pulse-check-env-aware is Beacon's systemic response to the SUPABASE env-missing false alarms surfaced in iter 835.
+- Worktree teardown working as designed: wt-mirror-heal-wedged-review-sessions-reaper removed on PR #302 auto-merge (event-driven teardown mechanism live since PR #266). Down to 8 worktrees.
+
+**Learned:** Nothing new. System behavior consistent with patterns documented in MEMORY.md.
+
+---
+
 ## Iteration 837 — 2026-06-04 04:49 UTC (interactive)
 
 **Health:** ✅ Tier 1, consecutive_clean=1 — **0 auto-fixes. 0 new alerts. Sync CLEAR. 8/8 services active. 2 open PRs (both too young: PR #302 17 min, PR #36 12 min). Mirror revision sent to Forge at 04:48Z. Healer: 04:25:55Z (~24 min, ✅).**
