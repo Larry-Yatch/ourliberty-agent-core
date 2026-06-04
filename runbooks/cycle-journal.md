@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 919 — 2026-06-04 20:37 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean. consecutive_clean=2. 0 actions. 8/8 services active. 0 open PRs (PR #328 MERGED). Forge: 1 fresh task (heal-wedged-review-xlate-001 preflight). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
+
+Alert watermark: **1293 lines / 20:28:59Z** (+1 from iter 918's 1292/20:20:26Z — outbox-notifier/review-pass, Tier-3 FYI known-pattern). Pipeline-stall heartbeat: 20:22:19Z (✅ ~15 min at cycle start, within 90-min threshold). Stale-daemon heartbeat: 20:30:18Z (✅ ~7 min at cycle start). Sync: status=error, last_sync=2026-06-04T20:28:24Z, commit=b92f9b41d8. Session-start HEAD=48b79d8 "Pulse cycle 20260604T203136Z" (iter 918 wrapper) — SYNC-PUSH-REBASE-FALLBACK pattern; self-clears on next hourly timer. Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2**.
+
+**Notable inter-cycle event (20:32Z):** Notification-handling — Beacon returned APPROVAL_REQUEST result for `cycle-finding-heal-wedged-review-sessions-xlate-20260604T202254Z`. Finding: fix is NOT config-only (code change required in `heal_wedged_review_sessions.py:782` — switch hyphen delimiter to colon + add translation config). Decision: APPROVED (sound fix, minimal blast radius, follows mirror-dag-pass precedent). Action: dispatched `build-heal-wedged-review-xlate-001.json` to Forge inbox for preflight. Committed as journal notification-handling entry (commit b92f9b41d8). PRIME DIRECTIVE: verification_pending row recorded. Pipeline advancement: G-rule dispatch (iter 917) → Beacon spec (20:32Z) → Forge preflight (pending).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (Tier-3 silence).** Watermark 1292→1293. New alert at 20:28:59Z: `src=outbox-notifier, subj=review-pass`. Gate 1: `review-pass` IS in alert-translations.json (PR #264 merged, iter 668 — Tier-3 FYI). Tier-3 silence; no tier-reset. This alert signals Mirror's verdict PASS for PR #328 (triggering auto-merge). PR #328 confirmed merged in git history. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session. Pulse inbox = 0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 20:22:19Z (~15 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Pulse inbox empty. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 20:30:18Z (~7 min at cycle start; ✅ well within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=48b79d8 "Pulse cycle 20260604T203136Z" (iter 918 wrapper). ✅
+
+- **(Check B) Sync health: ✅ Clean (SYNC-PUSH-REBASE-FALLBACK pattern).** sync.json: status=error, last_sync=2026-06-04T20:28:24Z, commit=b92f9b41d8. Notification-handling commit (b92f9b41d8) raced with sync timer → push failed. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-clears on next hourly timer. No action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=1 (`build-heal-wedged-review-xlate-001.json`, dispatched ~20:32Z notification-handling — ~5 min old, well under 1h stale threshold; fresh preflight task). Mirror=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open (both repos).** PR #328 merged — confirmed via commit 1704b7f in git history ("fix(tests): repin leak-gate whitelist to test_outbox_notifier.py lines 72/317 after PR #321 line shift") AND outbox-notifier/review-pass alert at 20:28:59Z confirming Mirror PASS + auto-merge. Test regression fix now in main. Dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **Periodic checks (Thursday June 4 UTC):** Check I (Monday only → skip), Check III (next 2026-06-14), Check VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule watch (updated this iter):**
+  - `heal-wedged-review-sessions source not in alert-translations.json`: **3/3 DISPATCHED (iter 917) → Beacon spec COMPLETE (20:32Z) → Forge preflight dispatched.** Watch for PR (code: colon-delimiter change + config-only addition).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=715, systemic_fixes=12, ratio≈59.6 (verification_pending row + iter_clean row appended this iter). Ledger ts: 2026-06-04T20:37:32Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. `cycle_prime_ledger.py append --tier 1 --kind verification_pending` → heal-wedged-review-xlate-001 Forge dispatch in pipeline. ✅
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → ledger entry recorded. ✅
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; 64th+ total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** heal-wedged-review-sessions fix has advanced from G-rule dispatch (iter 917) → Beacon spec → Forge preflight in a single cycle. Velocity is good. The `review-pass` Tier-3 silence confirms PR #328 auto-merge pipeline worked end-to-end: Mirror retry 1/3 (iter 918) → Mirror PASS (20:28:59Z) → auto-merge → commit 1704b7f in main. consecutive_clean=2 at Tier 1; one more clean iter → Tier 2 promotion (if no new signals).
+
+**Learned:** Notification-handling out-of-band events (Beacon APPROVAL_REQUEST → Pulse approval → Forge dispatch) can produce sync.json commit mismatches that are correctly classified as SYNC-PUSH-REBASE-FALLBACK. The pattern is confirmed as benign; the commit will push on the next hourly sync timer.
+
+---
+
 ## Iteration 918 — 2026-06-04 20:30 UTC (interactive)
 
 **Health:** ✅ **Tier 1 clean. consecutive_clean=1. 0 actions. 8/8 services active. PR #328 open (CLEAN/MERGEABLE, Mirror marker-error retry 1/3 in progress ~7 min). Sync: ✅ SYNC-PUSH-REBASE-FALLBACK (self-clears).**
@@ -69,6 +136,18 @@ Alert watermark: **1292 lines / 20:20:26Z** (unchanged from iter 917 — no new 
 **Patterns:** Mirror MalformedMirrorMarker on the PR #328 review (retry 1/3). This has occurred before (10th+ lifetime MalformedForgeMarker lifetime count in MEMORY, but Mirror markers are tracked separately — PR #316 doc-fix merged to require canonical markers). The retry mechanism handles automatically; no G-rule (not at 3/3 for this new instance). If Mirror fails all 3 retries, dead-letter back to Beacon — watch Check D on next iters for resolution or escalation.
 
 **Learned:** MalformedMirrorMarker on replan1 review is a routine known-risk. The PR #316 doc-fix was supposed to reduce this. If this recurs in the next 2 Mirror review invocations (2/3, 3/3), dispatch G-rule to Beacon for further hardening.
+
+---
+
+## Notification-handling — 2026-06-04 20:32 UTC (inter-agent: Beacon → Pulse)
+
+**Event:** Beacon returned result for `cycle-finding-heal-wedged-review-sessions-xlate-20260604T202254Z` with an embedded APPROVAL_REQUEST.
+
+**Beacon's finding (confirmed):** The fix is NOT config-only. `heal_wedged_review_sessions.py:782` emits `f'wedged-review-reaped-{Path(cand.cwd).name}'` — all-hyphen subject, no colon. The colon-strip matcher can never reduce this to the bare `wedged-review-reaped` key. A config entry alone would be dead. Required: (1) switch delimiter to colon → `wedged-review-reaped:<wt-name>`; (2) add `heal-wedged-review-sessions` source key + `wedged-review-reaped` entry to `config/alert-translations.json` (severity INFO, tier FYI). Follows `mirror-dag-pass` colon-delimiter precedent (`outbox_notifier.py:2720`). Both test suites unaffected.
+
+**Decision:** APPROVED. Fix is technically sound, blast radius is minimal (1-line code change + 1 new config key), follows established precedent, and directly closes the cadence-ladder tier-reset noise documented in iter 917.
+
+**Action:** Dispatched `heal-wedged-review-xlate-001.json` to `~/agents/inboxes/forge/` for preflight. Scope: phase=preflight, target_repo=ourliberty-agent-core. Build phase is a separate dispatch per Beacon's scoping.
 
 ---
 
