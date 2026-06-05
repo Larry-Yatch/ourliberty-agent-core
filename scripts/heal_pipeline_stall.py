@@ -102,6 +102,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
+from id_match import id_matches  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -580,9 +581,11 @@ def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
       1. Exact: headRefName == `forge/<task_id>` (or `larry/<task_id>`).
       2. Branch-truncation tolerant: branch suffix is a strict prefix of
          task_id and >= `_BRANCH_TRUNCATION_MIN_LEN` chars long.
-      3. Title fallback: task_id appears (case-insensitive) in the PR
-         title — covers re-keyed dispatches and human-titled PRs that
-         carry the original task verbatim in the subject line.
+      3. Title fallback: task_id appears in the PR title as a whole,
+         boundary-delimited token with a length floor (id_matches) — covers
+         re-keyed dispatches and human-titled PRs that carry the original task
+         verbatim. A bare substring match here let a short/common task_id match
+         an unrelated PR title (audit #19, mirror of task_resolution).
     """
     branch = pr.get('headRefName') or ''
     branch_task = _task_id_from_branch(branch)
@@ -595,7 +598,7 @@ def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
         ):
             return 'branch_truncated'
     title = pr.get('title') or ''
-    if task_id and task_id.lower() in title.lower():
+    if id_matches(task_id, title):
         return 'title'
     return None
 

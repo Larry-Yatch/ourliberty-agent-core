@@ -27,8 +27,18 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Optional
+
+# Repo scripts dir on sys.path so the sibling id_match import resolves cleanly
+# when invoked by systemd / a healer.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from id_match import id_matches  # noqa: E402
 
 GH_TIMEOUT_S = 15
 
@@ -102,8 +112,13 @@ def pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
         if (len(branch_task) >= _BRANCH_TRUNCATION_MIN_LEN
                 and task_id.startswith(branch_task)):
             return 'branch_truncated'
+    # Title fallback: match the task_id only as a whole, boundary-delimited
+    # token with a length floor (id_matches). A bare `task_id.lower() in
+    # title.lower()` let a short/common task_id match an unrelated merged PR
+    # title and suppress legitimate recovery (audit #19); the branch path above
+    # already carries its own `_BRANCH_TRUNCATION_MIN_LEN` floor.
     title = pr.get('title') or ''
-    if task_id and task_id.lower() in title.lower():
+    if id_matches(task_id, title):
         return 'title'
     return None
 

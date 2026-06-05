@@ -63,6 +63,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# Repo scripts dir on sys.path so the sibling id_match import resolves cleanly
+# when invoked by systemd.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from id_match import id_matches  # noqa: E402
+
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_abandoned_inbox_tasks.log"
@@ -140,8 +148,14 @@ def has_active_worker(task_id: str, active_cwds: set[str]) -> bool:
     safe = _worktree_safe_stem(task_id)
     if not safe:
         return False
+    # Match the sanitized stem as a whole, boundary-delimited token with a
+    # length floor (id_matches). A bare `safe in cwd` let a short/common stem
+    # (e.g. 'b') match an unrelated worktree like 'wt-forge-rebuild-...' and
+    # falsely report a live worker, so the abandoned task was never recovered
+    # (audit #26). A non-match here fails safe: recovery proceeds (and the
+    # dispatch dedup guard prevents a genuine double-dispatch).
     for cwd in active_cwds:
-        if cwd.startswith("wt-") and safe in cwd:
+        if cwd.startswith("wt-") and id_matches(safe, cwd):
             return True
     return False
 

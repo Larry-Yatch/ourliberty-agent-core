@@ -47,11 +47,31 @@ class PrMatchesTaskTest(unittest.TestCase):
             tr.pr_matches_task({'headRefName': 'forge/build'}, 'build-x-001'))
 
     def test_title_substring(self):
+        # A realistic-length task_id carried verbatim in a human PR title still
+        # matches via the title fallback (case-insensitively).
         self.assertEqual(
             tr.pr_matches_task(
-                {'headRefName': 'forge/other', 'title': 'fix Abc-123 bug'},
-                'abc-123'),
+                {'headRefName': 'forge/other',
+                 'title': 'fix Chain-Discipline-Gap-Synthesis-001 bug'},
+                'chain-discipline-gap-synthesis-001'),
             'title')
+
+    def test_title_short_id_below_floor_no_match(self):
+        # audit #19: a short/common task_id must NOT match by title substring,
+        # which previously suppressed legitimate recovery. Below id_match's
+        # length floor the title path returns None so recovery proceeds.
+        self.assertIsNone(
+            tr.pr_matches_task(
+                {'headRefName': 'forge/other', 'title': 'fix Abc-123 bug'},
+                'abc-123'))
+
+    def test_title_match_requires_token_boundary(self):
+        # a long id that is only an infix of a larger title token must not match
+        self.assertIsNone(
+            tr.pr_matches_task(
+                {'headRefName': 'forge/other',
+                 'title': 'chain-discipline-gap-synthesis-001x follow-up'},
+                'chain-discipline-gap-synthesis-001'))
 
     def test_no_match(self):
         self.assertIsNone(

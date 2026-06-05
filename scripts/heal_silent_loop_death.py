@@ -57,6 +57,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Repo scripts dir on sys.path so the sibling id_match import resolves cleanly
+# when invoked by the systemd oneshot.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from id_match import id_matches  # noqa: E402
+
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_silent_loop_death.log"
@@ -87,12 +95,16 @@ def find_recent_dispatches(slug_root: str, inboxes) -> bool:
         for f in inbox.iterdir():
             if not f.is_file() or not f.name.endswith(".json"):
                 continue
-            if slug_root in f.name and "-result" not in f.name:
+            if id_matches(slug_root, f.name) and "-result" not in f.name:
                 return True
         processed = inbox / "processed"
         if processed.is_dir():
             for f in processed.iterdir():
-                if slug_root in f.name and "-result" not in f.name:
+                # Mirror the active-branch filter: skip directories and
+                # non-.json entries (audit #41 — the processed/ branch lacked it).
+                if not f.is_file() or not f.name.endswith(".json"):
+                    continue
+                if id_matches(slug_root, f.name) and "-result" not in f.name:
                     try:
                         if (time.time() - f.stat().st_mtime) < STALE_MIN * 60:
                             return True
