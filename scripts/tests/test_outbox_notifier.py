@@ -2668,7 +2668,8 @@ class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
         self.assertIn('Coverage clean', decision['intent_kwargs']['summary'])
 
     def test_recovers_latest_marker_when_verdict_changed_across_turns(self):
-        # PASS then REVISION across turns — the revised verdict wins.
+        # PASS then REVISION across turns — the non-PASS verdict wins (here it
+        # is also the latest, so both last-wins and conservative-priority agree).
         session_id = 'sess-verdict-changed'
         self._write_session_log(session_id, [
             _mirror_pass_marker(summary='Initial approval.'),
@@ -2682,6 +2683,55 @@ class ClassifyMirrorMarkerSessionLogFallbackTest(unittest.TestCase):
         decision = on._classify_mirror_marker(data)
         self.assertEqual(decision['marker_type'], 'review_revision')
         self.assertEqual(decision['intent'], 'review-revision')
+
+    def test_echoed_pass_does_not_override_earlier_revision(self):
+        # nervous-system-audit #14 (2026-06-05) — the dangerous ordering:
+        # REVISION emitted first, then a LATER turn ECHOES a
+        # `=== REVIEW_PASS ===` block. Plain last-wins would pick the echoed
+        # PASS and auto-merge a PR Mirror wanted revised. Conservative-priority
+        # keeps the non-PASS verdict.
+        session_id = 'sess-echoed-pass'
+        self._write_session_log(session_id, [
+            _mirror_revision_marker(confidence='high'),
+            'Restating my earlier note for the record:\n\n'
+            + _mirror_pass_marker(summary='(echoed) approving.'),
+        ])
+        data = _mirror_outbox_body(
+            result='Restating my earlier note for the record.',
+            claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_revision')
+        self.assertEqual(decision['intent'], 'review-revision')
+
+    def test_escalate_beats_a_later_pass(self):
+        # Severity priority: an ESCALATE anywhere in the session beats a later
+        # PASS — never auto-merge when Mirror flagged a replan-worthy concern.
+        session_id = 'sess-escalate-then-pass'
+        self._write_session_log(session_id, [
+            _mirror_escalate_marker(),
+            _mirror_pass_marker(summary='(echoed) looks fine after all.'),
+        ])
+        data = _mirror_outbox_body(
+            result='Echoed pass.', claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_escalate')
+
+    def test_single_pass_verdict_still_routes_pass(self):
+        # No conflict — a clean single-verdict REVIEW_PASS session still routes
+        # pass (conservative-priority only engages on multi-verdict-type
+        # sessions; the normal single-verdict case is unchanged last-wins).
+        session_id = 'sess-clean-pass'
+        self._write_session_log(session_id, [
+            'Reviewed the diff. Looks good.',
+            _mirror_pass_marker(summary='All clear.'),
+        ])
+        data = _mirror_outbox_body(
+            result='post-marker chatter', claude_session_id=session_id,
+        )
+        decision = on._classify_mirror_marker(data)
+        self.assertEqual(decision['marker_type'], 'review_pass')
 
     def test_fallback_review_phase_raises_when_session_log_absent(self):
         # fix-mirror-verdict-marker-gate-001: no log file AND no recoverable
@@ -7744,6 +7794,78 @@ class MirrorMarkerRoutingAutoMergeTest(unittest.TestCase):
         on.process_outbox(f)
         self.assertEqual(self._auto_merge_calls, [])
 
+    def test_auto_merge_refused_on_marker_envelope_pr_url_mismatch(self):
+        # nervous-system-audit #15 (2026-06-05): the PASS marker names a
+        # DIFFERENT PR than the one Mirror was dispatched to review (the
+        # envelope's pr_url, set by _dispatch_mirror_review). Refuse the merge
+        # — never merge a PR other than the reviewed one — and render a failed
+        # outcome so Larry sees the gap.
+        body = self._body_with_chat(_mirror_pass_marker())  # marker pr=.../pull/42
+        body['pr_url'] = (
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/999'
+        )
+        f = self._write_mirror_outbox('mismatch.json', body)
+        on.process_outbox(f)
+        # No merge attempted at all.
+        self.assertEqual(self._auto_merge_calls, [])
+        notifications = [
+            r for r in self._read_notifications()
+            if r.get('kind') == 'notification'
+            and r.get('intent') == 'review-pass'
+        ]
+        self.assertEqual(len(notifications), 1)
+        self.assertIn('Auto-merge FAILED', notifications[0]['message'])
+
+    def test_auto_merge_proceeds_when_marker_matches_envelope_pr_url(self):
+        # Control for #15: marker pr_url == envelope pr_url → merge fires.
+        body = self._body_with_chat(_mirror_pass_marker())
+        body['pr_url'] = PR_URL_FIXTURE
+        f = self._write_mirror_outbox('match.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+
+    def test_cosmetic_pr_url_variant_is_not_a_mismatch(self):
+        # #15 compares NORMALIZED (owner/repo, number) coords, so an
+        # agent-authored marker URL that differs only cosmetically (trailing
+        # slash + /files) from the envelope must NOT block the merge.
+        body = self._body_with_chat(_mirror_pass_marker())  # marker pr=.../pull/42
+        body['pr_url'] = PR_URL_FIXTURE + '/files'
+        f = self._write_mirror_outbox('cosmetic.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+
+    def test_legacy_envelope_without_pr_url_still_merges(self):
+        # Graceful degradation: a chain that never propagated an envelope
+        # pr_url (legacy) falls through the #15 gate to the existing
+        # shape/existence validators — merge still fires on the marker pr_url.
+        body = self._body_with_chat(_mirror_pass_marker())
+        self.assertNotIn('pr_url', body)  # _mirror_outbox_body sets none
+        f = self._write_mirror_outbox('legacy.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._auto_merge_calls), 1)
+
+    def test_auto_merge_fires_even_when_back_leg_notify_fails(self):
+        # nervous-system-audit #12 (2026-06-05): a back-leg notify
+        # DispatchRejected must NOT dead-end the outbox before the auto-merge
+        # block. Pre-fix, the merge never ran and no AUTO_MERGE log was
+        # written, so heal_pr_auto_merge had nothing to retry.
+        body = self._body_with_chat(_mirror_pass_marker())
+        f = self._write_mirror_outbox('notify-fail.json', body)
+
+        def _raise_notify(*_a, **_k):
+            raise swi.DispatchRejected('inbox closed for maintenance')
+
+        with mock.patch.object(
+            on.safe_write_inbox, 'safe_write_inbox', _raise_notify,
+        ):
+            result = on.process_outbox(f)
+        # Status preserved for telemetry, but the merge STILL fired.
+        self.assertEqual(result, 'notify-failed')
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
+
 
 class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
     """fix-review-pass-dm-await-merge-outcome (2026-05-26) — Larry's
@@ -10362,6 +10484,53 @@ class PrUrlRobustExtractionTest(unittest.TestCase):
             'from last week, but built fresh instead.'
         )
         self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+
+class PrUrlAmbiguousReturnsNoneTest(unittest.TestCase):
+    """nervous-system-audit #16 (2026-06-05): _extract_pr_url_from_build_result
+    refuses to guess when the build result names more than one DISTINCT PR
+    URL. The prior first-match `.search` dispatched/merged the wrong PR when a
+    stale line preceded the real one; last-match has the mirror failure. On
+    ambiguity we return None (skip inline dispatch; reconcile / Larry
+    resolves) rather than auto-dispatching the wrong PR in either direction.
+    A single (possibly repeated-identical) URL is still returned."""
+
+    def test_distinct_multiple_urls_returns_none(self):
+        result = (
+            'PR opened: https://github.com/x/y/pull/10\n'
+            'On reflection I reworked the branch and opened a clean one.\n'
+            'PR opened: https://github.com/x/y/pull/20'
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_stale_after_real_also_returns_none(self):
+        # The mirror of the original #16 hazard: real PR first (contract-
+        # following), stale backreference after. Last-match would wrongly pick
+        # the stale one; refuse-to-guess returns None.
+        result = (
+            'PR opened: https://github.com/x/y/pull/7\n'
+            'This supersedes last week\'s attempt on:\n'
+            'PR updated: https://github.com/x/y/pull/3'
+        )
+        self.assertIsNone(on._extract_pr_url_from_build_result(result))
+
+    def test_single_match_unchanged(self):
+        result = 'PR opened: https://github.com/x/y/pull/5\n\nDetails follow.'
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/5',
+        )
+
+    def test_repeated_identical_url_returns_it(self):
+        # Same URL on two lines — a harmless echo, not ambiguous. Returned.
+        result = (
+            'PR opened: https://github.com/x/y/pull/9\n'
+            'PR opened: https://github.com/x/y/pull/9'
+        )
+        self.assertEqual(
+            on._extract_pr_url_from_build_result(result),
+            'https://github.com/x/y/pull/9',
+        )
 
 
 class ReconcileMissedMirrorReviewsTest(unittest.TestCase):
