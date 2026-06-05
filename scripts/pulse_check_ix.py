@@ -74,6 +74,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from atomic_io import atomic_write_json  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
 
 
@@ -749,10 +750,30 @@ def build_artifact(result: CycleResult, *, as_of_iso: str) -> dict[str, Any]:
 
 
 def write_artifact(artifact: dict[str, Any]) -> Path:
-    PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
+    # Audit #7 (sibling of pulse_check_viii, missed by #366): this file doubles
+    # as the same-week idempotency sentinel (the target_path.exists() gate in
+    # main()). A non-atomic write_text left a truncated artifact on a mid-write
+    # crash that still satisfied .exists(), permanently suppressing the check
+    # for that ISO week. Write atomically so a crash leaves either the intact
+    # prior artifact or the intact new one.
     path = artifact_path_for_week(artifact['week_anchor'])
-    path.write_text(json.dumps(artifact, indent=2))
+    atomic_write_json(path, artifact, indent=2)
     return path
+
+
+def _artifact_is_valid_sentinel(path: Path) -> bool:
+    """True if ``path`` holds a parseable artifact (a real same-week sentinel).
+
+    A zero-byte or truncated/corrupt file satisfies ``path.exists()`` but is not
+    a valid completion marker; treat it as 'not yet run' so the check
+    regenerates it instead of being suppressed for the week (audit #7). Mirrors
+    pulse_check_viii's gate hardening from #366.
+    """
+    try:
+        obj = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(obj, dict) and bool(obj.get('week_anchor'))
 
 
 def run_signals(
@@ -883,7 +904,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     week_anchor = iso_week_monday(now.date())
     target_path = artifact_path_for_week(week_anchor)
 
-    if target_path.exists() and not args.force and not args.dry_run:
+    if (target_path.exists() and _artifact_is_valid_sentinel(target_path)
+            and not args.force and not args.dry_run):
         log(f'Check IX already ran this week ({week_anchor}); '
             'skipping (use --force to re-run).')
         return 0

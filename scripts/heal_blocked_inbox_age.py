@@ -60,6 +60,24 @@ def log(level: str, msg: str) -> None:
         pass
 
 
+def _unique_archive_target(target: Path) -> Path:
+    """Pick a collision-free archive path when ``target`` already exists.
+
+    Audit #54 (sibling of heal_restart_dedup_obsolete, missed by #366):
+    ``shutil.move`` silently overwrites a same-named destination, destroying the
+    prior archived task and defeating the module's audit-trail guarantee. If the
+    name recurs across ticks, fall back to ``<name>-dup1.json``, ``-dup2.json``,
+    … so no prior archived task is ever clobbered.
+    """
+    stem, suffix, parent = target.stem, target.suffix, target.parent
+    i = 1
+    while True:
+        candidate = parent / f"{stem}-dup{i}{suffix}"
+        if not candidate.exists():
+            return candidate
+        i += 1
+
+
 def main() -> int:
     if KILL_SWITCH.exists():
         log("KILLED_BY_SWITCH", "healers.disabled flag present, exiting")
@@ -86,8 +104,11 @@ def main() -> int:
                 continue
             age_h = int((datetime.now(timezone.utc).timestamp() - mtime) / 3600)
             try:
-                shutil.move(str(task_file), str(archive_dir / task_file.name))
-                sidecar = archive_dir / f"{task_file.stem}.archive-reason.txt"
+                dest = archive_dir / task_file.name
+                if dest.exists():
+                    dest = _unique_archive_target(dest)
+                shutil.move(str(task_file), str(dest))
+                sidecar = archive_dir / f"{dest.stem}.archive-reason.txt"
                 sidecar.write_text(
                     f"archived_at_utc={datetime.now(timezone.utc).isoformat()}\n"
                     f"reason=blocked_inbox_age_exceeded_threshold\n"

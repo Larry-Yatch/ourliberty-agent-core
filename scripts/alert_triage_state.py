@@ -177,6 +177,12 @@ def read_state() -> dict[str, dict[str, Any]]:
         _preserve_corrupt_state(path, raw)
         return {}
     if not isinstance(data, dict):
+        # Valid JSON of the wrong shape (a top-level list/number/null from a
+        # partial or buggy external write) is just as much a corruption as a
+        # parse error: returning {} here would let the next _write_state clobber
+        # every prior row. Preserve + alert on this path too (audit #37 gap
+        # left by #366, which only handled JSONDecodeError).
+        _preserve_corrupt_state(path, raw)
         return {}
     out: dict[str, dict[str, Any]] = {}
     for k, v in data.items():
