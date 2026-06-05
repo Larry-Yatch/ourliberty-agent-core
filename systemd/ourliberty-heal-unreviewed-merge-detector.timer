@@ -1,0 +1,15 @@
+[Unit]
+Description=Unreviewed-merge detective watcher — alert if main got a merge with no Mirror REVIEW_PASS
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow. Every
+# 5 min so a merge that slipped the gate is caught within minutes; the
+# persisted cursor + per-PR alerted ledger make repeats idempotent.
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=ourliberty-heal-unreviewed-merge-detector.service
+
+[Install]
+WantedBy=timers.target

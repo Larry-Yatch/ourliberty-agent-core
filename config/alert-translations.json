@@ -378,5 +378,14 @@
       "plain_language_summary": "A Pulse self-optimization check (I-X) ran but did not complete cleanly (it raised or exited nonzero), so it did NOT refresh its liveness heartbeat. This is the same-cycle complement to the staleness watcher -- it names the failing check immediately instead of waiting out the staleness window. The subject carries the check id after the colon.",
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
     }
+  },
+  "heal-unreviewed-merge-detector": {
+    "unreviewed-merge": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "never_silence": true,
+      "plain_language_summary": "A pull request was merged into main with NO evidence of a Mirror REVIEW_PASS -- the Mirror-review merge gate did not hold for it. This is the exact hole that let #303 (merged despite a REVISION verdict) and #324 (merged with no review) slip through. Branch protection should now block this; if this alert fires, protection was bypassed or misconfigured. The subject carries the PR number after the colon.",
+      "recommended_action": "Inspect the merge with `gh pr view <N> --repo Larry-Yatch/ourliberty-agent-core`. If it should not have merged, assess the change and revert if needed. Confirm branch protection is intact: `gh api repos/Larry-Yatch/ourliberty-agent-core/branches/main/protection`. This is a defense-in-depth detector; treat a hit as a gate failure worth root-causing."
+    }
   }
 }
