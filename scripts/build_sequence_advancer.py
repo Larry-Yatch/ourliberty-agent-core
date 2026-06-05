@@ -126,6 +126,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import build_sequence_validator as bsv  # noqa: E402
+from id_match import id_matches  # noqa: E402
 
 
 # -------------------- logging + heartbeat --------------------
@@ -953,11 +954,38 @@ def _gh_list_merged_prs(
 
 def _match_pr_for_step(
     step_id: str, pr_url: Optional[str], merged_prs: list[dict[str, Any]],
+    logger: Optional[logging.Logger] = None,
 ) -> Optional[dict[str, Any]]:
     """Find a merged PR that identifies as this step. Precedence:
       1. exact pr_url match (only when the step has pr_url populated)
       2. headRefName == f'forge/{step_id}' (Forge worktree convention)
-      3. step_id substring in title (kebab-case is unambiguous)
+      3. step_id appears as a whole, boundary-delimited token in BOTH the
+         PR title AND the PR headRefName (branch) — corroboration.
+
+    Tier-3 corroboration (audit #9): the original tier-3 was a bare,
+    unanchored `step_id in title` substring test. With no token boundary
+    a short/common step_id ('api', 'auth', 'rotation') false-matched an
+    unrelated merged PR (e.g. step_id='api' matching a PR titled
+    'feat(api): unrelated change') and advanced the wrong sequence step.
+
+    The shared id-match-discipline helper (id_match.id_matches) adds the
+    missing boundary check, but its DEFAULT length floor (12) cannot be
+    applied here: real step_ids ARE genuinely short ('a', 'b', 'api',
+    'step-1'), so a floor would disable this tier entirely — including the
+    designed derivative-branch case (a rebase/rescue/revision dispatch
+    that auto-merges under a branch like `pr100-rebase-step-bar-001`, no
+    pr_url, whose title contains the step_id). So instead of a length
+    floor we require corroboration: the step_id must appear as a boundary-
+    delimited token in BOTH the title AND the branch. In the legitimate
+    derivative case the branch carries the step_id; in the audit's false
+    case the unrelated PR's branch does not. Corroboration across two
+    independent fields supplies the distinctiveness a length floor would,
+    so we pass min_len=1 (boundary check only, no floor).
+
+    A non-match fails safe — the step stays in `dispatched` for the belt-
+    and-suspenders gate or a later tick / manual unstick — so tightening
+    this tier can only ever err toward NOT advancing, never toward a
+    silent wrong-advance.
 
     Returns the first match found at the highest-precedence tier, or
     None if no PR matches by any signal."""
@@ -969,10 +997,32 @@ def _match_pr_for_step(
     for pr in merged_prs:
         if pr.get('headRefName') == expected_branch:
             return pr
+    # Remember the FIRST title-only near-miss (token in title, not in branch
+    # — the audit #9 false-positive shape) but keep scanning: a later PR may
+    # still corroborate. Only emit the WARN below if we fall through without
+    # a match, so the log reflects an actual non-advance rather than firing
+    # once per candidate PR (and never contradicting a same-tick advance).
+    title_near_miss: Optional[tuple[str, str]] = None
     for pr in merged_prs:
         title = pr.get('title') or ''
-        if step_id in title:
+        branch = pr.get('headRefName') or ''
+        if not id_matches(step_id, title, min_len=1):
+            continue
+        if id_matches(step_id, branch, min_len=1):
             return pr
+        if title_near_miss is None:
+            title_near_miss = (title, branch)
+    # No corroborated match. Surface a single diagnosable WARN if some PR
+    # title token-matched but no branch corroborated — advancer changes are
+    # flagged high-blast-radius in the remediation plan, so a legitimate
+    # match this guard drops must stay visible in the log.
+    if title_near_miss is not None and logger is not None:
+        near_title, near_branch = title_near_miss
+        logger.warning(
+            f'reconcile: step_id={step_id!r} token-matched merged PR '
+            f'title {near_title!r} but branch {near_branch!r} does not '
+            f'corroborate; NOT advancing (audit #9 corroboration guard)'
+        )
     return None
 
 
@@ -1048,7 +1098,9 @@ def _reconcile_dispatched_steps(
         merged_prs = _repo_cache[target_repo]
         if merged_prs is None:
             continue  # gh failure already logged; soft-fail.
-        match = _match_pr_for_step(step_id, step.get('pr_url'), merged_prs)
+        match = _match_pr_for_step(
+            step_id, step.get('pr_url'), merged_prs, logger,
+        )
         if match is None:
             continue
         pr_url = match.get('url') or ''

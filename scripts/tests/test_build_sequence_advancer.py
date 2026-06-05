@@ -861,6 +861,78 @@ class TestActiveReconciliation(_AdvancerHarness):
         step = next(s for s in seq2['steps'] if s['step_id'] == 'step-bar')
         self.assertEqual(step['status'], 'merged')
 
+    def test_reconcile_short_step_id_title_match_needs_branch_corroboration(self):
+        # Audit #9 false-positive shape: a short/common step_id ('api')
+        # appears as a token in an UNRELATED merged PR's title, but the
+        # branch does NOT carry it. The pre-fix bare `step_id in title`
+        # test advanced the wrong step here; the corroboration guard must
+        # NOT advance — the step stays dispatched.
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'api', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['api'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 500,
+                    'url': 'https://github.com/x/y/pull/500',
+                    # 'api' is a boundary token in the title but NOT in the
+                    # branch — corroboration fails.
+                    'title': 'feat(api): unrelated change',
+                    'headRefName': 'feat/unrelated-change',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'api')
+        self.assertEqual(step['status'], 'dispatched')
+        events = [e['event'] for e in seq2['audit_log']]
+        self.assertNotIn('step-merged', events)
+
+    def test_reconcile_short_step_id_advances_when_branch_corroborates(self):
+        # The legitimate flip side of the guard: the SAME short step_id
+        # ('api') DOES advance when both the title AND the branch carry it
+        # as a token — the designed derivative-branch case (rebase/rescue
+        # dispatch, no pr_url, auto-merged under a derivative branch). This
+        # is the case a bare length floor (min_len=12) would wrongly kill.
+        seq = _make_sequence(
+            steps=[
+                _make_step(
+                    'api', status='dispatched',
+                    pr_url=None,
+                    dispatched_at='2026-05-30T00:00:00+00:00',
+                ),
+            ],
+            current_steps=['api'],
+        )
+        self._write_sequence(seq)
+        self._patch_gates(chain_merged=False, gh_merged=False)
+        self._patch_gh_pr_list({
+            'ourliberty-agent-core': [
+                {
+                    'number': 501,
+                    'url': 'https://github.com/x/y/pull/501',
+                    'title': 'fix(api): rotation rebuild — step api',
+                    'headRefName': 'pr501-rebase-step-api-001',
+                    'mergedAt': '2026-05-30T01:00:00Z',
+                },
+            ],
+        })
+        self.bsa.tick()
+        seq2 = self._read_sequence('seq-001')
+        step = next(s for s in seq2['steps'] if s['step_id'] == 'api')
+        self.assertEqual(step['status'], 'merged')
+
     def test_reconcile_no_match_no_op(self):
         seq = _make_sequence(
             steps=[
