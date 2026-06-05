@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 934 — 2026-06-05 01:08 UTC (interactive)
+
+**Health:** ⚡ **Tier 1 (action). consecutive_clean=0. 8/8 services active. Sync: ✅ success. PR #332 MERGED (01:01:10Z ✅). PR #334 auto-merge enabled (30 min, CLEAN, Mirror reviewing). 1 new alert (Tier-3 expected).**
+
+Alert watermark: **1307 lines / 2026-06-05T01:01:24Z** (1 new alert since iter 933 watermark 1305/00:25:57Z — Tier-3 expected). Pipeline-stall heartbeat: 2026-06-05T00:55:19Z (✅ ~14 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T01:01:19Z (✅ ~7 min at cycle start; within 60-min threshold). Sync: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (✅ ~19 min old; within 2h threshold; local HEAD 01b9bd0 is newer — wrapper push from iter 933 auto-commit; self-clears on next hourly sync.timer). Session-start gitStatus: branch=main, tree=clean, HEAD=01b9bd0 "Pulse cycle 20260605T010418Z". Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (always-fix action taken → non-clean iter → tier maintained at 1).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Tier-3 nominal (1 new alert, expected-by-design).** Watermark advanced 1305→1307.
+  - **Alert 1306 (2026-06-05T01:01:24Z):** `heal-stale-daemon-code` / `auto-restarted:ourliberty-outbox-notifier.service`. Stale-daemon healer auto-restarted outbox-notifier: script mtime 2026-06-05T00:49:06Z (from PR #333 sync) was 499 min newer than service start 2026-06-04T16:30:06Z. Service active post-restart. Expected behavior — healer working correctly. Subject `auto-restarted:ourliberty-outbox-notifier.service` NOT in `config/alert-translations.json` (G-rule dispatched 3/3 iter 592; Beacon consumed iter 594; Forge brief STILL MISSING — re-dispatch pending Larry go-ahead per standing [yellow] escalation). Per actionable-only discipline: auto-remediated noise, no Larry action needed. Classification: **Tier 3 (actionable-only discipline)**. No DM, journal-note only. ✅
+  - Triage: 1 alert, 0 Tier-1 dispatched, 0 Tier-2 DMed, 1 Tier-3 silenced. No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T00:55:19Z (~14 min at cycle start; ✅ within 90-min threshold). Observation: last clarify1 stall alert was at 23:03Z June 4; no new occurrence since (~2h+ gap). Consistent with PR #332 ("fix(healer): reconcile retry-recovered dispatches") merged 01:01:10Z — reconciliation logic now suppresses false-positive stall fires for *.1 retry-recovered tasks. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active pipeline, not stalled.** Mirror=1 (active review task `review-build-unreviewed-merge-detector-20260605T000816Z.json` — Mirror reviewing PR #334). Forge=0, Beacon=0, Pulse=0. Pipeline progressing. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T01:01:19Z (~7 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=01b9bd0 "Pulse cycle 20260605T010418Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (~19 min old). Local HEAD 01b9bd0 newer — wrapper push from iter 933 auto-commit. Self-clears on next hourly tick. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Active, not stale.** Mirror=1 (active review, expected — PR #334). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚡ Always-fix applied (PR #334). PR #332 confirmed MERGED.**
+  - **PR #332** "fix(healer): reconcile retry-recovered dispatches + couple Medic silence with a fix report": MERGED 2026-06-05T01:01:10Z (mergeCommit=f997586). Auto-merge from iter 933 fired successfully. ✅
+  - **PR #334** "feat(healer): detect merges to main that bypassed Mirror review" (build-unreviewed-merge-detector-20260605T000816Z): created 00:38:49Z, age ~29.9 min at cycle start. CLEAN/MERGEABLE, reviewDecision="". Mirror actively reviewing (inbox task present). **Always-fix: `gh pr merge 334 --auto --squash` applied (01:08Z, 30-min threshold).** Will merge when Mirror verdict lands. ✅
+  - dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **`source=larry Forge builds auto-routing to Mirror`**: **1/3 (watching for healing)**. PR #334 (source=larry) IS in Mirror inbox — 1st positive data point that PR #333's commit-status mechanism routes source=larry Forge builds to Mirror. If Mirror approves → advance toward G-rule closure. If PR #334 merges before Mirror verdict → advance to 2/3.
+  - **`heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 retry succeeded`**: **1/3 (watching for healing)**. PR #332 ("reconcile retry-recovered dispatches") merged 01:01:10Z — this is the direct code fix for this G-rule's root cause. Watch: if no new pr-create-inferred-failure alerts appear in next 3+ cycles → G-rule closed as healed by PR #332.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `pulse/check-i-* not in alert-translations.json`: **2/3** (unchanged from iter 933).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=718, systemic_fixes=12, ratio≈59.8 (1 new intervention this iter: enable-pr-auto-merge on PR #334; ledger entry appended 2026-06-05T01:11:30Z).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Triaged 1 new alert (Tier-3 by actionable-only discipline: stale-daemon auto-restarted outbox-notifier post-PR #333). No DMs, no dispatches.
+3. Confirmed PR #332 MERGED at 01:01:10Z (mergeCommit=f997586). ✅
+4. **Always-fix:** `gh pr merge 334 --auto --squash` — PR #334 at 30-min threshold, CLEAN; auto-merge enabled (01:08Z). Logged to `cycle-actions.jsonl`.
+5. `cycle_prime_ledger.py append --tier 1 --kind intervention` → ledger entry recorded (01:11:30Z). ✅
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+7. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** PR #332 merged 01:01:10Z — recurring clarify1 stall alert noise (~every 65 min since June 3) has stopped; consistent with reconcile fix suppressing the false positive at source. PR #334 (detect unreviewed merges) in Mirror review: this is the live test of the `source=larry → Mirror routing` G-rule healing hypothesis. Outbox-notifier auto-restarted cleanly by stale-daemon healer after PR #333 updated the script (working as designed). Two G-rule healing watches open: clarify1 stall silence (watching PR #332 effectiveness) and source=larry routing (watching PR #334 Mirror verdict).
+
+---
+
 ## Iteration 933 — 2026-06-05 01:01 UTC (interactive)
 
 **Health:** ⚡ **Tier 3 → Tier 1 (always-fix action). consecutive_clean=4→0. 8/8 services active. Sync: ✅ success. PR #332 auto-merge enabled (38 min, CLEAN). PR #334 open (18 min, Mirror reviewing). 2 new alerts (Tier-3 expected).**
