@@ -655,14 +655,13 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         archive_dir.mkdir(parents=True, exist_ok=True)
         (archive_dir / f'{task}.{idx}.json').write_text(json.dumps(payload))
 
-    def test_step5_suppressed_when_retry_sibling_succeeded(self) -> None:
-        """The 2026-06-04 two-day false-fire: the first-attempt outbox
-        errored (exit_code=-1, 'All retries exhausted') but a marker-error
-        retry sibling (`...-clarify1.1.json`) recovered with PROCEED and
-        dispatched the build that opened PR #294. Step 5 must consult the
-        retry sibling and SKIP (reason=retry_recovered) instead of firing
-        `pr-create-inferred-failure` — even with NO sibling PR in view (the
-        re-keyed / aged-out window case)."""
+    def test_step5_suppressed_when_retry_sibling_opened_pr(self) -> None:
+        """Genuine recovery: the first-attempt outbox errored (exit_code=-1,
+        'All retries exhausted') but a marker-error retry sibling exited cleanly
+        AND opened a PR (a `PR opened:` preamble in its result). Step 5 must
+        consult the retry sibling and SKIP (reason=retry_recovered) instead of
+        firing `pr-create-inferred-failure` — even with NO PR in the live view
+        (the aged-out window case the sibling-outbox keying exists for)."""
         task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
         self._write_archive(task, {
             'task_id': task,
@@ -676,7 +675,7 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
             'phase': 'preflight',
             'exit_code': 0,
             'attempts': 1,
-            'result': '=== PROCEED ===',
+            'result': 'PR opened: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/294',
         })
         self.assertEqual(
             self.hps._forge_retry_succeeded(task), f'{task}.1.json')
@@ -689,6 +688,32 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         skips = [m for m in captured if 'reason=retry_recovered' in m]
         self.assertEqual(len(skips), 1)
         self.assertIn(f'{task}.1.json', skips[0])
+
+    def test_step5_fires_when_retry_sibling_proceed_but_no_pr(self) -> None:
+        """The false-positive guard: a retry sibling that exited cleanly with
+        `=== PROCEED ===` only proves the clarify resolved and a SEPARATE
+        downstream build was dispatched — NOT that any PR was opened. If that
+        build then crashed without a PR (none in the live view), Step 5 must
+        still fire `pr-create-inferred-failure` rather than silently treating
+        PROCEED as recovery. The clarify-then-shipped-build case is handled
+        upstream by Step 1b's family-PR cross-check, not by this PROCEED text."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'preflight',
+            'exit_code': -1, 'error': 'All retries exhausted',
+        })
+        self._write_retry_archive(task, 1, {
+            'task_id': f'{task}.1', 'phase': 'preflight',
+            'exit_code': 0, 'attempts': 1,
+            'result': '=== PROCEED ===',  # clarify resolved, NO PR opened here
+        })
+        self.assertIsNone(self.hps._forge_retry_succeeded(task))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            f'pipeline-stall:pr-create-inferred-failure:{task}')
 
     def test_step5_still_fires_when_retry_sibling_also_errored(self) -> None:
         """Guard: a retry sibling that ALSO errored is not a recovery — Step
