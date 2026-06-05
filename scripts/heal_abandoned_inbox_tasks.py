@@ -28,18 +28,19 @@ What it does:
   Every 10 min, scan inboxes/main/*.json (and other agent inboxes that have
   the same pattern). For each task file at the top level:
     1. Check mtime — only consider files >ABANDON_AGE_MINUTES old (default 30)
-    2. Cross-check: no lease file at state/dispatch-leases/<task_id>.lock
-    3. Cross-check: no active claude worker with cwd containing the task name
+    2. Cross-check: no LIVE in-flight registry entry (state/in-flight/<task_id>.json
+       with a signalable pid) — the real per-task "worker running" signal
+    3. Cross-check: no active claude worker whose worktree belongs to the task
     4. If all 3 conditions met → file is abandoned
   Rename file with `-recovery-<UTCtimestamp>.json` suffix to bypass
   orchestrator's submitted_tasks cache. This forces re-dispatch on next
   orchestrator main-loop iteration.
 
 Safe-by-construction:
-  - Conservative thresholds (30 min mtime, lease check, worker check) — false-
-    positive risk minimized; legitimate slow builds with active workers pass through
+  - Conservative thresholds (60 min mtime, in-flight check, worker check) —
+    false-positive risk minimized; legitimate slow builds with active workers pass through
   - Reversible (rename only — original task body preserved verbatim)
-  - Lease-aware (won't touch tasks with active dispatch-leases/*.lock)
+  - In-flight-aware (won't touch a task with a live state/in-flight/*.json worker)
   - Worker-aware (won't touch tasks with claude procs running in their worktree)
   - Kill-switch aware (/home/larry/agents/healers.disabled)
   - Read-only on GitHub
@@ -53,6 +54,7 @@ Verification (Empirical-Verification Gate per PRIME DIRECTIVE):
 # Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -65,7 +67,15 @@ AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_abandoned_inbox_tasks.log"
 INBOXES_ROOT = AGENTS_ROOT / "inboxes"
-LEASE_DIR = AGENTS_ROOT / "state" / "dispatch-leases"
+# The authoritative "this task is being processed by a live worker" signal:
+# agent_runner writes state/in-flight/<task_stem>.json (with the worker `pid`)
+# for the WHOLE duration of the claude run, and removes it on completion. The
+# previous code checked state/dispatch-leases/<task_id>.lock, but nothing ever
+# writes that file — the real dispatch lease is the per-AGENT `inbox:<agent>.lock`
+# (dispatch_lease keys on identity `inbox:<agent>`), held only briefly during a
+# poll. So the old lease gate was dead (always passed) and never protected an
+# in-flight task; the in-flight registry is the correct per-task gate.
+IN_FLIGHT_DIR = AGENTS_ROOT / "state" / "in-flight"
 
 # Only scan these agents' top-level inboxes — they have the workflow pattern
 # where workers create worktrees but the completion handler is supposed to move
@@ -111,29 +121,83 @@ def get_active_claude_cwds() -> set[str]:
     return cwds
 
 
+def _worktree_safe_stem(task_stem: str) -> str:
+    """Reproduce agent_runner's worktree-name sanitization so we can match a
+    task against its `wt-<agent>-<safe_stem>-<ts>` directory. agent_runner maps
+    every non-[alnum-_] char to '-' and truncates to 50. Matching the RAW
+    task_id (as the old code did) silently failed for any task_id containing a
+    '.', ':', or space — those become '-' in the worktree name, so the raw
+    substring was never present and a live worker went undetected."""
+    return ''.join(c if (c.isalnum() or c in '-_') else '-' for c in task_stem)[:50]
+
+
 def has_active_worker(task_id: str, active_cwds: set[str]) -> bool:
-    """A worktree is named `wt-<agent>-<task_id_truncated>-<timestamp>`.
-    Check if any active worker's cwd basename matches this specific task_id.
-
-    Iter 117 fix: previous 30-char truncation was not unique enough for
-    parallel surface dispatches with shared prefix. False-positive matches
-    caused healer to skip recovery on genuinely-abandoned tasks because a
-    sibling surface's worker was active.
-
-    New approach: take a longer, more discriminating prefix that includes
-    the full distinguishing slug. We use 50 chars which captures most
-    realistic task slugs without cross-surface overlap. Filesystem worktree
-    names are typically truncated around 60-70 chars so 50 is a safe match
-    window."""
-    truncated = task_id[:50]
+    """True if a live claude worker's worktree belongs to this task. A worktree
+    basename is `wt-<agent>-<safe_stem>[-<timestamp>]` where safe_stem is the
+    SANITIZED task stem — so we must sanitize the task_id the same way before
+    the substring check (see _worktree_safe_stem). 50 chars is the same match
+    window the dispatcher truncates to."""
+    safe = _worktree_safe_stem(task_id)
+    if not safe:
+        return False
     for cwd in active_cwds:
-        if cwd.startswith("wt-") and truncated in cwd:
+        if cwd.startswith("wt-") and safe in cwd:
             return True
     return False
 
 
-def has_lease(task_id: str) -> bool:
-    return (LEASE_DIR / f"{task_id}.lock").exists()
+def _pid_alive(pid) -> bool:
+    try:
+        ipid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    # pid<=0 would signal a process GROUP / every process, not a specific pid —
+    # a corrupted registry entry must not read as "alive forever".
+    if ipid <= 0:
+        return False
+    try:
+        os.kill(ipid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # The process EXISTS but is owned by another uid — it's alive; we just
+        # can't signal it. Treating EPERM as dead would re-dispatch a live
+        # cross-user worker (double dispatch).
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def has_in_flight_worker(task_id: str) -> bool:
+    """True if agent_runner's in-flight registry has a LIVE worker for this task
+    (state/in-flight/<task_id>.json present AND its pid signalable). This is the
+    real per-task 'being processed' gate. The prior `has_lease(task_id)` checked
+    state/dispatch-leases/<task_id>.lock — a file nothing writes — so it always
+    returned False (dead), leaving the worker check as the only guard. A stale
+    entry whose pid is dead does NOT block recovery (that IS the abandoned
+    case)."""
+    try:
+        entry = json.loads((IN_FLIGHT_DIR / f"{task_id}.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(entry, dict) and _pid_alive(entry.get("pid"))
+
+
+def _canonical_task_id(task_file: Path) -> str:
+    """The task_id the dispatcher keyed the worktree + in-flight registry on:
+    the task body's `task_id` field, falling back to the filename stem — exactly
+    inbox_watcher's `task.get('task_id') or task_file.stem`. Using the filename
+    stem alone misses the worktree/in-flight entry whenever the two differ."""
+    try:
+        body = json.loads(task_file.read_text())
+        if isinstance(body, dict):
+            tid = body.get("task_id")
+            if isinstance(tid, str) and tid:
+                return tid
+    except (OSError, json.JSONDecodeError):
+        pass
+    return task_file.stem
 
 
 def task_already_resolved(task_id: str, since_ts: datetime) -> Optional[str]:
@@ -201,11 +265,14 @@ def scan_agent_inbox(agent: str, active_cwds: set[str]) -> tuple[int, int]:
             continue
         if mtime >= cutoff:
             continue  # not old enough
-        task_id = task_file.stem
-        if has_lease(task_id):
-            continue  # actively dispatched
+        # The worktree, in-flight registry, AND the PR branch are all keyed on
+        # the BODY task_id (which may differ from the filename stem), so derive
+        # the canonical id once and use it for every cross-check.
+        task_id = _canonical_task_id(task_file)
+        if has_in_flight_worker(task_id):
+            continue  # live worker registered in-flight for this task
         if has_active_worker(task_id, active_cwds):
-            continue  # worker grinding
+            continue  # worker grinding in the task's worktree
         since_ts = datetime.fromtimestamp(mtime, tz=timezone.utc)
         resolved_reason = task_already_resolved(task_id, since_ts)
         if resolved_reason:
