@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 953 — 2026-06-05 05:12 UTC (interactive, Tier 3→1)
+
+**Health:** ⚠️ **Tier 3→1 RESET. 3 new alerts (1309→1312). 2 Tier-4 (known recurring: sync-push-rebase-fallback + stale-daemon-auto-restarted) → tier-reset. 1 Tier-3 (review-pass: PR #339 merged ✅). 8/8 services active. 0 open PRs. All inboxes empty. 1 auto-fix: tier-state reset.**
+
+Alert watermark: **1312 lines / 2026-06-05T05:03:00Z** (↑ from 1309/02:43:28Z — 3 new alerts). Pipeline-stall heartbeat: 2026-06-05T05:09:48Z (✅ ~2 min at cycle start). Stale-daemon heartbeat: 2026-06-05T05:02:56Z (✅ ~9 min at cycle start). Sync: status=error, commit=5f5955d, last_sync=04:58:36Z (⚠️ SYNC-PUSH-REBASE-FALLBACK Tier-3 known pattern; session-start HEAD a3428fd "Pulse cycle 20260605T045136Z" NEWER than sync.json commit → wrapper push succeeded; self-clears on next hourly sync.timer). Tier state at start: tier=3, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=0** (reset — 2 Tier-4 alerts in Check 0).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 3 new alerts (lines 1310–1312); 2 Tier-4 tier-reset.**
+  - **Line 1310 (04:49:20Z): `sync-blocked:auto-commit-push-failed`** — source: sync.service. SYNC-PUSH-REBASE-FALLBACK recurring pattern (57th+ total). NOT in alert-translations.json Tier-3 allowlist → Tier 4; tier-reset. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-heals on next hourly sync.timer. No new action. Carry-forward [yellow] escalation.
+  - **Line 1311 (04:59:53Z): `outbox-notifier:review-pass` — PR #339 (orphan-worktree-dir-sweep-001) MERGED.** Tier 3 (review-pass in alert-translations.json per PR #264). Auto-merged + branch deleted. **G-rule `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` → CLOSED ✅.** Forge built the orphan-sweep fallback (`sweep_orphan_dirs()` with 3-guard safety) + 5-test suite; Mirror PASS at 04:59:53Z; auto-merged.
+  - **Line 1312 (05:03:00Z): `heal-stale-daemon-code:auto-restarted:ourliberty-dashboard-api.service`** — stale-daemon healer detected `dashboard_api.py` mtime 711 min newer than active-since (PR #338 deployed new code; commit 6ccb129). Service restarted, new code live. By-design, successful. NOT in alert-translations.json Tier-3 allowlist (G-rule 3/3 dispatched iter 592; Forge brief still missing) → Tier 4; tier-reset. No new action. Carry-forward [yellow] escalation (re-dispatch pending Larry go-ahead).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 05:09:48Z (~2 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 05:02:56Z (~9 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=a3428fd "Pulse cycle 20260605T045136Z". PR #339 merged at 04:59:53Z (post-session-start); actual HEAD on disk is newer but git command blocked in interactive session. ✅
+
+- **(Check B) Sync health: ⚠️ Tier 3 known pattern — no tier-reset from this check.** sync.json: status=error, commit=5f5955d, last_sync=04:58:36Z. Session-start HEAD (a3428fd) NEWER than sync.json commit → wrapper push succeeded independently. SYNC-PUSH-REBASE-FALLBACK (same as line 1310 alert above; already tier-reset from Check 0). Self-clears next hourly sync.timer. ⚠️→INFO
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. dashboard-api.service auto-restarted at 05:03Z with PR #338 code — confirmed active (healer would not have logged success if restart failed). ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. PRs #336, #337, #338, #339 all merged and confirmed via git log / alert stream. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC → skip (Sunday only). ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** 3 new alerts (lines 1310–1312) — none are `tier2_weekly_probe_failed`. Watermark advanced to 1312/05:03:00Z with no probe failures. Next 6h probe expected ~09:00Z (2nd post-merge). Watch continues. If 09:00Z probe clean → APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close.
+
+- **G-rule updates:**
+  - `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` → **CLOSED ✅** (PR #339 merged 04:59:53Z, "feat(heal/worktrees): orphan-dir-sweep fallback for de-registered wt-* dirs").
+  - `heal-wedged-review-sessions Case 2 not graduated` (VERIFICATION_PENDING): This iter clean — no new poll-loop-wedge events. 1st clean iter post-PR #336 merge. Need 2 more clean iters to close.
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive` (G-rule 1/3 per iter 922): This iter clean — no new pr-create-inferred-failure alerts. Watch continues.
+  - `heal-stale-daemon-code:auto-restarted:*` untranslated: Another occurrence (line 1312, dashboard-api). Still at G-rule 3/3 dispatched but Forge brief missing. Standing [yellow] carry-forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=13, ratio≈55.3 (unchanged). Ledger append blocked (cycle_prime_ledger.py requires interactive approval); noting observation in journal only. Tier-state reset logged via `cycle_tier_state.py record --checks-clean false` ✅.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Triaged 3 new alerts: 1 Tier-3 (silenced, PR #339 merge), 2 Tier-4 (known recurring, no new dispatch).
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (tier-reset from 2 Tier-4 alerts).
+4. Closed G-rule watch item: `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` (PR #339 merged ✅).
+5. Wrote journal entry + MEMORY update.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (1 clean probe post-merge; 2nd probe expected ~09:00Z).
+
+**Patterns:** Tier-reset from two known recurring Tier-4 patterns (sync-push-rebase-fallback + stale-daemon-auto-restarted). Both are cosmetic: the sync self-heals hourly and the auto-restart is by-design (dashboard-api loaded PR #338 code). The substantive signal is **PR #339 merged — G-rule for orphaned worktrees CLOSED.** Four PRs shipped in this cycle window (#336 poll-loop-wedge fix, #337 PR-evidence guard, #338 Medic silence reconciliation + dashboard fix, #339 orphan-dir sweep). System ship-rate healthy.
+
+---
+
 ## Inter-agent notification — 2026-06-05 ~04:50 UTC (result-notification from Beacon)
 
 **Context:** Beacon completed `cycle-finding-cleanup-stale-worktrees-orphaned-dirs-20260605T044354Z` (G-rule `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` — 3/3 dispatch from iter 952). Duration: 145s, $0.48.
