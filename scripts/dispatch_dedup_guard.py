@@ -70,9 +70,16 @@ def recent_dispatches(target_agent: str, minutes: int) -> list[dict]:
 
 
 def log_refusal(record: dict):
-    GUARD_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with GUARD_LOG.open('a') as f:
-        f.write(json.dumps(record) + '\n')
+    # Best-effort: refusal logging must not itself crash the guard. In the
+    # ledger-write-failed refusal path (audit #56) the log FS may be the same
+    # one that just failed, so an unguarded write here would turn a clean REFUSE
+    # into an uncaught traceback.
+    try:
+        GUARD_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with GUARD_LOG.open('a') as f:
+            f.write(json.dumps(record) + '\n')
+    except OSError:
+        pass
 
 
 def record_dispatch(target_agent: str, prompt_hash_val: str, task_file: str) -> bool:

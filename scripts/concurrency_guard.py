@@ -103,7 +103,9 @@ class ConcurrencyGuard:
         except FileNotFoundError:
             # Raced with a delete between exists() and open() — treat as first run.
             return {'slots': [], 'max': MAX_CONCURRENT}
-        except (json.JSONDecodeError, ValueError, OSError):
+        except (ValueError, OSError):
+            # ValueError covers json.JSONDecodeError (its subclass). Corrupt or
+            # unreadable but present → None (fail closed).
             return None
 
     def _write(self, data):
