@@ -60,6 +60,24 @@ def log(level: str, msg: str) -> None:
         pass
 
 
+def _noclobber_dest(target: Path) -> Path:
+    """Return a destination that does not overwrite an existing archive file.
+
+    Audit #54 (sibling idiom): `shutil.move` silently overwrites a same-named
+    destination, so two same-named blocked tasks archived across separate ticks
+    would destroy the earlier audit copy. Append a `.N` suffix until free.
+    """
+    if not target.exists():
+        return target
+    stem, suffix = target.stem, target.suffix
+    n = 1
+    while True:
+        candidate = target.with_name(f"{stem}.{n}{suffix}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 def main() -> int:
     if KILL_SWITCH.exists():
         log("KILLED_BY_SWITCH", "healers.disabled flag present, exiting")
@@ -86,8 +104,9 @@ def main() -> int:
                 continue
             age_h = int((datetime.now(timezone.utc).timestamp() - mtime) / 3600)
             try:
-                shutil.move(str(task_file), str(archive_dir / task_file.name))
-                sidecar = archive_dir / f"{task_file.stem}.archive-reason.txt"
+                dest = _noclobber_dest(archive_dir / task_file.name)
+                shutil.move(str(task_file), str(dest))
+                sidecar = archive_dir / f"{dest.stem}.archive-reason.txt"
                 sidecar.write_text(
                     f"archived_at_utc={datetime.now(timezone.utc).isoformat()}\n"
                     f"reason=blocked_inbox_age_exceeded_threshold\n"

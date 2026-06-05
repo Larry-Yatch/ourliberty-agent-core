@@ -74,6 +74,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import atomic_io  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
 
 
@@ -751,7 +752,10 @@ def build_artifact(result: CycleResult, *, as_of_iso: str) -> dict[str, Any]:
 def write_artifact(artifact: dict[str, Any]) -> Path:
     PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
     path = artifact_path_for_week(artifact['week_anchor'])
-    path.write_text(json.dumps(artifact, indent=2))
+    # Atomic write (audit #7, sibling of pulse_check_viii): the artifact is the
+    # same-week idempotency sentinel; a truncated non-atomic write would still
+    # satisfy target_path.exists() and suppress the check for the week.
+    atomic_io.atomic_write_json(path, artifact)
     return path
 
 

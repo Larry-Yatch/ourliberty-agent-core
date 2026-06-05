@@ -61,6 +61,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import atomic_io  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
 
 
@@ -491,12 +492,15 @@ def write_proposal_artifact(
     artifact: dict[str, Any], path: Path = PROPOSALS_FILE,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(artifact, indent=2))
+    # Atomic write (audit #7, sibling of pulse_check_viii): this proposal file
+    # is the idempotency sentinel; a truncated non-atomic write would still
+    # satisfy .exists() and suppress the next run. The history copy is made
+    # atomic for the same crash-safety reason.
+    atomic_io.atomic_write_json(path, artifact)
     history_dir = PROPOSALS_HISTORY_DIR
     history_dir.mkdir(parents=True, exist_ok=True)
     date_str = artifact['as_of'][:10]
-    (history_dir / f'check-iii-{date_str}.json').write_text(
-        json.dumps(artifact, indent=2))
+    atomic_io.atomic_write_json(history_dir / f'check-iii-{date_str}.json', artifact)
 
 
 def dm_digest(artifact: dict[str, Any]) -> bool:

@@ -662,6 +662,52 @@ class HappyPathTest(_LarryActionBase):
         )
 
 
+class _FrozenDatetime(datetime):
+    """datetime whose .now() always returns a fixed instant, so two requests
+    in one test share an identical isoformat() microsecond — the precondition
+    for the audit #58 event_id collision."""
+
+    @classmethod
+    def now(cls, tz=None):  # type: ignore[override]
+        return datetime(2026, 6, 5, 12, 0, 0, 123456, tzinfo=tz)
+
+
+class Audit58EventIdCollisionTest(_LarryActionBase):
+    """Audit #58: two distinct larry_actions on two source events that share a
+    task_id and land in the same microsecond must produce DISTINCT audit
+    event_ids, so the on_conflict=event_id / ignore_duplicates upsert does not
+    silently drop the second audit row. The fix folds source_event_id into the
+    event_id hash input; before it, both rows hashed to the same id."""
+
+    def test_distinct_source_events_same_task_same_ts_distinct_audit_ids(self):
+        # Two source events, SAME task_id, different event_id — the realistic
+        # case (e.g. an approval_request and a later clarify on the same task).
+        self._seed(event_id='ev-src-A', task_id='task-shared',
+                   event_type='larry_alert', payload={'message': 'A'},
+                   read_at=None)
+        self._seed(event_id='ev-src-B', task_id='task-shared',
+                   event_type='larry_alert', payload={'message': 'B'},
+                   read_at=None)
+        with mock.patch.object(da, 'datetime', _FrozenDatetime):
+            r1 = self.c.post('/api/larry/action', headers=AUTH,
+                             json={'source_event_id': 'ev-src-A',
+                                   'action': 'mark_done'})
+            r2 = self.c.post('/api/larry/action', headers=AUTH,
+                             json={'source_event_id': 'ev-src-B',
+                                   'action': 'mark_done'})
+        self.assertEqual(r1.status_code, 200, r1.text)
+        self.assertEqual(r2.status_code, 200, r2.text)
+        upserts = [c for c in self.client_stub.calls if c['op'] == 'upsert']
+        self.assertEqual(len(upserts), 2, 'expected two audit upserts')
+        ids = {u['upsert_rows'][0]['event_id'] for u in upserts}
+        # Both rows carry ts identical to the microsecond (frozen clock)…
+        ts_values = {u['upsert_rows'][0]['ts'] for u in upserts}
+        self.assertEqual(len(ts_values), 1, 'clock should be frozen identical')
+        # …yet the event_ids differ, so neither audit row is dropped.
+        self.assertEqual(len(ids), 2,
+                         'audit event_ids collided across distinct source events')
+
+
 # ---------- #10 atomic-claim (TOCTOU) ----------
 
 class AtomicClaimConcurrencyTest(_LarryActionBase):

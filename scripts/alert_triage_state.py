@@ -52,6 +52,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+import atomic_io
 import cycle_prime_ledger as cpl
 import larry_alerts
 
@@ -124,8 +125,15 @@ def read_state() -> dict[str, dict[str, Any]]:
         return {}
     try:
         data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        _log(f'{path.name} unreadable; treating as empty', 'WARN')
+    except (OSError, json.JSONDecodeError) as e:
+        # Audit #37: returning {} here lets the next _write_state() overwrite
+        # the file with a single new row, permanently discarding every other
+        # alert's lifecycle state on one transient corruption. We keep the
+        # not-stuck property (still return {} so triage can proceed) but
+        # PRESERVE the corrupt bytes in a timestamped backup first, so the
+        # prior rows are recoverable instead of silently destroyed, and raise
+        # the visibility from a quiet WARN to a CRITICAL alert.
+        _preserve_corrupt_state(path, e)
         return {}
     if not isinstance(data, dict):
         return {}
@@ -136,13 +144,52 @@ def read_state() -> dict[str, dict[str, Any]]:
     return out
 
 
+def _preserve_corrupt_state(path: Path, err: Exception) -> None:
+    """Back up a corrupt state file and alert, before the caller proceeds.
+
+    Best-effort: every step is guarded so a recovery failure can never break
+    read_state (the alternative — raising — would leave triage stuck, the very
+    thing the {}-fallback exists to avoid). Renames the corrupt file aside to
+    a timestamped `.corrupt-<ts>` sidecar so the prior rows survive for manual
+    re-merge, then raises a CRITICAL alert so the corruption is noticed rather
+    than silently swallowed.
+    """
+    ts = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+    backup = path.with_name(f'{path.name}.corrupt-{ts}')
+    backed_up = False
+    try:
+        os.replace(path, backup)
+        backed_up = True
+    except OSError as move_err:
+        _log(f'{path.name} corrupt and backup failed: {move_err}', 'ERROR')
+    where = f'; prior rows preserved at {backup.name}' if backed_up else ''
+    _log(f'{path.name} unreadable ({err}); treating as empty{where}', 'WARN')
+    rows_note = (
+        f'backed up to {backup.name}' if backed_up
+        else 'could not be backed up'
+    )
+    try:
+        larry_alerts.append_alert(
+            'alert_triage_state',
+            'critical',
+            f'alert-triage state file {path.name} was corrupt and reset; '
+            f'lifecycle rows {rows_note}. Error: {err}',
+            subject='corrupt-state',
+        )
+    except Exception as alert_err:  # never let alerting break read_state
+        _log(f'corrupt-state alert failed: {alert_err}', 'ERROR')
+
+
 def _write_state(state: dict[str, dict[str, Any]]) -> None:
-    """Atomic tmp + replace. Never partial-file-write."""
-    path = _state_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
-    tmp.replace(path)
+    """Atomic write. Never partial-file-write.
+
+    Uses the shared atomic_io helper (unique tmp + fsync + os.replace) rather
+    than a fixed `<file>.tmp` so two concurrent writers cannot clobber each
+    other's scratch file (audit PR-E).
+    """
+    atomic_io.atomic_write_json(
+        _state_path(), state, indent=2, sort_keys=True,
+    )
 
 
 def record_triage(alert_id: str, tier: int, decision: str,

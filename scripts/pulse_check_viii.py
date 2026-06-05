@@ -105,6 +105,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import atomic_io  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
 
 
@@ -629,7 +630,12 @@ def artifact_path_for_week(week_anchor: str) -> Path:
 def write_artifact(artifact: dict[str, Any]) -> Path:
     PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
     path = artifact_path_for_week(artifact['week_anchor'])
-    path.write_text(json.dumps(artifact, indent=2))
+    # Atomic write (audit #7): this artifact doubles as the same-week
+    # idempotency sentinel (main() skips when target_path.exists()). A
+    # non-atomic write_text left a truncated file on a crash mid-write that
+    # still satisfied .exists(), permanently suppressing Check VIII for the
+    # week. atomic_write_json makes the file appear only once fully written.
+    atomic_io.atomic_write_json(path, artifact)
     return path
 
 

@@ -75,6 +75,29 @@ def log(level: str, msg: str) -> None:
         pass
 
 
+def _noclobber_dest(target: Path) -> Path:
+    """Return a destination that does not overwrite an existing archive file.
+
+    Audit #54: the archive name is `<14-digit-ts>-<task>.json`, whose prefix is
+    minted at restart-dedup time and *can* repeat for the same task across two
+    dedup events in the same wall-clock second. `shutil.move` silently
+    overwrites a same-named destination, destroying the earlier archived copy
+    and defeating the module's "move (not delete) preserves the audit trail"
+    guarantee. If `target` is free, return it unchanged; otherwise append a
+    `.N` suffix before the extension until a free name is found.
+    """
+    if not target.exists():
+        return target
+    stem = target.stem
+    suffix = target.suffix
+    n = 1
+    while True:
+        candidate = target.with_name(f"{stem}.{n}{suffix}")
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 def main() -> int:
     if KILL_SWITCH.exists():
         log("KILLED_BY_SWITCH", "healers.disabled flag present, exiting")
@@ -101,7 +124,7 @@ def main() -> int:
             continue
         if mtime > threshold:
             continue
-        target = ARCHIVE_DIR / f.name
+        target = _noclobber_dest(ARCHIVE_DIR / f.name)
         try:
             shutil.move(str(f), str(target))
             age_h = (now - mtime) / 3600

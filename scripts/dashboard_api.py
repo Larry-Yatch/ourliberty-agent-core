@@ -2837,8 +2837,18 @@ def _handle_larry_action(
     # (unsilenced / kept-silenced / …) + fingerprint in the audit row.
     if reconcile_detail:
         action_payload.update(reconcile_detail)
+    # Audit #58: the audit row's event_id must disambiguate by the *source*
+    # event, not just (task_id, ts). Two distinct actions on two source events
+    # that share a task_id (e.g. an approval_request and a later clarify on the
+    # same task) acted on in the same isoformat() microsecond would otherwise
+    # hash to the same event_id, and the on_conflict=event_id /
+    # ignore_duplicates upsert would silently drop the second audit row while
+    # its side effect (envelope write / read_at flip) still happened. Folding
+    # source_event_id into the hash input keys the audit row per source event;
+    # a genuine same-microsecond replay of the *same* source event still
+    # collides (correct dedup), distinct source events no longer do.
     action_event_id = compute_event_id(
-        source_task_id, 'larry_action', ts_iso,
+        source_task_id, f'larry_action:{source_event_id}', ts_iso,
     )
     row: dict[str, Any] = {
         'event_id': action_event_id,
