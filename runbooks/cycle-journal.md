@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 958 — 2026-06-05 06:09 UTC (interactive, Tier 2 — clean)
+
+**Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=2. 2 new Tier-3 FYI alerts (install-healed, no tier-reset). 8/8 services active. All inboxes empty. 0 open PRs. Sync: SELF-HEALED ✅ (was SYNC-PUSH-REBASE-FALLBACK; now no-change). PR #342 merged at 05:39:55Z.**
+
+Alert watermark: **1314 lines / 2026-06-05T06:00:08Z** (was 1312/05:03:00Z — 2 new Tier-3 FYI alerts). Pipeline-stall heartbeat: 2026-06-05T05:57:07Z (✅ ~12 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T06:03:09Z (✅ ~6 min at scan; within 60-min threshold). Sync: **status=no-change**, commit=d145a733, last_sync=2026-06-05T05:49:25Z (**✅ SYNC-PUSH-REBASE-FALLBACK self-healed** — prior iters showed status=error; hourly sync.timer ran at 05:49Z and succeeded cleanly). Tier state at start: tier=2, consecutive_clean=1. Tier state at end: **tier=2, consecutive_clean=2** (1 more clean iter needed for Tier 3 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ 2 new alerts — both Tier 3 FYI, no tier-reset.** Watermark advanced 1312→1314.
+  - `source=heal-systemd-install-drift, subject=install-healed:ourliberty-heal-unreviewed-merge-detector.service` (06:00:06Z) → Gate 1 match: `install-healed` entry in alert-translations.json, tier=FYI → Tier 3 silence. The unreviewed-merge-detector service (from PR #334) was missing from /etc/systemd/system/; auto-installed, daemon-reloaded, confirmed active. No action needed.
+  - `source=heal-systemd-install-drift, subject=install-healed:ourliberty-heal-unreviewed-merge-detector.timer` (06:00:08Z) → Same classification → Tier 3 silence. Timer installed and enabled --now; first fire: ~06:05Z. Note: install-drift healer installed BOTH the service AND its sibling timer — this is counter-evidence to G-rule `install-drift healer doesn't auto-install sibling timers` (2/3). Noting but not closing G-rule — prior occurrences involved an already-installed service with a missing timer; this case had both missing together (different scenario). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T05:57:07Z (~12 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T06:03:09Z (~6 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=d145a73 "Pulse cycle 20260605T054843Z". ✅
+
+- **(Check B) Sync health: ✅ SELF-HEALED.** sync.json: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z. The SYNC-PUSH-REBASE-FALLBACK pattern that carried through iters 954–957 has self-healed via the hourly sync.timer at 05:49Z. APPROVAL_REQUEST `sync-push-rebase-fallback-001` remains open (root code fix still pending), but the runtime error is cleared. Demoting to INFO this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. Note: `ourliberty-heal-unreviewed-merge-detector.{service,timer}` now also installed on the droplet (see Check 0). ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC → skip (Sunday gate). ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #342 merged at 05:39:55Z:** "fix(heal): stop false 'merged' success, revive dead stall sentinel, no silent merge-cap" — Between iters 957 and 958. Heal pipeline stall code fix: corrects a false 'merged' success path, revives a dead stall sentinel, removes a silent merge-cap. Stale-daemon healer will auto-restart the affected service on next sweep when it detects the script mtime change.
+
+- **PR #335 healing watch:** Watermark advanced 1312→1314, but neither new alert is `tier2_weekly_probe_failed`. 0 new probe-failed alerts. Next probe expected ~09:00Z (6h cadence from 03:02:48Z). Watch continues.
+
+- **G-rule updates:**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive` (G-rule 1/3, iter 922): Clean — no new alerts. **2nd clean iter post-PR #332** (consistent with healing by #332 + now also #342). Watch continues.
+  - `wedged-review-silent-wt:* not in alert-translations.json` (G-rule 1/3, iter 935): No new occurrence. Watch continues.
+  - `install-drift healer doesn't auto-install sibling timers` (G-rule 2/3): Counter-observation this iter — healer installed BOTH service AND timer for unreviewed-merge-detector. Not closing G-rule (different scenario: both were missing together, not the previous pattern of service present / timer absent). Watch continues.
+  - All other G-rules: no new occurrences.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=13, ratio≈55.3 (unchanged). No interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 2 new Tier-3 FYI alerts (install-healed, Tier 3 silence applied, no tier-reset).
+3. Noted SYNC-PUSH-REBASE-FALLBACK self-healed (status=no-change at 05:49Z).
+4. Noted PR #342 merged at 05:39:55Z.
+5. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2. ✅
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovered this iter; root code fix still pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** Sync self-healed after 4 iters of carry-forward error (hourly sync.timer recovered cleanly). PR #342 adds another layer of heal-pipeline-stall fix on top of PR #332. Unreviewed-merge-detector now live on the droplet (auto-installed by install-drift healer). System fully nominal. 1 more clean iter → Tier 3 de-escalation.
+
+---
+
 ## Iteration 957 — 2026-06-05 05:46 UTC (interactive, Tier 2 — clean)
 
 **Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=1. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (known pattern, self-heals).**
