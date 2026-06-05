@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 960 — 2026-06-05 06:28 UTC (interactive, Tier 1 — clean)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change. G-rule `pr-create-inferred-failure false positive` CLOSED ✅.**
+
+Alert watermark: **1317 lines** (unchanged — 0 new alerts since iter 959 watermark at 06:22:54Z). Pipeline-stall heartbeat: 2026-06-05T06:12:54Z (✅ ~15 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T06:03:09Z (✅ ~25 min at scan; within 60-min threshold). Sync: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z (✅ ~39 min at scan; within 2h threshold). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1** (2 more clean iters needed for Tier 2 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1317/06:22:54Z unchanged — 0 new alerts since iter 959. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T06:12:54Z (~15 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T06:03:09Z (~25 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6343b8b "Pulse cycle 20260605T062617Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z. SYNC-PUSH-REBASE-FALLBACK self-healed iter 958; continues holding. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel `check-i-2026-06-05.json` exists (fired 00:25Z at iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged at 1317 — 0 new `tier2_weekly_probe_failed` alerts. Next probe expected ~09:00Z (6h cadence). Watch continues.
+
+- **G-rule updates:**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive` (G-rule 1/3, iter 922): **CLOSED ✅.** Iter 959 noted "3rd+ clean iter post-PR #332 — confirm next iter." This is that confirmation. 4th clean iter; zero new `pr-create-inferred-failure` alerts since PR #332 (merged iter 934) + PR #342 (merged iter 958). G-rule closed as healed by PRs #332+#342 without dispatch.
+  - `wedged-review-silent-wt:* not in alert-translations.json` (G-rule 1/3, iter 935): No new occurrence. Watch continues.
+  - All other G-rules: no new occurrences.
+
+- **PR #343 (unreviewed-merge) — Larry response watch:** Escalation from iter 959 (`[red]`) still open. No new response from Larry yet. Watch continues.
+
+- **PRIME DIRECTIVE ratio:** interventions=720, systemic_fixes=13, ratio≈55.4 (unchanged). No interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all services active, all inboxes empty, 0 open PRs.
+3. Closed G-rule `pr-create-inferred-failure false positive` (1/3 iter 922) — 4th clean iter post-PR #332+#342 confirms healed.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+5. Wrote journal entry + MEMORY update (G-rule closure).
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PR #343 unreviewed-merge — Larry confirmation still pending (iter 959 escalation).
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovered iter 958; root code fix still pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** Clean iter post-tier-reset. G-rule `pr-create-inferred-failure false positive` confirmed closed — PRs #332+#342 together eliminated the repeating false-positive stall alerts. System otherwise nominal; all subsystems holding steady.
+
+---
+
 ## Iteration 959 — 2026-06-05 06:22 UTC (interactive, Tier 2→1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 2→1 — SIGNAL. Tier-reset triggered by tier-NOW / never_silence alert. 3 new alerts: 1 tier-NOW (unreviewed-merge:343, escalated), 2 pulse-escalation echoes (expected noise pattern). 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
