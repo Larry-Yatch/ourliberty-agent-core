@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 1009 — 2026-06-05 19:06 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 1 new alert (Tier-4 unreviewed-merge:366, tier-reset). 9/9 services active. All inboxes empty. 0 open PRs. Sync no-change. Audit series now 23 consecutive Larry-direct merges (PRs #343–#366).**
+
+Alert watermark: **1365 lines / 2026-06-05T19:00:37Z** (was 1364 / 18:37:31Z — +1 alert). Pipeline-stall heartbeat: 2026-06-05T19:01:25Z (✅ ~5 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T18:37:07Z (✅ ~29 min at scan; within 60-min threshold). Sync: status=no-change, commit=5b31316, last_sync=18:50:21Z — ✅ sync service run predates PR #366 merge; wrapper pulled a674423 subsequently; within 2h service threshold. Session-start gitStatus: branch=main, tree=clean, HEAD=a674423 "fix(durability): atomic writes + corrupt-state preservation (audit PR-E, subset) (#366)". Tier state at start: tier=1, consecutive_clean=2 (from iter 1008). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 1 Tier-4 unreviewed-merge:366 alert). `cycle_tier_state.py record --checks-clean false` → last_signal_at=2026-06-05T19:07:57Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert — Tier 4, tier-reset.** Watermark advanced 1364→1365.
+  - **Line 1365: `unreviewed-merge:366`** at 19:00:37Z — source=heal-unreviewed-merge-detector, route=escalate; beacon-bot DM delivered. PR #366 "fix(durability): atomic writes + corrupt-state preservation (audit PR-E, subset)" merged by Larry-Yatch; no Mirror review. **Tier 4, tier-reset.** ⚠️ Extends audit series to **23 consecutive** Larry-direct unreviewed merges (PRs #343–#366). Actor-exemption-config dispatch still pending Larry's `go: actor-exemption-config`.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active Telegram session. Pulse inbox empty. No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T19:01:25Z (~5 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T18:37:07Z (~29 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=a674423 "fix(durability): atomic writes + corrupt-state preservation (audit PR-E, subset) (#366)". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T18:50:21Z (~16 min at scan). Service run predates PR #366 merge; wrapper pulled a674423 after that. Local=remote. Within 2h service threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Nominal.** 0 open PRs in ourliberty-agent-core (PR #365 merged; PR #366 merged). 0 in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 23 consecutive (PRs #343–#366).** Dispatch `actor-exemption-config` still pending Larry's `go: actor-exemption-config`. No other G-rule changes.
+
+- **PRIME DIRECTIVE ratio:** interventions=724, systemic_fixes=16, ratio≈45.3. No new always-fix actions this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 1 new alert: `unreviewed-merge:366` (Tier 4, tier-reset; PR #366 Larry-direct merge = 23rd consecutive in audit series; beacon-bot DM already delivered by outbox-notifier).
+3. Confirmed 9/9 services active, all inboxes empty, 0 open PRs, both heartbeats nominal, sync nominal.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=19:07:57Z.
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter (unreviewed-merge:366 DM was already delivered by beacon-bot via outbox-notifier; no additional Pulse DM needed for known-pattern). Standing items carry forward:
+- `[red]` PRs #343–#366 audit-series (23 total) Larry-direct unreviewed merges. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 57th+ total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Audit series continues: 23 consecutive Larry-direct merges (PRs #343–#366). PR #366 closed the last open PR from iter 1008's watch. No new systemic patterns this iter; all noise is known-pattern category.
+
+---
+
 ## Iteration 1008 — 2026-06-05 18:56 UTC (interactive, Tier 1 — CLEAN)
 
 **Health:** ✅ **Tier 1 — consecutive_clean=2. 0 new alerts. 9/9 services active. All inboxes empty. PR #365 OPEN (CLEAN/MERGEABLE, ~13 min old — below 30-min threshold). Sync self-recovered.**
