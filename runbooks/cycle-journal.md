@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 994 — 2026-06-05 17:15 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 2 new alerts. 9/9 services active. All inboxes empty. 3 open PRs (#355, #356, #357) below 30-min threshold. 1 sync error (self-recovering).**
+
+Alert watermark: **1344 lines / 2026-06-05T17:10:10Z** (was 1342 lines / 17:00:30Z — 2 new alerts). Pipeline-stall heartbeat: 2026-06-05T17:11:11Z (✅ ~4 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:06:55Z (✅ ~8 min at scan; within 60-min threshold). Sync: status=error, commit=2fb56ffd, last_sync=2026-06-05T16:50:18Z (~25 min) — SYNC-PUSH-REBASE-FALLBACK-001 56th occurrence; self-recovering at ~17:50Z hourly tick. Session-start gitStatus: branch=main, tree=clean, HEAD=dcf9b28 "Pulse cycle 20260605T171253Z" (iter 993 wrapper commit). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (tier-reset from Tier-4 unreviewed-merge:353 alert).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts.** Watermark advanced 1342→1344. New alerts:
+  - Line 1343: `heal-stale-daemon-code auto-restarted:ourliberty-dashboard-api.service` (17:07:00Z) — `triage_decisions.py` mtime newer after PR #354 merged (commit a6343ec updated `triage_decisions.py`); healer correctly restarted dashboard-api with new code. By-design success event. beacon-bot: route=digest, no DM (idx=1342 at 17:08:14Z). **Tier 3 (known-pattern, auto-restarted:* by-design cluster)** → no tier-reset.
+  - Line 1344: `heal-unreviewed-merge-detector unreviewed-merge:353` (17:10:10Z) — PR #353 "fix(dispatch): sanitize inbox/outbox path components against traversal (PR-A)" merged by Larry-Yatch, no Mirror review. **14th consecutive Larry-direct unreviewed merge in audit-PR series** (PR #353 merged after #354 per git log — commit 1a51e04 is newer than a6343ec). beacon-bot DM delivered to Larry (idx=1343 at 17:13:35Z). **Tier 4** → tier-reset. Standing [red] escalation extended to 14 merges.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '40 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last Larry message: 2026-06-04T02:48Z UTC. beacon-bot log shows automated routing only (idx=1342 digest/skip, idx=1343 DM delivered). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:11:11Z (~4 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:06:55Z (~8 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=dcf9b28 "Pulse cycle 20260605T171253Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=2fb56ffd, last_sync=16:50:18Z (~25 min). SYNC-PUSH-REBASE-FALLBACK-001 56th total; self-recovering at ~17:50Z hourly tick. HEAD=dcf9b28 is newer (wrapper push succeeded after sync service failure). Within 2h threshold. ⚠️ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. (dashboard-api restarted 17:07Z by stale-daemon-code; confirmed active post-restart.) ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ Watch — 3 open, all below 30-min threshold.**
+  - **PR #355** "fix(advancer): corroborate tier-3 title match against branch (audit #9, PR-C)" — age=~11 min at scan, CLEAN/MERGEABLE, autoMerge=null. Audit-PR series continuation.
+  - **PR #356** "fix(heal): anchor PR/issue resolution on referential #<n> only (audit §4)" — age=~10 min at scan, UNKNOWN/UNKNOWN. Below threshold. (UNKNOWN = GitHub caching; use `gh pr view 356` to validate before acting per MEMORY calibration.)
+  - **PR #357** "fix(auth): restore credentials on a truncated fresh login, not just a missing one" — age=~1 min at scan, CLEAN/MERGEABLE. NEW.
+  - ourliberty-dashboard: 0 PRs. ✅
+  - Next automated Tier-1 cycle will evaluate all 3 PRs for 30-min threshold.
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: count extended to 14.** PR #353 = 14th consecutive Larry-direct audit-PR merge without Mirror review (PRs #343–#354 = 13 previously; PR #353 merged after #354 = 14th). Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. PRs #355, #356, #357 open — if merged directly, count reaches 15–17.
+
+- **PRIME DIRECTIVE ratio: interventions=722, systemic_fixes=16, ratio≈45.1.** No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 2 new alerts: 1 Tier-3 (auto-restarted:dashboard-api, no tier-reset) + 1 Tier-4 (unreviewed-merge:353, tier-reset; DM already delivered by beacon-bot 17:13:35Z).
+3. Confirmed 9/9 services active, all inboxes empty, 3 open PRs below 30-min threshold, both heartbeats healthy.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter (beacon-bot delivered unreviewed-merge:353 DM at 17:13:35Z). Standing items carry forward:
+- `[red]` PRs #343–#353 audit-series (14 total) Larry-direct unreviewed merges — standing from iter 967, extended through PR #353. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 56th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1 — consecutive_clean=0. PR #353 merged by Larry immediately after iter 993 (14th consecutive unreviewed audit-PR merge in the series). dashboard-api restarted by stale-daemon-code (expected by-design; PR #354 updated triage_decisions.py). Audit-PR series continues; PRs #355, #356, #357 open. Sync error self-recovering at ~17:50Z.
+
+---
+
 ## Iteration 993 — 2026-06-05 17:09 UTC (interactive, Tier 2 → Tier 1 reset — SIGNAL)
 
 **Health:** ⚠️ **Tier 2 → Tier 1 reset (consecutive_clean=0). 7 new alerts. 8/8 services active. All inboxes empty. 2 open PRs (#355, #356) below 30-min threshold. 1 sync error (self-recovering).**
