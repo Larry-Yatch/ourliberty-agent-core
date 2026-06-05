@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 962 — 2026-06-05 06:46 UTC (interactive, Tier 1→2 — CLEAN + de-escalate)
+
+**Health:** ✅ **Tier 1→2 — CLEAN. 3rd consecutive clean iter → de-escalated to Tier 2. 1 new alert (Tier-3 FYI, no tier-reset). 8/8 services active. All inboxes empty. PR #344 OPEN (< 30 min, watch). PR #335 healing holds. outbox-notifier live with PR #343 code.**
+
+Alert watermark: **1318 lines** (was 1317 iter 961 — 1 new: stale-daemon auto-restart of outbox-notifier at 06:33:24Z). Pipeline-stall heartbeat: 2026-06-05T06:45:09Z (✅ ~1 min at scan). Stale-daemon heartbeat: 2026-06-05T06:33:19Z (✅ ~13 min at scan; within 60-min threshold). Sync: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z (✅ ~57 min at scan; within 2h threshold). Tier state at start: tier=1, consecutive_clean=2. Tier state at end: **tier=2, consecutive_clean=0** (3rd clean iter triggered Tier-1→Tier-2 de-escalation via `cycle_tier_state.py record --checks-clean true`).
+
+**Found:**
+
+- **(Check 0) Alert triage: ℹ️ 1 new alert — Tier-3 FYI, no tier-reset.** Watermark 1317→1318 (+1).
+  - `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, ts=06:33:24Z, route=digest` — stale-daemon healer correctly detected that `outbox_notifier.py` was updated by PR #343 (script mtime 309.4 min newer than service active-since at 01:01:21Z) and restarted the service. New code live at 06:33:24Z.
+  - Classification: **Tier-3 FYI by analysis** (expected-by-design; successful enforcement event per WARN-vs-INFO calibration — "the rule worked as designed"; `heal-stale-daemon-code` source has no translations in `config/alert-translations.json` — G-rule 3/3 dispatched iter 592, Forge brief still missing). NO tier-reset. FYI.
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd logs in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 06:45:09Z (~1 min at scan; ✅ well within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 06:33:19Z (~13 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=7b99941 "Pulse cycle 20260605T063445Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z (57 min, within 2h). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. outbox-notifier restarted 06:33:24Z (new PR #343 code live). ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ PR #344 OPEN — watch, < 30 min.**
+  - `gh pr list` → `[{"number":344,"title":"fix(safety): paid re-run on outbox fail, dashboard action TOCTOU, medic fingerprint substring (audit PR E)","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN"}]`
+  - Created 2026-06-05T06:39:02Z by Larry-Yatch, branch `fix/nervous-system-audit-pr-e-misc-safety`. autoMergeRequest=null, reviewDecision="".
+  - Age at scan: ~4 min. **30-min auto-merge threshold: 07:09Z.** Mirror review not in-flight (Mirror inbox=0, outbox-notifier just restarted — any pre-restart in-flight dispatch would be in the archive; none observed).
+  - Action at threshold: `gh pr merge 344 --auto --squash` (always-fix `enable-pr-auto-merge`).
+  - **[yellow] observation:** PR #343 (same author, similar audit-PR pattern) was merged without Mirror review → `heal-unreviewed-merge-detector` fired `[red]` tier-NOW at iter 959. PR #344 has no Mirror review in-flight. If Larry merges directly, another `[red]` will fire. Recommend routing to Mirror or confirming intent. (See escalation below.)
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark 1317→1318; new line is stale-daemon restart (not tier2_weekly_probe_failed). 0 new probe-failed alerts since last watermark. Next probe expected ~09:00Z (6h cadence). Watch continues. ✅
+
+- **PR #343 [red] escalation:** Standing (iter 959). Larry response still pending.
+
+- **PRIME DIRECTIVE ratio update:** Ledger tail shows `systemic_fix` row at 04:45:29Z for iter 952 (cleanup-stale-worktrees G-rule dispatch → PR #339 MERGED ✅). Previous MEMORY count was 13 systemic_fixes; actual is **14**. Interventions: **721** (iter 959 intervention row). **New ratio: 721/14 ≈ 51.5** (improved from 55.4 — PR #339's G-rule close added a systemic_fix credit).
+
+- **G-rule updates:** No new occurrences for any active G-rules. All carry forward.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified Check 0 alert (`auto-restarted:ourliberty-outbox-notifier.service`) as Tier-3 FYI by analysis — expected, no tier-reset.
+3. Noted PR #344 OPEN (< 30 min, no action yet). Flagged [yellow] for Larry.
+4. `cycle_tier_state.py record --checks-clean true` → tier promoted 1→2, consecutive_clean=0. ✅
+5. Wrote journal entry + MEMORY update.
+
+**Escalated:**
+- `[yellow]` PR #344 open without Mirror review in-flight. Created 06:39:02Z by Larry-Yatch ("fix(safety): paid re-run on outbox fail, dashboard action TOCTOU, medic fingerprint substring (audit PR E)"). Given PR #343 triggered `[red]` unreviewed-merge alert: recommend routing PR #344 to Mirror before merge, or confirm intent to bypass. Auto-merge will engage at 07:09Z if still CLEAN. If direct-merge is planned, the detector will fire (by-design per `never_silence=true`).
+- Prior standing items carry forward:
+  - `[red]` PR #343 unreviewed-merge — Larry confirmation still pending.
+  - `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` open.
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+  - APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** 3rd consecutive clean iter → Tier-1 de-escalated to Tier-2 (15-min cadence). PRIME DIRECTIVE ratio corrected to 51.5 (better than logged 55.4 — iter 952's G-rule dispatch was missing from MEMORY count). PR #344 follows the same pattern as PR #343 (Larry-direct audit PRs, no Mirror routing). Watching for repeat unreviewed-merge event; escalated to Larry.
+
+---
+
 ## Iteration 961 — 2026-06-05 06:33 UTC (interactive, Tier 1 — clean)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change. 1 more clean iter → Tier 2 de-escalation.**
