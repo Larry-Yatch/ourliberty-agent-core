@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 985 — 2026-06-05 13:42 UTC (interactive, Tier 3 — CLEAN)
+
+**Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=8. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
+
+Alert watermark: **1333 lines / 2026-06-05T08:04:15Z** (unchanged from iter 984 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T13:39:45Z (✅ ~2 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T13:35:45Z (✅ ~6 min at scan; within 60-min threshold). Sync: status=no-change, commit=846da50 (1 commit behind HEAD=2ac61cc; iter 984 wrapper commit not yet synced — self-clears hourly tick), last_sync=2026-06-05T12:50:16Z (~52 min). Session-start gitStatus: branch=main, tree=clean, HEAD=2ac61cc "Pulse cycle 20260605T130841Z" (iter 984 wrapper commit). Tier state at start: tier=3, consecutive_clean=7. Tier state at end: **tier=3, consecutive_clean=8**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark timestamp 2026-06-05T08:04:15Z unchanged — 0 new alerts since iter 984. Line count 1333 (stable). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '35 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session. No new Larry directives since June 4 20:48 MDT (02:48Z June 5). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T13:39:45Z (~2 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T13:35:45Z (~6 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** gitStatus: branch=main, tree=clean, HEAD=2ac61cc "Pulse cycle 20260605T130841Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, commit=846da50 (1 commit behind HEAD=2ac61cc), last_sync=2026-06-05T12:50:16Z (~52 min). Iter 984 wrapper push ahead of sync tick — self-clears hourly. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open.** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch: ✅ 2 clean probe cycles achieved.** Checked tier2_weekly_probe_failed entries in larry-alerts.jsonl: last occurrence was 2026-06-05T00:01:10Z (pre-merge; PR #335 merged 03:00:27Z). No probe-failed alert at 06:01Z (1st post-merge probe) and no probe-failed alert at 12:01Z (2nd post-merge probe) — both clean. Line count still 1333 at 13:42Z confirms no 12:01Z failure. 2-clean-probe-cycle condition MET ✅. 12h closure mark ~15:00Z today (~1.3h away). Watch: next iter can close APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` if 15:00Z passes clean.
+
+- **G-rule updates:** No new occurrences. All G-rules carry forward unchanged from iter 984.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=13, ratio≈55.5, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty, 0 open PRs.
+3. Verified PR #335 healing: 2 consecutive clean tier2_weekly_probe cycles (06:01Z + 12:01Z both silent) — condition nearly met for APPROVAL_REQUEST closure at 15:00Z mark.
+4. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=8. ✅
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PRs #343–#350 audit-series (9 total) unreviewed-merge — standing from iter 967. **Larry: confirm direct audit-PR merges are intentional. Reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — 2 clean probe cycles achieved; awaiting 15:00Z 12h mark to formally close.
+
+**Patterns:** Tier 3, consecutive_clean=8. Eighth consecutive clean iter. Both healer heartbeats fresh (pipeline-stall ~2 min, stale-daemon ~6 min at scan). System holding steady. PR #335 healing on track — 2 clean probe cycles observed, 12h closure mark at ~15:00Z.
+
+---
+
 ## Iteration 984 — 2026-06-05 13:07 UTC (interactive, Tier 3 — CLEAN)
 
 **Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=7. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
