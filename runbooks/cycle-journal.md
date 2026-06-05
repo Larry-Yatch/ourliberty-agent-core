@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 940 — 2026-06-05 02:21 UTC (interactive)
+
+**Health:** ⚠️ **Tier 2 → Tier 1 (signal). consecutive_clean=2→0. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts (Check 0). Pipeline STALLED — Mirror review session wedged.**
+
+Alert watermark: **1308 lines / 2026-06-05T02:25:21Z** (1 new: pulse-escalation/mirror-poll-loop-wedge-iter940 — this iter's own escalation). Prior incoming watermark: 1307 lines / 01:05:44Z (unchanged from iter 939 — 0 incoming alerts). Pipeline-stall heartbeat: 2026-06-05T02:13:19Z (✅ ~8 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T02:01:43Z (✅ ~20 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=982bbdd5, last_sync=01:49:07Z (~32 min at cycle start; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=a7f84cd "Pulse cycle 20260605T020925Z". Tier state at start: tier=2, consecutive_clean=2. Tier state at end: **tier=1, consecutive_clean=0** (signal found — Tier-reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Prior watermark 1307 / 01:05:44Z unchanged — 0 new incoming alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ STALLED.** heal-pipeline-stall heartbeat = 02:13:19Z (~8 min — technically OK), but the inbox-watcher (PID 4075378) is itself **stuck** waiting for Mirror's claude session (PID 44633) to exit. Mirror's claude session has been running since 00:39:12Z UTC (102 min). Root cause: Mirror's review session spawned a background bash poll loop (PID 46961) via a `Bash` tool call. The loop uses `until [ ! -d /proc/$(pgrep -f '[t]est_regression_check.py' | head -1) ]`. `test_regression_check.py` has finished (pgrep returns empty); with empty substitution, the path becomes `/proc/` which is always a directory; `until` condition never succeeds; loop never exits. claude (PID 44633) is waiting for the bash tool to return; inbox-watcher (PID 4075378) is waiting for claude. Session log last modified 00:45:06Z (6 min after session start) — Mirror's actual review work likely completed; it's the trailing poll loop that's stuck. PR #334 (the target of the review) **already merged at 01:09:33Z** — review verdict is moot. This is the post-cycle-exit-discipline anti-pattern from `agents/mirror/CLAUDE.md`. **Classification: ask-then-do. Tier-reset.** ⚠️
+
+- **(Check 4) Pending Larry directives: ⚠️ ESCALATION THRESHOLD MET.** Mirror inbox: `review-build-unreviewed-merge-detector-20260605T000816Z.json` — inbox-watcher started Mirror's session at 00:39:12Z; now 102 min old. This is the iter 939 escalation watch trigger. inbox-watcher log: zero entries since 00:39:12Z — confirmed blocked on Mirror's claude process exit. Forge=0, Beacon=0, Pulse=0. **Classification: ask-then-do.** ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 02:01:43Z (~20 min; within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=a7f84cd "Pulse cycle 20260605T020925Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, last_sync=01:49:07Z (32 min old; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ⚠️ 8/8 systemd-active — but inbox-watcher effectively stuck.** All 8 units report `active` from systemctl. However: ourliberty-inbox-watcher PID 4075378 has been log-silent since 00:39:12Z (~102 min) — confirmed blocked awaiting Mirror's PID 44633. System capacity for new task dispatch is zero until Mirror's session resolves. **Classification: escalated via Check 3/4.** ⚠️
+
+- **(Check D) Forge/agent inboxes: ⚠️ Mirror=1 (stuck; same as Check 3/4).** Forge=0, Beacon=0, Pulse=0. ⚠️
+
+- **(Check E) PRs: ✅ Clean.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **NEW (this iter): `heal-wedged-review-sessions Case 2 not graduated — poll-loop-wedge auto-kill blocked`: G-rule 1/3.** Root cause of this iter's stall: Mirror's session spawned a bash poll loop that got stuck when the monitored process finished (empty pgrep → `/proc/` always a dir). `heal-wedged-review-sessions` detected the silent worktree at 01:05:44Z and fired a warning but didn't kill (Case 2 not yet graduated). At 3/3: dispatch Beacon to spec Case 2 graduation — auto-kill when worktree files unchanged for >N min AND no active claude process writing to the session log AND worktree branch exists (prevents false-kill on legitimate long-running reviews). Note: different from existing `wedged-review-silent-wt:* not in alert-translations.json` G-rule (that's about alert noise; this is about the healer not acting).
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; unchanged — no new occurrence this iter because the 01:05:44Z alert was already within prior watermark).
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (unchanged).
+  - All other G-rules: unchanged from iter 939.
+
+- **PRIME DIRECTIVE ratio:** interventions=719 (added 1 this iter), systemic_fixes=12, ratio≈59.9. `intervention` row appended 02:24:57Z (uncategorized:iter-0; tag: mirror-poll-loop-wedge). `cycle_tier_state.py record --checks-clean false` → tier=2→1, consecutive_clean=0, last_signal_at=2026-06-05T02:24:58Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Diagnosed Mirror session wedge: claude PID 44633 stuck in bash poll loop PID 46961 (empty `pgrep → /proc/` never exits). inbox-watcher blocked 102 min.
+3. `cycle_prime_ledger.py append --tier 1 --kind intervention` → recorded 02:24:57Z. ✅
+4. `cycle_tier_state.py record --checks-clean false` → tier=2→1, consecutive_clean=0. ✅
+5. Sent `[yellow]` escalation via `larry_alerts.append_alert` (source=pulse-escalation, subject=mirror-poll-loop-wedge-iter940, route=escalate). Written to larry-alerts.jsonl at 02:25:21Z (line 1308).
+6. Wrote journal entry.
+
+**Escalated:**
+- **NEW [yellow]** `mirror-poll-loop-wedge-iter940`: Mirror review session (claude PID 44633) stuck 102 min; inbox-watcher blocked. Suggested: `kill 46961` to unblock poll loop (Option A, more surgical), or `kill 44633` to fail the Mirror session and allow inbox-watcher to retry (Option B). PR #334 already merged — retry harmless but noisy. Larry approves which option to proceed.
+- Standing items carry forward:
+  - `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+  - `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+  - `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** Mirror review session (build-unreviewed-merge-detector, PR #334) wedged in a bash poll loop anti-pattern 102 min. Same class as PR #101 incident (2026-05-25). `heal-wedged-review-sessions` healer detected at 01:05:44Z but Case 2 auto-kill not yet graduated — healer can warn but cannot act. inbox-watcher blocked — system has zero task dispatch capacity until Mirror's session resolves. New G-rule 1/3 for Case 2 graduation. Tier-reset to Tier 1.
+
+---
+
 ## Iteration 939 — 2026-06-05 02:07 UTC (interactive)
 
 **Health:** ✅ **Tier 2 clean. consecutive_clean=1→2. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ no-change (fully current).**
