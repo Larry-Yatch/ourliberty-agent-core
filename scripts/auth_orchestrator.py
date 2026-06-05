@@ -21,7 +21,7 @@ to CODE_FILE, reads the URL from URL_FILE); only the file HANDLING is hardened.
 Import is side-effect-free: the executable flow lives under main()/__main__, so
 the helpers can be unit-tested without spawning `claude auth login`.
 """
-import os, pty, subprocess, time, select, sys, re, stat, errno, shutil, atexit
+import os, pty, subprocess, time, select, sys, re, stat, errno, shutil, atexit, json
 
 EMAIL = "agent.beacon.ourliberty@gmail.com"
 URL_FILE = "/tmp/auth-url.txt"
@@ -104,21 +104,65 @@ def log(msg):
     _write_private(LOG_FILE, f"[{time.time():.2f}] {msg}\n", append=True)
 
 
+def _is_valid_credentials_file(path):
+    """True iff `path` is a non-empty *regular file we own* that parses as JSON —
+    i.e. a complete credentials file, not the zero-byte/truncated remnant of a
+    login killed mid-write. Uses O_NOFOLLOW + regular-file + same-owner checks,
+    consistent with the rest of this script, so a symlink planted at the
+    credentials path can't point at some valid JSON and fake a finished login
+    (which would suppress the restore). The credentials file is always JSON, so
+    a parse failure (or empty content) is a reliable 'not a finished login'
+    signal."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return False
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != os.getuid():
+            return False
+        return bool(json.loads(os.read(fd, 1 << 20).decode("utf-8", errors="replace")))
+    except (OSError, ValueError):
+        return False
+    finally:
+        os.close(fd)
+
+
 def _maybe_restore_credentials(cred_backup, cred_file, log_fn=log):
-    """Restore the moved-aside credentials iff we made a backup and no fresh
-    credentials file exists — i.e. the run aborted (URL scrape failed, code
-    timed out, crash) before `claude auth login` wrote a new file. Without this,
-    a failed run leaves the Tier 1 account with NO credentials. A successful run
-    leaves a fresh cred_file in place, so we keep our hands off it. Returns True
-    iff a restore actually happened."""
-    if cred_backup and not os.path.exists(cred_file):
+    """Restore the moved-aside credentials unless the run produced a *valid*
+    fresh credentials file. We made a backup iff the live Tier 1 account had
+    credentials we moved aside before login; if the run aborted (URL scrape
+    failed, code timed out, crash) it leaves either no file or a truncated one,
+    and either way the Tier 1 account would be left with NO usable credentials.
+
+    Gating on validity, not mere existence, matters: a login killed mid-write of
+    ~/.claude/.credentials.json leaves a zero-byte/corrupt file that the old
+    existence check treated as 'fresh login succeeded', suppressing the restore
+    and stranding the account. Returns True iff a restore actually happened.
+
+    Runs as an atexit handler, so it must never raise: os.replace does the
+    restore atomically (no unlink->move window where the file could vanish, and
+    it overwrites a stale remnant or a planted symlink-name in one step), and all
+    logging is best-effort so a failing logger (e.g. a hostile /tmp) can't turn
+    this into an uncaught double-fault."""
+    if not cred_backup:
+        return False
+    if _is_valid_credentials_file(cred_file):
+        return False  # a real fresh login wrote it — keep our hands off
+
+    def _safe_log(msg):
         try:
-            shutil.move(cred_backup, cred_file)
-            log_fn("restored pre-orchestrator credentials (run did not complete a fresh login)")
-            return True
-        except OSError as e:
-            log_fn(f"WARN: could not restore credentials backup {cred_backup!r}: {e}")
-    return False
+            log_fn(msg)
+        except Exception:
+            pass  # never let a logging failure escape the atexit handler
+
+    try:
+        os.replace(cred_backup, cred_file)
+    except OSError as e:
+        _safe_log(f"WARN: could not restore credentials backup {cred_backup!r}: {e}")
+        return False
+    _safe_log("restored pre-orchestrator credentials (run did not complete a valid fresh login)")
+    return True
 
 
 def _read_code_if_present():

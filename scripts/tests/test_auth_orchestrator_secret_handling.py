@@ -18,6 +18,7 @@ Run:
 """
 from __future__ import annotations
 
+import json
 import os
 import stat
 import subprocess
@@ -156,15 +157,80 @@ class RestoreCredentialsTest(unittest.TestCase):
         self.assertEqual(self.cred.read_text(), "ORIGINAL_CREDS")
         self.assertFalse(self.backup.exists())
 
-    def test_keeps_fresh_creds_from_successful_login(self):
-        self.backup.write_text("ORIGINAL_CREDS")
-        self.cred.write_text("FRESH_CREDS")  # login succeeded and wrote new file
+    def test_keeps_valid_fresh_creds_from_successful_login(self):
+        self.backup.write_text('{"orig": true}')
+        # A real login writes a complete JSON credentials file.
+        self.cred.write_text('{"accessToken": "fresh", "refreshToken": "r"}')
         restored = auth_orchestrator._maybe_restore_credentials(
             str(self.backup), str(self.cred), log_fn=self._noop_log
         )
         self.assertFalse(restored)
-        self.assertEqual(self.cred.read_text(), "FRESH_CREDS")  # not clobbered
+        self.assertIn("fresh", self.cred.read_text())  # not clobbered
         self.assertTrue(self.backup.exists())  # backup preserved as artifact
+
+    def test_restores_over_truncated_fresh_creds(self):
+        # A login killed mid-write leaves a corrupt/partial JSON file. The old
+        # existence-only check treated that as success and stranded the account;
+        # validity-gating must restore over it.
+        self.backup.write_text('{"orig": true}')
+        self.cred.write_text('{"accessToken": "fre')  # truncated JSON
+        restored = auth_orchestrator._maybe_restore_credentials(
+            str(self.backup), str(self.cred), log_fn=self._noop_log
+        )
+        self.assertTrue(restored)
+        self.assertEqual(json.loads(self.cred.read_text()), {"orig": True})
+        self.assertFalse(self.backup.exists())
+
+    def test_restores_over_empty_fresh_creds(self):
+        self.backup.write_text('{"orig": true}')
+        self.cred.write_text("")  # zero-byte remnant
+        restored = auth_orchestrator._maybe_restore_credentials(
+            str(self.backup), str(self.cred), log_fn=self._noop_log
+        )
+        self.assertTrue(restored)
+        self.assertEqual(json.loads(self.cred.read_text()), {"orig": True})
+        self.assertFalse(self.backup.exists())
+
+    def test_symlinked_cred_file_does_not_suppress_restore(self):
+        # A symlink at the credentials path pointing to valid JSON must NOT count
+        # as a finished login (O_NOFOLLOW), so the backup is still restored and
+        # the decoy target is left untouched.
+        self.backup.write_text('{"orig": true}')
+        decoy = self.tmp / "decoy.json"
+        decoy.write_text('{"accessToken": "decoy"}')
+        os.symlink(str(decoy), str(self.cred))
+        restored = auth_orchestrator._maybe_restore_credentials(
+            str(self.backup), str(self.cred), log_fn=self._noop_log
+        )
+        self.assertTrue(restored)
+        self.assertFalse(self.cred.is_symlink())  # symlink name was replaced
+        self.assertEqual(json.loads(self.cred.read_text()), {"orig": True})
+        self.assertFalse(self.backup.exists())
+        self.assertEqual(json.loads(decoy.read_text()), {"accessToken": "decoy"})
+
+    def test_empty_json_object_is_not_a_finished_login(self):
+        # A real credentials file always carries tokens; an empty object is not a
+        # usable login, so restoring the backup over it is the safe choice.
+        self.backup.write_text('{"orig": true}')
+        self.cred.write_text("{}")
+        restored = auth_orchestrator._maybe_restore_credentials(
+            str(self.backup), str(self.cred), log_fn=self._noop_log
+        )
+        self.assertTrue(restored)
+        self.assertEqual(json.loads(self.cred.read_text()), {"orig": True})
+
+    def test_restore_survives_a_failing_logger(self):
+        # The handler runs at atexit and must never raise: a logger that throws
+        # (e.g. a hostile /tmp) must not mask a successful restore.
+        def boom(*_a, **_k):
+            raise PermissionError("logger down")
+        self.backup.write_text('{"orig": true}')
+        # no fresh cred file => restore path
+        restored = auth_orchestrator._maybe_restore_credentials(
+            str(self.backup), str(self.cred), log_fn=boom
+        )
+        self.assertTrue(restored)
+        self.assertEqual(json.loads(self.cred.read_text()), {"orig": True})
 
     def test_noop_when_no_backup_was_made(self):
         # No pre-existing creds => no backup => nothing to restore.
