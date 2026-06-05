@@ -477,10 +477,10 @@ class TestDrainOnce(_IsolatedAgentsRoot):
         buffer = ces.EventBuffer(path=Path(self._tmp) / 'state' / 'buf.jsonl')
         cursors = {}
         pulse_cursor = ces.PulseCursor()
-        stats, _new_pulse = ces.drain_once(
+        stats, _new_pulse, _jc = ces.drain_once(
             sink, buffer, cursors, pulse_cursor,
             ces._setup_logging(),
-            journal_iter_fn=lambda: iter(journal_records),
+            journal_iter_fn=lambda: iter([(r, f"jc{i}") for i, r in enumerate(journal_records)]),
             pulse_path=pulse_path, outbox_log_path=outbox_log,
             larry_alerts_path=larry_path,
             sentinel_alerts_path=sentinel_path,
@@ -507,7 +507,7 @@ class TestDrainOnce(_IsolatedAgentsRoot):
         buffer = ces.EventBuffer(path=Path(self._tmp) / 'state' / 'buf.jsonl')
         cursors = {}
         pulse_cursor = ces.PulseCursor()
-        stats1, new_pulse = ces.drain_once(
+        stats1, new_pulse, _jc = ces.drain_once(
             sink, buffer, cursors, pulse_cursor, ces._setup_logging(),
             journal_iter_fn=self._empty_journal,
             pulse_path=pulse_path,
@@ -517,7 +517,7 @@ class TestDrainOnce(_IsolatedAgentsRoot):
         )
         self.assertEqual(stats1.pulse_escalations, 1)
         # Same content -> no new events on second drain.
-        stats2, _ = ces.drain_once(
+        stats2, _, _ = ces.drain_once(
             sink, buffer, cursors, new_pulse, ces._setup_logging(),
             journal_iter_fn=self._empty_journal,
             pulse_path=pulse_path,
@@ -536,7 +536,7 @@ class TestDrainOnce(_IsolatedAgentsRoot):
         sink = _MockSink(raise_on_insert=True)
         buffer = ces.EventBuffer(path=Path(self._tmp) / 'state' / 'buf.jsonl')
         cursors = {}
-        stats, _ = ces.drain_once(
+        stats, _, _ = ces.drain_once(
             sink, buffer, cursors, ces.PulseCursor(), ces._setup_logging(),
             journal_iter_fn=self._empty_journal,
             pulse_path=Path(self._tmp) / 'blackboard' / 'pulse-absent.json',
@@ -615,7 +615,7 @@ class TestDrainOnce(_IsolatedAgentsRoot):
                 path=Path(self._tmp) / 'state' / 'buf.jsonl',
                 max_lines=2, max_bytes=10**9,
             )
-            stats, _ = ces.drain_once(
+            stats, _, _ = ces.drain_once(
                 sink, buffer, {}, ces.PulseCursor(), ces._setup_logging(),
                 journal_iter_fn=self._empty_journal,
                 pulse_path=Path(self._tmp) / 'blackboard' / 'absent.json',
@@ -641,9 +641,9 @@ class TestDrainOnce(_IsolatedAgentsRoot):
              'OURLIBERTY_AGENT': 'forge',
              'OURLIBERTY_TASK_ID': 'abc'},
         ]
-        stats, _ = ces.drain_once(
+        stats, _, _ = ces.drain_once(
             sink, buffer, {}, ces.PulseCursor(), ces._setup_logging(),
-            journal_iter_fn=lambda: iter(journal_records),
+            journal_iter_fn=lambda: iter([(r, f"jc{i}") for i, r in enumerate(journal_records)]),
             pulse_path=Path(self._tmp) / 'blackboard' / 'absent.json',
             outbox_log_path=Path(self._tmp) / 'logs' / 'absent.log',
             larry_alerts_path=Path(self._tmp) / 'blackboard' / 'a.jsonl',
