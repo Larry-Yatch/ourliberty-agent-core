@@ -263,6 +263,14 @@ def _load_rotation_config(models_file=None):
     if not isinstance(block, dict):
         return cfg
     cfg.update({k: v for k, v in block.items() if not k.startswith('_')})
+    # Audit #22: the master kill switch must fail safe. `enabled` is consumed
+    # via bool(cfg['enabled']), and bool() of any non-empty string is True — so
+    # a wrongly-typed JSON value (e.g. the string "false", a common quoted-bool
+    # typo) would silently ENABLE rotation, the exact opposite of intent.
+    # Normalize at the boundary: rotation is enabled only when the value is the
+    # JSON boolean `true`; every other type/value collapses to the safe default
+    # (disabled), consistent with this loader's stated posture.
+    cfg['enabled'] = cfg.get('enabled') is True
     return cfg
 
 

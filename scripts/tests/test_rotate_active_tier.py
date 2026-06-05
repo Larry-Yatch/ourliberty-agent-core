@@ -223,6 +223,37 @@ class DisabledKillSwitchTest(RotateTickBaseTest):
         self.assertEqual(result['action'], 'disabled')
 
 
+class EnabledTypeCoercionTest(RotateTickBaseTest):
+    """Audit #22: the master kill switch must fail safe against a wrongly-typed
+    `enabled`. bool('false') is True, so a quoted-boolean config typo used to
+    silently ENABLE rotation. Only a real JSON boolean true may arm it."""
+
+    def test_string_false_is_treated_as_disabled(self):
+        # {"enabled": "false"} — the natural quoted-boolean typo. Must NOT
+        # enable rotation: tick from tier2 should force tier1 (disabled path).
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled='false')
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['action'], 'disabled')
+        self.assertEqual(active_tier.read()['tier'], 'tier1')
+
+    def test_string_true_is_also_treated_as_disabled(self):
+        # Even a "truthy" string must not arm the kill switch — only a real bool.
+        self._set_rotation(enabled='true')
+        cfg = rotate_active_tier._load_rotation_config(self.models_file)
+        self.assertIs(cfg['enabled'], False)
+
+    def test_integer_one_is_treated_as_disabled(self):
+        self._set_rotation(enabled=1)
+        cfg = rotate_active_tier._load_rotation_config(self.models_file)
+        self.assertIs(cfg['enabled'], False)
+
+    def test_real_boolean_true_enables(self):
+        self._set_rotation(enabled=True)
+        cfg = rotate_active_tier._load_rotation_config(self.models_file)
+        self.assertIs(cfg['enabled'], True)
+
+
 class RuntimeOverrideTest(RotateTickBaseTest):
     """dashboard-rotation-switch-001: the ~/agents/rotation.disabled runtime
     override forces the scheduler off exactly like config enabled=false, even

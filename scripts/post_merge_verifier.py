@@ -162,6 +162,38 @@ def list_recent_merged_agent_prs() -> list[dict]:
     return [p for p in prs if any((p.get('headRefName') or '').startswith(prefix) for prefix in agent_prefixes)]
 
 
+def _tracking_matches(track_file, tracking: dict, pr_num: int, feature: str) -> bool:
+    """True if a ship-tracking file corresponds to this PR/feature (audit #44).
+
+    The upstream /ship writer is not in this fork, so the on-disk schema isn't
+    pinned here; match on any of the plausible identifiers so a real tracking
+    file is recognized while an unrelated one is skipped (falling through to
+    the briefing fallback). A bare PR number / feature slug is required — a file
+    with neither is treated as non-matching rather than a wildcard.
+    """
+    if not isinstance(tracking, dict):
+        return False
+    # PR number under any of the conventional keys.
+    for key in ('pr_num', 'pr_number', 'pr'):
+        val = tracking.get(key)
+        if val is not None:
+            try:
+                if int(val) == int(pr_num):
+                    return True
+            except (TypeError, ValueError):
+                pass
+    # Feature slug, via an explicit field or the filename stem.
+    if feature and feature != 'uncategorized':
+        if str(tracking.get('feature') or '').lower() == feature.lower():
+            return True
+        try:
+            if track_file.stem.lower() == feature.lower():
+                return True
+        except AttributeError:
+            pass
+    return False
+
+
 def find_originating_chat(pr_num: int, feature: str) -> int:
     """Look up the originating chat_id for a PR/feature.
 
@@ -182,11 +214,24 @@ def find_originating_chat(pr_num: int, feature: str) -> int:
         pass
 
     # Source 2: ship-tracking files (scan for matching feature)
+    #
+    # Audit #44: the loop used to return the FIRST ship-tracking file that had
+    # any originating_chat_id, ignoring `feature`/`pr_num` entirely — so with
+    # two concurrent /ship features it could deliver the verification briefing
+    # to the wrong operator chat. Require the tracking file to actually
+    # correspond to this PR/feature before trusting its chat_id; otherwise skip
+    # it and fall through to the briefing fallback (the documented safe
+    # default). Matching on any of the plausible identifiers keeps this robust
+    # to the tracking-file schema (the /ship writer lives upstream and is not
+    # in this fork, so ship-tracking is currently vestigial here — this is a
+    # fail-safe tightening that can only no-op to the fallback, never mis-route).
     try:
         if SHIP_TRACKING_DIR.exists():
             for track_file in sorted(SHIP_TRACKING_DIR.glob('*.json'), reverse=True):
                 with open(track_file) as f:
                     tracking = json.load(f)
+                if not _tracking_matches(track_file, tracking, pr_num, feature):
+                    continue
                 chat = tracking.get('originating_chat_id')
                 if chat:
                     return int(chat)
