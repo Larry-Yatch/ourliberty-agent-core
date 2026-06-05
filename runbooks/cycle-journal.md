@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 936 — 2026-06-05 01:24 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean. consecutive_clean=1→2. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ success.**
+
+Alert watermark: **1307 lines / 2026-06-05T01:05:44Z** (unchanged — 0 new alerts since iter 935 watermark). Pipeline-stall heartbeat: 2026-06-05T01:10:49Z (✅ ~14 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T01:01:19Z (✅ ~23 min at cycle start; within 60-min threshold). Sync: status=success, commit=6d40503, last_sync=2026-06-05T00:49:37Z (✅ ~35 min old; within 2h threshold; local HEAD ad3d725 "Pulse cycle 20260605T012237Z" newer — wrapper push from iter 935; self-clears on next hourly sync.timer). Session-start gitStatus: branch=main, tree=clean, HEAD=ad3d725 "Pulse cycle 20260605T012237Z". Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2** (clean iter — no actions taken; 1 more clean iter triggers de-escalation to Tier 2).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 0 new alerts since iter 935 watermark (1307 lines / 01:05:44Z; file remains 1307 lines). No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T01:10:49Z (~14 min at cycle start; ✅ within 90-min threshold). 0 new pr-create-inferred-failure alerts (now ~23-min quiet window since PR #332 merged at 01:01:10Z). G-rule watch: 2nd consecutive clean cycle → watching for healing. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active, not stalled.** Mirror=1 (review-build-unreviewed-merge-detector-20260605T000816Z.json — post-merge archive pending for PR #334; expected behavior). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T01:01:19Z (~23 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=ad3d725. ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=success, last_sync=2026-06-05T00:49:37Z (35 min old). Local HEAD newer — wrapper push from iter 935; self-clears on next hourly tick. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Mirror=1 (post-merge PR #334 archive task; expected). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Clean.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch (unchanged):**
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; unchanged).
+  - `heal-pipeline-stall:pr-create-inferred-failure false positive`: **1/3, watching for healing** — 2nd consecutive clean cycle post-PR #332 merge. Need 3 clean cycles total. Continue watching.
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (routing confirmed working via PR #334; watch 2 more source=larry builds before closing).
+  - All other G-rules: unchanged from iter 935.
+
+- **PRIME DIRECTIVE ratio:** interventions=718, systemic_fixes=12, ratio≈59.8 (iter_clean row appended 2026-06-05T01:24:24Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → recorded (01:24:24Z). ✅
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** System nominal. 0 new alerts, 0 open PRs, 8/8 services active. PR #332 quiet window now 23+ min with no pr-create-inferred-failure recurrence — 2nd consecutive clean cycle watching. consecutive_clean=2; one more clean iter de-escalates to Tier 2.
+
+---
+
 ## Iteration 935 — 2026-06-05 01:18 UTC (interactive)
 
 **Health:** ✅ **Tier 1 clean. consecutive_clean=0→1. 0 auto-fix actions. 8/8 services active. PR #334 MERGED (01:09:33Z ✅). 1 new alert (Tier-3 per actionable-only discipline). Sync: ✅ success.**
