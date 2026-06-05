@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 950 — 2026-06-05 03:52 UTC (interactive)
+
+**Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. Sync CLEAN (sync.timer cleared SYNC-PUSH-REBASE-FALLBACK). PR #336 opened at 03:43Z (~9 min old, below 30-min threshold, UNKNOWN state). 0 auto-fix actions.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 949). Pipeline-stall heartbeat: 2026-06-05T03:48:59Z (✅ ~3 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T03:32:02Z (✅ ~20 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=47f4a92, last_sync=03:49:16Z (✅ CLEAN — sync.timer fired and cleared the SYNC-PUSH-REBASE-FALLBACK error that persisted through iters 946–949). Tier state at start: tier=2, consecutive_clean=1. Tier state at end: **tier=2, consecutive_clean=2** (clean iter; 1 more needed for Tier 3 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z unchanged — 0 new alerts since iter 949. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 03:48:59Z (~3 min at cycle start; ✅ within 90-min threshold). All inboxes idle. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heartbeat = 03:32:02Z (~20 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=47f4a92 "Pulse cycle 20260605T033756Z". ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, commit=47f4a92, last_sync=03:49:16Z. ✅ Sync.timer fired between iters 949 and 950 and resolved the SYNC-PUSH-REBASE-FALLBACK that persisted through the rapid interactive session. Pattern cleared.
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ PR #336 OPEN — below 30-min threshold.** PR #336 "fix(heal): pipeline-stall retry reconciliation + kill the poll-loop wedge class" opened at 03:43:32Z (branch `fix/heal-pipeline-stall-retry-reconcile`). `gh pr list` initially showed DIRTY/CONFLICTING but `gh pr view 336` returns UNKNOWN/UNKNOWN (GitHub recomputing merge state; per calibration rule: UNKNOWN from gh pr view = defer, do NOT act). PR age ~9 min — below 30-min always-fix threshold. No Mirror review task dispatched yet (Mirror inbox=0, Forge outbox=empty, no recent Mirror archive entry). **Watch: if PR reaches 30 min without Mirror review dispatch or reaches CLEAN/MERGEABLE, re-evaluate next cycle.** PR scope: poll-loop wedge class fix (scripts/wait_for_pid.sh + 8 tests) + retry reconciliation hardening (series of 6 commits). This PR addresses G-rule `heal-wedged-review-sessions Case 2 not graduated` (2/3) at root. ourliberty-dashboard: 0 open PRs. ⚠️→WATCH
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** last artifact 2026-05-31 (~5d ago); next gate is Sunday 2026-06-07 → skip today (Friday). ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** No new `tier2_weekly_probe_failed` alerts. Watermark unchanged at 1309/02:43:28Z. Next probe fire expected ~09:00Z (6h cadence from 03:02:48Z first post-merge fire). Watch continues.
+
+- **G-rule watch:** All unchanged. PR #336 addresses the poll-loop wedge root cause; if it merges clean, G-rule `heal-wedged-review-sessions Case 2 not graduated` (2/3) may close as healed (systemic_fix record pending merge verification). All other G-rules: unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed sync CLEAN — sync.timer cleared SYNC-PUSH-REBASE-FALLBACK from iters 946–949.
+3. Noted PR #336 opened 03:43Z, UNKNOWN state, below 30-min threshold — no action taken; watch next cycle.
+4. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. All prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (1 clean probe so far; 2nd probe expected ~09:00Z).
+
+**Patterns:** Sync cleared (self-healed via hourly timer — expected). PR #336 is a major Forge build addressing the poll-loop wedge class at root with a safe primitive (`wait_for_pid.sh`); if it merges, it closes the G-rule that has been at 2/3 since iter 940. System at Tier 2, consecutive_clean=2 — one more clean iter de-escalates to Tier 3 (30-min cadence).
+
+---
+
 ## Iteration 949 — 2026-06-05 03:36 UTC (interactive)
 
 **Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=1. 0 new alerts. 0 open PRs. 8/8 services active. All inboxes empty. 0 auto-fix actions.**
