@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 1024 — 2026-06-05 21:06 UTC (interactive, Tier 1 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 1 (consecutive_clean=1). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1383 lines / 2026-06-05T21:00:20Z** (UNCHANGED — 0 new alerts since iter 1023 watermark 1383/21:00:20Z). Pipeline-stall heartbeat: 2026-06-05T20:55:58Z (✅ ~11 min at 21:06Z scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T20:37:49Z (✅ ~29 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T20:50:44Z (~16 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=e6f5f99 "Pulse cycle 20260605T210415Z". Tier state at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-05T21:02:26Z (iter 1023). Tier state at end: **tier=1, consecutive_clean=1**. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1383/21:00:20Z unchanged — 0 new alerts since iter 1023. Beacon-bot delivered DM for idx=1382 (unreviewed-merge:375) at 21:04:39Z as expected. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 21:04:39Z (idx=1382 delivered — unreviewed-merge:375 DM confirmed delivered post-iter-1023). No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T20:55:58Z (~11 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T20:37:49Z (~29 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=e6f5f99 "Pulse cycle 20260605T210415Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T20:50:44Z (~16 min at scan). Well within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ No open PRs.** Both agent-core and dashboard repos clean. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 32 consecutive (PRs #343–#375).** No new occurrences this iter. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat (script-authoritative). No new always-fix actions this iter → no ledger append.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts since iter 1023 watermark. Beacon-bot DM delivery for unreviewed-merge:375 confirmed.
+3. Confirmed 9/9 services active, all inboxes empty, both heartbeats nominal, sync nominal, no open PRs.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+5. Wrote journal entry.
+
+**Escalated:** None new. Standing items carry forward:
+- `[red]` PRs #343–#375 audit-series (32 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** All clean. 2 more clean iters needed to de-escalate from Tier 1 → Tier 2.
+
+---
+
 ## Iteration 1023 — 2026-06-05 21:02 UTC (interactive, Tier 1 — SIGNAL: 1 new unreviewed-merge alert; PR #375 merged Larry-direct)
 
 **Health:** ⚠️ **Tier 1 (tier-reset: 1 new unreviewed-merge alert in Check 0). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
