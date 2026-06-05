@@ -57,9 +57,16 @@ class FindRecentDispatchesTest(unittest.TestCase):
         self._write(f'x{SLUG}-extra.json')
         self.assertFalse(hsld.find_recent_dispatches(SLUG, [self.inbox]))
 
-    def test_short_slug_below_floor_does_not_match(self):
-        self._write('qc-1-20260605T010000Z.json')
-        self.assertFalse(hsld.find_recent_dispatches('qc-1', [self.inbox]))
+    def test_short_real_slug_still_matches_its_own_dispatch(self):
+        # Real loop slugs are legitimately short ('re-queue'=8, 'self-task'=9,
+        # 'queue-check'=11). A length floor would make these live loops read as
+        # dead and emit a spurious LOOP_DEATH_DETECTED, so the structured-name
+        # match uses min_len=1 — each slug still matches its own dispatch file.
+        for slug in ('re-queue', 'self-task', 'queue-check'):
+            self._write(f'{slug}-20260605T010000Z.json')
+        for slug in ('re-queue', 'self-task', 'queue-check'):
+            with self.subTest(slug=slug):
+                self.assertTrue(hsld.find_recent_dispatches(slug, [self.inbox]))
 
     def test_processed_dir_entry_is_skipped(self):
         # a *directory* (not a file) whose name contains the slug must not count

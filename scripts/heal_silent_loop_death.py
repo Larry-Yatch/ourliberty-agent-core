@@ -92,10 +92,17 @@ def find_recent_dispatches(slug_root: str, inboxes) -> bool:
     for inbox in inboxes:
         if not inbox.is_dir():
             continue
+        # The slug is matched as a whole, boundary-delimited token (audit #41) so
+        # an unrelated artifact that merely contains it as an infix no longer
+        # masks a dead loop. min_len=1 (no length floor): the filename is a
+        # STRUCTURED name and real loop slugs are legitimately short
+        # ('re-queue', 'self-task', 'queue-check' are all < 12), so a floor would
+        # make every such live loop read as dead and emit a spurious
+        # LOOP_DEATH_DETECTED.
         for f in inbox.iterdir():
             if not f.is_file() or not f.name.endswith(".json"):
                 continue
-            if id_matches(slug_root, f.name) and "-result" not in f.name:
+            if id_matches(slug_root, f.name, min_len=1) and "-result" not in f.name:
                 return True
         processed = inbox / "processed"
         if processed.is_dir():
@@ -104,7 +111,7 @@ def find_recent_dispatches(slug_root: str, inboxes) -> bool:
                 # non-.json entries (audit #41 — the processed/ branch lacked it).
                 if not f.is_file() or not f.name.endswith(".json"):
                     continue
-                if id_matches(slug_root, f.name) and "-result" not in f.name:
+                if id_matches(slug_root, f.name, min_len=1) and "-result" not in f.name:
                     try:
                         if (time.time() - f.stat().st_mtime) < STALE_MIN * 60:
                             return True
