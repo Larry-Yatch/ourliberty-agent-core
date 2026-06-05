@@ -2837,8 +2837,12 @@ def _handle_larry_action(
     # (unsilenced / kept-silenced / …) + fingerprint in the audit row.
     if reconcile_detail:
         action_payload.update(reconcile_detail)
+    # Audit #58: key the audit id on source_event_id too, so two distinct
+    # larry_actions on different source events sharing a task_id in the same
+    # microsecond produce distinct ids rather than silently dropping one row
+    # via ignore_duplicates.
     action_event_id = compute_event_id(
-        source_task_id, 'larry_action', ts_iso,
+        source_task_id, 'larry_action', ts_iso, extra=source_event_id,
     )
     row: dict[str, Any] = {
         'event_id': action_event_id,

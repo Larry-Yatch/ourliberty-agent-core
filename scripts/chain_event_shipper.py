@@ -188,15 +188,28 @@ def heartbeat() -> None:
 
 # -------------------- dedup hash + payload sanitization --------------------
 
-def compute_event_id(task_id: Optional[str], event_type: str, ts: str) -> str:
-    """Deterministic sha1 of (task_id|<none>, event_type, ts).
+def compute_event_id(
+    task_id: Optional[str], event_type: str, ts: str,
+    extra: Optional[str] = None,
+) -> str:
+    """Deterministic sha1 of (task_id|<none>, event_type, ts[, extra]).
 
     Per spec § 5.1: any writer (poller now, push-instrumented in a future
     PR) computes the same event_id for the same logical event. The PK
     absorbs double-inserts via ON CONFLICT DO NOTHING.
+
+    ``extra`` is an optional disambiguator appended only when truthy, so
+    existing callers (which omit it) hash exactly as before. Audit #58: the
+    dashboard's larry_action audit row keys on (task_id, 'larry_action', ts)
+    only, so two distinct actions on different source events sharing a task_id
+    that land in the same microsecond collide and one audit row is silently
+    dropped by ignore_duplicates. Passing the source_event_id as ``extra``
+    makes each action's audit id unique.
     """
-    raw = f'{task_id or ""}|{event_type}|{ts}'.encode('utf-8')
-    return hashlib.sha1(raw).hexdigest()
+    raw = f'{task_id or ""}|{event_type}|{ts}'
+    if extra:
+        raw += f'|{extra}'
+    return hashlib.sha1(raw.encode('utf-8')).hexdigest()
 
 
 def sanitize_payload(payload: Any) -> Any:

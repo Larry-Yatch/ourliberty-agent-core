@@ -48,12 +48,14 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 import cycle_prime_ledger as cpl
 import larry_alerts
+from atomic_io import atomic_write_json
 
 STATE_REL = 'state/alert-triage.json'
 LOG_REL = 'logs/alert-triage-state.log'
@@ -114,18 +116,65 @@ def _log(msg: str, level: str = 'INFO') -> None:
         pass
 
 
+def _preserve_corrupt_state(path: Path, raw: bytes) -> Optional[Path]:
+    """Move a corrupt state file aside to a unique timestamped sidecar.
+
+    Audit #37: returning {} on a parse error lets the very next _write_state
+    atomically clobber every other alert's lifecycle row. Instead, rename the
+    corrupt file to ``<name>.corrupt-<utc>`` (history recoverable for manual
+    repair) and ALERT, then let the caller treat the live state as empty so
+    triage isn't permanently stuck. Renaming (rather than copying) also means
+    the next read sees a missing file → {} cleanly, so only ONE backup is made
+    per corruption rather than one per tick. Best-effort: never raises.
+    """
+    backup: Optional[str] = None
+    try:
+        stamp = _now_iso().replace(':', '').replace('-', '')
+        # mkstemp reserves a guaranteed-unique name even within the same second.
+        fd, backup = tempfile.mkstemp(
+            prefix=f'{path.name}.corrupt-{stamp}-', suffix='',
+            dir=str(path.parent),
+        )
+        os.close(fd)
+        os.replace(path, backup)
+        _log(f'{path.name} CORRUPT ({len(raw)} bytes); preserved prior triage '
+             f'state at {Path(backup).name} before treating as empty', 'ERROR')
+        return Path(backup)
+    except OSError as e:
+        # Don't leave the empty mkstemp reservation behind if the rename failed.
+        if backup is not None:
+            try:
+                os.unlink(backup)
+            except OSError:
+                pass
+        _log(f'{path.name} corrupt and could not be preserved: {e}', 'ERROR')
+        return None
+
+
 def read_state() -> dict[str, dict[str, Any]]:
-    """Atomic read. Returns {} on missing or corrupt — callers can then
-    add the first row without losing prior data only when prior data was
-    unreadable (the alternative — refusing to write — would leave the
-    triage state permanently stuck after one bad write)."""
+    """Atomic read. Returns {} on missing or corrupt.
+
+    Audit #37: a single transient corruption used to return {} silently, and
+    the next write then clobbered every other alert's lifecycle row. On a
+    parse error we now PRESERVE the corrupt file to a timestamped sidecar and
+    alert before returning {}, so prior history is recoverable while triage
+    still makes forward progress (refusing to write would leave the triage
+    state permanently stuck after one bad write)."""
     path = _state_path()
     if not path.exists():
         return {}
     try:
-        data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        _log(f'{path.name} unreadable; treating as empty', 'WARN')
+        raw = path.read_bytes()
+    except OSError:
+        # Transient I/O failure — the file may be intact on disk. Treat as
+        # empty for this read but do NOT move it aside (we couldn't read its
+        # bytes to preserve them); the next successful read recovers it.
+        _log(f'{path.name} unreadable (I/O); treating as empty', 'WARN')
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        _preserve_corrupt_state(path, raw)
         return {}
     if not isinstance(data, dict):
         return {}
@@ -137,12 +186,9 @@ def read_state() -> dict[str, dict[str, Any]]:
 
 
 def _write_state(state: dict[str, dict[str, Any]]) -> None:
-    """Atomic tmp + replace. Never partial-file-write."""
-    path = _state_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True))
-    tmp.replace(path)
+    """Atomic write via a unique tmp + fsync + os.replace. Never partial-write
+    and never shares a tmp name with a concurrent writer (audit #62 class)."""
+    atomic_write_json(_state_path(), state, indent=2, sort_keys=True)
 
 
 def record_triage(alert_id: str, tier: int, decision: str,
@@ -246,11 +292,9 @@ def _read_executions_doc() -> dict[str, Any]:
 
 
 def _write_executions_doc(doc: dict[str, Any]) -> None:
-    path = _exec_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(doc, indent=2, sort_keys=True))
-    tmp.replace(path)
+    # Same unique-tmp + fsync atomic write as _write_state (audit #62 class):
+    # avoid a fixed <path>.tmp two writers could collide on.
+    atomic_write_json(_exec_path(), doc, indent=2, sort_keys=True)
 
 
 def load_executions() -> dict[str, list[dict[str, Any]]]:
