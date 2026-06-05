@@ -45,8 +45,8 @@ Safe-by-construction:
 """
 # Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
 from __future__ import annotations
+import os
 import re
-import shutil
 import sys
 import time
 from datetime import datetime, timezone
@@ -75,23 +75,36 @@ def log(level: str, msg: str) -> None:
         pass
 
 
-def _unique_archive_target(target: Path) -> Path:
-    """Pick a collision-free archive path when ``target`` already exists.
+def _atomic_archive_move(src: Path, target: Path) -> Path:
+    """Move ``src`` into the archive at ``target`` (or the next free
+    ``<name>-dupN``) — race-free — and return the final path.
 
-    Audit #54: ``shutil.move`` silently overwrites a same-named destination,
-    destroying the prior archived task and defeating the module's stated
-    "Move (not delete) — preserves audit trail" guarantee. If the timestamped
-    name recurs (the 14-digit prefix can repeat across restart-dedup of the
-    same task), fall back to ``<name>-dup1.json``, ``-dup2.json``, … so no
-    earlier archived copy is ever clobbered.
+    Audit #54 + PR-E2 residual: the previous ``if target.exists():`` guard then
+    ``shutil.move`` had a TOCTOU window — a concurrent writer or a parallel healer
+    run could create the destination between the existence check and the move, and
+    ``shutil.move`` would silently overwrite it, destroying a prior archived task
+    (defeating the module's "Move, not delete — preserves audit trail" guarantee).
+
+    ``os.link`` is an ATOMIC no-clobber primitive: it raises ``FileExistsError`` if
+    the destination already exists. We link-then-unlink, looping over ``-dupN``
+    suffixes — whoever wins the link owns that name; everyone else falls through to
+    the next free one, so no earlier archived copy is ever clobbered. Inbox and
+    archive live under the same agents tree (one filesystem), so the hardlink
+    always succeeds; a cross-device ``OSError`` propagates to the caller's archive-
+    failed handler rather than risking a clobber. A crash between link and unlink
+    leaves a harmless duplicate (src re-archived as ``-dup1`` next run), never loss.
     """
-    stem, suffix, parent = target.stem, target.suffix, target.parent
-    i = 1
+    candidate = target
+    i = 0
     while True:
-        candidate = parent / f"{stem}-dup{i}{suffix}"
-        if not candidate.exists():
-            return candidate
-        i += 1
+        try:
+            os.link(src, candidate)
+            break
+        except FileExistsError:
+            i += 1
+            candidate = target.parent / f"{target.stem}-dup{i}{target.suffix}"
+    os.unlink(src)
+    return candidate
 
 
 def main() -> int:
@@ -121,10 +134,8 @@ def main() -> int:
         if mtime > threshold:
             continue
         target = ARCHIVE_DIR / f.name
-        if target.exists():
-            target = _unique_archive_target(target)
         try:
-            shutil.move(str(f), str(target))
+            _atomic_archive_move(f, target)
             age_h = (now - mtime) / 3600
             log("HEALED", f"action=archive_restart_dedup_obsolete task={f.name} age_h={age_h:.1f}")
             healed += 1

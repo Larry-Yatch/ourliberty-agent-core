@@ -114,15 +114,33 @@ class TestRestartDedupNoClobber(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
 
-    def test_unique_target_sequence(self):
+    def test_atomic_move_into_free_target(self):
+        d = self.tmp
+        src = d / 'src.json'
+        src.write_text('X')
+        target = d / 'archive-me.json'
+        dest = hrd._atomic_archive_move(src, target)
+        self.assertEqual(dest, target)
+        self.assertEqual(target.read_text(), 'X')
+        self.assertFalse(src.exists(), 'source must be unlinked after the move')
+
+    def test_atomic_move_picks_next_free_name_without_clobber(self):
+        # os.link is atomic no-clobber: when the base name AND -dup1 already
+        # exist, the move lands at -dup2 and never overwrites a prior archive.
         d = self.tmp
         name = '20260504231311-build-foo.json'
-        (d / name).write_text('first')
-        t1 = hrd._unique_archive_target(d / name)
-        self.assertEqual(t1.name, '20260504231311-build-foo-dup1.json')
-        t1.write_text('second')
-        t2 = hrd._unique_archive_target(d / name)
-        self.assertEqual(t2.name, '20260504231311-build-foo-dup2.json')
+        (d / name).write_text('OLD-0')
+        (d / '20260504231311-build-foo-dup1.json').write_text('OLD-1')
+        src = d / 'src.json'
+        src.write_text('NEW')
+        dest = hrd._atomic_archive_move(src, d / name)
+        self.assertEqual(dest.name, '20260504231311-build-foo-dup2.json')
+        self.assertEqual(dest.read_text(), 'NEW')
+        self.assertFalse(src.exists())
+        # Prior archived copies untouched.
+        self.assertEqual((d / name).read_text(), 'OLD-0')
+        self.assertEqual(
+            (d / '20260504231311-build-foo-dup1.json').read_text(), 'OLD-1')
 
     def test_archive_run_preserves_prior_same_named_file(self):
         # Two restart-dedup events mint the identical 14-digit prefix for the
