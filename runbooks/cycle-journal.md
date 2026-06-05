@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 938 — 2026-06-05 01:52 UTC (interactive)
+
+**Health:** ✅ **Tier 2 clean. consecutive_clean=0→1. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ no-change (fully current).**
+
+Alert watermark: **1307 lines / 2026-06-05T01:05:44Z** (unchanged — 0 new alerts since iter 937 watermark). Pipeline-stall heartbeat: 2026-06-05T01:41:55Z (✅ ~10 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T01:31:19Z (✅ ~21 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=982bbdd5, last_sync=2026-06-05T01:49:07Z (✅ fully current). Session-start gitStatus: branch=main, tree=clean, HEAD=982bbdd "Pulse cycle 20260605T013412Z". Tier state at start: tier=2, consecutive_clean=0. Tier state at end: **tier=2, consecutive_clean=1** (clean iter — 2 more clean iters trigger de-escalation to Tier 3).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1307 lines, unchanged from iter 937 watermark (1307 / 01:05:44Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T01:41:55Z (~10 min at cycle start; ✅ within 90-min threshold). G-rule `heal-pipeline-stall:pr-create-inferred-failure false positive` remains CLOSED per iter 937 — still 0 new pr-create-inferred-failure alerts post-PR #332. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active, not stalled.** Mirror=1 (review-build-unreviewed-merge-detector-20260605T000816Z.json — post-merge archive task for PR #334; mtime 2026-06-05T00:39:06Z; ~70 min old at cycle start; above 60-min default threshold but consistent with known post-merge archive behavior — Mirror is active). Forge=0, Beacon=0, Pulse=0. Not escalating: Mirror is 8/8 active, this is by-design post-merge processing, and the task has been tracked since iter 934 as expected. **Watch:** if this task persists beyond iter 940 (~2h more), escalate as potential stuck mirror sweep. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T01:31:19Z (~21 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=982bbdd "Pulse cycle 20260605T013412Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=982bbdd5, last_sync=2026-06-05T01:49:07Z (✅ fully current — no local divergence, no sync errors). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Mirror=1 (post-merge review for PR #334; expected; same as Check 4). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Clean.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch (unchanged from iter 937):**
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; unchanged).
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (routing confirmed working via PR #334; watch 2 more source=larry builds before closing).
+  - All other G-rules: unchanged from iter 937.
+
+- **PRIME DIRECTIVE ratio:** interventions=718, systemic_fixes=12, ratio≈59.8 (iter_clean row appended 2026-06-05T01:52:09Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. `cycle_prime_ledger.py append --tier 2 --kind iter_clean` → recorded (01:52:09Z). ✅
+3. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=1. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** System fully nominal. 0 new alerts, 0 open PRs, 8/8 services active, sync fully current. Mirror post-merge archive task for PR #334 still pending but by-design; adding watch to escalate if it persists beyond ~2h. Tier 2 consecutive_clean now at 1/3; two more clean iters de-escalate to Tier 3 (30-min cadence).
+
+---
+
 ## Iteration 937 — 2026-06-05 01:32 UTC (interactive)
 
 **Health:** ✅ **Tier 1 → Tier 2 de-escalation. consecutive_clean=2→3. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ success.**
