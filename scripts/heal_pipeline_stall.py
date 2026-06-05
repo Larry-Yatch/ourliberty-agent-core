@@ -614,6 +614,17 @@ def _pr_matches_task(pr: dict, task_id: str) -> Optional[str]:
 # ambiguous stems (e.g. `build-` / `fix-` families).
 _PREFLIGHT_FAMILY_MIN_LEN = 12
 
+# A build branch for a family is `forge/build-<family>-<ts>`, so after we
+# strip the prefix + optional `build-` and the `<family>-` head, the
+# remainder is the build task's own timestamp. Require it to *start* with a
+# canonical `YYYYMMDDTHHMMSSZ` stamp (a trailing retry/clarify suffix on the
+# stamp is fine). This anchors the family match to a real build timestamp
+# instead of accepting any suffix — without it, `stem.startswith(family + '-')`
+# over-matched a DIFFERENT, longer family that merely shares a dash-prefix
+# (e.g. preflight family `add-user-auth` falsely matched the shipped build of
+# `add-user-auth-v2`), silently suppressing a genuine preflight stall.
+_BUILD_TS_PREFIX_RE = re.compile(r'\d{8}T\d{6}Z')
+
 
 def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:
     """If `task_id` is a preflight/clarify task whose build *family* has
@@ -622,9 +633,12 @@ def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:
     Family = the task_id stem before `-preflight`. A build PR for the same
     family carries a branch like `forge/build-<family>-<ts>` (or
     `forge/<family>-...`). We strip the `forge/`|`larry/` prefix and an
-    optional leading `build-` segment, then require the remainder to equal
-    `<family>` or start with `<family>-`. Only applies to task_ids that
-    contain `-preflight`; non-preflight tasks fall through unchanged.
+    optional leading `build-` segment, then accept the PR iff the remainder
+    equals `<family>` exactly, or equals `<family>-<ts>` where `<ts>` is a
+    real build timestamp. The timestamp anchor is what stops a longer,
+    distinct family (`<family>-v2-...`) from matching by mere dash-prefix.
+    Only applies to task_ids that contain `-preflight`; non-preflight tasks
+    fall through unchanged.
     """
     idx = task_id.find('-preflight')
     if idx <= 0:
@@ -639,7 +653,10 @@ def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:
         stem = branch_task
         if stem.startswith('build-'):
             stem = stem[len('build-'):]
-        if stem == family or stem.startswith(family + '-'):
+        if stem == family:
+            return pr
+        head = family + '-'
+        if stem.startswith(head) and _BUILD_TS_PREFIX_RE.match(stem[len(head):]):
             return pr
     return None
 
