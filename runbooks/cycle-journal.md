@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 995 — 2026-06-05 17:20 UTC (interactive, Tier 1 — CLEAN)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 0 new alerts. 9/9 services active. All inboxes empty. 2 open PRs (#355, #356) below 30-min threshold. Sync error self-recovering.**
+
+Alert watermark: **1344 lines / 2026-06-05T17:10:10Z** (unchanged from iter 994 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T17:11:11Z (✅ ~9 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:06:55Z (✅ ~14 min at scan; within 60-min threshold). Sync: status=error, commit=2fb56ffd, last_sync=2026-06-05T16:50:18Z (~30 min) — SYNC-PUSH-REBASE-FALLBACK-001 56th occurrence; self-recovering at ~17:50Z hourly tick. Session-start gitStatus: branch=main, tree=clean, HEAD=3966f36 "Pulse cycle 20260605T171909Z" (iter 994 wrapper commit). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1344/17:10:10Z unchanged — 0 new alerts since iter 994. Beacon-bot log confirms last delivery at 17:13:35Z (idx=1343, unreviewed-merge:353). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '40 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session. No new Larry directives. Last delivery: idx=1343 at 17:13:35Z (unreviewed-merge:353 DM to Larry). Beacon bot log shows no new activity since 11:13:35 MDT. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:11:11Z (~9 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:06:55Z (~14 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=3966f36 "Pulse cycle 20260605T171909Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=2fb56ffd, last_sync=16:50:18Z (~30 min). SYNC-PUSH-REBASE-FALLBACK-001 56th total. HEAD=3966f36 is newer than sync commit (wrapper push succeeded). Within 2h threshold. Hourly tick at ~17:50Z will self-recover. ⚠️ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. (dashboard-api was restarted at 17:07Z by stale-daemon-code per iter 994; confirmed still active.) ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ Watch — 2 open, below 30-min threshold.**
+  - **PR #355** "fix(advancer): corroborate tier-3 title match against branch (audit #9, PR-C)" — created 17:03:55Z, age ~17 min at scan, CLEAN/MERGEABLE, autoMerge=null. Audit-PR series. Below 30-min threshold → watch.
+  - **PR #356** "fix(heal): anchor PR/issue resolution on referential #<n> only (audit §4)" — created 17:05:30Z, age ~15 min at scan, UNKNOWN/UNKNOWN (GitHub caching artifact; validate with `gh pr view 356` before acting per MEMORY calibration). Below 30-min threshold → watch.
+  - **PR #357** "fix(auth): restore credentials on a truncated fresh login, not just a missing one" — MERGED (commit 03f9449 in session-start git log). No unreviewed-merge:357 alert in larry-alerts.jsonl yet (~10 min post-merge); detector may not have swept. Watch for alert on next cycle.
+  - ourliberty-dashboard: 0 PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge`: count ≥14.** PR #357 merged (no unreviewed-merge:357 alert yet); if detector fires next cycle, count reaches 15. Dispatch `actor-exemption-config` pending Larry `go: actor-exemption-config`. All other G-rules unchanged from iter 994.
+
+- **PRIME DIRECTIVE ratio:** interventions=722, systemic_fixes=16, ratio≈45.1. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 9 services active, all inboxes empty, 2 open PRs below 30-min threshold, both heartbeats healthy.
+3. Noted PR #357 MERGED with no unreviewed-merge:357 alert yet; watching for detector sweep.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[red]` PRs #343–#357 audit-series (14+ consecutive) Larry-direct unreviewed merges — standing from iter 967. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 56th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=1. First clean iter since iter 994 signal (unreviewed-merge:353). PRs #355 and #356 will cross 30-min threshold at ~17:34Z and ~17:36Z — next automated cycle will evaluate. PR #357 merged; watch for unreviewed-merge:357 on next sweep. Sync error self-clearing at ~17:50Z.
+
+---
+
 ## Iteration 994 — 2026-06-05 17:15 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 2 new alerts. 9/9 services active. All inboxes empty. 3 open PRs (#355, #356, #357) below 30-min threshold. 1 sync error (self-recovering).**
