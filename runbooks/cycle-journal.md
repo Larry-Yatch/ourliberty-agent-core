@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 947 — 2026-06-05 03:09 UTC (interactive)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2 (↑ from 1). 0 new alerts. 0 open PRs. 8/8 services active. All inboxes empty. PR #335 healing confirmed: tier2-probe ran at 03:02:48Z post-merge, exit 0, no new `tier2_weekly_probe_failed` alert. 1 clean iter until Tier 2 de-escalation.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 946). Pipeline-stall heartbeat: 2026-06-05T03:02:36Z (✅ ~7 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T03:01:59Z (✅ ~7 min at cycle start; within 60-min threshold). Sync: status=error, commit=c0e5f6cf, last_sync=02:56:04Z (⚠️ SYNC-PUSH-REBASE-FALLBACK Tier 3 known pattern; session-start HEAD 9ac1961 "Pulse cycle 20260605T030659Z" is NEWER than sync.json commit → wrapper push succeeded; self-clears on next hourly sync.timer). Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2** (clean iter; 1 more needed for Tier 2 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z unchanged — 0 new alerts since iter 946. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 03:02:36Z (~7 min at cycle start; ✅ within 90-min threshold). Inbox-watcher last log 03:01:04Z: Beacon completed `notify-manual-tier2-probe-memcap-pr335` (success, 40s, $0.28). Fully operational, idle after completing queued tasks. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Beacon=0, Forge=0, Mirror=0, Pulse=0. `notify-manual-tier2-probe-memcap-pr335.json` processed at 03:01:04Z. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heartbeat = 03:01:59Z (~7 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=9ac1961 "Pulse cycle 20260605T030659Z". ✅
+
+- **(Check B) Sync health: ⚠️ Tier 3 known pattern — no tier-reset.** sync.json: status=error, commit=c0e5f6cf, last_sync=02:56:04Z. "Auto-commit push failed; rolled back." Session-start HEAD (9ac1961, ~03:07Z) NEWER than sync.json commit → wrapper push succeeded independently. SYNC-PUSH-REBASE-FALLBACK (56th+ total; APPROVAL_REQUEST `sync-push-rebase-fallback-001` open). Self-clears on next hourly sync.timer. ⚠️→INFO
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All units systemd-active. Inbox-watcher operational and processing normally. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. PR #335 confirmed merged (iter 946). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** `ourliberty-heal-tier2-weekly-health-probe.service` ran at 03:02:48Z (first fire post-merge) and exited at 03:02:51Z, **status=0** (success). MemoryMax confirmed 1073741824 (1G — per PR #335 fix; daemon-reload applied post-merge). No new `tier2_weekly_probe_failed` alert in larry-alerts.jsonl since 2026-06-05T00:01:10Z (before merge). **First post-PR-335 probe fire: CLEAN.** Watch: next probe fires in ~3h (~06:00Z); if clean → APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close.
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions Case 2 not graduated`: 2/3 (unchanged).** No new occurrence.
+  - **`wedged-review-silent-wt:* not in alert-translations.json`: 1/3** (unchanged).
+  - **`source=larry Forge builds auto-routing to Mirror`: 1/3** (unchanged).
+  - **`pulse/check-i-* not in alert-translations.json`: 2/3** (unchanged; at 3/3 dispatch Beacon).
+  - All other G-rules: unchanged from iter 946.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Verified PR #335 healing: probe ran post-merge at 03:02:48Z, exit 0, MemoryMax=1G confirmed, no new tier2_weekly_probe_failed alert.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. All prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply from Larry).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (first post-merge probe fire CLEAN ✅; 1 more clean probe fire needed to confirm).
+
+**Patterns:** System fully recovered from iters 940–945 stall (Mirror wedge resolved, PR #335 merged, inbox-watcher idle-but-healthy). First clean iteration since iter 936. PR #335 healing on track: first post-merge probe fire exits 0 in 3s (unit memory cap no longer a bottleneck). consecutive_clean=2; one more clean iter de-escalates to Tier 2.
+
+---
+
 ## Iteration 946 — 2026-06-05 03:04 UTC (interactive)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1 (↑ from 0). PR #335 MERGED ✅ (Mirror PASS 03:00:15Z, auto-merged 03:00:27Z). Inbox-watcher fully operational. Mirror wedge from iters 940–945 confirmed resolved. 0 open PRs. 0 new alerts. 0 Pulse auto-fix actions.**
