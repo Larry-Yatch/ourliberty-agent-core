@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 989 — 2026-06-05 15:49 UTC (interactive, Tier 3 — CLEAN)
+
+**Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=12. 0 new alerts. 8/8 services active. All inboxes empty. 1 open PR (#351, below 30-min threshold — watch). 30-min cadence continues.**
+
+Alert watermark: **1333 lines / 2026-06-05T08:04:15Z** (unchanged from iter 988 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T15:34:09Z (✅ ~12 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T15:36:19Z (✅ ~10 min at scan; within 60-min threshold). Sync: status=no-change, commit=a37beb6 (1 behind session-start HEAD=9f1314b; hourly sync at ~15:50Z), last_sync=2026-06-05T14:50:16Z (~56 min). Session-start gitStatus: branch=main, tree=clean, HEAD=9f1314b "Pulse cycle 20260605T151854Z" (iter 988 wrapper commit). Tier state at start: tier=3, consecutive_clean=11. Tier state at end: **tier=3, consecutive_clean=12**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark timestamp 2026-06-05T08:04:15Z unchanged — 0 new alerts since iter 988. Line count 1333 (stable). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '35 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session. No new Larry directives since June 4 02:48Z UTC. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T15:34:09Z (~12 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T15:36:19Z (~10 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=9f1314b "Pulse cycle 20260605T151854Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, commit=a37beb6 (1 behind session-start HEAD=9f1314b), last_sync=2026-06-05T14:50:16Z (~56 min). Hourly sync at ~15:50Z will catch up. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ Watch.** **NEW: PR #351 OPEN.** Source=larry-direct (audit remediation SEC1 — "fix(auth): close write-side TOCTOU in OAuth orchestrators"). CLEAN/MERGEABLE. reviewDecision="" (no Mirror review dispatched). autoMergeRequest=null. Created 2026-06-05T15:43:01Z (~6 min at scan). **Below 30-min stale threshold — no action this iter.** Next Tier-3 automated cycle at ~16:16Z will find this PR ~33 min old — evaluate auto-merge enable then. ourliberty-dashboard: 0 PRs. PR #351 is the 10th Larry-direct audit PR in the series (#343–#350 were first 9). Standing `[red]` escalation context extended.
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule updates:** No new occurrences. All carry forward unchanged from iter 988.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=13, ratio≈55.5, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty. Both heartbeats healthy.
+3. Detected PR #351 (Larry-direct audit SEC1, age ~6 min, CLEAN/MERGEABLE). Below 30-min stale threshold — watch only. Evaluate auto-merge enable at next automated cycle (~16:16Z).
+4. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=12. ✅
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations. Prior standing items carry forward + extended:
+- `[red]` PRs #343–#351 audit-series (10 total) Larry-direct unreviewed merges — standing from iter 967, extended to include PR #351 (SEC1, "fix(auth): close write-side TOCTOU in OAuth orchestrators", OPEN, CLEAN/MERGEABLE, created 15:43Z). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec for actor-exemption config.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 3, consecutive_clean=12. Twelfth consecutive clean iter. All nominal except PR #351 watch item (Larry-direct SEC1, below 30-min threshold). PR hits 30-min threshold at ~16:13Z — auto-merge evaluate at next automated cycle.
+
+---
+
 ## Iteration 988 — 2026-06-05 15:16 UTC (interactive, Tier 3 — CLEAN)
 
 **Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=11. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` CLOSED ✅.**
