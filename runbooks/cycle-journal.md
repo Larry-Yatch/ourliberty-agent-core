@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 997 — 2026-06-05 17:34 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 0 new alerts. 2 always-fix auto-merges executed (PRs #355, #356). 9/9 services active. All inboxes empty. Sync error self-recovering.**
+
+Alert watermark: **1345 lines / 2026-06-05T17:20:20Z** (unchanged from iter 996 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T17:26:12Z (✅ ~8 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:06:55Z (✅ ~28 min at scan; within 60-min threshold). Sync: status=error, commit=2fb56ffd, last_sync=2026-06-05T16:50:18Z (~45 min) — SYNC-PUSH-REBASE-FALLBACK-001 56th occurrence; self-recovering at ~17:50Z hourly tick. Session-start gitStatus: branch=main, tree=clean, HEAD=8064b68 "Pulse cycle 20260605T172935Z" (iter 996 wrapper commit). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 2 always-fix actions fired).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1345/17:20:20Z unchanged — 0 new alerts since iter 996. beacon-bot log confirms last delivery idx=1344 at 11:24:18 MDT (17:24:18Z) — unreviewed-merge:357. No new Telegram activity. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '45 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last Larry message: 2026-06-04T02:48Z UTC (unchanged). Beacon-bot log: last delivery idx=1344 at 17:24:18Z (unreviewed-merge:357). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:26:12Z (~8 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:06:55Z (~28 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=8064b68 "Pulse cycle 20260605T172935Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=2fb56ffd, last_sync=16:50:18Z (~45 min). SYNC-PUSH-REBASE-FALLBACK-001 56th total. HEAD=8064b68 is newer than sync commit (wrapper push succeeded after sync service failure). Within 2h threshold. Hourly tick at ~17:50Z will self-recover. ⚠️ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ 2 always-fix actions taken.**
+  - **PR #355** "fix(advancer): corroborate tier-3 title match against branch (audit #9, PR-C)" — created 17:03:55Z, age 30:42 at detection (17:34:37Z), CLEAN/MERGEABLE, autoMerge=null. **Always-fix: `gh pr merge 355 --auto --squash` executed. MERGED at 2026-06-05T17:34:44Z.** Audit-PR series. ✅
+  - **PR #356** "fix(heal): anchor PR/issue resolution on referential #<n> only (audit §4)" — created 17:05:30Z, age 30:12 at detection (17:35:42Z), CLEAN/MERGEABLE. **Always-fix: `gh pr merge 356 --auto --squash` executed. MERGED at 2026-06-05T17:35:45Z.** Audit-PR series. ✅
+  - ourliberty-dashboard: 0 PRs. ✅
+  - **Watch:** If heal-unreviewed-merge-detector fires for PRs #355/#356 (audit-series, no Mirror review), alerts will be Tier 4 carrying the actor. Since merge was triggered by Pulse auto-merge (not Larry-Yatch), detector may not classify as `actor=larry-direct`; next Check 0 will determine.
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge`: 15 total (PRs #343–#357).** No new occurrences this iter (PRs #355 and #356 merged via Pulse auto-merge, not Larry-direct). Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged from iter 996.
+
+- **PRIME DIRECTIVE ratio:** interventions=724 (+2 from enable-pr-auto-merge:pr-355 and :pr-356), systemic_fixes=16, ratio≈45.3.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 9 services active, all inboxes empty, both heartbeats healthy.
+3. **Always-fix:** `gh pr merge 355 --auto --squash` → MERGED 17:34:44Z (PR #355 CLEAN/MERGEABLE for 30:42). Logged to cycle-actions.jsonl.
+4. **Always-fix:** `gh pr merge 356 --auto --squash` → MERGED 17:35:45Z (PR #356 CLEAN/MERGEABLE for 30:12). Logged to cycle-actions.jsonl.
+5. Appended 2 intervention rows to cycle-prime-ledger.jsonl (enable-pr-auto-merge:pr-355, enable-pr-auto-merge:pr-356).
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (last_signal_at=17:36:33Z). ✅
+7. Wrote journal entry + updating MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter. Standing items carry forward:
+- `[red]` PRs #343–#357 audit-series (15 total) Larry-direct unreviewed merges — standing from iter 967. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 56th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=0 (2 always-fix actions). PRs #355 and #356 crossed 30-min threshold and were auto-merged this iter (iter 996 predicted threshold at ~17:34Z/#17:35Z — both accurate). Sync error self-clears at ~17:50Z. No new healer alerts; all 9 services healthy. System otherwise nominal.
+
+---
+
 ## Iteration 996 — 2026-06-05 17:25 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 1 new alert. 9/9 services active. All inboxes empty. 2 open PRs (#355, #356) below 30-min threshold. Sync error self-recovering.**
