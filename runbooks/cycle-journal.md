@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 996 — 2026-06-05 17:25 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 1 new alert. 9/9 services active. All inboxes empty. 2 open PRs (#355, #356) below 30-min threshold. Sync error self-recovering.**
+
+Alert watermark: **1345 lines / 2026-06-05T17:20:20Z** (was 1344 lines / 17:10:10Z — 1 new alert). Pipeline-stall heartbeat: 2026-06-05T17:11:11Z (✅ ~14 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:06:55Z (✅ ~19 min at scan; within 60-min threshold). Sync: status=error, commit=2fb56ffd, last_sync=2026-06-05T16:50:18Z (~35 min) — SYNC-PUSH-REBASE-FALLBACK-001 56th occurrence; self-recovering at ~17:50Z hourly tick. Session-start gitStatus: branch=main, tree=clean, HEAD=edc7eea "Pulse cycle 20260605T172451Z" (iter 995 wrapper commit). Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=0** (tier-reset from Tier-4 unreviewed-merge:357 alert at 17:26:52Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** Watermark advanced 1344→1345. New alert:
+  - idx=1344 (line 1345): `heal-unreviewed-merge-detector unreviewed-merge:357` (17:20:20Z) — PR #357 "fix(auth): restore credentials on a truncated fresh login, not just a missing one" merged by Larry-Yatch, no Mirror review. Iter 995 noted to watch for this detector sweep (~10 min post-merge); detector swept at ~17:20Z. Beacon-bot DM delivered at 17:24:18Z (idx=1344 `delivered` in bot log). **Tier 4** → tier-reset. **15th consecutive Larry-direct audit-PR merge without Mirror review** (PRs #343–#357). Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '45 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last Larry message: 2026-06-04T02:48Z UTC. Beacon-bot log confirms only automated routing (idx=1344 `unreviewed-merge:357` DM delivered 17:24:18Z). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:11:11Z (~14 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:06:55Z (~19 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=edc7eea "Pulse cycle 20260605T172451Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=2fb56ffd, last_sync=16:50:18Z (~35 min). SYNC-PUSH-REBASE-FALLBACK-001 56th total. HEAD=edc7eea is newer than sync commit (wrapper push succeeded after sync service failure). Within 2h threshold. Hourly tick at ~17:50Z will self-recover. ⚠️ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ Watch — 2 open, below 30-min threshold.**
+  - **PR #355** "fix(advancer): corroborate tier-3 title match against branch (audit #9, PR-C)" — created 17:03:55Z, age ~22 min at scan, CLEAN/MERGEABLE, autoMerge=null. Audit-PR series. Hits 30-min threshold at ~17:34Z.
+  - **PR #356** "fix(heal): anchor PR/issue resolution on referential #<n> only (audit §4)" — created 17:05:30Z, age ~20 min at scan, UNKNOWN in `gh pr list` but CLEAN/MERGEABLE confirmed via `gh pr view 356` (GitHub caching artifact per MEMORY calibration). autoMerge=null. Audit-PR series. Hits 30-min threshold at ~17:35Z.
+  - ourliberty-dashboard: 0 PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: count = 15.** PR #357 confirmed merged (unreviewed-merge:357 detector fired 17:20:20Z). Total: PRs #343–#357 = 15 consecutive Larry-direct audit-PR merges without Mirror review. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged from iter 995.
+
+- **PRIME DIRECTIVE ratio:** interventions=722, systemic_fixes=16, ratio≈45.1. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 1 new alert: unreviewed-merge:357 (Tier 4, tier-reset; DM delivered by beacon-bot at 17:24:18Z).
+3. Confirmed 9/9 services active, all inboxes empty, 2 open PRs below 30-min threshold, both heartbeats healthy.
+4. Validated PR #356 CLEAN/MERGEABLE via `gh pr view 356` (list API showed UNKNOWN — expected caching artifact).
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (last_signal_at=17:26:52Z). ✅
+6. Wrote journal entry + updating MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter (beacon-bot delivered unreviewed-merge:357 DM at 17:24:18Z). Standing items carry forward:
+- `[red]` PRs #343–#357 audit-series (15 total) Larry-direct unreviewed merges — standing from iter 967, extended through PR #357. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 56th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=0. PR #357 merged by Larry immediately post-iter-995 (15th consecutive unreviewed audit-PR merge). Detector swept at ~17:20Z (10 min post-merge, as predicted). PRs #355 and #356 approach 30-min auto-merge threshold at ~17:34Z and ~17:35Z — next automated cycle will act. Sync error self-clearing at ~17:50Z.
+
+---
+
 ## Iteration 995 — 2026-06-05 17:20 UTC (interactive, Tier 1 — CLEAN)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 0 new alerts. 9/9 services active. All inboxes empty. 2 open PRs (#355, #356) below 30-min threshold. Sync error self-recovering.**
