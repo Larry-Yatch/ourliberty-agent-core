@@ -436,6 +436,11 @@ def _emit_silence_decision(fp: str, reason: str, remediation: str) -> bool:
     payload = {
         'proposing_agent': 'medic',
         'target_agent': 'medic',
+        # `summary` is in beacon_approval_handler.REQUIRED_FIELDS for
+        # approval_request and is what the Approvals-tab renderer shows as the
+        # card title (dashboard_api maps it to plan_summary). Without it the card
+        # renders as "(no summary)". Keep it short — full context is in `prompt`.
+        'summary': f'Medic silenced a false positive — keep or lift? ({subject})',
         'prompt': prompt,
         'severity': 'warning',
         'dedup_identity': task_id,

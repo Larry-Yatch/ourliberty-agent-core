@@ -410,6 +410,34 @@ class TestConfig(unittest.TestCase):
             cfg = h.load_config(p)
             self.assertEqual(cfg['marker_grace_seconds'], 300)
 
+    def test_hard_below_silent_disables_hard_backstop(self):
+        # Safety invariant: a mistuned config (hard <= silent) must NOT make the
+        # healer kill more aggressively — it disables the hard path instead, so
+        # only the conservative alert ladder runs.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({
+                'silent_grace_seconds': 900,
+                'hard_silent_grace_seconds': 600,  # below silent — invalid
+            }))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['hard_silent_grace_seconds'], h._HARD_BACKSTOP_DISABLED)
+            # And a normally-hard-eligible idle now classifies as the soft path.
+            self.assertEqual(
+                h.classify(marker_present=False, idle_secs=5000, cfg=cfg),
+                h.SILENT_CASE2)
+
+    def test_hard_equal_silent_disables_hard_backstop(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({
+                'silent_grace_seconds': 900, 'hard_silent_grace_seconds': 900,
+            }))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['hard_silent_grace_seconds'], h._HARD_BACKSTOP_DISABLED)
+
 
 # ---------------------- streak / mode helpers ----------------------
 

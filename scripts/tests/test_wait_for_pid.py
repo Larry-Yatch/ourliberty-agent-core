@@ -123,6 +123,25 @@ class WaitForPidTest(unittest.TestCase):
         result = _run('123', '--bogus')
         self.assertEqual(result.returncode, EXIT_USAGE, result.stderr)
 
+    def test_trailing_timeout_flag_without_value_does_not_hang(self):
+        """A bare `--timeout` as the last arg must fail fast, not loop forever.
+        Regression: a `shift 2` past $# under `set -u` left the args unchanged
+        and re-processed the flag forever — the anti-wedge script wedging
+        itself. `hard_timeout` is the harness net: if it loops, _run raises
+        TimeoutExpired and the test fails loudly."""
+        result = _run('123', '--timeout', hard_timeout=10)
+        self.assertEqual(result.returncode, EXIT_USAGE, result.stderr)
+
+    def test_trailing_interval_flag_without_value_does_not_hang(self):
+        result = _run('123', '--interval', hard_timeout=10)
+        self.assertEqual(result.returncode, EXIT_USAGE, result.stderr)
+
+    def test_zero_timeout_rejected(self):
+        """`--timeout 0` would time out on the first iteration (instant exit 124
+        even for a healthy process → spurious retries). Reject it."""
+        result = _run('123', '--timeout', '0')
+        self.assertEqual(result.returncode, EXIT_USAGE, result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

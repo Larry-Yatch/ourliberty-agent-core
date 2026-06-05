@@ -63,11 +63,15 @@ CASE 2 — silent (NO marker):
   flagged on PR #334 (2026-06-05): the healer could WARN at 15 min but not act
   until the streak graduated, so the first wedges (71 min PR #101, 102 min
   PR #334) needed a manual kill. The hard path lets it act on the FIRST wedge
-  while the 15-min streak path stays conservative. A hard reap still feeds the
-  streak as a TRUE positive on the next sweep (via verify_pending), so it also
-  helps the 15-min path graduate. The same fresh resumed-at-gate recheck as the
-  graduated path guards it, so a session that resumed between scan and kill is
-  never reaped.
+  while the 15-min streak path stays conservative. If the session was already
+  alerted (it crossed silent_grace in an earlier sweep, so it has a pending
+  entry), the hard reap is credited as a TRUE positive by verify_pending on the
+  next sweep, nudging the 15-min path toward graduation; a first-sight hard reap
+  (the healer was down while the session wedged, so it never passed through the
+  alert path and has no pending entry) kills it without a streak credit — which
+  is fine, the hard path doesn't depend on the streak. The same fresh
+  resumed-at-gate recheck as the graduated path guards it, so a session that
+  resumed between scan and kill is never reaped.
 
 Config (Pulse-Check-tunable; NOT hardcoded)
 -------------------------------------------
@@ -144,6 +148,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     'streak_to_promote': 3,              # consecutive true positives → auto-reap
 }
 
+# Sentinel the hard backstop is pushed to when config is mistuned (hard <=
+# silent): an idle window no real session can ever reach (~31,000 years), so
+# the hard path is effectively disabled and only the conservative alert ladder
+# runs. Far larger than any plausible idle_secs.
+_HARD_BACKSTOP_DISABLED = 10 ** 12
+
 # Tree-kill: how long to wait after SIGTERM before escalating to SIGKILL.
 SIGTERM_GRACE_SECONDS = 5
 
@@ -219,6 +229,18 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
             cfg[key] = int(raw)
         elif key in data:
             log(f'config {key}={raw!r} invalid; keeping default {cfg[key]}', 'WARN')
+    # Safety invariant — this file's contract is "a config mishap can never make
+    # the healer kill more aggressively than intended." The hard deterministic-
+    # reap ceiling MUST sit above the soft alert floor; otherwise a mistuned JSON
+    # (hard <= silent) would make every silent session cross the hard gate first
+    # and be auto-reaped immediately, bypassing the alert ladder + streak
+    # graduation. If that happens, disable the hard backstop (push it out of
+    # reach) and warn — a config error must make us LESS aggressive, never more.
+    if cfg['hard_silent_grace_seconds'] <= cfg['silent_grace_seconds']:
+        log(f'config hard_silent_grace_seconds={cfg["hard_silent_grace_seconds"]} '
+            f'<= silent_grace_seconds={cfg["silent_grace_seconds"]}; disabling the '
+            f'hard backstop (it would bypass the alert ladder)', 'WARN')
+        cfg['hard_silent_grace_seconds'] = _HARD_BACKSTOP_DISABLED
     return cfg
 
 

@@ -63,9 +63,24 @@ usage() {
 PID=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --timeout) TIMEOUT_SECONDS="${2:-}"; shift 2 ;;
+        # A bare `--timeout`/`--interval` as the LAST arg must NOT `shift 2`:
+        # under `set -u` (no `set -e`) a shift past $# fails silently, leaves the
+        # args unchanged, and the while-loop re-processes the flag forever — the
+        # script whose whole job is to stop poll-loop wedges would wedge itself.
+        # Require the value explicitly before consuming it.
+        --timeout)
+            if [ $# -lt 2 ]; then
+                echo "wait_for_pid.sh: FATAL: --timeout requires a value." >&2
+                exit 2
+            fi
+            TIMEOUT_SECONDS="$2"; shift 2 ;;
         --timeout=*) TIMEOUT_SECONDS="${1#*=}"; shift ;;
-        --interval) INTERVAL_SECONDS="${2:-}"; shift 2 ;;
+        --interval)
+            if [ $# -lt 2 ]; then
+                echo "wait_for_pid.sh: FATAL: --interval requires a value." >&2
+                exit 2
+            fi
+            INTERVAL_SECONDS="$2"; shift 2 ;;
         --interval=*) INTERVAL_SECONDS="${1#*=}"; shift ;;
         -h|--help) usage; exit 0 ;;
         --) shift ;;
@@ -96,6 +111,13 @@ case "$TIMEOUT_SECONDS" in
         echo "wait_for_pid.sh: FATAL: --timeout must be a positive integer, got '${TIMEOUT_SECONDS}'." >&2
         exit 2 ;;
 esac
+# Reject 0 explicitly: a 0 ceiling means "time out on the very first iteration"
+# (instant exit 124 even for a healthy process → spurious caller retries). A
+# caller that wants an effectively-unbounded wait passes a large number, not 0.
+if [ "$TIMEOUT_SECONDS" -lt 1 ]; then
+    echo "wait_for_pid.sh: FATAL: --timeout must be >= 1 second (got ${TIMEOUT_SECONDS})." >&2
+    exit 2
+fi
 case "$INTERVAL_SECONDS" in
     ''|*[!0-9]*)
         echo "wait_for_pid.sh: FATAL: --interval must be a positive integer, got '${INTERVAL_SECONDS}'." >&2
