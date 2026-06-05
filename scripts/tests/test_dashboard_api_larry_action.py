@@ -22,6 +22,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -80,11 +81,21 @@ class _RecordingClient:
     def __init__(self, rows_by_event_id: Optional[dict[str, dict[str, Any]]] = None):
         self.rows_by_event_id = rows_by_event_id or {}
         self.calls: list[dict[str, Any]] = []
+        # When True, the next `read_at IS NULL` conditional UPDATE claims 0
+        # rows — models a concurrent request winning the #10 CAS race between
+        # this request's SELECT (which saw read_at=None) and its own claim.
+        self.force_claim_lost = False
+        # When True, UPDATEs return empty `.data` but a populated `.count` —
+        # models a client built with `returning=minimal` (PostgREST returns no
+        # representation). The #10 claim must still succeed off the count.
+        self.representation_off = False
         self._table: Optional[str] = None
         self._op: Optional[str] = None
         self._filters: dict[str, Any] = {}
+        self._is_filters: dict[str, Any] = {}
         self._select_cols: Optional[str] = None
         self._update_values: Optional[dict[str, Any]] = None
+        self._update_count: Any = None
         self._upsert_rows: Optional[list[dict[str, Any]]] = None
         self._upsert_kwargs: Optional[dict[str, Any]] = None
         self._limit: Optional[int] = None
@@ -93,8 +104,10 @@ class _RecordingClient:
         self._table = name
         self._op = None
         self._filters = {}
+        self._is_filters = {}
         self._select_cols = None
         self._update_values = None
+        self._update_count = None
         self._upsert_rows = None
         self._upsert_kwargs = None
         self._limit = None
@@ -105,9 +118,10 @@ class _RecordingClient:
         self._select_cols = cols
         return self
 
-    def update(self, values: dict[str, Any]):
+    def update(self, values: dict[str, Any], count: Any = None, **kwargs):
         self._op = 'update'
         self._update_values = values
+        self._update_count = count
         return self
 
     def upsert(self, rows: list[dict[str, Any]], **kwargs):
@@ -120,6 +134,11 @@ class _RecordingClient:
         self._filters[col] = val
         return self
 
+    def is_(self, col: str, val: Any):
+        # PostgREST IS filter — only `read_at IS NULL` is used (the #10 CAS).
+        self._is_filters[col] = val
+        return self
+
     def limit(self, n: int):
         self._limit = n
         return self
@@ -129,6 +148,7 @@ class _RecordingClient:
             'table': self._table,
             'op': self._op,
             'filters': dict(self._filters),
+            'is_filters': dict(self._is_filters),
             'limit': self._limit,
             'select_cols': self._select_cols,
             'update_values': self._update_values,
@@ -140,12 +160,35 @@ class _RecordingClient:
             event_id = self._filters.get('event_id')
             row = self.rows_by_event_id.get(event_id)
             return _Resp([row] if row else [])
+        if self._op == 'update':
+            event_id = self._filters.get('event_id')
+            row = self.rows_by_event_id.get(event_id)
+            if row is None:
+                return _Resp([], count=0 if self._update_count else None)
+            # #10 atomic claim: `update(...).eq(event_id).is_('read_at','null')`
+            # claims the row ONLY when read_at is currently NULL, mirroring
+            # PostgREST's conditional UPDATE returning the affected rows.
+            if self._is_filters.get('read_at') == 'null' and (
+                self.force_claim_lost or row.get('read_at') is not None
+            ):
+                return _Resp([], count=0 if self._update_count else None)
+            # Apply the mutation so a second concurrent claim sees the flipped
+            # state (and a release can null it back out).
+            for k, v in (self._update_values or {}).items():
+                row[k] = v
+            affected = [dict(row)]
+            resp_count = len(affected) if self._update_count else None
+            # representation_off models `returning=minimal`: rows updated, but
+            # PostgREST returns no body — only the Content-Range count.
+            resp_data = [] if self.representation_off else affected
+            return _Resp(resp_data, count=resp_count)
         return _Resp([])
 
 
 class _Resp:
-    def __init__(self, data: list[Any]):
+    def __init__(self, data: list[Any], count: Optional[int] = None):
         self.data = data
+        self.count = count
 
 
 # ---------- shared test base ----------
@@ -617,6 +660,127 @@ class HappyPathTest(_LarryActionBase):
             source_event_id='ev-alert-fresh', action='mark_done',
             target_agent=None, envelope_written=None,
         )
+
+
+# ---------- #10 atomic-claim (TOCTOU) ----------
+
+class AtomicClaimConcurrencyTest(_LarryActionBase):
+    """nervous-system-audit #10 (2026-06-05): the action handler claims the
+    event with a conditional `read_at IS NULL` UPDATE BEFORE any side effect,
+    so two concurrent approve/reject requests can't both write a dispatch
+    envelope (the sync endpoint runs in a threadpool)."""
+
+    def _seed_approval(self, event_id: str):
+        return self._seed(
+            event_id=event_id,
+            task_id=f'task-{event_id}',
+            event_type='approval_request',
+            payload={
+                'proposing_agent': 'beacon',
+                'target_agent': 'forge',
+                'prompt': 'Forge should X.',
+            },
+            read_at=None,
+        )
+
+    def test_lost_claim_409_and_no_envelope(self):
+        # The SELECT saw read_at=None (early check passes) but the atomic claim
+        # finds 0 rows — a concurrent request won. Must 409 and write nothing.
+        self._seed_approval('ev-race')
+        self.client_stub.force_claim_lost = True
+        r = self.c.post(
+            '/api/larry/action',
+            headers=AUTH,
+            json={'source_event_id': 'ev-race', 'action': 'approve'},
+        )
+        self.assertEqual(r.status_code, 409)
+        beacon_inbox = self.tmp / 'inboxes' / 'beacon'
+        self.assertEqual(list(beacon_inbox.glob('*.json')), [])
+        # No audit row either — the loser did nothing.
+        upserts = [c for c in self.client_stub.calls if c['op'] == 'upsert']
+        self.assertEqual(upserts, [])
+
+    def test_second_request_after_claim_409_single_envelope(self):
+        # End-to-end: first approve claims + dispatches; the second sees the
+        # flipped read_at and 409s. Exactly one envelope is written.
+        self._seed_approval('ev-once')
+        r1 = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-once', 'action': 'approve'},
+        )
+        self.assertEqual(r1.status_code, 200, r1.text)
+        r2 = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-once', 'action': 'approve'},
+        )
+        self.assertEqual(r2.status_code, 409)
+        beacon_inbox = self.tmp / 'inboxes' / 'beacon'
+        self.assertEqual(len(list(beacon_inbox.glob('*.json'))), 1)
+
+    def test_claim_succeeds_off_count_when_representation_off(self):
+        # If the client is ever built with returning=minimal, the claim UPDATE
+        # returns empty `.data` but a populated `.count`. The #10 claim must
+        # still succeed off the count (else every action would falsely 409).
+        self._seed_approval('ev-minimal')
+        self.client_stub.representation_off = True
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-minimal', 'action': 'approve'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(
+            len(list((self.tmp / 'inboxes' / 'beacon').glob('*.json'))), 1,
+        )
+
+    def test_path_injection_400_takes_no_claim(self):
+        # A 400 (bad target_agent) fires BEFORE the claim, so read_at is never
+        # touched — no claim, no release churn.
+        self._seed(
+            event_id='ev-badtarget',
+            task_id='t-badtarget',
+            event_type='clarify_request',
+            payload={
+                'asking_agent': 'rogue-agent',  # outside ALLOWED_TARGET_AGENTS
+                'question': 'q?',
+                'resume_session_id': 's',
+            },
+            read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-badtarget', 'action': 'comment',
+                  'comment': 'reply'},
+        )
+        self.assertEqual(r.status_code, 400)
+        # read_at untouched, and no update call was made at all.
+        self.assertIsNone(self.client_stub.rows_by_event_id['ev-badtarget']['read_at'])
+        updates = [c for c in self.client_stub.calls if c['op'] == 'update']
+        self.assertEqual(updates, [])
+
+    def test_side_effect_failure_releases_claim(self):
+        # If the envelope write fails AFTER the claim, read_at is released so
+        # the action can be retried instead of being permanently 409'd.
+        self._seed_approval('ev-rel')
+        with mock.patch.object(
+            da, '_atomic_write_envelope', side_effect=OSError('disk full'),
+        ):
+            with self.assertRaises(OSError):
+                da._handle_larry_action(
+                    source_event_id='ev-rel',
+                    action='approve',
+                    comment=None,
+                    actor=ALLOWED_ACTOR,
+                    agents_root=self.tmp,
+                    supabase_client=self.client_stub,
+                )
+        # Claim released — stored row read_at back to None.
+        self.assertIsNone(self.client_stub.rows_by_event_id['ev-rel']['read_at'])
+        # Exactly one release update (read_at -> None) was issued.
+        releases = [
+            c for c in self.client_stub.calls
+            if c['op'] == 'update' and (c['update_values'] or {}).get('read_at') is None
+        ]
+        self.assertEqual(len(releases), 1)
 
 
 # ---------- GET /api/larry/allowlist ----------

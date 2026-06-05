@@ -32,6 +32,7 @@ Run locally (after pip install):
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -45,6 +46,8 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.utils import get_authorization_scheme_param  # noqa: F401  # reserved
 from pydantic import BaseModel, ConfigDict, Field
+
+logger = logging.getLogger(__name__)
 
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
@@ -2704,7 +2707,13 @@ def _handle_larry_action(
         )
 
     # Already-acted-on lock: read_at IS NOT NULL blocks every action
-    # except mark_done (which is idempotent against the read state).
+    # except mark_done (which is idempotent against the read state). This is a
+    # cheap fast-fail; the AUTHORITATIVE mutex is the atomic compare-and-set
+    # below. nervous-system-audit #10 (2026-06-05): /api/larry/action is a
+    # synchronous endpoint, so Starlette runs it in a threadpool — two
+    # concurrent approve/reject clicks on the same event can BOTH pass this
+    # check-then-act read and BOTH write a dispatch envelope (duplicate agent
+    # run). The check and the read_at flip were not atomic; they are now.
     if source.get('read_at') is not None and action != 'mark_done':
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -2715,15 +2724,15 @@ def _handle_larry_action(
     target_agent: Optional[str] = None
     reconcile_detail: dict[str, Any] = {}
 
+    # Decide the action's side-effect plan FIRST — this is pure (no DB write,
+    # no inbox write). The 400 path-injection guards live here so a malformed
+    # request fails BEFORE the atomic claim below, never churning read_at.
     medic_fp = _medic_silence_fingerprint(source)
-    if medic_fp is not None and action in ('approve', 'reject'):
-        # Medic silence decisions reconcile DIRECTLY here — no agent envelope.
-        # (Reject lifts the silence; Approve keeps it.) The shared read_at-flip
-        # + audit block below records the outcome with target_agent/envelope
-        # both None.
-        reconcile_detail = _reconcile_medic_silence(medic_fp, action)
-    elif action != 'mark_done':
-        target_agent, filename, envelope = _build_envelope_for_action(
+    is_medic_silence = medic_fp is not None and action in ('approve', 'reject')
+    envelope_candidate: Optional[Path] = None
+    envelope_payload: Optional[dict[str, Any]] = None
+    if not is_medic_silence and action != 'mark_done':
+        target_agent, filename, envelope_payload = _build_envelope_for_action(
             source=source, action=action, comment=comment, actor=actor,
         )
         # Path-injection guard — both checks required.
@@ -2739,19 +2748,78 @@ def _handle_larry_action(
         # whose immediate parent is the agent inbox — no subdirectories,
         # no `..` traversal even if it lands back inside the inbox tree.
         # This is the second half of the spec § 7.3 path-injection guard.
-        candidate = (agent_inbox / filename).resolve()
-        if candidate.parent != agent_inbox.resolve():
+        envelope_candidate = (agent_inbox / filename).resolve()
+        if envelope_candidate.parent != agent_inbox.resolve():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail='invalid envelope filename',
             )
-        _atomic_write_envelope(candidate, envelope)
-        envelope_written = str(candidate)
 
-    # Flip read_at on source event (mark_done flow + envelope flows both).
-    supabase_client.table('chain_events').update(
-        {'read_at': ts_iso}
-    ).eq('event_id', source_event_id).execute()
+    # #10: CLAIM the event atomically BEFORE any side effect. The conditional
+    # UPDATE flips read_at NULL→ts only if it is still NULL; only the winning
+    # request gets a non-empty result, so a loser of a concurrent race → 409
+    # and never writes the envelope / reconciles the silence (the side effect
+    # fires at most once). We accept EITHER the returned rows (`data`, present
+    # with the default `returning=representation`) OR the affected-row `count`
+    # (requested below) as proof of the claim, so the CAS does not silently
+    # break if the client is ever built with `returning=minimal`. mark_done is
+    # idempotent (no side effect) and flips read_at unconditionally below.
+    read_at_claimed = False
+    if action != 'mark_done':
+        claim_resp = (
+            supabase_client.table('chain_events')
+            .update({'read_at': ts_iso}, count='exact')
+            .eq('event_id', source_event_id)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        claimed_rows = getattr(claim_resp, 'data', None) or []
+        claimed_count = getattr(claim_resp, 'count', None)
+        if not claimed_rows and not (claimed_count and claimed_count > 0):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail='source event already acted on',
+            )
+        read_at_claimed = True
+
+    # Side effects — gated by the claim above. If the write raises, RELEASE the
+    # claim (read_at back to NULL) so the half-applied action can be retried
+    # instead of being permanently 409'd. (Validation 400s already fired above,
+    # before the claim, so they never reach here.)
+    try:
+        if is_medic_silence:
+            # Medic silence decisions reconcile DIRECTLY here — no agent
+            # envelope. (Reject lifts the silence; Approve keeps it.) The
+            # shared audit block below records the outcome with
+            # target_agent/envelope both None. _reconcile_medic_silence never
+            # raises (it records unsilence-error in the detail), so the
+            # release path below is intentionally not exercised for it.
+            reconcile_detail = _reconcile_medic_silence(medic_fp, action)
+        elif envelope_candidate is not None:
+            _atomic_write_envelope(envelope_candidate, envelope_payload)
+            envelope_written = str(envelope_candidate)
+    except Exception:
+        if read_at_claimed:
+            try:
+                (
+                    supabase_client.table('chain_events')
+                    .update({'read_at': None})
+                    .eq('event_id', source_event_id)
+                    .execute()
+                )
+            except Exception:  # noqa: BLE001 — best-effort release; never mask
+                logger.exception(
+                    'failed to release read_at claim after side-effect error '
+                    'on event %s', source_event_id,
+                )
+        raise
+
+    # mark_done flow flips read_at (idempotent — no claim was taken). The
+    # non-mark_done flows already flipped it via the atomic claim above.
+    if action == 'mark_done':
+        supabase_client.table('chain_events').update(
+            {'read_at': ts_iso}
+        ).eq('event_id', source_event_id).execute()
 
     # Insert the larry_action audit row. Top-level `actor` column per
     # migration 0006; payload mirrors spec § 5.2 verbatim.

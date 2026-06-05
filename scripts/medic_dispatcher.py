@@ -468,34 +468,121 @@ def _read_medic_records_since(start_line: int) -> list[dict]:
     return out
 
 
+# nervous-system-audit #4 (2026-06-05): chars that can be part of a
+# fingerprint token (`source:subject`, medic_ledger.fingerprint). A delivery
+# match is accepted only when the chars FLANKING the hit are NOT in this set,
+# so a short fingerprint can't be confirmed by the escalation text of a longer
+# one it is a prefix of (see _fp_token_in_text / _delivered_fingerprints).
+_FP_CONTINUATION_CHARS = frozenset(
+    'abcdefghijklmnopqrstuvwxyz'
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    '0123456789:_-'
+)
+
+
+def _fp_token_in_text(fp: str, text: str) -> bool:
+    """True iff `fp` occurs in `text` as a boundary-delimited token, NOT as a
+    substring of a longer fingerprint.
+
+    Fingerprints are human-readable `source:subject` strings of varying length
+    (medic_ledger.fingerprint), so a plain `fp in text` lets a short
+    fingerprint (`pipeline-stall:forge-no-pr`) false-match the escalation text
+    of a longer one that merely starts with it
+    (`pipeline-stall:forge-no-pr:task-42`). That records the short fingerprint
+    as delivered when it was not → it is never retried → silent drop, the exact
+    audit #4 failure. We accept a hit only when the chars immediately before
+    and after it are not fingerprint-continuation chars, so a prefix
+    fingerprint cannot be swallowed by a longer escalated one. False negatives
+    stay safe (they just trigger a retry, never a silent drop)."""
+    if not fp:
+        # Self-safe: an empty needle would `str.find('') == 0` and match every
+        # text. The sole caller already filters empty fps, but never let this
+        # helper report a bogus universal delivery.
+        return False
+    span = len(fp)
+    n = len(text)
+    start = 0
+    while True:
+        i = text.find(fp, start)
+        if i < 0:
+            return False
+        before_ok = i == 0 or text[i - 1] not in _FP_CONTINUATION_CHARS
+        after_ok = (i + span == n) or text[i + span] not in _FP_CONTINUATION_CHARS
+        if before_ok and after_ok:
+            return True
+        start = i + 1
+
+
+_APPROVAL_ID_PREFIX = 'medic-'
+
+
+def _fp_in_approval_id(fp: str, approval_id: str) -> bool:
+    """True iff `approval_id` is the templated id for `fp`.
+
+    Approval-request escalations carry the fingerprint in the structurally
+    templated `--approval-id 'medic-<fingerprint>-<ts>'` (agents/medic/CLAUDE.md
+    L128-134) — the one field where it is GUARANTEED present, not dependent on
+    the operator's free-form prose. We confirm delivery by recovering the
+    embedded fingerprint precisely instead of substring-scanning: strip the
+    `medic-` prefix and the trailing `-<ts>` segment, then compare for EQUALITY.
+    Because `<ts>` is a single trailing token, the embedded fingerprint is
+    everything before the LAST `-`; a prefix fingerprint therefore can't match a
+    longer one's approval_id (audit #4 false-positive stays closed). If a `<ts>`
+    ever contains a `-`, this under-matches → a safe false negative (retry),
+    never a false positive."""
+    if not fp or not approval_id.startswith(_APPROVAL_ID_PREFIX):
+        return False
+    rest = approval_id[len(_APPROVAL_ID_PREFIX):]
+    cut = rest.rfind('-')
+    if cut < 0:
+        return False
+    return rest[:cut] == fp
+
+
 def _delivered_fingerprints(medic_records: list[dict],
                             batch_fps: set) -> set:
-    """Subset of batch fingerprints that appear in a Medic-emitted record
-    from this run. The operator embeds the fingerprint in every escalation
-    (notification `message`, approval_request `body` / `approval_id`) per
-    agents/medic/CLAUDE.md, so a substring match over those fields confirms
-    delivery. A fingerprint with no matching record was NOT delivered and
-    will be recorded escalate-failed (a false negative is safe: it just
-    triggers a retry, never a silent drop)."""
+    """Subset of batch fingerprints that appear in a Medic-emitted record from
+    this run. The operator embeds the fingerprint in every escalation per
+    agents/medic/CLAUDE.md, so a match over those fields confirms delivery. A
+    fingerprint with no matching record was NOT delivered and will be recorded
+    escalate-failed (a false negative is safe: it just triggers a retry, never
+    a silent drop).
+
+    Two complementary, false-positive-safe matchers:
+      * `message` / `body` (the human-readable fields) — boundary-delimited
+        TOKEN match (`_fp_token_in_text`), so a short fingerprint can't be
+        confirmed by the escalation text of a longer one it prefixes.
+      * `approval_id` — STRUCTURAL match (`_fp_in_approval_id`) against the
+        `medic-<fp>-<ts>` template, the field where the fingerprint is
+        guaranteed present for approval-request escalations. This is NOT the old
+        substring scan (which let a prefix fingerprint false-match); it recovers
+        the exact embedded fingerprint. Keeping it avoids wedging the queue when
+        the operator's free-form body prose happens not to echo the fingerprint
+        verbatim."""
     if not batch_fps:
         return set()
     haystacks: list[str] = []
+    approval_ids: list[str] = []
     for rec in medic_records:
         parts: list[str] = []
-        for field in ('message', 'body', 'approval_id'):
+        for field in ('message', 'body'):
             val = rec.get(field)
             if isinstance(val, str):
                 parts.append(val)
         if parts:
             haystacks.append(' '.join(parts))
+        aid = rec.get('approval_id')
+        if isinstance(aid, str) and aid:
+            approval_ids.append(aid)
     delivered: set = set()
     for fp in batch_fps:
         if not isinstance(fp, str) or not fp:
             continue
-        for hay in haystacks:
-            if fp in hay:
-                delivered.add(fp)
-                break
+        if any(_fp_token_in_text(fp, hay) for hay in haystacks):
+            delivered.add(fp)
+            continue
+        if any(_fp_in_approval_id(fp, aid) for aid in approval_ids):
+            delivered.add(fp)
     return delivered
 
 

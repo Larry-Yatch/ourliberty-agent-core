@@ -911,6 +911,86 @@ class DeliveryGatingTest(_IsolatedDispatcher):
         self.assertIsNone(medic_dispatcher._match_owned(rec, owned))
 
 
+class DeliveryFingerprintMatchTest(unittest.TestCase):
+    """nervous-system-audit #4 (2026-06-05): delivery confirmation matches the
+    fingerprint as a boundary-delimited token, so a short fingerprint can't be
+    falsely confirmed by the escalation text of a longer one it prefixes (which
+    would silently drop the short alert — recorded escalated, never retried)."""
+
+    def test_prefix_fingerprint_not_falsely_delivered(self):
+        # Only the LONGER fingerprint was escalated. The shorter one (a prefix
+        # of it) must NOT be reported delivered.
+        short = 'pipeline-stall:forge-no-pr'
+        long = 'pipeline-stall:forge-no-pr:task-42'
+        records = [{'message': f'Diagnose-only for fingerprint {long}.'}]
+        delivered = medic_dispatcher._delivered_fingerprints(
+            records, {short, long},
+        )
+        self.assertEqual(delivered, {long})
+
+    def test_exact_fingerprint_delivered(self):
+        fp = 'sentinel:inbox-stall:agent-a'
+        records = [{'message': f'Diagnose-only for fingerprint {fp}.'}]
+        self.assertEqual(
+            medic_dispatcher._delivered_fingerprints(records, {fp}),
+            {fp},
+        )
+
+    def test_both_distinct_fingerprints_delivered(self):
+        a = 'sentinel:inbox-stall:a'
+        b = 'sentinel:inbox-stall:b'
+        records = [
+            {'message': f'Acted on {a} ok.'},
+            {'body': f'Approval request for {b} pending.'},
+        ]
+        self.assertEqual(
+            medic_dispatcher._delivered_fingerprints(records, {a, b}),
+            {a, b},
+        )
+
+    def test_approval_id_structural_match_confirms_exact_fp(self):
+        # approval_id `medic-<fp>-<ts>` confirms delivery for the approval tier
+        # (where the fp may only be guaranteed in this templated field) — via a
+        # STRUCTURAL match, not a substring scan.
+        fp = 'sentinel:inbox-stall:agent-a'
+        records = [{'approval_id': f'medic-{fp}-20260605T000000Z'}]
+        self.assertEqual(
+            medic_dispatcher._delivered_fingerprints(records, {fp}),
+            {fp},
+        )
+
+    def test_approval_id_does_not_confirm_prefix_fp(self):
+        # The longer fp's approval_id must NOT confirm a shorter prefix fp —
+        # the substring false-positive stays closed in approval_id too.
+        short = 'pipeline-stall:forge-no-pr'
+        long = 'pipeline-stall:forge-no-pr:task-42'
+        records = [{'approval_id': f'medic-{long}-20260605T000000Z'}]
+        self.assertEqual(
+            medic_dispatcher._delivered_fingerprints(records, {short, long}),
+            {long},
+        )
+
+    def test_fp_in_approval_id_helper(self):
+        f = medic_dispatcher._fp_in_approval_id
+        self.assertTrue(f('a:b', 'medic-a:b-1733000000'))
+        self.assertTrue(f('a-b:c-d', 'medic-a-b:c-d-20260605T000000Z'))
+        self.assertFalse(f('a:b', 'medic-a:b-c-1733000000'))   # longer fp
+        self.assertFalse(f('a:b', 'notmedic-a:b-1733000000'))  # wrong prefix
+        self.assertFalse(f('a:b', 'medic-a:b'))                # no -ts segment
+
+    def test_fp_token_boundary_helper(self):
+        f = medic_dispatcher._fp_token_in_text
+        # bounded by delimiters -> match
+        self.assertTrue(f('a:b', 'see a:b here'))
+        self.assertTrue(f('a:b', 'a:b'))
+        self.assertTrue(f('a:b', 'ends with a:b'))
+        self.assertTrue(f('a:b', '(a:b)'))
+        # substring of a longer fingerprint token -> no match
+        self.assertFalse(f('a:b', 'a:b-c is longer'))
+        self.assertFalse(f('a:b', 'prefix a:bcd'))
+        self.assertFalse(f('a:b', 'xa:b leading'))
+
+
 class MedicAllowlistShapeTest(unittest.TestCase):
     """The Medic operator allowlist must permit ONLY the append_notification
     and append_approval_request subcommands of larry_alerts.py -- never
