@@ -4,6 +4,22 @@
 
 ---
 
+## Inter-agent notification — 2026-06-05 ~04:50 UTC (result-notification from Beacon)
+
+**Context:** Beacon completed `cycle-finding-cleanup-stale-worktrees-orphaned-dirs-20260605T044354Z` (G-rule `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` — 3/3 dispatch from iter 952). Duration: 145s, $0.48.
+
+**Root cause confirmed by Beacon:** `sweep_canonical()` builds its removal-candidate set entirely from `git worktree list --porcelain` per repo. Physical dirs that have been de-registered from git (via `git worktree remove`/`prune`) are never enumerated → hourly GC never reaps them. Confirmed by three observations: `wt-fix` (iter 716, 2d+ old), `wt-forge-build-unreviewed-merge-detector-20260605T000816Z` and `wt-mirror-build-unreviewed-merge-detector-20260605T000816Z` (iters 951–952, 4h+ post-PR #334 merge). The gap is structural.
+
+**Fix designed (APPROVAL_REQUEST → Pulse approval gate):** New `sweep_orphan_dirs()` function with 3 independent safety guards: (1) registered-path check (skip dirs known to git); (2) in-flight stem check (skip dirs whose name contains an active task stem); (3) 24h age floor (`ORPHAN_MAX_AGE_SECONDS = 86400`, longer grace than the 4h registered threshold). `main()` aggregates all registered paths first, then calls orphan sweep once. Production scope: `scripts/cleanup_stale_worktrees.py` only. Tests: 4 cases in `scripts/tests/test_cleanup_stale_worktrees_orphan_sweep.py`.
+
+**Action taken:** Approved the APPROVAL_REQUEST (Pulse is the approval gate for its own Beacon dispatches). Dispatched `orphan-worktree-dir-sweep-001.json` → Forge inbox (`source=beacon`, `phase=preflight`).
+
+**G-rule status:** `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` → **3/3 DISPATCHED ✅** (Beacon COMPLETE, Forge preflight queued).
+
+**Beacon sidebar:** asked whether to register a `worktree-GC-hardening` mission for this in `missions.json`. Decision is Larry's; this is a one-off GC bugfix and fits Missions Orphans lane without a dedicated mission entry.
+
+---
+
 ## Iteration 951 — 2026-06-05 04:06 UTC (interactive, Tier 2→3)
 
 **Health:** ✅ **Tier 2→3 CLEAN. consecutive_clean=3 → de-escalating to Tier 3. 0 new alerts. 7/7 scanned services active. All inboxes empty. Sync CLEAN. 0 auto-fix actions.**
