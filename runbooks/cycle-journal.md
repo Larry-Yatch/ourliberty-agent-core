@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 1004 — 2026-06-05 18:26 UTC (interactive, Tier 1 — CLEAN)
+
+**Health:** ✅ **Tier 1 — consecutive_clean=1. 0 new alerts. 9/9 services active. All inboxes empty. 0 open PRs. Sync error self-recovering.**
+
+Alert watermark: **1354 lines / 2026-06-05T18:20:42Z** (unchanged from iter 1003 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T18:14:08Z (✅ ~12 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T18:06:59Z (✅ ~19 min at scan; within 60-min threshold). Sync: status=error, commit=22a2b98f, last_sync=17:50:20Z (~36 min) — SYNC-PUSH-REBASE-FALLBACK-001 57th (unchanged); HEAD=c04b773 "Pulse cycle 20260605T182252Z" newer than sync commit (wrapper push succeeded). Next hourly tick ~18:50Z. Session-start gitStatus: branch=main, tree=clean, HEAD=c04b773 "Pulse cycle 20260605T182252Z". Tier state at start: tier=1, consecutive_clean=0 (last_signal_at=18:21:38Z). Tier state at end: **tier=1, consecutive_clean=1** (all checks clean — no tier-reset conditions).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1354/18:20:42Z unchanged — 0 new alerts since iter 1003. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '50 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T18:14:08Z (~12 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T18:06:59Z (~19 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=c04b773 "Pulse cycle 20260605T182252Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=22a2b98f, last_sync=17:50:20Z (~36 min). SYNC-PUSH-REBASE-FALLBACK-001 57th total (unchanged). HEAD=c04b773 newer than sync commit (wrapper push succeeded). Within 2h threshold; next hourly tick ~18:50Z. ⚠️ (no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Nominal.** 0 open PRs in ourliberty-agent-core. 0 in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 18 consecutive (PRs #343–#360).** No new occurrences this iter. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=724, systemic_fixes=16, ratio≈45.3. No new always-fix actions this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts (watermark unchanged at 1354/18:20:42Z).
+3. Confirmed 9/9 services active, all inboxes empty, 0 open PRs, both heartbeats within threshold, sync self-recovering.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[red]` PRs #343–#360 audit-series (18 total) Larry-direct unreviewed merges. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 57th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=1. System nominally healthy. One more clean iter will trigger de-escalation to Tier 2 (15-min cadence). Sync race steady at 57th; next hourly tick ~18:50Z will clear. Audit series at 18 consecutive Larry-direct merges (PRs #343–#360); pattern clearly intentional; `actor-exemption-config` dispatch awaiting Larry's `go`.
+
+---
+
 ## Iteration 1003 — 2026-06-05 18:21 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 1 new alert (Tier-4, tier-reset). 9/9 services active. All inboxes empty. 0 open PRs. Sync error self-recovering.**
