@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 946 — 2026-06-05 03:04 UTC (interactive)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1 (↑ from 0). PR #335 MERGED ✅ (Mirror PASS 03:00:15Z, auto-merged 03:00:27Z). Inbox-watcher fully operational. Mirror wedge from iters 940–945 confirmed resolved. 0 open PRs. 0 new alerts. 0 Pulse auto-fix actions.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 945). Pipeline-stall heartbeat: 2026-06-05T02:46:00Z (✅ ~18 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T02:31:59Z (✅ ~32 min at cycle start; within 60-min threshold). Sync: status=error, commit=c0e5f6cf, last_sync=02:56:04Z (⚠️ SYNC-PUSH-REBASE-FALLBACK — Tier 3 known pattern, "Auto-commit push failed; rolled back"; session-start HEAD 2927e8f is NEWER than sync.json commit → wrapper push succeeded independently; self-clears on next hourly sync.timer). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1** (clean iter — all mandatory and additive checks nominal at end; sync error is Tier 3, no tier-reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z unchanged — 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** Inbox-watcher log reviewed for 02:50Z–03:01Z window. One WARN: Mirror's first attempt on `build-unreviewed-merge-detector-20260605T000816Z` exited 143 (SIGTERM) at 02:50:38Z — expected (session killed/timed after 131 min); attempt 2 completed successfully at 02:57:28Z (duration=8295.8s total, 2 attempts). No patterns above threshold. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ RESOLVED.** Heartbeat = 02:46:00Z (~18 min; ✅ within 90-min threshold). **Mirror wedge from iters 940–945 fully resolved.** Confirmed from inbox-watcher log: `build-unreviewed-merge-detector-20260605T000816Z` completed at 02:57:28Z (success=True, 2 attempts, 8295.8s, $3.47 Forge + $0.70 Mirror). Immediately after, Mirror took up `review-manual-tier2-probe-memcap-pr335.json` (started 02:57:35Z, completed 03:00:15Z, **REVIEW_PASS**, duration=160s, cost=$0.52). Inbox-watcher is processing tasks normally. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Mirror=0, Forge=0, Beacon=0 (all inboxes empty). Pulse inbox: `notify-manual-tier2-probe-memcap-pr335.json` — pipeline notify, new at ~03:01Z, not yet 1-hour threshold; inbox-watcher will process. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 02:31:59Z (~32 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2927e8f "Pulse cycle 20260605T025909Z". ✅
+
+- **(Check B) Sync health: ⚠️ Tier 3 known pattern — no tier-reset.** sync.json: status=error, commit=c0e5f6cf, last_sync=02:56:04Z. Message: "Auto-commit push failed; rolled back." session-start HEAD (2927e8f, 02:59:09Z) is NEWER than sync.json commit (c0e5f6cf) → per MEMORY.md calibration rule, wrapper push succeeded; sync service's push failed in timing race. SYNC-PUSH-REBASE-FALLBACK pattern (total 55+; APPROVAL_REQUEST `sync-push-rebase-fallback-001` open). Self-clears on next hourly sync.timer. `last_sync=02:56:04Z` = ~8 min old; ✅ within 2h threshold. No tier-reset (Tier 3 known pattern). ⚠️→INFO
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All units systemd-active. Inbox-watcher operational. ✅
+
+- **(Check D) Agent inboxes: ✅ Nominal.** All empty except Pulse inbox `notify-manual-tier2-probe-memcap-pr335.json` (brand new, < 5 min, not stale). ✅
+
+- **(Check E) PRs: ✅ PR #335 MERGED at 03:00:27Z.** Mirror PASS (03:00:15Z) → outbox-notifier classified `review_pass` at 03:00:20Z → deferred auto-merge 1x (UNKNOWN) → retry immediately → **`gh pr merge --squash --delete-branch` succeeded at 03:00:27Z** → worktree teardown fired (event-driven, per PR #266). PR #335 "fix(tier2-probe): raise memory cap that OOM-throttled the probe + classify failure mode" is now in main. ourliberty-dashboard: 0 open PRs. **0 open PRs total.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Thursday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions Case 2 not graduated — poll-loop-wedge auto-kill blocked`: 2/3 (unchanged).** Mirror build-unreviewed-merge-detector task completed with attempt 2 after attempt 1 exited 143 (SIGTERM at 02:50:38Z). Exit mechanism: SIGTERM, likely the 14400s timeout kicking in on attempt 1 (started 00:39:12Z, 131 min elapsed = within timeout, but could be healer-kill or external). G-rule stays 2/3 — the poll-loop-wedge-blocks-kill variant needs a fresh bash pgrep self-match occurrence to advance.
+  - **`wedged-review-silent-wt:* not in alert-translations.json`: 1/3** (no new occurrence). Unchanged.
+  - **`source=larry Forge builds auto-routing to Mirror`: 1/3** (routing confirmed working via PR #334, same confirmation applies here — Mirror completed build-unreviewed-merge-detector review post-merge). Unchanged at 1/3; counting only pre-merge review confirmations.
+  - **NEW watch: `tier2_weekly_probe_failed` — PR #335 healing expected.** PR #335 raises MemoryMax to 1G (was 256M), adds `classify_failure()` to distinguish OOM vs auth_401. Probe runs every 6h. Next fire: watch for absence of `tier2_weekly_probe_failed` alert in `larry-alerts.jsonl`. If clean through next 2+ probe fires (≥12h): APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close and G-rule `tier2_weekly_probe_failed` treated as healed. Watch item added.
+  - All other G-rules: unchanged from iter 945.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). No new intervention or systemic_fix rows this iter (no new Pulse-level findings; PR #335 auto-merge was outbox-notifier pipeline action, not a Pulse intervention). `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed Mirror wedge fully resolved via inbox-watcher log: both tasks (`build-unreviewed-merge-detector` + `review-manual-tier2-probe-memcap-pr335`) completed successfully.
+3. Confirmed PR #335 MERGED at 03:00:27Z via outbox-notifier auto-merge path (Mirror PASS → retry → squash merge → worktree teardown). Pulse did NOT issue a manual `gh pr merge` command — outbox-notifier handled it autonomously. 0 open PRs.
+4. Noted sync.json error as Tier 3 SYNC-PUSH-REBASE-FALLBACK (no tier-reset, self-recovering).
+5. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. All prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watch PR #335 healing before closing.
+
+**Patterns:** Mirror wedge (iters 940–945, ~134 min) resolved cleanly: attempt 2 on `build-unreviewed-merge-detector` completed the review (SIGTERM on attempt 1 was the 131-min mark), immediately followed by PR #335 review (PASS, 160s, $0.52) and auto-merge. PR #335 addresses `tier2_weekly_probe_failed` OOM root cause (MemoryMax 256M → 1G + classify_failure). System at consecutive_clean=1 — 2 more clean iters needed to de-escalate to Tier 2.
+
+---
+
 ## Iteration 945 — 2026-06-05 02:53 UTC (interactive)
 
 **Health:** ⚠️ **Tier 1 — RESOLVING. PID 44633 GONE (Mirror session terminated naturally ~02:53Z after 134 min). Inbox-watcher recovery in progress. PR #335 open 20 min, UNKNOWN merge state, below 30-min threshold. Mirror review task for PR #335 now queued. 0 auto-fix actions.**
