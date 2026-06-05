@@ -194,6 +194,7 @@ def find_archived_envelope(task_stem: str,
     short-circuits the scan when the marker carried it; otherwise we scan
     every agent inbox's `.archive/` (slow path for legacy markers written
     before the agent_id field landed)."""
+    import safe_write_inbox as swi  # lazy, matching this module's convention
     candidates: list[str] = []
     if agent_hint:
         candidates.append(agent_hint)
@@ -203,8 +204,12 @@ def find_archived_envelope(task_stem: str,
                 if d.is_dir() and not d.name.startswith('.'):
                     candidates.append(d.name)
 
+    # The inbox .archive holds files written by safe_write_inbox under their
+    # canonical (sanitized + length-capped) name, so look them up the same way —
+    # a raw task_stem would miss for a path-structural / long id.
+    archived_name = swi.canonical_inbox_name(f'{task_stem}.json')
     for agent in candidates:
-        path = INBOXES_ROOT / agent / '.archive' / f'{task_stem}.json'
+        path = INBOXES_ROOT / agent / '.archive' / archived_name
         if not path.exists():
             continue
         try:

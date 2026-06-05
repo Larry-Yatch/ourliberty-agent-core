@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from task_type_inference import infer_task_type
+import safe_write_inbox  # sanitize_component: match on-disk outbox archive names
 
 # --- constants ---
 
@@ -155,7 +156,10 @@ def attribute_task_types(rows: list[CostRow], outbox_root: Path) -> None:
     "writer set nothing" apart from "inference saw the id and gave up").
     """
     for row in rows:
-        archive = outbox_root / row.agent / ".archive" / f"{row.task_id}.json"
+        # Outbox archive names are sanitize-only (inbox_watcher writes the
+        # outbox via _unique_dest without truncation), so match that — a raw
+        # task_id misses for a path-structural id.
+        archive = outbox_root / row.agent / ".archive" / safe_write_inbox.sanitize_component(f"{row.task_id}.json")
         if archive.exists():
             try:
                 with open(archive, "r", encoding="utf-8") as f:
