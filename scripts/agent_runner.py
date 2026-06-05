@@ -338,7 +338,7 @@ def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id):
         )
     elif failure_type == 'auth_401':
         recovery = (
-            'Auth-401: run /tmp/auth_orchestrator.py from chat to '
+            'Auth-401: run scripts/auth_orchestrator.py from chat to '
             'headless-re-auth Tier 1. Runbook: '
             'docs/runbooks/restore-larry-personal-claude-oauth-tier2.md.'
         )

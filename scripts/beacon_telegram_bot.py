@@ -210,7 +210,7 @@ def _tier2_failure_dm(
         )
     else:
         recovery = (
-            "Tier 1 auth-401: run /tmp/auth_orchestrator.py from chat to "
+            "Tier 1 auth-401: run scripts/auth_orchestrator.py from chat to "
             "headless-re-auth Tier 1; runbook "
             "docs/runbooks/restore-larry-personal-claude-oauth-tier2.md "
             "for Tier 2 provisioning."
