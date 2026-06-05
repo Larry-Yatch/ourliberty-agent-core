@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 937 — 2026-06-05 01:32 UTC (interactive)
+
+**Health:** ✅ **Tier 1 → Tier 2 de-escalation. consecutive_clean=2→3. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ success.**
+
+Alert watermark: **1307 lines / 2026-06-05T01:05:44Z** (unchanged — 0 new alerts since iter 936 watermark). Pipeline-stall heartbeat: 2026-06-05T01:26:29Z (✅ ~5 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T01:01:19Z (✅ ~30 min at cycle start; within 60-min threshold). Sync: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (✅ ~42 min old; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=a3e00e5 "Pulse cycle 20260605T012511Z". Tier state at start: tier=1, consecutive_clean=2. Tier state at end: **tier=2, consecutive_clean=0** (3rd consecutive clean iter → de-escalated from Tier 1 to Tier 2; 15-min cadence now active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1307 lines, unchanged from iter 936 watermark (1307 / 01:05:44Z). 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T01:26:29Z (~5 min at cycle start; ✅ within 90-min threshold). 0 new pr-create-inferred-failure alerts since PR #332 merged (01:01:10Z); now ~30 min quiet window. **G-rule `heal-pipeline-stall:pr-create-inferred-failure false positive` — 3rd consecutive clean cycle post-PR #332: CLOSED. ✅** PR #332 "reconcile retry-recovered dispatches" confirmed effective — no false-positive stall fires in 3 consecutive clean iters. G-rule closed without further dispatch. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active, not stalled.** Mirror=1 (review-build-unreviewed-merge-detector-20260605T000816Z.json — post-merge review for PR #334, ~52 min old; expected behavior — Mirror processes post-merge and archives). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T01:01:19Z (~30 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=a3e00e5. ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (~42 min old; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Mirror=1 (post-merge review for PR #334; expected). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Clean.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** Friday → skip (Monday only). ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch (updated):**
+  - ~~**`heal-pipeline-stall:pr-create-inferred-failure false positive`: 1/3 (watching for healing)**~~ **→ CLOSED. 3 consecutive clean cycles post-PR #332 merge: no new pr-create-inferred-failure alerts. PR #332 "reconcile retry-recovered dispatches" confirmed effective. G-rule closed healed. ✅**
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; unchanged).
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (routing confirmed working via PR #334; watch 2 more source=larry builds before closing).
+  - All other G-rules: unchanged from iter 936.
+
+- **PRIME DIRECTIVE ratio:** interventions=718, systemic_fixes=12, ratio≈59.8 (iter_clean row appended 2026-06-05T01:32:25Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Closed G-rule `heal-pipeline-stall:pr-create-inferred-failure false positive` — 3 consecutive clean cycles post-PR #332 confirm healing. No dispatch needed.
+3. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → recorded (01:32:25Z). ✅
+4. `cycle_tier_state.py record --checks-clean true` → tier=1→2 (de-escalation), consecutive_clean=0. ✅
+5. Updated MEMORY.md.
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** Three consecutive clean iters achieved → de-escalated from Tier 1 to Tier 2 (15-min cadence). G-rule `pr-create-inferred-failure false positive` closed after 3 clean cycles post-PR #332 — PR #332's reconcile fix is confirmed effective. System has been stable for 3+ iters since PR #334's merge (unreviewed-merge-detector live, Mirror still has its post-merge review task to archive). Mirror inbox will self-clear on next healer sweep. Tier 2 now active; one more de-escalation cycle to Tier 3 (30 min).
+
+---
+
 ## Iteration 936 — 2026-06-05 01:24 UTC (interactive)
 
 **Health:** ✅ **Tier 1 clean. consecutive_clean=1→2. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts. Sync: ✅ success.**
