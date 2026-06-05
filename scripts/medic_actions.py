@@ -529,8 +529,13 @@ def silence_false_positive(fingerprint: str, reason: str = '',
             fp, reason=(reason or 'medic-confirmed false positive'),
             ttl_sec=ttl_sec, by='medic')
 
-        # (e) verify
-        if not (wrote and larry_alerts.is_silenced(fp)):
+        # (e) verify -- the file persisted AND, when the silence is meant to be
+        # active right now, is_silenced agrees. A non-positive ttl_sec is an
+        # immediately-expired (no-op) silence, so is_silenced is *expected* to
+        # be False; only require the write to have succeeded there (don't read a
+        # legitimately-expired silence as a write failure).
+        expect_active = ttl_sec is None or ttl_sec > 0
+        if not wrote or (expect_active and not larry_alerts.is_silenced(fp)):
             return _refuse(
                 ACTION_SILENCE, fp, fp, attempt_int, 'silence-write-failed',
                 f'Could not persist a silence for {fp}; escalate diagnose-only.')
@@ -553,7 +558,9 @@ def silence_false_positive(fingerprint: str, reason: str = '',
         _log('INFO', f'silence decision for {fp}: '
                      f'{"posted to Approvals tab" if posted else "not posted (chain_events unavailable)"}')
 
-        ttl_note = 'permanent' if not ttl_sec else f'ttl={ttl_sec}s'
+        # Match larry_alerts.silence semantics: only ttl_sec=None is permanent
+        # (ttl_sec=0 expires immediately, it is NOT eternal).
+        ttl_note = 'permanent' if ttl_sec is None else f'ttl={ttl_sec}s'
         decision_note = ('Approve/Reject decision posted to Approvals tab'
                          if posted else
                          'Approvals-tab decision NOT posted (chain_events unavailable)')

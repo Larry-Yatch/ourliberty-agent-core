@@ -24,7 +24,9 @@ Stdlib only.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,9 +69,33 @@ DEFAULT_ROUTE = 'escalate'
 # ---------- cooldown machinery ----------
 
 
+# Cap the sanitized filename well under the common 255-byte filesystem
+# NAME_MAX, leaving headroom for the `.tmp.<pid>` suffix `silence()` adds during
+# its atomic write (and the 11-byte hash suffix below). A key longer than this
+# is truncated and disambiguated by the hash, so an over-long fingerprint can't
+# make `open()`/`write` raise (which would read as a silence-write failure).
+_MAX_SAFE_KEY_LEN = 200
+
+
 def _safe_key(key: str) -> str:
-    """Filesystem-safe form of a cooldown key."""
-    return ''.join(c if (c.isalnum() or c in '-._:') else '_' for c in key)
+    """Filesystem-safe form of a cooldown/silence key.
+
+    Sanitization (mapping every disallowed char to `_`) is lossy: distinct raw
+    keys like `forge:a/b` and `forge:a b` both collapse to `forge:a_b`, so one
+    alert's cooldown/silence would suppress the other. To keep the mapping
+    injective, append a short stable hash of the RAW key whenever sanitization
+    changed something OR the key is over-length. Keys that are already
+    filesystem-safe AND short (the common `source:subject` case where subject is
+    a task-id) are returned unchanged, so there is no churn for existing
+    cooldown/silence files.
+    """
+    safe = ''.join(c if (c.isalnum() or c in '-._:') else '_' for c in key)
+    if safe == key and len(safe) <= _MAX_SAFE_KEY_LEN:
+        return safe
+    digest = hashlib.sha1(key.encode('utf-8')).hexdigest()[:10]
+    if len(safe) > _MAX_SAFE_KEY_LEN:
+        safe = safe[:_MAX_SAFE_KEY_LEN]
+    return f'{safe}.{digest}'
 
 
 def _cooldown_path(severity: str, key: str) -> Path:
@@ -132,37 +158,64 @@ def is_silenced(key: str, now: Optional[float] = None) -> bool:
         with open(path, encoding='utf-8') as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError):
-        # An explicitly-written silence file that is unreadable still
-        # suppresses -- fail toward quiet, since something deliberately wrote it.
-        return True
+        # A corrupt/unreadable silence file must NOT suppress permanently.
+        # Failing-quiet here means a possibly-real, recurring alert is silently
+        # dropped forever with no recovery path -- the irreversible-bad
+        # direction. Fail LOUD instead: let the alert through so Larry (or
+        # Medic) sees it and can re-silence cleanly. `silence()` writes
+        # atomically, so a corrupt file is an external/partial-write anomaly,
+        # not a normal state.
+        return False
+    if not isinstance(data, dict):
+        return False
     until = data.get('until')
-    if until in (None, 0):
+    # `until is None` => permanent silence (until manually cleared). A numeric
+    # `until` is an absolute epoch deadline; 0 (or any past value) is simply
+    # expired -- NOT permanent (the old `until in (None, 0)` treated a 0
+    # deadline as permanent, which made an immediate-expiry silence eternal).
+    if until is None:
         return True
     try:
         return (now if now is not None else time.time()) < float(until)
     except (TypeError, ValueError):
-        return True
+        # A non-numeric, non-None `until` is malformed -> don't suppress.
+        return False
 
 
 def silence(key: str, reason: str = '', ttl_sec: Optional[float] = None,
             by: str = 'medic', now: Optional[float] = None) -> bool:
     """Write a durable silence for `key`. Returns True on success, never
-    raises. `ttl_sec=None` -> permanent (until the file is removed)."""
+    raises. `ttl_sec=None` -> permanent (until the file is removed);
+    `ttl_sec=0` -> expires immediately (a no-op silence), NOT permanent."""
     path = _silence_path(key)
     base = now if now is not None else time.time()
-    record = {
-        'key': key,
-        'reason': reason,
-        'by': by,
-        'ts': datetime.now(timezone.utc).isoformat(),
-        'until': (base + float(ttl_sec)) if ttl_sec else None,
-    }
+    tmp = Path(f'{path}.tmp.{os.getpid()}')
     try:
+        # ttl_sec=0 must stay distinct from ttl_sec=None: `if ttl_sec` treated
+        # 0 as falsy -> None -> a permanent silence, so a caller asking for a
+        # zero-duration silence got an eternal one. Gate on `is not None`.
+        until = None if ttl_sec is None else base + float(ttl_sec)
+        record = {
+            'key': key,
+            'reason': reason,
+            'by': by,
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'until': until,
+        }
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w', encoding='utf-8') as f:
+        # Atomic write: a crash/partial write mid-`json.dump` would leave a
+        # corrupt silence file; with the fail-loud `is_silenced` that only
+        # costs a re-fire, but atomic replace avoids even that and keeps a
+        # legitimate silence intact.
+        with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(record, f, ensure_ascii=False)
+        os.replace(tmp, path)
         return True
     except (OSError, TypeError, ValueError):
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
         return False
 
 

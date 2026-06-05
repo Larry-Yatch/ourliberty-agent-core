@@ -516,12 +516,87 @@ class SilenceLayerTest(_IsolatedQueueTest):
     def test_unsilence_missing_is_false(self):
         self.assertFalse(larry_alerts.unsilence('never:silenced'))
 
-    def test_unreadable_silence_file_fails_quiet(self):
-        # A silence file that exists but is unparseable still suppresses.
+    def test_corrupt_silence_file_fails_loud(self):
+        # Audit fix: a corrupt/unreadable silence file must NOT suppress —
+        # permanent silent suppression of a possibly-real alert is the
+        # irreversible-bad direction. Fail loud so the alert surfaces and can
+        # be re-silenced cleanly.
         path = larry_alerts._silence_path('a:b')
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text('not json{')
-        self.assertTrue(larry_alerts.is_silenced('a:b'))
+        self.assertFalse(larry_alerts.is_silenced('a:b'))
+
+    def test_non_dict_silence_file_fails_loud(self):
+        # A well-formed JSON that isn't an object (e.g. a bare number) is also
+        # malformed → don't suppress.
+        path = larry_alerts._silence_path('a:b')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('12345')
+        self.assertFalse(larry_alerts.is_silenced('a:b'))
+
+    def test_ttl_zero_expires_immediately_not_permanent(self):
+        # Audit fix: ttl_sec=0 must mean "expires immediately", NOT permanent.
+        # The old `if ttl_sec` falsy-check turned 0 into a None (eternal) until.
+        self.assertTrue(larry_alerts.silence('a:b', ttl_sec=0, now=1000))
+        data = json.loads(larry_alerts._silence_path('a:b').read_text())
+        self.assertEqual(data['until'], 1000)  # base+0, a real deadline (not None)
+        self.assertFalse(larry_alerts.is_silenced('a:b', now=1000))
+        self.assertFalse(larry_alerts.is_silenced('a:b', now=1001))
+
+    def test_until_zero_deadline_is_expired_not_permanent(self):
+        # A literal until=0 (epoch) is a long-past deadline → expired, not
+        # permanent (the old `until in (None, 0)` treated 0 as eternal).
+        path = larry_alerts._silence_path('a:b')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'key': 'a:b', 'until': 0}))
+        self.assertFalse(larry_alerts.is_silenced('a:b', now=1000))
+
+    def test_silence_write_is_atomic_no_tmp_left(self):
+        larry_alerts.silence('a:b', reason='x')
+        # No leftover .tmp.* sidecar in the silence dir.
+        leftovers = [p.name for p in larry_alerts.SILENCE_ROOT.iterdir()
+                     if '.tmp.' in p.name]
+        self.assertEqual(leftovers, [])
+
+    def test_long_key_silence_round_trip(self):
+        # A capped (over-long) key must still write+read a silence without an
+        # OSError from a NAME_MAX overflow on the atomic-write tmp file.
+        key = 'forge:' + ('x' * 400)
+        self.assertTrue(larry_alerts.silence(key))
+        self.assertTrue(larry_alerts.is_silenced(key))
+
+
+class SafeKeyTest(unittest.TestCase):
+    def test_clean_key_unchanged(self):
+        # A key with only filesystem-safe chars passes through verbatim (no
+        # churn for existing cooldown/silence files).
+        self.assertEqual(larry_alerts._safe_key('watchdog:my-service.unit'),
+                         'watchdog:my-service.unit')
+
+    def test_distinct_dirty_keys_do_not_collide(self):
+        # `forge:a/b` and `forge:a b` both sanitize to `forge:a_b`; the hash
+        # suffix keeps them distinct so one alert's silence can't suppress the
+        # other.
+        k1 = larry_alerts._safe_key('forge:a/b')
+        k2 = larry_alerts._safe_key('forge:a b')
+        self.assertNotEqual(k1, k2)
+        self.assertTrue(k1.startswith('forge:a_b.'))
+        self.assertTrue(k2.startswith('forge:a_b.'))
+
+    def test_safe_key_is_deterministic(self):
+        self.assertEqual(larry_alerts._safe_key('forge:a/b'),
+                         larry_alerts._safe_key('forge:a/b'))
+
+    def test_over_long_key_is_capped_and_disambiguated(self):
+        # A near-NAME_MAX key must be capped so the base name + `.tmp.<pid>`
+        # atomic-write suffix can't overflow the filesystem 255-byte limit.
+        long_clean = 'forge:' + ('a' * 400)
+        out = larry_alerts._safe_key(long_clean)
+        self.assertLessEqual(len(out), larry_alerts._MAX_SAFE_KEY_LEN + 11)
+        # Two distinct over-long keys with the same 200-char prefix stay distinct.
+        other = 'forge:' + ('a' * 399) + 'b'
+        self.assertNotEqual(larry_alerts._safe_key(long_clean),
+                            larry_alerts._safe_key(other))
 
 
 if __name__ == '__main__':

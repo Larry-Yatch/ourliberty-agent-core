@@ -256,6 +256,18 @@ class SilenceFalsePositiveTest(_IsolatedActions):
         self.assertEqual(recs[-1]['outcome'], 'acted')
         self.assertEqual(recs[-1]['classification'], 'reversible')
 
+    def test_zero_ttl_silence_does_not_false_report_write_failure(self) -> None:
+        # ttl_sec=0 is an immediately-expired (no-op) silence, so is_silenced is
+        # legitimately False afterward. The verify step must NOT read that as a
+        # 'silence-write-failed' refusal — the write itself succeeded.
+        res = medic_actions.silence_false_positive(
+            self.SILENCEABLE_FP, reason='zero ttl', ttl_sec=0)
+        self.assertTrue(res['ok'], res)
+        self.assertNotEqual(res['reason'], 'silence-write-failed')
+        # The file was written even though the silence is already expired.
+        self.assertTrue(medic_actions.larry_alerts._silence_path(
+            self.SILENCEABLE_FP).exists())
+
     def test_fingerprint_not_in_allowlist_is_refused(self) -> None:
         res = medic_actions.silence_false_positive(
             'watchdog:disk-full-critical', reason='nope')

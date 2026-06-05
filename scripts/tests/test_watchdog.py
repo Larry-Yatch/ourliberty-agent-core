@@ -45,6 +45,8 @@ class _IsolatedRootsTest(unittest.TestCase):
             mock.patch.object(watchdog, 'LOG_DIR', self._tmp_path / 'logs'),
             mock.patch.object(watchdog, 'HEALTH_FILE',
                               self._tmp_path / 'blackboard' / 'system-health.json'),
+            mock.patch.object(watchdog, '_FLAP_STREAK_DIR',
+                              self._tmp_path / 'state' / 'auto-restart-flap'),
             mock.patch.object(larry_alerts, 'AGENTS_ROOT', self._tmp_path),
             mock.patch.object(larry_alerts, 'ALERTS_FILE',
                               self._tmp_path / 'blackboard' / 'larry-alerts.jsonl'),
@@ -103,14 +105,16 @@ class IsServiceAliveTest(_IsolatedRootsTest):
 
 class CheckAutoRestartTest(_IsolatedRootsTest):
     def test_alive_service_returns_ok_no_action(self):
-        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=('active', 'running')):
             with mock.patch.object(watchdog, '_attempt_start') as mock_start:
                 result = watchdog._check_auto_restart('ourliberty-x', 'x')
         self.assertEqual(result['status'], 'ok')
         mock_start.assert_not_called()
 
     def test_dead_service_attempts_start_and_recovers(self):
-        with mock.patch.object(watchdog, 'is_service_alive', return_value=False):
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=('failed', 'failed')):
             with mock.patch.object(watchdog, '_attempt_start', return_value=True):
                 result = watchdog._check_auto_restart('ourliberty-x', 'x')
         self.assertEqual(result['status'], 'recovered')
@@ -120,7 +124,8 @@ class CheckAutoRestartTest(_IsolatedRootsTest):
         self.assertIn('"warning"', contents)
 
     def test_dead_service_start_fails_appends_critical(self):
-        with mock.patch.object(watchdog, 'is_service_alive', return_value=False):
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=('failed', 'failed')):
             with mock.patch.object(watchdog, '_attempt_start', return_value=False):
                 result = watchdog._check_auto_restart('ourliberty-x', 'x')
         self.assertEqual(result['status'], 'down')
@@ -130,6 +135,99 @@ class CheckAutoRestartTest(_IsolatedRootsTest):
         record = json.loads(contents.splitlines()[-1])
         self.assertEqual(record['subject'], 'ourliberty-x')
         self.assertIn('sudo systemctl status', record['suggested_action'])
+
+    def test_systemctl_error_treated_as_down_and_started(self):
+        # (None, None) = systemctl query failed → treat as down, actuate.
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=(None, None)):
+            with mock.patch.object(watchdog, '_attempt_start',
+                                   return_value=True) as mock_start:
+                result = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(result['status'], 'recovered')
+        mock_start.assert_called_once()
+
+    # ---- auto-restart flap detection (audit fix) ----
+
+    def test_single_auto_restart_tick_defers_no_actuation_no_alert(self):
+        # First observation in auto-restart: defer to systemd, no actuation,
+        # no alert (a normal restart looks like this for one tick).
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=('activating', 'auto-restart')):
+            with mock.patch.object(watchdog, '_attempt_start') as mock_start:
+                result = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(result['status'], 'auto-restart-wait')
+        self.assertEqual(result['streak'], 1)
+        mock_start.assert_not_called()
+        self.assertFalse(larry_alerts.ALERTS_FILE.exists()
+                         and larry_alerts.ALERTS_FILE.read_text().strip())
+
+    def test_sustained_auto_restart_streak_escalates_critical_no_actuation(self):
+        with mock.patch.object(watchdog, '_systemctl_states',
+                               return_value=('activating', 'auto-restart')):
+            with mock.patch.object(watchdog, '_attempt_start') as mock_start:
+                first = watchdog._check_auto_restart('ourliberty-x', 'x')
+                second = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(first['status'], 'auto-restart-wait')
+        self.assertEqual(second['status'], 'flapping')
+        self.assertEqual(second['streak'], 2)
+        mock_start.assert_not_called()  # never actuate during auto-restart
+        contents = larry_alerts.ALERTS_FILE.read_text().strip()
+        self.assertIn('crash-looping', contents)
+        self.assertIn('"critical"', contents)
+        record = json.loads(contents.splitlines()[-1])
+        self.assertEqual(record['subject'], 'ourliberty-x-flapping')
+
+    def test_confirmed_down_breaks_auto_restart_streak(self):
+        # auto-restart tick (streak 1) → a confirmed dead state with a FAILED
+        # start (no recovery) must still reset the streak, so the next
+        # auto-restart observation starts fresh at 1 (not escalate to flapping).
+        with mock.patch.object(watchdog, '_attempt_start', return_value=False):
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                first = watchdog._check_auto_restart('ourliberty-x', 'x')
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('failed', 'failed')):
+                down = watchdog._check_auto_restart('ourliberty-x', 'x')
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                again = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(first['streak'], 1)
+        self.assertEqual(down['status'], 'down')
+        self.assertEqual(again['streak'], 1)  # streak reset by the down tick
+        self.assertEqual(again['status'], 'auto-restart-wait')
+
+    def test_systemctl_error_does_not_reset_streak(self):
+        # An unknown (None) reading must NOT reset the streak — else a flapping
+        # service could evade detection by interleaving systemctl-error ticks.
+        with mock.patch.object(watchdog, '_attempt_start', return_value=False):
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                watchdog._check_auto_restart('ourliberty-x', 'x')  # streak 1
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=(None, None)):
+                watchdog._check_auto_restart('ourliberty-x', 'x')  # no reset
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                again = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(again['status'], 'flapping')
+        self.assertEqual(again['streak'], 2)
+
+    def test_recovery_resets_flap_streak(self):
+        # An auto-restart tick, then the service comes up clean → streak reset,
+        # so a later single auto-restart tick is back to streak 1 (no alert).
+        with mock.patch.object(watchdog, '_attempt_start', return_value=True):
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                watchdog._check_auto_restart('ourliberty-x', 'x')
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('active', 'running')):
+                ok = watchdog._check_auto_restart('ourliberty-x', 'x')
+            with mock.patch.object(watchdog, '_systemctl_states',
+                                   return_value=('activating', 'auto-restart')):
+                again = watchdog._check_auto_restart('ourliberty-x', 'x')
+        self.assertEqual(ok['status'], 'ok')
+        self.assertEqual(again['streak'], 1)
+        self.assertEqual(again['status'], 'auto-restart-wait')
 
 
 # ---------- inbox-watcher memory (V2 RSS) ----------
