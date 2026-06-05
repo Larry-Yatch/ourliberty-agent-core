@@ -91,6 +91,28 @@ class SweepOrphanDirsTest(unittest.TestCase):
         self.assertEqual((removed, kept), (0, 0))
         self.assertTrue(other.exists())
 
+    def test_short_stem_does_not_keep_unrelated_worktree(self):
+        # audit #12 regression: a short active stem 'b' must NOT keep an
+        # unrelated worktree via a bare substring match. The old guard
+        # (`stem in name`) matched the 'b' infix of 'rebuild' and wrongly
+        # preserved a stale worktree forever. Boundary matching (id_matches,
+        # min_len=1) sees 'b' is not a delimited token in 'wt-forge-rebuild-001'
+        # and lets the age sweep reap it.
+        d = self._make_dir(
+            'wt-forge-rebuild-001', csw.ORPHAN_MAX_AGE_SECONDS + 3600
+        )
+        removed, kept = csw.sweep_orphan_dirs(set(), {'b'})
+        self.assertEqual((removed, kept), (1, 0))
+        self.assertFalse(d.exists())
+
+    def test_short_stem_keeps_its_own_worktree(self):
+        # Safe direction: the same short stem 'b' MUST still keep its own
+        # worktree, where it appears as a boundary-delimited token (-b-).
+        d = self._make_dir('wt-forge-b-001', csw.ORPHAN_MAX_AGE_SECONDS + 3600)
+        removed, kept = csw.sweep_orphan_dirs(set(), {'b'})
+        self.assertEqual((removed, kept), (0, 1))
+        self.assertTrue(d.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

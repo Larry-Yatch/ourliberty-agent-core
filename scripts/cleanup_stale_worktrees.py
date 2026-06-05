@@ -34,6 +34,15 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Repo scripts dir on sys.path so the sibling id_match import resolves cleanly
+# when invoked by systemd. id_match is itself stdlib-only (re), so this preserves
+# the module's stdlib-only contract.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from id_match import id_matches  # noqa: E402
+
 _MODELS_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
 _REPO_PATHS_CACHE: list[Path] | None = None
 
@@ -222,7 +231,15 @@ def sweep_canonical(
         # A long Read-heavy build doesn't touch the worktree's mtime, so the
         # 24h gate isn't enough on its own — without this check the cleanup
         # could remove an actively-in-use worktree.
-        if any(stem and stem in Path(path).name for stem in active_stems):
+        #
+        # audit #12 (PR-B id-match discipline): match the stem against the
+        # structured ``wt-<agent>-<stem>-<ts>`` basename on token boundaries,
+        # not as a bare substring — a short stem 'b' must not match the infix of
+        # 'wt-forge-rebuild-...'. min_len=1: the basename is structured (boundary
+        # alone disambiguates), so no length floor. Fail-safe: a non-match only
+        # happens when the stem genuinely isn't this worktree's, so the keep
+        # guard never wrongly drops an active worktree.
+        if any(id_matches(stem, Path(path).name, min_len=1) for stem in active_stems):
             log(f'Keeping {path} — in-flight task active')
             kept += 1
             continue
@@ -294,8 +311,9 @@ def sweep_orphan_dirs(
             continue
 
         # Same in-flight guard sweep_canonical uses: a live agent_runner
-        # subprocess may hold this worktree even if mtime is stale.
-        if any(stem and stem in child.name for stem in active_stems):
+        # subprocess may hold this worktree even if mtime is stale. Boundary
+        # match (audit #12) against the structured basename, min_len=1.
+        if any(id_matches(stem, child.name, min_len=1) for stem in active_stems):
             log(f'Keeping orphan candidate {child} — in-flight task active')
             kept += 1
             continue
