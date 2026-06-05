@@ -2892,7 +2892,12 @@ def _read_rotation_config_enabled(models_path: Path) -> bool:
     block = data.get('rotation')
     if not isinstance(block, dict):
         return False
-    return bool(block.get('enabled'))
+    # Audit #22: the master kill switch must fail safe and stay consistent with
+    # the scheduler (rotate_active_tier._load_rotation_config). bool() of any
+    # non-empty string is True, so a quoted-bool typo like {"enabled": "false"}
+    # would wrongly read as ENABLED here. Treat rotation as on only when the
+    # value is the JSON boolean ``true``; every other type collapses to off.
+    return block.get('enabled') is True
 
 
 def _reader_rotation_mode(
