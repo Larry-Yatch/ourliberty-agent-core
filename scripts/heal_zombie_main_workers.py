@@ -61,6 +61,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pid_identity  # noqa: E402  # PID-reuse guard before SIGKILL
+
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_zombie_main_workers.log"
@@ -202,7 +205,21 @@ def is_zombie(pid: int) -> tuple[bool, str]:
     return True, f"pattern-B completed-PR etime={etime}s, merged-PR-on-branch, idle"
 
 
-def kill_zombie(pid: int, reason: str) -> bool:
+def kill_zombie(pid: int, reason: str, expected_starttime: int | None = None) -> bool:
+    # PID-reuse guard: is_zombie() makes slow blocking calls (gh pr list, find)
+    # between the pgrep snapshot and here, so the PID could have exited and been
+    # recycled to an unrelated process. Re-verify it is STILL a sysprompt-main
+    # claude worker with the same start time before the irreversible SIGKILL.
+    # A missing baseline start time (None) means we never had a stable identity
+    # to compare against — on the droplet that only happens if the PID already
+    # exited (nothing to kill), so fail closed rather than fall back to the
+    # weaker cmdline-only check.
+    if expected_starttime is None or not pid_identity.still_same_process(
+        pid, expected_starttime, require_cmdline_substr=SYSPROMPT_FILTER
+    ):
+        log("SKIP", f"pid={pid} identity unverifiable/changed before kill (PID reuse?); "
+                    f"not killing. reason={reason}")
+        return False
     try:
         os.kill(pid, signal.SIGKILL)
         log("HEALED", f"pid={pid} action=sigkill reason={reason}")
@@ -222,9 +239,12 @@ def main() -> int:
     pattern_a = 0
     pattern_b = 0
     for pid in pids:
+        # Capture identity up front so the kill can detect a PID recycled during
+        # is_zombie()'s slow checks.
+        expected_starttime = pid_identity.proc_starttime(pid)
         is_z, reason = is_zombie(pid)
         if is_z:
-            if kill_zombie(pid, reason):
+            if kill_zombie(pid, reason, expected_starttime):
                 healed += 1
                 if "pattern-A" in reason:
                     pattern_a += 1
