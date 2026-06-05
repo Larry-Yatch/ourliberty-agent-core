@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 1001 — 2026-06-05 18:06 UTC (interactive, Tier 1 — CLEAN)
+
+**Health:** ✅ **Tier 1 — consecutive_clean=1. 1 new alert (Tier-3 silenced). 9/9 services active. All inboxes empty. 0 open PRs. Sync error self-recovering. cycle.timer stuck-healed at 18:00Z (Tier 3 FYI).**
+
+Alert watermark: **1353 lines / 2026-06-05T18:00:06Z** (was 1352 / 17:50:28Z — +1 alert). Pipeline-stall heartbeat: 2026-06-05T17:58:40Z (✅ ~8 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:36:56Z (✅ ~30 min at scan; within 60-min threshold). Sync: status=error, commit=22a2b98f, last_sync=17:50:20Z (~16 min) — SYNC-PUSH-REBASE-FALLBACK-001 57th (unchanged); HEAD=0544808 "Pulse cycle 20260605T180450Z" newer than sync commit (wrapper push succeeded). Next hourly tick ~18:50Z. Session-start gitStatus: branch=main, tree=clean, HEAD=0544808 "Pulse cycle 20260605T180450Z". Tier state at start: tier=1, consecutive_clean=0 (last_signal_at=18:03:06Z from prior automated cycle). Tier state at end: **tier=1, consecutive_clean=1** (all checks clean — Tier-3 alert + self-recovering sync do not trigger tier-reset per § 2.3 + § 3.0 carve-out).
+
+**Found:**
+
+- **(Check 0) Alert triage: ℹ️ 1 new alert — Tier 3 silenced.** Watermark advanced 1352→1353.
+  - **Line 1353: `stuck-timer-healed:ourliberty-cycle.timer`** at 18:00:06Z — source=heal-systemd-install-drift, route=digest. cycle.timer entered infinity trap (NextElapseUSecRealtime empty + NextElapseUSecMonotonic=infinity); install-drift healer auto-healed via daemon-reload + restart at 18:00:06Z. Timer confirmed running again (SubState=running at 18:06Z scan; timer fired at 18:05:00Z, automated cycle produced commit 0544808 at 18:04:50Z). Subject `stuck-timer-healed` matches Gate 1 in alert-translations.json under heal-systemd-install-drift (tier=FYI). **Tier 3 → silenced. No tier-reset.** ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '40 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last delivery: beacon-bot idx=1351 at 17:53:07Z (unreviewed-merge:359). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:58:40Z (~8 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:36:56Z (~30 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=0544808 "Pulse cycle 20260605T180450Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=22a2b98f, last_sync=17:50:20Z (~16 min). SYNC-PUSH-REBASE-FALLBACK-001 57th total (unchanged). HEAD=0544808 newer than sync commit (wrapper push succeeded after sync service failure). Within 2h threshold; next hourly tick ~18:50Z will clear. ⚠️ (no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. cycle.timer SubState=running (automated cycle in progress at 18:06Z fire window — expected concurrent with interactive session). ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Nominal.** 0 open PRs in ourliberty-agent-core. 0 in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 17 consecutive (PRs #343–#359).** No new occurrences this iter. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged from iter 1000.
+
+- **PRIME DIRECTIVE ratio:** interventions=724, systemic_fixes=16, ratio≈45.3. No new always-fix actions this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 1 new alert: stuck-timer-healed:ourliberty-cycle.timer (Tier 3 known-pattern, silenced per alert-translations.json; no tier-reset). Verified timer healthy post-heal (SubState=running, automated cycle committed 0544808 at 18:04:50Z).
+3. Confirmed 9/9 services active, all inboxes empty, 0 open PRs, both heartbeats within threshold, sync self-recovering.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations this iter. Standing items carry forward:
+- `[red]` PRs #343–#359 audit-series (17 total) Larry-direct unreviewed merges. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 57th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=1. System nominally healthy. cycle.timer entered infinity trap briefly between ~17:55Z and 18:00:06Z (the 17:55 and 18:00 automated fires may have been missed); healer caught and fixed at 18:00:06Z; 18:05Z fire confirmed via wrapper commit 0544808. This is the known `stuck-timer` pattern — OnCalendar timer momentarily loses anchor during daemon-reload window; no systemic concern. SYNC-PUSH-REBASE-FALLBACK-001 steady at 57th; root fix APPROVAL_REQUEST still open. No new PRs. Audit series paused (no new Larry-direct merges since iter 1000's PR #359).
+
+---
+
 ## Iteration 1000 — 2026-06-05 18:05 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 2 new alerts (1350→1352). 9/9 services active. All inboxes empty. No open PRs. Sync error self-recovering.**
