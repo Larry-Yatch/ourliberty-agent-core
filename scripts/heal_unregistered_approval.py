@@ -319,16 +319,58 @@ _IDENTITY_STOPWORDS = frozenset({
     'an', 'to', 'of', 're', 'is', 'are', 'on', 'or', 'vs',
 })
 _IDENTITY_TOKEN_RE = re.compile(r'[a-z0-9]+')
-# Pull PR/issue numbers out of a subject. 'PR #294' and a bare '#294' both
-# contain '#294', so a single '#<n>' pattern catches both forms.
-_REF_NUM_RE = re.compile(r'#(\d+)')
+
+# Pull PR/issue numbers out of a subject — but ONLY where a '#<n>' sits in a
+# clearly-REFERENTIAL position, so an incidental cross-mention is never treated
+# as this decision's resolution anchor (audit §4). Alert records carry no
+# structured `pr`/`issue` field (append_alert only writes source/severity/
+# message/subject/suggested_action/route), so the subject is the only place a
+# reference can live — but not every '#<n>' in it is one. A genuine reference is
+# either:
+#   * the subject LEADS with it ('#294: rebase or close?'), or
+#   * it follows a PR/issue keyword ('PR #294', 'issue #5', or a GitHub closing
+#     keyword: closes/fixes/resolves/merged/landed #<n>).
+# Anything else — a number buried mid-subject, or any '#<n>' inside parentheses
+# / after 're:' (e.g. 'pick A vs B (re: design #5)') — is INCIDENTAL and yields
+# no ref, so an unrelated PR #5 merging can't skip-before-promote or auto-retire
+# a live direction-ask. Conservative by construction: an ambiguous ref is no
+# resolution signal, favoring surfacing/keeping a real decision over hiding it.
+_REF_KEYWORD = (
+    r'(?:prs?|pull[\s_-]?requests?|issues?|'
+    r'close[sd]?|fix(?:e[sd])?|resolve[sd]?|merge[sd]?|land(?:s|ed)?)'
+)
+# Subject-LEADING '#<n>' ('#294: rebase or close?'). Matched against the raw
+# subject, NOT the paren-stripped one, so blanking a parenthetical aside can
+# never promote a buried/trailing ref into leading position (e.g. '(foo) #5').
+_LEADING_REF_RE = re.compile(r'^\s*#(\d+)')
+# '#<n>' right after a PR/issue/closing keyword, anywhere in the subject.
+_KEYWORD_REF_RE = re.compile(
+    r'\b' + _REF_KEYWORD + r'\b[\s:_-]*#(\d+)',
+    re.IGNORECASE,
+)
+# Parenthetical spans are blanked before the keyword scan: a ref inside '(...)'
+# is a side note, not the decision's anchor.
+_PAREN_RE = re.compile(r'\([^)]*\)')
 
 
 def parse_ref_numbers(text: Any) -> list[int]:
-    """Return the PR/issue numbers referenced as '#<n>' in `text` (subject)."""
+    """Return the PR/issue numbers genuinely referenced in `text` (subject).
+
+    Only '#<n>' tokens in a clearly-referential position count: subject-leading
+    (checked on the raw subject), or right after a PR/issue/closing keyword
+    (checked on the subject with parenthetical asides blanked). Parenthetical
+    and other incidental mentions are ignored — this is the anchor for
+    skip-before-promote and retire-on-resolution, so an incidental ref must
+    never qualify."""
     if not isinstance(text, str):
         return []
-    return [int(m) for m in _REF_NUM_RE.findall(text)]
+    nums: list[int] = []
+    lead = _LEADING_REF_RE.match(text)
+    if lead:
+        nums.append(int(lead.group(1)))
+    scannable = _PAREN_RE.sub(' ', text)
+    nums.extend(int(m) for m in _KEYWORD_REF_RE.findall(scannable))
+    return list(dict.fromkeys(nums))  # dedup, preserve order
 
 
 def decision_identity(record: dict[str, Any]) -> str:
