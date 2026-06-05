@@ -22,9 +22,16 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ourliberty-heal-tier2-weekly-probe
 
-# Memory cap: small subprocess + JSON parse, never needs more than 256M.
-MemoryMax=256M
-MemoryHigh=128M
+# Memory cap. NOTE: the probe is NOT a "small subprocess + JSON parse" — it
+# execs the real `claude` CLI (a Node process) whose peak RSS for even a
+# trivial `say PROBE_OK` is ~280M. The original 256M/128M caps (2026-05-27)
+# throttled it under MemoryHigh and hit MemoryMax, so the process thrashed:
+# the 2026-05-31 run that *succeeded* still took 33s, and from 2026-06-03 on
+# every run blew past its 60s timeout → TimeoutExpired → a FALSE
+# "Tier 2 OAuth down" page while the token + real dispatch were healthy.
+# The dispatch path (ourliberty-cycle.service) sets no memory limit at all;
+# give the probe a generous ceiling well above claude's footprint + headroom.
+MemoryMax=1G
 
 # Hardening — matches heal-pipeline-stall pattern, BUT ReadWritePaths
 # adds /home/larry/.claude-larry-personal so the subprocess can read

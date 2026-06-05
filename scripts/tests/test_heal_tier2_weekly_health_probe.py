@@ -179,5 +179,88 @@ class TokenNeverLoggedTest(_ProbeHarness):
         self.assertNotIn(_TIER2_TOKEN, text)
 
 
+class ClassifyFailureTest(unittest.TestCase):
+    """classify_failure must separate auth failures (re-auth) from
+    probe-environment failures (token likely fine; do NOT re-auth). The
+    2026-06-03 incident was 30h of TimeoutExpired misread as 'Tier 2 down'."""
+
+    def test_timeout_is_env_not_auth(self):
+        reason, _detail, hint = hp.classify_failure(
+            '', "subprocess failed: TimeoutExpired: ... timed out after 60 seconds",
+            -1)
+        self.assertEqual(reason, 'timeout')
+        self.assertIs(hint, hp._ENV_HINT)
+
+    def test_oom_kill_is_env(self):
+        for code in (-9, 137):
+            reason, _d, hint = hp.classify_failure('', '', code)
+            self.assertEqual(reason, 'killed')
+            self.assertIs(hint, hp._ENV_HINT)
+        reason, _d, hint = hp.classify_failure('', 'MemoryError', 1)
+        self.assertEqual(reason, 'killed')
+
+    def test_binary_missing_is_env(self):
+        reason, _d, hint = hp.classify_failure(
+            '', 'subprocess failed: FileNotFoundError: ...', -1)
+        self.assertEqual(reason, 'binary_missing')
+        self.assertIs(hint, hp._ENV_HINT)
+
+    def test_401_is_auth(self):
+        for blob in ('... "api_error_status":401 ...',
+                     'Failed to authenticate. API Error: 401',
+                     'Invalid authentication credentials'):
+            reason, _d, hint = hp.classify_failure(blob, '', 1)
+            self.assertEqual(reason, 'auth_401', blob)
+            self.assertIs(hint, hp._AUTH_HINT)
+
+    def test_unknown_is_generic(self):
+        reason, _d, hint = hp.classify_failure('weird output', '', 2)
+        self.assertEqual(reason, 'other')
+        self.assertIs(hint, hp._GENERIC_HINT)
+
+
+class AlertRoutingTest(_ProbeHarness):
+    """run() must route the alert's suggested_action by failure mode: a
+    timeout points at the env hint (not the re-auth runbook); a 401 points at
+    the re-auth runbooks. Guards against regressing to a single generic hint."""
+
+    def _run_failed(self, stdout, stderr, returncode):
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            return mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+
+        def fake_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = _TIER2_TOKEN
+        with mock.patch.object(hp.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(hp, 'load_haiku_model_id', return_value=_MODEL_ID), \
+                mock.patch.object(hp.larry_alerts, 'append_alert',
+                                  side_effect=fake_alert):
+            hp.run()
+        return captured
+
+    def test_timeout_routes_to_env_hint(self):
+        cap = self._run_failed(
+            '', 'subprocess failed: TimeoutExpired: ... after 60 seconds', -1)
+        self.assertEqual(cap['suggested_action'], hp._ENV_HINT)
+        self.assertIn('[timeout]', cap['message'])
+        self.assertEqual(cap['subject'], 'tier2_weekly_probe_failed')
+
+    def test_401_routes_to_auth_hint(self):
+        cap = self._run_failed(
+            json.dumps({'is_error': True, 'api_error_status': 401,
+                        'result': 'Invalid authentication credentials'}), '', 1)
+        self.assertEqual(cap['suggested_action'], hp._AUTH_HINT)
+        self.assertIn('[auth_401]', cap['message'])
+
+    def test_failure_alert_never_leaks_token(self):
+        cap = self._run_failed('Invalid authentication credentials', '', 1)
+        self.assertNotIn(_TIER2_TOKEN, cap['message'])
+        self.assertNotIn(_TIER2_TOKEN, cap['suggested_action'])
+
+
 if __name__ == '__main__':
     unittest.main()

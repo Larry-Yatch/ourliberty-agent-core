@@ -89,9 +89,66 @@ _CONFIG_FILE = Path(__file__).resolve().parent.parent / 'config' / 'agent-models
 # when present.
 DEFAULT_HAIKU_MODEL_ID = 'claude-haiku-4-5-20251001'
 
-RUNBOOK_HINT = (
-    'Run docs/runbooks/restore-larry-personal-claude-oauth-tier2.md to re-auth.'
+# Failure-mode-specific recovery hints. The 2026-06-03 incident showed why a
+# single generic "re-auth Tier 2" hint is actively misleading: the probe failed
+# for 30h with TimeoutExpired (its own 256M cgroup cap starving a ~280M claude
+# process) while the setup-token and real dispatch were perfectly healthy.
+# Re-authing would have wasted a credential rotation and not fixed anything.
+# So: route auth failures (401) to the re-auth runbooks, and route
+# environment failures (timeout / OOM-kill / missing binary) to a "verify
+# before you re-auth" hint that points at the probe's own resources.
+_AUTH_HINT = (
+    'Re-auth Tier 2 — the setup-token is the PRIMARY dispatch auth, so start '
+    'with docs/runbooks/rotate-claude-setup-tokens.md (Tier 2); the legacy '
+    'credentials.json fallback is docs/runbooks/'
+    'restore-larry-personal-claude-oauth-tier2.md.'
 )
+_ENV_HINT = (
+    'This is a probe-ENVIRONMENT failure, NOT necessarily an auth failure — '
+    'the Tier 2 token may be fine. Verify before re-authing: '
+    '`HOME=/home/larry/.claude-larry-personal '
+    'CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN_TIER2 claude -p '
+    "'say PROBE_OK'`. If that returns PROBE_OK, the token is healthy and the "
+    "fault is the probe's systemd unit (claude needs ~280M RSS — check "
+    'MemoryMax) or the host. Do NOT rotate credentials on a green token.'
+)
+_GENERIC_HINT = (
+    'Unclassified probe failure. Verify the token with a live probe '
+    '(`HOME=/home/larry/.claude-larry-personal '
+    'CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN_TIER2 claude -p '
+    "'say PROBE_OK'`) before deciding between re-auth "
+    '(docs/runbooks/rotate-claude-setup-tokens.md) and a host/unit fix.'
+)
+
+
+def classify_failure(stdout, stderr, exit_code):
+    """Map a failed probe run to ``(reason_code, detail, suggested_action)``.
+
+    Lets the operator (and the alert) distinguish a genuine auth failure
+    (token bad -> re-auth) from a probe-environment failure (process hung or
+    OOM-killed -> token likely fine; re-auth is the wrong move). Pure string
+    classification over the subprocess output; never raises."""
+    err = stderr or ''
+    blob = f'{err}\n{stdout or ""}'
+    low = blob.lower()
+    if 'TimeoutExpired' in err:
+        return ('timeout',
+                f'probe hung > {PROBE_TIMEOUT_SEC}s and was killed by timeout',
+                _ENV_HINT)
+    if exit_code in (-9, 137) or 'MemoryError' in blob or 'Killed' in err:
+        return ('killed',
+                'probe process was killed (out-of-memory likely)',
+                _ENV_HINT)
+    if ('FileNotFoundError' in err or 'No such file' in err
+            or 'binary' in low):
+        return ('binary_missing',
+                'claude binary not found or not executable',
+                _ENV_HINT)
+    if ('401' in blob or 'invalid authentication' in low
+            or 'failed to authenticate' in low):
+        return ('auth_401', 'API rejected the credentials (HTTP 401)',
+                _AUTH_HINT)
+    return ('other', f'unclassified failure (exit={exit_code})', _GENERIC_HINT)
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -259,29 +316,31 @@ def run() -> int:
     if ok:
         log(f'TIER2_WEEKLY_PROBE_OK model={model_id}', 'INFO')
         return 0
-    log(f'TIER2_WEEKLY_PROBE_FAILED model={model_id} exit={exit_code} '
-        f'stdout={stdout[:300]!r} stderr={stderr[:300]!r}', 'WARN')
+    reason, detail, suggested = classify_failure(stdout, stderr, exit_code)
+    log(f'TIER2_WEEKLY_PROBE_FAILED model={model_id} reason={reason} '
+        f'exit={exit_code} stdout={stdout[:300]!r} stderr={stderr[:300]!r}',
+        'WARN')
     now = datetime.now(timezone.utc)
     state = load_state()
     if _in_dm_cooldown(state, now):
         log(f'probe failed but within DM cooldown '
             f'(last_dm_ts={state.get("last_dm_ts")}) — suppressing', 'INFO')
         return 0
+    # Lead with the classified reason so the operator sees timeout/OOM vs 401
+    # at a glance — "Output: ''" alone sent the 2026-06-03 triage down a
+    # credential-rotation path for a failure that was really the probe's
+    # memory cap. Prefer stderr in the snippet (timeouts carry no stdout).
+    snippet = (stderr or stdout or '')[:200]
     body = (
-        f'Tier 2 weekly probe failed. Output: {stdout[:200]!r}. '
-        f'{RUNBOOK_HINT}'
+        f'Tier 2 weekly probe failed [{reason}]: {detail} '
+        f'(exit={exit_code}). Detail: {snippet!r}. {suggested}'
     )
     ok = larry_alerts.append_alert(
         source='heal-tier2-weekly-probe',
         severity='warning',
         message=body,
         subject='tier2_weekly_probe_failed',
-        suggested_action=(
-            f'Re-auth Tier 2: see '
-            f'docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. '
-            f'Manual re-probe: '
-            f'`HOME={TIER2_HOME} claude -p --model {model_id} \'{PROBE_PROMPT}\'`.'
-        ),
+        suggested_action=suggested,
     )
     if ok:
         state['last_dm_ts'] = now.isoformat()
