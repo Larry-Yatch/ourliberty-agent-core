@@ -299,14 +299,25 @@ def _emit_foreground_warning() -> None:
     notifier layer (always-scan-latest-wins across all assistant turns); the
     warning here closes the other side of the loop by surfacing the
     foreground requirement on every invocation.
+
+    PR #334 (2026-06-05): the "fix" for the self-match — the bracket trick
+    `pgrep -f '[t]est_regression_check.py'` — spawned a NEW wedge:
+    `until [ ! -d /proc/$(pgrep ... | head -1) ]`. Once this script finished,
+    pgrep returned empty, `/proc/$()` collapsed to `/proc/` (always a dir),
+    the `until` never exited, and Mirror hung 102 min blocking inbox-watcher.
+    Same root cause: liveness re-derived each iteration + no timeout. The safe
+    primitive for any unavoidable PID wait is scripts/wait_for_pid.sh.
     """
     print(
         'WARNING: test_regression_check.py must be run FOREGROUND.\n'
         '  Do not background with & and poll for completion.\n'
-        '  Self-matching `pgrep -f` loops have hung Mirror reviews for 71 min '
-        'on PR #101 (2026-05-25).\n'
-        '  The script has no completion flag file; the only completion signal '
-        'is the exit code returned synchronously.',
+        '  Poll loops re-deriving liveness via `pgrep` (self-match) or a\n'
+        '  `/proc/<pid>` path test (empty pgrep -> /proc/ is always a dir) have\n'
+        '  hung Mirror reviews 71 min (PR #101) and 102 min (PR #334).\n'
+        '  The script has no completion flag file; the only completion signal\n'
+        '  is the exit code returned synchronously. If you ever must wait on a\n'
+        '  backgrounded PID elsewhere, use scripts/wait_for_pid.sh (captures the\n'
+        '  PID once, gates on `kill -0`, has a wall-clock timeout).',
         file=sys.stderr,
     )
 
