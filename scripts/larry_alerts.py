@@ -32,10 +32,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import file_lock
+
 AGENTS_ROOT = Path.home() / 'agents'
 ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
 COOLDOWN_ROOT = AGENTS_ROOT / 'state' / 'alert-cooldown'
 OFFSET_FILE = AGENTS_ROOT / 'state' / 'beacon-alerts-offset.txt'
+
+# PR-E2 (#16): larry_alerts_retention rewrites this file (read snapshot →
+# os.replace with survivors). An append that lands between the snapshot and the
+# replace is silently dropped. Every appender below takes the SAME sidecar flock
+# the retention RMW takes, so an append is either fully inside the snapshot (kept)
+# or strictly after the replace (lands in the new file) — never lost.
+#
+# The wait is bounded so a fire-and-forget appender can never hang a daemon
+# thread if retention (or a wedged process) holds the lock: on timeout we fall
+# back to a plain append — strictly no worse than the pre-lock behaviour, and the
+# retention RMW window is sub-second to a few seconds on a daily bounded prefix.
+_APPEND_LOCK_TIMEOUT_SEC = float(
+    os.environ.get('OURLIBERTY_ALERTS_APPEND_LOCK_TIMEOUT', '10') or '10'
+)
 
 # Translation layer (stopgap until Pulse cycle upgrade ships healer-alert
 # triage; see docs/operating-manual.md Part II #68). Lookup by (source,
@@ -231,6 +247,39 @@ def unsilence(key: str) -> bool:
 # ---------- writer side ----------
 
 
+def _locked_append(line: str) -> bool:
+    """Append one already-serialized ``line`` (including its trailing newline) to
+    the alerts file under the shared retention flock (PR-E2 #16).
+
+    The flock excludes ``larry_alerts_retention``'s read-snapshot→``os.replace``
+    rewrite for the duration of the append, so a concurrent retention pass can
+    never drop this line: the append is either captured in the snapshot or lands
+    in the freshly-rewritten file. ``O_APPEND`` still guarantees the write itself
+    doesn't tear.
+
+    Never raises — returns False on any ``OSError`` so callers can fire-and-forget.
+    On a bounded-wait timeout (a wedged lock holder) or a platform without
+    ``fcntl``, fall back to a plain append: strictly no worse than the pre-lock
+    behaviour, reintroducing the original race only for this one line and only
+    while the lock stays contended past the timeout.
+    """
+    try:
+        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = file_lock.sidecar_lock_path(ALERTS_FILE)
+        try:
+            with file_lock.exclusive_lock(
+                lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
+            ):
+                with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
+                    f.write(line)
+        except file_lock.LockTimeout:
+            with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
+                f.write(line)
+    except OSError:
+        return False
+    return True
+
+
 def append_alert(
     source: str,
     severity: str,
@@ -288,14 +337,10 @@ def append_alert(
         record['subject'] = subject
     if suggested_action:
         record['suggested_action'] = suggested_action
-    try:
-        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        # O_APPEND is atomic for writes <= PIPE_BUF (4096 on Linux); JSON
-        # alerts are well under that. Open fresh each call so concurrent
-        # writers (watchdog + sentinel) don't share a buffered handle.
-        with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(record, ensure_ascii=False) + '\n')
-    except OSError:
+    # O_APPEND is atomic for writes <= PIPE_BUF (4096 on Linux) so the line
+    # itself never tears; the shared flock (see _locked_append) additionally
+    # excludes the retention rewrite so the line is never lost.
+    if not _locked_append(json.dumps(record, ensure_ascii=False) + '\n'):
         return False
     _mark_cooldown(severity, key)
     return True
@@ -418,13 +463,7 @@ def append_notification(
     }
     if task_id:
         record['task_id'] = task_id
-    try:
-        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(record, ensure_ascii=False) + '\n')
-    except OSError:
-        return False
-    return True
+    return _locked_append(json.dumps(record, ensure_ascii=False) + '\n')
 
 
 # ---------- approval-request writer (D3.5 5c: Beacon's auto-replan path) ----------
@@ -470,13 +509,7 @@ def append_approval_request(
         'chat_id': chat_id,
         'body': body,
     }
-    try:
-        ALERTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(ALERTS_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(record, ensure_ascii=False) + '\n')
-    except OSError:
-        return False
-    return True
+    return _locked_append(json.dumps(record, ensure_ascii=False) + '\n')
 
 
 # ---------- reader side (bot owns this) ----------

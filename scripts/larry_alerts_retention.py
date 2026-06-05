@@ -40,12 +40,30 @@ CURSOR-SAFE ALGORITHM (the load-bearing guarantee):
   a successful pass is also a no-op because the rewritten file's eligible
   prefix is gone.
 
-  Safe-resume on crash: each step is individually durable. Archive append is
-  idempotent-by-content for a given pass only in the sense that a re-run starts
-  from the current (already-rotated) file; a crash mid-rewrite leaves either the
-  old file (tmp not yet renamed → re-run repeats cleanly) or the new file (rename
-  done → offsets/cursor refresh re-run as a near-no-op). The live file is never
-  left partially written because the rewrite goes through tmp+rename.
+  CONCURRENCY (PR-E2 #16): the live file is appended by ~20 independent
+  processes (watchdog/sentinel/healers/...) via larry_alerts.append_alert. The
+  whole read-snapshot → archive → rewrite → offset-decrement sequence runs under
+  an exclusive advisory flock on <alerts-file>.lock; every appender takes the
+  SAME lock for its append. So an append is either fully inside the snapshot
+  (kept) or strictly after the os.replace (lands in the rewritten file) — never
+  lost to the read-then-rewrite window.
+
+  CRASH-ATOMICITY (PR-E2 #8): the file rewrite (step 2) and the offset
+  decrements (step 3) are two separate disk operations; a crash between them
+  would otherwise strand alerts (file shifted, offsets stale → consumers skip).
+  Before the rewrite we write a JOURNAL (<alerts-file>.retention.journal)
+  recording the pre-rewrite inode, the line count to drop, and the ABSOLUTE
+  target offsets. On the next tick, _recover_pending (under the same lock)
+  completes any interrupted pass idempotently:
+    * if the live inode still equals the journal's pre_inode the rewrite did NOT
+      happen → drop the recorded leading-line count from the CURRENT file
+      (preserving any alerts appended after the crash, which sit at the tail);
+    * otherwise the rewrite already landed (inode swapped) → only re-assert the
+      offsets.
+  Offsets are written as absolute targets, so replaying them is a no-op. The
+  archive append happens before the journal; a crash in that sub-second window
+  leaves at most a duplicate copy of already-delivered lines in the cold dated
+  archive (never a delivery loss), de-duplicated by nothing but harmless.
 
 POLICY is config-driven + Pulse-tunable (config/larry-alerts-retention.json),
 never hardcoded at the call site. A missing / malformed config, or any
@@ -64,6 +82,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import atomic_io  # noqa: E402  (shared durable-write helper, PR-E #366)
+import file_lock  # noqa: E402  (shared advisory flock, PR-E2 #16)
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
@@ -172,12 +194,11 @@ def _read_offset(path: Path) -> int:
 
 
 def _write_offset(path: Path, offset: int) -> None:
-    """Atomically persist a line-index offset (tmp + rename). Never negative."""
-    value = max(0, int(offset))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(str(value))
-    tmp.rename(path)
+    """Durably + atomically persist a line-index offset (unique tmp + fsync +
+    rename, via atomic_io). Never negative. Writing an absolute target value is
+    idempotent, which is what makes crash recovery (_recover_pending) safe to
+    replay."""
+    atomic_io.atomic_write_text(path, str(max(0, int(offset))))
 
 
 # -------------------- retention math --------------------
@@ -308,13 +329,134 @@ def _archive_lines(lines: list[str], now: datetime, archive_dir: Path) -> Path:
 
 
 def _atomic_rewrite(path: Path, lines: list[str]) -> None:
-    """Rewrite `path` with exactly `lines` via tmp + os.replace (atomic on the
-    same filesystem). The rename swaps the inode, which the shipper's rotation
-    detection keys on."""
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    with open(tmp, 'w', encoding='utf-8') as fh:
-        fh.writelines(lines)
-    os.replace(tmp, path)
+    """Rewrite `path` with exactly `lines` via a unique tmp + fsync + os.replace
+    (atomic + durable on the same filesystem, via atomic_io). The rename swaps
+    the inode, which both the shipper's rotation detection AND crash recovery
+    (_recover_pending's pre_inode check) key on."""
+    atomic_io.atomic_write_text(path, ''.join(lines))
+
+
+# -------------------- crash-recovery journal (PR-E2 #8) --------------------
+
+def _journal_path(alerts_file: Path) -> Path:
+    """Intent-journal sidecar for the alerts file. Present ⇔ a rewrite/offset
+    transaction was started but not yet confirmed complete."""
+    return alerts_file.parent / (alerts_file.name + '.retention.journal')
+
+
+def _write_journal(journal_path: Path, payload: dict[str, Any]) -> None:
+    """Durably write the intent journal (fsync + atomic rename). This is the
+    commit point: once it is on disk the transition WILL complete, either inline
+    below or via _recover_pending on the next tick."""
+    atomic_io.atomic_write_json(journal_path, payload)
+
+
+def _read_journal(journal_path: Path) -> Optional[dict[str, Any]]:
+    """Return the pending-transaction journal, or None if absent/unreadable.
+
+    A corrupt journal (truncated by a crash mid-write — though atomic_io makes
+    that nearly impossible) is treated as absent: we cannot safely act on a
+    journal we can't parse, and the worst case of ignoring it is the original
+    pre-PR-E2 behaviour (offsets recomputed from current state next tick)."""
+    try:
+        data = json.loads(journal_path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _clear_journal(journal_path: Path) -> None:
+    """Remove the journal — transaction confirmed complete. Best-effort: a
+    leftover journal is replayed idempotently next tick, so a failed unlink is
+    not fatal."""
+    try:
+        journal_path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        log(f'could not remove retention journal {journal_path} '
+            f'({type(e).__name__}); will replay (idempotent) next tick', 'WARN')
+
+
+def _recover_pending(
+    journal_path: Path,
+    alerts_file: Path,
+    beacon_offset_file: Path,
+    medic_offset_file: Path,
+    shipper_cursors_file: Path,
+    counts: dict[str, Any],
+) -> None:
+    """Complete an interrupted prior pass, idempotently. MUST run under the
+    exclusive lock (so the file is stable) before a fresh tick computes anything.
+
+    The journal records the pre-rewrite inode, the leading-line count to drop,
+    and the absolute target offsets. We determine where the prior pass died from
+    the live file's inode (robust against alerts appended after the crash, which
+    only ever land at the tail):
+
+      * inode == pre_inode → the os.replace never happened. Re-derive survivors
+        by dropping `safe_cut` leading lines from the CURRENT file (this keeps
+        any post-crash appends) and rewrite.
+      * inode != pre_inode → the rewrite already landed. Leave the file alone.
+
+    Then write the absolute target offsets (idempotent), refresh the shipper
+    cursor, and clear the journal.
+    """
+    journal = _read_journal(journal_path)
+    if journal is None:
+        return
+
+    safe_cut = int(journal.get('safe_cut', 0))
+    target_beacon = int(journal.get('target_beacon_offset', 0))
+    target_medic = int(journal.get('target_medic_offset', 0))
+    pre_inode = journal.get('pre_inode')
+
+    log('found retention journal from an interrupted prior pass; completing it '
+        f'(safe_cut={safe_cut}, target beacon={target_beacon}, '
+        f'medic={target_medic})', 'WARN')
+
+    if not alerts_file.exists():
+        log('alerts file missing during recovery; abandoning journal '
+            '(nothing safe to complete)', 'WARN')
+        _clear_journal(journal_path)
+        return
+
+    try:
+        cur_inode = alerts_file.stat().st_ino
+    except OSError:
+        cur_inode = None
+
+    if pre_inode is not None and cur_inode == pre_inode:
+        # The rewrite did NOT happen before the crash. Drop the recorded leading
+        # lines from the CURRENT file so any post-crash appends (at the tail) are
+        # preserved.
+        with open(alerts_file, encoding='utf-8') as fh:
+            cur = fh.readlines()
+        if not 0 <= safe_cut <= len(cur):
+            # safe_cut should always be ≤ the original line count ≤ the current
+            # count (appends only grow the file). An out-of-range value means a
+            # corrupt/garbage journal; refuse to rewrite rather than risk wiping
+            # survivors, and abandon the journal for manual inspection.
+            log(f'recovery: journal safe_cut={safe_cut} out of range for '
+                f'{len(cur)} current line(s); abandoning journal WITHOUT rewrite '
+                '(manual check advised)', 'ERROR')
+            _clear_journal(journal_path)
+            return
+        _atomic_rewrite(alerts_file, cur[safe_cut:])
+        log(f'recovery: rewrote live file, dropped {safe_cut} leading line(s), '
+            f'kept {len(cur) - safe_cut}')
+    else:
+        log('recovery: live file already rewritten (inode changed); completing '
+            'offset decrement only')
+
+    _write_offset(beacon_offset_file, target_beacon)
+    _write_offset(medic_offset_file, target_medic)
+    counts['cursor_refreshed'] = _refresh_shipper_cursor(
+        shipper_cursors_file, SHIPPER_CURSOR_KEY, alerts_file,
+    )
+    _clear_journal(journal_path)
+    counts['recovered'] = True
+    log(f'recovery complete: beacon→{target_beacon}, medic→{target_medic}')
 
 
 # -------------------- orchestration --------------------
@@ -348,75 +490,135 @@ def run_once(
         'archived': 0,
         'remaining': 0,
         'cursor_refreshed': False,
+        'recovered': False,
     }
 
-    if not alerts_file.exists():
-        log('alerts file does not exist; nothing to do')
-        log('tick: ' + ('DRY-RUN ' if dry_run else '')
-            + ' '.join(f'{k}={v}' for k, v in counts.items()))
+    lock_path = file_lock.sidecar_lock_path(alerts_file)
+    journal_path = _journal_path(alerts_file)
+
+    # The whole read→archive→rewrite→offset transaction runs under an exclusive
+    # advisory flock that every appender (larry_alerts.append_alert) also takes,
+    # so a concurrent append can never be lost to the read-then-rewrite window
+    # (PR-E2 #16).
+    with file_lock.exclusive_lock(lock_path):
+        # 0. Finish any prior pass that crashed mid-transaction BEFORE computing
+        #    a fresh tick (under the same lock, so the file is stable). Skipped
+        #    in dry-run, which must not mutate state (PR-E2 #8).
+        if not dry_run:
+            _recover_pending(
+                journal_path, alerts_file, beacon_offset_file,
+                medic_offset_file, shipper_cursors_file, counts,
+            )
+        elif _read_journal(journal_path) is not None:
+            log('DRY-RUN: a retention journal is pending (a prior pass was '
+                'interrupted); a real run would complete it first', 'WARN')
+
+        if not alerts_file.exists():
+            log('alerts file does not exist; nothing to do')
+            log('tick: ' + ('DRY-RUN ' if dry_run else '')
+                + ' '.join(f'{k}={v}' for k, v in counts.items()))
+            return counts
+
+        with open(alerts_file, encoding='utf-8') as fh:
+            lines = fh.readlines()
+            try:
+                pre_inode = os.fstat(fh.fileno()).st_ino
+            except OSError:
+                pre_inode = None
+        n = len(lines)
+        counts['total_lines'] = n
+
+        beacon_offset = _read_offset(beacon_offset_file)
+        medic_offset = _read_offset(medic_offset_file)
+        counts['beacon_offset'] = beacon_offset
+        counts['medic_offset'] = medic_offset
+
+        retention_cut = compute_retention_cut(
+            lines, retention_days, min_retained_lines, now,
+        )
+        counts['retention_cut'] = retention_cut
+
+        # Cursor-safety cap: never archive a line at or after a line-based
+        # consumer's offset. A pending (undelivered) alert can never be archived.
+        safe_cut = min(retention_cut, beacon_offset, medic_offset)
+        safe_cut = max(0, safe_cut)
+        counts['safe_cut'] = safe_cut
+        counts['remaining'] = n - safe_cut
+
+        if safe_cut <= 0:
+            log(f'no cursor-safe lines to archive (retention_cut={retention_cut}, '
+                f'beacon={beacon_offset}, medic={medic_offset}); no-op')
+            log('tick: ' + ('DRY-RUN ' if dry_run else '')
+                + ' '.join(f'{k}={v}' for k, v in counts.items()))
+            return counts
+
+        to_archive = lines[:safe_cut]
+        survivors = lines[safe_cut:]
+
+        if dry_run:
+            log(f'DRY-RUN would archive {safe_cut} line(s), keep {len(survivors)}')
+            log('tick: DRY-RUN '
+                + ' '.join(f'{k}={v}' for k, v in counts.items()))
+            return counts
+
+        if pre_inode is None:
+            # The inode is how _recover_pending tells whether a crash landed
+            # before or after the rewrite. Without it we cannot journal a
+            # crash-safe transaction, so skip this destructive tick entirely
+            # (no archive, no rewrite, offsets untouched) and retry next tick —
+            # strictly safer than rewriting un-recoverably.
+            log('could not determine alerts-file inode; skipping rewrite this '
+                'tick to preserve crash-safe recovery (will retry next tick)',
+                'ERROR')
+            log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items()))
+            return counts
+
+        target_beacon = beacon_offset - safe_cut
+        target_medic = medic_offset - safe_cut
+
+        # 1. Archive FIRST (the rotation is reversible from the dated archive).
+        #    Before the journal: a crash in this sub-second window leaves no
+        #    journal, so the next tick recomputes the identical pass — at worst a
+        #    duplicate copy of already-delivered lines in the cold archive.
+        archive_path = _archive_lines(to_archive, now, archive_dir)
+        counts['archived'] = safe_cut
+
+        # 2. COMMIT POINT (PR-E2 #8): journal the intent — pre_inode, the leading
+        #    line count to drop, and the ABSOLUTE target offsets — durably. Past
+        #    here the transition always completes: inline below, or via
+        #    _recover_pending on the next tick if we crash.
+        _write_journal(journal_path, {
+            'version': 1,
+            'created_at': now.isoformat(),
+            'pre_inode': pre_inode,
+            'safe_cut': safe_cut,
+            'target_beacon_offset': target_beacon,
+            'target_medic_offset': target_medic,
+        })
+
+        # 3. Atomically rewrite the live file with the survivors (inode swaps,
+        #    which both rotation detection and recovery key on).
+        _atomic_rewrite(alerts_file, survivors)
+
+        # 4. Decrement both line-based offsets to their ABSOLUTE targets (atomic,
+        #    clamped ≥ 0). The two consumers' read logic is unchanged; we only
+        #    shift their offset VALUES so they keep pointing at the same line.
+        _write_offset(beacon_offset_file, target_beacon)
+        _write_offset(medic_offset_file, target_medic)
+
+        # 5. Re-sync the chain-shipper byte cursor to the rewritten file.
+        counts['cursor_refreshed'] = _refresh_shipper_cursor(
+            shipper_cursors_file, SHIPPER_CURSOR_KEY, alerts_file,
+        )
+
+        # 6. Transaction complete — drop the journal.
+        _clear_journal(journal_path)
+
+        log(f'archived {safe_cut} line(s) → {archive_path}; kept {len(survivors)}; '
+            f'beacon {beacon_offset}→{target_beacon}, '
+            f'medic {medic_offset}→{target_medic}')
+        log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items()))
         return counts
-
-    with open(alerts_file, encoding='utf-8') as fh:
-        lines = fh.readlines()
-    n = len(lines)
-    counts['total_lines'] = n
-
-    beacon_offset = _read_offset(beacon_offset_file)
-    medic_offset = _read_offset(medic_offset_file)
-    counts['beacon_offset'] = beacon_offset
-    counts['medic_offset'] = medic_offset
-
-    retention_cut = compute_retention_cut(
-        lines, retention_days, min_retained_lines, now,
-    )
-    counts['retention_cut'] = retention_cut
-
-    # Cursor-safety cap: never archive a line at or after a line-based
-    # consumer's offset. A pending (undelivered) alert can never be archived.
-    safe_cut = min(retention_cut, beacon_offset, medic_offset)
-    safe_cut = max(0, safe_cut)
-    counts['safe_cut'] = safe_cut
-    counts['remaining'] = n - safe_cut
-
-    if safe_cut <= 0:
-        log(f'no cursor-safe lines to archive (retention_cut={retention_cut}, '
-            f'beacon={beacon_offset}, medic={medic_offset}); no-op')
-        log('tick: ' + ('DRY-RUN ' if dry_run else '')
-            + ' '.join(f'{k}={v}' for k, v in counts.items()))
-        return counts
-
-    to_archive = lines[:safe_cut]
-    survivors = lines[safe_cut:]
-
-    if dry_run:
-        log(f'DRY-RUN would archive {safe_cut} line(s), keep {len(survivors)}')
-        log('tick: DRY-RUN '
-            + ' '.join(f'{k}={v}' for k, v in counts.items()))
-        return counts
-
-    # 1. Archive FIRST (the rotation is reversible from the dated archive).
-    archive_path = _archive_lines(to_archive, now, archive_dir)
-    counts['archived'] = safe_cut
-
-    # 2. Atomically rewrite the live file with the survivors.
-    _atomic_rewrite(alerts_file, survivors)
-
-    # 3. Decrement both line-based offsets by safe_cut (atomic, clamped ≥ 0).
-    #    The two consumers' read logic is unchanged; we only shift their
-    #    offset VALUES so they keep pointing at the same logical position.
-    _write_offset(beacon_offset_file, beacon_offset - safe_cut)
-    _write_offset(medic_offset_file, medic_offset - safe_cut)
-
-    # 4. Re-sync the chain-shipper byte cursor to the rewritten file.
-    counts['cursor_refreshed'] = _refresh_shipper_cursor(
-        shipper_cursors_file, SHIPPER_CURSOR_KEY, alerts_file,
-    )
-
-    log(f'archived {safe_cut} line(s) → {archive_path}; kept {len(survivors)}; '
-        f'beacon {beacon_offset}→{beacon_offset - safe_cut}, '
-        f'medic {medic_offset}→{medic_offset - safe_cut}')
-    log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items()))
-    return counts
 
 
 def main() -> int:
