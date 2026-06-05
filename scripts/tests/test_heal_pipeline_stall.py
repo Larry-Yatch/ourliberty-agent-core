@@ -1933,5 +1933,52 @@ class TestCheckTier2FallbackOutcomes(_TempAgentsRootMixin, unittest.TestCase):
         self.assertFalse(any('skipped' in s for s in subjects))
 
 
+class TestMergedPrFetchTruncation(_TempAgentsRootMixin, unittest.TestCase):
+    """`_all_merged_prs_recent` must cover the full 7-day window, not just the
+    most-recent N merges. Regression guard for the 2026-06-04 limit=30 bug
+    where a ~22h-old sibling build PR was truncated off the tail, so
+    `_preflight_family_shipped` never saw it."""
+
+    @staticmethod
+    def _merged(num: int, minutes_ago: int) -> dict:
+        dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        return {'number': num, 'title': f'pr {num}', 'state': 'MERGED',
+                'mergedAt': dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'headRefName': f'forge/build-x-{num}'}
+
+    def _run(self, prs: list) -> tuple[list, list]:
+        captured: list[tuple[str, str]] = []
+        with patch.object(self.hps, 'REPOS', ['x/y']), \
+             patch.object(self.hps, 'gh_pr_list', return_value=prs), \
+             patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO':
+                          captured.append((level, msg))):
+            out = self.hps._all_merged_prs_recent()
+        warns = [m for lvl, m in captured if lvl == 'WARN' and 'cap' in m]
+        return out, warns
+
+    def test_warns_when_cap_hit_with_oldest_still_in_window(self) -> None:
+        limit = self.hps._MERGED_PR_FETCH_LIMIT
+        prs = [self._merged(i, minutes_ago=i % 60) for i in range(limit)]
+        out, warns = self._run(prs)
+        self.assertEqual(len(out), limit)
+        self.assertEqual(len(warns), 1)
+
+    def test_no_warn_when_below_cap(self) -> None:
+        out, warns = self._run([self._merged(i, minutes_ago=i) for i in range(10)])
+        self.assertEqual(len(out), 10)
+        self.assertEqual(warns, [])
+
+    def test_no_warn_when_cap_hit_but_oldest_outside_window(self) -> None:
+        limit = self.hps._MERGED_PR_FETCH_LIMIT
+        # `limit` results, but the oldest (last, newest-first order) merged 8
+        # days ago — the 7-day window is fully covered, so no truncation risk.
+        prs = [self._merged(i, minutes_ago=i) for i in range(limit - 1)]
+        prs.append(self._merged(9999, minutes_ago=8 * 24 * 60))
+        out, warns = self._run(prs)
+        self.assertEqual(len(out), limit - 1)  # the 8-day-old PR is filtered out
+        self.assertEqual(warns, [])
+
+
 if __name__ == '__main__':
     unittest.main()

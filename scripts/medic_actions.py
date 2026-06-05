@@ -353,49 +353,106 @@ def retrigger_inbox(target: str, fingerprint: str, attempt: int = 1) -> dict:
                         allowed)
 
 
-def _emit_remediation_notice(fp: str, reason: str, remediation: str) -> bool:
-    """Emit ONE actionable 'the root cause still needs fixing' alert to Larry
-    when Medic durably silences a false positive.
+def _emit_silence_decision(fp: str, reason: str, remediation: str) -> bool:
+    """Post the silence to Larry's Approvals tab as ONE Approve/Reject
+    decision (Supabase chain_events, event_type='approval_request').
 
-    Silencing stops the recurring inbox noise, but the underlying bug is
-    still unfixed -- Medic can quiet the symptom, not patch the code. So a
-    silence must never be truly silent: it is coupled with exactly one DM
-    telling Larry what to fix at the source. The notice rides a DISTINCT
-    subject (`medic-silenced-needs-fix:<subject>`) so the silence on the
-    original fingerprint does not also suppress this report, and so it
-    carries its own cooldown bucket. One-shot by construction: the caller
-    only reaches this on a FRESH silence (the idempotent re-silence path
-    returns earlier), and append_alert's per-subject cooldown is a backstop
-    against duplicates.
+    Silencing stops the recurring inbox noise, but Medic can only quiet the
+    symptom -- the root cause is still unfixed, and whether to keep or lift
+    the silence is Larry's call. So a silence is never truly silent: it is
+    coupled with exactly one decision on the Approvals tab:
+      * Approve = keep it silenced; Larry will fix the root cause in code.
+      * Reject  = the silence is wrong; unsilence the fingerprint so the
+        alert fires again.
+
+    The Approvals tab is a decisions-only inbox (only `approval_request` /
+    `clarify_request` render there; plain alerts go to the Ops/System tab).
+    When Larry clicks, the dashboard writes a generic 'follow the source
+    event's suggested_envelope' envelope into Beacon's inbox
+    (dashboard_api._build_envelope_for_action), so the two suggested
+    envelopes below carry the concrete instruction Beacon executes. The
+    shape mirrors the Beacon-originated approval
+    (beacon_approval_handler.build_approval_request_chain_event) so the
+    dashboard action handler treats a Medic-originated decision identically.
 
     `remediation` is the operator's specific 'here is the fix' text; when
     empty, a generic instruction is used so the coupling holds even if the
-    operator supplied none. Fail-safe: returns append_alert's bool and never
-    raises (append_alert itself never raises)."""
+    operator supplied none. One-shot by construction: the caller only
+    reaches this on a FRESH silence (the idempotent re-silence path returns
+    earlier). Best-effort -- emit_event never raises and returns False if
+    Supabase is unavailable, so a missing decision never blocks the
+    silence itself."""
+    try:
+        import chain_event_emit as cee  # lazy: heavy dep, keeps tests light
+        import chain_event_shipper as ces
+    except Exception:
+        return False
     _src, subject = _fp_parts(fp)
-    fix = remediation.strip() if isinstance(remediation, str) else ''
     why = reason.strip() if isinstance(reason, str) else ''
-    body = (
-        f'Medic durably silenced a confirmed false positive to stop it '
-        f'looping in your inbox, but the ROOT CAUSE is still unfixed -- '
-        f'Medic can quiet the alert, not patch the code. Fingerprint: {fp}.')
+    fix = (remediation.strip() if isinstance(remediation, str) else '') or (
+        'Investigate the healer/source that emits this fingerprint and patch '
+        'it at the source.')
+    task_id = f'medic-silence-{subject}'[:120]
+    use_ts = datetime.now(timezone.utc).isoformat()
+    event_id = ces.compute_event_id(task_id, 'approval_request', use_ts)
+    prompt = (
+        f'# Medic silenced a false positive — keep it or lift it?\n\n'
+        f'Medic durably silenced a recurring alert it confirmed benign, to '
+        f'stop it looping in your inbox. Medic can quiet the symptom but not '
+        f'patch the code, so the root cause is still unfixed and this is your '
+        f'call.\n\n'
+        f'**Fingerprint:** `{fp}`\n\n')
     if why:
-        body += f' Why benign: {why}.'
-    if fix:
-        body += f' Needs fixing: {fix}'
-    else:
-        body += (' Needs fixing: investigate the healer/source that emits '
-                 'this fingerprint and patch it at the source.')
-    action = (
-        f'Fix the root cause, then lift the mask: '
-        f'larry_alerts.unsilence("{fp}"). Audit trail: medic-dispatcher.log.')
-    return larry_alerts.append_alert(
-        source='medic',
-        severity='warning',
-        message=body,
-        subject=f'medic-silenced-needs-fix:{subject}',
-        suggested_action=action,
-        route='escalate',
+        prompt += f'**Why Medic judged it benign:** {why}\n\n'
+    prompt += (
+        f'**Root cause to fix:** {fix}\n\n'
+        f'- **Approve** — keep it silenced; you will fix the root cause in '
+        f'code.\n'
+        f'- **Reject** — this silence is wrong; unsilence it so the alert '
+        f'fires again.')
+    approve_env = {
+        'task_id': f'larry-approval-{event_id}',
+        'source': 'dashboard',
+        'dedup_identity': f'larry-approval:{event_id}',
+        'timeout': 600,
+        'prompt': (
+            f'Larry approved Medic\'s silence of `{fp}`. No dispatch needed — '
+            f'the root-cause fix is Larry\'s to make in code. Acknowledge and '
+            f'close the pending item; leave the silence in place (do NOT '
+            f'unsilence).'),
+    }
+    reject_env = {
+        'task_id': f'larry-reject-{event_id}',
+        'source': 'dashboard',
+        'dedup_identity': f'larry-reject:{event_id}',
+        'timeout': 600,
+        'prompt': (
+            f'Larry rejected Medic\'s silence of `{fp}` — the silence is '
+            f'wrong. Lift it so the alert can fire again by calling '
+            f'larry_alerts.unsilence("{fp}") (verify the silence file under '
+            f'state/alert-silenced/ is gone). Do not abort any in-flight '
+            f'work.'),
+    }
+    payload = {
+        'proposing_agent': 'medic',
+        'target_agent': 'medic',
+        # `summary` is in beacon_approval_handler.REQUIRED_FIELDS for
+        # approval_request and is what the Approvals-tab renderer shows as the
+        # card title (dashboard_api maps it to plan_summary). Without it the card
+        # renders as "(no summary)". Keep it short — full context is in `prompt`.
+        'summary': f'Medic silenced a false positive — keep or lift? ({subject})',
+        'prompt': prompt,
+        'severity': 'warning',
+        'dedup_identity': task_id,
+        'suggested_envelope_for_approve': approve_env,
+        'suggested_envelope_for_reject': reject_env,
+    }
+    return cee.emit_event(
+        event_type='approval_request',
+        agent='medic',
+        task_id=task_id,
+        payload=payload,
+        ts=use_ts,
     )
 
 
@@ -419,10 +476,11 @@ def silence_false_positive(fingerprint: str, reason: str = '',
       (d) perform -- larry_alerts.silence(fingerprint, ...).
       (e) verify  -- larry_alerts.is_silenced(fingerprint) is now True.
       (f) record  -- ledger outcome='acted' (classification='reversible').
-      (g) couple  -- emit ONE `medic-silenced-needs-fix:<subject>` alert to
-          Larry with the root cause / `remediation`. Silencing stops the
-          symptom; this guarantees the bug Medic cannot fix itself still
-          reaches Larry exactly once with what to fix.
+      (g) couple  -- post ONE Approve/Reject decision to Larry's Approvals
+          tab (event_type='approval_request') with the root cause /
+          `remediation`. Silencing stops the symptom; this guarantees the
+          bug Medic cannot fix itself still reaches Larry exactly once as an
+          actionable decision (keep silenced vs unsilence).
 
     The silence is logged to medic-dispatcher.log for the audit trail and is
     reversible via larry_alerts.unsilence(fingerprint).
@@ -478,21 +536,23 @@ def silence_false_positive(fingerprint: str, reason: str = '',
             outcome='acted', attempt=attempt_int, notes=notes)
         _log('INFO', notes)
 
-        # (g) couple the silence with ONE actionable fix report. Silencing
-        # stops the inbox loop; this guarantees the unfixed root cause still
-        # reaches Larry exactly once instead of being quietly masked. Only on
-        # this fresh-silence path -- the (c) idempotence branch returned
-        # earlier, so the notice never repeats on subsequent cycles.
-        notified = _emit_remediation_notice(fp, reason, remediation)
-        _log('INFO', f'remediation notice for {fp}: '
-                     f'{"sent" if notified else "suppressed (cooldown)"}')
+        # (g) couple the silence with ONE Approve/Reject decision on Larry's
+        # Approvals tab. Silencing stops the inbox loop; this guarantees the
+        # unfixed root cause still reaches Larry exactly once as an actionable
+        # decision instead of being quietly masked. Only on this fresh-silence
+        # path -- the (c) idempotence branch returned earlier, so the decision
+        # never repeats on subsequent cycles.
+        posted = _emit_silence_decision(fp, reason, remediation)
+        _log('INFO', f'silence decision for {fp}: '
+                     f'{"posted to Approvals tab" if posted else "not posted (chain_events unavailable)"}')
 
         ttl_note = 'permanent' if not ttl_sec else f'ttl={ttl_sec}s'
-        dm_note = ('fix-report DM sent' if notified
-                   else 'fix-report DM suppressed (cooldown)')
+        decision_note = ('Approve/Reject decision posted to Approvals tab'
+                         if posted else
+                         'Approvals-tab decision NOT posted (chain_events unavailable)')
         return _result(
             ACTION_SILENCE, fp, fp, ok=True, outcome='acted', reason='silenced',
-            detail=(f'{fp} silenced ({ttl_note}); {dm_note}. Reversible: '
+            detail=(f'{fp} silenced ({ttl_note}); {decision_note}. Reversible: '
                     f'larry_alerts.unsilence("{fp}") restores it.'))
     except Exception as e:  # never raise -- fail safe
         _log('ERROR', f'{ACTION_SILENCE} unexpected exception for '

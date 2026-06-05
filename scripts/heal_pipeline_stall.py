@@ -366,14 +366,28 @@ def _all_open_prs() -> list[dict]:
     return out
 
 
+# gh returns merged PRs newest-first. The fetch limit must comfortably
+# exceed the busiest realistic 7-day merge count, or the window is silently
+# truncated to "the most-recent N merges". That was the 2026-06-04 bug: on a
+# high-velocity repo PR #294 merged ~22h before the alert but already sat
+# >30 PRs back, so the old limit=30 dropped it and `_preflight_family_shipped`
+# never saw the shipped sibling build. Sized with headroom; if a cycle ever
+# hits the cap with the oldest fetched PR still inside the window, we WARN
+# instead of truncating silently (so the limit gets bumped, not the bug
+# rediscovered).
+_MERGED_PR_FETCH_LIMIT = 300
+
+
 def _all_merged_prs_recent() -> list[dict]:
     """Return MERGED PRs across tracked repos in the last 7 days, augmented
     with `_repo`. Used to detect PRs that merged after a Mirror PASS so we
-    can skip the still-OPEN check."""
+    can skip the still-OPEN check, and (via `_preflight_family_shipped`) to
+    correlate a preflight/clarify task to its already-shipped sibling build."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     out = []
     for repo in REPOS:
-        for pr in gh_pr_list(repo, state='merged', limit=30):
+        raw = gh_pr_list(repo, state='merged', limit=_MERGED_PR_FETCH_LIMIT)
+        for pr in raw:
             merged = pr.get('mergedAt')
             if not merged:
                 continue
@@ -381,6 +395,22 @@ def _all_merged_prs_recent() -> list[dict]:
             if ts and ts >= cutoff:
                 pr['_repo'] = repo
                 out.append(pr)
+        # No silent caps: if we fetched exactly the limit AND the oldest
+        # result is still inside the 7-day window, older in-window merges may
+        # have fallen off the tail. Surface it; correctness (a missed
+        # family-shipped match -> false stall alert) depends on full coverage.
+        if len(raw) >= _MERGED_PR_FETCH_LIMIT:
+            oldest = raw[-1].get('mergedAt') if raw else None
+            oldest_ts = _parse_ts(oldest) if oldest else None
+            if oldest_ts and oldest_ts >= cutoff:
+                log(
+                    f'merged-PR fetch for {repo} hit the '
+                    f'{_MERGED_PR_FETCH_LIMIT} cap with the oldest result '
+                    f'({oldest}) still inside the 7-day window — older '
+                    f'in-window merges may be truncated; bump '
+                    f'_MERGED_PR_FETCH_LIMIT.',
+                    'WARN',
+                )
     return out
 
 

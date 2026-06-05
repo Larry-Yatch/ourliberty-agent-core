@@ -1,7 +1,8 @@
 {
-  "_comment": "Tunable config for scripts/heal_wedged_review_sessions.py. Pulse-Check adjusts these values (no hand-picked constants in the healer). marker_grace_seconds: idle window after a terminal marker before a provably-done session is auto-reaped (Case 1). silent_grace_seconds: idle window with NO marker before a session is flagged as a silent-wedge candidate (Case 2). streak_to_promote: consecutive Case-2 true positives required to graduate Case 2 from alert-only to auto-reap.",
+  "_comment": "Tunable config for scripts/heal_wedged_review_sessions.py. Pulse-Check adjusts these values (no hand-picked constants in the healer). marker_grace_seconds: idle window after a terminal marker before a provably-done session is auto-reaped (Case 1). silent_grace_seconds: idle window with NO marker before a session is flagged as a silent-wedge candidate (Case 2, alert/confidence-ladder path). hard_silent_grace_seconds: idle window with NO marker beyond which a session is auto-reaped DETERMINISTICALLY, independent of the confidence ladder — set well above the longest legitimate silent operation (the foreground regression gate, ~10 min) so it only ever fires on a provably-wedged session; this is what lets the healer act on the FIRST wedge (PR #101 / #334) instead of waiting for the streak to graduate. streak_to_promote: consecutive Case-2 true positives required to graduate the 15-min alert path from alert-only to auto-reap.",
   "enabled": true,
   "marker_grace_seconds": 300,
   "silent_grace_seconds": 900,
+  "hard_silent_grace_seconds": 3600,
   "streak_to_promote": 3
 }

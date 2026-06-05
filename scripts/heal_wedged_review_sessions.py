@@ -53,12 +53,32 @@ CASE 2 — silent (NO marker):
   graduates to auto-reap (one-time graduation CLOSURE notify). Any miss
   auto-demotes back to alert-only.
 
+  HARD backstop (deterministic, mode-independent): a no-marker session idle
+  past hard_silent_grace_seconds (default 3600 = 60 min) is auto-reaped
+  immediately, regardless of the confidence ladder. The justification is
+  arithmetic, not statistical: the longest legitimate silent operation is the
+  foreground regression gate (test_regression_check.py, ~10 min wall for both
+  SHAs at the 300s/SHA default), so 60 min of silence is 4–6× anything a live
+  review could be doing — it is provably wedged. This closes the gap Pulse
+  flagged on PR #334 (2026-06-05): the healer could WARN at 15 min but not act
+  until the streak graduated, so the first wedges (71 min PR #101, 102 min
+  PR #334) needed a manual kill. The hard path lets it act on the FIRST wedge
+  while the 15-min streak path stays conservative. If the session was already
+  alerted (it crossed silent_grace in an earlier sweep, so it has a pending
+  entry), the hard reap is credited as a TRUE positive by verify_pending on the
+  next sweep, nudging the 15-min path toward graduation; a first-sight hard reap
+  (the healer was down while the session wedged, so it never passed through the
+  alert path and has no pending entry) kills it without a streak credit — which
+  is fine, the hard path doesn't depend on the streak. The same fresh
+  resumed-at-gate recheck as the graduated path guards it, so a session that
+  resumed between scan and kill is never reaped.
+
 Config (Pulse-Check-tunable; NOT hardcoded)
 -------------------------------------------
 `config/review-reaper-rules.json`: marker_grace_seconds, silent_grace_seconds,
-streak_to_promote, enabled. Missing/malformed → conservative built-in
-defaults (never raises). Pulse adjusts the JSON; no constant is hand-picked
-in this file.
+hard_silent_grace_seconds, streak_to_promote, enabled. Missing/malformed →
+conservative built-in defaults (never raises). Pulse adjusts the JSON; no
+constant is hand-picked in this file.
 
 Coexistence with heal_zombie_main_workers.py (no double-kill)
 ------------------------------------------------------------
@@ -122,10 +142,17 @@ ZOMBIE_HEALER_CWD_PREFIX = '/tmp/wt-main-'
 # more aggressively than intended.
 DEFAULT_CONFIG: dict[str, Any] = {
     'enabled': True,
-    'marker_grace_seconds': 300,    # 5 min  — Case 1 post-marker idle floor
-    'silent_grace_seconds': 900,    # 15 min — Case 2 no-marker idle floor
-    'streak_to_promote': 3,         # consecutive true positives → auto-reap
+    'marker_grace_seconds': 300,         # 5 min  — Case 1 post-marker idle floor
+    'silent_grace_seconds': 900,         # 15 min — Case 2 no-marker idle floor (alert)
+    'hard_silent_grace_seconds': 3600,   # 60 min — Case 2 deterministic auto-reap backstop
+    'streak_to_promote': 3,              # consecutive true positives → auto-reap
 }
+
+# Sentinel the hard backstop is pushed to when config is mistuned (hard <=
+# silent): an idle window no real session can ever reach (~31,000 years), so
+# the hard path is effectively disabled and only the conservative alert ladder
+# runs. Far larger than any plausible idle_secs.
+_HARD_BACKSTOP_DISABLED = 10 ** 12
 
 # Tree-kill: how long to wait after SIGTERM before escalating to SIGKILL.
 SIGTERM_GRACE_SECONDS = 5
@@ -133,8 +160,9 @@ SIGTERM_GRACE_SECONDS = 5
 GIT_TIMEOUT_SEC = 60
 
 # --- classification verdicts ---
-REAP_CASE1 = 'reap_case1'      # provably done (marker present)
-SILENT_CASE2 = 'silent_case2'  # no marker, idle past silent grace
+REAP_CASE1 = 'reap_case1'              # provably done (marker present)
+SILENT_CASE2 = 'silent_case2'          # no marker, idle past silent grace (alert/ladder)
+REAP_CASE2_HARD = 'reap_case2_hard'    # no marker, idle past HARD grace (deterministic reap)
 SKIP = 'skip'
 
 # --- confidence-ladder modes ---
@@ -194,12 +222,25 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
         return cfg
     if isinstance(data.get('enabled'), bool):
         cfg['enabled'] = data['enabled']
-    for key in ('marker_grace_seconds', 'silent_grace_seconds', 'streak_to_promote'):
+    for key in ('marker_grace_seconds', 'silent_grace_seconds',
+                'hard_silent_grace_seconds', 'streak_to_promote'):
         raw = data.get(key)
         if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
             cfg[key] = int(raw)
         elif key in data:
             log(f'config {key}={raw!r} invalid; keeping default {cfg[key]}', 'WARN')
+    # Safety invariant — this file's contract is "a config mishap can never make
+    # the healer kill more aggressively than intended." The hard deterministic-
+    # reap ceiling MUST sit above the soft alert floor; otherwise a mistuned JSON
+    # (hard <= silent) would make every silent session cross the hard gate first
+    # and be auto-reaped immediately, bypassing the alert ladder + streak
+    # graduation. If that happens, disable the hard backstop (push it out of
+    # reach) and warn — a config error must make us LESS aggressive, never more.
+    if cfg['hard_silent_grace_seconds'] <= cfg['silent_grace_seconds']:
+        log(f'config hard_silent_grace_seconds={cfg["hard_silent_grace_seconds"]} '
+            f'<= silent_grace_seconds={cfg["silent_grace_seconds"]}; disabling the '
+            f'hard backstop (it would bypass the alert ladder)', 'WARN')
+        cfg['hard_silent_grace_seconds'] = _HARD_BACKSTOP_DISABLED
     return cfg
 
 
@@ -383,14 +424,23 @@ def classify(
 ) -> str:
     """Pure verdict for one live review session.
 
-    REAP_CASE1   — marker present and idle past marker_grace (work is in hand).
-    SILENT_CASE2 — no marker and idle past silent_grace (possible wedge).
-    SKIP         — still fresh / actively working.
+    REAP_CASE1      — marker present and idle past marker_grace (work is in hand).
+    REAP_CASE2_HARD — no marker and idle past hard_silent_grace (provably wedged:
+                      longer than any legitimate silent operation; deterministic
+                      auto-reap, independent of the confidence ladder).
+    SILENT_CASE2    — no marker and idle past silent_grace (possible wedge; the
+                      alert/confidence-ladder path).
+    SKIP            — still fresh / actively working.
+
+    The hard gate is checked before the soft gate so a session past the hard
+    ceiling always reaps regardless of how the two thresholds are configured.
     """
     if marker_present:
         if idle_secs > cfg['marker_grace_seconds']:
             return REAP_CASE1
         return SKIP
+    if idle_secs > cfg['hard_silent_grace_seconds']:
+        return REAP_CASE2_HARD
     if idle_secs > cfg['silent_grace_seconds']:
         return SILENT_CASE2
     return SKIP
@@ -811,7 +861,7 @@ def run_cycle(
 
     summary: dict[str, Any] = {
         'scanned': len(candidates), 'case1_reaped': 0, 'case2_alerted': 0,
-        'case2_auto_reaped': 0, 'case2_demoted_at_gate': 0,
+        'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
         'true_positives': 0, 'false_positives': 0,
         'mode_before': state.mode,
     }
@@ -850,6 +900,25 @@ def run_cycle(
                  reaper=reaper, worktree_remover=worktree_remover,
                  closure_notify=closure_notify, event_emitter=event_emitter)
             summary['case1_reaped'] += 1
+        elif verdict == REAP_CASE2_HARD:
+            # Deterministic backstop: silent far longer than any legitimate
+            # review operation could run, so reap regardless of the confidence
+            # ladder/mode — this is the provably-wedged fast path that lets the
+            # healer act on the FIRST wedge instead of waiting for the streak to
+            # graduate. Same fresh resumed-at-gate recheck as the graduated path:
+            # if the session resumed between scan and now it was live work, so
+            # abort the kill (a benign skip — not a streak-affecting outcome).
+            if _resumed_since_scan(cand):
+                log(f'CASE2-HARD reap aborted: {cand.session_id} resumed at gate '
+                    f'— live work, not killing', 'WARN')
+                continue
+            reap(cand, case='case2-hard',
+                 reason=(f'no marker, idle {int(cand.idle_secs)}s > HARD silent grace '
+                         f'{cfg["hard_silent_grace_seconds"]}s (deterministic wedge '
+                         f'backstop — provably past any legitimate review operation)'),
+                 reaper=reaper, worktree_remover=worktree_remover,
+                 closure_notify=closure_notify, event_emitter=event_emitter)
+            summary['case2_hard_reaped'] += 1
         elif verdict == SILENT_CASE2:
             if state.mode == MODE_AUTO_REAP:
                 # Final fresh recheck right before an irreversible kill: if the
@@ -891,7 +960,7 @@ def run_cycle(
                          f'{cand.pid}, {Path(cand.cwd).name}): idle '
                          f'{int(cand.idle_secs)}s with no terminal marker. '
                          f'Alert-only (Case 2 not yet graduated). Not killing.'),
-                        f'wedged-review-silent-{Path(cand.cwd).name}',
+                        f'wedged-review-silent:{Path(cand.cwd).name}',
                         (f'Inspect: `ls -la {cand.cwd}` and the session log at '
                          f'{cand.jsonl}. If genuinely wedged, kill pid {cand.pid}.'),
                     )
@@ -916,6 +985,7 @@ def main() -> int:
     summary = run_cycle(cfg=cfg)
     log('HEARTBEAT scanned={scanned} case1_reaped={case1_reaped} '
         'case2_alerted={case2_alerted} case2_auto_reaped={case2_auto_reaped} '
+        'case2_hard_reaped={case2_hard_reaped} '
         'tp={true_positives} fp={false_positives} mode={mode_after} '
         'streak={streak}'.format(**summary))
     return 0

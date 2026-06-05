@@ -191,18 +191,11 @@ class GateTest(_IsolatedActions):
 
 class SilenceFalsePositiveTest(_IsolatedActions):
     """silence-false-positive handler: reversible, allowlist-gated, and
-    coupled with exactly ONE actionable fix report. The 2026-06-04
-    forge-no-pr backstop -- Medic durably quiets a confirmed benign
-    fingerprint instead of escalating attempt N+1 to Larry, but still DMs
-    Larry once with the root cause so the underlying bug is not silently
-    masked."""
-
-    def _alert_records(self) -> list:
-        path = medic_actions.larry_alerts.ALERTS_FILE
-        if not path.exists():
-            return []
-        return [json.loads(line) for line in
-                path.read_text().splitlines() if line.strip()]
+    coupled with exactly ONE Approve/Reject decision on Larry's Approvals
+    tab. The 2026-06-04 forge-no-pr backstop -- Medic durably quiets a
+    confirmed benign fingerprint instead of escalating attempt N+1 to Larry,
+    but posts a one-time decision (keep silenced vs unsilence) so the unfixed
+    root cause is not silently masked."""
 
     SILENCEABLE_FP = ('heal-pipeline-stall:pipeline-stall:forge-no-pr:'
                       'forge-queue-api-preflight-20260603T231401Z-clarify1')
@@ -229,13 +222,24 @@ class SilenceFalsePositiveTest(_IsolatedActions):
             mock.patch.object(la, 'SILENCE_ROOT',
                               self.agents_root / 'state' / 'alert-silenced'),
         ]
+        # SAFETY: stub the Approvals-tab emitter so no test ever writes a real
+        # chain_events row to production Supabase. Captured for assertions.
+        import chain_event_emit
+        self._emit_patch = mock.patch.object(
+            chain_event_emit, 'emit_event', return_value=True)
+        self._emit_mock = self._emit_patch.start()
         for p in self._la_patches:
             p.start()
 
     def tearDown(self) -> None:
         for p in self._la_patches:
             p.stop()
+        self._emit_patch.stop()
         super().tearDown()
+
+    def _decisions(self) -> list:
+        """The payload kwargs of every approval_request emitted this test."""
+        return [c.kwargs for c in self._emit_mock.call_args_list]
 
     def test_silences_allowlisted_fingerprint_and_suppresses_alert(self) -> None:
         la = medic_actions.larry_alerts
@@ -287,59 +291,56 @@ class SilenceFalsePositiveTest(_IsolatedActions):
         self.assertTrue(
             medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FP))
 
-    def test_silence_emits_one_shot_fix_report(self) -> None:
+    def test_silence_posts_one_approval_decision(self) -> None:
         """Silencing must not be silent: it couples with exactly one
-        actionable fix report to Larry, carrying the operator's remediation
-        text under a DISTINCT `medic-silenced-needs-fix:` subject so the
-        silence on the original fingerprint does not suppress it."""
+        Approve/Reject decision on the Approvals tab (an approval_request
+        chain_event from agent='medic'), carrying the operator's remediation
+        text and the silenced fingerprint in the decision prompt."""
         res = medic_actions.silence_false_positive(
             self.SILENCEABLE_FP, reason='build shipped as PR #294',
             remediation='Add retry-sibling reconciliation to '
                         'heal_pipeline_stall.py _forge_pr_create_inferred_failure')
         self.assertTrue(res['ok'])
-        self.assertIn('fix-report DM sent', res['detail'])
-        reports = [r for r in self._alert_records()
-                   if str(r.get('subject', '')).startswith(
-                       'medic-silenced-needs-fix:')]
-        self.assertEqual(len(reports), 1)
-        self.assertEqual(reports[0]['source'], 'medic')
-        self.assertEqual(reports[0]['route'], 'escalate')
-        self.assertIn('retry-sibling reconciliation',
-                      reports[0]['suggested_action'] + reports[0]['message'])
-        self.assertIn(self.SILENCEABLE_FP, reports[0]['message'])
+        self.assertIn('Approvals tab', res['detail'])
+        decisions = self._decisions()
+        self.assertEqual(len(decisions), 1)
+        d = decisions[0]
+        self.assertEqual(d['event_type'], 'approval_request')
+        self.assertEqual(d['agent'], 'medic')
+        payload = d['payload']
+        self.assertEqual(payload['proposing_agent'], 'medic')
+        self.assertIn('retry-sibling reconciliation', payload['prompt'])
+        self.assertIn(self.SILENCEABLE_FP, payload['prompt'])
+        # Reject envelope must carry the unsilence instruction; approve must not.
+        self.assertIn('unsilence',
+                      payload['suggested_envelope_for_reject']['prompt'])
+        self.assertIn('do NOT',
+                      payload['suggested_envelope_for_approve']['prompt'])
 
-    def test_silence_without_remediation_still_emits_generic_fix_report(self) -> None:
+    def test_silence_without_remediation_uses_generic_fix(self) -> None:
         """Coupling holds even if the operator supplied no remediation text —
-        a generic 'patch it at the source' instruction is sent."""
+        a generic 'patch it at the source' instruction fills the decision."""
         res = medic_actions.silence_false_positive(self.SILENCEABLE_FP)
         self.assertTrue(res['ok'])
-        reports = [r for r in self._alert_records()
-                   if str(r.get('subject', '')).startswith(
-                       'medic-silenced-needs-fix:')]
-        self.assertEqual(len(reports), 1)
-        self.assertIn('patch it at the source', reports[0]['message'])
+        decisions = self._decisions()
+        self.assertEqual(len(decisions), 1)
+        self.assertIn('patch it at the source', decisions[0]['payload']['prompt'])
 
-    def test_idempotent_silence_does_not_re_emit_fix_report(self) -> None:
+    def test_idempotent_silence_does_not_re_post_decision(self) -> None:
         """One-shot: the second (idempotent) silence returns early and must
-        NOT add a second fix report, so a re-confirmed false positive can't
-        re-junk the inbox."""
+        NOT post a second decision, so a re-confirmed false positive can't
+        re-junk the Approvals tab."""
         medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='a')
         res = medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='b')
         self.assertEqual(res['reason'], 'already-silenced')
-        reports = [r for r in self._alert_records()
-                   if str(r.get('subject', '')).startswith(
-                       'medic-silenced-needs-fix:')]
-        self.assertEqual(len(reports), 1)
+        self.assertEqual(len(self._decisions()), 1)
 
-    def test_refused_silence_emits_no_fix_report(self) -> None:
+    def test_refused_silence_posts_no_decision(self) -> None:
         """A refused silence (not in allowlist) performs nothing, so it must
-        not emit a fix report either."""
+        not post a decision either."""
         medic_actions.silence_false_positive(
             'watchdog:disk-full-critical', reason='nope')
-        reports = [r for r in self._alert_records()
-                   if str(r.get('subject', '')).startswith(
-                       'medic-silenced-needs-fix:')]
-        self.assertEqual(reports, [])
+        self.assertEqual(self._decisions(), [])
 
 
 class RestartSuccessTest(_IsolatedActions):
