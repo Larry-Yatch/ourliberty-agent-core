@@ -64,6 +64,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import atomic_io  # noqa: E402  (shared durable atomic write, PR-E #366)
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 LOG_FILE = AGENTS_ROOT / 'logs' / 'chain-event-shipper.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'chain-event-shipper.heartbeat'
@@ -331,6 +334,34 @@ def save_pulse_cursor(cursor: PulseCursor) -> None:
     try:
         PULSE_CURSOR_FILE.parent.mkdir(parents=True, exist_ok=True)
         PULSE_CURSOR_FILE.write_text(json.dumps(cursor.to_dict()))
+    except OSError:
+        pass
+
+
+def load_journal_cursor(cursor_file: Path = JOURNAL_CURSOR_FILE) -> str:
+    """Read the persisted journald cursor string, or '' if none yet.
+
+    PR-E2 #18: we manage this cursor ourselves (instead of letting journalctl's
+    --cursor-file advance it as it streams) so it only ever points at a record we
+    actually consumed. '' means "no cursor yet" → drain from the start of the
+    unit's journal (matching the old first-run --cursor-file behaviour)."""
+    try:
+        return cursor_file.read_text().strip()
+    except OSError:
+        return ''
+
+
+def save_journal_cursor(cursor: str, cursor_file: Path = JOURNAL_CURSOR_FILE) -> None:
+    """Durably persist the journald cursor (unique temp + fsync + os.replace).
+
+    Saved only AFTER a drain consumes records, mirroring save_log_cursors: a
+    crash before this leaves the old cursor, so the next drain re-reads the
+    un-persisted records and the event_id PK dedup absorbs the duplicates — the
+    failure mode is re-read, never skip."""
+    if not cursor:
+        return
+    try:
+        atomic_io.atomic_write_text(cursor_file, cursor)
     except OSError:
         pass
 
@@ -717,28 +748,34 @@ def tail_file(
 # -------------------- journalctl tail --------------------
 
 def iter_journalctl(
-    cursor_file: Path = JOURNAL_CURSOR_FILE,
+    after_cursor: str = '',
     unit: str = JOURNALCTL_UNIT,
     once: bool = True,
     timeout_sec: float = 10.0,
-) -> Iterator[dict[str, Any]]:
-    """Yield parsed journalctl JSON records since the last cursor.
+) -> Iterator[tuple[dict[str, Any], str]]:
+    """Yield ``(record, cursor)`` for each journalctl JSON record after
+    ``after_cursor``.
 
-    once=True spawns `journalctl ...` in its default non-follow mode so it
-    drains the available records and exits (suitable for the daemon's drain
-    pass). once=False is reserved for a future live-follow use case.
+    PR-E2 #18: we DON'T pass ``--cursor-file`` — letting journalctl own cursor
+    advancement meant a timeout/SIGTERM could terminate it AFTER it had advanced
+    the cursor past records that were streamed into the pipe but never consumed
+    here, silently dropping them. Instead we resume with ``--after-cursor`` and
+    surface each record's own ``__CURSOR`` so the CALLER advances the persisted
+    cursor only as far as it actually consumed (mirroring the tail_file sources).
 
-    The subprocess writes its position to cursor_file so the next call
-    resumes cleanly.
+    ``after_cursor`` empty → no ``--after-cursor`` flag → drain from the start of
+    the unit's journal (the old first-run behaviour). once=True drains then exits.
     """
-    cursor_file.parent.mkdir(parents=True, exist_ok=True)
     cmd = [
         'journalctl',
         '-u', unit,
         '--output=json',
-        f'--cursor-file={cursor_file}',
         '--no-pager',
     ]
+    if after_cursor:
+        # --after-cursor is exclusive: it yields records STRICTLY after the given
+        # cursor, so the last-consumed record is never re-emitted.
+        cmd.append(f'--after-cursor={after_cursor}')
     try:
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -756,9 +793,16 @@ def iter_journalctl(
             if not line:
                 continue
             try:
-                yield json.loads(line)
+                record = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            cursor = record.get('__CURSOR')
+            if not isinstance(cursor, str) or not cursor:
+                # No usable cursor on this record — yield it but advance to the
+                # empty sentinel so the caller keeps its prior cursor rather than
+                # persisting an un-resumable position.
+                cursor = ''
+            yield record, cursor
     finally:
         with contextlib.suppress(Exception):
             proc.terminate()
@@ -922,24 +966,35 @@ def drain_once(
     pulse_cursor: PulseCursor,
     logger: logging.Logger,
     *,
+    journal_cursor: str = '',
     journal_iter_fn=None,
     pulse_path: Path = PULSE_ESCALATIONS_JSON,
     outbox_log_path: Path = OUTBOX_NOTIFIER_LOG,
     larry_alerts_path: Path = LARRY_ALERTS_JSONL,
     sentinel_alerts_path: Path = SENTINEL_ALERTS_JSONL,
-) -> tuple[DrainStats, PulseCursor]:
+) -> tuple[DrainStats, PulseCursor, str]:
     """Walk all five sources, build event rows, INSERT or buffer.
 
     Pure-function-shaped for testing: pass mocked sink + buffer +
     cursors + journal_iter_fn and verify the resulting DrainStats.
+
+    Returns ``(stats, new_pulse_cursor, new_journal_cursor)``. The journal cursor
+    advances only as far as records are actually consumed here (PR-E2 #18), and
+    the caller persists it AFTER the drain — so a deadline/SIGTERM mid-stream
+    re-reads the un-consumed tail next time rather than skipping it.
     """
     stats = DrainStats()
     events: list[ChainEvent] = []
     unknown_types: list[str] = []
 
     # 1. journalctl
-    j_iter = journal_iter_fn() if journal_iter_fn else iter_journalctl()
-    for record in j_iter:
+    new_journal_cursor = journal_cursor
+    j_iter = journal_iter_fn() if journal_iter_fn else iter_journalctl(journal_cursor)
+    for record, jcursor in j_iter:
+        # Advance our in-memory cursor to every record we consume (even ones that
+        # don't parse into an event — like tail_file advancing past a bad line).
+        if jcursor:
+            new_journal_cursor = jcursor
         ev = parse_journal_record(record)
         if ev:
             events.append(ev)
@@ -1015,7 +1070,7 @@ def drain_once(
     all_rows = pending_buffer + rows
 
     if not all_rows:
-        return stats, new_pulse_cursor
+        return stats, new_pulse_cursor, new_journal_cursor
 
     try:
         sink.insert_rows(all_rows)
@@ -1039,7 +1094,7 @@ def drain_once(
                 'BUFFER_OVERFLOW dropped=%d oldest events; chronic outage?', dropped,
             )
 
-    return stats, new_pulse_cursor
+    return stats, new_pulse_cursor, new_journal_cursor
 
 
 # -------------------- run / argparse --------------------
@@ -1068,6 +1123,7 @@ def run_loop(logger: logging.Logger) -> int:
     buffer = EventBuffer()
     log_cursors = load_log_cursors()
     pulse_cursor = load_pulse_cursor()
+    journal_cursor = load_journal_cursor()
 
     logger.info(
         'chain_event_shipper starting: drain_interval=%ds heartbeat=%ds',
@@ -1080,11 +1136,15 @@ def run_loop(logger: logging.Logger) -> int:
             logger.info('kill-switch active; exiting cleanly')
             return 0
         try:
-            stats, pulse_cursor = drain_once(
+            stats, pulse_cursor, journal_cursor = drain_once(
                 sink, buffer, log_cursors, pulse_cursor, logger,
+                journal_cursor=journal_cursor,
             )
+            # Persist cursors only AFTER the drain (and its insert/buffer) — a
+            # crash before this re-reads the un-persisted tail, never skips it.
             save_log_cursors(log_cursors)
             save_pulse_cursor(pulse_cursor)
+            save_journal_cursor(journal_cursor)
             if any((stats.journal, stats.outbox_log, stats.pulse_escalations,
                     stats.larry_alerts, stats.sentinel_alerts,
                     stats.dropped_unknown_type, stats.dropped_buffer_overflow,
@@ -1132,13 +1192,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         buffer = EventBuffer()
         log_cursors = load_log_cursors()
         pulse_cursor = load_pulse_cursor()
+        journal_cursor = load_journal_cursor()
         try:
-            stats, pulse_cursor = drain_once(
+            stats, pulse_cursor, journal_cursor = drain_once(
                 sink, buffer, log_cursors, pulse_cursor, logger,
+                journal_cursor=journal_cursor,
             )
         finally:
             save_log_cursors(log_cursors)
             save_pulse_cursor(pulse_cursor)
+            save_journal_cursor(journal_cursor)
             heartbeat()
         logger.info('--once drain complete: %s', stats)
         return 0
