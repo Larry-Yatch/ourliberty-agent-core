@@ -4,6 +4,66 @@
 
 ---
 
+## Iteration 949 — 2026-06-05 03:36 UTC (interactive)
+
+**Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=1. 0 new alerts. 0 open PRs. 8/8 services active. All inboxes empty. 0 auto-fix actions.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 948). Pipeline-stall heartbeat: 2026-06-05T03:33:15Z (✅ ~3 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T03:32:02Z (✅ ~4 min at cycle start; within 60-min threshold). Sync: status=error, commit=c0e5f6cf, last_sync=02:56:04Z (⚠️ SYNC-PUSH-REBASE-FALLBACK Tier 3 known pattern; session-start HEAD dce7fd6 "Pulse cycle 20260605T031943Z" NEWER than sync.json commit → wrapper push succeeded; self-clears on next hourly sync.timer). Tier state at start: tier=2, consecutive_clean=0. Tier state at end: **tier=2, consecutive_clean=1** (clean iter; 2 more needed for Tier 3 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z unchanged — 0 new alerts since iter 948. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 03:33:15Z (~3 min at cycle start; ✅ within 90-min threshold). All inboxes idle. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heartbeat = 03:32:02Z (~4 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=dce7fd6 "Pulse cycle 20260605T031943Z". ✅
+
+- **(Check B) Sync health: ⚠️ Tier 3 known pattern — no tier-reset.** sync.json: status=error, commit=c0e5f6cf, last_sync=02:56:04Z. Session-start HEAD (dce7fd6) NEWER than sync.json commit → wrapper push succeeded independently. SYNC-PUSH-REBASE-FALLBACK (APPROVAL_REQUEST `sync-push-rebase-fallback-001` open). Self-clears on next hourly sync.timer. ⚠️→INFO
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All units systemd-active. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** last artifact 2026-05-31 (~5d), and today is Friday (not Sunday) → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** No new `tier2_weekly_probe_failed` alerts. Next probe expected ~09:00Z (6h cadence from ~03:02Z). Watch continues.
+
+- **G-rule watch:** All unchanged from iter 948. No new occurrences.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=1. ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed 0 new alerts, 0 open PRs, 8/8 services active, all inboxes empty — fully nominal.
+3. `cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=1.
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. All prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (1 clean probe so far; next probe ~09:00Z).
+
+**Patterns:** System stable at Tier 2. Second consecutive clean iter post-de-escalation (iter 948=Tier1→2; iter 949=Tier2 consecutive_clean=1). PR #335 healing watch: no new tier2_weekly_probe_failed alerts; next probe at ~09:00Z will be the 2nd post-merge confirmation.
+
+---
+
 ## Iteration 948 — 2026-06-05 03:17 UTC (interactive)
 
 **Health:** ✅ **Tier 1 → 2 DE-ESCALATED. consecutive_clean=3 → promoted to Tier 2 (15-min cadence). 0 new alerts. 0 open PRs. 8/8 services active. All inboxes empty. 0 auto-fix actions.**
