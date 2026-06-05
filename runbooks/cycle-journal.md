@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 935 — 2026-06-05 01:18 UTC (interactive)
+
+**Health:** ✅ **Tier 1 clean. consecutive_clean=0→1. 0 auto-fix actions. 8/8 services active. PR #334 MERGED (01:09:33Z ✅). 1 new alert (Tier-3 per actionable-only discipline). Sync: ✅ success.**
+
+Alert watermark: **1307 lines / 2026-06-05T01:05:44Z** (1 new alert since iter 934 watermark 1307/01:01:24Z — Tier-3 by actionable-only discipline; same line count, newer last-alert timestamp via retention-healer prune). Pipeline-stall heartbeat: 2026-06-05T01:10:49Z (✅ ~5 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T01:01:19Z (✅ ~15 min at cycle start; within 60-min threshold). Sync: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (✅ 26 min old; within 2h threshold; local HEAD 29135e8 is newer — wrapper push from iter 934; self-clears on next hourly sync.timer). Session-start gitStatus: branch=main, tree=clean, HEAD=29135e8 "Pulse cycle 20260605T011414Z". Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1** (clean iter — no actions taken).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Tier-3 per actionable-only discipline (1 new alert — novel variant, not Larry-actionable).** Watermark advanced 1307/01:01:24Z → 1307/01:05:44Z.
+  - **Alert (2026-06-05T01:05:44Z):** `heal-wedged-review-sessions` / `wedged-review-silent-wt-mirror-build-unreviewed-merge-detector-20260605T000816Z`. Healer detected Mirror's review worktree for PR #334's review task was silent — the pre-reap warning phase. NOT in `config/alert-translations.json` — only `wedged-review-reaped:*` is registered (success-confirmation phase); `wedged-review-silent-wt:*` (warning phase) is a separate unregistered variant. Per actionable-only discipline: behavior is expected and auto-healing — healer will reap the worktree, then emit `wedged-review-reaped:*` which IS Tier-3. PR #334 already merged at 01:09:33Z. No Larry action required. Classification: **Tier 3 (actionable-only discipline)**. **New G-rule: `wedged-review-silent-wt:* not in alert-translations.json` 1/3** — at 3/3 dispatch Beacon to add `wedged-review-silent-wt:*` as Tier 3/FYI alongside existing `wedged-review-reaped`. ✅
+  - Triage: 1 alert, 0 Tier-1, 0 Tier-2 DMed, 1 Tier-3 silenced. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T01:10:49Z (~5 min at cycle start; ✅ within 90-min threshold). 0 new pr-create-inferred-failure alerts since PR #332 merged (01:01:10Z) — consistent with PR #332 fix suppressing the reconcile false-positives. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active, not stalled.** Mirror=1 (review-build-unreviewed-merge-detector-20260605T000816Z.json — review task for PR #334, now merged; Mirror will process and archive on next sweep). Forge=0, Beacon=0, Pulse=0. Not stalled. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T01:01:19Z (~15 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=29135e8 "Pulse cycle 20260605T011414Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (26 min old; within 2h threshold). Local HEAD 29135e8 newer — wrapper push from iter 934. Self-clears on next hourly tick. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Mirror=1 (active review for merged PR #334; expected). Forge=0, Beacon=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Clean.**
+  - **PR #334** "feat(healer): detect merges to main that bypassed Mirror review": **MERGED 2026-06-05T01:09:33Z ✅** (auto-merge fired ~1 min after iter 934 enabled it). Note: PR merged before Mirror's verdict — auto-merge fires on CI pass, not Mirror verdict. PR #334's own unreviewed-merge-detector feature is now live in main to detect this pattern going forward.
+  - agent-core: 0 open PRs. dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **NEW (this iter): `wedged-review-silent-wt:* not in alert-translations.json` — 1/3.** Pre-reap warning variant from `heal-wedged-review-sessions`. Only success-phase `wedged-review-reaped:*` is in translations (PR #329). At 3/3: dispatch Beacon to add `wedged-review-silent-wt:*` as Tier 3/FYI in `config/alert-translations.json`.
+  - **`source=larry Forge builds auto-routing to Mirror`**: routing confirmed working — PR #334 (source=larry) DID route to Mirror (review task appeared in inbox). Merge-before-verdict is expected auto-merge timing behavior, now detectable via PR #334's unreviewed-merge-detector. G-rule healing in progress; watch 2 more source=larry builds before closing.
+  - **`heal-pipeline-stall:pr-create-inferred-failure false positive`**: **1/3 (watching for healing)**. 0 new pr-create-inferred-failure alerts in this iter (14-min quiet window). Watch continues.
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged).
+  - `pulse/check-i-* not in alert-translations.json`: **2/3** (unchanged).
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=718, systemic_fixes=12, ratio≈59.8 (iter_clean row appended 2026-06-05T01:18:27Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Triaged 1 new alert (Tier-3 by actionable-only discipline: wedged-review-sessions pre-reap warning for Mirror's PR #334 review worktree). Started G-rule `wedged-review-silent-wt:* not in alert-translations.json` 1/3.
+3. Confirmed PR #334 MERGED at 01:09:33Z ✅.
+4. `cycle_prime_ledger.py append --tier 1 --kind iter_clean` → recorded (01:18:27Z). ✅
+5. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** PR #334 (unreviewed-merge-detector) live in main — merged via auto-merge at 01:09:33Z before Mirror's review completed. Somewhat ironic: PR #334 detects unreviewed merges, and PR #334 itself merged before Mirror verdict. Root: auto-merge fires on CI, not Mirror verdict; this timing gap is now at least detectable by the new feature. 0 new pr-create-inferred-failure alerts since PR #332's reconcile fix — 14-min quiet window, watching. New alert variant `wedged-review-silent-wt:*` joins the G-rule queue at 1/3.
+
+---
+
 ## Iteration 934 — 2026-06-05 01:08 UTC (interactive)
 
 **Health:** ⚡ **Tier 1 (action). consecutive_clean=0. 8/8 services active. Sync: ✅ success. PR #332 MERGED (01:01:10Z ✅). PR #334 auto-merge enabled (30 min, CLEAN, Mirror reviewing). 1 new alert (Tier-3 expected).**
