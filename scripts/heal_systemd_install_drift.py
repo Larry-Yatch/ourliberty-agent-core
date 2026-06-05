@@ -556,45 +556,53 @@ def _cp_and_reload(unit: str) -> tuple[int, str]:
 # -------------------- missing-install remediation --------------------
 
 def _remediate_missing_install(unit: str) -> tuple[int, str]:
-    """cp the repo unit file into /etc/systemd/system, daemon-reload, and
-    enable --now if it's a timer. Returns (rc, stderr); never raises.
+    """cp the repo unit file into /etc/systemd/system, daemon-reload, then
+    ACTIVATE it according to its class. Returns (rc, stderr); never raises.
 
-    For a .timer we verify after by re-reading systemctl show and confirming
-    ActiveState=active + NextElapseUSecRealtime populated; verification
-    failure flips rc non-zero so the caller falls back to the manual-dance
-    alert. A .service is intentionally not enabled directly — it is
-    activated by its sibling timer.
+    Activation (via _activates_via_enable):
+      - a .timer, or a standalone long-running daemon that carries its own
+        [Install] (e.g. ourliberty-inbox-watcher.service) -> enable --now; verify
+        ActiveState=active (timers additionally verify NextElapseUSecRealtime). A
+        standalone daemon is NOT started by any timer, so cp+daemon-reload alone
+        leaves it installed-but-DEAD — the gap that let this healer report a false
+        'install-healed' and de-dup the unit from re-alerting (audit #2).
+      - a oneshot service, or a timer-activated service with NO [Install] (e.g.
+        ourliberty-cycle.service, started by its sibling .timer) -> cp+daemon-
+        reload is enough; `enable` is wrong/fails for them.
+
+    A verification failure flips rc non-zero so the caller falls back to the
+    manual-dance alert (and the unit keeps re-alerting) rather than reporting a
+    false success.
     """
     rc, stderr = _cp_and_reload(unit)
     if rc != 0:
         return rc, stderr
 
-    if unit.endswith('.timer'):
-        try:
-            enable_result = subprocess.run(
-                ['sudo', '-n', 'systemctl', 'enable', '--now', unit],
-                capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
-            )
-        except subprocess.TimeoutExpired:
-            return -1, f'enable --now {unit} timed out'
-        except FileNotFoundError:
-            return -1, 'sudo or systemctl not found in PATH'
-        if enable_result.returncode != 0:
-            return enable_result.returncode, (
-                f'enable --now failed: '
-                f'{(enable_result.stderr or "").strip()}'
-            )
-        # Verify the timer actually came up.
-        post = _systemctl_show(unit) or {}
-        if post.get('ActiveState') != 'active':
-            return -1, (
-                f'post-enable verify failed: ActiveState='
-                f'{post.get("ActiveState")!r}'
-            )
-        if not post.get('NextElapseUSecRealtime'):
-            return -1, (
-                'post-enable verify failed: NextElapseUSecRealtime empty'
-            )
+    if not _activates_via_enable(unit):
+        return 0, ''  # oneshot / timer-activated: cp+daemon-reload suffices
+
+    # A .timer or a standalone [Install] daemon: enable --now + verify.
+    try:
+        enable_result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'enable', '--now', unit],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return -1, f'enable --now {unit} timed out'
+    except FileNotFoundError:
+        return -1, 'sudo or systemctl not found in PATH'
+    if enable_result.returncode != 0:
+        return enable_result.returncode, (
+            f'enable --now failed: {(enable_result.stderr or "").strip()}'
+        )
+    post = _systemctl_show(unit) or {}
+    if post.get('ActiveState') != 'active':
+        return -1, (
+            f'post-enable verify failed: ActiveState={post.get("ActiveState")!r}'
+        )
+    # A timer must additionally have a scheduled next fire.
+    if unit.endswith('.timer') and not post.get('NextElapseUSecRealtime'):
+        return -1, 'post-enable verify failed: NextElapseUSecRealtime empty'
 
     return 0, ''
 
@@ -746,6 +754,37 @@ def _classify_unit(unit: str, repo_dir: Path = REPO_SYSTEMD_DIR) -> str:
     return 'oneshot' if unit_type == 'oneshot' else 'long-running'
 
 
+def _unit_has_install_section(unit: str, repo_dir: Path = REPO_SYSTEMD_DIR) -> bool:
+    """True iff the repo copy of `unit` carries an ``[Install]`` section.
+
+    ``systemctl enable`` REQUIRES an ``[Install]`` section, so this distinguishes
+    a standalone daemon (e.g. ourliberty-inbox-watcher.service — has [Install]
+    WantedBy=multi-user.target, no sibling timer, MUST be enable --now'd) from a
+    timer-activated service (e.g. ourliberty-cycle.service — Type=simple, NO
+    [Install]; its sibling .timer carries the [Install] and starts it, so
+    `enable` would fail with 'no install target'). Read failure -> False (never
+    attempt an enable we can't justify; cp+daemon-reload is the safe default)."""
+    try:
+        for line in (repo_dir / unit).read_text().splitlines():
+            if line.strip().lower() == '[install]':
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def _activates_via_enable(unit: str) -> bool:
+    """True iff bringing `unit` up should be done with ``enable --now``: a
+    .timer, or a long-running .service that carries its own [Install] (standalone
+    daemon). oneshot services and timer-activated (no-[Install]) services come up
+    via cp+daemon-reload alone — `enable` is wrong (or fails) for them."""
+    if unit.endswith('.timer'):
+        return True
+    if _classify_unit(unit) != 'long-running':
+        return False  # oneshot
+    return _unit_has_install_section(unit)
+
+
 def _render_stuck_timer_heal(unit: str, next_fire: str) -> tuple[str, str, str]:
     message = (
         f'Auto-healed stuck timer `{unit}`. Trap: `NextElapseUSecRealtime` '
@@ -781,15 +820,19 @@ def _render_stuck_timer_dry_run(unit: str) -> tuple[str, str, str]:
 
 
 def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
-    is_timer = unit.endswith('.timer')
-    enable_phrase = (
-        'enabled --now' if is_timer
-        else 'left to its sibling timer to activate'
-    )
+    # Describe what _remediate_missing_install actually did for this unit class.
+    if unit.endswith('.timer'):
+        activation = f'enabled --now. Next fire: {next_fire}.'
+    elif _activates_via_enable(unit):  # standalone [Install] daemon
+        activation = 'enabled --now and verified active (running).'
+    elif _classify_unit(unit) == 'oneshot':
+        activation = 'left to re-exec with the new content on its next timer fire.'
+    else:  # long-running service activated by its sibling timer (no [Install])
+        activation = 'left for its sibling timer to start on the next fire.'
     message = (
         f'Auto-installed `{unit}` — it was shipped in the repo but missing '
         f'from /etc/systemd/system/. Installed, daemon-reloaded, and '
-        f'{enable_phrase}. Next fire: {next_fire}.'
+        f'{activation}'
     )
     # Distinct subject from the failed/manual `install-drift:` so the healed
     # outcome and the manual install-dance copy are separate translation
@@ -801,18 +844,20 @@ def _render_install_healed(unit: str, next_fire: str) -> tuple[str, str, str]:
 
 def _render_missing_install(unit: str) -> tuple[str, str, str]:
     repo_path = f'~/agent-core/systemd/{unit}'
-    unit_class = _classify_unit(unit)
-    if unit_class == 'timer':
-        enable_line = f'sudo systemctl enable --now {unit}'
-    elif unit_class == 'oneshot':
+    if _activates_via_enable(unit):  # timer or standalone [Install] daemon
+        enable_line = (
+            f'sudo systemctl enable --now {unit}  '
+            f'# enable --now: starts it now + at boot'
+        )
+    elif _classify_unit(unit) == 'oneshot':
         enable_line = (
             'sudo systemctl daemon-reload  '
             '# oneshot service re-execs on its next timer fire'
         )
-    else:  # long-running daemon — daemon-reload alone never starts it
+    else:  # long-running service activated by its sibling timer (no [Install])
         enable_line = (
-            f'sudo systemctl enable --now {unit}  '
-            f'# long-running daemon — starts it now + enables at boot'
+            'sudo systemctl daemon-reload  '
+            '# its sibling timer starts it on the next fire'
         )
     message = (
         f'Unit `{unit}` is shipped in the repo (`systemd/{unit}`) but is not '
