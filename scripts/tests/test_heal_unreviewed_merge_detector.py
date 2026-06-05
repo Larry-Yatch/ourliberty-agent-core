@@ -304,6 +304,42 @@ class MainTest(_IsolatedAgentsRoot):
         cur = h.load_state()['cursor_iso']
         self.assertEqual(h._parse_iso(cur), h._parse_iso('2026-06-04T18:00:00Z'))
 
+    def test_cursor_advances_even_on_large_batch_no_livelock(self):
+        # gh has no pagination, so a truncated tick must still ADVANCE the cursor
+        # (holding it would re-fetch the same newest N forever and never reach
+        # the tail — a livelock). The headroom limit + fetch WARN are the
+        # protection, not a cursor hold.
+        self._seed_cursor('2026-06-04T00:00:00Z')
+        prs = [_pr(1000 + i, '2026-06-04T18:00:00Z')
+               for i in range(h._MERGED_PR_FETCH_LIMIT)]
+        log = '\n'.join(f'AUTO_MERGE task=t pr={p["url"]} outcome=merged'
+                        for p in prs)
+        with mock.patch.object(h, 'fetch_merged_prs', return_value=prs), \
+                mock.patch.object(h, 'read_notifier_log', return_value=log):
+            h.main()
+        self.assertEqual(h._parse_iso(h.load_state()['cursor_iso']),
+                         h._parse_iso('2026-06-04T18:00:00Z'),
+                         'cursor must advance (no livelock) even on a full batch')
+
+    def test_fetch_warns_loudly_when_cap_hit(self):
+        # No silent caps: a gh result at the row cap logs a TRUNCATED warning so
+        # the limit gets bumped before an unreviewed merge slips off the tail.
+        rows = [{'number': i, 'mergedAt': '2026-06-04T18:00:00Z',
+                 'url': f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{i}',
+                 'author': {'login': 'x'}, 'title': 't'}
+                for i in range(h._MERGED_PR_FETCH_LIMIT)]
+        from datetime import datetime, timezone
+        proc = type('P', (), {'returncode': 0, 'stdout': json.dumps(rows), 'stderr': ''})()
+        logs: list[tuple[str, str]] = []
+        with mock.patch.object(h, 'subprocess') as sp, \
+                mock.patch.object(h, 'log', side_effect=lambda m, lvl='INFO': logs.append((lvl, m))):
+            sp.run.return_value = proc
+            out = h.fetch_merged_prs(
+                '2026-06-04T00:00:00Z', datetime(2026, 6, 5, tzinfo=timezone.utc))
+        self.assertEqual(len(out), h._MERGED_PR_FETCH_LIMIT)
+        self.assertTrue(any('limit' in m.lower() and lvl == 'WARN' for lvl, m in logs),
+                        'a cap-hit WARN must be logged')
+
     def test_idempotent_no_duplicate_alert_on_rescan(self):
         self._seed_cursor('2026-06-04T00:00:00Z')
         pr = _pr(324, '2026-06-04T18:00:00Z')

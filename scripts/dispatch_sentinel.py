@@ -181,6 +181,34 @@ def scan_inbox(agent_id: str, now: float) -> list[dict[str, Any]]:
     return stalls
 
 
+def _started_epoch(data: dict[str, Any]) -> float:
+    """Epoch seconds for when the in-flight worker started, 0.0 if unknown.
+
+    agent_runner._register_in_flight writes `started_at` as an ISO-8601 STRING
+    (datetime.now(timezone.utc).isoformat()). The prior code did float(started)
+    on that string → ValueError → started_f=0.0 → `if started_f <= 0: continue`
+    skipped EVERY in-flight entry, so the stall scan was dead code: a worker
+    wedged mid-dispatch (exactly what this scan exists to catch) was never
+    surfaced. Parse the ISO form first, then fall back to a raw epoch float for
+    the legacy `timestamp_started` field."""
+    iso = data.get('started_at')
+    if isinstance(iso, str) and iso:
+        try:
+            dt = datetime.fromisoformat(iso)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.timestamp()
+        except ValueError:
+            pass  # not ISO — maybe a numeric string; fall through to float()
+    for raw in (data.get('started_at'), data.get('timestamp_started')):
+        try:
+            if raw is not None:
+                return float(raw)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
 def scan_in_flight(now: float) -> list[dict[str, Any]]:
     """Stalls in `state/in-flight/` — tasks picked up but stuck past threshold."""
     if not IN_FLIGHT_DIR.exists():
@@ -192,11 +220,7 @@ def scan_in_flight(now: float) -> list[dict[str, Any]]:
                 data = json.load(f)
         except (json.JSONDecodeError, OSError):
             continue
-        started = data.get('started_at') or data.get('timestamp_started') or 0
-        try:
-            started_f = float(started)
-        except (TypeError, ValueError):
-            started_f = 0.0
+        started_f = _started_epoch(data)
         if started_f <= 0:
             continue
         age = now - started_f

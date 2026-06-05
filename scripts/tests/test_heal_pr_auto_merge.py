@@ -457,5 +457,54 @@ class AutomergeEnabledTest(_IsolatedAgentsRoot):
                                  f'value {v!r} should be disabled')
 
 
+class MergePrClassificationTest(_IsolatedAgentsRoot):
+    """gh's 'not in a mergeable state' is ambiguous (conflicts / failing checks
+    / branch protection), so merge_pr must verify the PR's real state before
+    claiming 'already_merged' — else it falsely reports an unmerged PR as
+    shipped and drops the retry budget."""
+
+    def _fake_run(self, *, merge_rc, merge_stderr, view_state):
+        CP = h.subprocess.CompletedProcess
+
+        def run(cmd, **kw):
+            if 'merge' in cmd:
+                return CP(cmd, merge_rc, stdout='', stderr=merge_stderr)
+            if 'view' in cmd:
+                payload = json.dumps({
+                    'state': view_state,
+                    'mergedAt': '2026-06-05T00:00:00Z' if view_state == 'MERGED' else None,
+                })
+                return CP(cmd, 0, stdout=payload, stderr='')
+            return CP(cmd, 0, stdout='', stderr='')
+        return run
+
+    def test_not_mergeable_unmerged_is_failed_not_already_merged(self):
+        with patch.object(h.subprocess, 'run', side_effect=self._fake_run(
+                merge_rc=1,
+                merge_stderr='Pull request #5 is not in a mergeable state.',
+                view_state='OPEN')):
+            outcome, reason = h.merge_pr('Larry-Yatch/ourliberty-agent-core', 5, 't')
+        self.assertEqual(outcome, 'failed')
+        self.assertNotIn('already', reason.lower())
+
+    def test_not_mergeable_but_actually_merged_is_already_merged(self):
+        with patch.object(h.subprocess, 'run', side_effect=self._fake_run(
+                merge_rc=1,
+                merge_stderr='Pull request #5 is not in a mergeable state.',
+                view_state='MERGED')):
+            outcome, _ = h.merge_pr('Larry-Yatch/ourliberty-agent-core', 5, 't')
+        self.assertEqual(outcome, 'already_merged')
+
+    def test_already_been_merged_is_already_merged_without_view(self):
+        # Unambiguous stderr → already_merged even though the (unused) view
+        # would report OPEN.
+        with patch.object(h.subprocess, 'run', side_effect=self._fake_run(
+                merge_rc=1,
+                merge_stderr='! Pull request #5 has already been merged',
+                view_state='OPEN')):
+            outcome, _ = h.merge_pr('Larry-Yatch/ourliberty-agent-core', 5, 't')
+        self.assertEqual(outcome, 'already_merged')
+
+
 if __name__ == '__main__':
     unittest.main()
