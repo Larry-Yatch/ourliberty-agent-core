@@ -2115,6 +2115,9 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         build_filename = f'build-{task_id}-replan{replan_count}.json'
     else:
         build_filename = f'build-{task_id}.json'
+    # Match the on-disk name the writer produces (sanitize + length cap) so the
+    # dedup can't miss for a task_id carrying a path-structural byte.
+    build_filename = safe_write_inbox.canonical_inbox_name(build_filename)
     # Idempotency check (4b review fix): if the build task is already
     # present in Forge's inbox OR was already archived, skip re-dispatch.
     # Guards against the notifier crashing between dispatch and archive
@@ -3091,6 +3094,7 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
         review_filename = f'review-{task_id}-replan{replan_count}.json'
     else:
         review_filename = f'review-{task_id}.json'
+    review_filename = safe_write_inbox.canonical_inbox_name(review_filename)
     # Idempotency check (same pattern as _dispatch_build_phase): if the
     # review task is already in Mirror's inbox OR archived OR .invalid, skip.
     # Guards against the notifier crashing between dispatch and archive of the
@@ -3198,7 +3202,7 @@ def _reconcile_missed_mirror_reviews() -> None:
         # so it's correctly skipped here. We key on the unkeyed review filename
         # — a missed FIRST dispatch is the failure shape this sweep heals;
         # replan re-reviews are dispatched/keyed elsewhere.
-        review_filename = f'review-{task_id}.json'
+        review_filename = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
         if _review_request_already_dispatched(review_filename):
             continue
 
@@ -3619,6 +3623,7 @@ def _dispatch_revision_to_forge(
         )
     else:
         revision_filename = f'revision-{task_id}-{next_count}.json'
+    revision_filename = safe_write_inbox.canonical_inbox_name(revision_filename)
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
     if (
         (forge_inbox / revision_filename).exists()
@@ -3807,6 +3812,7 @@ def _dispatch_mirror_review_rerun(
         )
     else:
         review_filename = f'review-{task_id}-rev{round_num}.json'
+    review_filename = safe_write_inbox.canonical_inbox_name(review_filename)
     mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
     if (
         (mirror_inbox / review_filename).exists()
@@ -6119,7 +6125,7 @@ def _handle_beacon_headless_approval_request(
     # _dispatch_build_phase. Guards against re-processing the same outbox
     # if the notifier crashes between dispatch and archive.
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
-    filename = f'{marker_task_id}.json'
+    filename = safe_write_inbox.canonical_inbox_name(f'{marker_task_id}.json')
     for candidate in (
         forge_inbox / filename,
         forge_inbox / '.archive' / filename,
@@ -6686,7 +6692,7 @@ def _handle_beacon_clarification_response(
     # hits the inbox+archive+invalid existence check and skips. Same
     # idempotency shape as _handle_beacon_headless_approval_request.
     count_for_filename = data.get('clarification_count', 0) or 0
-    filename = f'resume-{original_task_id}-r{count_for_filename}.json'
+    filename = safe_write_inbox.canonical_inbox_name(f'resume-{original_task_id}-r{count_for_filename}.json')
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
     for candidate in (
         forge_inbox / filename,

@@ -93,19 +93,42 @@ def sanitize_component(name: str, *, fallback: str = 'task') -> str:
     return cleaned
 
 
+def canonical_inbox_name(filename: str) -> str:
+    """The exact on-disk filename ``safe_write_inbox()`` writes for `filename`:
+    ``sanitize_component`` then the length cap.
+
+    Any reader that looks up a previously dispatched file by name (an idempotency
+    dedup check, an archive lookup) MUST derive the name through this so it
+    matches the writer. Otherwise a task_id carrying a path-structural byte is
+    rewritten on write, the raw-name lookup misses, and a duplicate is
+    dispatched. NOTE: this is the INBOX name (sanitize + truncate); the outbox
+    path (inbox_watcher via _unique_dest) is sanitize-only — use
+    ``sanitize_component`` directly there.
+    """
+    return _truncate_filename(sanitize_component(filename))[0]
+
+
 def _truncate_filename(filename: str) -> tuple[str, bool]:
-    """Return (safe_filename, was_truncated)."""
+    """Return (safe_filename, was_truncated).
+
+    The result is always within MAX_FILENAME_BYTES *bytes*, so re-applying is a
+    no-op — _truncate_filename is idempotent. That matters because the writer and
+    every reader call canonical_inbox_name independently; if truncation weren't a
+    fixed point they would compute different names for a long/multibyte id and
+    the dedup would miss (duplicate dispatch). The slice is therefore by BYTES,
+    not characters, and the extension is capped too (an all-'.ext' pathological
+    name must still fit)."""
     if len(filename.encode('utf-8')) <= MAX_FILENAME_BYTES:
         return filename, False
     stem, dot, ext = filename.rpartition('.')
     if not dot:
         stem, ext = filename, ''
     h = hashlib.sha1(filename.encode('utf-8')).hexdigest()[:10]
-    safe_stem = stem[:100].rstrip('-') or 'task'  # avoid a leading '--h…' on an all-'-' stem
-    safe = f'{safe_stem}--h{h}'
-    if ext:
-        safe = f'{safe}.{ext}'
-    return safe, True
+    marker = f'--h{h}'  # 13 bytes; ties the truncated name back to the original
+    ext_part = '.' + ext.encode('utf-8')[:24].decode('utf-8', 'ignore') if ext else ''
+    budget = MAX_FILENAME_BYTES - len(marker.encode()) - len(ext_part.encode())
+    safe_stem = stem.encode('utf-8')[:budget].decode('utf-8', 'ignore').rstrip('-') or 'task'
+    return f'{safe_stem}{marker}{ext_part}', True
 
 
 def _atomic_write_json(dest: Path, task_dict: dict[str, Any]) -> None:
@@ -196,10 +219,12 @@ def safe_write_inbox(
 
     # 3. Filename guard: neutralize path-traversal in the caller-supplied
     #    filename (it is typically f'{task_id}.json' and task_id arrives over
-    #    the wire), THEN enforce the length cap.
+    #    the wire), THEN enforce the length cap. canonical_inbox_name is the
+    #    single source of truth that readers reuse to find what we wrote here.
     sanitized_name = sanitize_component(filename)
     was_sanitized = sanitized_name != filename
-    safe_name, was_truncated = _truncate_filename(sanitized_name)
+    safe_name = canonical_inbox_name(filename)
+    was_truncated = safe_name != sanitized_name
 
     # 4. Atomic write. Sanitize the directory component too: final_target comes
     #    from routing_validator, but defend the join against any separator/'..'

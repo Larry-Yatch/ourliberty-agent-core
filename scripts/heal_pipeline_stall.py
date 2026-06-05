@@ -92,6 +92,7 @@ import os
 import re
 import subprocess
 import sys
+import glob as _glob
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -102,6 +103,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
+import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
 from id_match import id_matches  # noqa: E402
 
 HOME = Path.home()
@@ -695,7 +697,7 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
         recognized clean preflight outcome. Caller treats this as
         'no preflight skip-signal' and proceeds with the normal
         PR-existence reconciliation + alert decision."""
-    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
+    archive = FORGE_OUTBOX_ARCHIVE / safe_write_inbox.sanitize_component(f'{task_id}.json')
     if not archive.exists():
         return None
     try:
@@ -789,7 +791,7 @@ def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
     this function stays a pure read of the first attempt. Returns None on a
     missing/unreadable archive or a clean (exit_code==0, no error) outbox --
     the caller then proceeds with the normal build-gap alert decision."""
-    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
+    archive = FORGE_OUTBOX_ARCHIVE / safe_write_inbox.sanitize_component(f'{task_id}.json')
     if not archive.exists():
         return None
     try:
@@ -859,7 +861,13 @@ def _forge_retry_succeeded(task_id: str) -> Optional[str]:
     clean PR-bearing sibling's name; None if the archive dir is missing, no
     retry siblings exist, or no sibling both succeeded and opened a PR."""
     try:
-        siblings = sorted(FORGE_OUTBOX_ARCHIVE.glob(f'{task_id}.*.json'))
+        # The on-disk outbox stem is sanitize(f'{task_id}.json') minus '.json'
+        # (the whole filename is sanitized at write, so compose the same way —
+        # sanitizing task_id alone diverges for dot-only ids).
+        archive_stem = safe_write_inbox.sanitize_component(f'{task_id}.json')[:-len('.json')]
+        # Escape the stem so a '*'/'?'/'[' surviving in a task_id is matched
+        # literally, not as a glob wildcard; the trailing '.*.json' stays a glob.
+        siblings = sorted(FORGE_OUTBOX_ARCHIVE.glob(f'{_glob.escape(archive_stem)}.*.json'))
     except OSError:
         return None
     for sib in siblings:
