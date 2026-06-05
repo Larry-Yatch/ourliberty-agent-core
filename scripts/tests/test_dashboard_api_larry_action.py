@@ -472,6 +472,90 @@ class HappyPathTest(_LarryActionBase):
             target_agent='beacon', envelope_written=str(expected),
         )
 
+    def test_reject_medic_silence_unsilences_directly(self):
+        """A Medic silence decision (proposing_agent='medic' + fingerprint) is
+        reconciled DIRECTLY in the dashboard: Reject calls
+        larry_alerts.unsilence(fp) and writes NO agent envelope. Regression for
+        the routing gap where the reject prompt was dropped into Beacon's inbox
+        and the silence was never actually lifted."""
+        import larry_alerts
+        fp = 'heal-pipeline-stall:pr-create-inferred-failure:forge-x-clarify1'
+        self._seed(
+            event_id='ev-medic-1', task_id='medic-silence-x',
+            event_type='approval_request',
+            payload={'proposing_agent': 'medic', 'target_agent': 'medic',
+                     'fingerprint': fp, 'prompt': 'keep or lift?'},
+            read_at=None,
+        )
+        calls: list[str] = []
+        orig = larry_alerts.unsilence
+        larry_alerts.unsilence = lambda key: (calls.append(key) or True)
+        try:
+            r = self.c.post('/api/larry/action', headers=AUTH,
+                            json={'source_event_id': 'ev-medic-1', 'action': 'reject'})
+        finally:
+            larry_alerts.unsilence = orig
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(calls, [fp])                       # unsilence called
+        self.assertIsNone(body['target_agent'])             # no agent round-trip
+        self.assertIsNone(body['envelope_written'])
+        self.assertEqual(body['medic_reconcile'], 'unsilenced')
+        # No envelope written into ANY inbox.
+        for agent in ('beacon', 'forge', 'mirror', 'pulse'):
+            self.assertEqual(
+                list((self.tmp / 'inboxes' / agent).iterdir()), [],
+                f'unexpected envelope in {agent} inbox')
+        self._assert_read_at_flipped('ev-medic-1')
+
+    def test_approve_medic_silence_keeps_silenced_no_unsilence(self):
+        """Approve on a Medic silence decision keeps the silence: no
+        unsilence call, no envelope, audit records kept-silenced."""
+        import larry_alerts
+        fp = 'heal-x:benign:task'
+        self._seed(
+            event_id='ev-medic-2', task_id='medic-silence-y',
+            event_type='approval_request',
+            payload={'proposing_agent': 'medic', 'target_agent': 'medic',
+                     'fingerprint': fp, 'prompt': 'keep or lift?'},
+            read_at=None,
+        )
+        calls: list[str] = []
+        orig = larry_alerts.unsilence
+        larry_alerts.unsilence = lambda key: (calls.append(key) or True)
+        try:
+            r = self.c.post('/api/larry/action', headers=AUTH,
+                            json={'source_event_id': 'ev-medic-2', 'action': 'approve'})
+        finally:
+            larry_alerts.unsilence = orig
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(calls, [])                          # silence untouched
+        self.assertIsNone(body['target_agent'])
+        self.assertIsNone(body['envelope_written'])
+        self.assertEqual(body['medic_reconcile'], 'kept-silenced')
+        for agent in ('beacon', 'forge', 'mirror', 'pulse'):
+            self.assertEqual(
+                list((self.tmp / 'inboxes' / agent).iterdir()), [])
+
+    def test_beacon_approval_still_routes_to_inbox(self):
+        """Guard: a non-Medic approval_request (proposing_agent='beacon', no
+        fingerprint) is unaffected — it still writes the Beacon envelope."""
+        self._seed(
+            event_id='ev-bcn-1', task_id='task-bcn',
+            event_type='approval_request',
+            payload={'proposing_agent': 'beacon', 'target_agent': 'forge',
+                     'prompt': 'Forge should X.'},
+            read_at=None,
+        )
+        r = self.c.post('/api/larry/action', headers=AUTH,
+                        json={'source_event_id': 'ev-bcn-1', 'action': 'reject'})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertEqual(body['target_agent'], 'beacon')
+        self.assertTrue(body['envelope_written'])
+        self.assertIsNone(body['medic_reconcile'])  # not a direct-reconcile path
+
     def test_comment_writes_clarify_resume_envelope(self):
         self._seed(
             event_id='ev-cl-1',

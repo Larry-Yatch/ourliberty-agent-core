@@ -500,6 +500,10 @@ class LarryActionResponse(BaseModel):
     action_event_id: str
     envelope_written: Optional[str]
     target_agent: Optional[str]
+    # Set only for decisions reconciled directly by the dashboard (Medic
+    # silence): 'unsilenced' | 'unsilence-noop' | 'kept-silenced' | an error
+    # tag. None for the normal envelope-routed actions.
+    medic_reconcile: Optional[str] = None
 
 
 class LarryAllowlistResponse(BaseModel):
@@ -2604,6 +2608,54 @@ def _build_envelope_for_action(
     )
 
 
+def _medic_silence_fingerprint(source: dict[str, Any]) -> Optional[str]:
+    """Return the fingerprint iff `source` is a Medic-originated silence
+    decision: an `approval_request` with `payload.proposing_agent == 'medic'`
+    and a non-empty `payload.fingerprint`.
+
+    These decisions are reconciled DIRECTLY by the dashboard rather than routed
+    to an agent's inbox. The reject's only effect is a pure suppression-file
+    operation (`larry_alerts.unsilence`), and there is no live Medic inbox
+    executor for these envelopes — routing a generic 'follow the suggested
+    envelope' prompt to Beacon (the legacy approval_request path) silently
+    drops Medic's instruction, so the silence was never actually lifted.
+    Performing it server-side also matches the alert-toil principle: push
+    reconciliation down, don't make an agent interpret-and-act."""
+    if source.get('event_type') != 'approval_request':
+        return None
+    payload = source.get('payload')
+    if not isinstance(payload, dict):
+        return None
+    if payload.get('proposing_agent') != 'medic':
+        return None
+    fp = payload.get('fingerprint')
+    return fp if isinstance(fp, str) and fp else None
+
+
+def _reconcile_medic_silence(fingerprint: str, action: str) -> dict[str, Any]:
+    """Apply Larry's decision on a Medic silence directly, server-side, and
+    return an audit-detail dict.
+
+      reject  -> larry_alerts.unsilence(fp): lift the silence so the alert
+                 fires again (the root cause is unfixed).
+      approve -> no-op: keep the silence in place.
+
+    Best-effort: a missing/failed unsilence is recorded in the audit detail,
+    never raised, so a dashboard click can't 500 on it. Lazy import keeps
+    larry_alerts out of the module import path and lets tests patch it."""
+    detail: dict[str, Any] = {'fingerprint': fingerprint}
+    if action == 'reject':
+        try:
+            import larry_alerts
+            removed = larry_alerts.unsilence(fingerprint)
+            detail['medic_reconcile'] = 'unsilenced' if removed else 'unsilence-noop'
+        except Exception as e:  # noqa: BLE001 — never 500 the action
+            detail['medic_reconcile'] = f'unsilence-error:{type(e).__name__}'
+    else:  # approve
+        detail['medic_reconcile'] = 'kept-silenced'
+    return detail
+
+
 def _select_source_event(
     supabase_client: Any, source_event_id: str,
 ) -> Optional[dict[str, Any]]:
@@ -2661,8 +2713,16 @@ def _handle_larry_action(
 
     envelope_written: Optional[str] = None
     target_agent: Optional[str] = None
+    reconcile_detail: dict[str, Any] = {}
 
-    if action != 'mark_done':
+    medic_fp = _medic_silence_fingerprint(source)
+    if medic_fp is not None and action in ('approve', 'reject'):
+        # Medic silence decisions reconcile DIRECTLY here — no agent envelope.
+        # (Reject lifts the silence; Approve keeps it.) The shared read_at-flip
+        # + audit block below records the outcome with target_agent/envelope
+        # both None.
+        reconcile_detail = _reconcile_medic_silence(medic_fp, action)
+    elif action != 'mark_done':
         target_agent, filename, envelope = _build_envelope_for_action(
             source=source, action=action, comment=comment, actor=actor,
         )
@@ -2705,6 +2765,10 @@ def _handle_larry_action(
         'envelope_written': envelope_written,
         'target_agent': target_agent,
     }
+    # Direct-reconcile decisions (Medic silence) record their outcome
+    # (unsilenced / kept-silenced / …) + fingerprint in the audit row.
+    if reconcile_detail:
+        action_payload.update(reconcile_detail)
     action_event_id = compute_event_id(
         source_task_id, 'larry_action', ts_iso,
     )
@@ -2722,11 +2786,14 @@ def _handle_larry_action(
         [row], on_conflict='event_id', ignore_duplicates=True,
     ).execute()
 
-    return {
+    result = {
         'action_event_id': action_event_id,
         'envelope_written': envelope_written,
         'target_agent': target_agent,
     }
+    if reconcile_detail:
+        result['medic_reconcile'] = reconcile_detail['medic_reconcile']
+    return result
 
 
 # ---- /api/system/rotation Auto/Off switch (dashboard-rotation-switch-001) ----
