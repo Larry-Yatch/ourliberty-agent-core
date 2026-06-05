@@ -81,6 +81,10 @@ REPOS = ['Larry-Yatch/ourliberty-agent-core', 'Larry-Yatch/ourliberty-dashboard'
 GH_TIMEOUT_S = 30
 MAX_MERGES_PER_RUN = 5
 MAX_RETRIES_PER_PR = 3
+# CANCELLED-workflow rerun budget (#24): a PR stuck non-CLEAN purely on
+# CANCELLED runs is re-run via `gh run rerun`, but that path never counted
+# against any budget — a perpetually-cancelled PR was re-run every tick forever.
+MAX_RERUNS_PER_PR = 6
 LOG_LOOKBACK_HOURS = 24
 STALLED_LABEL = 'automerge-stalled'
 
@@ -167,7 +171,10 @@ def save_state(state: dict[str, Any]) -> None:
 def get_pr_state(state: dict[str, Any], pr_url: str) -> dict[str, Any]:
     entry = state['prs'].setdefault(pr_url, {})
     entry.setdefault('attempts', 0)
+    entry.setdefault('rerun_attempts', 0)
     entry.setdefault('stalled_alerted', False)
+    entry.setdefault('rerun_alerted', False)
+    entry.setdefault('head_changed_alerted', False)
     entry.setdefault('activation_alerted', False)
     entry.setdefault('last_attempt_iso', None)
     return entry
@@ -467,6 +474,52 @@ def merge_pr(repo: str, pr_number: int, title: str) -> tuple[str, str]:
 
 # -------------------- per-PR orchestration --------------------
 
+def _to_utc(s: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-ish timestamp (log 'YYYY-MM-DD HH:MM:SS' or gh
+    'YYYY-MM-DDTHH:MM:SSZ') to an aware UTC datetime, or None if unparseable."""
+    if not s:
+        return None
+    try:
+        dt = datetime.fromisoformat(s.strip().replace(' ', 'T').replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    # A naive value comes from outbox_notifier.log() (datetime.now() — the
+    # droplet's LOCAL clock); astimezone() on a naive datetime interprets it as
+    # the system-local zone and converts to UTC, so it lines up with gh's
+    # true-UTC committedDate. (heal + outbox run on the SAME host, so the local
+    # zone matches; stamping it as UTC instead skewed it ~6h and refused every
+    # merge.) An aware value ('...Z' -> +00:00) just normalizes to UTC.
+    return dt.astimezone(timezone.utc)
+
+
+def _head_pushed_since_pass(repo: str, pr_num: int, passed_ts_iso: str) -> bool:
+    """True (=> REFUSE to auto-merge) if the PR's HEAD commit is newer than the
+    recorded Mirror PASS — i.e. the branch was pushed/rebased after review, so
+    the current HEAD was never reviewed (audit #15). The AUTO_MERGE log line
+    proves Mirror PASSed *some* HEAD of this URL, not necessarily today's.
+
+    When there is NO review-time anchor (the PASS log line had no parseable
+    timestamp — a rare log-format gap), we can't compare, so defer to the prior
+    behavior and return False (don't block). But when we DO have an anchor and
+    still can't fetch the commit dates (transient gh error), fail CLOSED and
+    return True — that only delays the merge one tick (it retries), and never
+    merges a HEAD we couldn't prove was the reviewed one."""
+    passed_dt = _to_utc(passed_ts_iso)
+    if passed_dt is None:
+        return False  # no anchor (rare log gap) -> no regression vs prior behavior
+    data = gh_json('pr', 'view', str(pr_num), '--repo', repo,
+                   '--json', 'commits', default=None)
+    if data is None:
+        return True  # anchored but gh failed -> fail closed (retries next tick)
+    dates = [d for d in (_to_utc(c.get('committedDate'))
+                         for c in (data.get('commits') or [])) if d]
+    if not dates:
+        return True
+    # The reviewed commit predates the PASS log line; a post-review push lands a
+    # commit dated after it. Small grace absorbs clock skew between the two.
+    return max(dates) > passed_dt + timedelta(seconds=2)
+
+
 def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
                state: dict[str, Any], dry_run: bool) -> str:
     """Return one of: 'merged', 'rerun', 'budget-exhausted', 'skipped',
@@ -479,19 +532,84 @@ def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
     if pr_url not in mirror_passed:
         return 'no-mirror-pass'
 
+    # #15: the AUTO_MERGE log proves Mirror PASSed *some* HEAD of this URL, not
+    # necessarily the current one. If the branch was pushed/rebased after the
+    # PASS, the current HEAD was never reviewed — never auto-merge it.
+    if _head_pushed_since_pass(repo, pr_num, mirror_passed[pr_url].get('ts', '')):
+        pr_state = get_pr_state(state, pr_url)
+        log(f'PR {repo}#{pr_num}: HEAD changed since the Mirror PASS '
+            f'({mirror_passed[pr_url].get("ts") or "unknown"}); refusing to '
+            f'auto-merge an unreviewed HEAD', 'WARN')
+        # Surface it once so a persistently-refused PR isn't silently stuck.
+        if not pr_state['head_changed_alerted'] and not dry_run:
+            add_stalled_label(repo, pr_num)
+            dm_larry(
+                message=(
+                    f'A Mirror-PASSed PR was pushed/rebased after review, so its '
+                    f'current HEAD was never reviewed. The healer will NOT '
+                    f'auto-merge it.\n\nPR: {pr_url}'
+                ),
+                subject=f'Auto-merge needs re-review: {repo}#{pr_num}',
+                suggested_action=(
+                    f'Re-run Mirror review on the new HEAD, or merge manually if '
+                    f'the push was trivial: `gh pr merge {pr_num} --repo {repo} '
+                    f'--squash --delete-branch`'
+                ),
+                severity='warning',
+            )
+            pr_state['head_changed_alerted'] = True
+            save_state(state)
+        return 'head-changed-since-review'
+
     mergeable, reason = is_mergeable(pr)
     if not mergeable:
-        # CANCELLED-workflow rescue: if the only thing in the way is
-        # CANCELLED workflow runs, rerun them so the next tick sees green.
+        # CANCELLED-workflow rescue: if the only thing in the way is CANCELLED
+        # workflow runs, rerun them so the next tick sees green — but under a
+        # budget (#24) so a perpetually-cancelled PR isn't re-run forever.
         cancelled = find_cancelled_checks_to_rerun(pr)
-        if cancelled:
-            n = rerun_cancelled_checks(pr, cancelled)
-            if n:
+        if cancelled and not dry_run:  # reruns are a mutation — never in dry-run
+            pr_state = get_pr_state(state, pr_url)
+            if pr_state['rerun_attempts'] >= MAX_RERUNS_PER_PR:
+                if not pr_state['rerun_alerted']:
+                    log(f'PR {repo}#{pr_num}: CANCELLED-rerun budget exhausted '
+                        f'({pr_state["rerun_attempts"]}/{MAX_RERUNS_PER_PR}); '
+                        f'stopping reruns', 'WARN')
+                    add_stalled_label(repo, pr_num)
+                    dm_larry(
+                        message=(
+                            f'A Mirror-PASSed PR keeps failing on CANCELLED '
+                            f'workflow runs. The healer reran them '
+                            f'{MAX_RERUNS_PER_PR} times and has stopped.\n\n'
+                            f'PR: {pr_url}'
+                        ),
+                        subject=f'Auto-merge rerun-stalled: {repo}#{pr_num}',
+                        suggested_action=(
+                            f'Investigate why checks keep cancelling (concurrency '
+                            f'group / queued-then-superseded). To merge manually: '
+                            f'`gh pr merge {pr_num} --repo {repo} --squash '
+                            f'--delete-branch`'
+                        ),
+                        severity='warning',
+                    )
+                    pr_state['rerun_alerted'] = True
+                    save_state(state)
+            else:
+                # Count the attempt BEFORE firing so the budget advances even if
+                # `gh run rerun` fails to fire (n==0) — otherwise it would retry
+                # the rerun every tick forever, the very loop #24 closes.
+                pr_state['rerun_attempts'] += 1
+                save_state(state)
+                rerun_cancelled_checks(pr, cancelled)
                 return 'rerun'
         log(f'PR {repo}#{pr_num} mirror-passed but not mergeable: {reason}')
         return 'not-mergeable'
 
     pr_state = get_pr_state(state, pr_url)
+    # The PR is mergeable now — any CANCELLED bout resolved, so reset the rerun
+    # budget for a future one.
+    if pr_state['rerun_attempts']:
+        pr_state['rerun_attempts'] = 0
+        save_state(state)
     if pr_state['attempts'] >= MAX_RETRIES_PER_PR:
         if not pr_state['stalled_alerted']:
             log(f'PR {repo}#{pr_num} retry budget exhausted '

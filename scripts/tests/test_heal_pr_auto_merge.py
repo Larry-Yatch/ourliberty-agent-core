@@ -305,11 +305,17 @@ class ProcessPrTest(_IsolatedAgentsRoot):
         h.add_stalled_label = lambda r, n: (
             self._label_calls.append((r, n)) or True
         )
+        # Never hit gh in tests: default the #15 HEAD-freshness fetch to a commit
+        # dated long BEFORE any PASS ts, so the freshness gate passes. Individual
+        # tests override h.gh_json to drive the "HEAD changed" path.
+        self._orig_gh = h.gh_json
+        h.gh_json = lambda *a, **k: {'commits': [{'committedDate': '2020-01-01T00:00:00Z'}]}
 
     def tearDown(self):
         h.STATE_FILE = self._orig_state
         h.dm_larry = self._orig_dm
         h.add_stalled_label = self._orig_label
+        h.gh_json = self._orig_gh
         super().tearDown()
 
     def _pr(self, **overrides) -> dict:
@@ -410,6 +416,98 @@ class ProcessPrTest(_IsolatedAgentsRoot):
                           return_value=('already_merged', 'race condition')):
             out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
         self.assertEqual(out, 'merged')
+
+    # ---- #15: HEAD pushed after the Mirror PASS must not auto-merge ----
+
+    # The PASS ts is a NAIVE LOCAL wall-clock string (outbox_notifier.log uses
+    # datetime.now()); the code interprets it in the system-local zone. Derive
+    # the gh committedDate from the SAME conversion so these tests are correct on
+    # any machine's timezone, not just UTC.
+    _PASS_LOCAL = '2026-06-05 10:00:00'
+
+    def _utc_z_offset(self, seconds: int) -> str:
+        from datetime import datetime as _d, timezone as _tz, timedelta as _td
+        pass_instant = _d.fromisoformat(self._PASS_LOCAL.replace(' ', 'T')).astimezone(_tz.utc)
+        return (pass_instant + _td(seconds=seconds)).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    def test_head_changed_since_pass_refuses_merge(self):
+        pr = self._pr()
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'first-fail', 'ts': self._PASS_LOCAL}}
+        # HEAD commit is 5 min AFTER the PASS instant -> pushed after review.
+        h.gh_json = lambda *a, **k: {'commits': [{'committedDate': self._utc_z_offset(300)}]}
+        with patch.object(h, 'merge_pr', return_value=('merged', 'x')) as mp_mock:
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+        self.assertEqual(out, 'head-changed-since-review')
+        mp_mock.assert_not_called()  # the irreversible merge never fired
+        self.assertEqual(len(self._dm_calls), 1)  # surfaced once
+        self.assertIn('re-review', self._dm_calls[0]['subject'].lower())
+
+    def test_head_unchanged_since_pass_allows_merge(self):
+        pr = self._pr()
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'first-fail', 'ts': self._PASS_LOCAL}}
+        # HEAD commit is 5 min BEFORE the PASS instant -> reviewed HEAD is current.
+        h.gh_json = lambda *a, **k: {'commits': [{'committedDate': self._utc_z_offset(-300)}]}
+        with patch.object(h, 'merge_pr', return_value=('merged', 'x')):
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+        self.assertEqual(out, 'merged')
+
+    def test_gh_fetch_failure_with_anchor_fails_closed(self):
+        pr = self._pr()
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'r', 'ts': '2026-06-05 10:00:00'}}
+        h.gh_json = lambda *a, **k: None  # gh error
+        with patch.object(h, 'merge_pr', return_value=('merged', 'x')) as mp_mock:
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+        self.assertEqual(out, 'head-changed-since-review')
+        mp_mock.assert_not_called()
+
+    # ---- #24: CANCELLED-rerun budget ----
+
+    def test_rerun_budget_increments_then_caps_and_alerts(self):
+        pr = self._pr(mergeStateStatus='BLOCKED')  # not mergeable
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'cancelled',
+                          'ts': '2026-06-05 10:00:00'}}
+        with patch.object(h, 'find_cancelled_checks_to_rerun',
+                          return_value=[{'name': 'ci'}]), \
+             patch.object(h, 'rerun_cancelled_checks', return_value=1):
+            # First MAX_RERUNS ticks rerun and increment the budget.
+            for i in range(h.MAX_RERUNS_PER_PR):
+                out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+                self.assertEqual(out, 'rerun', f'tick {i}')
+            self.assertEqual(
+                h.load_state()['prs'][pr['url']]['rerun_attempts'],
+                h.MAX_RERUNS_PER_PR)
+            # Budget now exhausted: stop rerunning, label + DM once.
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+            self.assertEqual(out, 'not-mergeable')
+            self.assertEqual(len(self._label_calls), 1)
+            self.assertEqual(len(self._dm_calls), 1)
+            self.assertIn('rerun-stalled', self._dm_calls[0]['subject'])
+            # Next tick: no second DM/label.
+            h.process_pr(pr, mp, h.load_state(), dry_run=False)
+            self.assertEqual(len(self._dm_calls), 1)
+
+    def test_rerun_budget_advances_when_rerun_command_returns_zero(self):
+        # #4: even if `gh run rerun` fires nothing (n==0), the attempt must count
+        # against the budget — otherwise it retries the rerun every tick forever.
+        pr = self._pr(mergeStateStatus='BLOCKED')
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'cancelled', 'ts': self._PASS_LOCAL}}
+        with patch.object(h, 'find_cancelled_checks_to_rerun', return_value=[{'name': 'ci'}]), \
+             patch.object(h, 'rerun_cancelled_checks', return_value=0):
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=False)
+        self.assertEqual(out, 'rerun')
+        self.assertEqual(h.load_state()['prs'][pr['url']]['rerun_attempts'], 1)
+
+    def test_dry_run_does_not_fire_reruns_or_alerts(self):
+        # #5: reruns / labels / DMs are mutations — none may fire in dry-run.
+        pr = self._pr(mergeStateStatus='BLOCKED')
+        mp = {pr['url']: {'task_id': 't1', 'reason': 'cancelled', 'ts': self._PASS_LOCAL}}
+        with patch.object(h, 'find_cancelled_checks_to_rerun', return_value=[{'name': 'ci'}]), \
+             patch.object(h, 'rerun_cancelled_checks', return_value=1) as rerun_mock:
+            out = h.process_pr(pr, mp, h.load_state(), dry_run=True)
+        self.assertEqual(out, 'not-mergeable')
+        rerun_mock.assert_not_called()
+        self.assertEqual(len(self._dm_calls), 0)
+        self.assertEqual(len(self._label_calls), 0)
 
 
 # -------------------- kill-switch + activation gate --------------------
