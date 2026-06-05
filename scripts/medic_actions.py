@@ -553,7 +553,9 @@ def silence_false_positive(fingerprint: str, reason: str = '',
         _log('INFO', f'silence decision for {fp}: '
                      f'{"posted to Approvals tab" if posted else "not posted (chain_events unavailable)"}')
 
-        ttl_note = 'permanent' if not ttl_sec else f'ttl={ttl_sec}s'
+        # Match larry_alerts.silence semantics: only ttl_sec=None is permanent
+        # (ttl_sec=0 expires immediately, it is NOT eternal).
+        ttl_note = 'permanent' if ttl_sec is None else f'ttl={ttl_sec}s'
         decision_note = ('Approve/Reject decision posted to Approvals tab'
                          if posted else
                          'Approvals-tab decision NOT posted (chain_events unavailable)')

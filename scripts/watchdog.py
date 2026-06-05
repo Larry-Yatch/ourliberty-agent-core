@@ -92,6 +92,19 @@ RECONCILE_WINDOW_SEC = 30 * 60
 # this window pointlessly depletes StartLimitBurst.
 ALIVE_ACTIVE_STATES = ('active', 'activating', 'deactivating', 'reloading')
 
+# Auto-restart flap detection. The M1 fix correctly stopped watchdog from
+# actuating (`systemctl start`) while systemd is mid-auto-restart — but it did
+# so by reporting the service ALIVE, which also suppressed the down-alert. A
+# service WEDGED in auto-restart (crash-looping, never converging) therefore
+# went completely invisible. We now count consecutive watchdog checks that find
+# the service in auto-restart; once the streak hits this threshold, surface a
+# critical alert (still WITHOUT actuating — systemd owns the restart). A normal
+# restart completes in seconds, so catching the same service in auto-restart on
+# >=2 consecutive checks (watchdog cadence is minutes apart) means it is not a
+# transient restart.
+AUTO_RESTART_FLAP_TICKS = 2
+_FLAP_STREAK_DIR = AGENTS_ROOT / 'state' / 'auto-restart-flap'
+
 # inbox-watcher RSS threshold for V2 process-memory check. Restart above
 # this. Q2-Dial: 1.5 GB (was 1 GB on upstream's orchestrator; we have
 # MemoryMax=2G with 500MB headroom for children).
@@ -181,13 +194,82 @@ def _attempt_start(service_name: str, wait_sec: int = 8) -> bool:
 # ---------- checks ----------
 
 
+def _flap_streak_path(service_name: str) -> Path:
+    return _FLAP_STREAK_DIR / service_name
+
+
+def _bump_flap_streak(service_name: str) -> int:
+    """Increment and return the consecutive-auto-restart streak for a service."""
+    path = _flap_streak_path(service_name)
+    try:
+        prior = int(path.read_text().strip())
+    except (OSError, ValueError):
+        prior = 0
+    streak = prior + 1
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(streak))
+    except OSError:
+        pass
+    return streak
+
+
+def _reset_flap_streak(service_name: str) -> None:
+    try:
+        _flap_streak_path(service_name).unlink()
+    except (FileNotFoundError, OSError):
+        pass
+
+
 def _check_auto_restart(service_name: str, friendly: str) -> dict:
-    """Shared shape: alive? if not, start; if start fails, append critical alert."""
-    if is_service_alive(service_name):
+    """Alive? if not, start; if start fails, append critical alert. A service
+    wedged in systemd auto-restart is handled separately: no actuation (systemd
+    owns the restart), but a sustained streak escalates to a flapping alert so a
+    crash-loop isn't silently treated as alive."""
+    active, sub = _systemctl_states(service_name)
+
+    # Genuinely up and not mid-restart → clear any streak and we're done.
+    if active in ALIVE_ACTIVE_STATES and sub != 'auto-restart':
+        _reset_flap_streak(service_name)
         return {'status': 'ok'}
-    log(f'{friendly} ({service_name}) is DOWN — attempting start', 'WARN')
+
+    # systemd is between automatic restarts. Do NOT actuate (the M1 fix —
+    # `systemctl start` here just burns StartLimitBurst). But track the streak:
+    # a service that keeps reappearing in auto-restart is crash-looping.
+    if sub == 'auto-restart':
+        streak = _bump_flap_streak(service_name)
+        if streak >= AUTO_RESTART_FLAP_TICKS:
+            log(f'{friendly} ({service_name}) wedged in systemd auto-restart '
+                f'across {streak} consecutive checks — crash-looping', 'ERROR')
+            larry_alerts.append_alert(
+                source='watchdog',
+                severity='critical',
+                subject=f'{service_name}-flapping',
+                message=(f'{friendly} is crash-looping: systemd has held it in '
+                         f'auto-restart across {streak} consecutive watchdog '
+                         f'checks. Automatic restart is not converging.'),
+                suggested_action=(
+                    f'sudo systemctl status {service_name} && '
+                    f'sudo journalctl -u {service_name} -n 80'
+                ),
+            )
+            return {'status': 'flapping', 'streak': streak}
+        log(f'{friendly} ({service_name}) in systemd auto-restart '
+            f'(streak {streak}/{AUTO_RESTART_FLAP_TICKS}) — deferring to systemd',
+            'WARN')
+        return {'status': 'auto-restart-wait', 'streak': streak}
+
+    # active is None (systemctl error) or a dead state (failed/inactive) →
+    # genuinely down; watchdog actuates.
+    if active is None:
+        log(f'{friendly} ({service_name}) state unknown (systemctl query failed) '
+            f'— attempting start', 'WARN')
+    else:
+        log(f'{friendly} ({service_name}) is DOWN (state={active}) — attempting '
+            f'start', 'WARN')
     if _attempt_start(service_name):
         log(f'{friendly} recovered')
+        _reset_flap_streak(service_name)
         # Surface the recovery event so Larry knows watchdog acted.
         larry_alerts.append_alert(
             source='watchdog',
