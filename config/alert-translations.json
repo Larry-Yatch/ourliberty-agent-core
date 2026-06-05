@@ -18,15 +18,6 @@
     "stopgap_note": "Translation layer is a stopgap until the Pulse cycle upgrade (follow-up to PR #108) ships healer-alert triage as a core Pulse responsibility. Once Pulse triages, this table can retire; the CI gate that enforces every healer has an entry stays useful as an ergonomics review trigger.",
     "never_silence_note": "Optional per-entry boolean. By default a (source, subject) present in this table is a known pattern that Check 0 (alert_triage_state.classify) Tier-3-silences to digest. Set never_silence: true on an entry to keep its plain-language translation but force it to surface (Tier 4, route=escalate) instead of being muted — for detections like a dark pulse check, where the translation makes the alert clearer but silencing it would defeat the watcher's whole purpose."
   },
-  "medic": {
-    "medic-silenced-needs-fix": {
-      "severity": "WARNING",
-      "tier": "SOON",
-      "never_silence": true,
-      "plain_language_summary": "Medic durably silenced a confirmed false-positive alert so it stops looping in your inbox — but Medic can only quiet the symptom, not patch the code. The underlying bug is still unfixed. This one-time notice carries the root cause and what to fix at the source; it will not repeat (the silence is the dedupe).",
-      "recommended_action": "Apply the root-cause fix named in the alert body (the healer/source that emits the silenced fingerprint). Once shipped, lift the mask with `larry_alerts.unsilence(\"<fingerprint>\")` so a genuine future recurrence isn't hidden. Audit trail: medic-dispatcher.log; ledger classification=reversible."
-    }
-  },
   "heal-pipeline-stall": {
     "pipeline-stall:forge-no-pr": {
       "severity": "URGENT",
