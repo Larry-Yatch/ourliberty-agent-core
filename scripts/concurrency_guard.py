@@ -23,9 +23,14 @@ GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
 # Safe limit defaults to 6 (see module docstring for the RAM math: 6×400MB +
 # services + browsers ≈ 4.3 GB of 7.8 GB). It was previously hard-coded to 10 —
 # inherited from the gm-agent-core bootstrap — which contradicted the documented
-# ceiling and risked OOM on this VM. Override ONLY via the environment when the
-# VM is resized; a value outside the safe band fails loudly rather than silently
-# over-committing memory.
+# ceiling and risked OOM on this VM.
+#
+# OURLIBERTY_MAX_CONCURRENT can only override the limit DOWN (1..6) — e.g. to
+# throttle further under memory pressure. RAISING it is deliberately NOT possible
+# via env: a value >6 (or non-integer) raises at import, which fails every daemon
+# that imports this module loudly rather than silently over-committing memory (a
+# restart-after-fixing-env crash is recoverable; an OOM is not). To run a larger
+# VM, redo the RAM math and bump _MAX_CONCURRENT_CEILING in code.
 _MAX_CONCURRENT_CEILING = 6
 
 
