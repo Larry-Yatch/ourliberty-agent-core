@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 933 — 2026-06-05 01:01 UTC (interactive)
+
+**Health:** ⚡ **Tier 3 → Tier 1 (always-fix action). consecutive_clean=4→0. 8/8 services active. Sync: ✅ success. PR #332 auto-merge enabled (38 min, CLEAN). PR #334 open (18 min, Mirror reviewing). 2 new alerts (Tier-3 expected).**
+
+Alert watermark: **1305 lines / 2026-06-05T00:25:57Z** (2 new alerts since iter 932 watermark 1303/00:01:10Z — both Tier-3 expected). Pipeline-stall heartbeat: 2026-06-05T00:55:19Z (✅ ~6 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T00:30:46Z (✅ ~31 min at cycle start; within 60-min threshold). Sync: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (✅ ~7 min old; fully current). Session-start gitStatus: branch=main, tree=clean, HEAD=6d40503 "feat(notifier): post mirror-review commit status on Mirror verdict (#333)". Tier state at start: tier=3, consecutive_clean=4. Tier state at end: **tier=1, consecutive_clean=0** (always-fix action taken → non-clean iter → tier-reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Tier-3 nominal (2 new alerts, both expected-by-design).** Watermark advanced 1303→1305.
+  - **Alert 1304 (2026-06-05T00:25:54Z):** `ledger` / `weekly-2026-06-01`. Weekly cost report DM from Beacon bot. Not in `config/alert-translations.json` (ledger key absent — confirmed). Per actionable-only discipline: Larry already received Check I DM with same content (iter 932); no new Larry-actionable info. Classification: **Tier 3 (expected-by-design)**. No DM, journal-note only. `ledger/weekly-*` G-rule already in `deploy-notifier-alert-xlate-split-fix` engine-fix scope (APPROVAL_REQUEST pending Larry). ✅
+  - **Alert 1305 (2026-06-05T00:25:57Z):** `pulse` / `check-i-2026-06-01`. Pulse's own Check I DM from iter 932. Not in alert-translations.json (pulse key absent). Per actionable-only discipline: this is Pulse's own output already journaled at iter 932; no new actionable content. Classification: **Tier 3 (expected-by-design)**. No DM, journal-note only. G-rule `pulse/check-i-* not in alert-translations.json`: **advance 1→2/3**. At 3/3: dispatch Beacon to add `source:pulse / subject:check-i-*` as Tier 3/FYI, batch with engine-fix scope. ✅
+  - Triage: 2 alerts, 0 Tier-1, 0 Tier-2 DMed, 2 Tier-3 silenced. No tier-reset from Check 0. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T00:55:19Z (~6 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Active pipeline, not stalled.** Mirror=1 (active review task `review-build-unreviewed-merge-detector-20260605T000816Z.json`, ~53 min old — Mirror actively reviewing PR #334). Forge=0 (both source=larry tasks completed: build-mirror-review-status → PR #333 MERGED in session-start HEAD; build-unreviewed-merge-detector → PR #334 OPEN). Beacon=0. Pulse=0. Pipeline progressing normally. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T00:30:46Z (~31 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6d40503. ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=success, commit=6d405033, last_sync=2026-06-05T00:49:37Z (~7 min old). Fully current. ✅ (Previous SYNC-PUSH-REBASE-FALLBACK from iter 932 self-resolved as expected.)
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Nominal.** Forge=0, Beacon=0, Pulse=0. Mirror=1 (active review, expected — Mirror processing PR #334 review task). ✅
+
+- **(Check E) PRs: ⚡ Always-fix applied (PR #332).** 
+  - **PR #332** "fix(healer): reconcile retry-recovered dispatches + couple Medic silence with a fix report" (branch `fix/heal-pipeline-stall-retry-reconcile`): created 2026-06-05T00:18:09Z, ~38 min at cycle start. `gh pr view 332` → CLEAN/OPEN/no reviewDecision. **Past 30-min threshold — always-fix applied: `gh pr merge 332 --auto --squash`.** Auto-merge enabled; will merge when required checks pass. ✅
+  - **PR #334** "feat(healer): detect merges to main that bypassed Mirror review" (build-unreviewed-merge-detector-20260605T000816Z): created 00:38:49Z, ~18 min at cycle start. CLEAN/MERGEABLE, reviewDecision="". Mirror actively reviewing. Under 30-min threshold — no action. Watch: if still open and CLEAN+no Mirror review at 30 min next cycle, apply auto-merge. ✅
+  - dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I — sentinel check):** `check-i-2026-06-05.json` present → already fired at iter 932. Skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Monday only → skip. ✅
+
+- **G-rule watch:**
+  - **ADVANCED: `pulse/check-i-* not in alert-translations.json`: 1→2/3** (iter 638=1/3; this iter=2/3). Next occurrence (next Check I fire) → 3/3 → dispatch Beacon to add `source:pulse / subject:check-i-*` as Tier 3/FYI, batch with engine-fix scope.
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 retry succeeded`: **1/3** (unchanged).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged). PR #333 (source=larry) merged — verify no false forge-no-pr alarm on PR #334 sweep.
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+  - `source=larry Forge builds don't auto-route to Mirror for review`: **1/3** (unchanged). NOTE: PR #333 (build-mirror-review-status, source=larry) merged without Mirror review visible in this iter — same G-rule pattern. This is the **2nd data point** (but G-rule was noted at 1/3 iter 805 for PR #294; should this be 2/3?). Checking: PR #334 (build-unreviewed-merge-detector, source=larry) IS in Mirror inbox for review. Mirror routing for source=larry *may* now work for at least some cases via PR #333's new commit-status posting. Watch PR #334 review completion — if Mirror approves, this G-rule may be partially healed. Not advancing counter yet pending verification.
+
+- **PRIME DIRECTIVE ratio:** interventions=717, systemic_fixes=12, ratio≈59.75 (intervention row appended 2026-06-05T01:01:20Z; 1 new intervention this iter: enable-pr-auto-merge on PR #332).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Triaged 2 new alerts (both Tier-3 expected, no DMs). Watermark advanced 1303→1305.
+3. **Always-fix:** `gh pr merge 332 --auto --squash` — PR #332 (fix/heal-pipeline-stall-retry-reconcile) past 30-min threshold, CLEAN; auto-merge enabled (01:00Z). Logged to `cycle-actions.jsonl`.
+4. `cycle_prime_ledger.py append --tier 3 --kind intervention` → ledger entry recorded (01:01:20Z). ✅
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0 (tier-reset: action taken). ✅
+6. Advanced G-rule `pulse/check-i-*` 1→2/3.
+7. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (including ledger/weekly-* + 4 other G-rules) pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** PR #332 (Forge retry-reconcile fix) past threshold and auto-merged. PR #334 (unreviewed-merge-detector) in Mirror review — first test of `source=larry Forge builds → Mirror review` routing (via PR #333's new commit-status mechanism). Watch G-rule `source=larry Forge builds auto-routing to Mirror` at PR #334 resolution — if Mirror approves, advance G-rule to closed-healed rather than 2/3 dispatch. Sync fully recovered from iter 932's SYNC-PUSH-REBASE-FALLBACK. System re-escalated to Tier 1 for PR follow-through.
+
+---
+
 ## Iteration 932 — 2026-06-05 00:23 UTC (interactive)
 
 **Health:** ✅ **Tier 3 clean. consecutive_clean=3→4 (MAX_TIER). 0 auto-fix actions. 8/8 services active. Forge=2 fresh tasks. PR #332 open (5 min, under threshold). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK (self-recovering). Check I fired.**
