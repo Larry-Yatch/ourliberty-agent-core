@@ -154,6 +154,12 @@
       "tier": "SOON",
       "plain_language_summary": "The wedged-review-session healer spotted a Forge/Mirror review session idle past its threshold with no terminal marker, but is in alert-only mode (Case 2 not yet graduated) so it did NOT kill it. Unlike wedged-review-reaped, nothing was healed — this is a heads-up that a review session may be genuinely stuck and needs an operator to look. Common benign cause: the PR already merged, making the review moot while the session lingers. Common real cause: a poll-loop / inbox-watcher wedge holding the session open. The raw subject carries the worktree name after a colon (wedged-review-silent:<wt-name>); this bare key matches via the prefix-strip lookup rule.",
       "recommended_action": "Look before killing. Inspect the worktree (`ls -la ~/agent-worktrees/<wt-name>`) and the session log named in the alert. Check whether the session's PR already merged (`gh pr view`) — if so the review is moot and the session is safe to kill. If genuinely wedged, kill the claude PID named in the alert; inbox-watcher will retry harmlessly. If a bash poll loop is spinning (pgrep-empty → /proc check always true → until-loop never exits), that's the root cause — fix the loop's liveness check, don't just kill the symptom. Runbook: runbooks/heal-wedged-review-sessions.md."
+    },
+    "wedged-review-case2-graduated": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The wedged-review-session healer's Case-2 (silent, no-terminal-marker sessions) confidence streak crossed the promotion threshold, so it graduated from alert-only to auto-reap. From now on it will reap genuinely-wedged silent sessions automatically instead of only alerting (wedged-review-silent). By-design milestone confirmation, not a failure — the inverse event (a false positive demoting it back to alert-only) is logged as DEMOTED but not alerted.",
+      "recommended_action": "None — by-design confirmation that Case-2 auto-reap is now active after enough consecutive correct alerts. If you'd rather it stay alert-only, lower the confidence or reset the streak per runbooks/heal-wedged-review-sessions.md."
     }
   },
   "watchdog": {

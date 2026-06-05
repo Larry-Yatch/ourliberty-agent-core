@@ -110,6 +110,22 @@ _OUT_OF_V1_SCOPE_SUBJECTS = {
     # match. Infra subjects (disk, memory, cgroup) still rely on the raw
     # emoji+source rendering.
     ('watchdog', None),
+    # ---- Pre-existing wrapper-surfaced debt (2026-06 belt-and-suspenders) ----
+    # The wrapper-aware scanner (see _discover_notify_wrappers) follows one
+    # level of indirection through subject-forwarding helpers (_dm_larry,
+    # _emit, dm_larry, ...). That newly made VISIBLE a set of alert subjects in
+    # other healers that route their subject through such a wrapper and have no
+    # translation yet — they were invisible to the old direct-call-only scan,
+    # not absent. These sources have zero entries in alert-translations.json
+    # today, so wildcarding them removes no existing coverage; it converts an
+    # invisible blind spot into a tracked TODO. Translate per-source in future
+    # PRs and drop the wildcard. (heal-pr-auto-merge / heal-chain-event-type-
+    # audit / watchdog wrapper subjects are already covered by their wildcards
+    # above.)
+    ('build-sequence-advancer', None),
+    ('heal-build-sequence-advancer-heartbeat', None),
+    ('heal-phantom-dispatch-claim', None),
+    ('heal-resume-paused-on-tier1', None),
 }
 
 
@@ -181,50 +197,139 @@ def _evaluate_static(node: ast.AST) -> object:
     return _Dynamic()
 
 
+def _normalize_subject(subject: object) -> Optional[tuple]:
+    """Turn an extracted subject value into (subject_prefix, is_dynamic), or
+    None if it can't be validated statically (no subject / fully dynamic with
+    no literal prefix). Shared by the direct-call and wrapper-call scanners."""
+    if subject is None:
+        # No subject — alerts without subjects are not translatable under V1
+        # (no key shape).
+        return None
+    if isinstance(subject, str):
+        return (subject, False)
+    if isinstance(subject, _Dynamic):
+        prefix = subject.static_prefix
+        if not prefix:
+            # Fully dynamic with no extractable prefix — can't validate.
+            return None
+        # Strip trailing colon so the prefix is the static portion before the
+        # dynamic suffix (e.g. 'pipeline-stall:forge-no-pr:' →
+        # 'pipeline-stall:forge-no-pr').
+        if prefix.endswith(':'):
+            prefix = prefix[:-1]
+        return (prefix, True)
+    return None
+
+
+def _discover_notify_wrappers(tree: ast.AST) -> dict:
+    """Find subject-forwarding wrapper functions in a parsed module.
+
+    A wrapper is a function whose body calls `append_alert(source=<literal>,
+    subject=<param>)` where <param> is one of the function's own parameters.
+    The literal subject then lives at the wrapper's *call sites*, not the
+    `append_alert` call (whose `subject=<var>` is opaque to static analysis) —
+    this is the indirection that let wedged-review-silent ship untranslated.
+
+    Returns: {func_name: (source, subject_param_index)}.
+    """
+    wrappers: dict = {}
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        params = [a.arg for a in fn.args.args]
+        for call in ast.walk(fn):
+            if not (isinstance(call, ast.Call) and _is_append_alert_call(call)):
+                continue
+            source = _extract_kw_literal(call, 'source')
+            if not isinstance(source, str):
+                continue
+            subj = next(
+                (kw.value for kw in call.keywords if kw.arg == 'subject'), None)
+            if isinstance(subj, ast.Name) and subj.id in params:
+                wrappers[fn.name] = (source, params.index(subj.id))
+    return wrappers
+
+
+def _discover_wrapper_aliases(tree: ast.AST, wrappers: dict) -> dict:
+    """Resolve one level of dependency-injection aliasing: a function param
+    whose default value is a known wrapper (e.g. run_cycle's
+    `escalate_notify: Callable = _escalate_notify`) is, at that wrapper's call
+    sites, an alias for it. Returns {param_name: (source, subject_index)}."""
+    aliases: dict = {}
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        # Positional/positional-or-keyword params: defaults align to the tail.
+        args = fn.args.args
+        defaults = fn.args.defaults
+        pairs = list(zip(args[len(args) - len(defaults):], defaults))
+        # Keyword-only params (after `*`, as run_cycle uses for its injected
+        # notify hooks): kw_defaults aligns 1:1 with kwonlyargs, None = no
+        # default. Missing these is what hid wedged-review's DI indirection.
+        pairs += [
+            (a, d) for a, d in zip(fn.args.kwonlyargs, fn.args.kw_defaults)
+            if d is not None
+        ]
+        for arg, default in pairs:
+            if isinstance(default, ast.Name) and default.id in wrappers:
+                aliases[arg.arg] = wrappers[default.id]
+    return aliases
+
+
+def _wrapper_call_subject(call: ast.Call, subject_index: int) -> object:
+    """Extract the subject argument from a wrapper call — positional at
+    `subject_index`, or by `subject=` keyword. Returns the static-eval result
+    (str / _Dynamic / None)."""
+    if subject_index < len(call.args):
+        return _evaluate_static(call.args[subject_index])
+    for kw in call.keywords:
+        if kw.arg == 'subject':
+            return _evaluate_static(kw.value)
+    return None
+
+
 def _scan_file_for_call_sites(path: Path) -> list[dict]:
-    """Return [{file, line, source, subject_literal_or_prefix, is_dynamic}]
-    for every `append_alert(...)` call in `path` that includes a `source`
-    keyword."""
+    """Return [{file, line, source, subject_prefix, is_dynamic}] for every
+    translatable alert emission in `path` — both direct `append_alert(...)`
+    calls and calls to subject-forwarding wrapper functions (one level of
+    indirection, plus DI-default aliases)."""
     out: list[dict] = []
     try:
         tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
     except (OSError, SyntaxError):
         return out
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.Call) and _is_append_alert_call(node)):
-            continue
-        source = _extract_kw_literal(node, 'source')
-        if not isinstance(source, str):
-            continue  # source must be a literal string — skip dynamic.
-        subject = _extract_kw_literal(node, 'subject')
-        if subject is None:
-            # No subject keyword — alerts without subjects are not
-            # translatable under V1 (no key shape). Skip.
-            continue
-        if isinstance(subject, str):
-            subject_static = subject
-            is_dynamic = False
-        elif isinstance(subject, _Dynamic):
-            subject_static = subject.static_prefix
-            is_dynamic = True
-            if not subject_static:
-                # Fully dynamic with no extractable prefix — can't validate
-                # statically. Skip with a warning surface.
-                continue
-            # Strip trailing colon so the prefix is the static portion
-            # before the dynamic suffix (e.g. 'pipeline-stall:forge-no-pr:'
-            # → 'pipeline-stall:forge-no-pr').
-            if subject_static.endswith(':'):
-                subject_static = subject_static[:-1]
-        else:
-            continue
+
+    wrappers = _discover_notify_wrappers(tree)
+    callable_wrappers = {**wrappers, **_discover_wrapper_aliases(tree, wrappers)}
+
+    def _emit(source: str, subject_value: object, lineno: int) -> None:
+        norm = _normalize_subject(subject_value)
+        if norm is None:
+            return
         out.append({
             'file': str(path.relative_to(REPO_ROOT)),
-            'line': node.lineno,
+            'line': lineno,
             'source': source,
-            'subject_prefix': subject_static,
-            'is_dynamic': is_dynamic,
+            'subject_prefix': norm[0],
+            'is_dynamic': norm[1],
         })
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if _is_append_alert_call(node):
+            source = _extract_kw_literal(node, 'source')
+            if not isinstance(source, str):
+                continue  # source must be a literal string — skip dynamic.
+            _emit(source, _extract_kw_literal(node, 'subject'), node.lineno)
+            continue
+        # Wrapper / alias call — recover the literal subject from the caller.
+        func = node.func
+        name = (func.id if isinstance(func, ast.Name)
+                else func.attr if isinstance(func, ast.Attribute) else None)
+        if name in callable_wrappers:
+            source, subject_index = callable_wrappers[name]
+            _emit(source, _wrapper_call_subject(node, subject_index), node.lineno)
     return out
 
 
@@ -300,6 +405,40 @@ class TranslationCoverageTest(unittest.TestCase):
                 'Missing Tier 2 fallback translations — entries needed for: '
                 + ', '.join(missing)
                 + ' (template: pipeline-stall:tier2-fallback-<outcome>-<reason>)'
+            )
+
+    def test_wedged_review_subjects_surface_through_wrappers(self):
+        """Belt-and-suspenders regression guard. heal_wedged_review_sessions.py
+        emits every subject through the closure_notify / escalate_notify
+        indirection, so the literal subject lives at the wrapper call site —
+        invisible to a direct-append_alert-only scan. That blind spot let
+        wedged-review-silent ship with a hyphen instead of a colon, so it never
+        matched the longest-prefix lookup ('[no translation]'). Assert the
+        wrapper-aware scanner now surfaces each wedged-review subject AND that
+        each resolves — reverting the colon fix re-prefixes 'wedged-review-
+        silent-' and re-reds this gate."""
+        larry_alerts._TRANSLATIONS_CACHE = None  # noqa: SLF001
+        path = SCRIPTS_DIR / 'heal_wedged_review_sessions.py'
+        surfaced = {
+            h['subject_prefix']
+            for h in _scan_file_for_call_sites(path)
+            if h['source'] == 'heal-wedged-review-sessions'
+        }
+        for expected in (
+            'wedged-review-reaped',
+            'wedged-review-silent',
+            'wedged-review-case2-graduated',
+        ):
+            self.assertIn(
+                expected, surfaced,
+                f'wrapper-aware scan failed to surface {expected!r} from '
+                'heal_wedged_review_sessions.py — wrapper resolution regressed '
+                '(or the producer subject changed shape).',
+            )
+            self.assertIsNotNone(
+                larry_alerts.translate_alert(
+                    'heal-wedged-review-sessions', expected),
+                f'{expected!r} surfaced but has no translation entry.',
             )
 
 
