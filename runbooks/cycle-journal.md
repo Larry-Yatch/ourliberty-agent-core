@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 1026 — 2026-06-05 21:27 UTC (interactive, Tier 1 — SIGNAL: 1 new unreviewed-merge alert; PR #376 merged Larry-direct)
+
+**Health:** ⚠️ **Tier 1 (tier-reset: 1 new unreviewed-merge alert). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1384 lines / 2026-06-05T21:20:19Z** (NEW: +1 since iter 1025 watermark 1383/21:00:20Z; unreviewed-merge:376 at 21:20:19Z; route=escalate). Pipeline-stall heartbeat: 2026-06-05T21:27:43Z (✅ ~0 min at 21:27Z scan — healer fired during this session; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T21:08:09Z (✅ ~19 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T20:50:44Z (~37 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=3bc514d "Pulse cycle 20260605T211736Z". Tier state at start: tier=1, consecutive_clean=2, last_signal_at=2026-06-05T21:02:26Z (iter 1023). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 1 Tier-4 novel alert). `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0, last_signal_at=21:27:08Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** Watermark advanced 1383/21:00:20Z → 1384/21:20:19Z. 1 new entry:
+  - idx=1383: `heal-unreviewed-merge-detector / unreviewed-merge:376` at 21:20:19Z, route=escalate — PR #376 "fix(heal): start standalone daemons on install-drift, honest DMs (PR-D #2)" merged by Larry-Yatch at ~21:20Z without Mirror review. **33rd consecutive unreviewed-merge.** beacon-bot delivered DM at 21:20:33Z (idx=1383 confirmed in log). Tier-4 novel (unreviewed-merge:* not in known-pattern allowlist). Action pending: Larry's `go: actor-exemption-config`. **Tier-reset: YES.**
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 21:20:33Z (idx=1383, unreviewed-merge:376 delivered). No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T21:27:43Z (fresh — healer fired during this session; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T21:08:09Z (~19 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=3bc514d "Pulse cycle 20260605T211736Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T20:50:44Z (~37 min at scan). Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ No open PRs.** agent-core: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 33 consecutive (PRs #343–#376).** PR #376 = "fix(heal): start standalone daemons on install-drift, honest DMs (PR-D #2)". Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. Carry forward.
+
+- **G-rule `auto-restarted:*` untranslated**: No new occurrences this iter. G-rule 3/3 dispatched iter 592; Forge brief still missing. Carry forward.
+
+- **G-rule `gh pr merge --auto disabled`: 1/3.** No new occurrence this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat (script-authoritative). No new always-fix actions this iter → no ledger append.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 1 new alert (unreviewed-merge:376; route=escalate; beacon-bot DM delivered 21:20:33Z).
+3. Confirmed 9/9 services active, all inboxes empty, both heartbeats nominal, sync nominal, no open PRs.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=21:27:08Z.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations this iter beyond standing items. beacon-bot already delivered DM for unreviewed-merge:376 (route=escalate).
+Standing items carry forward:
+- `[red]` PRs #343–#376 audit-series (33 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** PR #376 ("fix(heal): start standalone daemons on install-drift, honest DMs (PR-D #2)") merged Larry-direct ~21:20Z — 33rd consecutive unreviewed-merge. Pattern clearly intentional (active build sprint). G-rule `actor-exemption-config` dispatch pending Larry's `go`. PRIME DIRECTIVE ratio stable (55.92).
+
+---
+
 ## Iteration 1025 — 2026-06-05 21:16 UTC (interactive, Tier 1 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 1 (consecutive_clean=2). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
