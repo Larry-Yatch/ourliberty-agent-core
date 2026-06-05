@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 984 — 2026-06-05 13:07 UTC (interactive, Tier 3 — CLEAN)
+
+**Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=7. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
+
+Alert watermark: **1333 lines / 2026-06-05T08:04:15Z** (unchanged from iter 983 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T12:52:34Z (✅ ~14 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T13:05:45Z (✅ ~1 min at scan; within 60-min threshold). Sync: status=no-change, commit=846da50 (=HEAD), last_sync=2026-06-05T12:50:16Z (~16 min). Fully caught up. ✅ Session-start gitStatus: branch=main, tree=clean, HEAD=846da50 "Pulse cycle 20260605T123734Z" (iter 983 wrapper commit). Tier state at start: tier=3, consecutive_clean=6. Tier state at end: **tier=3, consecutive_clean=7**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark timestamp 2026-06-05T08:04:15Z unchanged — 0 new alerts since iter 983. Line count 1333 (stable). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '35 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Beacon bot log reviewed: pre-restart (before 08:03Z) had intermittent `idx=0 delivery failed` (401 Unauthorized) — known ongoing medic-tier2auth401 issue, pre-existing. Post-restart (08:03Z onward): clean. Last Larry directives: June 4 at 20:48 MDT — no new June 5 directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T12:52:34Z (~14 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T13:05:45Z (~1 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** gitStatus: branch=main, tree=clean, HEAD=846da50 "Pulse cycle 20260605T123734Z". ✅
+
+- **(Check B) Sync health: ✅ Fully caught up.** sync.json: status=no-change, commit=846da50 (=HEAD), last_sync=2026-06-05T12:50:16Z (~16 min). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open.** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged — 0 new `tier2_weekly_probe_failed` alerts. 12h closure mark ~15:00Z today (~1.9h away at scan). Watch continues. ✅
+
+- **G-rule updates:** No new occurrences. All G-rules carry forward unchanged from iter 983.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=13, ratio≈55.5, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty, 0 open PRs.
+3. Reviewed beacon bot log — delivery failures (401) are pre-restart (before 08:03Z) and correspond to the known medic-tier2auth401 issue. Post-restart clean.
+4. Confirmed both heartbeats especially fresh (pipeline-stall ~14 min, stale-daemon ~1 min — stale-daemon healer actively cycling). Sync fully caught up (commit=HEAD, last_sync 16 min).
+5. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=7. ✅
+6. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PRs #343–#350 audit-series (9 total) unreviewed-merge — standing from iter 967. **Larry: confirm direct audit-PR merges are intentional. Reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335; 12h closure mark ~15:00Z today (~1.9h away).
+
+**Patterns:** Tier 3, consecutive_clean=7. Seventh consecutive clean iter. Stale-daemon heartbeat 1 min old at scan — healer actively cycling. Beacon bot 401 delivery failures present before 08:03Z restart; clean since. System holding steady with no new signals.
+
+---
+
 ## Iteration 983 — 2026-06-05 12:36 UTC (interactive, Tier 3 — CLEAN)
 
 **Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=6. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
