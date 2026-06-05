@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -49,6 +50,17 @@ ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 
 MAX_FILENAME_BYTES = 200  # leaves margin under NAME_MAX (255)
 
+# Characters that are STRUCTURALLY dangerous in a single path component:
+# the separators '/' and '\\', NUL, and other ASCII control bytes. These are
+# replaced with '-'. We deliberately do NOT touch other printable characters
+# (':', '@', '#', spaces, ...): a task_id like 'medic-silence-cpu:high@web-01'
+# is filesystem-safe, and rewriting it would make the on-disk name diverge from
+# f'{task_id}.json' — which the idempotency readers in outbox_notifier /
+# heal_pipeline_stall reconstruct from the raw task_id, so a silent rewrite
+# would defeat their dedup and cause duplicate dispatch. Neutralizing only the
+# genuinely path-structural bytes closes traversal without that divergence.
+_UNSAFE_COMPONENT_RE = re.compile(r'[\x00-\x1f\x7f/\\]')
+
 
 class DispatchRejected(Exception):
     """Schema validation rejected the task."""
@@ -56,6 +68,29 @@ class DispatchRejected(Exception):
 
 # Re-export so callers only need to import safe_write_inbox.
 RoutingDenied = routing_validator.RoutingDenied
+
+
+def sanitize_component(name: str, *, fallback: str = 'task') -> str:
+    """Reduce `name` to a single safe path component.
+
+    The path separators ``/`` and ``\\``, NUL, and other ASCII control bytes are
+    replaced with ``-``; a component that is empty or consists only of dots
+    (``.``, ``..``, ``...``) is replaced with `fallback`. Together these prevent
+    a caller-supplied identifier (e.g. a ``task_id`` arriving over the wire) from
+    escaping its target directory via ``../``, an absolute path, or a bare
+    ``..``. Other printable characters are intentionally preserved so the
+    on-disk name still equals ``f'{task_id}.json'`` for real task ids — see the
+    note on `_UNSAFE_COMPONENT_RE`. The normal case (ids of ``[A-Za-z0-9._-]``)
+    passes through unchanged.
+    """
+    if not isinstance(name, str) or not name:
+        return fallback
+    cleaned = _UNSAFE_COMPONENT_RE.sub('-', name)
+    # A component of only dots still names a directory entry ('.' -> same dir,
+    # '..' -> parent). Separators are already gone, but neutralize these too.
+    if cleaned.strip('.') == '':
+        return fallback
+    return cleaned
 
 
 def _truncate_filename(filename: str) -> tuple[str, bool]:
@@ -66,7 +101,7 @@ def _truncate_filename(filename: str) -> tuple[str, bool]:
     if not dot:
         stem, ext = filename, ''
     h = hashlib.sha1(filename.encode('utf-8')).hexdigest()[:10]
-    safe_stem = stem[:100].rstrip('-')
+    safe_stem = stem[:100].rstrip('-') or 'task'  # avoid a leading '--h…' on an all-'-' stem
     safe = f'{safe_stem}--h{h}'
     if ext:
         safe = f'{safe}.{ext}'
@@ -159,11 +194,17 @@ def safe_write_inbox(
     if not repo_ok:
         raise routing_validator.RoutingDenied(repo_reason or 'target_repo denied')
 
-    # 3. Filename guard
-    safe_name, was_truncated = _truncate_filename(filename)
+    # 3. Filename guard: neutralize path-traversal in the caller-supplied
+    #    filename (it is typically f'{task_id}.json' and task_id arrives over
+    #    the wire), THEN enforce the length cap.
+    sanitized_name = sanitize_component(filename)
+    was_sanitized = sanitized_name != filename
+    safe_name, was_truncated = _truncate_filename(sanitized_name)
 
-    # 4. Atomic write
-    dest = INBOXES_ROOT / final_target / safe_name
+    # 4. Atomic write. Sanitize the directory component too: final_target comes
+    #    from routing_validator, but defend the join against any separator/'..'
+    #    leaking through the destination component as well as the filename.
+    dest = INBOXES_ROOT / sanitize_component(final_target) / safe_name
     _atomic_write_json(dest, task_dict)
 
     # 5. Audit log
@@ -174,6 +215,7 @@ def safe_write_inbox(
         'target_agent_final': final_target,
         'filename_requested': filename,
         'filename_final': safe_name,
+        'sanitized': was_sanitized,
         'truncated': was_truncated,
         'rerouted': was_rerouted,
         'reroute_reason': reroute_reason,

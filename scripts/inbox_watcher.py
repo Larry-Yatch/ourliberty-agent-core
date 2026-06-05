@@ -43,6 +43,7 @@ import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
 import routing_validator  # noqa: E402
+import safe_write_inbox  # noqa: E402
 import worktree_manager  # noqa: E402
 
 HOME = Path.home()
@@ -269,10 +270,13 @@ def reap_orphans_on_startup() -> int:
             except (OSError, ProcessLookupError, ValueError, TypeError):
                 alive = False
 
-        outbox_dir = OUTBOXES_ROOT / agent
+        outbox_dir = OUTBOXES_ROOT / safe_write_inbox.sanitize_component(agent)
         try:
             outbox_dir.mkdir(parents=True, exist_ok=True)
-            forfeit = _unique_dest(outbox_dir, f"{task_stem}.forfeit.json")
+            forfeit = _unique_dest(
+                outbox_dir,
+                safe_write_inbox.sanitize_component(f"{task_stem}.forfeit.json"),
+            )
             forfeit.write_text(json.dumps({
                 "task_id": task_stem,
                 "agent": agent,
@@ -623,7 +627,10 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         outbox = _build_outbox(agent, task_id, task, task_file,
                                False, "", None, meta,
                                error=f"agent_runner exception: {e!r}")
-        outbox_path = _unique_dest(OUTBOXES_ROOT / agent, f"{task_id}.json")
+        outbox_path = _unique_dest(
+            OUTBOXES_ROOT / safe_write_inbox.sanitize_component(agent),
+            safe_write_inbox.sanitize_component(f"{task_id}.json"),
+        )
         try:
             outbox_path.parent.mkdir(parents=True, exist_ok=True)
             outbox_path.write_text(json.dumps(outbox, indent=2))
@@ -639,7 +646,10 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
                            success, output_text, session_id, meta,
                            error=None if success else (output_text or "claude returned non-success"))
 
-    outbox_path = _unique_dest(OUTBOXES_ROOT / agent, f"{task_id}.json")
+    outbox_path = _unique_dest(
+        OUTBOXES_ROOT / safe_write_inbox.sanitize_component(agent),
+        safe_write_inbox.sanitize_component(f"{task_id}.json"),
+    )
     try:
         outbox_path.parent.mkdir(parents=True, exist_ok=True)
         outbox_path.write_text(json.dumps(outbox, indent=2))
