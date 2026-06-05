@@ -122,14 +122,24 @@ class SentinelScansTest(_IsolatedAgentsRoot):
         os.utime(f, (old_time, old_time))
         return f
 
-    def _write_in_flight(self, name, started_age_seconds, agent='forge', model='sonnet-4.6'):
+    def _write_in_flight(self, name, started_age_seconds, agent='forge',
+                         model='sonnet-4.6', iso=True):
+        # PRODUCTION format: agent_runner writes started_at as an ISO-8601
+        # STRING. The old fixture wrote an epoch float, which masked the bug
+        # where scan_in_flight float()'d the ISO string and skipped every entry.
+        from datetime import datetime, timedelta, timezone
         ds.IN_FLIGHT_DIR.mkdir(parents=True, exist_ok=True)
         f = ds.IN_FLIGHT_DIR / name
+        if iso:
+            started = (datetime.now(timezone.utc)
+                       - timedelta(seconds=started_age_seconds)).isoformat()
+        else:
+            started = time.time() - started_age_seconds  # legacy epoch float
         with open(f, 'w') as fh:
             json.dump({
                 'task_stem': name.replace('.json', ''),
                 'agent_id': agent,
-                'started_at': time.time() - started_age_seconds,
+                'started_at': started,
                 'model': model,
                 'pid': 99999,
             }, fh)
@@ -171,12 +181,32 @@ class SentinelScansTest(_IsolatedAgentsRoot):
 
     def test_in_flight_stall_per_model_threshold(self):
         # Sonnet threshold = 30m. 25m → not stalled. 35m → stalled.
+        # Uses the PRODUCTION ISO started_at — this test would FAIL on the old
+        # float()-only parse (every entry skipped → no stall ever detected).
         self._write_in_flight('fresh.json', started_age_seconds=25 * 60, model='sonnet-4.6')
         self._write_in_flight('old.json', started_age_seconds=35 * 60, model='sonnet-4.6')
         stalls = ds.scan_in_flight(time.time())
         names = [s['file'] for s in stalls]
         self.assertIn('old.json', names)
         self.assertNotIn('fresh.json', names)
+
+    def test_in_flight_stall_detected_with_legacy_epoch_float(self):
+        # Back-compat: a legacy epoch-float started_at still parses.
+        self._write_in_flight('legacy.json', started_age_seconds=35 * 60,
+                              model='sonnet-4.6', iso=False)
+        stalls = ds.scan_in_flight(time.time())
+        self.assertIn('legacy.json', [s['file'] for s in stalls])
+
+    def test_started_epoch_parses_iso_and_float_and_garbage(self):
+        from datetime import datetime, timezone
+        iso = datetime(2026, 6, 5, 12, 0, 0, tzinfo=timezone.utc)
+        self.assertAlmostEqual(
+            ds._started_epoch({'started_at': iso.isoformat()}),
+            iso.timestamp(), places=3)
+        self.assertEqual(ds._started_epoch({'started_at': 1700000000.0}), 1700000000.0)
+        self.assertEqual(ds._started_epoch({'timestamp_started': 1700000000}), 1700000000.0)
+        self.assertEqual(ds._started_epoch({'started_at': 'not-a-date'}), 0.0)
+        self.assertEqual(ds._started_epoch({}), 0.0)
 
     def test_in_flight_stall_opus_has_higher_threshold(self):
         # Opus threshold = 60m. 35m should NOT stall on opus.

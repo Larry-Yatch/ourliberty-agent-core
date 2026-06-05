@@ -404,6 +404,29 @@ def find_mirror_passed_failures(
 
 # -------------------- merge primitive --------------------
 
+def _pr_is_merged(repo: str, pr_number: int) -> Optional[bool]:
+    """True/False whether the PR is actually merged on GitHub; None if it can't
+    be determined (gh error / parse failure). Used to disambiguate gh's
+    'not in a mergeable state' error — a None/False result means we must NOT
+    claim the PR shipped."""
+    env = {**os.environ, 'PATH': '/usr/bin:/usr/local/bin:/snap/bin'}
+    try:
+        out = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number), '--repo', repo,
+             '--json', 'state,mergedAt'],
+            capture_output=True, text=True, timeout=GH_TIMEOUT_S, env=env,
+        )
+        if out.returncode != 0:
+            return None
+        data = json.loads(out.stdout or '{}')
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError,
+            json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data.get('state') == 'MERGED' or bool(data.get('mergedAt'))
+
+
 def merge_pr(repo: str, pr_number: int, title: str) -> tuple[str, str]:
     """Execute `gh pr merge <N> --squash --delete-branch`.
     Returns (outcome, reason) where outcome in
@@ -419,8 +442,22 @@ def merge_pr(repo: str, pr_number: int, title: str) -> tuple[str, str]:
         if result.returncode == 0:
             return 'merged', f'merged {repo}#{pr_number}'
         stderr = (result.stderr or '').strip().lower()
-        if 'not in a mergeable state' in stderr or 'already been merged' in stderr:
+        # 'already been merged' is unambiguous — gh only says it for a true race.
+        if 'already been merged' in stderr:
             return 'already_merged', f'already-merged race for {repo}#{pr_number}'
+        # 'not in a mergeable state' is AMBIGUOUS: gh emits it for conflicts,
+        # failing/late required checks, and branch-protection blocks too — not
+        # only already-merged races. Classifying all of those as 'already_merged'
+        # (which process_pr treats as success: drops retry state + DMs Larry
+        # "Healer merged") silently reports an UNMERGED PR as shipped. Verify the
+        # PR's real state before claiming success.
+        if 'not in a mergeable state' in stderr:
+            if _pr_is_merged(repo, pr_number) is True:
+                return 'already_merged', f'already-merged (verified) {repo}#{pr_number}'
+            return 'failed', (
+                'not in a mergeable state and PR is not merged — likely '
+                'conflict / failing checks / branch protection: '
+                + (result.stderr or '').strip()[:160])
         return 'failed', (result.stderr or '').strip()[:200]
     except subprocess.TimeoutExpired:
         return 'failed', f'gh pr merge timed out after {GH_TIMEOUT_S}s'
