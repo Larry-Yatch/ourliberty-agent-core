@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 964 — 2026-06-05 07:09 UTC (interactive, Tier 1 — clean)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 3 new alerts — all Tier-3 FYI. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change. 2 more clean iters → Tier 2 de-escalation.**
+
+Alert watermark: **1322 lines / 2026-06-05T07:03:50Z** (was 1320 iter 963 — 3 new, all Tier-3). Pipeline-stall heartbeat: 2026-06-05T07:01:22Z (✅ ~8 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T07:03:42Z (✅ ~5 min at scan; within 60-min threshold). Sync: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (✅ ~19 min at scan; within 2h threshold). Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=1** (2 more clean iters needed for Tier 2 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ℹ️ 3 new alerts — all Tier-3 FYI, no tier-reset.** Watermark 1320 → 1322 (+2 net; effective 3 new since iter 963's ts-reference of 06:45:30Z).
+  - `source=pulse-escalation, subject=unreviewed-merge:344-pulse-triage, ts=07:02:08Z` — Pulse's own iter-963 escalation echoing back. G-rule `pulse-escalation not in alert-translations.json` already at 3/3 (iter 836), batched into `deploy-notifier-alert-xlate-split-fix` pending Larry. Tier-3 FYI. No tier-reset.
+  - `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, ts=07:03:46Z` — dashboard-api.service restarted by stale-daemon healer (script mtime 105.6 min newer from PR #344 merge). Expected by design. Tier-3 FYI.
+  - `source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-inbox-watcher.service, ts=07:03:50Z` — inbox-watcher.service restarted by stale-daemon healer (script mtime 1126.4 min newer from PR #344 merge). Expected by design. Tier-3 FYI.
+  - Note: stale-daemon healer processed both services within 8 seconds — all active, new PR #344 code live on both.
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd logs in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T07:01:22Z (~8 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T07:03:42Z (~5 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=5830ea1 "Pulse cycle 20260605T070624Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (19 min, within 2h). Iter 963's wrapper push landed after the last sync.timer fire; sync.json will update on next hourly tick. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. inbox-watcher and dashboard-api restarted at 07:03Z with PR #344 code. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** New alerts 1321–1322 are stale-daemon restarts (not `tier2_weekly_probe_failed`). 0 new probe-failed alerts since last watermark. Next probe expected ~09:00Z (6h cadence). Watch continues. ✅
+
+- **PR #343/#344 [red] escalation:** Larry response still pending (iter 959/963).
+
+- **G-rule updates:** No new occurrences. G-rule `actor=larry-direct-merge` at 2/3 carries forward. All other G-rules unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=721, systemic_fixes=13, ratio≈55.5 (unchanged). No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 3 new alerts as Tier-3 FYI (pulse-escalation echo + 2× stale-daemon auto-restart for PR #344 code pickup). No tier-reset.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PR #343 + PR #344 unreviewed-merge — Larry confirmation still pending (iters 959/963).
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** PR #344 code fully propagated — dashboard-api and inbox-watcher both picked up new code within 8s of each other at 07:03Z (stale-daemon healer working correctly). Tier 1 consecutive_clean=1; system holding clean. Stale-daemon healer alert translations still missing (G-rule dispatched iter 592, Forge brief still missing — this is the 3rd+ occurrence of the translation gap; the G-rule is already at 3/3, the brief is in Beacon/Forge pipeline somewhere).
+
+---
+
 ## Iteration 963 — 2026-06-05 07:02 UTC (interactive, Tier 2→1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 2→1 — SIGNAL. Tier-reset triggered by tier-NOW / never_silence alert. 1 new alert: `unreviewed-merge:344` (PR #344 merged without Mirror review, actor=Larry-Yatch — 2nd consecutive in 35 min). 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
