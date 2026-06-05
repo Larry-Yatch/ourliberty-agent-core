@@ -799,8 +799,10 @@ class RemediationAllowlistTest(_IsolatedAgentsRoot):
 
 class RemediateMissingInstallTest(_IsolatedAgentsRoot):
     """`_remediate_missing_install` shell-out sequence — fully mocked.
-    .timer = cp + daemon-reload + enable --now + verify; .service = cp +
-    daemon-reload (no enable, no verify).
+    .timer (or a standalone [Install] daemon) = cp + daemon-reload + enable --now
+    + verify; a service WITHOUT [Install] (timer-activated, like foo.service here
+    which isn't in the repo) = cp + daemon-reload only (no enable, no verify).
+    See RemediateMissingInstallClassAwareTest for the [Install] discrimination.
     """
 
     def _fake_runs_record(self, plan):
@@ -839,7 +841,9 @@ class RemediateMissingInstallTest(_IsolatedAgentsRoot):
             ['sudo', '-n', 'systemctl', 'enable', '--now', 'foo.timer'],
         )
 
-    def test_service_skips_enable(self):
+    def test_service_without_install_skips_enable(self):
+        # foo.service is not in the repo -> no [Install] detectable -> treated as
+        # timer-activated -> cp + daemon-reload only (its sibling timer starts it).
         def plan(cmd):
             return mock.MagicMock(returncode=0, stdout='', stderr='')
         ran, fake_run = self._fake_runs_record(plan)
@@ -847,7 +851,7 @@ class RemediateMissingInstallTest(_IsolatedAgentsRoot):
                 mock.patch.object(h, '_systemctl_show', return_value={}):
             rc, stderr = h._remediate_missing_install('foo.service')
         self.assertEqual(rc, 0)
-        # cp + daemon-reload only — no enable line for a .service.
+        # cp + daemon-reload only — no enable line for a no-[Install] service.
         self.assertEqual(len(ran), 2)
         self.assertEqual(ran[0][:3], ['sudo', '-n', 'cp'])
         self.assertEqual(
@@ -1042,11 +1046,11 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         self.assertIn('daemon-reload', dm['suggested_action'])
         self.assertIn('enable --now', dm['suggested_action'])
 
-    def test_timer_enable_line_present_service_not(self):
+    def test_timer_activated_service_not_enabled_only_timer(self):
+        # svc.service has no [Install] (_make_repo_systemd writes a bare file),
+        # so it is started by its sibling timer — only svc.timer is enable --now'd.
         with tempfile.TemporaryDirectory() as td:
-            r = _make_repo_systemd(Path(td), [
-                'svc.service', 'svc.timer',
-            ])
+            r = _make_repo_systemd(Path(td), ['svc.service', 'svc.timer'])
             i = _make_installed(Path(td), [])
             ran: list[list[str]] = []
 
@@ -1072,6 +1076,7 @@ class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):
         self.assertEqual(len(enable_cmds), 1)
         self.assertIn('svc.timer', enable_cmds[0])
         self.assertNotIn('svc.service', enable_cmds[0])
+
 
     def test_dry_run_unchanged_no_remediation_shell_out(self):
         # With allowlist active, dry-run must still emit a single activation
@@ -1620,6 +1625,87 @@ class HealedSubjectTranslationTest(_IsolatedAgentsRoot):
         self.assertIsNotNone(entry)
         self.assertEqual(entry['severity'], 'URGENT')
         self.assertEqual(entry['tier'], 'NOW')
+
+
+class RemediateMissingInstallClassAwareTest(_IsolatedAgentsRoot):
+    """audit #2: a missing STANDALONE daemon (long-running .service WITH
+    [Install], no sibling timer) must be enable --now'd + verified, not just cp'd
+    — otherwise it is installed-but-dead yet reported 'install-healed' and
+    de-duped from re-alerting. A timer-activated (no-[Install]) service still
+    skips enable (its sibling timer starts it)."""
+
+    def _recorder(self, returncode=0, stderr=''):
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            return mock.Mock(returncode=returncode, stdout='', stderr=stderr)
+
+        return calls, fake_run
+
+    def test_standalone_daemon_is_enabled_now_and_verified(self):
+        # A long-running service WITH [Install] (no sibling timer) must be started.
+        calls, fake_run = self._recorder(returncode=0)
+        with mock.patch.object(h, '_cp_and_reload', return_value=(0, '')), \
+             mock.patch.object(h, '_activates_via_enable', return_value=True), \
+             mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+             mock.patch.object(h, '_systemctl_show', return_value={'ActiveState': 'active'}):
+            rc, err = h._remediate_missing_install('ourliberty-inbox-watcher.service')
+        self.assertEqual((rc, err), (0, ''))
+        # The fix: a standalone daemon IS enable --now'd (it was not before).
+        self.assertTrue(any('enable' in c and '--now' in c for c in calls), calls)
+
+    def test_standalone_daemon_dead_after_enable_is_honest_failure(self):
+        _, fake_run = self._recorder(returncode=0)
+        with mock.patch.object(h, '_cp_and_reload', return_value=(0, '')), \
+             mock.patch.object(h, '_activates_via_enable', return_value=True), \
+             mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+             mock.patch.object(h, '_systemctl_show', return_value={'ActiveState': 'failed'}):
+            rc, err = h._remediate_missing_install('x.service')
+        self.assertNotEqual(rc, 0)  # not a false 'install-healed'
+        self.assertIn('ActiveState', err)
+
+    def test_timer_activated_service_is_not_enabled(self):
+        # A long-running service with NO [Install] is started by its sibling
+        # timer — enable would fail; cp+daemon-reload is the right remediation.
+        calls, fake_run = self._recorder(returncode=0)
+        with mock.patch.object(h, '_cp_and_reload', return_value=(0, '')), \
+             mock.patch.object(h, '_activates_via_enable', return_value=False), \
+             mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+            rc, err = h._remediate_missing_install('ourliberty-cycle.service')
+        self.assertEqual((rc, err), (0, ''))
+        self.assertFalse(any('enable' in c for c in calls), calls)
+
+    def test_timer_still_requires_next_elapse(self):
+        _, fake_run = self._recorder(returncode=0)
+        with mock.patch.object(h, '_cp_and_reload', return_value=(0, '')), \
+             mock.patch.object(h, '_activates_via_enable', return_value=True), \
+             mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+             mock.patch.object(h, '_systemctl_show', return_value={'ActiveState': 'active'}):
+            rc, err = h._remediate_missing_install('x.timer')
+        self.assertNotEqual(rc, 0)  # active but no scheduled fire -> verify fails
+        self.assertIn('NextElapse', err)
+
+    def test_unit_has_install_section_reads_repo_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            (repo / 'daemon.service').write_text(
+                '[Service]\nType=simple\n[Install]\nWantedBy=multi-user.target\n')
+            (repo / 'cyclic.service').write_text('[Service]\nType=simple\n')  # no [Install]
+            self.assertTrue(h._unit_has_install_section('daemon.service', repo_dir=repo))
+            self.assertFalse(h._unit_has_install_section('cyclic.service', repo_dir=repo))
+            self.assertFalse(h._unit_has_install_section('missing.service', repo_dir=repo))
+
+    def test_activates_via_enable_logic(self):
+        self.assertTrue(h._activates_via_enable('anything.timer'))
+        with mock.patch.object(h, '_classify_unit', return_value='oneshot'):
+            self.assertFalse(h._activates_via_enable('x.service'))
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'), \
+             mock.patch.object(h, '_unit_has_install_section', return_value=True):
+            self.assertTrue(h._activates_via_enable('x.service'))  # standalone daemon
+        with mock.patch.object(h, '_classify_unit', return_value='long-running'), \
+             mock.patch.object(h, '_unit_has_install_section', return_value=False):
+            self.assertFalse(h._activates_via_enable('x.service'))  # timer-activated
 
 
 if __name__ == '__main__':
