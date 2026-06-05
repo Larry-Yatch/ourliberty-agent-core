@@ -278,6 +278,47 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
             [{'headRefName': 'forge/build-done-today-fix-20260604T045743Z'}],
         ))
 
+    def test_preflight_family_no_match_on_dash_prefixed_sibling_family(self) -> None:
+        """Prefix-extension over-match guard: a preflight for family
+        `add-user-auth` must NOT be silenced by the shipped build of the
+        DISTINCT family `add-user-auth-v2`. The old `startswith(family + '-')`
+        accepted the `-v2-<ts>` suffix; the timestamp anchor rejects it because
+        the segment after `add-user-auth-` is `v2`, not a build timestamp."""
+        self.assertIsNone(self.hps._preflight_family_shipped(
+            'add-user-auth-preflight-20260603T231401Z-clarify1',
+            [{'headRefName': 'forge/build-add-user-auth-v2-20260604T045743Z',
+              'number': 1}],
+        ))
+
+    def test_preflight_family_matches_exact_family_with_timestamp(self) -> None:
+        """The legitimate case still matches: the build branch for the SAME
+        family is `forge/build-<family>-<ts>`."""
+        pr = {'headRefName': 'forge/build-add-user-auth-20260604T045743Z',
+              'number': 2}
+        self.assertEqual(self.hps._preflight_family_shipped(
+            'add-user-auth-preflight-20260603T231401Z-clarify1', [pr],
+        ), pr)
+
+    def test_preflight_family_matches_short_hhmm_timestamp(self) -> None:
+        """Production build branches also use the shorter `YYYYMMDDTHHMM` stamp
+        (no seconds, no Z), e.g. `forge/build-...-20260604T1528`. That must
+        still register as the shipped build."""
+        pr = {'headRefName': 'forge/build-agent-queue-generalize-20260604T1528',
+              'number': 4}
+        self.assertEqual(self.hps._preflight_family_shipped(
+            'agent-queue-generalize-preflight-20260603T231401Z', [pr],
+        ), pr)
+
+    def test_preflight_family_requires_timestamp_after_family(self) -> None:
+        """A build branch whose `<family>-` suffix is NOT a timestamp (e.g. an
+        unrelated descriptive slug that happens to share the dash-prefix) must
+        not match."""
+        self.assertIsNone(self.hps._preflight_family_shipped(
+            'forge-queue-api-preflight-20260603T231401Z',
+            [{'headRefName': 'forge/build-forge-queue-api-extension-work',
+              'number': 3}],
+        ))
+
     def test_branch_truncation_min_length_floor(self) -> None:
         """A 5-char shared prefix must NOT match — only branch suffixes
         >= _BRANCH_TRUNCATION_MIN_LEN (30) chars long are trusted as

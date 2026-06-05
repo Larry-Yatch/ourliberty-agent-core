@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -277,36 +278,51 @@ def read_notifier_log() -> str:
 
 # -------------------- review-pass evidence (pure) --------------------
 
+# Match ONLY the standalone `pr=<url>` field — i.e. `pr=` at the start of a
+# token (preceded by start-of-line or whitespace), with an optional opening
+# quote from `{pr_url!r}` repr. The whitespace anchor is load-bearing: the
+# marker/envelope pr-url-MISMATCH refusal line (nervous-system-audit #15)
+# carries `marker_pr='<wrong-url>' envelope_pr='<real-url>'`, and a naive
+# `find('pr=')` matched the `pr=` *inside* `marker_pr=`, recording a
+# REVIEW-REFUSED wrong-PR url as "passed". That both (a) mislabels a PR the
+# gate explicitly refused to merge and (b) could suppress a future
+# unreviewed-merge alert for that url. Requiring a boundary before `pr=`
+# excludes `marker_pr=`/`envelope_pr=` (preceded by `_`) entirely, so a
+# refusal line contributes nothing — the fail-loud direction.
+_PR_FIELD_RE = re.compile(r'(?:^|\s)pr=([\'"]?)(\S+)')
+
+
 def review_passed_pr_urls(notifier_log_text: str) -> set[str]:
     """Extract the set of PR URLs that have Mirror REVIEW_PASS evidence.
 
-    The outbox-notifier only logs an `AUTO_MERGE...` line carrying `pr=<url>`
-    after it has classified a Mirror REVIEW_PASS marker for that PR (auto-merge
-    is gated on the pass). So every PR URL that appears on an AUTO_MERGE line —
-    regardless of the merge OUTCOME (merged / already_merged / failed / held /
-    deferred / skipped) — had a pass classified. The merge mechanics may have
-    succeeded, failed, or been deferred to the healer; what matters here is
-    only that a pass happened.
+    The outbox-notifier only logs an `AUTO_MERGE...` line carrying a standalone
+    `pr=<url>` field after it has classified a Mirror REVIEW_PASS marker for that
+    PR (auto-merge is gated on the pass). So every PR URL that appears as the
+    `pr=` field of an AUTO_MERGE line — regardless of the merge OUTCOME (merged /
+    already_merged / failed / held / deferred / skipped) — had a pass classified.
+    The merge mechanics may have succeeded, failed, or been deferred to the
+    healer; what matters here is only that a pass happened.
+
+    Note: the `marker_pr=`/`envelope_pr=` fields on a pr-url-mismatch *refusal*
+    line are deliberately NOT treated as evidence — that line means the merge was
+    refused, and neither url passed review through that path. `_PR_FIELD_RE`'s
+    boundary anchor enforces this.
 
     Pure function over the log text so tests inject fixtures."""
     passed: set[str] = set()
     for line in notifier_log_text.splitlines():
         if 'AUTO_MERGE' not in line:
             continue
-        idx = line.find('pr=')
-        if idx < 0:
+        m = _PR_FIELD_RE.search(line)
+        if not m:
             continue
-        rest = line[idx + 3:].lstrip()
-        # The url may be repr'd (quoted) or bare: pr='https://...' or pr=https://...
-        if rest and rest[0] in '\'"':
-            rest = rest[1:]
-        # Take the token up to the next whitespace or closing quote.
-        token = []
-        for ch in rest:
-            if ch.isspace() or ch in '\'"':
-                break
-            token.append(ch)
-        url = ''.join(token)
+        quote, token = m.group(1), m.group(2)
+        # Trim a trailing closing quote / punctuation from the repr form.
+        if quote:
+            end = token.find(quote)
+            if end >= 0:
+                token = token[:end]
+        url = token.rstrip('\'",')
         if url.startswith('http'):
             passed.add(url.rstrip('/'))
     return passed

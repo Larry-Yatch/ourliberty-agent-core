@@ -37,12 +37,40 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-AGENTS_ROOT = Path("/home/larry/agents")
+# Path isolation: honor OURLIBERTY_AGENTS_ROOT (the repo-wide convention — see
+# agent_runner / dashboard_api / the other healers) so tests can point this at a
+# tmp tree and droplet overrides work. Was a hardcoded "/home/larry/agents",
+# which silently scanned the real inbox during tests and ignored the override
+# every sibling healer respects.
+AGENTS_ROOT = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT", "/home/larry/agents"))
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_recovery_already_merged.log"
 INBOX_AGENTS = ("beacon", "forge", "mirror", "pulse")
 RECOVERY_PATTERNS = (re.compile(r"00-RECOVER-"), re.compile(r"recover-"), re.compile(r"forge-stage3-results-"))
 PR_TAG_RE = re.compile(r"PR-[0-9]+[a-z]?")
+
+# Tracked repos with active dispatch chains — mirrors heal_pipeline_stall.REPOS
+# / heal_pr_auto_merge.REPOS (the codebase's established multi-repo convention).
+# A recovery task's target PR may live in any of them, so scan all. Was a single
+# hardcoded repo, which meant a PR merged in a sibling repo looked un-merged —
+# the recovery task then sat forever and watchdog re-flagged it, the exact
+# stuck-task failure this healer exists to clear.
+REPOS = [
+    "Larry-Yatch/ourliberty-agent-core",
+    "Larry-Yatch/ourliberty-dashboard",
+]
+_DEFAULT_VERIFY_REPO = REPOS[0]
+
+
+def verify_repos() -> list[str]:
+    """Repos to search for an already-merged target PR, in priority order.
+
+    Honors a single-repo `OURLIBERTY_VERIFY_REPO` override (back-compat and test
+    injection); otherwise scans all tracked `REPOS`."""
+    single = os.environ.get("OURLIBERTY_VERIFY_REPO")
+    if single:
+        return [single]
+    return list(REPOS)
 
 
 def log(level: str, msg: str) -> None:
@@ -54,26 +82,30 @@ def log(level: str, msg: str) -> None:
 
 
 def query_merged_pr(sub_task_tag: str) -> dict | None:
-    """Return dict with PR number/title/mergedAt if a merged PR has the tag in its title."""
-    repo = os.environ.get('OURLIBERTY_VERIFY_REPO', 'Larry-Yatch/ourliberty-agent-core')
-    try:
-        r = subprocess.run(
-            ["gh", "pr", "list",
-             "--repo", repo,
-             "--state", "merged",
-             "--search", f"[{sub_task_tag}] in:title",
-             "--json", "number,title,mergedAt",
-             "--limit", "5"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if r.returncode != 0:
-            return None
-        prs = json.loads(r.stdout)
-        for pr in prs:
-            if f"[{sub_task_tag}]" in pr.get("title", ""):
-                return pr
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
-        pass
+    """Return dict with PR number/title/mergedAt/repo if a merged PR in any
+    configured repo has the tag in its title. Searches `verify_repos()` in
+    order and returns the first hit; a query error on one repo doesn't abort
+    the others."""
+    for repo in verify_repos():
+        try:
+            r = subprocess.run(
+                ["gh", "pr", "list",
+                 "--repo", repo,
+                 "--state", "merged",
+                 "--search", f"[{sub_task_tag}] in:title",
+                 "--json", "number,title,mergedAt",
+                 "--limit", "5"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if r.returncode != 0:
+                continue
+            prs = json.loads(r.stdout)
+            for pr in prs:
+                if f"[{sub_task_tag}]" in pr.get("title", ""):
+                    pr["repo"] = repo
+                    return pr
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+            continue
     return None
 
 
@@ -121,8 +153,9 @@ def main() -> int:
                 continue
             pr = query_merged_pr(sub_task)
             if pr:
-                archive_file(task_file, f"target_pr_already_merged pr=#{pr['number']} mergedAt={pr['mergedAt']}")
-                log("HEALED", f"{agent}/{task_file.name} action=archive_already_merged pr=#{pr['number']}")
+                repo = pr.get("repo", _DEFAULT_VERIFY_REPO)
+                archive_file(task_file, f"target_pr_already_merged repo={repo} pr=#{pr['number']} mergedAt={pr['mergedAt']}")
+                log("HEALED", f"{agent}/{task_file.name} action=archive_already_merged repo={repo} pr=#{pr['number']}")
                 healed += 1
     log("HEARTBEAT", f"scanned={scanned} healed={healed}")
     return 0

@@ -108,6 +108,35 @@ class ReviewPassEvidenceTest(unittest.TestCase):
     def test_empty_log(self):
         self.assertEqual(h.review_passed_pr_urls(''), set())
 
+    def test_marker_envelope_mismatch_line_is_not_evidence(self):
+        # nervous-system-audit #15 refusal line: the merge was REFUSED because
+        # the marker named a different PR than Mirror reviewed. Neither url
+        # passed review through this path — a naive find('pr=') used to match
+        # the `pr=` inside `marker_pr=` and wrongly record the wrong-PR url as
+        # passed. The boundary-anchored parser must extract NOTHING here.
+        wrong = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/999'
+        real = self.URL
+        log = (
+            f'[ts] [notifier] [WARN] AUTO_MERGE task=t-001 outcome=failed '
+            f'reason=marker-envelope-pr-url-mismatch '
+            f"marker_pr='{wrong}' envelope_pr='{real}' — refusing to merge"
+        )
+        passed = h.review_passed_pr_urls(log)
+        self.assertNotIn(wrong, passed)
+        self.assertNotIn(real, passed)
+        self.assertEqual(passed, set())
+
+    def test_marker_pr_substring_not_mistaken_for_pr_field(self):
+        # A line carrying only `marker_pr=` (no standalone `pr=` field) is not
+        # evidence — the `_pr` suffix must not be read as the `pr=` field.
+        log = f"[ts] AUTO_MERGE task=t marker_pr='{self.URL}' note=diagnostic"
+        self.assertNotIn(self.URL, h.review_passed_pr_urls(log))
+
+    def test_queue_released_pr_field_is_evidence(self):
+        # A standalone `pr=` field on any AUTO_MERGE* line is still evidence.
+        log = f'[ts] AUTO_MERGE_QUEUE_RELEASED pr={self.URL} blocker=#7'
+        self.assertIn(self.URL, h.review_passed_pr_urls(log))
+
 
 # -------------------- gh json parser --------------------
 
