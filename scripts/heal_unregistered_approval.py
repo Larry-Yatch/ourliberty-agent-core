@@ -940,7 +940,20 @@ def main() -> int:
         retired = []
     if retired:
         ledger_changed = True
-        approval.save_state(state)  # persist the pending -> history moves
+        # PR-E2 #48: the retire decisions above used slow gh probes against the
+        # `state` snapshot WITHOUT the lock. Persist them under the shared lock by
+        # re-loading FRESH state inside it and re-applying only the resolutions —
+        # so we never clobber a concurrent add/resolve from the bot or notifier.
+        # resolve() is idempotent (an entry already moved to history → no-op).
+        with approval.state_lock():
+            fresh = approval.load_state()
+            for tid, reason in retired:
+                approval.resolve(
+                    tid, 'expired',
+                    note=f'auto-retired by {HEALER_SOURCE}: {reason}',
+                    state=fresh,
+                )
+            approval.save_state(fresh)
         _clear_retired_read_at([tid for tid, _ in retired])
         log(f'retired {len(retired)} resolved card(s) off the tab')
 

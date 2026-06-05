@@ -52,6 +52,7 @@ The bot is the only caller. The bot's main loop:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import sys
@@ -63,7 +64,9 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import atomic_io        # noqa: E402  # shared durable atomic write (PR-E #366)
 import chain_event_shipper as _ces  # noqa: E402  # imported read-only for compute_event_id
+import file_lock         # noqa: E402  # shared advisory flock (PR-E2 #48)
 import safe_write_inbox  # noqa: E402
 import trust_policy      # noqa: E402
 
@@ -449,15 +452,40 @@ def load_state() -> dict[str, Any]:
 
 
 def save_state(state: dict[str, Any]) -> None:
-    PENDING_APPROVALS_PATH.parent.mkdir(parents=True, exist_ok=True)
     # Cap history.
     history = state.get('history', [])
     if len(history) > HISTORY_CAP:
         state['history'] = history[-HISTORY_CAP:]
-    tmp = PENDING_APPROVALS_PATH.with_suffix('.tmp')
-    with open(tmp, 'w') as f:
-        json.dump(state, f, indent=2)
-    tmp.rename(PENDING_APPROVALS_PATH)
+    # Durable atomic write via the shared helper: a UNIQUE temp file (no two
+    # writers sharing a fixed '<path>.tmp' that could truncate each other's
+    # half-written tmp, audit #62/#48) + fsync + os.replace. This guarantees only
+    # the WRITE is crash-safe and tmp-collision-free; serializing the surrounding
+    # load→mutate→save (the lost-update fix) is the job of state_lock(), which the
+    # mutators take on their state=None path and external batch callers must hold.
+    atomic_io.atomic_write_json(PENDING_APPROVALS_PATH, state, indent=2)
+
+
+def state_lock():
+    """Exclusive advisory lock for the shared pending-approvals file (PR-E2 #48).
+
+    Two daemons (beacon_telegram_bot, outbox_notifier) plus a healer
+    (heal_unregistered_approval) all read-modify-write this file. Hold this around
+    a WHOLE load_state()→mutate→save_state() envelope so concurrent writers
+    serialize instead of clobbering each other (last-writer-wins on the full JSON).
+
+    The mutators below take it automatically on their state=None path. An external
+    batch caller that loads + mutates + saves explicitly must hold it itself —
+    doing the SLOW work (gh probes, etc.) OUTSIDE the lock and re-loading fresh
+    state inside, so the lock is held only for the fast RMW."""
+    return file_lock.exclusive_lock(
+        file_lock.sidecar_lock_path(PENDING_APPROVALS_PATH))
+
+
+def _state_txn(own: bool):
+    """Guard a mutator's internal load→mutate→save. When ``own`` is True (the
+    caller did NOT pass an explicit state) take :func:`state_lock`; when False the
+    caller owns the transaction (and any lock) → no-op here."""
+    return state_lock() if own else contextlib.nullcontext()
 
 
 def add_pending(
@@ -477,31 +505,33 @@ def add_pending(
     the next task envelope so the loop budget propagates through the next
     Forge dispatch.
     """
-    s = state if state is not None else load_state()
-    entry = {
-        'id': payload['task_id'],
-        'created_at': _now_utc(),
-        'chat_id': chat_id,
-        'plan_summary': payload.get('summary', ''),
-        'target_agent': payload.get('target_agent', 'forge'),
-        'dispatch_payload': payload,
-        'status': 'pending',
-        'reminders_sent': [],
-        'queued_during_pause': queued_during_pause,
-    }
-    # D3.5 5c — system-controlled replan counter. Only attach when this is
-    # a replan (count > 0). Fresh approvals don't carry the field at all,
-    # so dispatch_approved doesn't write replan_count=0 to the envelope
-    # (which would be noise and could confuse downstream propagation).
-    if replan_count and replan_count > 0:
-        entry['_replan_count'] = replan_count
-        entry['_max_replans'] = (
-            max_replans if max_replans is not None else DEFAULT_MAX_REPLANS
-        )
-    s['pending'].append(entry)
-    if state is None:
-        save_state(s)
-    return entry
+    own = state is None
+    with _state_txn(own):
+        s = load_state() if own else state
+        entry = {
+            'id': payload['task_id'],
+            'created_at': _now_utc(),
+            'chat_id': chat_id,
+            'plan_summary': payload.get('summary', ''),
+            'target_agent': payload.get('target_agent', 'forge'),
+            'dispatch_payload': payload,
+            'status': 'pending',
+            'reminders_sent': [],
+            'queued_during_pause': queued_during_pause,
+        }
+        # D3.5 5c — system-controlled replan counter. Only attach when this is
+        # a replan (count > 0). Fresh approvals don't carry the field at all,
+        # so dispatch_approved doesn't write replan_count=0 to the envelope
+        # (which would be noise and could confuse downstream propagation).
+        if replan_count and replan_count > 0:
+            entry['_replan_count'] = replan_count
+            entry['_max_replans'] = (
+                max_replans if max_replans is not None else DEFAULT_MAX_REPLANS
+            )
+        s['pending'].append(entry)
+        if own:
+            save_state(s)
+        return entry
 
 
 def find_pending_by_id(approval_id: str, state: Optional[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
@@ -587,26 +617,28 @@ def resolve(
     Returns the moved entry (with the new status + resolution metadata)."""
     if new_status not in {'approved', 'rejected', 'modified', 'expired'}:
         raise ValueError(f'invalid status: {new_status}')
-    s = state if state is not None else load_state()
-    pending = s.get('pending', [])
-    matched = None
-    remaining = []
-    for entry in pending:
-        if entry.get('id') == approval_id and matched is None:
-            matched = entry
-        else:
-            remaining.append(entry)
-    if matched is None:
-        return None
-    matched['status'] = new_status
-    matched['resolved_at'] = _now_utc()
-    if note:
-        matched['resolution_note'] = note
-    s['pending'] = remaining
-    s.setdefault('history', []).append(matched)
-    if state is None:
-        save_state(s)
-    return matched
+    own = state is None
+    with _state_txn(own):
+        s = load_state() if own else state
+        pending = s.get('pending', [])
+        matched = None
+        remaining = []
+        for entry in pending:
+            if entry.get('id') == approval_id and matched is None:
+                matched = entry
+            else:
+                remaining.append(entry)
+        if matched is None:
+            return None
+        matched['status'] = new_status
+        matched['resolved_at'] = _now_utc()
+        if note:
+            matched['resolution_note'] = note
+        s['pending'] = remaining
+        s.setdefault('history', []).append(matched)
+        if own:
+            save_state(s)
+        return matched
 
 
 def pop_paused_backlog(state: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
@@ -615,16 +647,18 @@ def pop_paused_backlog(state: Optional[dict[str, Any]] = None) -> list[dict[str,
     Called on /resume so the bot can DM the backlog. The entries remain
     pending (still need approval); only the `queued_during_pause` flag flips.
     """
-    s = state if state is not None else load_state()
-    backlog = []
-    for entry in s.get('pending', []):
-        if entry.get('queued_during_pause'):
-            entry['queued_during_pause'] = False
-            entry['unpaused_at'] = _now_utc()
-            backlog.append(entry)
-    if state is None and backlog:
-        save_state(s)
-    return backlog
+    own = state is None
+    with _state_txn(own):
+        s = load_state() if own else state
+        backlog = []
+        for entry in s.get('pending', []):
+            if entry.get('queued_during_pause'):
+                entry['queued_during_pause'] = False
+                entry['unpaused_at'] = _now_utc()
+                backlog.append(entry)
+        if own and backlog:
+            save_state(s)
+        return backlog
 
 
 # -------------------- pause / resume --------------------
@@ -703,15 +737,17 @@ def record_reminder_sent(
     threshold_hours: int,
     state: Optional[dict[str, Any]] = None,
 ) -> None:
-    s = state if state is not None else load_state()
-    for entry in s.get('pending', []):
-        if entry.get('id') == approval_id:
-            sent = entry.setdefault('reminders_sent', [])
-            if threshold_hours not in sent:
-                sent.append(threshold_hours)
-            break
-    if state is None:
-        save_state(s)
+    own = state is None
+    with _state_txn(own):
+        s = load_state() if own else state
+        for entry in s.get('pending', []):
+            if entry.get('id') == approval_id:
+                sent = entry.setdefault('reminders_sent', [])
+                if threshold_hours not in sent:
+                    sent.append(threshold_hours)
+                break
+        if own:
+            save_state(s)
 
 
 # -------------------- DM formatters --------------------
