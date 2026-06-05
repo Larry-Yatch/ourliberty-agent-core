@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 1021 — 2026-06-05 20:41 UTC (interactive, Tier 1 — SIGNAL: 8 auto-restarted:* alerts; by-design post-PR-#370 code update)
+
+**Health:** ⚠️ **Tier 1 (tier-reset: 8 Tier-4 novel `auto-restarted:*` alerts from stale-daemon-code healer). By-design: PR #370 merged → larry_alerts.py script mtime updated → healer restarted all 8 services within 28s. Services all back active (9/9). All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1382 lines / 2026-06-05T20:38:21Z** (NEW: +8 since iter 1020 watermark 1374/20:20:16Z; all `heal-stale-daemon-code / auto-restarted:*` at 20:37:53Z–20:38:21Z). Pipeline-stall heartbeat: 2026-06-05T20:39:43Z (✅ ~2 min at 20:41Z scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T20:37:49Z (✅ ~3 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T19:50:40Z (~51 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=48d7876 "Pulse cycle 20260605T203500Z". Tier state at start: tier=1, consecutive_clean=1, last_signal_at=2026-06-05T20:30:36Z (iter 1020). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 8 Tier-4 novel alerts). `cycle_tier_state.py record --checks-clean false` → last_signal_at=2026-06-05T20:43:21Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 8 new alerts.** Watermark advanced 1374/20:20:16Z → 1382/20:38:21Z. All 8 entries: `heal-stale-daemon-code / auto-restarted:*` at 20:37:53Z–20:38:21Z, route=digest:
+  - idx=1374: `auto-restarted:ourliberty-chain-event-shipper.service` (20:37:53Z)
+  - idx=1375: `auto-restarted:ourliberty-dashboard-api.service` (20:37:57Z)
+  - idx=1376: `auto-restarted:ourliberty-beacon-bot.service` (20:38:02Z)
+  - idx=1377: `auto-restarted:ourliberty-outbox-notifier.service` (20:38:06Z)
+  - idx=1378: `auto-restarted:ourliberty-forge-bot.service` (20:38:10Z)
+  - idx=1379: `auto-restarted:ourliberty-inbox-watcher.service` (20:38:14Z)
+  - idx=1380: `auto-restarted:ourliberty-mirror-bot.service` (20:38:17Z)
+  - idx=1381: `auto-restarted:ourliberty-pulse-bot.service` (20:38:21Z)
+  Trigger: PR #370 "fix(retention): flock-coordinate appends + crash-atomic offset journal (PR-E2 #16/#8)" merged → `larry_alerts.py` script mtime updated to 20:09:00Z → stale-daemon-code healer found all 8 services with active-since ~18:37Z (91+ min behind mtime) → mass restart sweep. **Tier-4 novel** (`auto-restarted:*` not yet in alert-translations.json; G-rule 3/3 dispatched iter 592, Forge brief still missing). beacon-bot already processed all as `route=digest; skipping DM` — no DM sent to Larry. Not actionable: by-design code-update restart. **Tier-reset: YES.**
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: restarted 20:37:59Z (itself part of the auto-restart sweep), processed idx=1374–1375 as `route=digest; skipping DM`. No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T20:39:43Z (~2 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T20:37:49Z (~3 min at scan; ✅ within 60-min threshold — healer fired the sweep and updated its own heartbeat). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=48d7876 "Pulse cycle 20260605T203500Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T19:50:40Z (~51 min at scan). Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active` (post-restart sweep). ✅
+
+- **(Check E) PRs: ✅ No open PRs.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 31 consecutive (PRs #343–#374/#372).** No new occurrence this iter (no merges). Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`.
+
+- **G-rule `auto-restarted:*` untranslated**: 8 new occurrences (mass restart sweep at 20:37Z). G-rule 3/3 already dispatched (iter 592); Forge brief still MISSING. Re-dispatch pending Larry go-ahead. These by-design restarts will continue firing Tier-4 novel on every code-update PR merge until the fix lands.
+
+- **G-rule `gh pr merge --auto disabled`: 1/3.** No new occurrence this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat (script-authoritative). No new always-fix actions this iter → no ledger append.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 8 new alerts (all `auto-restarted:*`; beacon-bot route=digest; skipping DM — by-design, not actionable). New watermark: 1382/20:38:21Z.
+3. Confirmed 9/9 services active (post-restart sweep), all inboxes empty, both heartbeats nominal, sync nominal, no open PRs.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=20:43:21Z.
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations (8 auto-restart alerts are by-design; no DM to Larry per actionable-only policy). Standing items carry forward:
+- `[red]` PRs #343–#374/#372 audit-series (31 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead. (This iter: 8 new occurrences; mass sweep post-PR #370.)
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** PR #370 merge triggered stale-daemon-code healer to restart all 8 services (expected behavior — larry_alerts.py script mtime updated, healer enforces "new code runs"). Mass restart pattern (all services within 28s) is normal for a single-script-mtime update. No new G-rule; `auto-restarted:*` untranslated G-rule 3/3 already dispatched. Tier reset to consecutive_clean=0; next 3 clean iters will de-escalate to Tier 2.
+
+---
+
 ## Iteration 1020 — 2026-06-05 20:33 UTC (interactive, Tier 1 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 1 (consecutive_clean=1). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
