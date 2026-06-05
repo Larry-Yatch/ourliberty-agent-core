@@ -302,6 +302,41 @@ def reap_orphans_on_startup() -> int:
     return reaped
 
 
+def _record_outbox_cost(agent: str, task_id: str, outbox: dict) -> None:
+    """Append the paid run's cost row to costs.jsonl (best-effort via
+    append_cost). Called on BOTH the success path and the outbox-write-failure
+    path (#13) so a paid run is never invisible to budget/quota accounting just
+    because its outbox couldn't be persisted. No-op when no cost was recorded."""
+    if outbox.get("cost_usd") is None:
+        return
+    usage = outbox.get("usage") or {}
+    # task_type either rides through from the dispatch envelope (already in
+    # outbox) or is inferred from task_id prefix so cost rows are not uniformly
+    # "unknown". See task_type_inference for the discriminator.
+    task_type = outbox.get("task_type") or infer_task_type(task_id)
+    append_cost({
+        "ts": outbox.get("completed_at") or now_iso(),
+        "agent": agent,
+        "task_id": task_id,
+        "task_type": task_type,
+        "model": outbox.get("model"),
+        # Step C: per-account field for rolling-5h scoping. Falls back to
+        # 'tier1' when meta did not populate `account_tier` (older outbox rows
+        # from before this PR), preserving the documented V1 default in
+        # config/agent-models.json:tier1_quota._note. Readers MUST tolerate an
+        # absent field too (= unknown/tier1).
+        "account": outbox.get("account_tier") or "tier1",
+        "cost_usd": outbox.get("cost_usd"),
+        "input_tokens": usage.get("input_tokens"),
+        "output_tokens": usage.get("output_tokens"),
+        "cache_read": usage.get("cache_read"),
+        "cache_creation": usage.get("cache_creation"),
+        "duration_sec": outbox.get("duration_sec"),
+        "attempts": outbox.get("attempts"),
+        "source": "inbox-watcher",
+    })
+
+
 def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
                   success: bool, output_text: str, session_id: str | None,
                   meta: dict, error: str | None = None) -> dict:
@@ -609,37 +644,30 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         outbox_path.parent.mkdir(parents=True, exist_ok=True)
         outbox_path.write_text(json.dumps(outbox, indent=2))
     except OSError as e:
-        log(f"[{agent}] outbox write failed: {e}; bumping requeue and leaving task in inbox")
-        bump_requeue(task_file, task)
+        # nervous-system-audit #13 (2026-06-05): the run_claude call above
+        # already PAID for the LLM (and may have produced side effects — a PR,
+        # a merge). bump_requeue leaves the task in the inbox, so the next poll
+        # re-runs it and re-pays + duplicates those side effects. That violates
+        # this module's own "NEVER re-dispatch paid work" policy (see
+        # reap_orphans_on_startup). Archive the task instead so it cannot
+        # re-run; the lost outbox is recovered by the reconcile/heal layer
+        # (missing-outbox sweeps), which is strictly safer than a double-bill.
+        log(f"[{agent}] outbox write failed for {task_file.name}: {e}; "
+            f"archiving task WITHOUT requeue to avoid a paid re-run "
+            f"(result lost — reconcile/heal recovers the chain)")
+        # The run already PAID — record the spend before archiving so the
+        # budget/quota ledger stays accurate even though the outbox is lost.
+        # (The old re-run path eventually costed it on a successful retry; this
+        # path never retries, so record it here.)
+        _record_outbox_cost(agent, task_id, outbox)
+        try:
+            move_to(task_file, INBOXES_ROOT / agent / ".archive")
+        except OSError as me:
+            log(f"[{agent}] archive after outbox-write failure also failed "
+                f"for {task_file}: {me}")
         return
 
-    if outbox.get("cost_usd") is not None:
-        usage = outbox.get("usage") or {}
-        # task_type either rides through from the dispatch envelope (already
-        # in outbox) or is inferred from task_id prefix so cost rows are not
-        # uniformly "unknown". See task_type_inference for the discriminator.
-        task_type = outbox.get("task_type") or infer_task_type(task_id)
-        append_cost({
-            "ts": outbox["completed_at"],
-            "agent": agent,
-            "task_id": task_id,
-            "task_type": task_type,
-            "model": outbox.get("model"),
-            # Step C: per-account field for rolling-5h scoping. Falls back to
-            # 'tier1' when meta did not populate `account_tier` (older outbox
-            # rows from before this PR), preserving the documented V1 default
-            # in config/agent-models.json:tier1_quota._note. Readers MUST
-            # tolerate an absent field too (= unknown/tier1).
-            "account": outbox.get("account_tier") or "tier1",
-            "cost_usd": outbox.get("cost_usd"),
-            "input_tokens": usage.get("input_tokens"),
-            "output_tokens": usage.get("output_tokens"),
-            "cache_read": usage.get("cache_read"),
-            "cache_creation": usage.get("cache_creation"),
-            "duration_sec": outbox.get("duration_sec"),
-            "attempts": outbox.get("attempts"),
-            "source": "inbox-watcher",
-        })
+    _record_outbox_cost(agent, task_id, outbox)
 
     try:
         move_to(task_file, INBOXES_ROOT / agent / ".archive")
