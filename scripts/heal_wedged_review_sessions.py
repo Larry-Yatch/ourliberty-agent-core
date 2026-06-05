@@ -100,6 +100,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -325,28 +326,66 @@ def session_jsonl_for_cwd(
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
-def terminal_markers_for_tier(tier: str) -> tuple[str, ...]:
-    """Canonical terminal-marker substrings whose presence in a session JSONL
-    proves the agent's work is in hand for that tier.
+# Forge build/revision terminal preambles — MIRROR the outbox-notifier's
+# canonical grammar (outbox_notifier._PR_URL_RE / _REVISION_APPLIED_RE) so the
+# reaper treats as "work in hand" exactly what the notifier treats as a terminal
+# signal: a FIRST-LINE 'PR [#N ]opened:/updated: <pull-url>' or
+# 'Revision N applied:'. Two precision details are load-bearing:
+#   - the PR form REQUIRES the github pull URL, so ordinary prose
+#     ('I considered PR opened: ... last week') without a URL does NOT match
+#     (the old bare 'PR opened:' substring did), AND a real 'PR #303 opened:
+#     <url>' (the actual shape Forge writes) IS matched (the old 'PR opened:'
+#     literal MISSED the '#303' token — a false negative);
+#   - the revision form requires the 'applied:' colon, so 'the Revision phase'
+#     or 'Revision 2 applied cleanly' prose does NOT match.
+# Compiled once at module load; matched per stripped assistant line via .match
+# (line-anchored). An optional leading clause ('Done. ', 'Result: ') is allowed
+# exactly as the notifier allows it.
+_FORGE_PREAMBLE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r'(?:[^\n]*?[.:][ \t]+)?'          # optional leading clause ('Done. ')
+        r'PR[ \t]+(?:#\d+[ \t]+)?'         # 'PR ' + optional '#303 '
+        r'(?:opened|updated):[ \t]*'
+        r'https://github\.com/[^\s]+/pull/\d+'
+    ),
+    re.compile(r'Revision\s+\d+\s+applied:', re.IGNORECASE),
+)
+
+
+def terminal_markers_for_tier(
+    tier: str,
+) -> tuple[tuple[str, ...], tuple[re.Pattern[str], ...]]:
+    """Return ``(substr_markers, line_anchored_patterns)`` whose presence in a
+    session JSONL proves the agent's work is in hand for that tier.
+
+    ``substr_markers`` — distinctive block delimiters ('=== REVIEW_PASS ===',
+    etc.) safe to match anywhere in an assistant message.
+
+    ``line_anchored_patterns`` — compiled regexes that must match at the START
+    of a stripped assistant line. Forge's build/revision terminal signals are
+    short English phrases ('PR opened:', 'Revision N applied:'); as bare
+    substrings they false-match ordinary prose — e.g. a live agent writing 'the
+    Revision phase' or a recap mentioning 'PR opened:'. A false match here is
+    not cosmetic: it sets marker_present=True, and once the JSONL is idle past
+    marker_grace (e.g. during the foreground regression gate) classify() returns
+    REAP_CASE1, which SIGKILLs the process and force-removes its worktree — a
+    destructive false positive on LIVE work. Anchoring to line-start plus the
+    precise 'Revision <N> applied:' form (not bare 'Revision ') closes that.
 
     Reuses the handler modules' MARKER_KEYWORDS rather than re-listing the
-    grammar here, so a marker rename in either handler propagates
-    automatically. Forge additionally has the build/revision exit preambles.
+    grammar, so a marker rename propagates automatically.
     """
     if tier == 'mirror':
-        return tuple(
+        substrs = tuple(
             f'=== {kw} ===' for kw in mirror_review_handler.MARKER_KEYWORDS.values()
         )
+        return substrs, ()
     if tier == 'forge':
-        preflight = tuple(
+        substrs = tuple(
             f'=== {kw} ===' for kw in forge_preflight_handler.MARKER_KEYWORDS.values()
         )
-        # Build/revision phases emit no marker block; their terminal signal is
-        # a first-line preamble (agents/forge/CLAUDE.md "Post-marker exit
-        # discipline"). These are the literal prefixes Forge writes.
-        preambles = ('PR opened:', 'PR updated:', 'Revision ')
-        return preflight + preambles
-    return ()
+        return substrs, _FORGE_PREAMBLE_PATTERNS
+    return (), ()
 
 
 def _assistant_text_from_jsonl_line(obj: Any) -> str:
@@ -393,8 +432,8 @@ def jsonl_has_terminal_marker(jsonl: Path, tier: str) -> bool:
 
     Parses line-by-line; tolerates non-JSON / decode errors. On read failure
     returns False (conservative: no proof of done → not a Case-1 reap)."""
-    markers = terminal_markers_for_tier(tier)
-    if not markers:
+    substrs, line_patterns = terminal_markers_for_tier(tier)
+    if not substrs and not line_patterns:
         return False
     try:
         with jsonl.open('r', errors='replace') as fh:
@@ -407,8 +446,19 @@ def jsonl_has_terminal_marker(jsonl: Path, tier: str) -> bool:
                 except (ValueError, TypeError):
                     continue
                 text = _assistant_text_from_jsonl_line(obj)
-                if text and any(m in text for m in markers):
+                if not text:
+                    continue
+                # Distinctive block delimiters: match anywhere.
+                if substrs and any(m in text for m in substrs):
                     return True
+                # Forge exit preambles: only a LINE that STARTS with the
+                # preamble counts (a bare-substring match would reap a live
+                # agent merely discussing 'the Revision phase').
+                if line_patterns:
+                    for textline in text.splitlines():
+                        stripped = textline.strip()
+                        if stripped and any(p.match(stripped) for p in line_patterns):
+                            return True
     except OSError:
         return False
     return False
@@ -608,10 +658,31 @@ def _repo_on_main(repo: Path) -> bool:
     return out.returncode == 0 and out.stdout.strip() == 'main'
 
 
+def _worktree_has_uncommitted_changes(worktree: str) -> Optional[bool]:
+    """True iff the worktree has uncommitted changes (`git status --porcelain`
+    non-empty). None if the status can't be read (don't guess — the caller
+    treats unknown as 'do not force-destroy'). Committed-but-unpushed work is
+    NOT flagged: `git worktree remove` leaves the branch ref (and its commits)
+    intact in the repo; only uncommitted working-tree edits are lost to
+    --force, so that is what we protect."""
+    try:
+        out = subprocess.run(
+            ['git', '-c', f'safe.directory={worktree}', '-C', worktree,
+             'status', '--porcelain'],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT_SEC,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if out.returncode != 0:
+        return None
+    return bool(out.stdout.strip())
+
+
 def remove_worktree(worktree: str) -> bool:
     """`git worktree remove --force` + prune, guarded on the canonical repo
-    being on `main`. Never removes the canonical repo itself or a worktree
-    whose own branch is `main`. Returns True on success / nothing-to-do."""
+    being on `main` AND the worktree having no uncommitted changes. Never
+    removes the canonical repo itself, and never `--force`-discards uncommitted
+    work. Returns True on success / nothing-to-do; False (skip) otherwise."""
     canonical = _canonical_repo_for_worktree(worktree)
     if canonical is None:
         log(f'worktree-remove skipped: cannot resolve canonical repo for {worktree}',
@@ -623,6 +694,17 @@ def remove_worktree(worktree: str) -> bool:
     if not _repo_on_main(canonical):
         log(f'worktree-remove skipped: canonical repo {canonical} not on main',
             'WARN')
+        return False
+    # Data-loss guard: `git worktree remove --force` discards uncommitted
+    # changes. A Case-2 (no-marker) reap means the work was never proven pushed,
+    # so refuse to force-destroy a dirty worktree — preserve it for inspection
+    # and let the process kill alone free the fleet slot. (The previous guard
+    # only checked the canonical repo's branch, which is always 'main' and tells
+    # us nothing about THIS worktree's state.)
+    dirty = _worktree_has_uncommitted_changes(worktree)
+    if dirty is not False:  # True (dirty) or None (unknown) → do not force
+        log(f'worktree-remove skipped: {worktree} has uncommitted changes '
+            f'(dirty={dirty!r}); preserving to avoid --force data loss', 'WARN')
         return False
     try:
         subprocess.run(
@@ -819,8 +901,26 @@ def reap(cand: Candidate, *, case: str, reason: str,
          reaper: Callable[[int], bool] = kill_process_tree,
          worktree_remover: Callable[[str], bool] = remove_worktree,
          closure_notify: Callable[[str, str], None] = _closure_notify,
-         event_emitter: Callable[..., None] = _emit_healed_event) -> None:
-    """Kill the session tree, remove its worktree (guarded), and notify."""
+         event_emitter: Callable[..., None] = _emit_healed_event,
+         verify_pid_fn: Callable[[int], Optional[str]] = proc_cwd) -> bool:
+    """Kill the session tree, remove its worktree (guarded), and notify.
+
+    Returns True iff the kill was actually issued. Before signalling, re-verify
+    the PID still belongs to the same review worktree via its /proc/<pid>/cwd —
+    the SAME identity signal the scan used. Between scan and now the wedged
+    process can exit and the OS recycle its PID; this recheck shrinks (does not
+    fully close — a microsecond TOCTOU vs the actual signal remains) the window
+    in which we'd SIGKILL an unrelated process that inherited the number. A cwd
+    mismatch (incl. the process having exited → cwd None) aborts the WHOLE reap,
+    including worktree removal: we don't tear down a worktree whose process we
+    couldn't confirm we own. A genuinely-orphaned worktree from a clean exit is
+    then swept by the hourly cleanup_stale_worktrees GC instead of here."""
+    current_cwd = verify_pid_fn(cand.pid)
+    if current_cwd != cand.cwd:
+        log(f'reap ABORTED pid={cand.pid} tier={cand.tier} case={case}: pid cwd '
+            f'{current_cwd!r} != expected {cand.cwd!r} (process exited or PID '
+            f'reused since scan); not killing', 'WARN')
+        return False
     killed = reaper(cand.pid)
     removed = worktree_remover(cand.cwd)
     log(f'HEALED pid={cand.pid} tier={cand.tier} case={case} '
@@ -831,6 +931,7 @@ def reap(cand: Candidate, *, case: str, reason: str,
          f'{reason}. Worktree removed: {removed}.'),
         f'wedged-review-reaped:{Path(cand.cwd).name}',
     )
+    return True
 
 
 def run_cycle(
@@ -844,6 +945,7 @@ def run_cycle(
     closure_notify: Callable[[str, str], None] = _closure_notify,
     escalate_notify: Callable[[str, str, str], None] = _escalate_notify,
     event_emitter: Callable[..., None] = _emit_healed_event,
+    verify_pid_fn: Callable[[int], Optional[str]] = proc_cwd,
     persist: bool = True,
 ) -> dict[str, Any]:
     """One sweep. All IO seams are injectable so the whole flow is unit-
@@ -894,12 +996,13 @@ def run_cycle(
         verdict = classify(
             marker_present=cand.marker_present, idle_secs=cand.idle_secs, cfg=cfg)
         if verdict == REAP_CASE1:
-            reap(cand, case='case1',
-                 reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '
-                         f'> grace {cfg["marker_grace_seconds"]}s'),
-                 reaper=reaper, worktree_remover=worktree_remover,
-                 closure_notify=closure_notify, event_emitter=event_emitter)
-            summary['case1_reaped'] += 1
+            if reap(cand, case='case1',
+                    reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '
+                            f'> grace {cfg["marker_grace_seconds"]}s'),
+                    reaper=reaper, worktree_remover=worktree_remover,
+                    closure_notify=closure_notify, event_emitter=event_emitter,
+                    verify_pid_fn=verify_pid_fn):
+                summary['case1_reaped'] += 1
         elif verdict == REAP_CASE2_HARD:
             # Deterministic backstop: silent far longer than any legitimate
             # review operation could run, so reap regardless of the confidence
@@ -912,13 +1015,14 @@ def run_cycle(
                 log(f'CASE2-HARD reap aborted: {cand.session_id} resumed at gate '
                     f'— live work, not killing', 'WARN')
                 continue
-            reap(cand, case='case2-hard',
-                 reason=(f'no marker, idle {int(cand.idle_secs)}s > HARD silent grace '
-                         f'{cfg["hard_silent_grace_seconds"]}s (deterministic wedge '
-                         f'backstop — provably past any legitimate review operation)'),
-                 reaper=reaper, worktree_remover=worktree_remover,
-                 closure_notify=closure_notify, event_emitter=event_emitter)
-            summary['case2_hard_reaped'] += 1
+            if reap(cand, case='case2-hard',
+                    reason=(f'no marker, idle {int(cand.idle_secs)}s > HARD silent grace '
+                            f'{cfg["hard_silent_grace_seconds"]}s (deterministic wedge '
+                            f'backstop — provably past any legitimate review operation)'),
+                    reaper=reaper, worktree_remover=worktree_remover,
+                    closure_notify=closure_notify, event_emitter=event_emitter,
+                    verify_pid_fn=verify_pid_fn):
+                summary['case2_hard_reaped'] += 1
         elif verdict == SILENT_CASE2:
             if state.mode == MODE_AUTO_REAP:
                 # Final fresh recheck right before an irreversible kill: if the
@@ -935,12 +1039,13 @@ def run_cycle(
                     log(f'CASE2 auto-reap aborted: {cand.session_id} resumed at '
                         f'gate — FALSE positive, demoting to alert-only', 'WARN')
                     continue
-                reap(cand, case='case2-auto',
-                     reason=(f'no marker, idle {int(cand.idle_secs)}s > silent grace '
-                             f'{cfg["silent_grace_seconds"]}s (auto-reap, graduated)'),
-                     reaper=reaper, worktree_remover=worktree_remover,
-                     closure_notify=closure_notify, event_emitter=event_emitter)
-                summary['case2_auto_reaped'] += 1
+                if reap(cand, case='case2-auto',
+                        reason=(f'no marker, idle {int(cand.idle_secs)}s > silent grace '
+                                f'{cfg["silent_grace_seconds"]}s (auto-reap, graduated)'),
+                        reaper=reaper, worktree_remover=worktree_remover,
+                        closure_notify=closure_notify, event_emitter=event_emitter,
+                        verify_pid_fn=verify_pid_fn):
+                    summary['case2_auto_reaped'] += 1
             else:
                 # Alert-only: escalate + record pending for later verification.
                 if cand.session_id and cand.session_id not in state.pending:

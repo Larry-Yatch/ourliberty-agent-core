@@ -74,12 +74,20 @@ class _Recorder:
         self.escalations.append((message, subject, action))
 
 
-def _run(rec, candidates, state, cfg=CFG):
+def _run(rec, candidates, state, cfg=CFG, verify_pid_fn=None):
+    # By default the pre-kill identity recheck must SUCCEED for the synthetic
+    # candidates (their pids aren't real, so the production proc_cwd would abort
+    # every kill). Map each candidate's pid back to its cwd so the recheck
+    # passes; individual tests override verify_pid_fn to exercise the abort.
+    if verify_pid_fn is None:
+        _cwd_by_pid = {c.pid: c.cwd for c in (candidates or [])}
+        verify_pid_fn = lambda pid: _cwd_by_pid.get(pid)  # noqa: E731
     return h.run_cycle(
         candidates=candidates, state=state, cfg=cfg, now=NOW,
         reaper=rec.reaper, worktree_remover=rec.remover,
         closure_notify=rec.closure, escalate_notify=rec.escalate,
         event_emitter=lambda **kw: None,  # never touch the live chain_events table
+        verify_pid_fn=verify_pid_fn,
         persist=False,
     )
 
@@ -545,6 +553,117 @@ class TestMarkerDetection(unittest.TestCase):
             p.write_text(_user_line(
                 "forge/CLAUDE.md: start your result with 'PR opened:'") + '\n')
             self.assertFalse(h.jsonl_has_terminal_marker(p, 'forge'))
+
+    def test_forge_revision_prose_is_not_a_marker(self):
+        # Regression: bare substring 'Revision ' matched ordinary prose from a
+        # LIVE Forge agent ('the Revision phase'), triggering a destructive
+        # Case-1 reap. The preamble must be line-anchored + the precise
+        # 'Revision N applied:' form.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            for prose in (
+                "I'll move to the Revision phase next.",
+                'Revision protocol: first re-read the findings.',
+                'Working on a revision pass for the failing test.',
+                'Mid-sentence note about PR opened: discipline in the docs.',
+            ):
+                p = Path(td) / 's.jsonl'
+                p.write_text(_assistant_line(prose) + '\n')
+                self.assertFalse(
+                    h.jsonl_has_terminal_marker(p, 'forge'),
+                    f'prose should NOT be a terminal marker: {prose!r}')
+
+    def test_forge_revision_applied_line_is_a_marker(self):
+        # The genuine terminal signal: a line that STARTS with 'Revision N
+        # applied:' still counts (even when preceded by other assistant text).
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 's.jsonl'
+            p.write_text(_assistant_line(
+                'Done.\nRevision 2 applied: pushed fixes to the PR branch.') + '\n')
+            self.assertTrue(h.jsonl_has_terminal_marker(p, 'forge'))
+
+    def test_forge_canonical_pr_forms_are_markers(self):
+        # The real shapes Forge writes (mirroring outbox_notifier._PR_URL_RE):
+        # the '#<num>' token and a leading clause must still be recognized — the
+        # earlier bare 'PR opened:' literal MISSED 'PR #303 opened:'.
+        import tempfile
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/303'
+        for line in (
+            f'PR #303 opened: {url}',
+            f'Done. PR opened: {url}',
+            f'Result: PR #303 updated: {url}',
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                p = Path(td) / 's.jsonl'
+                p.write_text(_assistant_line(line) + '\n')
+                self.assertTrue(h.jsonl_has_terminal_marker(p, 'forge'),
+                                f'should be a terminal marker: {line!r}')
+
+    def test_forge_pr_mention_without_url_is_not_a_marker(self):
+        # Prose discussing a PR but carrying no pull URL must NOT count
+        # (the URL requirement is what rejects 'I considered PR opened: ...').
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 's.jsonl'
+            p.write_text(_assistant_line(
+                'I considered PR opened: discipline from last week but moved on.')
+                + '\n')
+            self.assertFalse(h.jsonl_has_terminal_marker(p, 'forge'))
+
+
+class TestRemoveWorktreeDataLossGuard(unittest.TestCase):
+    def test_skips_removal_when_worktree_dirty(self):
+        # A dirty worktree (uncommitted changes) must NOT be force-removed —
+        # --force would discard the work. remove_worktree returns False (skip)
+        # and never invokes `git worktree remove`.
+        from unittest import mock
+        wt = '/home/larry/agent-worktrees/wt-mirror-dirty'
+        with mock.patch.object(h, '_canonical_repo_for_worktree',
+                               return_value=Path('/home/larry/agent-core')), \
+             mock.patch.object(h, '_repo_on_main', return_value=True), \
+             mock.patch.object(h, '_worktree_has_uncommitted_changes', return_value=True), \
+             mock.patch.object(h.subprocess, 'run') as run:
+            self.assertFalse(h.remove_worktree(wt))
+            run.assert_not_called()  # no `git worktree remove` issued
+
+    def test_unknown_dirty_state_also_skips(self):
+        # If status can't be read (None), treat as 'do not force-destroy'.
+        from unittest import mock
+        wt = '/home/larry/agent-worktrees/wt-forge-unknown'
+        with mock.patch.object(h, '_canonical_repo_for_worktree',
+                               return_value=Path('/home/larry/agent-core')), \
+             mock.patch.object(h, '_repo_on_main', return_value=True), \
+             mock.patch.object(h, '_worktree_has_uncommitted_changes', return_value=None), \
+             mock.patch.object(h.subprocess, 'run') as run:
+            self.assertFalse(h.remove_worktree(wt))
+            run.assert_not_called()
+
+
+class TestReapPidIdentityRecheck(unittest.TestCase):
+    def test_reap_aborts_when_pid_cwd_no_longer_matches(self):
+        # PID-reuse / process-exited guard: if the pid's cwd no longer matches
+        # the wedged worktree at kill time, the reap aborts (no kill) — never
+        # SIGKILL a process that inherited the recycled PID.
+        rec = _Recorder()
+        state = h.ConfidenceState(mode=h.MODE_AUTO_REAP,
+                                  executions=[{'outcome': h.TRUE_POSITIVE, 'session_id': s}
+                                              for s in ('a', 'b', 'c')])
+        cand = _cand(pid=9100, marker=False, idle=1200, session_id='reused')
+        # The pid now reports a DIFFERENT cwd than the scanned worktree.
+        summary = _run(rec, [cand], state,
+                       verify_pid_fn=lambda pid: '/some/other/unrelated/cwd')
+        self.assertEqual(rec.killed, [])           # nothing killed
+        self.assertEqual(summary['case2_auto_reaped'], 0)
+
+    def test_reap_aborts_when_pid_already_gone(self):
+        rec = _Recorder()
+        state = h.ConfidenceState(mode=h.MODE_ALERT_ONLY, executions=[], pending={})
+        cand = _cand(pid=9200, marker=False, idle=4000, session_id='gone')  # hard-grace
+        summary = _run(rec, [cand], state,
+                       verify_pid_fn=lambda pid: None)  # pid no longer exists
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(summary['case2_hard_reaped'], 0)
 
 
 if __name__ == '__main__':
