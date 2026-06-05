@@ -41,6 +41,24 @@ import safe_write_inbox as swi      # noqa: E402
 _AGENTS_ROOT_BACKUP = None
 _AGENTS_ROOT_TMPDIR = None
 
+# build-mirror-review-status — shared ordered call log. The inert status
+# override (installed in setUpModule) and per-class merge overrides both
+# append here so a test can assert the `mirror-review` status POST fires
+# before auto-merge without shelling out to real `gh`.
+_MIRROR_STATUS_CALL_LOG: list[tuple] = []
+
+
+def _inert_mirror_review_status(data, marker_decision):
+    """Stand-in for `_post_mirror_review_commit_status` during process_outbox
+    integration tests — records the verdict + mapped state, no `gh` shell-out."""
+    mtype = marker_decision.get('marker_type')
+    state = 'success' if mtype == 'review_pass' else 'failure'
+    payload = marker_decision.get('payload') or {}
+    _MIRROR_STATUS_CALL_LOG.append(
+        ('status', mtype, state, payload.get('pr_url')),
+    )
+    return state
+
 
 def setUpModule():  # noqa: N802 — unittest hook name
     global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
@@ -51,6 +69,10 @@ def setUpModule():  # noqa: N802 — unittest hook name
         Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
     importlib.reload(on)
+    # Install the inert status override so any class routing a Mirror verdict
+    # through process_outbox never shells out to real `gh`. Tests that exercise
+    # the real helper restore `on._POST_STATUS_FN_OVERRIDE = None` themselves.
+    on._POST_STATUS_FN_OVERRIDE = _inert_mirror_review_status
 
 
 def tearDownModule():  # noqa: N802 — unittest hook name
@@ -2812,8 +2834,10 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         # returns a synthetic `merged` outcome; individual tests can
         # replace _auto_merge_override with their own outcome shape.
         self._auto_merge_calls: list[tuple[str, str]] = []
+        _MIRROR_STATUS_CALL_LOG.clear()
         def _default_auto_merge(pr_url, task_id):
             self._auto_merge_calls.append((pr_url, task_id))
+            _MIRROR_STATUS_CALL_LOG.append(('merge', pr_url))
             return {
                 'merge_outcome': 'merged',
                 'merge_reason': 'squash-merged + branch deleted (test override)',
@@ -2893,6 +2917,36 @@ class MirrorMarkerRoutingTest(unittest.TestCase):
         self.assertEqual(data['intent'], 'review-pass')
         self.assertIn(PR_URL_FIXTURE, data['prompt'])
         self.assertIn('APPROVED', data['prompt'])
+
+    def test_review_pass_posts_success_status_before_merge(self):
+        # build-mirror-review-status: a PASS posts state=success and does so
+        # BEFORE auto-merge fires, so the merge satisfies the required check.
+        body = _mirror_outbox_body(_mirror_pass_marker())
+        f = self._write_mirror_outbox('real-rev.json', body)
+        on.process_outbox(f)
+        kinds = [e[0] for e in _MIRROR_STATUS_CALL_LOG]
+        self.assertIn('status', kinds)
+        self.assertIn('merge', kinds)
+        self.assertLess(
+            kinds.index('status'), kinds.index('merge'),
+            f'status POST must precede auto-merge; got {_MIRROR_STATUS_CALL_LOG}',
+        )
+        status_entry = next(e for e in _MIRROR_STATUS_CALL_LOG if e[0] == 'status')
+        self.assertEqual(status_entry[1], 'review_pass')
+        self.assertEqual(status_entry[2], 'success')
+        self.assertEqual(status_entry[3], PR_URL_FIXTURE)
+
+    def test_review_revision_posts_failure_status(self):
+        # build-mirror-review-status: REVISION posts state=failure so the PR
+        # stays blocked from merging (the #303 hole). No merge fires.
+        body = _mirror_outbox_body(_mirror_revision_marker(confidence='high'))
+        f = self._write_mirror_outbox('real-rev.json', body)
+        on.process_outbox(f)
+        status_entries = [e for e in _MIRROR_STATUS_CALL_LOG if e[0] == 'status']
+        self.assertEqual(len(status_entries), 1)
+        self.assertEqual(status_entries[0][1], 'review_revision')
+        self.assertEqual(status_entries[0][2], 'failure')
+        self.assertNotIn('merge', [e[0] for e in _MIRROR_STATUS_CALL_LOG])
 
     def test_review_revision_notifies_beacon_with_finding_count(self):
         body = _mirror_outbox_body(_mirror_revision_marker(confidence='high'))
@@ -6669,6 +6723,122 @@ class ParsePrUrlTest(unittest.TestCase):
         self.assertIsNone(on._parse_pr_url(
             'https://github.com/owner/repo/pull/0',
         ))
+
+
+class PostMirrorReviewCommitStatusTest(unittest.TestCase):
+    """build-mirror-review-status — `_post_mirror_review_commit_status` gh
+    interaction: state mapping, head-SHA targeting, error tolerance."""
+
+    def setUp(self):
+        # Exercise the real helper (setUpModule installs an inert override).
+        self._orig_override = on._POST_STATUS_FN_OVERRIDE
+        on._POST_STATUS_FN_OVERRIDE = None
+
+    def tearDown(self):
+        on._POST_STATUS_FN_OVERRIDE = self._orig_override
+
+    def _cp(self, *, returncode=0, stdout='', stderr=''):
+        class _R:
+            pass
+        r = _R()
+        r.returncode = returncode
+        r.stdout = stdout
+        r.stderr = stderr
+        return r
+
+    def _decision(self, marker_type='review_pass', pr_url=PR_URL_FIXTURE):
+        return {'marker_type': marker_type, 'payload': {'pr_url': pr_url}}
+
+    def _run_helper(self, decision, *, head_sha='deadbeefcafe',
+                    view_rc=0, api_rc=0):
+        """Run the helper with subprocess.run mocked; return (state, api_cmds)."""
+        api_cmds: list[list[str]] = []
+
+        def _run(cmd, **kwargs):
+            if 'view' in cmd:
+                stdout = json.dumps({'headRefOid': head_sha}) if view_rc == 0 else ''
+                return self._cp(returncode=view_rc, stdout=stdout, stderr='boom')
+            if len(cmd) > 1 and cmd[1] == 'api':
+                api_cmds.append(cmd)
+                return self._cp(returncode=api_rc, stdout='{}', stderr='boom')
+            return self._cp(returncode=1)
+
+        with mock.patch.object(on.subprocess, 'run', side_effect=_run):
+            state = on._post_mirror_review_commit_status({'task_id': 't'}, decision)
+        return state, api_cmds
+
+    def test_pass_posts_success_to_head_sha(self):
+        state, api_cmds = self._run_helper(self._decision('review_pass'),
+                                           head_sha='abc123sha')
+        self.assertEqual(state, 'success')
+        self.assertEqual(len(api_cmds), 1)
+        cmd = api_cmds[0]
+        # Targets the correct head SHA + owner/repo via gh api statuses.
+        self.assertIn(
+            'repos/Larry-Yatch/ourliberty-agent-core/statuses/abc123sha', cmd,
+        )
+        self.assertIn('state=success', cmd)
+        self.assertIn('context=mirror-review', cmd)
+        self.assertIn('description=Mirror review passed', cmd)
+
+    def test_revision_posts_failure(self):
+        state, api_cmds = self._run_helper(self._decision('review_revision'))
+        self.assertEqual(state, 'failure')
+        self.assertEqual(len(api_cmds), 1)
+        self.assertIn('state=failure', api_cmds[0])
+        self.assertIn('description=REVIEW_REVISION', api_cmds[0])
+
+    def test_escalate_and_emergency_halt_post_failure(self):
+        for mtype, desc in (
+            ('review_escalate', 'description=REVIEW_ESCALATE'),
+            ('review_emergency_halt', 'description=REVIEW_EMERGENCY_HALT'),
+        ):
+            state, api_cmds = self._run_helper(self._decision(mtype))
+            self.assertEqual(state, 'failure')
+            self.assertIn('state=failure', api_cmds[0])
+            self.assertIn(desc, api_cmds[0])
+
+    def test_gh_view_failure_tolerated(self):
+        # No head SHA -> skip the POST, return None, never raise.
+        state, api_cmds = self._run_helper(self._decision('review_pass'),
+                                           view_rc=1)
+        self.assertIsNone(state)
+        self.assertEqual(api_cmds, [])
+
+    def test_gh_api_failure_tolerated(self):
+        # Status POST itself fails -> return None, never raise.
+        state, api_cmds = self._run_helper(self._decision('review_pass'),
+                                           api_rc=1)
+        self.assertIsNone(state)
+        self.assertEqual(len(api_cmds), 1)
+
+    def test_gh_missing_binary_tolerated(self):
+        def _raise(cmd, **kwargs):
+            raise FileNotFoundError('gh not on PATH')
+        with mock.patch.object(on.subprocess, 'run', side_effect=_raise):
+            state = on._post_mirror_review_commit_status(
+                {'task_id': 't'}, self._decision('review_pass'),
+            )
+        self.assertIsNone(state)
+
+    def test_invalid_pr_url_skipped_without_shellout(self):
+        called = []
+
+        def _run(cmd, **kwargs):
+            called.append(cmd)
+            return self._cp(returncode=0)
+
+        with mock.patch.object(on.subprocess, 'run', side_effect=_run):
+            state = on._post_mirror_review_commit_status(
+                {'task_id': 't'}, self._decision('review_pass', pr_url='not-a-url'),
+            )
+        self.assertIsNone(state)
+        self.assertEqual(called, [])
+
+    def test_unknown_marker_type_is_noop(self):
+        state, api_cmds = self._run_helper(self._decision('review_unknown'))
+        self.assertIsNone(state)
+        self.assertEqual(api_cmds, [])
 
 
 class AutoMergePRTest(unittest.TestCase):
