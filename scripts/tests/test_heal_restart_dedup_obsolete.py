@@ -12,31 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import heal_restart_dedup_obsolete as mod  # noqa: E402
 
-
-class NoClobberDestTest(unittest.TestCase):
-    def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp())
-
-    def test_free_name_unchanged(self):
-        t = self.tmp / "20260101000000-foo.json"
-        self.assertEqual(mod._noclobber_dest(t), t)
-
-    def test_collision_appends_suffix(self):
-        t = self.tmp / "20260101000000-foo.json"
-        t.write_text("first")
-        self.assertEqual(
-            mod._noclobber_dest(t), self.tmp / "20260101000000-foo.1.json"
-        )
-
-    def test_multiple_collisions_increment(self):
-        base = "20260101000000-foo"
-        (self.tmp / f"{base}.json").write_text("0")
-        (self.tmp / f"{base}.1.json").write_text("1")
-        (self.tmp / f"{base}.2.json").write_text("2")
-        self.assertEqual(
-            mod._noclobber_dest(self.tmp / f"{base}.json"),
-            self.tmp / f"{base}.3.json",
-        )
+# Unit tests for the no-clobber helper itself live in test_atomic_io
+# (NoClobberDestTest); this suite exercises the healer's end-to-end use of it.
 
 
 class ArchiveCollisionIntegrationTest(unittest.TestCase):

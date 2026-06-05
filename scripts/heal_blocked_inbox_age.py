@@ -39,6 +39,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Run as a script (systemd ExecStart=.../heal_blocked_inbox_age.py), so the
+# script's directory is on sys.path[0] and the sibling import resolves.
+import atomic_io
+
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_blocked_inbox_age.log"
@@ -58,24 +62,6 @@ def log(level: str, msg: str) -> None:
             f.write(f"[{ts}] [{level}] {msg}\n")
     except OSError:
         pass
-
-
-def _noclobber_dest(target: Path) -> Path:
-    """Return a destination that does not overwrite an existing archive file.
-
-    Audit #54 (sibling idiom): `shutil.move` silently overwrites a same-named
-    destination, so two same-named blocked tasks archived across separate ticks
-    would destroy the earlier audit copy. Append a `.N` suffix until free.
-    """
-    if not target.exists():
-        return target
-    stem, suffix = target.stem, target.suffix
-    n = 1
-    while True:
-        candidate = target.with_name(f"{stem}.{n}{suffix}")
-        if not candidate.exists():
-            return candidate
-        n += 1
 
 
 def main() -> int:
@@ -104,7 +90,9 @@ def main() -> int:
                 continue
             age_h = int((datetime.now(timezone.utc).timestamp() - mtime) / 3600)
             try:
-                dest = _noclobber_dest(archive_dir / task_file.name)
+                # Audit #54 (sibling idiom): no-clobber so two same-named
+                # blocked tasks archived across ticks don't overwrite.
+                dest = atomic_io.noclobber_dest(archive_dir / task_file.name)
                 shutil.move(str(task_file), str(dest))
                 sidecar = archive_dir / f"{dest.stem}.archive-reason.txt"
                 sidecar.write_text(

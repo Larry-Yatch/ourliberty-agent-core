@@ -52,6 +52,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# When run as a script (systemd ExecStart=.../heal_restart_dedup_obsolete.py),
+# the script's own directory is on sys.path[0], so the sibling import resolves.
+import atomic_io
+
 AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_restart_dedup_obsolete.log"
@@ -73,29 +77,6 @@ def log(level: str, msg: str) -> None:
             f.write(f"[{ts}] [{level}] {msg}\n")
     except OSError:
         pass
-
-
-def _noclobber_dest(target: Path) -> Path:
-    """Return a destination that does not overwrite an existing archive file.
-
-    Audit #54: the archive name is `<14-digit-ts>-<task>.json`, whose prefix is
-    minted at restart-dedup time and *can* repeat for the same task across two
-    dedup events in the same wall-clock second. `shutil.move` silently
-    overwrites a same-named destination, destroying the earlier archived copy
-    and defeating the module's "move (not delete) preserves the audit trail"
-    guarantee. If `target` is free, return it unchanged; otherwise append a
-    `.N` suffix before the extension until a free name is found.
-    """
-    if not target.exists():
-        return target
-    stem = target.stem
-    suffix = target.suffix
-    n = 1
-    while True:
-        candidate = target.with_name(f"{stem}.{n}{suffix}")
-        if not candidate.exists():
-            return candidate
-        n += 1
 
 
 def main() -> int:
@@ -124,7 +105,12 @@ def main() -> int:
             continue
         if mtime > threshold:
             continue
-        target = _noclobber_dest(ARCHIVE_DIR / f.name)
+        # Audit #54: the archive name is `<14-digit-ts>-<task>.json`, whose
+        # prefix is minted at restart-dedup time and can repeat for the same
+        # task across two dedup events in the same wall-clock second.
+        # shutil.move would silently overwrite a same-named prior archive, so
+        # pick a non-colliding destination.
+        target = atomic_io.noclobber_dest(ARCHIVE_DIR / f.name)
         try:
             shutil.move(str(f), str(target))
             age_h = (now - mtime) / 3600

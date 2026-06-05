@@ -136,6 +136,13 @@ def read_state() -> dict[str, dict[str, Any]]:
         _preserve_corrupt_state(path, e)
         return {}
     if not isinstance(data, dict):
+        # Valid JSON of the wrong shape (e.g. a top-level list/number/null from
+        # a partial or buggy external write) is just as much a corruption as a
+        # parse error: returning {} here would let the next write clobber every
+        # prior row. Preserve + alert on this path too (audit #37 follow-up).
+        _preserve_corrupt_state(
+            path, ValueError(f'state root is {type(data).__name__}, not object'),
+        )
         return {}
     out: dict[str, dict[str, Any]] = {}
     for k, v in data.items():
@@ -183,12 +190,16 @@ def _preserve_corrupt_state(path: Path, err: Exception) -> None:
 def _write_state(state: dict[str, dict[str, Any]]) -> None:
     """Atomic write. Never partial-file-write.
 
-    Uses the shared atomic_io helper (unique tmp + fsync + os.replace) rather
-    than a fixed `<file>.tmp` so two concurrent writers cannot clobber each
-    other's scratch file (audit PR-E).
+    Uses the shared atomic_io helper (unique tmp + os.replace) rather than a
+    fixed `<file>.tmp` so two concurrent writers cannot clobber each other's
+    scratch file (audit PR-E). fsync is disabled: this file is rewritten on
+    every triage decision and each write supersedes the last, so atomicity (no
+    torn file) is what matters here, not durability of the very last write —
+    paying a synchronous disk flush per triage would serialize an alert storm
+    on disk latency for negligible benefit.
     """
     atomic_io.atomic_write_json(
-        _state_path(), state, indent=2, sort_keys=True,
+        _state_path(), state, indent=2, sort_keys=True, fsync=False,
     )
 
 

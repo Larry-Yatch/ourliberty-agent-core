@@ -54,6 +54,42 @@ class TestReadState(_ATSTestBase):
         self._state_path().write_text('{garbage')
         self.assertEqual(ats.read_state(), {})
 
+    def test_corrupt_json_backs_up_prior_rows(self):
+        # Audit #37: a transient parse error must not silently discard prior
+        # rows. read_state preserves the corrupt bytes to a .corrupt-* sidecar
+        # (so they're recoverable) before returning {}.
+        p = self._state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text('{"alert-A": {"status": "triaged"}, BROKEN')
+        self.assertEqual(ats.read_state(), {})
+        self.assertFalse(p.exists(), 'corrupt file should be moved aside')
+        backups = list(p.parent.glob(f'{p.name}.corrupt-*'))
+        self.assertEqual(len(backups), 1)
+        self.assertIn('BROKEN', backups[0].read_text())
+
+    def test_wrong_shape_json_backs_up_not_clobbers(self):
+        # Audit #37 follow-up: valid JSON of the wrong shape (top-level list)
+        # is also a corruption — it must be preserved, not silently dropped so
+        # the next write clobbers it.
+        p = self._state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text('["not", "an", "object"]')
+        self.assertEqual(ats.read_state(), {})
+        backups = list(p.parent.glob(f'{p.name}.corrupt-*'))
+        self.assertEqual(len(backups), 1)
+
+    def test_subsequent_write_after_corruption_does_not_lose_backup(self):
+        # After corruption is backed up, a fresh record_triage write produces a
+        # valid single-row file while the prior rows remain in the backup.
+        p = self._state_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text('{"alert-A": {"status": "triaged"}, BROKEN')
+        ats.record_triage('alert-C', 1, 'autofix', 'rationale')
+        self.assertEqual(list(ats.read_state().keys()), ['alert-C'])
+        backups = list(p.parent.glob(f'{p.name}.corrupt-*'))
+        self.assertEqual(len(backups), 1)
+        self.assertIn('alert-A', backups[0].read_text())
+
 
 class TestRecordTriage(_ATSTestBase):
 

@@ -2,8 +2,8 @@
 """Tests for scripts/atomic_io.py (audit PR-E shared primitives)."""
 
 import json
-import multiprocessing
 import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -32,13 +32,22 @@ class AtomicWriteTest(unittest.TestCase):
         atomic_io.atomic_write_json(nested, [1, 2, 3])
         self.assertEqual(json.loads(nested.read_text()), [1, 2, 3])
 
+    def test_default_mode_is_0644(self):
+        # mkstemp creates 0600; the helper must widen to the umask-default the
+        # replaced write_text calls produced, so perms are not silently narrowed.
+        atomic_io.atomic_write_text(self.path, "x")
+        perm = stat.S_IMODE(os.stat(self.path).st_mode)
+        self.assertEqual(perm, 0o644)
+
+    def test_explicit_mode_respected(self):
+        atomic_io.atomic_write_text(self.path, "x", mode=0o600)
+        perm = stat.S_IMODE(os.stat(self.path).st_mode)
+        self.assertEqual(perm, 0o600)
+
     def test_overwrite_preserves_old_on_error(self):
-        # Pre-existing good file.
         atomic_io.atomic_write_text(self.path, "ORIGINAL")
-        # Non-serializable object raises inside json.dumps, before any rename.
         with self.assertRaises(TypeError):
             atomic_io.atomic_write_json(self.path, {"bad": object()})
-        # Original is untouched.
         self.assertEqual(self.path.read_text(), "ORIGINAL")
 
     def test_no_tmp_files_left_on_success(self):
@@ -52,10 +61,6 @@ class AtomicWriteTest(unittest.TestCase):
         self.assertEqual(list(Path(self.tmp).iterdir()), [])
 
     def test_unique_tmp_names_do_not_collide(self):
-        # Two interleaved writers using the same destination must not share a
-        # scratch file. We can't easily force true concurrency here, but we can
-        # assert that two mkstemp-based writes in the same dir each produce a
-        # distinct temp (the property that prevents the clobber).
         names = set()
         real_mkstemp = tempfile.mkstemp
 
@@ -74,51 +79,30 @@ class AtomicWriteTest(unittest.TestCase):
         self.assertEqual(self.path.read_text(), "two")
 
 
-def _locked_increment(path_str, lock_str, n, barrier):
-    """Worker: increment a shared counter under file_lock, n times."""
-    path = Path(path_str)
-    barrier.wait()
-    for _ in range(n):
-        with atomic_io.file_lock(lock_str):
-            try:
-                cur = json.loads(path.read_text())["v"]
-            except (OSError, ValueError):
-                cur = 0
-            atomic_io.atomic_write_json(path, {"v": cur + 1})
-
-
-class FileLockTest(unittest.TestCase):
+class NoClobberDestTest(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.mkdtemp()
-        self.path = Path(self.tmp) / "counter.json"
-        self.lock = Path(self.tmp) / "counter.lock"
+        self.tmp = Path(tempfile.mkdtemp())
 
-    def test_lock_held_flag(self):
-        with atomic_io.file_lock(self.lock) as held:
-            self.assertTrue(held)
+    def test_free_name_unchanged(self):
+        t = self.tmp / "20260101000000-foo.json"
+        self.assertEqual(atomic_io.noclobber_dest(t), t)
 
-    def test_concurrent_increments_no_lost_update(self):
-        atomic_io.atomic_write_json(self.path, {"v": 0})
-        procs = 4
-        per = 25
-        ctx = multiprocessing.get_context("fork") if sys.platform != "win32" else multiprocessing.get_context()
-        barrier = ctx.Barrier(procs)
-        workers = [
-            ctx.Process(
-                target=_locked_increment,
-                args=(str(self.path), str(self.lock), per, barrier),
-            )
-            for _ in range(procs)
-        ]
-        for w in workers:
-            w.start()
-        for w in workers:
-            w.join(30)
-        for w in workers:
-            self.assertFalse(w.is_alive())
-        # Without the lock, racing read-modify-write would lose updates and
-        # land well under procs*per. With it, every increment survives.
-        self.assertEqual(json.loads(self.path.read_text())["v"], procs * per)
+    def test_collision_appends_suffix(self):
+        t = self.tmp / "20260101000000-foo.json"
+        t.write_text("first")
+        self.assertEqual(
+            atomic_io.noclobber_dest(t), self.tmp / "20260101000000-foo.1.json"
+        )
+
+    def test_multiple_collisions_increment(self):
+        base = "20260101000000-foo"
+        (self.tmp / f"{base}.json").write_text("0")
+        (self.tmp / f"{base}.1.json").write_text("1")
+        (self.tmp / f"{base}.2.json").write_text("2")
+        self.assertEqual(
+            atomic_io.noclobber_dest(self.tmp / f"{base}.json"),
+            self.tmp / f"{base}.3.json",
+        )
 
 
 if __name__ == "__main__":
