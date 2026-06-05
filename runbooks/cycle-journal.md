@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 955 — 2026-06-05 05:26 UTC (interactive, Tier 1 — clean)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (known pattern, self-heals). 1 more clean iter needed for Tier 2 de-escalation.**
+
+Alert watermark: **1312 lines / 2026-06-05T05:03:00Z** (unchanged — 0 new alerts since iter 954). Pipeline-stall heartbeat: 2026-06-05T05:09:48Z (✅ ~17 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T05:02:56Z (✅ ~24 min at cycle start; within 60-min threshold). Sync: status=error, commit=5f5955d, last_sync=04:58:36Z (⚠️ SYNC-PUSH-REBASE-FALLBACK carry-forward — same status as iter 954; session-start HEAD=6c37433 "Pulse cycle 20260605T052143Z" NEWER than sync.json commit → wrapper push succeeded; self-clears on next hourly sync.timer). Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2** (clean iter; 1 more clean iter needed for Tier 2 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1312/05:03:00Z unchanged — 0 new alerts since iter 954. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T05:09:48Z (~17 min at cycle start; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T05:02:56Z (~24 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=6c37433 "Pulse cycle 20260605T052143Z". ✅
+
+- **(Check B) Sync health: ⚠️ Tier 3 known pattern — carry-forward.** sync.json: status=error, commit=5f5955d, last_sync=04:58:36Z. SYNC-PUSH-REBASE-FALLBACK recurring pattern (same error as iter 954; wrapper push succeeded independently per HEAD newer than sync.json commit). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. Self-heals on next hourly sync.timer. ⚠️→INFO
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC → skip (Sunday gate). ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged at 1312/05:03:00Z — 0 new `tier2_weekly_probe_failed` alerts. Next probe expected ~09:00Z (6h cadence from 03:02:48Z first post-merge fire). Watch continues. If clean → APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close.
+
+- **G-rule updates:**
+  - `heal-wedged-review-sessions Case 2 not graduated` (VERIFICATION_PENDING): This iter clean — no new poll-loop-wedge or reaper-destruction events. **2nd clean iter post-PR #336+#340.** Need 1 more clean iter to close G-rule.
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive` (G-rule 1/3, iter 922): This iter clean — no new pr-create-inferred-failure alerts. Watch continues.
+  - `wedged-review-silent-wt:* not in alert-translations.json` (G-rule 1/3, iter 935): No new occurrence. Watch continues.
+  - All other G-rules: no new occurrences.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=13, ratio≈55.3 (unchanged). No interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all services active, all inboxes empty, 0 open PRs.
+3. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+4. Wrote journal entry.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** Second consecutive clean iter at Tier 1. System fully nominal — 0 alerts, 0 PRs, 8/8 services, all inboxes empty. SYNC-PUSH-REBASE-FALLBACK is the single persistent cosmetic noise (known pattern, APPROVAL_REQUEST open). One more clean iter de-escalates to Tier 2. Wedged-review-sessions VERIFICATION_PENDING advancing cleanly.
+
+---
+
 ## Iteration 954 — 2026-06-05 05:17 UTC (interactive, Tier 1 — clean)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. Sync: SYNC-PUSH-REBASE-FALLBACK carry-forward (known pattern, self-heals). New: PR #340 merged post-iter-953.**
