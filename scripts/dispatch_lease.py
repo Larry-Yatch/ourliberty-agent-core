@@ -28,8 +28,12 @@ import time
 import fcntl
 import signal
 import threading
+import sys
 from pathlib import Path
 from datetime import datetime, timezone
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pid_identity  # noqa: E402  # PID-reuse guard before reclaim-kill
 
 AGENTS_ROOT = Path.home() / 'agents'
 LEASES_DIR = AGENTS_ROOT / 'state' / 'dispatch-leases'
@@ -163,22 +167,31 @@ def try_acquire(identity, holder_pid=None):
                         'existing_pid': ex_pid,
                     }
 
-                if _pid_alive_same_boot(ex_pid, ex_boot):
+                # boot_id catches a PID reused across a reboot; the start-time
+                # check catches a PID recycled to an unrelated process within the
+                # SAME boot (None on a legacy lease -> degrades to liveness only,
+                # never less safe). Only kill when it is provably still the holder.
+                same_holder = _pid_alive_same_boot(ex_pid, ex_boot) and \
+                    pid_identity.still_same_process(ex_pid, existing.get('holder_starttime'))
+                if same_holder:
                     _log_op(f'RECLAIM: stale lease for {identity} with live PID {ex_pid} '
                             f'(age={int(age)}s) — SIGTERM then SIGKILL')
                     try:
                         os.kill(int(ex_pid), signal.SIGTERM)
                         time.sleep(RECLAIM_SIGTERM_GRACE_SECONDS)
-                        try:
-                            os.kill(int(ex_pid), 0)
+                        # Re-verify IDENTITY (not just liveness) after the grace:
+                        # the holder may have exited in response to SIGTERM and
+                        # the PID been recycled to an unrelated process during the
+                        # window. still_same_process returns False if it's gone or
+                        # recycled, so we never SIGKILL a bystander.
+                        if pid_identity.still_same_process(ex_pid, existing.get('holder_starttime')):
                             os.kill(int(ex_pid), signal.SIGKILL)
                             _log_op(f'RECLAIM: SIGKILLed {ex_pid}')
-                        except (OSError, ProcessLookupError):
-                            pass
                     except (OSError, ProcessLookupError):
                         pass
                 else:
-                    _log_op(f'RECLAIM: stale lease for {identity} (pid {ex_pid} dead or different boot)')
+                    _log_op(f'RECLAIM: stale lease for {identity} '
+                            f'(pid {ex_pid} dead, different boot, or PID reused)')
 
                 lease_path.unlink(missing_ok=True)
 
@@ -187,6 +200,7 @@ def try_acquire(identity, holder_pid=None):
         _atomic_write(lease_path, {
             'identity': identity,
             'holder_pid': holder_pid,
+            'holder_starttime': pid_identity.proc_starttime(holder_pid),
             'boot_id': boot_id,
             'nonce': nonce,
             'timestamp_created': now,
