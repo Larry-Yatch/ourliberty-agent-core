@@ -24,9 +24,10 @@
                 "webhook", "telegram-webhook", "watchdog", "auto-retry", "auto-iterate",
                 "blackboard", "system-test", "parallel-test", "cron", "unknown",
                 "continuation", "system-sweep", "cycle-recovery", "orchestrator",
-                "ship_completion_watcher", "backlog-promoter"
+                "ship_completion_watcher", "backlog-promoter",
+                "outbox-notifier", "pulse-auto-dispatch", "dashboard"
             ],
-            "description": "Who initiated this task. Must match dispatch_validator.ALLOWED_SOURCES — keep these two in sync. Phase D3 added forge-question / mirror-question (preflight clarifications) and beacon-clarification (clarification responses)."
+            "description": "Who initiated this task. Must match dispatch_validator.ALLOWED_SOURCES EXACTLY — the two are kept in sync by scripts/tests/test_source_enum_sync.py (drift fails CI). The validator is the source of truth; this enum mirrors it. Phase D3 added forge-question / mirror-question (preflight clarifications) and beacon-clarification (clarification responses); later additions: outbox-notifier (marker-error re-dispatch), pulse-auto-dispatch (closed-loop proposal dispatch), dashboard (E4.4 Approve/Reject UI actions)."
         },
         "reply_chat_id": {
             "type": ["integer", "null"],
