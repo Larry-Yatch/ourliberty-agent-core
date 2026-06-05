@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 941 — 2026-06-05 02:29 UTC (interactive)
+
+**Health:** ⚠️ **Tier 1 (signal). consecutive_clean=0. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts (Check 0). Mirror wedge ONGOING — PID 44633 + PID 46961 still alive 110 min; inbox-watcher blocked. Standing [yellow] escalation from iter 940 stands.**
+
+Alert watermark: **1308 lines / 2026-06-05T02:25:21Z** (unchanged from iter 940 — 0 new alerts since iter 940 escalation). Pipeline-stall heartbeat: 2026-06-05T02:13:19Z (✅ ~16 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T02:01:43Z (✅ ~28 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=982bbdd5, last_sync=01:49:07Z (~40 min at cycle start; within 2h threshold; local HEAD b0555cd newer — wrapper push from iter 940; self-clears on next hourly tick). Session-start gitStatus: branch=main, tree=clean, HEAD=b0555cd "Pulse cycle 20260605T022805Z". Tier state at start: tier=1, consecutive_clean=0 (from iter 940 tier-reset). Tier state at end: **tier=1, consecutive_clean=0** (signal ongoing — Mirror wedge still active).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1308 lines, unchanged from iter 940 watermark (1308 / 02:25:21Z). 0 new incoming alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ONGOING.** heal-pipeline-stall heartbeat = 02:13:19Z (~16 min at cycle start; within 90-min threshold). Confirmed: Mirror's claude session (PID 44633) still running 01:49:55 elapsed (still stuck). Bash poll loop PID 46961 still alive (1 sec CPU — idle loop). inbox-watcher (PID 4075378) log silent since 00:39:12Z (110+ min). Zero dispatch capacity. Larry has not yet acted on iter 940 [yellow] escalation (kill 46961 / kill 44633). **No new escalation sent — standing iter 940 [yellow] covers this.** ⚠️
+
+- **(Check 4) Pending Larry directives: ⚠️ STALLED.** Mirror inbox: review-build-unreviewed-merge-detector-20260605T000816Z.json still present (~110 min old). Forge=0, Beacon=0, Pulse=0. Same as Check 3 — inbox-watcher blocked awaiting PID 44633. No new action: escalation already sent at iter 940. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 02:01:43Z (~28 min at cycle start; within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=b0555cd "Pulse cycle 20260605T022805Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=982bbdd5, last_sync=01:49:07Z (~40 min old; within 2h threshold; local HEAD newer — wrapper push, self-clears on next hourly sync.timer). ✅
+
+- **(Check C) Agent liveness: ⚠️ 8/8 systemd-active — inbox-watcher still effectively blocked.** All 8 units active. inbox-watcher PID 4075378 log-silent since 00:39:12Z (110+ min) — blocked on Mirror PID 44633. Systemd sees it as active; runtime capacity = zero. **Classification: escalated via Check 3/4.** ⚠️
+
+- **(Check D) Agent inboxes: ⚠️ Mirror=1 (same as Check 3/4).** Forge=0, Beacon=0, Pulse=0. ⚠️
+
+- **(Check E) PRs: ✅ Clean.** 0 open PRs in agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Thursday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions Case 2 not graduated — poll-loop-wedge auto-kill blocked`: G-rule 2/3.** Mirror PID 44633 + bash PID 46961 still alive at iter 941 start — same pattern as iter 940 (1/3). Healer detected 01:05:44Z but couldn't kill (Case 2 not graduated). Now 110 min into the stall. One more iter with this pattern → dispatch Beacon to spec Case 2 graduation. ⚠️
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; no new occurrence this iter). Unchanged.
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (unchanged).
+  - All other G-rules: unchanged from iter 940.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:30:31Z. No new intervention row (finding ongoing from iter 940; standing escalation covers it).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed Mirror wedge persists: PID 44633 (01:49:55 elapsed), PID 46961 (bash poll loop, alive). inbox-watcher blocked 110+ min.
+3. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+4. No new escalation sent — standing [yellow] from iter 940 (02:25:21Z) covers the Mirror wedge; no new information to add.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- **[yellow] (iter 940)** `mirror-poll-loop-wedge-iter940`: Mirror PID 44633 still stuck; inbox-watcher blocked. Suggested: `kill 46961` (Option A) or `kill 44633` (Option B).
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** Mirror wedge from iter 940 persists into iter 941 (110+ min stall). G-rule `Case 2 not graduated` advances to 2/3 — one more occurrence triggers dispatch to Beacon for Case 2 graduation spec. Larry's approval via kill command is the only unblock path. inbox-watcher has zero dispatch capacity; Forge and Beacon inboxes empty so no tasks are queuing behind the blockage currently.
+
+---
+
 ## Iteration 940 — 2026-06-05 02:21 UTC (interactive)
 
 **Health:** ⚠️ **Tier 2 → Tier 1 (signal). consecutive_clean=2→0. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts (Check 0). Pipeline STALLED — Mirror review session wedged.**
