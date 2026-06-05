@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 965 — 2026-06-05 07:17 UTC (interactive, Tier 1 — clean)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. PR #345 OPEN (7 min, watch). 1 more clean iter → Tier 2 de-escalation.**
+
+Alert watermark: **1322 lines / 2026-06-05T07:03:50Z** (unchanged — 0 new alerts since iter 964). Pipeline-stall heartbeat: 2026-06-05T07:01:22Z (✅ ~16 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T07:03:42Z (✅ ~14 min at scan; within 60-min threshold). Sync: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (✅ ~28 min at scan; within 2h threshold). Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2** (1 more clean iter needed for Tier 2 de-escalation).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1322/07:03:50Z unchanged — 0 new alerts since iter 964. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd logs in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T07:01:22Z (~16 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T07:03:42Z (~14 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=ae9a365 "Pulse cycle 20260605T071037Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (28 min, within 2h). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ PR #345 OPEN — watch, 7 min old.**
+  - `gh pr view 345` → CLEAN / MERGEABLE, author=Larry-Yatch, branch=`fix/nervous-system-audit-pr-f-healer-correctness`, created 07:10:46Z. autoMergeRequest=null, reviewDecision="".
+  - Title: "fix(healers): healer correctness — preflight over-match, review-pass false-include, recovery path/repo (audit PR F)"
+  - Age at scan: 7 min. **30-min auto-merge threshold: 07:40:46Z.**
+  - Mirror review: NOT in-flight (Mirror inbox=0). No dispatch observed.
+  - **[yellow] pattern observation:** This is audit PR F in the series — PRs #343 (audit D) and #344 (audit E) were both merged directly by Larry-Yatch without Mirror review within 30 min of creation, triggering consecutive [red] unreviewed-merge alerts (iters 959+963). If this PR follows the same pattern (Larry direct merge before 07:40:46Z), G-rule `actor=larry-direct-merge causes unreviewed-merge alert` will reach 3/3 threshold, requiring Beacon dispatch for `actor-exemption-config` spec.
+  - Action at threshold (07:40:46Z): `gh pr merge 345 --auto --squash` (always-fix `enable-pr-auto-merge`) — if still CLEAN and not yet merged.
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged at 1322 — 0 new `tier2_weekly_probe_failed` alerts since iter 964. Next probe expected ~09:00Z (6h cadence from ~03:00Z last restart). Watch continues. ✅
+
+- **PR #343/#344 [red] escalation:** Larry response still pending (iters 959/963).
+
+- **G-rule updates:** No new occurrences. G-rule `actor=larry-direct-merge` at 2/3 carries forward. At 3/3: dispatch Beacon for `actor-exemption-config` spec. All other G-rules unchanged.
+
+- **PRIME DIRECTIVE ratio:** interventions=721, systemic_fixes=13, ratio≈55.5 (unchanged). No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty.
+3. Noted PR #345 OPEN (audit PR F, < 30 min, no action yet). Flagged [yellow] audit-PR pattern watch.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. ✅
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PR #343 + PR #344 unreviewed-merge — Larry confirmation still pending (iters 959/963).
+- `[yellow]` PR #345 open (audit PR F, same pattern as #343/#344 — watch for Larry direct merge before 07:40:46Z threshold; if merged directly, G-rule 3/3 → dispatch Beacon for actor-exemption-config).
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** PR #345 (audit PR F) just opened, following the pattern of #343 (audit D) and #344 (audit E). All three are Larry-direct PRs on the `fix/nervous-system-audit-pr-*` branch series without Mirror review in-flight. G-rule `actor=larry-direct-merge` is at 2/3 — one more direct merge without Mirror review triggers the 3/3 threshold and a Beacon dispatch. consecutive_clean=2; system is otherwise stable. If next cycle is clean (and PR #345 is managed), de-escalation to Tier 2 is possible.
+
+---
+
 ## Iteration 964 — 2026-06-05 07:09 UTC (interactive, Tier 1 — clean)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1. 3 new alerts — all Tier-3 FYI. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change. 2 more clean iters → Tier 2 de-escalation.**
