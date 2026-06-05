@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 959 — 2026-06-05 06:22 UTC (interactive, Tier 2→1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 2→1 — SIGNAL. Tier-reset triggered by tier-NOW / never_silence alert. 3 new alerts: 1 tier-NOW (unreviewed-merge:343, escalated), 2 pulse-escalation echoes (expected noise pattern). 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
+
+Alert watermark: **1317 lines** (was 1314 iter 958 — 3 new: 1 detector alert + 2 pulse-escalation entries). Pipeline-stall heartbeat: 2026-06-05T06:12:54Z (✅ fresh; ~10 min at scan). Stale-daemon heartbeat: 2026-06-05T06:03:09Z (✅ within 60-min threshold; ~20 min at scan). Sync: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z (✅ fresh). Tier state at start: tier=2, consecutive_clean=2. Tier state at end: **tier=1, consecutive_clean=0** (tier-NOW alert forced reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 tier-NOW alert — tier-reset.** Watermark advanced 1314→1315.
+  - `source=heal-unreviewed-merge-detector, subject=unreviewed-merge:343, ts=2026-06-05T06:10:18Z, severity=critical, route=escalate` — PR #343 merged at 06:10:01Z by Larry-Yatch with no Mirror REVIEW_PASS evidence (`reviewDecision=""` per `gh pr view`). PR title: "fix(outbox): auto-merge correctness — wrong-PR guard, notify-fail merge, echoed-PASS, ambiguous pr_url (audit PR D)". Config entry in alert-translations.json: `tier=NOW, never_silence=true`. **Classification: Tier-NOW, never_silence → escalate + tier-reset.** This is the **first production fire** of the newly-installed `ourliberty-heal-unreviewed-merge-detector.{service,timer}` (auto-installed by install-drift healer at 06:00Z per iter 958). The service is working as designed — it found a real gap: Larry merged PR #343 directly without Mirror review. Whether this was an intentional bypass (Larry is repo owner, can override branch protection) or inadvertent is for Larry to confirm. Two pulse-escalation echoes (lines 1316-1317) are expected noise per G-rule `pulse-escalation not in alert-translations.json` (APPROVAL_REQUEST `deploy-notifier-alert-xlate-split-fix` engine-scope pending).
+  - Escalation written: `pulse-escalation` source, `unreviewed-merge-343-pulse-triage` subject, route=escalate. DM queued via Beacon bot.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T06:12:54Z (~10 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T06:03:09Z (~20 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** gitStatus from session start: branch=main, tree=clean, HEAD=ff0f8b9 "Pulse cycle 20260605T061045Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=d145a733, last_sync=2026-06-05T05:49:25Z. SYNC-PUSH-REBASE-FALLBACK self-healed (iter 958); remains healed this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. Note: `ourliberty-heal-unreviewed-merge-detector.{service,timer}` also installed and firing (see Check 0). ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0, ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC → skip (Sunday gate). ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** No new `tier2_weekly_probe_failed` alerts in the new window (lines 1315-1317 are unreviewed-merge + pulse-escalation, not probe-failed). Watermark at 1314 + 3 new = none are probe failures. Next probe expected ~09:00Z. Watch continues.
+
+- **G-rule updates:**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive` (G-rule 1/3, iter 922): No new alerts. **3rd+ clean iter post-PR #332** (now also post-PR #342). G-rule appears healed; will note at 3/3 clean confirmation next iter.
+  - `wedged-review-silent-wt:* not in alert-translations.json` (G-rule 1/3, iter 935): No new occurrence. Watch continues.
+  - `install-drift healer doesn't auto-install sibling timers` (G-rule 2/3): The unreviewed-merge-detector firing confirms the service is working; the timer fired correctly (its first fire at ~06:10Z aligned with the merge event). Healer installed both service+timer in iter 958. Counter-evidence still stands (prior G-rule scenario was service present / timer absent; this was both missing). G-rule remains 2/3.
+  - All other G-rules: no new occurrences.
+
+- **NEW observation (unreviewed-merge-detector behavior):** The detector fired its **first production alert** correctly. However, the trigger was Larry's own merge — actor=Larry-Yatch (repo owner). This raises a calibration question: should source=larry manual merges be exempt, or should they always alert (defense-in-depth)? The `never_silence: true` flag suggests the author intended all unreviewed merges to alert regardless of actor. Larry's response to this escalation will calibrate this. If Larry says "expected, exempt Larry-direct-merges," that's a new G-rule for `heal-unreviewed-merge-detector`: exempt-actor-list configuration. If Larry says "correct behavior, always alert even for my merges," the detector is perfectly calibrated. Watch for Larry's response next iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=720 (+1), systemic_fixes=13, ratio≈55.4 (up from 55.3). Intervention: `unreviewed-merge-escalation:PR-343-Larry-Yatch-no-mirror-review`.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified `unreviewed-merge:343` as tier-NOW / never_silence → escalated to Larry.
+3. Wrote escalation via `larry_alerts.py append_alert` (source=pulse-escalation, route=escalate). DM queued.
+4. Recorded PRIME DIRECTIVE intervention: `unreviewed-merge-escalation:PR-343-Larry-Yatch-no-mirror-review`.
+5. `cycle_tier_state.py record --checks-clean false` → tier-reset: tier=2→1, consecutive_clean=0.
+6. Wrote journal entry.
+
+**Escalated:**
+- `[red]` PR #343 merged without Mirror review — `heal-unreviewed-merge-detector` tier-NOW alert. DM queued via Beacon bot. Larry: confirm whether the manual merge of "fix(outbox): auto-merge correctness — wrong-PR guard, notify-fail merge, echoed-PASS, ambiguous pr_url (audit PR D)" was intentional. If intentional bypass, clarify if detector should allow source=larry actor merges.
+- Prior standing items carry forward:
+  - `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovered iter 958; root code fix still pending).
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+  - APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** Unreviewed-merge-detector fired correctly on its first production run, catching PR #343 merged by Larry-Yatch without Mirror review. This is good news (detector works) and a question (actor=Larry merges: exemption or always-alert?). Tier-reset to 1. All other subsystems nominal.
+
+---
+
 ## Iteration 958 — 2026-06-05 06:09 UTC (interactive, Tier 2 — clean)
 
 **Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=2. 2 new Tier-3 FYI alerts (install-healed, no tier-reset). 8/8 services active. All inboxes empty. 0 open PRs. Sync: SELF-HEALED ✅ (was SYNC-PUSH-REBASE-FALLBACK; now no-change). PR #342 merged at 05:39:55Z.**
