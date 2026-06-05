@@ -54,6 +54,43 @@ class TestReadState(_ATSTestBase):
         self._state_path().write_text('{garbage')
         self.assertEqual(ats.read_state(), {})
 
+    def test_corrupt_json_preserves_prior_bytes_to_sidecar(self):
+        # Audit #37: a transient corruption must not silently discard prior
+        # lifecycle rows. read_state() moves the corrupt file aside so its
+        # bytes are recoverable, then returns {}.
+        path = self._state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        original = '{"alert-A": {"x": 1}, "alert-B": {"y": 2}}TRUNCATED'
+        path.write_text(original)
+
+        self.assertEqual(ats.read_state(), {})
+
+        # The live path is now gone (moved aside), and exactly one corrupt
+        # sidecar holds the original bytes verbatim.
+        self.assertFalse(path.exists())
+        sidecars = sorted(p for p in path.parent.iterdir()
+                          if p.name.startswith(f'{path.name}.corrupt-'))
+        self.assertEqual(len(sidecars), 1)
+        self.assertEqual(sidecars[0].read_text(), original)
+
+    def test_corrupt_read_then_write_does_not_lose_history(self):
+        # End-to-end: corrupt state, then a new record_triage write. The new
+        # row lands, AND the prior bytes survive in the sidecar (recoverable),
+        # rather than being atomically clobbered with no trace.
+        path = self._state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        original = '{"alert-A": {"status": "triaged-tier-1"}}!!corrupt'
+        path.write_text(original)
+
+        ats.record_triage('alert-C', 1, 'auto', 'why')
+
+        live = json.loads(path.read_text())
+        self.assertEqual(list(live), ['alert-C'])  # forward progress
+        sidecars = [p for p in path.parent.iterdir()
+                    if p.name.startswith(f'{path.name}.corrupt-')]
+        self.assertEqual(len(sidecars), 1)
+        self.assertEqual(sidecars[0].read_text(), original)  # history preserved
+
 
 class TestRecordTriage(_ATSTestBase):
 

@@ -48,6 +48,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import build_sequence_validator as bsv  # noqa: E402
+from atomic_io import atomic_write_json  # noqa: E402
 
 
 # AGENTS_ROOT is a module-level constant so tests can monkeypatch it the
@@ -126,23 +127,21 @@ def _read_sequence(seq_id: str) -> tuple[Optional[dict[str, Any]], Optional[Resu
 
 
 def _atomic_write(path: Path, seq: dict[str, Any]) -> Optional[Result]:
-    """Atomic write of seq to path via tmp + os.replace.
+    """Atomic write of seq to path via a UNIQUE tmp + os.replace.
 
-    On failure (OSError), unlinks the partial tmp and returns an error
-    Result. On success returns None.
+    On failure (OSError), returns an error Result; on success returns None.
+
+    Audit #62: the previous implementation used a *fixed* ``<path>.tmp`` name,
+    so two concurrent shortcut writers (or a shortcut racing another process
+    using the same convention, e.g. outbox_notifier) could truncate each
+    other's half-written tmp before ``os.replace`` — corrupting the sequence
+    file or surfacing a spurious FileNotFoundError. The shared
+    ``atomic_write_json`` helper writes to a unique mkstemp tmp + fsync, so
+    concurrent writers never share a tmp. Trailing newline is preserved.
     """
-    # Same convention as the kickoff handler in outbox_notifier.
-    tmp_path = path.with_suffix(path.suffix + '.tmp')
     try:
-        with open(tmp_path, 'w', encoding='utf-8') as f:
-            json.dump(seq, f, indent=2)
-            f.write('\n')
-        os.replace(tmp_path, path)
+        atomic_write_json(path, seq, indent=2, trailing_newline=True)
     except OSError as e:
-        try:
-            tmp_path.unlink()
-        except OSError:
-            pass
         return Result(
             applied=False,
             reason=f'Sequence file write failed at {path}: {e}',

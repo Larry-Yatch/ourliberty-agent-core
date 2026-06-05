@@ -75,6 +75,25 @@ def log(level: str, msg: str) -> None:
         pass
 
 
+def _unique_archive_target(target: Path) -> Path:
+    """Pick a collision-free archive path when ``target`` already exists.
+
+    Audit #54: ``shutil.move`` silently overwrites a same-named destination,
+    destroying the prior archived task and defeating the module's stated
+    "Move (not delete) — preserves audit trail" guarantee. If the timestamped
+    name recurs (the 14-digit prefix can repeat across restart-dedup of the
+    same task), fall back to ``<name>-dup1.json``, ``-dup2.json``, … so no
+    earlier archived copy is ever clobbered.
+    """
+    stem, suffix, parent = target.stem, target.suffix, target.parent
+    i = 1
+    while True:
+        candidate = parent / f"{stem}-dup{i}{suffix}"
+        if not candidate.exists():
+            return candidate
+        i += 1
+
+
 def main() -> int:
     if KILL_SWITCH.exists():
         log("KILLED_BY_SWITCH", "healers.disabled flag present, exiting")
@@ -102,6 +121,8 @@ def main() -> int:
         if mtime > threshold:
             continue
         target = ARCHIVE_DIR / f.name
+        if target.exists():
+            target = _unique_archive_target(target)
         try:
             shutil.move(str(f), str(target))
             age_h = (now - mtime) / 3600

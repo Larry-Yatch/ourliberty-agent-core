@@ -62,6 +62,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from fixture_patterns import is_fixture_task_id  # noqa: E402
+from atomic_io import atomic_write_json  # noqa: E402
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -490,13 +491,13 @@ def _connect_supabase():
 def write_proposal_artifact(
     artifact: dict[str, Any], path: Path = PROPOSALS_FILE,
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(artifact, indent=2))
+    # Audit #7 (companion to pulse_check_viii): atomic write so a mid-write
+    # crash leaves the intact prior artifact, never a truncated one.
+    atomic_write_json(path, artifact, indent=2)
     history_dir = PROPOSALS_HISTORY_DIR
-    history_dir.mkdir(parents=True, exist_ok=True)
     date_str = artifact['as_of'][:10]
-    (history_dir / f'check-iii-{date_str}.json').write_text(
-        json.dumps(artifact, indent=2))
+    atomic_write_json(
+        history_dir / f'check-iii-{date_str}.json', artifact, indent=2)
 
 
 def dm_digest(artifact: dict[str, Any]) -> bool:
