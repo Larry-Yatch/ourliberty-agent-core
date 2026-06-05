@@ -130,12 +130,29 @@ def get_active_claude_cwds() -> set[str]:
 
 
 def _worktree_safe_stem(task_stem: str) -> str:
-    """Reproduce agent_runner's worktree-name sanitization so we can match a
-    task against its `wt-<agent>-<safe_stem>-<ts>` directory. agent_runner maps
-    every non-[alnum-_] char to '-' and truncates to 50. Matching the RAW
-    task_id (as the old code did) silently failed for any task_id containing a
-    '.', ':', or space — those become '-' in the worktree name, so the raw
-    substring was never present and a live worker went undetected."""
+    """Reproduce the WORKTREE-domain sanitization so we can match a task
+    against its `wt-<agent>-<safe_stem>-<ts>` directory. Maps every
+    non-[alnum-_] char to '-' and truncates to 50. Matching the RAW task_id
+    (as the old code did) silently failed for any task_id containing a '.',
+    ':', or space — those become '-' in the worktree name, so the raw
+    substring was never present and a live worker went undetected.
+
+    MUST-MATCH INVARIANT (PR-A follow-up, audit #53): this mirrors the TWO
+    live worktree namers byte-for-byte (same char map, same 50-char cap):
+    `worktree_manager._sanitize_task_id` (the inbox_watcher dispatch path) and
+    `agent_runner._worktree_safe_stem` (the agent_runner 'main'-agent path).
+    Both produce `wt-<agent>-<safe_stem>` dirs that a live worker runs in. If
+    any of the three diverge, `has_active_worker` builds a stem the dispatcher
+    never wrote, the substring check misses, and a live worker goes undetected
+    (the abandoned-task healer then double-dispatches). The one intentional
+    difference: this returns '' (not 'task') for an empty stem, because
+    `has_active_worker` guards on `if not safe` to avoid a spurious match — see
+    the consistency-contract test
+    `test_path_traversal_sanitizer.WorktreeSanitizerConsistencyTest`.
+
+    NB: this is the AGGRESSIVE worktree sanitizer, NOT the printable-
+    preserving inbox one (`safe_write_inbox.sanitize_component`); the two
+    domains diverge on purpose — see `_sanitize_task_id`'s docstring."""
     return ''.join(c if (c.isalnum() or c in '-_') else '-' for c in task_stem)[:50]
 
 

@@ -74,7 +74,42 @@ LogFn = Callable[[str], None]
 
 
 def _sanitize_task_id(task_id: str) -> str:
-    """Sanitize a task_id for safe filesystem path use."""
+    """Sanitize a task_id for safe filesystem path use.
+
+    Sanitizer architecture (PR-A follow-up, audit #53)
+    --------------------------------------------------
+    This is the WORKTREE-domain sanitizer and it deliberately diverges from
+    the INBOX-domain sanitizer in ``safe_write_inbox.sanitize_component``:
+
+      - The inbox sanitizer neutralizes ONLY path-structural bytes
+        (``/ \\`` NUL, control) and PRESERVES other printables (``: @ #``,
+        space). It must, because the on-disk inbox name has to stay equal to
+        ``f'{task_id}.json'`` — the idempotency readers in ``outbox_notifier``
+        and ``heal_pipeline_stall`` rebuild that name from the RAW task_id, so
+        a rewrite there would defeat dedup and re-dispatch.
+
+      - This worktree sanitizer maps EVERY non-``[A-Za-z0-9_-]`` char to
+        ``-`` and caps length. It can be aggressive because the worktree
+        directory name is a DERIVED identifier never reconstructed from the
+        task_id: nothing reads the task_id back out of the worktree path.
+        Aggressiveness is also desirable — the stem feeds
+        ``derive_branch_name`` (``<agent>/<safe_stem>``), and git ref names
+        reject ``:``, ``..``, control bytes, etc., so the conservative
+        allowlist keeps branch names valid.
+
+    The two domains have different round-trip requirements, so they correctly
+    use different rules. Do NOT route this through ``sanitize_component`` —
+    that would leak ``:``/``@`` into worktree and branch names.
+
+    INVARIANT: two siblings mirror this exact char mapping + 50-char cap so
+    ``heal_abandoned_inbox_tasks.has_active_worker`` can match a task against
+    its on-disk ``wt-<agent>-<safe_stem>`` dir: ``agent_runner.
+    _worktree_safe_stem`` (the 'main'-agent dispatch path also names worktrees)
+    and ``heal_abandoned_inbox_tasks._worktree_safe_stem`` (the matcher). If
+    you change the mapping here, change it in BOTH — the three-way consistency
+    contract is locked by
+    ``test_path_traversal_sanitizer.WorktreeSanitizerConsistencyTest``.
+    """
     safe = ''.join(
         c if (c.isalnum() or c in '-_') else '-'
         for c in (task_id or 'task')
@@ -85,7 +120,13 @@ def _sanitize_task_id(task_id: str) -> str:
 def worktree_path_for(agent_id: str, task_id: str) -> Path:
     """Return the deterministic worktree path for an (agent_id, task_id) pair.
 
-    No filesystem side effects. The path is ``/tmp/wt-<agent>-<task_id>/``.
+    No filesystem side effects. The path is
+    ``<WORKTREE_BASE>/wt-<agent>-<safe_task_id>/``. ``_sanitize_task_id``
+    strips ``/`` and ``..``, so a hostile task_id cannot traverse out of
+    ``WORKTREE_BASE`` (verified by ``test_path_traversal_sanitizer.
+    WorktreePathTraversalTest``). NB: ``agent_id`` is NOT sanitized here — it
+    is an internal models_config key, never wire-supplied; the traversal
+    surface (#53) is the task_id.
     """
     safe_stem = _sanitize_task_id(task_id)
     return WORKTREE_BASE / f'{WORKTREE_PREFIX}{agent_id}-{safe_stem}'

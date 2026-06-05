@@ -1361,6 +1361,25 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
 
 
+def _worktree_safe_stem(task_stem):
+    """Sanitize a task stem for the worktree directory name.
+
+    WORKTREE-domain sanitizer (PR-A follow-up, audit #53): maps every
+    non-[alnum-_] char to '-' and caps at 50. MUST stay byte-for-byte
+    identical to ``worktree_manager._sanitize_task_id`` and
+    ``heal_abandoned_inbox_tasks._worktree_safe_stem`` — this is one of three
+    live namers of ``wt-<agent>-<safe_stem>`` dirs, and the abandoned-task
+    healer's ``has_active_worker`` matches a worker's on-disk cwd against this
+    exact mapping. If the three diverge, a live worker spawned via THIS path
+    (the 'main' agent, agent_runner main loop) goes undetected and gets
+    double-dispatched. The contract is locked by
+    ``test_path_traversal_sanitizer.WorktreeSanitizerConsistencyTest``. NOT
+    the printable-preserving inbox sanitizer — see that test and
+    ``worktree_manager._sanitize_task_id``'s docstring for why the domains
+    diverge."""
+    return ''.join(c if (c.isalnum() or c in '-_') else '-' for c in task_stem)[:50]
+
+
 def create_worktree_for_task(agent_id, task_stem):
     """
     Create a fresh git worktree for a task. Returns the worktree path or None on failure.
@@ -1378,8 +1397,9 @@ def create_worktree_for_task(agent_id, task_stem):
         log(agent_id, 'Cannot create worktree: repo not found at ' + str(repo_dir), 'WARN')
         return None
 
-    # Sanitize task stem for path safety
-    safe_stem = ''.join(c if (c.isalnum() or c in '-_') else '-' for c in task_stem)[:50]
+    # Sanitize task stem for path safety (shared worktree-domain rule;
+    # see _worktree_safe_stem for the must-match-three-copies invariant).
+    safe_stem = _worktree_safe_stem(task_stem)
     timestamp = int(time.time())
     worktree_path = Path('/tmp') / ('wt-' + agent_id + '-' + safe_stem + '-' + str(timestamp))
 
