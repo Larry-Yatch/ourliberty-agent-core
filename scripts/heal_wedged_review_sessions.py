@@ -891,7 +891,7 @@ def run_cycle(
                          f'{cand.pid}, {Path(cand.cwd).name}): idle '
                          f'{int(cand.idle_secs)}s with no terminal marker. '
                          f'Alert-only (Case 2 not yet graduated). Not killing.'),
-                        f'wedged-review-silent-{Path(cand.cwd).name}',
+                        f'wedged-review-silent:{Path(cand.cwd).name}',
                         (f'Inspect: `ls -la {cand.cwd}` and the session log at '
                          f'{cand.jsonl}. If genuinely wedged, kill pid {cand.pid}.'),
                     )
