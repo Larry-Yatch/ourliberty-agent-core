@@ -190,9 +190,19 @@ class GateTest(_IsolatedActions):
 
 
 class SilenceFalsePositiveTest(_IsolatedActions):
-    """silence-false-positive handler: reversible, allowlist-gated, no DM.
-    The 2026-06-04 forge-no-pr backstop -- Medic durably quiets a confirmed
-    benign fingerprint instead of escalating attempt N+1 to Larry."""
+    """silence-false-positive handler: reversible, allowlist-gated, and
+    coupled with exactly ONE actionable fix report. The 2026-06-04
+    forge-no-pr backstop -- Medic durably quiets a confirmed benign
+    fingerprint instead of escalating attempt N+1 to Larry, but still DMs
+    Larry once with the root cause so the underlying bug is not silently
+    masked."""
+
+    def _alert_records(self) -> list:
+        path = medic_actions.larry_alerts.ALERTS_FILE
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in
+                path.read_text().splitlines() if line.strip()]
 
     SILENCEABLE_FP = ('heal-pipeline-stall:pipeline-stall:forge-no-pr:'
                       'forge-queue-api-preflight-20260603T231401Z-clarify1')
@@ -276,6 +286,60 @@ class SilenceFalsePositiveTest(_IsolatedActions):
         self.assertEqual(rc, 0)
         self.assertTrue(
             medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FP))
+
+    def test_silence_emits_one_shot_fix_report(self) -> None:
+        """Silencing must not be silent: it couples with exactly one
+        actionable fix report to Larry, carrying the operator's remediation
+        text under a DISTINCT `medic-silenced-needs-fix:` subject so the
+        silence on the original fingerprint does not suppress it."""
+        res = medic_actions.silence_false_positive(
+            self.SILENCEABLE_FP, reason='build shipped as PR #294',
+            remediation='Add retry-sibling reconciliation to '
+                        'heal_pipeline_stall.py _forge_pr_create_inferred_failure')
+        self.assertTrue(res['ok'])
+        self.assertIn('fix-report DM sent', res['detail'])
+        reports = [r for r in self._alert_records()
+                   if str(r.get('subject', '')).startswith(
+                       'medic-silenced-needs-fix:')]
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(reports[0]['source'], 'medic')
+        self.assertEqual(reports[0]['route'], 'escalate')
+        self.assertIn('retry-sibling reconciliation',
+                      reports[0]['suggested_action'] + reports[0]['message'])
+        self.assertIn(self.SILENCEABLE_FP, reports[0]['message'])
+
+    def test_silence_without_remediation_still_emits_generic_fix_report(self) -> None:
+        """Coupling holds even if the operator supplied no remediation text —
+        a generic 'patch it at the source' instruction is sent."""
+        res = medic_actions.silence_false_positive(self.SILENCEABLE_FP)
+        self.assertTrue(res['ok'])
+        reports = [r for r in self._alert_records()
+                   if str(r.get('subject', '')).startswith(
+                       'medic-silenced-needs-fix:')]
+        self.assertEqual(len(reports), 1)
+        self.assertIn('patch it at the source', reports[0]['message'])
+
+    def test_idempotent_silence_does_not_re_emit_fix_report(self) -> None:
+        """One-shot: the second (idempotent) silence returns early and must
+        NOT add a second fix report, so a re-confirmed false positive can't
+        re-junk the inbox."""
+        medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='a')
+        res = medic_actions.silence_false_positive(self.SILENCEABLE_FP, reason='b')
+        self.assertEqual(res['reason'], 'already-silenced')
+        reports = [r for r in self._alert_records()
+                   if str(r.get('subject', '')).startswith(
+                       'medic-silenced-needs-fix:')]
+        self.assertEqual(len(reports), 1)
+
+    def test_refused_silence_emits_no_fix_report(self) -> None:
+        """A refused silence (not in allowlist) performs nothing, so it must
+        not emit a fix report either."""
+        medic_actions.silence_false_positive(
+            'watchdog:disk-full-critical', reason='nope')
+        reports = [r for r in self._alert_records()
+                   if str(r.get('subject', '')).startswith(
+                       'medic-silenced-needs-fix:')]
+        self.assertEqual(reports, [])
 
 
 class RestartSuccessTest(_IsolatedActions):

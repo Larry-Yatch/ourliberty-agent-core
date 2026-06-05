@@ -353,26 +353,78 @@ def retrigger_inbox(target: str, fingerprint: str, attempt: int = 1) -> dict:
                         allowed)
 
 
+def _emit_remediation_notice(fp: str, reason: str, remediation: str) -> bool:
+    """Emit ONE actionable 'the root cause still needs fixing' alert to Larry
+    when Medic durably silences a false positive.
+
+    Silencing stops the recurring inbox noise, but the underlying bug is
+    still unfixed -- Medic can quiet the symptom, not patch the code. So a
+    silence must never be truly silent: it is coupled with exactly one DM
+    telling Larry what to fix at the source. The notice rides a DISTINCT
+    subject (`medic-silenced-needs-fix:<subject>`) so the silence on the
+    original fingerprint does not also suppress this report, and so it
+    carries its own cooldown bucket. One-shot by construction: the caller
+    only reaches this on a FRESH silence (the idempotent re-silence path
+    returns earlier), and append_alert's per-subject cooldown is a backstop
+    against duplicates.
+
+    `remediation` is the operator's specific 'here is the fix' text; when
+    empty, a generic instruction is used so the coupling holds even if the
+    operator supplied none. Fail-safe: returns append_alert's bool and never
+    raises (append_alert itself never raises)."""
+    _src, subject = _fp_parts(fp)
+    fix = remediation.strip() if isinstance(remediation, str) else ''
+    why = reason.strip() if isinstance(reason, str) else ''
+    body = (
+        f'Medic durably silenced a confirmed false positive to stop it '
+        f'looping in your inbox, but the ROOT CAUSE is still unfixed -- '
+        f'Medic can quiet the alert, not patch the code. Fingerprint: {fp}.')
+    if why:
+        body += f' Why benign: {why}.'
+    if fix:
+        body += f' Needs fixing: {fix}'
+    else:
+        body += (' Needs fixing: investigate the healer/source that emits '
+                 'this fingerprint and patch it at the source.')
+    action = (
+        f'Fix the root cause, then lift the mask: '
+        f'larry_alerts.unsilence("{fp}"). Audit trail: medic-dispatcher.log.')
+    return larry_alerts.append_alert(
+        source='medic',
+        severity='warning',
+        message=body,
+        subject=f'medic-silenced-needs-fix:{subject}',
+        suggested_action=action,
+        route='escalate',
+    )
+
+
 def silence_false_positive(fingerprint: str, reason: str = '',
                            attempt: int = 1,
-                           ttl_sec: Optional[float] = None) -> dict:
+                           ttl_sec: Optional[float] = None,
+                           remediation: str = '') -> dict:
     """Durably suppress a confirmed benign false-positive alert so it stops
-    DMing Larry. Reversible (writes a suppression file only; mutates nothing
-    on the system). Strict order, mirroring _act_restart:
+    looping in Larry's inbox, AND emit exactly one actionable fix report so
+    the unfixed root cause is never silently masked. Reversible (writes a
+    suppression file only; mutates nothing on the system). Strict order,
+    mirroring _act_restart:
 
       (a) gates  -- enable flag + both kill switches.
       (b) allowlist -- the fingerprint must match a `silenceable_subjects`
           pattern (substring). A fingerprint matching no pattern is REFUSED:
           Medic may only auto-silence proven-benign CLASSES, never an
           arbitrary alert.
-      (c) idempotence -- if already silenced, succeed as a no-op.
+      (c) idempotence -- if already silenced, succeed as a no-op (and do NOT
+          re-emit the fix report; that keeps the notice one-shot).
       (d) perform -- larry_alerts.silence(fingerprint, ...).
       (e) verify  -- larry_alerts.is_silenced(fingerprint) is now True.
       (f) record  -- ledger outcome='acted' (classification='reversible').
+      (g) couple  -- emit ONE `medic-silenced-needs-fix:<subject>` alert to
+          Larry with the root cause / `remediation`. Silencing stops the
+          symptom; this guarantees the bug Medic cannot fix itself still
+          reaches Larry exactly once with what to fix.
 
-    Deliberately emits NO notification: the whole point is that a benign
-    false positive should reach neither Larry nor a diagnose-only DM. The
-    silence is logged to medic-dispatcher.log for the audit trail and is
+    The silence is logged to medic-dispatcher.log for the audit trail and is
     reversible via larry_alerts.unsilence(fingerprint).
     """
     try:
@@ -425,10 +477,22 @@ def silence_false_positive(fingerprint: str, reason: str = '',
             source=rec_source, subject=rec_subject, classification='reversible',
             outcome='acted', attempt=attempt_int, notes=notes)
         _log('INFO', notes)
+
+        # (g) couple the silence with ONE actionable fix report. Silencing
+        # stops the inbox loop; this guarantees the unfixed root cause still
+        # reaches Larry exactly once instead of being quietly masked. Only on
+        # this fresh-silence path -- the (c) idempotence branch returned
+        # earlier, so the notice never repeats on subsequent cycles.
+        notified = _emit_remediation_notice(fp, reason, remediation)
+        _log('INFO', f'remediation notice for {fp}: '
+                     f'{"sent" if notified else "suppressed (cooldown)"}')
+
         ttl_note = 'permanent' if not ttl_sec else f'ttl={ttl_sec}s'
+        dm_note = ('fix-report DM sent' if notified
+                   else 'fix-report DM suppressed (cooldown)')
         return _result(
             ACTION_SILENCE, fp, fp, ok=True, outcome='acted', reason='silenced',
-            detail=(f'{fp} silenced ({ttl_note}); no DM sent. Reversible: '
+            detail=(f'{fp} silenced ({ttl_note}); {dm_note}. Reversible: '
                     f'larry_alerts.unsilence("{fp}") restores it.'))
     except Exception as e:  # never raise -- fail safe
         _log('ERROR', f'{ACTION_SILENCE} unexpected exception for '
@@ -462,6 +526,11 @@ def _main(argv: Optional[list] = None) -> int:
     parser.add_argument('--ttl-sec', dest='ttl_sec', type=float, default=None,
                         help='silence-false-positive: optional TTL in seconds; '
                              'omit for a permanent silence')
+    parser.add_argument('--remediation', default='',
+                        help='silence-false-positive: the specific root-cause '
+                             'fix to report to Larry alongside the silence '
+                             '(what to patch at the source). Optional; a '
+                             'generic instruction is sent if omitted.')
     args = parser.parse_args(argv)
 
     if args.action == ACTION_RESTART_DAEMON:
@@ -470,7 +539,8 @@ def _main(argv: Optional[list] = None) -> int:
         result = retrigger_inbox(args.target, args.fingerprint, args.attempt)
     elif args.action == ACTION_SILENCE:
         result = silence_false_positive(args.fingerprint, args.reason,
-                                        args.attempt, args.ttl_sec)
+                                        args.attempt, args.ttl_sec,
+                                        remediation=args.remediation)
     else:
         # Privileged / judgment / unknown action types never reach a handler.
         result = _result(

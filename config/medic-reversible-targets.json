@@ -9,6 +9,7 @@
     "ourliberty-inbox-watcher.service"
   ],
   "silenceable_subjects": [
-    "pipeline-stall:forge-no-pr:"
+    "pipeline-stall:forge-no-pr:",
+    "pipeline-stall:pr-create-inferred-failure:"
   ]
 }

@@ -650,6 +650,76 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
         self.assertEqual(alerts, [])
 
+    def _write_retry_archive(self, task: str, idx: int, payload: dict) -> None:
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.{idx}.json').write_text(json.dumps(payload))
+
+    def test_step5_suppressed_when_retry_sibling_succeeded(self) -> None:
+        """The 2026-06-04 two-day false-fire: the first-attempt outbox
+        errored (exit_code=-1, 'All retries exhausted') but a marker-error
+        retry sibling (`...-clarify1.1.json`) recovered with PROCEED and
+        dispatched the build that opened PR #294. Step 5 must consult the
+        retry sibling and SKIP (reason=retry_recovered) instead of firing
+        `pr-create-inferred-failure` — even with NO sibling PR in view (the
+        re-keyed / aged-out window case)."""
+        task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': -1,
+            'error': 'All retries exhausted',
+            'result': 'All retries exhausted',
+        })
+        self._write_retry_archive(task, 1, {
+            'task_id': f'{task}.1',
+            'phase': 'preflight',
+            'exit_code': 0,
+            'attempts': 1,
+            'result': '=== PROCEED ===',
+        })
+        self.assertEqual(
+            self.hps._forge_retry_succeeded(task), f'{task}.1.json')
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+        skips = [m for m in captured if 'reason=retry_recovered' in m]
+        self.assertEqual(len(skips), 1)
+        self.assertIn(f'{task}.1.json', skips[0])
+
+    def test_step5_still_fires_when_retry_sibling_also_errored(self) -> None:
+        """Guard: a retry sibling that ALSO errored is not a recovery — Step
+        5 still surfaces the genuine infra/auth loss once."""
+        task = 'forge-x-preflight-20260604T010000Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'preflight',
+            'exit_code': -1, 'error': 'All retries exhausted',
+        })
+        self._write_retry_archive(task, 1, {
+            'task_id': f'{task}.1', 'phase': 'preflight',
+            'exit_code': -1, 'error': 'All retries exhausted',
+        })
+        self.assertIsNone(self.hps._forge_retry_succeeded(task))
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'],
+            f'pipeline-stall:pr-create-inferred-failure:{task}')
+
+    def test_forge_retry_succeeded_none_when_no_siblings(self) -> None:
+        """Only the first-attempt outbox exists (no `.N.json` retry) -> None.
+        The glob must not match the base `<task>.json` itself."""
+        task = 'forge-y-preflight-20260604T020000Z-clarify1'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'preflight',
+            'exit_code': -1, 'error': 'All retries exhausted',
+        })
+        self.assertIsNone(self.hps._forge_retry_succeeded(task))
+
 
 class TestCheckPrNoMirrorDispatch(_TempAgentsRootMixin, unittest.TestCase):
 
