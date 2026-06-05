@@ -24,6 +24,13 @@ from collections import defaultdict
 
 PENDING_APPROVALS = "/home/larry/agents/state/beacon-pending-approvals.json"
 MOCK_MARKERS = ("real-", "prod-clr", "prod-fail", "task-cascade", "real-pf")
+# A marker identifies a mock task_id only as a whole leading component, not as a
+# bare substring: 'prod-fail' tags 'prod-fail-001' but must NOT tag the real
+# 'prod-failover-check', and 'real-' must NOT tag 'unreal-deploy-001' (audit
+# #36). A marker matches when the id equals it or begins with it followed by a
+# '-'/'_' component separator. Markers that already end in a separator ('real-')
+# carry their own boundary.
+_COMPONENT_SEP = ("-", "_")
 
 
 def _client():
@@ -34,7 +41,14 @@ def _client():
 
 
 def _is_mock(tid):
-    return any(m in (tid or "") for m in MOCK_MARKERS)
+    tid = tid or ""
+    for m in MOCK_MARKERS:
+        if tid == m:
+            return True
+        if tid.startswith(m) and (m.endswith(_COMPONENT_SEP)
+                                  or tid[len(m):len(m) + 1] in _COMPONENT_SEP):
+            return True
+    return False
 
 
 def _fetch(client, **filt):

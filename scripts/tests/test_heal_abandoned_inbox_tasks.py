@@ -129,6 +129,26 @@ class ResolvedGateTest(_IsolatedRoot):
         resolved_m.assert_not_called()
         recover_m.assert_not_called()
 
+    def test_worker_gate_short_stem_does_not_false_match(self):
+        # audit #26: a short/common task stem ('b') must NOT match an unrelated
+        # worktree by bare substring, which made the gate report a phantom live
+        # worker and permanently strand the abandoned task. Below id_match's
+        # floor it no longer matches, so recovery proceeds.
+        self.assertFalse(h.has_active_worker('b', {'wt-forge-rebuild-pipeline-001'}))
+        # ...but a legitimately-short stem MUST still match its OWN worktree, or
+        # we would double-dispatch live work. The match uses min_len=1 (the
+        # worktree name is structured), so no length floor drops it.
+        self.assertTrue(h.has_active_worker('b', {'wt-forge-b-20260605T010101Z'}))
+        # A long stem that appears only as an INFIX of a larger worktree token
+        # (not boundary-delimited) must not match.
+        self.assertFalse(
+            h.has_active_worker('configuration-management',
+                                {'wt-forge-reconfiguration-management-extras-1'}))
+        # Sanity: the same stem as a real boundary-delimited token DOES match.
+        self.assertTrue(
+            h.has_active_worker('configuration-management',
+                                {'wt-forge-configuration-management-001'}))
+
 
 class PidAliveTest(unittest.TestCase):
     def test_self_pid_is_alive(self):

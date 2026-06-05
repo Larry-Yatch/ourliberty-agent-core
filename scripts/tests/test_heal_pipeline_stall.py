@@ -438,14 +438,25 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         )
 
     def test_pr_matches_task_helper_title_fallback(self) -> None:
+        # A realistic-length task_id carried verbatim in a human PR title still
+        # matches via the title fallback (case-insensitively).
+        pr = {
+            'headRefName': 'forge/something-else',
+            'title': 'fix: handle PIPELINE-STALL-RECOVERY-001 case',
+        }
+        self.assertEqual(
+            self.hps._pr_matches_task(pr, 'pipeline-stall-recovery-001'),
+            'title',
+        )
+
+    def test_pr_matches_task_title_short_id_below_floor(self) -> None:
+        # audit #19 mirror: a short/common task_id must NOT match by title
+        # substring (previously it did and stalled recovery).
         pr = {
             'headRefName': 'forge/something-else',
             'title': 'fix: handle MY-TASK-001 case',
         }
-        self.assertEqual(
-            self.hps._pr_matches_task(pr, 'my-task-001'),
-            'title',
-        )
+        self.assertIsNone(self.hps._pr_matches_task(pr, 'my-task-001'))
 
     def test_pr_matches_task_helper_returns_none(self) -> None:
         pr = {'headRefName': 'forge/unrelated', 'title': 'no match'}
