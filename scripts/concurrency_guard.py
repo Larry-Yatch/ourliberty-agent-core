@@ -19,7 +19,33 @@ from pathlib import Path
 
 AGENTS_ROOT = Path.home() / 'agents'
 GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
-MAX_CONCURRENT = 10
+
+# Safe limit defaults to 6 (see module docstring for the RAM math: 6×400MB +
+# services + browsers ≈ 4.3 GB of 7.8 GB). It was previously hard-coded to 10 —
+# inherited from the gm-agent-core bootstrap — which contradicted the documented
+# ceiling and risked OOM on this VM. Override ONLY via the environment when the
+# VM is resized; a value outside the safe band fails loudly rather than silently
+# over-committing memory.
+_MAX_CONCURRENT_CEILING = 6
+
+
+def _resolve_max_concurrent():
+    raw = os.environ.get('OURLIBERTY_MAX_CONCURRENT')
+    if raw is None:
+        return _MAX_CONCURRENT_CEILING
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(
+            f'OURLIBERTY_MAX_CONCURRENT={raw!r} is not an integer')
+    if value < 1 or value > _MAX_CONCURRENT_CEILING:
+        raise ValueError(
+            f'Unsafe OURLIBERTY_MAX_CONCURRENT={value}; expected 1..'
+            f'{_MAX_CONCURRENT_CEILING} for current VM sizing')
+    return value
+
+
+MAX_CONCURRENT = _resolve_max_concurrent()
 STALE_TIMEOUT = 600  # Fallback reap window when process identity is unverifiable
 
 
