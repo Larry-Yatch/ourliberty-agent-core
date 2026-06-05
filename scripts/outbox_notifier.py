@@ -1637,7 +1637,7 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     # post-marker chatter from Forge would mask her decision. Fall back to
     # final-turn parsing only when the session log is unavailable.
     marker_type, payload, _narrative = (None, None, '')
-    recovered = _recover_forge_marker_text_from_session_log(
+    recovered, _recovered_by_type = _recover_forge_marker_text_from_session_log(
         data.get('claude_session_id'),
     )
     if recovered:
@@ -2173,16 +2173,28 @@ def _scan_session_log_for_latest_marker_text(
     session_id: Optional[str],
     parser,
     skip_exceptions: tuple,
-) -> Optional[str]:
-    """Walk a Claude session log and return the latest assistant-turn text
-    that parses as a valid marker under ``parser``.
+) -> tuple[Optional[str], dict[str, str]]:
+    """Walk a Claude session log for the latest assistant-turn marker text.
 
-    Returns the combined text of the LATEST assistant turn whose parse returns
-    a non-None marker_type (so a revised verdict still wins over an earlier
-    one), or None when the session log is missing, unreadable, or carries no
-    parseable marker. Intermediate turns whose text raises one of
-    ``skip_exceptions`` are skipped — that's mid-session noise (e.g. an agent
-    reasoning about the marker grammar in prose), not her final verdict.
+    Returns ``(latest_marker_text, latest_text_by_type)``:
+
+    * ``latest_marker_text`` — the combined text of the LATEST assistant turn
+      whose parse returns a non-None marker_type (so a revised verdict still
+      wins over an earlier one), or None when the session log is missing,
+      unreadable, or carries no parseable marker.
+    * ``latest_text_by_type`` — maps each distinct ``marker_type`` seen across
+      the session to the LATEST text that parsed as that type. Empty when
+      there's no marker. When it has MORE THAN ONE key the session emitted
+      conflicting verdicts across turns (e.g. a later turn ECHOING a
+      `=== REVIEW_PASS ===` block over a real earlier `REVIEW_REVISION`);
+      plain last-wins would silently pick the echo. The Mirror classifier
+      uses this to apply a conservative-priority rule instead of last-wins so
+      a PASS can't override a co-occurring non-PASS verdict and auto-merge a
+      PR Mirror wanted revised — nervous-system-audit #14 (2026-06-05).
+
+    Intermediate turns whose text raises one of ``skip_exceptions`` are
+    skipped — that's mid-session noise (e.g. an agent reasoning about the
+    marker grammar in prose), not her final verdict.
 
     ``parser`` is one of ``mrh.parse_mirror_marker`` / ``fph.parse_forge_marker``
     and must return ``(marker_type, payload, narrative)`` or raise. The caller
@@ -2197,15 +2209,16 @@ def _scan_session_log_for_latest_marker_text(
     after REVIEW_PASS, etc.) the marker is invisible to a final-turn parser.
     """
     if not session_id:
-        return None
+        return None, {}
     try:
         candidates = list(CLAUDE_PROJECTS_ROOT.glob(f'*/{session_id}.jsonl'))
     except OSError:
-        return None
+        return None, {}
     if not candidates:
-        return None
+        return None, {}
     log_path = candidates[0]
     last_marker_text: Optional[str] = None
+    latest_text_by_type: dict[str, str] = {}
     try:
         with log_path.open('r', encoding='utf-8') as fh:
             for line in fh:
@@ -2232,17 +2245,21 @@ def _scan_session_log_for_latest_marker_text(
                     continue
                 if marker_type is not None:
                     last_marker_text = combined
+                    latest_text_by_type[marker_type] = combined
     except OSError:
-        return None
-    return last_marker_text
+        return None, {}
+    return last_marker_text, latest_text_by_type
 
 
 def _recover_marker_text_from_session_log(
     session_id: Optional[str],
-) -> Optional[str]:
+) -> tuple[Optional[str], dict[str, str]]:
     """Mirror-parser binding of `_scan_session_log_for_latest_marker_text`.
 
-    Retained for back-compat with prior multi-turn-recovery call sites.
+    Returns ``(latest_marker_text, latest_text_by_type)`` — see the scanner
+    docstring. The Mirror classifier uses the per-type map to apply the
+    conservative-priority verdict rule when a session emits more than one
+    verdict type across turns (#14).
     """
     return _scan_session_log_for_latest_marker_text(
         session_id,
@@ -2253,8 +2270,13 @@ def _recover_marker_text_from_session_log(
 
 def _recover_forge_marker_text_from_session_log(
     session_id: Optional[str],
-) -> Optional[str]:
-    """Forge-parser binding of `_scan_session_log_for_latest_marker_text`."""
+) -> tuple[Optional[str], dict[str, str]]:
+    """Forge-parser binding of `_scan_session_log_for_latest_marker_text`.
+
+    Returns ``(latest_marker_text, latest_text_by_type)`` — see the scanner
+    docstring. Forge routing keeps plain last-wins (uses ``latest_marker_text``);
+    the per-type map is unused here.
+    """
     return _scan_session_log_for_latest_marker_text(
         session_id,
         fph.parse_forge_marker,
@@ -2314,11 +2336,45 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
     # authoritative path; result_text is a fallback for when the session log
     # is unavailable (no session_id, missing file, etc.).
     marker_type, payload, _narrative = (None, None, '')
-    recovered = _recover_marker_text_from_session_log(
+    recovered, recovered_by_type = _recover_marker_text_from_session_log(
         data.get('claude_session_id'),
     )
     if recovered:
-        marker_type, payload, _narrative = mrh.parse_mirror_marker(recovered)
+        # nervous-system-audit #14 (2026-06-05) — conservative-priority
+        # verdict selection when a session emits MORE THAN ONE verdict type
+        # across turns. Plain last-wins lets a later turn that merely ECHOES a
+        # `=== REVIEW_PASS ===` block override a real earlier REVIEW_REVISION
+        # — and a REVIEW_PASS routes straight to auto-merge (irreversible). We
+        # can't tell a genuine mid-session re-verdict from an echo by type
+        # alone, so we don't try: a PASS is honored ONLY when it is the sole
+        # verdict type. If any non-PASS verdict co-occurs, the most
+        # conservative (highest-severity) verdict present wins — the safe
+        # action (don't merge; route revision/escalate/halt) is always
+        # recoverable, so this stays auto-routed and never dead-letters to
+        # Larry (alert-toil discipline). Single-verdict sessions (the normal
+        # case) are unaffected: last-wins == the one type's latest text.
+        chosen_text = recovered
+        if len(recovered_by_type) > 1:
+            # Severity order, most-conservative first. A type not in this
+            # list (future marker) falls through to last-wins via `recovered`.
+            for _t in (
+                'review_emergency_halt',
+                'review_escalate',
+                'review_revision',
+                'review_pass',
+            ):
+                if _t in recovered_by_type:
+                    chosen_text = recovered_by_type[_t]
+                    break
+            if chosen_text is not recovered:
+                log(
+                    f'mirror verdict conflict across session turns '
+                    f'({sorted(recovered_by_type)}); conservative-priority '
+                    f'selection overrode last-wins to avoid an echoed-PASS '
+                    f'auto-merge (task={data.get("task_id")!r})',
+                    'WARN',
+                )
+        marker_type, payload, _narrative = mrh.parse_mirror_marker(chosen_text)
         if marker_type is not None:
             log(
                 f'classified mirror {marker_type} marker from session log scan '
@@ -2863,15 +2919,38 @@ def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
     shape often narrates status bullets and puts the URL at the end. Mid-
     paragraph URLs ("I considered PR opened: <stale> last week") still don't
     match — the line anchor preserves the m-2 false-match protection.
-    Returns the first matching line's URL, or None on empty/None input or
-    no match.
+
+    Returns the single PR URL when the result names exactly one (possibly
+    repeated identical) PR, or None on empty/None input, no match, OR an
+    AMBIGUOUS result that names more than one DISTINCT PR URL.
+
+    nervous-system-audit #16 (2026-06-05): the prior first-match `.search`
+    dispatched/merged the WRONG PR when a stale `PR opened: <old>` line
+    preceded the real one (e.g. Forge narrating a superseded attempt before
+    announcing the fresh PR). Last-match has the mirror failure (a stale line
+    AFTER the real one — which is the contract-following case, since Forge is
+    asked to lead with the canonical `PR opened:` line). We can't reliably
+    tell which of two distinct URLs is real, so we refuse to guess: distinct
+    multiples return None + a WARN, leaving the inline build→review dispatch
+    skipped so the reconciliation sweep / Larry resolves it rather than
+    auto-dispatching the wrong PR in EITHER direction. Repeated identical
+    lines are not ambiguous — that single URL is returned.
     """
     if not isinstance(result_text, str) or not result_text:
         return None
-    m = _PR_URL_RE.search(result_text)
-    if not m:
+    urls = [m.group(1) for m in _PR_URL_RE.finditer(result_text)]
+    if not urls:
         return None
-    return m.group(1)
+    distinct = set(urls)
+    if len(distinct) > 1:
+        log(
+            f'_extract_pr_url_from_build_result: {len(distinct)} distinct PR '
+            f'URLs in build result {urls!r}; refusing to guess which is real '
+            f'(returning None — reconcile sweep / Larry resolves)',
+            'WARN',
+        )
+        return None
+    return urls[0]
 
 
 def _review_request_already_dispatched(review_filename: str) -> bool:
@@ -7035,6 +7114,13 @@ def process_outbox(outbox_file: Path) -> str:
                 _maybe_dm_larry_direct_synth(data, marker_decision)
 
         task_id = data.get('task_id', outbox_file.stem)
+        # nervous-system-audit #12 (2026-06-05): the back-leg inter-agent
+        # notify is INFORMATIONAL (the upstream agent journals the result).
+        # A notify failure must NOT abort the chain's substantive actions —
+        # auto-merge, build/revision dispatch — which run further below. Track
+        # the failure in a flag and surface it in the final return value
+        # instead of early-returning before those blocks.
+        notify_failed = False
         prompt = build_notify_prompt(
             intent=marker_decision['intent'],
             sender=agent,
@@ -7155,13 +7241,20 @@ def process_outbox(outbox_file: Path) -> str:
                 safe_write_inbox.DispatchRejected,
                 safe_write_inbox.RoutingDenied,
             ) as e:
+                # #12: do NOT archive + return here — that dead-ended the
+                # outbox BEFORE the auto-merge block, so a review_pass PR
+                # never merged AND no `AUTO_MERGE ... failed` line was logged,
+                # leaving heal_pr_auto_merge nothing to retry. Record the
+                # failure and fall through; the merge attempt (and its
+                # AUTO_MERGE log line) now run regardless of notify outcome,
+                # and the archive happens once at the end of the block.
                 log(
                     f'marker notify failed for {outbox_file.name}: '
-                    f'{type(e).__name__}: {e}',
+                    f'{type(e).__name__}: {e}; continuing to dispatch + '
+                    f'auto-merge (notify is informational)',
                     'WARN',
                 )
-                _archive_outbox(outbox_file)
-                return 'notify-failed'
+                notify_failed = True
 
         # Phase D3 commit 4b: PROCEED → write a build-phase task to
         # Forge's inbox. The notify-to-Beacon above is informational
@@ -7204,7 +7297,59 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             payload = marker_decision.get('payload') or {}
             pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
-            if pr_url:
+            # nervous-system-audit #15 (2026-06-05): the marker's `pr_url` is
+            # agent-authored and must agree with the PR the chain actually
+            # dispatched Mirror to review — `data['pr_url']`, set on the
+            # review envelope by `_dispatch_mirror_review` and propagated
+            # through the outbox. Without this gate the shape+OPEN validators
+            # below would happily merge ANY structurally-valid OPEN PR the
+            # marker names, even a different one than Mirror reviewed. Same
+            # discipline as the marker-vs-envelope task_id check at
+            # classification time, applied at the irreversible merge boundary.
+            # Both-present-and-differ is the only fail case: a legacy chain
+            # with no envelope pr_url falls through to the existing validators
+            # (graceful degradation), and an absent / unparseable marker
+            # pr_url is handled by the no-pr_url / shape-check branches below.
+            # Compare NORMALIZED (owner/repo, number) coords via _GH_PR_URL_RE
+            # rather than raw strings: the marker pr_url is agent-authored, so
+            # cosmetic variants of the same PR (trailing slash, `/files`,
+            # `?query`, `#frag`) must NOT read as a mismatch and block a
+            # legitimate merge.
+            envelope_pr_url = data.get('pr_url')
+            _marker_m = (
+                _GH_PR_URL_RE.search(pr_url) if isinstance(pr_url, str) else None
+            )
+            _env_m = (
+                _GH_PR_URL_RE.search(envelope_pr_url)
+                if isinstance(envelope_pr_url, str) else None
+            )
+            pr_url_mismatch = (
+                _marker_m is not None
+                and _env_m is not None
+                and (_marker_m.group(1), _marker_m.group(2))
+                != (_env_m.group(1), _env_m.group(2))
+            )
+            if pr_url_mismatch:
+                log(
+                    f'AUTO_MERGE task={data.get("task_id", "?")} '
+                    f'outcome=failed reason=marker-envelope-pr-url-mismatch '
+                    f'marker_pr={pr_url!r} envelope_pr={envelope_pr_url!r} — '
+                    f'refusing to merge a PR other than the one Mirror was '
+                    f'dispatched to review',
+                    'WARN',
+                )
+                marker_decision['merge_result'] = {
+                    'merge_outcome': 'failed',
+                    'merge_reason': (
+                        f'marker pr_url ({pr_url}) does not match the '
+                        f'dispatched review pr_url ({envelope_pr_url}); '
+                        f'auto-merge refused'
+                    ),
+                    'pr_number': '?',
+                    'repo_coords': '?',
+                }
+                marker_decision['merge_outcome'] = 'failed'
+            elif pr_url:
                 # Structural pr_url validator (2026-05-29 —
                 # structural-pr-url-validator). Two layers run BEFORE the
                 # serializer gates / `gh pr merge` shell-out:
@@ -7326,6 +7471,11 @@ def process_outbox(outbox_file: Path) -> str:
         _maybe_dm_larry(data, marker_decision)
 
         _archive_outbox(outbox_file)
+        # #12: preserve the 'notify-failed' status for telemetry, but only
+        # AFTER the substantive actions (auto-merge, dispatch, DM) and the
+        # archive above have run.
+        if notify_failed:
+            return 'notify-failed'
         return 'larry-direct-marker' if larry_direct else 'notified-marker'
 
     # task-25 (2026-05-20) — headless Beacon clarification-response handler.
