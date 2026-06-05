@@ -386,6 +386,19 @@ CYCLE_TIMER_ALERT = {
     'suggested_action': 'Choose reload-now or wait-for-window',
 }
 
+# Audit §4 regression: a LIVE direction-ask that merely MENTIONS an unrelated
+# PR in a parenthetical 're:' aside. The incidental '#5' must NOT become the
+# decision's resolution anchor — otherwise merging unrelated PR #5 would
+# skip-before-promote or auto-retire this still-open ask off the Approvals tab.
+INCIDENTAL_REF_ALERT = {
+    'ts': _ts(2),
+    'source': 'pulse/beacon-result',
+    'route': 'escalate',
+    'subject': 'Need direction: pick option A vs B (re: design #5)',
+    'message': 'Beacon needs your call: pick option A vs B (re: design #5).',
+    'suggested_action': 'Choose option-A or option-B',
+}
+
 
 def _gh_merged(numbers):
     """Fake gh probe: True for the given resolved PR/issue numbers, else None
@@ -585,6 +598,105 @@ class ReconcileRetireTest(unittest.TestCase):
             promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
             gh_probe=_gh_merged([294]))
         self.assertEqual([t for t, _ in retired], [task_id])
+        self.assertEqual(remaining, {})
+
+
+class IncidentalRefAnchorTest(unittest.TestCase):
+    """Audit §4: a '#<n>' only anchors resolution when it is GENUINELY
+    referential (subject-leading or after a PR/issue/closing keyword). An
+    incidental / parenthetical mention must never resolve a live decision."""
+
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def _check(self, state, alerts, gh_probe):
+        return lambda rec: h.resolution_signal(
+            rec, state, alerts, DEFAULT_HEURISTICS,
+            after_ts=rec.get('ts'), gh_probe=gh_probe)
+
+    # ---- parse_ref_numbers: only referential positions count ----
+    def test_parenthetical_re_ref_is_ignored(self):
+        self.assertEqual(
+            h.parse_ref_numbers('Need direction: pick option A vs B (re: design #5)'),
+            [])
+
+    def test_buried_midsubject_ref_is_ignored(self):
+        # A bare number floating mid-subject is not an anchor.
+        self.assertEqual(h.parse_ref_numbers('deploy notifier #5 needs a call'), [])
+
+    def test_post_parenthetical_ref_is_not_promoted_to_leading(self):
+        # Blanking a parenthetical aside must NOT turn a trailing/buried '#n'
+        # into a subject-leading match (the leading check runs on the raw text).
+        self.assertEqual(h.parse_ref_numbers('(re: design) #5'), [])
+        self.assertEqual(h.parse_ref_numbers('(foo) #5'), [])
+
+    def test_pr_keyword_ref_is_parsed(self):
+        self.assertEqual(
+            h.parse_ref_numbers('PR #294 Mirror review gap'), [294])
+
+    def test_closing_keyword_ref_is_parsed(self):
+        self.assertEqual(h.parse_ref_numbers('closes #5 — ship or hold?'), [5])
+        self.assertEqual(h.parse_ref_numbers('Direction on issue #42'), [42])
+
+    def test_subject_leading_ref_is_parsed(self):
+        self.assertEqual(h.parse_ref_numbers('#294: rebase or close?'), [294])
+
+    # ---- decision identity is not hijacked by the incidental ref ----
+    def test_incidental_ref_does_not_anchor_identity(self):
+        ident = h.decision_identity(INCIDENTAL_REF_ALERT)
+        self.assertNotEqual(ident, 'ref:5')
+        self.assertFalse(ident.startswith('ref:'))
+
+    # ---- skip-before-promote: live ask survives an unrelated merged PR ----
+    def test_incidental_ref_ask_still_promoted_when_unrelated_pr_merged(self):
+        state = self._empty()
+        check = self._check(state, [INCIDENTAL_REF_ALERT], _gh_merged([5]))
+        out = h.evaluate([INCIDENTAL_REF_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(len(out), 1)  # NOT skipped-before-promote
+
+    def test_incidental_ref_is_not_a_resolution_signal(self):
+        reason = h.resolution_signal(
+            INCIDENTAL_REF_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=_gh_merged([5]))
+        self.assertIsNone(reason)
+
+    # ---- retire: live ask is NOT auto-retired when unrelated PR #5 merges ----
+    def test_incidental_ref_card_not_retired_when_unrelated_pr_merged(self):
+        subject = INCIDENTAL_REF_ALERT['subject']
+        identity = h.decision_identity(INCIDENTAL_REF_ALERT)
+        task_id = h.derive_task_id(identity)
+        state = {'pending': [{
+            'id': task_id, 'status': 'pending', 'plan_summary': 'live ask',
+        }], 'history': []}
+        promoted = {identity: {
+            'task_id': task_id, 'subject': subject, 'promoted_at': _ts(1)}}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([5]))
+        self.assertEqual(retired, [])           # not auto-retired
+        self.assertEqual(remaining, promoted)   # left in the ledger
+        self.assertEqual(len(state['pending']), 1)  # still on the tab
+
+    # ---- the genuine 'about PR #<n>' case still resolves ----
+    def test_genuine_pr_ask_skipped_before_promote_when_merged(self):
+        state = self._empty()
+        check = self._check(state, [PR294_ALERT], _gh_merged([294]))
+        out = h.evaluate([PR294_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(out, [])  # genuine merged PR -> skipped
+
+    def test_genuine_pr_card_retired_when_merged(self):
+        subject = PR294_ALERT['subject']
+        identity = h.decision_identity(PR294_ALERT)  # 'ref:294'
+        task_id = h.derive_task_id(identity)
+        state = {'pending': [{'id': task_id, 'status': 'pending'}], 'history': []}
+        promoted = {identity: {
+            'task_id': task_id, 'subject': subject, 'promoted_at': _ts(1)}}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([294]))
+        self.assertEqual([t for t, _ in retired], [task_id])  # genuine -> retired
         self.assertEqual(remaining, {})
 
 
