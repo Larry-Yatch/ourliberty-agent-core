@@ -136,6 +136,12 @@ def shipped_pr(
     log_fn = log_fn or _noop
     if not task_id or task_id == 'unknown':
         return None
+    # _parse_iso always returns an AWARE datetime; comparing it to a naive
+    # since_ts raises TypeError (not ValueError), which would escape this
+    # module's documented never-raise/failsafe contract (audit #40). Normalize a
+    # naive since_ts to UTC so every comparison is aware-vs-aware.
+    if since_ts is not None and since_ts.tzinfo is None:
+        since_ts = since_ts.replace(tzinfo=timezone.utc)
     for repo in (repos or DEFAULT_REPOS):
         try:
             res = subprocess.run(
@@ -161,7 +167,9 @@ def shipped_pr(
                     try:
                         if _parse_iso(merged) < since_ts:
                             continue
-                    except ValueError:
+                    except (ValueError, TypeError):
+                        # Unparseable mergedAt or any residual aware/naive
+                        # mismatch — don't let it escape the failsafe contract.
                         pass
             if pr_matches_task(pr, task_id):
                 pr['_repo'] = repo

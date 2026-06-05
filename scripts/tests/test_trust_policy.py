@@ -219,21 +219,38 @@ class LoadPolicyTest(unittest.TestCase):
         policy = tp.load_policy()
         self.assertEqual(policy['default_action'], 'reject')
 
-    def test_malformed_action_raises(self):
+    def test_malformed_rule_action_falls_to_default_deny(self):
+        # audit #21: a bad-schema (but valid-JSON) policy must fail CLOSED to
+        # force_ask, not raise TrustPolicyError out of load_policy()/evaluate()
+        # and crash the approval path.
         self._write(
             tp.RUNTIME_POLICY_PATH,
             {'version': 1, 'rules': [{'source': 'pulse', 'action': 'bogus'}]},
         )
-        with self.assertRaises(tp.TrustPolicyError):
-            tp.load_policy()
+        policy = tp.load_policy()
+        self.assertEqual(policy['default_action'], 'force_ask')
+        self.assertEqual(policy['rules'], [])
+        self.assertIn('_error', policy)
 
-    def test_malformed_default_action_raises(self):
+    def test_malformed_default_action_falls_to_default_deny(self):
         self._write(
             tp.RUNTIME_POLICY_PATH,
             {'version': 1, 'default_action': 'bogus', 'rules': []},
         )
-        with self.assertRaises(tp.TrustPolicyError):
-            tp.load_policy()
+        policy = tp.load_policy()
+        self.assertEqual(policy['default_action'], 'force_ask')
+        self.assertIn('_error', policy)
+
+    def test_malformed_policy_evaluates_to_force_ask(self):
+        # end-to-end: evaluate() on a bad-schema policy returns force_ask, never
+        # raises (the contract the beacon approval path relies on).
+        self._write(
+            tp.RUNTIME_POLICY_PATH,
+            {'version': 1, 'default_action': 'bogus', 'rules': []},
+        )
+        action, rule = tp.evaluate({'source': 'pulse', 'target': 'forge'})
+        self.assertEqual(action, 'force_ask')
+        self.assertIsNone(rule)
 
     def test_bad_json_falls_to_default_deny(self):
         tp.RUNTIME_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)

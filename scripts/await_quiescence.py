@@ -13,7 +13,6 @@ Exit 0 if quiescent, exit 1 if timeout reached.
 # Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
 
 import argparse
-import glob
 import json
 import os
 import subprocess
@@ -22,9 +21,13 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Repo scripts dir on sys.path so the sibling concurrency_guard import resolves.
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
 AGENTS_ROOT = "/home/larry/agents"
 INBOXES_DIR = os.path.join(AGENTS_ROOT, "inboxes")
-CONCURRENCY_PREFIX = os.path.join(AGENTS_ROOT, ".concurrency-guard")
 
 
 def get_inbox_files() -> list[str]:
@@ -69,26 +72,22 @@ def has_pending_tasks() -> bool:
 
 
 def has_running_agents() -> bool:
-    """Check if any concurrency guard slots are occupied."""
-    # Check for .concurrency-guard.* lock files
-    lock_pattern = f"{CONCURRENCY_PREFIX}.*"
-    lock_files = glob.glob(lock_pattern)
+    """True if any concurrency-guard slot is occupied (a live claude worker
+    holds capacity).
 
-    for lock_file in lock_files:
-        # Each lock file contains a PID — check if that PID is still alive
-        try:
-            with open(lock_file) as f:
-                content = f.read().strip()
-            # Try to parse PID
-            pid = int(content.split("\n")[0].strip())
-            # Check if process is alive
-            os.kill(pid, 0)
-            return True  # Process is alive, agent is running
-        except (ValueError, ProcessLookupError, PermissionError, OSError):
-            # PID is dead or file is malformed — stale lock, ignore
-            continue
+    Reads the guard's OWN accounting via concurrency_guard.active_count()
+    instead of globbing `.concurrency-guard.*` — the old glob matched a
+    top-level path the guard never writes (it stores config/.concurrency-guard.json),
+    so this always returned False and quiescence could be declared mid-dispatch,
+    letting a git sync/reset run while workers held slots (audit #5).
 
-    return False
+    Fail-safe: if the guard can't be read, assume agents MIGHT be running
+    (return True / not-quiescent) rather than greenlight a sync."""
+    try:
+        import concurrency_guard
+        return concurrency_guard.get_guard().active_count() > 0
+    except Exception:
+        return True
 
 
 def has_claude_processes() -> bool:
