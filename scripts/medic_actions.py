@@ -441,6 +441,13 @@ def _emit_silence_decision(fp: str, reason: str, remediation: str) -> bool:
         # card title (dashboard_api maps it to plan_summary). Without it the card
         # renders as "(no summary)". Keep it short — full context is in `prompt`.
         'summary': f'Medic silenced a false positive — keep or lift? ({subject})',
+        # Machine-readable fingerprint so the dashboard can reconcile this
+        # decision DIRECTLY (reject -> larry_alerts.unsilence(fp)) instead of
+        # routing an imperative prompt to an agent that won't execute it. The
+        # reject's only effect is a pure suppression-file operation; the
+        # dashboard performs it server-side. See dashboard_api
+        # `_medic_silence_fingerprint` / `_reconcile_medic_silence`.
+        'fingerprint': fp,
         'prompt': prompt,
         'severity': 'warning',
         'dedup_identity': task_id,
