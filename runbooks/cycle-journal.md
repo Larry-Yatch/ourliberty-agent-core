@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 1019 — 2026-06-05 20:30 UTC (interactive, Tier 1 — SIGNAL: 2 new unreviewed-merge alerts; PRs #372 + #374 merged Larry-direct)
+
+**Health:** ⚠️ **Tier 1 (tier-reset: 2 new unreviewed-merge alerts in Check 0). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1374 lines / 2026-06-05T20:20:16Z** (NEW: +2 since iter 1018 watermark 1372/20:15:30Z; unreviewed-merge:374 at 20:20:16Z + unreviewed-merge:372 at 20:20:16Z — DMs delivered by beacon-bot at 20:22:41Z idx=1372 and 20:22:43Z idx=1373). Pipeline-stall heartbeat: 2026-06-05T20:22:56Z (✅ ~7 min at 20:30Z scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T20:07:48Z (✅ ~22 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T19:50:40Z (~40 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=2180619 "Pulse cycle 20260605T202129Z". Tier state at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-05T20:19:47Z (iter 1018). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 2 new alerts). `cycle_tier_state.py record --checks-clean false` → last_signal_at=2026-06-05T20:30:36Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts.** Watermark advanced 1372/20:15:30Z → 1374/20:20:16Z. 2 new entries:
+  - idx=1372: `heal-unreviewed-merge-detector / unreviewed-merge:374` — PR #374 merged by Larry-Yatch at ~20:20Z without Mirror review. DM delivered by beacon-bot 20:22:41Z. **30th consecutive.**
+  - idx=1373: `heal-unreviewed-merge-detector / unreviewed-merge:372` — PR #372 merged by Larry-Yatch at ~20:20Z without Mirror review. DM delivered by beacon-bot 20:22:43Z. **31st consecutive.**
+  Both Tier-4 novel (unreviewed-merge:* not in known-pattern allowlist). DMs already delivered — no additional Pulse DM this iter. Action pending: Larry's `go: actor-exemption-config`. **Tier-reset: YES.**
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 20:22:43Z (idx=1373 unreviewed-merge:372 delivered). No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T20:22:56Z (~7 min at 20:30Z scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T20:07:48Z (~22 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=2180619 "Pulse cycle 20260605T202129Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T19:50:40Z (~40 min at scan). Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ No open PRs.** PRs #372 and #374 both merged by Larry-Yatch at ~20:20Z (before Pulse's 30-min auto-merge thresholds). No action needed. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 31 consecutive (PRs #343–#374/#372).** PRs #374 and #372 both Larry-direct merges at ~20:20Z; detector fired twice. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`.
+
+- **G-rule `gh pr merge --auto disabled`: 1/3.** No new occurrence this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat (script-authoritative). No new always-fix actions this iter → no ledger append.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 2 new alerts (unreviewed-merge:374 + :372; DMs delivered by beacon-bot at 20:22:41Z and 20:22:43Z). New watermark: 1374/20:20:16Z.
+3. Confirmed PRs #374 and #372 merged by Larry-Yatch at ~20:20Z (Larry-direct; before Pulse 30-min thresholds). No open PRs.
+4. Confirmed 9/9 services active, all inboxes empty, both heartbeats nominal, sync nominal.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=20:30:36Z.
+6. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[red]` PRs #343–#374/#372 audit-series (31 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Audit-PR series: PRs #374 and #372 merged Larry-direct at 20:20Z (before Pulse thresholds; 30th and 31st consecutive unreviewed-merge). G-rule `gh pr merge --auto disabled` at 1/3 (no new occurrence). PRIME DIRECTIVE ratio stable (55.92).
+
+---
+
 ## Iteration 1018 — 2026-06-05 20:19 UTC (interactive, Tier 1 — SIGNAL: 1 new alert + PR #371 closed/superseded by #374)
 
 **Health:** ⚠️ **Tier 1 (tier-reset: 1 new unreviewed-merge alert in Check 0). 9/9 services active. All inboxes empty. PR #371 closed without merge (superseded by PR #374). PRs #372 and #374 open, below 30-min threshold. Sync nominal.**
