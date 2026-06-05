@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 932 — 2026-06-05 00:23 UTC (interactive)
+
+**Health:** ✅ **Tier 3 clean. consecutive_clean=3→4 (MAX_TIER). 0 auto-fix actions. 8/8 services active. Forge=2 fresh tasks. PR #332 open (5 min, under threshold). Sync: ⚠️ SYNC-PUSH-REBASE-FALLBACK (self-recovering). Check I fired.**
+
+Alert watermark: **1303 lines / 2026-06-05T00:01:10Z** (1 new alert since iter 931 watermark 1302/23:05:24Z — Tier-3 silenced). Pipeline-stall heartbeat: 2026-06-05T00:07:19Z (✅ ~16 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T00:00:41Z (✅ ~23 min; within 60-min threshold). Sync: status=error, commit=99b182af, last_sync=2026-06-05T00:20:31Z — SYNC-PUSH-REBASE-FALLBACK-001 occurrence ~56; self-recovers via hourly sync.timer. Session-start gitStatus: branch=main, clean, HEAD=7d60236 "Pulse cycle 20260604T235248Z". Tier state at start: tier=3, consecutive_clean=3. Tier state at end: **tier=3, consecutive_clean=4**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal (1 new alert, Tier-3 silenced).** Watermark advanced 1302→1303. Alert 1303 (2026-06-05T00:01:10Z): `heal-tier2-weekly-probe` / `tier2_weekly_probe_failed`. Recurring known issue — Tier 2 OAuth still expired, APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open. Per actionable-only discipline: no new Larry-actionable information; suppress. Triage: 1 alert, 0 Tier-1, 0 Tier-2, 1 Tier-3 silenced. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** heal-pipeline-stall heartbeat = 2026-06-05T00:07:19Z (~16 min; ✅ within 90-min threshold). Forge has 2 fresh source=larry tasks (00:08:16Z, ~15 min old) — well within 1h stale threshold. Pipeline active but not stalled. ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Forge=2 (active, freshly dispatched source=larry: `build-mirror-review-status-20260605T000816Z` + `build-unreviewed-merge-detector-20260605T000816Z`; <1h old). Beacon=0, Mirror=0, Pulse=0. **Observation:** both Forge tasks reference `docs/mirror-review-merge-gate-brief.md` which is missing from main. Source=larry tasks explicitly dispatched — Larry owns the dependency; noting for awareness only. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 2026-06-05T00:00:41Z (~23 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=7d60236 "Pulse cycle 20260604T235248Z". ✅
+
+- **(Check B) Sync health: ⚠️ SYNC-PUSH-REBASE-FALLBACK (self-recovering).** sync.json: status=error, commit=99b182af, last_sync=2026-06-05T00:20:31Z. Session-start HEAD (7d60236) is newer than sync commit — wrapper push succeeded after sync service's failed attempt. Matches known SYNC-PUSH-REBASE-FALLBACK-001 pattern (occurrence ~56). Self-recovers via next hourly `ourliberty-sync.timer` fire. APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (root code fix pending). No new action. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Forge/agent inboxes: ✅ Active, not stale.** Forge=2 (source=larry, 00:08:16Z, ~15 min old; inbox-watcher will process). Others=0. No duplicates. ✅
+
+- **(Check E) PRs: ✅ Nominal (PR #332 under threshold).** agent-core: 1 open — **PR #332** "fix(healer): reconcile retry-recovered dispatches + couple Medic silence with a fix report" (branch `fix/heal-pipeline-stall-retry-reconcile`), CLEAN/MERGEABLE, created 2026-06-05T00:18:09Z, ~5 min old at cycle start. Under 30-min auto-merge threshold. No Mirror review yet — expected for brand-new PR. **Watch next cycle:** if still open and clean+green at 30 min, enable auto-merge. dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I — Friday gate) FIRED.** Today is Friday 2026-06-05 (Mon/Wed/Fri/Sun gate); no sentinel `check-i-2026-06-05.json` present; Ledger sentinel `ledger-ready-2026-06-01` present; no EMERGENCY_HALT. Script refreshed sidecar (run_ledger.sh exit=0, 3.5s), ran digest mode, wrote `~/agents/blackboard/pulse-check-i/check-i-2026-06-05.json`, queued DM, auto-dispatched=0.
+  - **1 proposal (medium):** "Template / fast-path repeating shape `smoke-5a-pf-no-marker`" — 3 retries this week on Forge; recurring shape → teach-to-fish candidate. Effort=medium (above auto-dispatch threshold). Larry can `/dispatch 1` to send to Beacon.
+  - Ledger headline: $1,611.38/wk, +540.7% vs prior week (0 σ anomalies). retry_overhead=0.36% (nominal).
+  - Note: same proposal surfaced on Mon 2026-06-01 and Wed 2026-06-03 without dispatch. **3rd consecutive Check I firing with same proposal.** Larry: `/dispatch 1` to action.
+  - Journal block not re-appended by script (weekly block for 2026-06-01 already present in journal).
+
+- **(Check III):** next scheduled 2026-06-14 (14d cadence anchored to Sunday). Skip. ✅
+
+- **(Checks VIII/IX/X):** Monday only → skip. ✅
+
+- **G-rule watch (unchanged from iter 931):**
+  - `heal-pipeline-stall:pr-create-inferred-failure fires false positive when *.1 retry succeeded`: **1/3** (iter 922).
+  - `forge-no-pr-false-alarm-for-source-larry-tasks`: **2/3** (unchanged). Note: 2 new source=larry Forge tasks just arrived — watch for false-alarm on next pipeline sweep.
+  - `outbox-notifier:approval_request not in alert-translations.json`: **1/3** (unchanged).
+  - `outbox-notifier:review-escalate not in alert-translations.json`: **1/3** (unchanged).
+  - `cycle-blocked:dirty-tree-* not in alert-translations.json`: **2/3** (unchanged).
+  - `install-drift healer doesn't auto-install sibling timers`: **2/3** (unchanged).
+  - `medic:medic-diagnosis not in alert-translations.json`: **3/3 DISPATCHED iter 804** — engine-fix pending Larry.
+
+- **PRIME DIRECTIVE ratio:** interventions=716, systemic_fixes=12, ratio≈59.7 (iter_clean row appended 2026-06-05T00:26:25Z; no new interventions this iter).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Triaged 1 new alert (Tier-3 silenced: tier2_weekly_probe_failed recurring). No DMs, no dispatches.
+3. Ran Check I (Friday gate): 1 proposal, DM queued, auto-dispatch=0.
+4. `cycle_prime_ledger.py append --tier 3 --kind iter_clean` → ledger entry recorded (00:26:25Z). ✅
+5. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=4. ✅
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** System at Tier 3, consecutive_clean=4 (above 3× MAX_TIER threshold; de-escalation already complete). PR #332 (Forge fix for heap-pipeline-stall retry reconciliation) just opened — fresh pipeline activity after ~9 iters of quiet. Two source=larry Forge tasks queued for mirror-review-merge-gate builds. `smoke-5a-pf-no-marker` proposal surfaced 3 consecutive Check I firings without dispatch — Larry: `/dispatch 1` to action.
+
+---
+
 ## Iteration 931 — 2026-06-04 23:51 UTC (interactive)
 
 **Health:** ✅ **Tier 3 clean. consecutive_clean=2→3 (MAX_TIER; stays at Tier 3). 0 actions. 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
