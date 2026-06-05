@@ -4,6 +4,58 @@
 
 ---
 
+## Iteration 1020 — 2026-06-05 20:33 UTC (interactive, Tier 1 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 1 (consecutive_clean=1). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1374 lines / 2026-06-05T20:20:16Z** (UNCHANGED — 0 new alerts since iter 1019). Pipeline-stall heartbeat: 2026-06-05T20:22:56Z (✅ ~11 min at 20:33Z scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T20:07:48Z (✅ ~26 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T19:50:40Z (~43 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=38eb74c "Pulse cycle 20260605T203222Z". Tier state at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-05T20:30:36Z (iter 1019). Tier state at end: **tier=1, consecutive_clean=1** (all checks clean this iter). `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1374/20:20:16Z unchanged — 0 new alerts since iter 1019. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T20:22:56Z (~11 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T20:07:48Z (~26 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=38eb74c "Pulse cycle 20260605T203222Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T19:50:40Z (~43 min at scan). Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ No open PRs.** ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). No others in window. ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts. Watermark 1374/20:20:16Z unchanged.
+3. Confirmed 9/9 services active, all inboxes empty, both heartbeats nominal, sync nominal, no open PRs.
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- `[red]` PRs #343–#374/#372 audit-series (31 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Fully nominal iter. consecutive_clean advances 0→1. Need 2 more clean iters to de-escalate to Tier 2. PRIME DIRECTIVE ratio: interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat.
+
+---
+
 ## Iteration 1019 — 2026-06-05 20:30 UTC (interactive, Tier 1 — SIGNAL: 2 new unreviewed-merge alerts; PRs #372 + #374 merged Larry-direct)
 
 **Health:** ⚠️ **Tier 1 (tier-reset: 2 new unreviewed-merge alerts in Check 0). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
