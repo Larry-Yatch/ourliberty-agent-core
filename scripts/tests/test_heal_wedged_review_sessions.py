@@ -34,6 +34,7 @@ CFG = {
     'enabled': True,
     'marker_grace_seconds': 300,
     'silent_grace_seconds': 900,
+    'hard_silent_grace_seconds': 3600,
     'streak_to_promote': 3,
 }
 
@@ -101,6 +102,26 @@ class TestClassify(unittest.TestCase):
     def test_no_marker_fresh_is_skip(self):
         self.assertEqual(
             h.classify(marker_present=False, idle_secs=300, cfg=CFG), h.SKIP)
+
+    def test_no_marker_idle_past_hard_is_hard_reap(self):
+        # 60+ min silent with no marker → deterministic backstop, not the
+        # confidence-ladder alert path.
+        self.assertEqual(
+            h.classify(marker_present=False, idle_secs=4000, cfg=CFG),
+            h.REAP_CASE2_HARD)
+
+    def test_hard_gate_takes_precedence_over_silent(self):
+        # Even if misconfigured so hard <= silent, the hard verdict wins.
+        cfg = dict(CFG, silent_grace_seconds=5000, hard_silent_grace_seconds=1000)
+        self.assertEqual(
+            h.classify(marker_present=False, idle_secs=2000, cfg=cfg),
+            h.REAP_CASE2_HARD)
+
+    def test_marker_present_never_hard_reaps(self):
+        # A provably-done session (marker) is Case 1 regardless of how long it
+        # has been idle — the hard backstop only applies to NO-marker sessions.
+        self.assertEqual(
+            h.classify(marker_present=True, idle_secs=9999, cfg=CFG), h.REAP_CASE1)
 
 
 # ---------------------- Case 1 ----------------------
@@ -202,6 +223,64 @@ class TestTruePositivePromotion(unittest.TestCase):
         self.assertEqual(rec.killed, [7000])
 
 
+class TestCase2HardBackstop(unittest.TestCase):
+    """The deterministic hard-silent backstop — reaps a provably-wedged
+    no-marker session on the FIRST occurrence, independent of the confidence
+    ladder. This is the gap Pulse flagged on PR #334: the healer could warn at
+    15 min but not act until the streak graduated."""
+
+    def test_ungraduated_session_past_hard_grace_is_reaped_immediately(self):
+        rec = _Recorder()
+        # Fresh state: alert-only, NO prior true positives — the streak path
+        # would only warn here. The hard backstop must still kill.
+        state = h.ConfidenceState(mode=h.MODE_ALERT_ONLY, executions=[], pending={})
+        cand = _cand(pid=8100, marker=False, idle=4000, session_id='wedged-hard',
+                     has_jsonl=True)  # /tmp/wedged-hard.jsonl absent → no resume
+        summary = _run(rec, [cand], state)
+        self.assertEqual(summary['case2_hard_reaped'], 1)
+        self.assertEqual(rec.killed, [8100])
+        # It did NOT need graduation and did NOT silently graduate the mode.
+        self.assertEqual(state.mode, h.MODE_ALERT_ONLY)
+        self.assertEqual(summary['case2_auto_reaped'], 0)
+        self.assertEqual(summary['case2_alerted'], 0)
+        # closure notify uses the reaped subject family.
+        self.assertTrue(any('reaped' in subj or 'wedged-review-reaped' in subj
+                            for _, subj in rec.closures))
+
+    def test_hard_reap_aborts_if_session_resumed_at_gate(self):
+        # Idle classification says hard-reap, but the JSONL has advanced since
+        # the scan (real fresh file) → live work → must NOT kill.
+        rec = _Recorder()
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            jsonl = Path(td) / 'resumed.jsonl'
+            jsonl.write_text('still working, no marker yet')  # fresh mtime ≈ now
+            cand = h.Candidate(
+                pid=8200, cwd='/home/larry/agent-worktrees/wt-mirror-resumed',
+                tier='mirror', jsonl=jsonl, session_id='resumed',
+                idle_secs=4000, marker_present=False,
+            )
+            state = h.ConfidenceState(mode=h.MODE_ALERT_ONLY, executions=[], pending={})
+            summary = _run(rec, [cand], state)
+        self.assertEqual(summary['case2_hard_reaped'], 0)
+        self.assertEqual(rec.killed, [])
+
+    def test_hard_reap_independent_of_graduated_mode(self):
+        # Belt-and-suspenders: even in auto-reap mode the hard path is the one
+        # that fires for a >hard-grace session (and only kills once).
+        rec = _Recorder()
+        state = h.ConfidenceState(
+            mode=h.MODE_AUTO_REAP,
+            executions=[{'outcome': h.TRUE_POSITIVE, 'session_id': s}
+                        for s in ('a', 'b', 'c')])
+        cand = _cand(pid=8300, marker=False, idle=5000, session_id='hard-grad',
+                     has_jsonl=True)
+        summary = _run(rec, [cand], state)
+        self.assertEqual(summary['case2_hard_reaped'], 1)
+        self.assertEqual(summary['case2_auto_reaped'], 0)
+        self.assertEqual(rec.killed, [8300])
+
+
 class TestFalsePositiveDemote(unittest.TestCase):
     def test_pending_session_that_emits_marker_is_false_positive(self):
         rec = _Recorder()
@@ -298,6 +377,7 @@ class TestConfig(unittest.TestCase):
         cfg = h.load_config(Path('/nonexistent/review-reaper-rules.json'))
         self.assertEqual(cfg['marker_grace_seconds'], 300)
         self.assertEqual(cfg['silent_grace_seconds'], 900)
+        self.assertEqual(cfg['hard_silent_grace_seconds'], 3600)
         self.assertEqual(cfg['streak_to_promote'], 3)
 
     def test_garbage_file_uses_defaults(self):
