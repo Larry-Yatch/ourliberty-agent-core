@@ -127,6 +127,7 @@ def _preserve_corrupt_state(path: Path, raw: bytes) -> Optional[Path]:
     the next read sees a missing file → {} cleanly, so only ONE backup is made
     per corruption rather than one per tick. Best-effort: never raises.
     """
+    backup: Optional[str] = None
     try:
         stamp = _now_iso().replace(':', '').replace('-', '')
         # mkstemp reserves a guaranteed-unique name even within the same second.
@@ -140,6 +141,12 @@ def _preserve_corrupt_state(path: Path, raw: bytes) -> Optional[Path]:
              f'state at {Path(backup).name} before treating as empty', 'ERROR')
         return Path(backup)
     except OSError as e:
+        # Don't leave the empty mkstemp reservation behind if the rename failed.
+        if backup is not None:
+            try:
+                os.unlink(backup)
+            except OSError:
+                pass
         _log(f'{path.name} corrupt and could not be preserved: {e}', 'ERROR')
         return None
 
@@ -285,11 +292,9 @@ def _read_executions_doc() -> dict[str, Any]:
 
 
 def _write_executions_doc(doc: dict[str, Any]) -> None:
-    path = _exec_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(doc, indent=2, sort_keys=True))
-    tmp.replace(path)
+    # Same unique-tmp + fsync atomic write as _write_state (audit #62 class):
+    # avoid a fixed <path>.tmp two writers could collide on.
+    atomic_write_json(_exec_path(), doc, indent=2, sort_keys=True)
 
 
 def load_executions() -> dict[str, list[dict[str, Any]]]:
