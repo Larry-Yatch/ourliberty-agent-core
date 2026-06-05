@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration 945 — 2026-06-05 02:53 UTC (interactive)
+
+**Health:** ⚠️ **Tier 1 — RESOLVING. PID 44633 GONE (Mirror session terminated naturally ~02:53Z after 134 min). Inbox-watcher recovery in progress. PR #335 open 20 min, UNKNOWN merge state, below 30-min threshold. Mirror review task for PR #335 now queued. 0 auto-fix actions.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 943's own escalation). Pipeline-stall heartbeat: 2026-06-05T02:46:00Z (✅ ~7 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T02:31:59Z (✅ ~21 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=337afbe, last_sync=02:49:11Z (~4 min at cycle start; ✅ within 2h threshold — updated from 01:49:07Z at iter 944). Session-start gitStatus: branch=main, tree=clean, HEAD=c626e62 "Pulse cycle 20260605T025214Z". Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (signals ongoing — inbox-watcher recovering, PR #335 open, mirror tasks pending). last_signal_at=02:55:48Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z — unchanged from iter 944. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "30 minutes ago"` → no entries (note: journald limited visibility in this context). ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (7998341473 → 1b5ed242; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ RESOLVING.** Heartbeat = 02:46:00Z (~7 min; ✅ within 90-min threshold). **PID 44633 NOT FOUND** — Mirror claude session terminated naturally between iter 944 (02:47Z) and this iter (02:53Z), ~134 min after start. No kill was issued by Pulse; session exited on its own. Inbox-watcher (PID 4075378, same PID) recovery in progress — old task `review-build-unreviewed-merge-detector-20260605T000816Z.json` still in inbox (archive not yet written; expected during post-exit cleanup). Worktrees `wt-forge-build-unreviewed-merge-detector-*` and `wt-mirror-build-unreviewed-merge-detector-*` still on disk (GC will clean up). **Standing [yellow] escalation from iter 943 (`kill 44633`) is now MOOT — session terminated without Larry intervention.** New `review-manual-tier2-probe-memcap-pr335.json` appeared in Mirror inbox at 02:53Z (dispatched_by: claude-manual-operator, for PR #335 review). Classification: RESOLVING; no new escalation. ✅→⚠️
+
+- **(Check 4) Pending Larry directives: ⚠️ IMPROVING.** Mirror inbox: 2 tasks (old `review-build-unreviewed-merge-detector-20260605T000816Z.json` in recovery + new `review-manual-tier2-probe-memcap-pr335.json` for PR #335). Forge=0, Beacon=0, Pulse=0. Stall resolving naturally; new review task queued for PR #335. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 02:31:59Z (~21 min at cycle start; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=c626e62 "Pulse cycle 20260605T025214Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=337afbe, last_sync=02:49:11Z (✅ ~4 min old; ✅ within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** All 8 units `active`. Inbox-watcher PID 4075378 (same, recovering). Worktrees still on disk — GC pending. ✅
+
+- **(Check D) Agent inboxes: ⚠️ Mirror=2 (see Checks 3/4).** Forge=0, Beacon=0, Pulse=0. ⚠️
+
+- **(Check E) PRs: ⚠️ PR #335 open — 20 min old, UNKNOWN/UNKNOWN, below 30-min threshold.** PR #335 "fix(tier2-probe): raise memory cap that OOM-throttled the probe + classify failure mode" created 02:33:06Z. `gh pr view 335` → UNKNOWN/UNKNOWN (GitHub recomputing). Per calibration rule: UNKNOWN = defer auto-merge. Also below the 30-min always-fix threshold (~03:03Z). Mirror review task now queued (`review-manual-tier2-probe-memcap-pr335.json`) — pipeline should handle auto-merge after Mirror PASS. ourliberty-dashboard: 0 open PRs. **Watch: if Mirror review completes PASS and PR still open at iter 946, verify auto-merge fired; if not, enable manually.** ⚠️
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions Case 2 not graduated — poll-loop-wedge auto-kill blocked`: 2/3 (unchanged).** PID 44633 terminated naturally — no auto-kill fired. The specific poll-loop-wedge-blocks-kill pattern (pgrep self-match → /proc/ → infinite loop blocks healer kill) was NOT conclusively the exit mechanism; exit cause unknown. G-rule stays at 2/3. At 3/3 (same bash poll loop trap recurs): dispatch Beacon to spec Case 2 graduation — auto-kill when worktree files unchanged >N min AND no active session log writes.
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; no new occurrence this iter).
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (unchanged).
+  - All other G-rules: unchanged from iter 944.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:55:48Z. No new intervention row — standing intervention from iter 940 covers the stall period; stall now self-resolved.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed PID 44633 GONE (terminated naturally since iter 944). New Mirror review task `review-manual-tier2-probe-memcap-pr335.json` appeared at 02:53Z for PR #335.
+3. Verified PR #335 via `gh pr view` → UNKNOWN/UNKNOWN. 20 min old; below 30-min threshold; UNKNOWN = defer per calibration rule.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:55:48Z. ✅
+5. No new escalations. Standing iter 943 [yellow] (`kill 44633`) is MOOT — session self-resolved. No resolution DM needed ([blue] = journal-only).
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing [yellow] from iter 943 is now MOOT (PID 44633 self-resolved). Other standing items carry forward:
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (PR #335 addresses OOM root cause — watch for Mirror PASS + merge to verify alerts cease).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers; root code fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** Mirror wedge (iters 940→945, 134 min total) resolved without Larry intervention. PID 44633 exited on its own — cause unknown (session may have completed its review normally, hit an internal timeout, or been killed externally between iter 944 check and this iter's check). Inbox-watcher is recovering. New PR #335 review task queued immediately (`review-manual-tier2-probe-memcap-pr335.json`, dispatched_by: claude-manual-operator) — this PR addresses the longstanding `tier2_weekly_probe_failed` OOM pattern. If Mirror PASS + auto-merge fires, APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close.
+
+---
+
 ## Iteration 944 — 2026-06-05 02:47 UTC (interactive)
 
 **Health:** ⚠️ **Tier 1 (signal). consecutive_clean=0. 0 auto-fix actions. 8/8 services active. PR #335 open (14 min, UNKNOWN merge state — watch for 30-min threshold ~03:03Z). Mirror wedge ONGOING — PID 44633 still running 128 min; inbox-watcher blocked. Standing [yellow] from iter 943 stands.**
