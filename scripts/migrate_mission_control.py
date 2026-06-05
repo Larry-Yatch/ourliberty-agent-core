@@ -45,9 +45,12 @@ MC nested tasks (inside each project's `tasks` array) → Supabase `tasks`:
   task_type    → 'human' (hardcoded; MC has no agent dispatches)
   agent        → NULL (hardcoded)
 
-Status translation (projects):
+Status translation (projects), in precedence order:
+  archived=true               → 'dropped'   (terminal: an archived project is
+                                shelved, so this wins even over a stale blocker;
+                                the blocker text is still preserved in the
+                                blocker_type/blocker_note columns)
   blocker non-null/non-empty  → 'blocked'
-  archived=true               → 'dropped'
   else                        → MC value passthrough
                                 ('notstarted'|'inprogress'|'done')
 
@@ -208,8 +211,32 @@ def _connect_supabase(url: Optional[str], key: Optional[str]):
 # Status / timestamp helpers
 # ============================================================
 
+# Supabase projects.priority CHECK constraint (e4-1-schema-v1.md §97).
+_VALID_PRIORITIES = ("high", "medium", "low")
+
+
+def _translate_priority(value: Any) -> str:
+    """Clamp an MC priority to the Supabase enum (audit #51).
+
+    projects.priority has a CHECK (priority IN ('high','medium','low')). MC can
+    carry out-of-enum values (e.g. 'urgent'); passing them verbatim makes the
+    insert raise mid-migration, halting the run after earlier rows were already
+    written. Map anything outside the enum to the schema default 'medium' so a
+    single bad source value can't abort the migration.
+    """
+    if isinstance(value, str) and value.lower() in _VALID_PRIORITIES:
+        return value.lower()
+    return "medium"
+
+
 def _translate_status(mc_project: dict) -> str:
-    """Apply MC → Supabase status enum translation."""
+    """Apply MC → Supabase status enum translation.
+
+    Precedence (see module docstring): archived wins over blocker — an archived
+    project is terminal/shelved, so it maps to 'dropped' even when a (possibly
+    stale) blocker is still set; the blocker text survives in blocker_type /
+    blocker_note regardless.
+    """
     if mc_project.get("archived") is True:
         return "dropped"
     blocker = mc_project.get("blocker")
@@ -403,7 +430,7 @@ def _migrate_projects(
             "reporting_brief": mc_project.get("reportingBrief"),
             "owner": mc_project.get("owner"),
             "status": _translate_status(mc_project),
-            "priority": mc_project.get("priority") or "medium",
+            "priority": _translate_priority(mc_project.get("priority")),
             "blocker_type": mc_project.get("blocker"),
             "blocker_note": mc_project.get("blockerNote"),
             "next_action": mc_project.get("nextAction"),

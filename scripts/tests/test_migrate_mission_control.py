@@ -390,6 +390,23 @@ class HelperTest(unittest.TestCase):
     def test_translate_status_unknown_falls_back_to_notstarted(self):
         self.assertEqual(mmc._translate_status({"status": "wat"}), "notstarted")
 
+    def test_translate_priority_passes_valid_enum(self):
+        for p in ("high", "medium", "low"):
+            self.assertEqual(mmc._translate_priority(p), p)
+
+    def test_translate_priority_is_case_insensitive(self):
+        self.assertEqual(mmc._translate_priority("HIGH"), "high")
+
+    def test_translate_priority_clamps_out_of_enum_to_medium(self):
+        # Audit #51: an out-of-enum value (e.g. 'urgent') must not flow verbatim
+        # into the insert and abort the migration on the CHECK constraint.
+        self.assertEqual(mmc._translate_priority("urgent"), "medium")
+
+    def test_translate_priority_clamps_missing_and_nonstring_to_medium(self):
+        self.assertEqual(mmc._translate_priority(None), "medium")
+        self.assertEqual(mmc._translate_priority(""), "medium")
+        self.assertEqual(mmc._translate_priority(3), "medium")
+
     def test_date_to_timestamptz_handles_bad_input(self):
         self.assertIsNone(mmc._date_to_timestamptz(None))
         self.assertIsNone(mmc._date_to_timestamptz(""))
