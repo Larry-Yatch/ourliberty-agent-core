@@ -262,9 +262,15 @@ def _check_auto_restart(service_name: str, friendly: str) -> dict:
     # active is None (systemctl error) or a dead state (failed/inactive) →
     # genuinely down; watchdog actuates.
     if active is None:
+        # Unknown state (transient systemctl error): do NOT reset the streak —
+        # resetting on an uncertain reading would let a flapping service evade
+        # detection by interleaving error ticks.
         log(f'{friendly} ({service_name}) state unknown (systemctl query failed) '
             f'— attempting start', 'WARN')
     else:
+        # Confirmed not in auto-restart → this breaks the consecutive-auto-restart
+        # streak (the flap counter only counts back-to-back auto-restart ticks).
+        _reset_flap_streak(service_name)
         log(f'{friendly} ({service_name}) is DOWN (state={active}) — attempting '
             f'start', 'WARN')
     if _attempt_start(service_name):

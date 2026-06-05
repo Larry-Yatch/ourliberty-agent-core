@@ -69,6 +69,14 @@ DEFAULT_ROUTE = 'escalate'
 # ---------- cooldown machinery ----------
 
 
+# Cap the sanitized filename well under the common 255-byte filesystem
+# NAME_MAX, leaving headroom for the `.tmp.<pid>` suffix `silence()` adds during
+# its atomic write (and the 11-byte hash suffix below). A key longer than this
+# is truncated and disambiguated by the hash, so an over-long fingerprint can't
+# make `open()`/`write` raise (which would read as a silence-write failure).
+_MAX_SAFE_KEY_LEN = 200
+
+
 def _safe_key(key: str) -> str:
     """Filesystem-safe form of a cooldown/silence key.
 
@@ -76,14 +84,17 @@ def _safe_key(key: str) -> str:
     keys like `forge:a/b` and `forge:a b` both collapse to `forge:a_b`, so one
     alert's cooldown/silence would suppress the other. To keep the mapping
     injective, append a short stable hash of the RAW key whenever sanitization
-    actually changed something. Keys that were already filesystem-safe (the
-    common `source:subject` case where subject is a task-id) are returned
-    unchanged, so this introduces no churn for existing cooldown/silence files.
+    changed something OR the key is over-length. Keys that are already
+    filesystem-safe AND short (the common `source:subject` case where subject is
+    a task-id) are returned unchanged, so there is no churn for existing
+    cooldown/silence files.
     """
     safe = ''.join(c if (c.isalnum() or c in '-._:') else '_' for c in key)
-    if safe == key:
+    if safe == key and len(safe) <= _MAX_SAFE_KEY_LEN:
         return safe
     digest = hashlib.sha1(key.encode('utf-8')).hexdigest()[:10]
+    if len(safe) > _MAX_SAFE_KEY_LEN:
+        safe = safe[:_MAX_SAFE_KEY_LEN]
     return f'{safe}.{digest}'
 
 

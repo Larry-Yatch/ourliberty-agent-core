@@ -558,6 +558,13 @@ class SilenceLayerTest(_IsolatedQueueTest):
                      if '.tmp.' in p.name]
         self.assertEqual(leftovers, [])
 
+    def test_long_key_silence_round_trip(self):
+        # A capped (over-long) key must still write+read a silence without an
+        # OSError from a NAME_MAX overflow on the atomic-write tmp file.
+        key = 'forge:' + ('x' * 400)
+        self.assertTrue(larry_alerts.silence(key))
+        self.assertTrue(larry_alerts.is_silenced(key))
+
 
 class SafeKeyTest(unittest.TestCase):
     def test_clean_key_unchanged(self):
@@ -579,6 +586,17 @@ class SafeKeyTest(unittest.TestCase):
     def test_safe_key_is_deterministic(self):
         self.assertEqual(larry_alerts._safe_key('forge:a/b'),
                          larry_alerts._safe_key('forge:a/b'))
+
+    def test_over_long_key_is_capped_and_disambiguated(self):
+        # A near-NAME_MAX key must be capped so the base name + `.tmp.<pid>`
+        # atomic-write suffix can't overflow the filesystem 255-byte limit.
+        long_clean = 'forge:' + ('a' * 400)
+        out = larry_alerts._safe_key(long_clean)
+        self.assertLessEqual(len(out), larry_alerts._MAX_SAFE_KEY_LEN + 11)
+        # Two distinct over-long keys with the same 200-char prefix stay distinct.
+        other = 'forge:' + ('a' * 399) + 'b'
+        self.assertNotEqual(larry_alerts._safe_key(long_clean),
+                            larry_alerts._safe_key(other))
 
 
 if __name__ == '__main__':
