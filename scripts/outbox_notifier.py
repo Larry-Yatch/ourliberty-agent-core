@@ -3907,6 +3907,151 @@ def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
     return None
 
 
+# build-mirror-review-status — Mirror verdict -> GitHub commit status.
+# A required `mirror-review` status check on `main` makes Mirror's pass
+# physically enforceable: no actor (even the admin identity) can merge a PR
+# unless this notifier posted state=success for it. We post at the verdict
+# moment, BEFORE the auto-merge shell-out, so a Mirror-passed PR satisfies
+# the (soon-to-be) required check at merge time; REVISION / ESCALATE /
+# EMERGENCY_HALT post state=failure so those PRs stay blocked (the #303
+# hole). Best-effort + idempotent: GitHub keeps the latest status per
+# (sha, context), and any gh error is logged and swallowed — this MUST
+# NEVER crash the notifier or block the merge flow.
+_MIRROR_REVIEW_STATUS_CONTEXT = 'mirror-review'
+
+# marker_type -> (commit-status state, description).
+_MIRROR_REVIEW_STATUS_BY_MARKER: dict[str, tuple[str, str]] = {
+    'review_pass': ('success', 'Mirror review passed'),
+    'review_revision': ('failure', 'REVIEW_REVISION'),
+    'review_escalate': ('failure', 'REVIEW_ESCALATE'),
+    'review_emergency_halt': ('failure', 'REVIEW_EMERGENCY_HALT'),
+}
+
+# Test seam (mirrors _AUTO_MERGE_FN_OVERRIDE). When set, replaces the whole
+# `_post_mirror_review_commit_status` body so integration tests routing
+# Mirror verdicts through process_outbox don't shell out to real `gh`.
+# Production leaves this None.
+_POST_STATUS_FN_OVERRIDE: Optional[Any] = None
+
+
+def _gh_pr_head_sha(repo_coords: str, pr_number: int) -> Optional[str]:
+    """Return the PR head commit SHA via `gh pr view --json headRefOid`, or None.
+
+    None on any transport error / non-zero exit / parse failure — the caller
+    treats that as "couldn't resolve the head SHA; skip the status POST."
+    """
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords, '--json', 'headRefOid'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) headRefOid lookup '
+            f'FAILED: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) headRefOid returned '
+            f'{proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    try:
+        payload = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return None
+    sha = payload.get('headRefOid')
+    if isinstance(sha, str) and sha:
+        return sha
+    return None
+
+
+def _post_mirror_review_commit_status(
+    data: dict[str, Any], marker_decision: dict[str, Any],
+) -> Optional[str]:
+    """POST a `mirror-review` commit status for a classified Mirror verdict.
+
+    REVIEW_PASS -> state=success; REVIEW_REVISION / REVIEW_ESCALATE /
+    REVIEW_EMERGENCY_HALT -> state=failure. Targets the PR head SHA (the
+    commit branch-protection gates) via `gh api repos/{repo}/statuses/{sha}`.
+    Returns the posted state on success, or None when skipped/failed.
+
+    Best-effort: never raises into the caller and never blocks the merge
+    flow. Idempotent — re-posting the same (sha, context, state) is harmless
+    (GitHub keeps the latest status per context).
+    """
+    if _POST_STATUS_FN_OVERRIDE is not None:
+        try:
+            return _POST_STATUS_FN_OVERRIDE(data, marker_decision)
+        except Exception as e:  # noqa: BLE001 — test seam must not wedge daemon
+            log(
+                f'MIRROR_REVIEW_STATUS override raised: {type(e).__name__}: {e}',
+                'WARN',
+            )
+            return None
+
+    marker_type = marker_decision.get('marker_type')
+    mapping = _MIRROR_REVIEW_STATUS_BY_MARKER.get(marker_type)
+    if mapping is None:
+        return None
+    state, description = mapping
+    payload = marker_decision.get('payload') or {}
+    pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
+    task_id_log = data.get('task_id', '?')
+
+    repo_coords, pr_number, shape_reason = _pr_url_shape_check(pr_url)
+    if repo_coords is None:
+        log(
+            f'MIRROR_REVIEW_STATUS task={task_id_log} pr={pr_url!r} '
+            f'skipped reason=pr-url-shape-invalid ({shape_reason})',
+            'WARN',
+        )
+        return None
+
+    head_sha = _gh_pr_head_sha(repo_coords, pr_number)
+    if not head_sha:
+        log(
+            f'MIRROR_REVIEW_STATUS task={task_id_log} pr={pr_url} '
+            f'skipped reason=no-head-sha',
+            'WARN',
+        )
+        return None
+
+    try:
+        proc = subprocess.run(
+            ['gh', 'api', f'repos/{repo_coords}/statuses/{head_sha}',
+             '-f', f'state={state}',
+             '-f', f'context={_MIRROR_REVIEW_STATUS_CONTEXT}',
+             '-f', f'description={description}'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'MIRROR_REVIEW_STATUS task={task_id_log} pr={pr_url} '
+            f'sha={head_sha[:12]} POST FAILED: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return None
+    if proc.returncode != 0:
+        log(
+            f'MIRROR_REVIEW_STATUS task={task_id_log} pr={pr_url} '
+            f'sha={head_sha[:12]} POST gh exit={proc.returncode}: '
+            f'{(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return None
+    log(
+        f'MIRROR_REVIEW_STATUS task={task_id_log} pr={pr_url} '
+        f'sha={head_sha[:12]} context={_MIRROR_REVIEW_STATUS_CONTEXT} '
+        f'state={state} posted'
+    )
+    return state
+
+
 def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     """Fire `gh pr merge <N> --squash --delete-branch` for a Mirror-PASSed PR.
 
@@ -6805,6 +6950,13 @@ def process_outbox(outbox_file: Path) -> str:
         # queue. Additive + best-effort; never blocks the flow below.
         if marker_decision:
             _emit_mirror_verdict_chain_event(data, marker_decision, agent='mirror')
+            # build-mirror-review-status — POST the `mirror-review` commit
+            # status for this verdict. Placed here (same spot that classifies
+            # the marker) so a REVIEW_PASS success status is on the head SHA
+            # BEFORE the auto-merge block below fires; REVISION / ESCALATE /
+            # EMERGENCY_HALT post a failure status that keeps the PR blocked.
+            # Best-effort — never raises, never blocks the merge flow.
+            _post_mirror_review_commit_status(data, marker_decision)
 
     if marker_decision is not None:
         # Marker-driven routing. Always targets the original dispatcher
