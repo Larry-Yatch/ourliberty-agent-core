@@ -20,7 +20,32 @@ from pathlib import Path
 AGENTS_ROOT = Path.home() / 'agents'
 GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
 MAX_CONCURRENT = 10
-STALE_TIMEOUT = 600  # Consider a slot stale after 10 min (dead process)
+STALE_TIMEOUT = 600  # Fallback reap window when process identity is unverifiable
+
+
+def _proc_start_token(pid):
+    """A stable per-process start token (Linux `/proc/<pid>/stat` starttime),
+    or None where unavailable (e.g. macOS, or the process is gone).
+
+    `os.kill(pid, 0)` alone can't tell a still-running slot-owner from an
+    unrelated process that the OS later assigned the SAME recycled PID. Pairing
+    the PID with its start time disambiguates: a recycled PID has a different
+    start time, so a stale slot is dropped immediately instead of squatting a
+    capacity slot until STALE_TIMEOUT — and a verified-same long-running process
+    keeps its slot even past STALE_TIMEOUT (builds can run for >10 min)."""
+    try:
+        with open(f'/proc/{pid}/stat', 'rb') as f:
+            data = f.read()
+    except (OSError, ValueError):
+        return None
+    # comm (field 2) is parenthesized and may contain spaces/parens; split after
+    # the last ')'. starttime is field 22 → index 19 of the post-comm fields
+    # (which start at field 3).
+    try:
+        rest = data[data.rfind(b')') + 2:].split()
+        return rest[19].decode()
+    except (IndexError, ValueError):
+        return None
 
 
 class ConcurrencyGuard:
@@ -40,20 +65,32 @@ class ConcurrencyGuard:
             json.dump(data, f)
 
     def _clean_stale(self, data):
-        """Remove slots from dead processes or timed-out entries."""
+        """Remove slots whose owning process is dead, whose PID was recycled by
+        a different process, or (when identity is unverifiable) timed out."""
         now = time.time()
         alive = []
         for slot in data.get('slots', []):
             pid = slot.get('pid', 0)
             ts = slot.get('ts', 0)
-            # Check if process is alive
+            # Is *some* process alive at this PID?
             try:
                 os.kill(pid, 0)
-                # Process alive — check if stale
-                if now - ts < STALE_TIMEOUT:
-                    alive.append(slot)
             except (OSError, ProcessLookupError):
-                pass  # Dead process, remove
+                continue  # dead process — drop the slot
+
+            stored = slot.get('start')
+            current = _proc_start_token(pid)
+            if stored is not None and current is not None:
+                # Identity is verifiable: keep iff it's the SAME process,
+                # regardless of age (a long build legitimately outlives
+                # STALE_TIMEOUT). A mismatch means the PID was recycled.
+                if stored == current:
+                    alive.append(slot)
+                continue
+            # Identity unverifiable (no /proc, or legacy slot without 'start')
+            # → fall back to the time-based reap.
+            if now - ts < STALE_TIMEOUT:
+                alive.append(slot)
         data['slots'] = alive
         return data
 
@@ -74,6 +111,7 @@ class ConcurrencyGuard:
                     'agent': agent_id,
                     'task': task_id,
                     'ts': time.time(),
+                    'start': _proc_start_token(os.getpid()),
                 })
                 self._write(data)
                 return True

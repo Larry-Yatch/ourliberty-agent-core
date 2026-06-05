@@ -121,6 +121,20 @@ ROUTING_SIGNAL_PROMPT_PREFIXES = (
     'review-sequence-dag ',
 )
 
+
+def _is_routing_signal_prompt(prompt: str) -> bool:
+    """True iff `prompt` is a canonical routing signal: it starts with a known
+    prefix AND carries a non-empty argument (the seq-id) after it. The
+    non-empty-argument check is what keeps a degenerate `kickoff ` (the F24
+    empty-prompt bug coincidentally carrying the prefix) from bypassing the
+    min-length guard — the whole point of the routing-signal carve-out is that
+    the seq-id IS the semantic payload, so a prefix with no seq-id is not a
+    routing signal at all."""
+    for p in ROUTING_SIGNAL_PROMPT_PREFIXES:
+        if prompt.startswith(p) and prompt[len(p):].strip():
+            return True
+    return False
+
 MIN_PROMPT_LEN = 100  # chars
 MAX_PROMPT_LEN = 50000
 MIN_TIMEOUT = 60      # seconds
@@ -145,7 +159,7 @@ def validate_task(task):
     is_routing_signal = (
         target_agent in ROUTING_SIGNAL_TARGET_AGENTS
         or phase == 'routing-signal'
-        or any(prompt.startswith(p) for p in ROUTING_SIGNAL_PROMPT_PREFIXES)
+        or _is_routing_signal_prompt(prompt)
     )
     if not is_routing_signal and len(prompt) < MIN_PROMPT_LEN:
         return False, f'prompt too short ({len(prompt)} chars, min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug'
