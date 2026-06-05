@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 942 — 2026-06-05 02:38 UTC (interactive)
+
+**Health:** ⚠️ **Tier 1 (signal). consecutive_clean=0. 0 auto-fix actions. 8/8 services active. 1 open PR (age ~1 min, watch). Mirror wedge: PID 46961 GONE (poll loop resolved), PID 44633 still running 115+ min. inbox-watcher still blocked. Standing [yellow] from iter 940 covers.**
+
+Alert watermark: **1308 lines / 2026-06-05T02:25:21Z** (unchanged from iter 941 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T02:30:09Z (✅ ~4 min at cycle start; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T02:31:59Z (✅ ~2 min at cycle start; within 60-min threshold). Sync: status=no-change, commit=982bbdd5, last_sync=01:49:07Z (~45 min at cycle start; within 2h threshold; local HEAD 0a424ab newer — wrapper push from iter 941; self-clears on next hourly tick). Session-start gitStatus: branch=main, tree=clean, HEAD=0a424ab "Pulse cycle 20260605T023305Z". Tier state at start: tier=1, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (signal ongoing — Mirror session still running, inbox-watcher still blocked).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** 1308 lines, unchanged from iter 941 watermark. 0 new alerts. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd log entries in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session (unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ⚠️ ONGOING — but evolving.** Heartbeat = 02:30:09Z (~4 min at cycle start; within threshold ✅). PID 46961 (bash poll loop) is **GONE** from process list — the `/proc/` infinite-loop anti-pattern has self-resolved since iter 941. **PID 44633 (Mirror claude session, started 00:39:12Z) is STILL RUNNING** at 115+ min total elapsed. Mirror outbox: empty (no review output written yet). inbox-watcher (PID 4075378) log still silent since 00:39:12Z — still effectively blocked waiting for PID 44633 to exit. The bash-loop-wedge (the specific Case 2 failure mode from iter 940) is resolved, but the Mirror session has not yet completed. This may indicate legitimate post-poll-loop work completing, or a new stuck state. Watch whether inbox-watcher logs resume in the next iter. **Classification: ask-then-do (ongoing). Standing escalation from iter 940 covers; no new DM.** ⚠️
+
+- **(Check 4) Pending Larry directives: ⚠️ Ongoing stall.** Mirror inbox: `review-build-unreviewed-merge-detector-20260605T000816Z.json` still present (~115 min old). Forge=0, Beacon=0, Pulse=0. Same status as Check 3 — inbox-watcher blocked. ⚠️
+
+- **(Check 5) Stale daemon: ✅ Nominal.** heal-stale-daemon-code heartbeat = 02:31:59Z (~2 min; within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** gitStatus: branch=main, tree=clean, HEAD=0a424ab "Pulse cycle 20260605T023305Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=982bbdd5, last_sync=01:49:07Z (✅ ~45 min old; within 2h threshold; local HEAD newer — wrapper push, self-clears on next hourly sync.timer). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** ourliberty-beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer — all `active`. ✅
+
+- **(Check D) Agent inboxes: ⚠️ Mirror=1 (same as Checks 3/4).** Forge=0, Beacon=0, Pulse=0. ⚠️
+
+- **(Check E) PRs: ⚠️ NEW PR #335 open — age ~1 min, auto-merge NOT set, watching.** PR #335 "fix(tier2-probe): raise memory cap that OOM-throttled the probe + classify failure mode" — branch `fix/tier2-probe-memory-cap-and-failure-classification`, created 2026-06-05T02:33:06Z, CLEAN/MERGEABLE, `autoMergeRequest: null`. Root cause addresses the longstanding `tier2_weekly_probe_failed` recurring alert (probe unit MemoryMax=256M; real claude RSS ~276 MB → OOM). Only 1 min old at check time — below the 30-min always-fix threshold. **Watch: if still open and CLEAN at iter 943 (~30 min from PR creation = ~03:03Z), enable auto-merge.** ⚠️
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** next scheduled 2026-06-14. Skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule watch:**
+  - **`heal-wedged-review-sessions Case 2 not graduated — poll-loop-wedge auto-kill blocked`: WATCH — not advancing to 3/3 this iter.** PID 46961 (bash poll loop) is now GONE — the specific bash-poll-loop-wedge anti-pattern self-resolved between iter 941 and iter 942. The G-rule was about the `pgrep -f '[t]est_regression_check.py'` → empty → `/proc/` trap variant. Since the loop exited, this occurrence resolved without healer intervention. Current status: PID 44633 still running but likely doing post-poll-loop work. **G-rule stays at 2/3**: the third occurrence would need the same bash-poll-loop trap to recur. If inbox-watcher doesn't recover and PID 44633 remains running into iter 943, reassess whether a NEW stuck pattern (Case 3?) requires a separate G-rule. Watch.
+  - `wedged-review-silent-wt:* not in alert-translations.json`: **1/3** (iter 935; no new occurrence). Unchanged.
+  - `source=larry Forge builds auto-routing to Mirror`: **1/3** (unchanged).
+  - All other G-rules: unchanged from iter 941.
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=02:38:04Z. No new intervention row (finding ongoing from iter 940; standing escalation covers it; adding duplicate intervention rows for the same ongoing event would inflate the ratio without adding signal).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates.
+2. Confirmed PID 46961 (bash poll loop) is GONE — the `/proc/` infinite loop self-resolved. PID 44633 still running (Mirror session, 115+ min).
+3. Identified new PR #335 (tier2-probe memory cap fix) — CLEAN/MERGEABLE, created 02:33:06Z. 1 min old at check; below 30-min auto-merge threshold. Added to watch.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+5. No new PRIME DIRECTIVE ledger row (ongoing signal, not a new intervention).
+6. Wrote journal entry.
+
+**Escalated:** No new escalations. Standing items carry forward:
+- **[yellow] (iter 940)** `mirror-poll-loop-wedge-iter940`: PID 44633 still running (115+ min); inbox-watcher blocked. Note: PID 46961 (bash poll loop cause) is now gone — evolution since iter 940. If PID 44633 completes and inbox-watcher recovers naturally in iter 943, escalation resolves without Larry action. If PID 44633 is still running at iter 943+, a new escalation with updated diagnosis will be warranted.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go").
+- `[yellow]` tier2_weekly_probe_failed recurring (APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` open — **note: PR #335 directly addresses this failure mode; watch for PR #335 to merge and verify tier2_weekly_probe_failed alerts cease**).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` (self-recovers).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- `medic:medic-diagnosis` engine-fix pending Larry.
+
+**Patterns:** Mirror bash poll loop (PID 46961) self-resolved between iter 941 and 942 — positive development. Mirror claude session (PID 44633) still running at 115+ min; inbox-watcher still blocked. Expect recovery to show up in inbox-watcher logs in iter 943 if PID 44633 wraps up normally post-poll-loop. New PR #335 addresses the recurring `tier2_weekly_probe_failed` OOM false-alarm pattern — if it merges, the long-running APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` may close (confirm after merge whether tier2-probe alerts cease).
+
+---
+
 ## Iteration 941 — 2026-06-05 02:29 UTC (interactive)
 
 **Health:** ⚠️ **Tier 1 (signal). consecutive_clean=0. 0 auto-fix actions. 8/8 services active. 0 open PRs. 0 new alerts (Check 0). Mirror wedge ONGOING — PID 44633 + PID 46961 still alive 110 min; inbox-watcher blocked. Standing [yellow] escalation from iter 940 stands.**
