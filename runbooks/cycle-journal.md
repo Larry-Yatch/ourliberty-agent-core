@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 963 — 2026-06-05 07:02 UTC (interactive, Tier 2→1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 2→1 — SIGNAL. Tier-reset triggered by tier-NOW / never_silence alert. 1 new alert: `unreviewed-merge:344` (PR #344 merged without Mirror review, actor=Larry-Yatch — 2nd consecutive in 35 min). 8/8 services active. All inboxes empty. 0 open PRs. Sync: ✅ no-change.**
+
+Alert watermark: **1320 lines / 2026-06-05T06:45:30Z** (was 1319 iter 962 — 1 new: unreviewed-merge:344). Pipeline-stall heartbeat: 2026-06-05T06:45:09Z (✅ ~17 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T06:33:19Z (✅ ~29 min at scan; within 60-min threshold). Sync: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (✅ ~12 min at scan; within 2h threshold). Tier state at start: tier=2, consecutive_clean=0. Tier state at end: **tier=1, consecutive_clean=0** (tier-NOW alert forced reset).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 tier-NOW alert — tier-reset.** Watermark advanced 1319→1320.
+  - `source=heal-unreviewed-merge-detector, subject=unreviewed-merge:344, ts=2026-06-05T06:45:30Z, severity=critical, route=escalate` — PR #344 ("fix(safety): paid re-run on outbox fail, dashboard action TOCTOU, medic fingerprint substring (audit PR E)") merged at 06:45:30Z by Larry-Yatch with no Mirror REVIEW_PASS evidence. **Second consecutive unreviewed-merge event** (PR #343 at 06:10Z, PR #344 at 06:45Z — 35 min apart). Config: `tier=NOW, never_silence=true`. Classification: **Tier-NOW, never_silence → escalate + tier-reset.**
+  - Escalation written via `larry_alerts.append_alert` (source=pulse-escalation, subject=unreviewed-merge:344-pulse-triage, line 1320).
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd logs in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session (7998341473; unchanged). No new untracked Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 06:45:09Z (~17 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 06:33:19Z (~29 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=2a9f631 "Pulse cycle 20260605T064833Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=2a9f631, last_sync=2026-06-05T06:49:42Z (12 min, within 2h). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** agent-core: 0 (PR #344 merged 06:45:30Z). ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d, outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** No new `tier2_weekly_probe_failed` alerts in the 1319→1320 window (new line = unreviewed-merge:344 only). Next probe expected ~09:00Z (6h cadence). Watch continues.
+
+- **PR #343 [red] escalation:** Standing (iter 959). Larry response still pending.
+
+- **NEW G-rule observation (iter 963): `actor=larry-direct-merge causes unreviewed-merge-detector false(?) positive` — 2/3.** Iter 959=1/3 (PR #343), iter 963=2/3 (PR #344). Two consecutive Larry-direct audit-PR merges without Mirror review. Pattern: Larry may be intentionally bypassing Mirror review for "audit PR" series merges. At 3/3: dispatch Beacon to spec `actor-exemption-config` in `heal-unreviewed-merge-detector` OR explicit `audit-pr` label bypass policy. Larry's response to the escalation will clarify intent before 3/3.
+
+- **PRIME DIRECTIVE ratio:** `cycle_prime_ledger.py ratio` → interventions=721, systemic_fixes=13, ratio≈55.5. NOTE: MEMORY states 14 systemic_fixes (ratio 51.5) based on iter 962 correction; script shows 13 — script is authoritative. MEMORY discrepancy to reconcile. Current iter adds 1 intervention (ledger row recorded: `unreviewed-merge-escalation:PR-344-Larry-Yatch-no-mirror-review-2nd-consecutive`).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified `unreviewed-merge:344` as tier-NOW / never_silence → escalated.
+3. Wrote escalation via `larry_alerts.append_alert` (source=pulse-escalation, line 1320). DM queued.
+4. Recorded PRIME DIRECTIVE intervention in cycle-prime-ledger.jsonl (iter 963, tier 2, kind=intervention).
+5. `cycle_tier_state.py record --checks-clean false` → tier-reset: tier=2→1, consecutive_clean=0, last_signal_at=07:02:19Z. ✅
+6. Wrote journal entry + MEMORY update.
+
+**Escalated:**
+- `[red]` PR #344 merged without Mirror review — `heal-unreviewed-merge-detector` tier-NOW alert (2nd consecutive: PR #343 at 06:10Z + PR #344 at 06:45Z). DM queued. Larry: confirm whether the manual merge of "fix(safety): paid re-run on outbox fail, dashboard action TOCTOU, medic fingerprint substring (audit PR E)" was intentional. This is the 2nd consecutive audit-PR merged directly. If intentional pattern: consider configuring `actor-exemption-list` in `heal-unreviewed-merge-detector`, or acknowledging audit-PR merges are always Larry-direct.
+- Prior standing items carry forward:
+  - `[red]` PR #343 unreviewed-merge — Larry confirmation still pending (iter 959).
+  - `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+  - `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — re-dispatch pending Larry go-ahead.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+  - APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** 2nd consecutive Larry-direct audit-PR merge without Mirror review (PR #343 + PR #344, 35 min apart). G-rule `actor=larry-direct-merge` at 2/3. Detector is working correctly; the question is whether Larry-direct merges should be a known exempt pattern. All other subsystems nominal — no infrastructure issues, no pipeline stalls, all services alive, inboxes clear.
+
+---
+
 ## Iteration 962 — 2026-06-05 06:46 UTC (interactive, Tier 1→2 — CLEAN + de-escalate)
 
 **Health:** ✅ **Tier 1→2 — CLEAN. 3rd consecutive clean iter → de-escalated to Tier 2. 1 new alert (Tier-3 FYI, no tier-reset). 8/8 services active. All inboxes empty. PR #344 OPEN (< 30 min, watch). PR #335 healing holds. outbox-notifier live with PR #343 code.**
