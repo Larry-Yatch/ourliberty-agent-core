@@ -128,6 +128,47 @@ class CleanStaleTest(_IsolatedGuard):
                 self.assertEqual(self.g.active_count(), 0)
 
 
+class MaxConcurrentResolutionTest(unittest.TestCase):
+    """The documented safe ceiling is 6 (RAM math in the module docstring). A
+    prior bootstrap left MAX_CONCURRENT hard-coded at 10, contradicting the
+    comment and risking OOM. These tests pin the value, not just the mechanics.
+    """
+
+    def test_default_is_six(self):
+        with mock.patch.dict('os.environ', {}, clear=False):
+            os_environ = cg.os.environ
+            if 'OURLIBERTY_MAX_CONCURRENT' in os_environ:
+                del os_environ['OURLIBERTY_MAX_CONCURRENT']
+            self.assertEqual(cg._resolve_max_concurrent(), 6)
+
+    def test_module_constant_within_safe_band(self):
+        self.assertGreaterEqual(cg.MAX_CONCURRENT, 1)
+        self.assertLessEqual(cg.MAX_CONCURRENT, 6)
+
+    def test_env_override_within_band(self):
+        with mock.patch.dict('os.environ',
+                             {'OURLIBERTY_MAX_CONCURRENT': '3'}):
+            self.assertEqual(cg._resolve_max_concurrent(), 3)
+
+    def test_env_override_above_ceiling_rejected(self):
+        with mock.patch.dict('os.environ',
+                             {'OURLIBERTY_MAX_CONCURRENT': '10'}):
+            with self.assertRaises(ValueError):
+                cg._resolve_max_concurrent()
+
+    def test_env_override_zero_rejected(self):
+        with mock.patch.dict('os.environ',
+                             {'OURLIBERTY_MAX_CONCURRENT': '0'}):
+            with self.assertRaises(ValueError):
+                cg._resolve_max_concurrent()
+
+    def test_env_override_non_integer_rejected(self):
+        with mock.patch.dict('os.environ',
+                             {'OURLIBERTY_MAX_CONCURRENT': 'lots'}):
+            with self.assertRaises(ValueError):
+                cg._resolve_max_concurrent()
+
+
 class ProcStartTokenTest(unittest.TestCase):
     def test_returns_none_for_missing_pid(self):
         # PID 999999 almost certainly doesn't exist; on macOS /proc is absent.
