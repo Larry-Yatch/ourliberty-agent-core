@@ -75,13 +75,21 @@ def _load_canonical_repos() -> list[Path]:
     _REPO_PATHS_CACHE = repos
     return repos
 
-# Path prefix that identifies a managed worktree. Must agree with
-# worktree_manager.WORKTREE_BASE + WORKTREE_PREFIX.
+# Base dir holding all managed worktrees. Mirrors worktree_manager.WORKTREE_BASE
+# (kept as a local literal to preserve this module's stdlib-only / import-free
+# contract). MANAGED_WORKTREE_PREFIX is WORKTREE_BASE joined with the 'wt-' name
+# prefix worktree_manager.WORKTREE_PREFIX uses.
+WORKTREE_BASE = Path('/home/larry/agent-worktrees')
 MANAGED_WORKTREE_PREFIX = '/home/larry/agent-worktrees/wt-'
 
 LOG_FILE = Path('/home/larry/agents/logs/worktree-cleanup.log')
 IN_FLIGHT_DIR = Path('/home/larry/agents/state/in-flight')
 MAX_AGE_SECONDS = 14400  # 4 hours — tightened 2026-05-25 per Pulse off-cycle-inv finding; in-flight guard at load_active_task_stems() prevents collateral removal of active worktrees
+# Orphan dirs (de-registered from git but physically present) get a longer grace
+# window than registered worktrees: git losing track of a worktree is a
+# lower-context signal than a normal completed build, and 24h is well past any
+# legitimate in-flight build.
+ORPHAN_MAX_AGE_SECONDS = 86400  # 24 hours
 GIT_TIMEOUT_SEC = 60
 
 
@@ -179,21 +187,32 @@ def remove_worktree(canonical_repo: Path, path: str) -> bool:
             return False
 
 
-def sweep_canonical(canonical_repo: Path, active_stems: set[str]) -> tuple[int, int]:
-    """Process one canonical repo. Returns (removed, kept)."""
+def sweep_canonical(
+    canonical_repo: Path, active_stems: set[str]
+) -> tuple[int, int, set[str]]:
+    """Process one canonical repo.
+
+    Returns ``(removed, kept, registered_paths)`` where ``registered_paths`` is
+    the set of resolved-path strings for every worktree git reported for this
+    repo. ``main()`` aggregates that set across all canonical repos so the orphan
+    sweep can skip any dir git still tracks (handled here by sweep_canonical).
+    """
     if not canonical_repo.exists():
         log(f'canonical_repo missing, skipping: {canonical_repo}')
-        return 0, 0
+        return 0, 0, set()
 
     worktrees = list_worktrees(canonical_repo)
     log(f'{canonical_repo}: found {len(worktrees)} worktree(s)')
 
     removed = 0
     kept = 0
+    registered_paths: set[str] = set()
     now = time.time()
 
     for wt in worktrees:
         path = wt.get('path', '')
+        if path:
+            registered_paths.add(str(Path(path).resolve()))
         # Skip the canonical itself and any worktree that isn't one of ours.
         if path == str(canonical_repo) or MANAGED_WORKTREE_PREFIX not in path:
             kept += 1
@@ -240,6 +259,66 @@ def sweep_canonical(canonical_repo: Path, active_stems: set[str]) -> tuple[int, 
             log(f'Error checking {path}: {e}')
             kept += 1
 
+    return removed, kept, registered_paths
+
+
+def sweep_orphan_dirs(
+    registered_paths: set[str], active_stems: set[str]
+) -> tuple[int, int]:
+    """Reap ``wt-*`` dirs under WORKTREE_BASE that git no longer tracks.
+
+    ``sweep_canonical`` only sees paths git reports via ``git worktree list``;
+    a dir de-registered by ``git worktree remove``/``prune`` whose filesystem
+    directory persists is invisible to that sweep and accumulates forever. This
+    closes that gap.
+
+    Removal here is a filesystem ``rmtree``, NOT ``git worktree remove``, because
+    the dir is already de-registered. Three independent guards protect a live
+    worktree: the registered-set membership check, the in-flight-stem guard, and
+    the 24h age floor. Returns ``(removed, kept)``.
+    """
+    if not WORKTREE_BASE.exists():
+        return 0, 0
+
+    removed = 0
+    kept = 0
+    now = time.time()
+
+    for child in sorted(WORKTREE_BASE.iterdir()):
+        if not child.is_dir() or not child.name.startswith('wt-'):
+            continue
+
+        resolved = str(child.resolve())
+        # git already tracks this dir — sweep_canonical owns it.
+        if resolved in registered_paths:
+            continue
+
+        # Same in-flight guard sweep_canonical uses: a live agent_runner
+        # subprocess may hold this worktree even if mtime is stale.
+        if any(stem and stem in child.name for stem in active_stems):
+            log(f'Keeping orphan candidate {child} — in-flight task active')
+            kept += 1
+            continue
+
+        try:
+            age = now - child.stat().st_mtime
+        except OSError as e:
+            log(f'Error checking orphan candidate {child}: {e}')
+            kept += 1
+            continue
+
+        hours = age / 3600
+        if age > ORPHAN_MAX_AGE_SECONDS:
+            shutil.rmtree(child, ignore_errors=True)
+            log(
+                f'Removed orphan dir (not git-registered): {child} '
+                f'(age {hours:.1f}h)'
+            )
+            removed += 1
+        else:
+            log(f'Keeping orphan candidate {child} (age: {hours:.1f}h)')
+            kept += 1
+
     return removed, kept
 
 
@@ -250,10 +329,17 @@ def main() -> int:
         log(f'In-flight task stems: {sorted(active_stems)}')
     total_removed = 0
     total_kept = 0
+    registered_paths: set[str] = set()
     for canonical in _load_canonical_repos():
-        removed, kept = sweep_canonical(canonical, active_stems)
+        removed, kept, repo_registered = sweep_canonical(canonical, active_stems)
         total_removed += removed
         total_kept += kept
+        registered_paths |= repo_registered
+
+    orphan_removed, orphan_kept = sweep_orphan_dirs(registered_paths, active_stems)
+    total_removed += orphan_removed
+    total_kept += orphan_kept
+
     log(f'Done. Removed: {total_removed}, Kept: {total_kept}')
     return 0
 
