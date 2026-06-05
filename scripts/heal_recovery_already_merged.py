@@ -49,24 +49,28 @@ INBOX_AGENTS = ("beacon", "forge", "mirror", "pulse")
 RECOVERY_PATTERNS = (re.compile(r"00-RECOVER-"), re.compile(r"recover-"), re.compile(r"forge-stage3-results-"))
 PR_TAG_RE = re.compile(r"PR-[0-9]+[a-z]?")
 
-_DEFAULT_VERIFY_REPO = "Larry-Yatch/ourliberty-agent-core"
+# Tracked repos with active dispatch chains — mirrors heal_pipeline_stall.REPOS
+# / heal_pr_auto_merge.REPOS (the codebase's established multi-repo convention).
+# A recovery task's target PR may live in any of them, so scan all. Was a single
+# hardcoded repo, which meant a PR merged in a sibling repo looked un-merged —
+# the recovery task then sat forever and watchdog re-flagged it, the exact
+# stuck-task failure this healer exists to clear.
+REPOS = [
+    "Larry-Yatch/ourliberty-agent-core",
+    "Larry-Yatch/ourliberty-dashboard",
+]
+_DEFAULT_VERIFY_REPO = REPOS[0]
 
 
 def verify_repos() -> list[str]:
     """Repos to search for an already-merged target PR, in priority order.
 
-    A recovery task's target may live in any repo the constellation ships to,
-    so honor a comma-separated `OURLIBERTY_VERIFY_REPOS` (falling back to the
-    single `OURLIBERTY_VERIFY_REPO`, then the default). Scanning only one
-    hardcoded repo meant a merged PR in a sibling repo looked un-merged, so the
-    recovery task sat forever and watchdog re-flagged it — the exact stuck-task
-    failure mode this healer exists to clear."""
-    multi = os.environ.get("OURLIBERTY_VERIFY_REPOS")
-    if multi:
-        repos = [r.strip() for r in multi.split(",") if r.strip()]
-        if repos:
-            return repos
-    return [os.environ.get("OURLIBERTY_VERIFY_REPO", _DEFAULT_VERIFY_REPO)]
+    Honors a single-repo `OURLIBERTY_VERIFY_REPO` override (back-compat and test
+    injection); otherwise scans all tracked `REPOS`."""
+    single = os.environ.get("OURLIBERTY_VERIFY_REPO")
+    if single:
+        return [single]
+    return list(REPOS)
 
 
 def log(level: str, msg: str) -> None:

@@ -616,14 +616,17 @@ _PREFLIGHT_FAMILY_MIN_LEN = 12
 
 # A build branch for a family is `forge/build-<family>-<ts>`, so after we
 # strip the prefix + optional `build-` and the `<family>-` head, the
-# remainder is the build task's own timestamp. Require it to *start* with a
-# canonical `YYYYMMDDTHHMMSSZ` stamp (a trailing retry/clarify suffix on the
-# stamp is fine). This anchors the family match to a real build timestamp
-# instead of accepting any suffix — without it, `stem.startswith(family + '-')`
-# over-matched a DIFFERENT, longer family that merely shares a dash-prefix
-# (e.g. preflight family `add-user-auth` falsely matched the shipped build of
-# `add-user-auth-v2`), silently suppressing a genuine preflight stall.
-_BUILD_TS_PREFIX_RE = re.compile(r'\d{8}T\d{6}Z')
+# remainder STARTS with the build task's own timestamp. Anchoring the family
+# match to a real timestamp (instead of `stem.startswith(family + '-')`
+# accepting ANY suffix) is what stops a DIFFERENT, longer family that merely
+# shares a dash-prefix from matching — e.g. preflight family `add-user-auth`
+# was falsely silenced by the shipped build of `add-user-auth-v2`.
+#
+# The stamp shape varies in production branch names — `20260604T045743Z`
+# (HHMMSS+Z) and the shorter `20260604T1528` (HHMM, no Z) both occur — so
+# accept `YYYYMMDDT` + 4-to-6 digits + optional Z. `.match` (not `.fullmatch`)
+# keeps a trailing retry/clarify suffix on the stamp fine.
+_BUILD_TS_PREFIX_RE = re.compile(r'\d{8}T\d{4,6}Z?')
 
 
 def _preflight_family_shipped(task_id: str, prs: list[dict]) -> Optional[dict]:

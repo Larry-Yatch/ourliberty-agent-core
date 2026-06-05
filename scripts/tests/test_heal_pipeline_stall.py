@@ -299,6 +299,16 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
             'add-user-auth-preflight-20260603T231401Z-clarify1', [pr],
         ), pr)
 
+    def test_preflight_family_matches_short_hhmm_timestamp(self) -> None:
+        """Production build branches also use the shorter `YYYYMMDDTHHMM` stamp
+        (no seconds, no Z), e.g. `forge/build-...-20260604T1528`. That must
+        still register as the shipped build."""
+        pr = {'headRefName': 'forge/build-agent-queue-generalize-20260604T1528',
+              'number': 4}
+        self.assertEqual(self.hps._preflight_family_shipped(
+            'agent-queue-generalize-preflight-20260603T231401Z', [pr],
+        ), pr)
+
     def test_preflight_family_requires_timestamp_after_family(self) -> None:
         """A build branch whose `<family>-` suffix is NOT a timestamp (e.g. an
         unrelated descriptive slug that happens to share the dash-prefix) must
