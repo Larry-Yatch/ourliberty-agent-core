@@ -227,5 +227,63 @@ class PostRotationTest(_RotationBase):
         self.assertEqual(r.status_code, 503)
 
 
+# ---------- _read_rotation_config_enabled strict coercion (Audit #22) ----------
+
+class ReadRotationConfigEnabledTest(unittest.TestCase):
+    """The master kill switch must fail safe: rotation reads as enabled ONLY
+    when ``rotation.enabled`` is the JSON boolean ``true``. Any other type —
+    notably the quoted-bool typo {"enabled": "false"}, whose ``bool()`` is
+    truthy — must collapse to False (disabled), matching the scheduler's
+    rotate_active_tier._load_rotation_config after PR #368."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-rotcfg-'))
+        self.models_path = self.tmp / 'agent-models.json'
+
+    def _write(self, enabled_value: Any):
+        # Embed the raw JSON for ``enabled`` so we can exercise non-bool types
+        # (strings, ints, null) exactly as they'd appear on disk.
+        self.models_path.write_text(
+            '{"rotation": {"enabled": %s}}' % json.dumps(enabled_value))
+
+    def test_real_bool_true_enables(self):
+        self._write(True)
+        self.assertTrue(da._read_rotation_config_enabled(self.models_path))
+
+    def test_real_bool_false_disables(self):
+        self._write(False)
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_quoted_false_string_disables(self):
+        # The exact Audit #22 typo: bool("false") is True, must NOT enable.
+        self._write('false')
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_quoted_true_string_disables(self):
+        # A string is not the JSON boolean true → safe default (off).
+        self._write('true')
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_int_one_disables(self):
+        self._write(1)
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_missing_key_disables(self):
+        self.models_path.write_text('{"rotation": {}}')
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_missing_block_disables(self):
+        self.models_path.write_text('{}')
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+    def test_missing_file_disables(self):
+        self.assertFalse(
+            da._read_rotation_config_enabled(self.tmp / 'nope.json'))
+
+    def test_malformed_json_disables(self):
+        self.models_path.write_text('{not json')
+        self.assertFalse(da._read_rotation_config_enabled(self.models_path))
+
+
 if __name__ == '__main__':
     unittest.main()
