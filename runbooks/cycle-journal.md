@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 1023 — 2026-06-05 21:02 UTC (interactive, Tier 1 — SIGNAL: 1 new unreviewed-merge alert; PR #375 merged Larry-direct)
+
+**Health:** ⚠️ **Tier 1 (tier-reset: 1 new unreviewed-merge alert in Check 0). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
+
+Alert watermark: **1383 lines / 2026-06-05T21:00:20Z** (NEW: +1 since iter 1022 watermark 1382/20:38:21Z; unreviewed-merge:375 at 21:00:20Z; route=escalate). Pipeline-stall heartbeat: 2026-06-05T20:55:58Z (✅ ~6 min at 21:01:51Z scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T20:37:49Z (✅ ~24 min at scan; within 60-min threshold). Sync: status=no-change, last_sync=2026-06-05T20:50:44Z (~11 min at scan; within 2h threshold). Session-start gitStatus: branch=main, tree=clean, HEAD=e79ae4f "Pulse cycle 20260605T205310Z". Tier state at start: tier=1, consecutive_clean=1, last_signal_at=2026-06-05T20:43:21Z (iter 1022). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 1 Tier-4 novel alert). `cycle_tier_state.py record --checks-clean false` → last_signal_at=2026-06-05T21:02:26Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 1 new alert.** Watermark advanced 1382/20:38:21Z → 1383/21:00:20Z. 1 new entry:
+  - idx=1382: `heal-unreviewed-merge-detector / unreviewed-merge:375` at 21:00:20Z, route=escalate — PR #375 "fix(heal): gate auto-merge on HEAD freshness + bound CANCELLED reruns (PR-D)" merged by Larry-Yatch at 20:56:42Z without Mirror review. **32nd consecutive unreviewed-merge.** beacon-bot last log 20:43:18Z — DM delivery pending at scan time (alert arrived after beacon-bot's last poll; expected to deliver shortly). Tier-4 novel (unreviewed-merge:* not in known-pattern allowlist). Action pending: Larry's `go: actor-exemption-config`. **Tier-reset: YES.**
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 20:43:18Z (idx=1381, auto-restarted:ourliberty-pulse-bot, route=digest). No new Larry directives. Last directive: 2026-06-04T02:48Z UTC (unchanged). DM for idx=1382 (unreviewed-merge:375) pending delivery (route=escalate; not yet in log at scan time). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T20:55:58Z (~6 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T20:37:49Z (~24 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=e79ae4f "Pulse cycle 20260605T205310Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, last_sync=2026-06-05T20:50:44Z (~11 min at scan). Well within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ No open PRs.** PR #375 merged by Larry-Yatch at 20:56:42Z (already closed). ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel check-i-2026-06-05.json exists → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 32 consecutive (PRs #343–#375).** PR #375 = "fix(heal): gate auto-merge on HEAD freshness + bound CANCELLED reruns (PR-D)". Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`.
+
+- **G-rule `auto-restarted:*` untranslated**: No new occurrences this iter. G-rule 3/3 dispatched iter 592; Forge brief still missing.
+
+- **G-rule `gh pr merge --auto disabled`: 1/3.** No new occurrence this iter.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92, trend=flat (script-authoritative). No new always-fix actions this iter → no ledger append.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 1 new alert (unreviewed-merge:375; route=escalate; DM pending via beacon-bot). New watermark: 1383/21:00:20Z.
+3. Confirmed PR #375 ("fix(heal): gate auto-merge on HEAD freshness + bound CANCELLED reruns (PR-D)") merged Larry-direct 20:56:42Z — 32nd consecutive unreviewed-merge.
+4. Confirmed 9/9 services active, all inboxes empty, both heartbeats nominal, sync nominal, no open PRs.
+5. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=21:02:26Z.
+6. Wrote journal entry.
+
+**Escalated:** No new escalations this iter beyond standing items (beacon-bot will deliver DM for unreviewed-merge:375 via route=escalate). Standing items carry forward:
+- `[red]` PRs #343–#375 audit-series (32 consecutive unreviewed-merge alerts). **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Audit-PR series continues: PR #375 ("fix(heal): gate auto-merge on HEAD freshness + bound CANCELLED reruns (PR-D)") merged Larry-direct 20:56:42Z — 32nd consecutive unreviewed-merge. Pattern is intentional (active build sprint). G-rule `actor-exemption-config` dispatch pending Larry's `go`. PRIME DIRECTIVE ratio stable (55.92).
+
+---
+
 ## Iteration 1022 — 2026-06-05 20:51 UTC (interactive, Tier 1 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 1 (consecutive_clean=1). 9/9 services active. All inboxes empty. No open PRs. Sync nominal.**
