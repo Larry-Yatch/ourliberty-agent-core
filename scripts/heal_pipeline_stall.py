@@ -689,30 +689,20 @@ def _is_preflight_or_clarify_task(task_id: str) -> bool:
     return '-preflight' in task_id or '-clarify' in task_id
 
 
-def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
-    """If the archived Forge outbox for `task_id` shows the dispatch was
-    consumed but errored (no clean PR), return a short human-readable cause
-    string for the alert message; else None.
-
-    Reads only `<task_id>.json` (the first-attempt outbox; retry variants
-    inherit the outcome). Returns None on a missing/unreadable archive or a
-    clean (exit_code==0, no error) outbox -- the caller then proceeds with
-    the normal build-gap alert decision.
+def _classify_outbox_error(data: dict) -> Optional[str]:
+    """Return a short human-readable cause string if the archived outbox
+    `data` shows a consumed-but-errored dispatch (no clean PR), else None
+    for a clean outbox (exit_code==0/absent, no error, no auth_401).
 
     Errored signals (any one suffices):
       * `exit_code` present and != 0 (e.g. -1 from 'All retries exhausted').
       * a non-empty `error` field (string).
       * a recognizable gh-pr-create auth_401 signal in `error` / `result`.
     The returned string prefers the `error` field text, names an auth_401
-    when detected, and otherwise reports the non-zero exit code."""
-    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
-    if not archive.exists():
-        return None
-    try:
-        with open(archive, errors='replace') as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return None
+    when detected, and otherwise reports the non-zero exit code. Shared by
+    `_forge_pr_create_inferred_failure` (reads the first-attempt outbox)
+    and `_forge_retry_succeeded` (reads each retry sibling) so the two stay
+    in lockstep on what 'errored' means."""
     exit_code = data.get('exit_code')
     error = data.get('error')
     result = data.get('result')
@@ -733,6 +723,71 @@ def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
     if error_str:
         return error_str
     return f'exit_code={exit_code}'
+
+
+def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
+    """If the archived Forge outbox for `task_id` shows the dispatch was
+    consumed but errored (no clean PR), return a short human-readable cause
+    string for the alert message; else None.
+
+    Reads only `<task_id>.json` (the first-attempt outbox). A successful
+    retry sibling does NOT change this return value — that recovery is
+    reconciled separately by `_forge_retry_succeeded` at the call site, so
+    this function stays a pure read of the first attempt. Returns None on a
+    missing/unreadable archive or a clean (exit_code==0, no error) outbox --
+    the caller then proceeds with the normal build-gap alert decision."""
+    archive = FORGE_OUTBOX_ARCHIVE / f'{task_id}.json'
+    if not archive.exists():
+        return None
+    try:
+        with open(archive, errors='replace') as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return _classify_outbox_error(data)
+
+
+def _forge_retry_succeeded(task_id: str) -> Optional[str]:
+    """If a retry-sibling outbox for `task_id` (`<task_id>.<N>.json`, e.g.
+    the marker-error retry `...-clarify1.1.json`) exited cleanly, return
+    that sibling's filename; else None.
+
+    `_forge_pr_create_inferred_failure` reads only the first-attempt outbox
+    `<task_id>.json`. When the first attempt errored (exit_code=-1, 'All
+    retries exhausted') but the outbox-notifier re-dispatched a marker-error
+    retry that SUCCEEDED — resolving the clarify with PROCEED and triggering
+    a separate build that opened the PR — the first-attempt failure is NOT a
+    loss. This helper detects that recovery so Step 5 can suppress the false
+    `pr-create-inferred-failure` alert. Critically, it keys on the archived
+    OUTBOX (always present), not the PR list, so it stays correct even when
+    the sibling build PR re-keyed its branch family or aged out of the
+    merged-PR query window.
+
+    Production driver (2026-06-04): `forge-queue-api-preflight-
+    20260603T231401Z-clarify1.json` errored, but `...-clarify1.1.json`
+    succeeded with PROCEED -> PR #294 (merged), later generalized by PR
+    #324. Step 5 re-alarmed hourly for ~2 days because it never consulted
+    the retry sibling.
+
+    'Clean' is the inverse of `_classify_outbox_error` (exit_code==0/absent,
+    no error, no auth_401). The glob `<task_id>.*.json` requires a non-empty
+    middle segment, so it naturally excludes the first-attempt
+    `<task_id>.json`. Returns the first clean sibling's name; None if the
+    archive dir is missing, no retry siblings exist, or every sibling also
+    errored."""
+    try:
+        siblings = sorted(FORGE_OUTBOX_ARCHIVE.glob(f'{task_id}.*.json'))
+    except OSError:
+        return None
+    for sib in siblings:
+        try:
+            with open(sib, errors='replace') as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if _classify_outbox_error(data) is None:
+            return sib.name
+    return None
 
 
 def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
@@ -874,6 +929,23 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
         if _is_preflight_or_clarify_task(task):
             cause = _forge_pr_create_inferred_failure(task)
             if cause is not None:
+                # The first attempt errored, but a marker-error retry
+                # sibling (`<task>.N.json`) may have recovered with PROCEED
+                # and dispatched the build that opened the PR. That is not an
+                # infra/auth loss — suppress rather than re-alarm. Keys on the
+                # archived outbox, so it holds even when the sibling build PR
+                # re-keyed its branch or aged out of the merged-PR window
+                # (the 2026-06-04 clarify1 -> PR #294 two-day false-fire).
+                recovered = _forge_retry_succeeded(task)
+                if recovered is not None:
+                    log(
+                        f'FORGE_NO_PR_SKIP task={task} reason=retry_recovered '
+                        f'sibling={recovered!r} '
+                        f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
+                        'INFO',
+                    )
+                    seen_tasks.add(task)
+                    continue
                 log(
                     f'FORGE_NO_PR_RECLASSIFY task={task} '
                     f'reason=pr_create_inferred_failure cause={cause!r} '
