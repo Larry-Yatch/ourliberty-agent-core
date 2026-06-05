@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 1006 — 2026-06-05 18:44 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 6 new alerts (all Tier-4 auto-restarted:*, tier-reset). 9/9 services active. All inboxes empty. 0 open PRs. Sync error self-recovering. Stale-daemon healer auto-restarted 6 services post-PR #361/#362 code updates.**
+
+Alert watermark: **1364 lines / 2026-06-05T18:37:31Z** (was 1358 / 18:35:16Z — +6 alerts). Pipeline-stall heartbeat: 2026-06-05T18:29:19Z (✅ ~15 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T18:37:07Z (✅ ~7 min at scan; within 60-min threshold). Sync: status=error, commit=22a2b98f, last_sync=17:50:20Z (~54 min) — SYNC-PUSH-REBASE-FALLBACK-001 57th (unchanged); HEAD=27f478e "Pulse cycle 20260605T184104Z" newer than sync commit (wrapper push succeeded). Next hourly tick ~18:50Z. Session-start gitStatus: branch=main, tree=clean, HEAD=27f478e. Tier state at start: tier=1, consecutive_clean=0 (last_signal_at=18:38:33Z from iter 1005). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 6 Tier-4 auto-restarted:* alerts). `cycle_tier_state.py record --checks-clean false` confirmed: last_signal_at=18:44:43Z.
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 6 new alerts — all Tier 4, tier-reset.** Watermark advanced 1358→1364.
+  - **Lines 1359–1364: `auto-restarted:*`** at 18:37:11Z–18:37:31Z — source=heal-stale-daemon-code, route=digest. Stale-daemon healer detected script updates from PRs #361/#362, restarted 6 services to pick up new code:
+    - 1359: `auto-restarted:ourliberty-beacon-bot.service` — beacon_telegram_bot.py mtime +51 min; commit 2547689 (PR #361)
+    - 1360: `auto-restarted:ourliberty-outbox-notifier.service` — mtime +53 min; commit 40c577e (PR #362)
+    - 1361: `auto-restarted:ourliberty-inbox-watcher.service` — mtime +53 min; commit 40c577e (PR #362)
+    - 1362: `auto-restarted:ourliberty-forge-bot.service` — concurrency_guard.py mtime +111 min; commit 2547689 (PR #361)
+    - 1363: `auto-restarted:ourliberty-mirror-bot.service` — mtime +111 min; commit 2547689 (PR #361)
+    - 1364: `auto-restarted:ourliberty-pulse-bot.service` — mtime +111 min; commit 2547689 (PR #361)
+  - `heal-stale-daemon-code` NOT in alert-translations.json (G-rule 3/3 dispatched iter 592, Beacon consumed iter 594, Forge brief MISSING — re-dispatch pending Larry go-ahead). → **Tier 4, tier-reset.** ⚠️ By-design expected behavior; healer working correctly. Alert noise only.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '60 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Pulse inbox empty. Last directive: 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T18:29:19Z (~15 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T18:37:07Z (~7 min at scan; ✅ within 60-min threshold — healer sweep just completed, restarted 6 services). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=27f478e "Pulse cycle 20260605T184104Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=22a2b98f, last_sync=17:50:20Z (~54 min). SYNC-PUSH-REBASE-FALLBACK-001 57th total (unchanged). HEAD=27f478e newer than sync commit (wrapper push succeeded). Within 2h threshold; next hourly tick ~18:50Z. ⚠️ (no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. All 6 healer-restarted services confirmed active post-restart. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Nominal.** 0 open PRs in ourliberty-agent-core. 0 in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 22 consecutive (PRs #343–#364).** No new occurrences this iter. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged from iter 1005.
+
+- **PRIME DIRECTIVE ratio:** interventions=724, systemic_fixes=16, ratio≈45.3. No new always-fix actions this iter. Stale-daemon healer restarts are healer-autonomous actions (not Pulse allow-list actions); not counted as Pulse interventions.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 6 new alerts: auto-restarted:* (all Tier 4, tier-reset; route=digest, no Larry DM; by-design healer behavior picking up new code from PRs #361+#362).
+3. Confirmed 9/9 services active post-healer-restart sweep, all inboxes empty, 0 open PRs, both heartbeats within threshold, sync self-recovering.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=18:44:43Z.
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter (route=digest on auto-restarted alerts; no Larry DM warranted for expected healer behavior). Standing items carry forward:
+- `[red]` PRs #343–#364 audit-series (22 total) Larry-direct unreviewed merges. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead. (+6 occurrences this iter; now a recurring per-PR-merge-day noise pattern.)
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 57th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Stale-daemon healer cluster-restart (6 services in 20s) is the expected post-merge code-pickup pattern — fires every time PRs update concurrency_guard.py, safe_write_inbox.py, outbox_notifier.py, or beacon_telegram_bot.py. Each cluster produces 5–6 Tier-4 tier-resets. The G-rule fix (`auto-restarted:*` → Tier-3 FYI) has been dispatched to Beacon but Forge brief is missing (suspected OAuth-block at iter 594). This noise will continue on every PR-merge day until the fix lands. Re-dispatch pending Larry's go-ahead.
+
+---
+
 ## Iteration 1005 — 2026-06-05 18:38 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 4 new alerts (all Tier-4 unreviewed-merge, tier-reset). 9/9 services active. All inboxes empty. 0 open PRs. Sync error self-recovering. Audit series now 22 consecutive Larry-direct merges (PRs #343–#364).**
