@@ -833,8 +833,15 @@ def _send_beacon_response(
         telegram_send(chat_id, reply)
         return
 
-    # Marker present — handle approval flow.
-    action_str, rule = approval.trust_decision(payload)
+    # Marker present — handle approval flow. Degrade to force_ask if the trust
+    # decision raises for any reason (audit #21): a malformed policy or any
+    # unexpected error must surface the decision to Larry, never crash the
+    # marker-handling path for this update.
+    try:
+        action_str, rule = approval.trust_decision(payload)
+    except Exception as e:
+        log(f"trust_decision raised; defaulting to force_ask: {type(e).__name__}: {e}")
+        action_str, rule = 'force_ask', None
 
     if narrative:
         telegram_send(chat_id, narrative)

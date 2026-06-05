@@ -15,6 +15,7 @@ import os
 import json
 import time
 import fcntl
+import tempfile
 from pathlib import Path
 
 AGENTS_ROOT = Path.home() / 'agents'
@@ -85,15 +86,42 @@ class ConcurrencyGuard:
             self._write({'slots': [], 'max': MAX_CONCURRENT})
 
     def _read(self):
+        """Return the guard state dict, or None when the file is present but
+        CORRUPT/unreadable.
+
+        Fail-closed contract (audit #6): a missing file means "no slots yet"
+        (first run) and returns an empty state, but a corrupt file (e.g. a
+        truncated JSON left by a SIGKILL mid-write) must NOT be silently reset to
+        empty — that would wipe all in-flight accounting and let acquire()
+        over-commit past the RAM ceiling, risking the OOM this module exists to
+        prevent. Corrupt → None, which callers treat as "full / refuse"."""
+        if not GUARD_FILE.exists():
+            return {'slots': [], 'max': MAX_CONCURRENT}
         try:
             with open(GUARD_FILE) as f:
                 return json.load(f)
-        except:
+        except FileNotFoundError:
+            # Raced with a delete between exists() and open() — treat as first run.
             return {'slots': [], 'max': MAX_CONCURRENT}
+        except (json.JSONDecodeError, ValueError, OSError):
+            return None
 
     def _write(self, data):
-        with open(GUARD_FILE, 'w') as f:
-            json.dump(data, f)
+        """Atomically replace the guard file (temp + os.replace) so a kill
+        mid-write can never leave a truncated/corrupt file (audit #6)."""
+        GUARD_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(
+            prefix='.concurrency-guard.', suffix='.tmp', dir=str(GUARD_FILE.parent))
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(data, f)
+            os.replace(tmp, GUARD_FILE)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
 
     def _clean_stale(self, data):
         """Remove slots whose owning process is dead, whose PID was recycled by
@@ -132,6 +160,11 @@ class ConcurrencyGuard:
             fcntl.flock(lf, fcntl.LOCK_EX)
             try:
                 data = self._read()
+                if data is None:
+                    # Corrupt guard file → fail closed: refuse the slot rather
+                    # than reset-to-empty and over-commit (audit #6). Recovery is
+                    # to delete the corrupt file so __init__ recreates it empty.
+                    return False
                 data = self._clean_stale(data)
 
                 if len(data['slots']) >= MAX_CONCURRENT:
@@ -156,6 +189,10 @@ class ConcurrencyGuard:
             fcntl.flock(lf, fcntl.LOCK_EX)
             try:
                 data = self._read()
+                if data is None:
+                    # Corrupt file — can't safely edit it without clobbering other
+                    # processes' slots. Leave it for repair (delete → recreate).
+                    return
                 pid = os.getpid()
                 data['slots'] = [s for s in data.get('slots', [])
                                 if not (s.get('pid') == pid and
@@ -165,8 +202,12 @@ class ConcurrencyGuard:
                 fcntl.flock(lf, fcntl.LOCK_UN)
 
     def active_count(self):
-        """How many slots are currently active."""
+        """How many slots are currently active. A corrupt guard file reads as
+        FULL (audit #6 fail-closed) so callers (e.g. await_quiescence) treat the
+        system as busy rather than idle."""
         data = self._read()
+        if data is None:
+            return MAX_CONCURRENT
         data = self._clean_stale(data)
         return len(data.get('slots', []))
 

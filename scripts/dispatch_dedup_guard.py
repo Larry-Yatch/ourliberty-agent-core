@@ -75,17 +75,20 @@ def log_refusal(record: dict):
         f.write(json.dumps(record) + '\n')
 
 
-def record_dispatch(target_agent: str, prompt_hash_val: str, task_file: str) -> None:
+def record_dispatch(target_agent: str, prompt_hash_val: str, task_file: str) -> bool:
     """Append an approved dispatch to the ledger so a later invocation can see a
-    prompt-hash duplicate within HASH_DEDUP_MIN.
+    prompt-hash duplicate within HASH_DEDUP_MIN. Return True if the row was
+    written, False if the write failed.
 
-    Without this the hash-dedup was DEAD: nothing populated `dispatch_ledger.jsonl`
-    with `prompt_hash`/`identity` rows, so `recent_dispatches` always came back
-    empty and the guard only ever enforced the filename-chain check. Recording
+    Without this the hash-dedup is DEAD: nothing populates `dispatch_ledger.jsonl`
+    with `prompt_hash`/`identity` rows, so `recent_dispatches` always comes back
+    empty and the guard only ever enforces the filename-chain check. Recording
     here is what arms the content-duplicate refusal.
 
-    Best-effort: a failure to write our own bookkeeping must NOT block an
-    otherwise-valid dispatch (fail-open on the ledger), so OSError is swallowed."""
+    A write failure used to be swallowed (fail-open), silently disarming the
+    content-duplicate check the guard exists to provide (audit #56). We now
+    return False so main() can fail CLOSED — refusing the dispatch rather than
+    proceeding with a blind dedup window."""
     record = {
         'ts': datetime.now(tz=timezone.utc).isoformat(),
         'identity': target_agent,
@@ -97,8 +100,9 @@ def record_dispatch(target_agent: str, prompt_hash_val: str, task_file: str) -> 
         LEDGER.parent.mkdir(parents=True, exist_ok=True)
         with LEDGER.open('a') as f:
             f.write(json.dumps(record) + '\n')
+        return True
     except OSError:
-        pass
+        return False
 
 
 def main():
@@ -167,7 +171,23 @@ def main():
             print(f'REFUSE: prompt hash {h} matches recent dispatch within {HASH_DEDUP_MIN} min', file=sys.stderr)
             sys.exit(1)
 
-    record_dispatch(args.target_agent, h, str(p))
+    if not record_dispatch(args.target_agent, h, str(p)):
+        # Fail closed (audit #56): if we couldn't arm the ledger, refuse rather
+        # than dispatch into a blind dedup window where a re-slugged prompt storm
+        # would go unblocked. A persistently-unwritable ledger surfaces here as a
+        # dispatch stall (visible/alertable) instead of a silent disarm.
+        record = {
+            'ts': datetime.now(tz=timezone.utc).isoformat(),
+            'reason': 'ledger-write-failed',
+            'hash': h,
+            'task_file': str(p),
+            'target_agent': args.target_agent,
+        }
+        log_refusal(record)
+        print(f'REFUSE: could not record dispatch to ledger {LEDGER} '
+              f'(disk full / perms?); refusing to dispatch with dedup disarmed',
+              file=sys.stderr)
+        sys.exit(1)
     print(f'OK: depth={depth} hash={h} target={args.target_agent}')
     sys.exit(0)
 

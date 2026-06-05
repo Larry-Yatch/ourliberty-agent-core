@@ -69,9 +69,24 @@ def _resolve_policy_path() -> Path:
     return REPO_POLICY_PATH
 
 
+def _fail_closed(reason: str) -> dict[str, Any]:
+    """The default-deny policy (force_ask) returned whenever the policy file is
+    missing, unreadable, or malformed. We never silently auto-approve."""
+    return {
+        'version': 1,
+        'default_action': 'force_ask',
+        'rules': [],
+        '_error': reason,
+    }
+
+
 def load_policy(path: Optional[Path] = None) -> dict[str, Any]:
-    """Load and lightly validate the policy file. Falls back to default-deny
-    if the file is missing or unreadable (we never silently auto-approve)."""
+    """Load and lightly validate the policy file. Falls back to the default-deny
+    policy (force_ask) if the file is missing, unreadable, OR malformed — we
+    never silently auto-approve, and we never raise (audit #21: a valid-JSON but
+    bad-schema file, e.g. an operator typo `"action": "approve"`, previously
+    raised TrustPolicyError out of evaluate() and crashed the beacon approval
+    path instead of degrading to force_ask)."""
     target = path or _resolve_policy_path()
     if not target.exists():
         return {'version': 1, 'default_action': 'force_ask', 'rules': []}
@@ -79,29 +94,23 @@ def load_policy(path: Optional[Path] = None) -> dict[str, Any]:
         with open(target) as f:
             policy = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        # Fail closed: malformed policy never auto-approves.
-        return {
-            'version': 1,
-            'default_action': 'force_ask',
-            'rules': [],
-            '_error': f'failed to read {target}: {e}',
-        }
+        return _fail_closed(f'failed to read {target}: {e}')
     if not isinstance(policy, dict):
-        raise TrustPolicyError(f'policy root must be an object, got {type(policy).__name__}')
+        return _fail_closed(
+            f'policy root must be an object, got {type(policy).__name__}')
     default_action = policy.get('default_action', 'force_ask')
     if default_action not in VALID_ACTIONS:
-        raise TrustPolicyError(f'default_action "{default_action}" not in {VALID_ACTIONS}')
+        return _fail_closed(
+            f'default_action "{default_action}" not in {VALID_ACTIONS}')
     rules = policy.get('rules', [])
     if not isinstance(rules, list):
-        raise TrustPolicyError('rules must be a list')
+        return _fail_closed('rules must be a list')
     for i, rule in enumerate(rules):
         if not isinstance(rule, dict):
-            raise TrustPolicyError(f'rule[{i}] must be an object')
+            return _fail_closed(f'rule[{i}] must be an object')
         action = rule.get('action')
         if action not in VALID_ACTIONS:
-            raise TrustPolicyError(
-                f'rule[{i}] action "{action}" not in {VALID_ACTIONS}'
-            )
+            return _fail_closed(f'rule[{i}] action "{action}" not in {VALID_ACTIONS}')
     return policy
 
 

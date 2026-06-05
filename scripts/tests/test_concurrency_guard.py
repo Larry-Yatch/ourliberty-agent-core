@@ -185,5 +185,43 @@ class ProcStartTokenTest(unittest.TestCase):
             self.assertEqual(cg._proc_start_token(4242), '998877')
 
 
+class FailClosedTest(_IsolatedGuard):
+    """audit #6: a corrupt guard file must fail CLOSED (refuse / read as full),
+    never reset to empty and over-commit past MAX_CONCURRENT."""
+
+    def test_corrupt_file_acquire_refuses(self):
+        cg.GUARD_FILE.write_text('{ truncated json')  # SIGKILL-mid-write shape
+        g = cg.ConcurrencyGuard()
+        with mock.patch.object(cg, '_proc_start_token', return_value='TOK'):
+            self.assertFalse(g.acquire('agent-a', 'task-1'))
+
+    def test_corrupt_file_active_count_reads_full(self):
+        cg.GUARD_FILE.write_text('not json at all')
+        self.assertEqual(cg.ConcurrencyGuard().active_count(), cg.MAX_CONCURRENT)
+
+    def test_corrupt_file_release_is_noop(self):
+        cg.GUARD_FILE.write_text('{ broken')
+        before = cg.GUARD_FILE.read_text()
+        cg.ConcurrencyGuard().release('agent-a')  # must not clobber/empty it
+        self.assertEqual(cg.GUARD_FILE.read_text(), before)
+
+    def test_missing_file_reads_empty_and_acquires(self):
+        # missing (vs corrupt) is the legitimate first-run case → empty, grants.
+        if cg.GUARD_FILE.exists():
+            cg.GUARD_FILE.unlink()
+        g = cg.ConcurrencyGuard()  # __init__ recreates empty
+        self.assertEqual(g.active_count(), 0)
+        with mock.patch.object(cg, '_proc_start_token', return_value='TOK'):
+            self.assertTrue(g.acquire('agent-a', 'task-1'))
+
+    def test_write_leaves_no_tmp_and_valid_json(self):
+        g = cg.ConcurrencyGuard()
+        with mock.patch.object(cg, '_proc_start_token', return_value='TOK'):
+            g.acquire('agent-a', 'task-1')
+        json.loads(cg.GUARD_FILE.read_text())  # valid
+        leftovers = list(cg.GUARD_FILE.parent.glob('.concurrency-guard.*.tmp'))
+        self.assertEqual(leftovers, [])
+
+
 if __name__ == '__main__':
     unittest.main()

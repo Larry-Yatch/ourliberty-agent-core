@@ -165,24 +165,32 @@ def remote_tracking_ref() -> Optional[str]:
     return stdout.strip() or None
 
 
-def ahead_count(upstream: str) -> int:
+def ahead_count(upstream: str) -> Optional[int]:
+    """Commits HEAD is ahead of `upstream`, or None on a git error.
+
+    None (not 0) on failure so the caller does not read a transient rev-list
+    error as "0 commits ahead / no drift" and silently mask real drift (audit
+    #50)."""
     rc, stdout, _ = _git(['rev-list', f'{upstream}..HEAD', '--count'])
     if rc != 0:
-        return 0
+        return None
     try:
         return int(stdout.strip())
     except ValueError:
-        return 0
+        return None
 
 
-def behind_count(upstream: str) -> int:
+def behind_count(upstream: str) -> Optional[int]:
+    """Commits HEAD is behind `upstream`, or None on a git error (see
+    ahead_count — None is distinct from a real 0 so a soft error never reads as
+    no-drift, audit #50)."""
     rc, stdout, _ = _git(['rev-list', f'HEAD..{upstream}', '--count'])
     if rc != 0:
-        return 0
+        return None
     try:
         return int(stdout.strip())
     except ValueError:
-        return 0
+        return None
 
 
 def oldest_unpushed_commit_ts(upstream: str) -> Optional[float]:
@@ -285,6 +293,11 @@ def evaluate_ahead(
 ) -> bool:
     """Return True if the ahead-trip alert fired (or was cooldown-suppressed)."""
     n = ahead_count(upstream)
+    if n is None:
+        log(f'ahead_count for {upstream} failed (git error after a successful '
+            f'fetch); skipping ahead-drift check this tick rather than reporting '
+            f'no drift', 'WARN')
+        return False
     if n <= 0:
         return False
     oldest_ts = oldest_unpushed_commit_ts(upstream)
@@ -311,6 +324,11 @@ def evaluate_behind(
     upstream: str, branch: str, state: dict, now: Optional[float] = None,
 ) -> bool:
     n = behind_count(upstream)
+    if n is None:
+        log(f'behind_count for {upstream} failed (git error after a successful '
+            f'fetch); skipping behind-drift check this tick rather than reporting '
+            f'no drift', 'WARN')
+        return False
     if n <= BEHIND_COMMIT_THRESHOLD:
         return False
     subject = f'droplet-behind:{branch}'

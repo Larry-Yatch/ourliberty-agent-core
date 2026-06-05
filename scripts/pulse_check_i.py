@@ -1338,9 +1338,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     now = datetime.now(timezone.utc)
     if args.week_ending:
-        week_ending_dt = datetime.fromisoformat(args.week_ending).replace(
-            tzinfo=timezone.utc
-        )
+        try:
+            week_ending_dt = datetime.fromisoformat(args.week_ending).replace(
+                tzinfo=timezone.utc
+            )
+        except ValueError as e:
+            # A malformed --week-ending is operator input error, not a check
+            # failure: exit cleanly with a usage message instead of letting the
+            # ValueError escape main() and mis-fire a pulse-check-failed:i alert
+            # (audit #29).
+            print(f"invalid --week-ending {args.week_ending!r}: {e}; "
+                  f"expected ISO date YYYY-MM-DD", file=sys.stderr)
+            return 2
     else:
         week_ending_dt = _default_week_ending(now)
 

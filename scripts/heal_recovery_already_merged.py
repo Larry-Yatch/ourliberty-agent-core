@@ -74,11 +74,18 @@ def verify_repos() -> list[str]:
 
 
 def log(level: str, msg: str) -> None:
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Best-effort: a full/read-only/permission-denied log filesystem must not
+    # crash the healer (audit #42 — main() calls log('HEARTBEAT', ...) as its
+    # final statement with no surrounding try/except, so an OSError here would
+    # exit the oneshot non-zero and record the tick as failed).
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     line = f"[{ts}] [{level}] {msg}\n"
-    with open(LOG_FILE, "a") as f:
-        f.write(line)
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, "a") as f:
+            f.write(line)
+    except OSError:
+        pass
 
 
 def query_merged_pr(sub_task_tag: str) -> dict | None:
