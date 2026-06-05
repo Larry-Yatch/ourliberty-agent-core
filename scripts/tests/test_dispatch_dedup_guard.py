@@ -104,6 +104,21 @@ class MainFlowTest(_IsolatedGuard):
         refusals = ddg.GUARD_LOG.read_text()
         self.assertIn('prompt-hash-duplicate', refusals)
 
+    def test_literal_same_task_file_rerun_not_self_blocked(self):
+        # A retry that re-runs the guard on the EXACT same task_file must not be
+        # refused by its own prior recording (the hash check targets re-slugged
+        # duplicates under a different filename, not literal re-runs).
+        task = self._task('retryable.json', prompt='same body each time')
+        self.assertEqual(self._run('main', task), 0)
+        self.assertEqual(self._run('main', task), 0)  # re-run, still OK
+
+    def test_substring_agent_name_not_false_matched(self):
+        # 'main' must not match a ledger row for 'maintenance' (boundary-safe).
+        ddg.record_dispatch('maintenance', ddg.prompt_hash('shared body'),
+                            str(self.root / 'other.json'))
+        rc = self._run('main', self._task('mine.json', prompt='shared body'))
+        self.assertEqual(rc, 0)  # different agent → not a duplicate
+
     def test_same_prompt_different_agent_allowed(self):
         self.assertEqual(self._run('main', self._task('a.json', prompt='same')), 0)
         # Same prompt body but a DIFFERENT target agent is not a duplicate.

@@ -142,10 +142,19 @@ def main():
     h = prompt_hash(prompt)
     recent = recent_dispatches(args.target_agent, HASH_DEDUP_MIN)
     for d in recent:
-        if d.get('prompt_hash') == h and (
+        # The hash check targets the SAME prompt re-dispatched to the SAME agent
+        # under a DIFFERENT filename (re-slugging); a literal re-run of the same
+        # task_file is a retry, not that abuse, so don't self-block it. Match the
+        # agent on the exact target_agent field or the boundary of the legacy
+        # `agent:...` identity (substring `in` would false-match 'main' against
+        # 'maintenance').
+        if d.get('task_file') == str(p):
+            continue
+        agent_matches = (
             d.get('target_agent') == args.target_agent
-            or args.target_agent in d.get('identity', '')
-        ):
+            or d.get('identity', '').split(':', 1)[0] == args.target_agent
+        )
+        if d.get('prompt_hash') == h and agent_matches:
             record = {
                 'ts': datetime.now(tz=timezone.utc).isoformat(),
                 'reason': 'prompt-hash-duplicate',
