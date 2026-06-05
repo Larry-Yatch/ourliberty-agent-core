@@ -62,10 +62,17 @@ TRIVIAL_JSON_VALUES = ({}, [], "", None)
 
 
 def log(level: str, msg: str) -> None:
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Best-effort: a full/read-only/permission-denied log filesystem must not
+    # crash the healer (audit #42 / PR-F — main() calls log("HEARTBEAT", ...) as
+    # its final statement with no surrounding try/except, so an OSError here
+    # would exit the oneshot non-zero and record the tick as failed).
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    with open(LOG_FILE, "a") as f:
-        f.write(f"[{ts}] [{level}] {msg}\n")
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{ts}] [{level}] {msg}\n")
+    except OSError:
+        pass
 
 
 def classify(task_file: Path) -> tuple[bool, str, int]:

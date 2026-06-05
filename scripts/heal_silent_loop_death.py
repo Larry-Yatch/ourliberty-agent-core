@@ -81,10 +81,17 @@ STALE_MIN = 90  # If a loop's "next check" is more than 90min past, declare dead
 
 
 def log(level: str, msg: str) -> None:
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Best-effort: a full/read-only/permission-denied log filesystem must not
+    # crash the healer (audit #42 / PR-F — main() calls log("HEARTBEAT", ...) as
+    # its final statement with no surrounding try/except, so an OSError here
+    # would exit the oneshot non-zero and record the tick as failed).
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-    with open(LOG_FILE, "a") as f:
-        f.write(f"[{ts}] [{level}] {msg}\n")
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOG_FILE, "a") as f:
+            f.write(f"[{ts}] [{level}] {msg}\n")
+    except OSError:
+        pass
 
 
 def find_recent_dispatches(slug_root: str, inboxes) -> bool:
