@@ -66,7 +66,9 @@ def _read_code_if_present():
         os.close(fd)
 
 
-for f in [URL_FILE, CODE_FILE, RESULT_FILE]:
+# LOG_FILE included so the _write_private below (O_NOFOLLOW) can't hit a
+# stale/planted log symlink and raise an uncaught OSError before we've logged.
+for f in [URL_FILE, CODE_FILE, RESULT_FILE, LOG_FILE]:
     if os.path.lexists(f):
         os.unlink(f)
 _write_private(LOG_FILE, "")  # truncate/create the log at 0600

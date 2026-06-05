@@ -71,8 +71,10 @@ def _read_code_if_present():
 
 
 # Start clean. lexists() also catches a dangling/planted symlink; unlink removes
-# the link itself (not its target), so this is safe.
-for f in [URL_FILE, CODE_FILE, RESULT_FILE]:
+# the link itself (not its target), so this is safe. LOG_FILE is included so the
+# _write_private below (O_NOFOLLOW) can't hit a stale/planted log symlink and
+# raise an uncaught OSError before we've logged anything.
+for f in [URL_FILE, CODE_FILE, RESULT_FILE, LOG_FILE]:
     if os.path.lexists(f):
         os.unlink(f)
 _write_private(LOG_FILE, "")  # truncate/create the log at 0600
