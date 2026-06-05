@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 981 — 2026-06-05 11:31 UTC (interactive, Tier 3 — CLEAN)
+
+**Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=4. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
+
+Alert watermark: **1333 lines / 2026-06-05T08:04:15Z** (unchanged from iter 980 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T11:17:34Z (✅ ~14 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T11:05:11Z (✅ ~26 min at scan; within 60-min threshold). Sync: status=no-change, commit=0bec5e94 (1 commit behind HEAD=eed3d48; iter 980 wrapper push not yet synced — self-clears on hourly tick ~11:50Z), last_sync=2026-06-05T10:50:10Z (~41 min). Session-start gitStatus: branch=main, tree=clean, HEAD=eed3d48 "Pulse cycle 20260605T110441Z" (iter 980 wrapper commit). Tier state at start: tier=3, consecutive_clean=3. Tier state at end: **tier=3, consecutive_clean=4**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark timestamp 2026-06-05T08:04:15Z unchanged — 0 new alerts since iter 980. Line count 1333 (stable). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-beacon-bot' --since '35 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session. Last Larry messages: June 4 at 20:48 MDT (02:48Z June 5) — no new June 5 directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T11:17:34Z (~14 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T11:05:11Z (~26 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=eed3d48 "Pulse cycle 20260605T110441Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, commit=0bec5e94 (1 commit behind HEAD=eed3d48), last_sync=2026-06-05T10:50:10Z (~41 min). Iter 980 wrapper push ahead of last sync tick — self-clears on hourly tick ~11:50Z. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open.** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged — 0 new `tier2_weekly_probe_failed` alerts. 12h closure mark ~15:00Z today (~3.5h away at scan). Watch continues. ✅
+
+- **G-rule updates:** No new occurrences. All G-rules carry forward unchanged from iter 980.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=13, ratio≈55.5, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty, 0 open PRs.
+3. Confirmed both heartbeats healthy (pipeline-stall ~14 min, stale-daemon ~26 min). Sync 1 commit behind HEAD — iter 980 wrapper push not yet synced; self-clears hourly.
+4. `cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=4. ✅
+5. Wrote journal entry + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PRs #343–#350 audit-series (9 total) unreviewed-merge — standing from iter 967. **Larry: confirm direct audit-PR merges are intentional. Reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335; 12h closure mark ~15:00Z today (~3.5h away).
+
+**Patterns:** Tier 3, consecutive_clean=4. System holding steady through four consecutive clean iters. All healers actively pulsing (pipeline-stall ~14 min, stale-daemon ~26 min at scan). No new signals.
+
+---
+
 ## Iteration 980 — 2026-06-05 11:01 UTC (interactive, Tier 3 — CLEAN)
 
 **Health:** ✅ **Tier 3 — CLEAN. consecutive_clean=3. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs. 30-min cadence continues.**
