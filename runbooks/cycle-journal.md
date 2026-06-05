@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 1000 — 2026-06-05 18:05 UTC (interactive, Tier 1 — SIGNAL)
+
+**Health:** ⚠️ **Tier 1 — consecutive_clean=0. 2 new alerts (1350→1352). 9/9 services active. All inboxes empty. No open PRs. Sync error self-recovering.**
+
+Alert watermark: **1352 lines / 2026-06-05T17:50:28Z** (was 1350 / 17:40:30Z — +2 alerts). Pipeline-stall heartbeat: 2026-06-05T17:41:55Z (✅ ~23 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T17:36:56Z (✅ ~28 min at scan; within 60-min threshold). Sync: status=error, commit=22a2b98f, last_sync=2026-06-05T17:50:20Z (~15 min) — SYNC-PUSH-REBASE-FALLBACK-001 57th occurrence; self-recovering. Session-start gitStatus: branch=main, tree=clean, HEAD=9a39114 "Pulse cycle 20260605T175044Z" (iter 999 wrapper commit). Tier state at start: tier=1, consecutive_clean=0 (last_signal_at=17:49:22Z from iter 999). Tier state at end: **tier=1, consecutive_clean=0** (tier-reset: 2 Tier-4 alerts — sync-blocked and unreviewed-merge:359).
+
+**Found:**
+
+- **(Check 0) Alert triage: ⚠️ 2 new alerts.** Watermark advanced 1350→1352.
+  - **Line 1351: `sync-blocked:auto-commit-push-failed`** at 17:50:20Z — SYNC-PUSH-REBASE-FALLBACK-001 57th occurrence. sync.service auto-committed Pulse runtime files but push to origin/main failed; rolled back to 22a2b98f (clean tree restored). route=digest; beacon-bot skipped DM (idx=1350). Self-recovering. Subject NOT in alert-translations.json Tier-3 allowlist. **Tier 4, tier-reset.** No new escalation — standing APPROVAL_REQUEST `sync-push-rebase-fallback-001` covers this.
+  - **Line 1352: `unreviewed-merge:359`** at 17:50:28Z — PR #359 "fix(advancer): corroborate tier-3 title match against branch (audit #9, PR-C)" merged by Larry-Yatch, no Mirror review. beacon-bot DM delivered 17:53:07Z (idx=1351). **Tier 4, tier-reset.** **17th consecutive Larry-direct audit-PR merge without Mirror review** (PRs #343–#359). Note: PR #359 shares the same title as PR #355 (Pulse auto-merged in iter 997); appears to be a continuation in the audit series. Standing dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '30 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives. Last Larry message: 2026-06-04T02:48Z UTC. beacon-bot log: last delivery idx=1351 at 17:53:07Z (unreviewed-merge:359 DM to Larry). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T17:41:55Z (~23 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T17:36:56Z (~28 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Branch=main, tree=clean, HEAD=9a39114 "Pulse cycle 20260605T175044Z". ✅
+
+- **(Check B) Sync health: ⚠️ status=error (self-recovering).** sync.json: status=error, commit=22a2b98f, last_sync=17:50:20Z (~15 min). SYNC-PUSH-REBASE-FALLBACK-001 57th total. Hourly sync tick fired at 17:50Z (cleared prior staleness) but push race persists. HEAD=9a39114 is newer than sync commit (wrapper push succeeded). Within 2h threshold. ⚠️ (self-recovering, no action)
+
+- **(Check C) Agent liveness: ✅ 9/9 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ Nominal.** 0 open PRs in ourliberty-agent-core. 0 in ourliberty-dashboard. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** Next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule `actor=larry-direct-merge causes unreviewed-merge alert`: 17 consecutive (PRs #343–#359).** PR #359 = 17th. Dispatch `actor-exemption-config` pending Larry's `go: actor-exemption-config`. All other G-rules unchanged from iter 999.
+
+- **G-rule `unreviewed-merge from Pulse auto-merge triggers detector`: 1/3 watch** (iter 999 first observation — PR #356). PR #359 is Larry-direct (not Pulse), so does not increment this G-rule. At 3/3: dispatch Beacon to distinguish actor=Larry-Yatch from actor=Pulse/GitHub in detector exemption spec.
+
+- **PRIME DIRECTIVE ratio:** interventions=724, systemic_fixes=16, ratio≈45.3. No new always-fix actions this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Classified 2 new alerts: sync-blocked:auto-commit-push-failed (Tier 4, self-recovering, standing APPROVAL_REQUEST); unreviewed-merge:359 (Tier 4, tier-reset; DM delivered by beacon-bot 17:53:07Z).
+3. Confirmed 9/9 services active, all inboxes empty, 0 open PRs, both heartbeats within threshold, sync self-recovering.
+4. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+5. Wrote journal entry (iter 1000 — milestone iteration) + updated MEMORY.md status snapshot.
+
+**Escalated:** No new escalations issued this iter (beacon-bot delivered unreviewed-merge:359 DM at 17:53:07Z). Standing items carry forward:
+- `[red]` PRs #343–#359 audit-series (17 total) Larry-direct unreviewed merges. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; 57th total; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=0. Milestone iteration 1000. PR #359 (audit series, Larry-direct) triggered unreviewed-merge:359 at 17:50:28Z; DM delivered by beacon-bot. SYNC-PUSH-REBASE-FALLBACK-001 57th — hourly tick fired as expected but push race still present; confirms root fix urgency. Audit series continues: 17 consecutive unreviewed merges since PR #343; actor-exemption-config dispatch awaiting Larry's `go`.
+
+---
+
 ## Iteration 998 — 2026-06-05 17:43 UTC (interactive, Tier 1 — SIGNAL)
 
 **Health:** ⚠️ **Tier 1 — consecutive_clean=0. 4 new alerts (1345→1349). 9/9 services active (3 auto-restarted post-PR-merge by stale-daemon-code healer). All inboxes empty. No open PRs. Sync self-recovering.**
