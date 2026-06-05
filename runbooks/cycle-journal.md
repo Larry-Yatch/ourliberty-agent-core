@@ -4,6 +4,64 @@
 
 ---
 
+## Iteration 992 — 2026-06-05 16:36 UTC (interactive, Tier 1 — CLEAN)
+
+**Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs.**
+
+Alert watermark: **1335 lines / 2026-06-05T16:15:20Z** (unchanged from iter 991 — 0 new alerts). Pipeline-stall heartbeat: 2026-06-05T16:22:56Z (✅ ~14 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T16:06:21Z (✅ ~30 min at scan; within 60-min threshold). Sync: status=no-change, commit=9f1314b (5 commits behind HEAD=b017b3e; hourly sync ~16:50Z), last_sync=2026-06-05T15:50:16Z (~46 min). Session-start gitStatus: branch=main, tree=clean, HEAD=b017b3e "Pulse cycle 20260605T162942Z" (iter 991 wrapper commit). Tier state at start: tier=1, consecutive_clean=1. Tier state at end: **tier=1, consecutive_clean=2**.
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1335 lines / 16:15:20Z unchanged — 0 new alerts since iter 991. Last 5 entries confirm: heal-stale-daemon-code auto-restarts (08:04Z, pre-watermark, known-pattern) and unreviewed-merge:352/351 (16:15:20Z, previously claimed). ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --since '35 minutes ago' -p warning` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session. No new Larry directives since June 4 02:48Z UTC. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T16:22:56Z (~14 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T16:06:21Z (~30 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** session-start gitStatus: branch=main, tree=clean, HEAD=b017b3e "Pulse cycle 20260605T162942Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** sync.json: status=no-change, commit=9f1314b (5 commits behind HEAD=b017b3e), last_sync=2026-06-05T15:50:16Z (~46 min). Hourly sync at ~16:50Z will catch up. Within 2h threshold. ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ✅ 0 open.** agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **G-rule updates:** No new occurrences. All carry forward unchanged from iter 991.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=16, ratio≈45.1, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty, 0 open PRs.
+3. Confirmed both heartbeats healthy (pipeline-stall ~14 min, stale-daemon ~30 min at scan).
+4. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=2. One more clean iter → Tier 2 de-escalation.
+5. Wrote journal entry.
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PRs #343–#352 audit-series (12 total) Larry-direct unreviewed merges — standing from iter 967. **Larry: reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovering; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** Tier 1, consecutive_clean=2. Second consecutive clean iter post-990 unreviewed-merge reset. One more clean iter triggers Tier 2 de-escalation. All checks nominal.
+
+---
+
 ## Iteration 991 — 2026-06-05 16:27 UTC (interactive, Tier 1 — CLEAN)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=1 (first clean iter since iter 990 signal). 0 new alerts. 8/8 services active. All inboxes empty. 0 open PRs.**
