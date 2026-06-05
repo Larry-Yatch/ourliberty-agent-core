@@ -59,6 +59,15 @@ MAX_FILENAME_BYTES = 200  # leaves margin under NAME_MAX (255)
 # heal_pipeline_stall reconstruct from the raw task_id, so a silent rewrite
 # would defeat their dedup and cause duplicate dispatch. Neutralizing only the
 # genuinely path-structural bytes closes traversal without that divergence.
+#
+# Sanitizer architecture (PR-A follow-up, audit #53): this INBOX-domain rule
+# (preserve printables, round-trip to f'{task_id}.json') is intentionally the
+# OPPOSITE of the WORKTREE-domain rule in worktree_manager._sanitize_task_id
+# (aggressive [A-Za-z0-9_-] allowlist) — the worktree name is a derived id that
+# never round-trips, so it can strip ':' '@' freely. They are NOT consolidated
+# onto one helper on purpose; see _sanitize_task_id's docstring. Front-door
+# defense for ids that can't round-trip here at all (a literal '/' or control
+# byte) lives in dispatch_validator._validate_task_id_chars.
 _UNSAFE_COMPONENT_RE = re.compile(r'[\x00-\x1f\x7f/\\]')
 
 

@@ -24,9 +24,12 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+import agent_runner               # noqa: E402
+import heal_abandoned_inbox_tasks as heal  # noqa: E402
 import inbox_watcher as iw          # noqa: E402
 import routing_validator as rv      # noqa: E402
 import safe_write_inbox as swi      # noqa: E402
+import worktree_manager as wm       # noqa: E402
 
 
 class SanitizeComponentTest(unittest.TestCase):
@@ -173,6 +176,101 @@ class InboxWatcherOutboxContainmentTest(unittest.TestCase):
         self.assertEqual(written[0].parent.resolve(), outbox_dir)
         self.assertNotIn("/etc/", str(written[0].resolve()))
         self.assertFalse((self.root.parent / "etc" / "pwned.json").exists())
+
+
+class WorktreePathTraversalTest(unittest.TestCase):
+    """PR-A follow-up (audit #53): worktree_manager.worktree_path_for must not
+    let a hostile task_id escape WORKTREE_BASE. _sanitize_task_id maps '/' and
+    '.' to '-', so the join stays contained — verify with resolve()."""
+
+    def test_traversal_task_ids_stay_under_base(self):
+        base = wm.WORKTREE_BASE.resolve()
+        for hostile in (
+            "../../etc",
+            "..",
+            "a/b",
+            "../../../../etc/passwd",
+            "/etc/shadow",
+            "....//....//",
+        ):
+            p = wm.worktree_path_for("forge", hostile).resolve()
+            self.assertTrue(
+                str(p).startswith(str(base) + "/"),
+                f"{hostile!r} escaped WORKTREE_BASE: {p}",
+            )
+            # The resolved path is a DIRECT child of base — no intermediate
+            # separators survived the sanitizer.
+            self.assertEqual(p.parent, base, f"{hostile!r} -> {p}")
+            self.assertNotIn("/etc/", str(p))
+
+    def test_sanitized_name_has_no_separators_or_dotdot(self):
+        for hostile in ("../../etc", "a/b", "..", "x\\y"):
+            stem = wm._sanitize_task_id(hostile)
+            self.assertNotIn("/", stem)
+            self.assertNotIn("\\", stem)
+            self.assertNotIn("..", stem)
+
+
+class WorktreeSanitizerConsistencyTest(unittest.TestCase):
+    """PR-A follow-up (audit #53), Task-1 must-match invariant.
+
+    THREE live copies of the worktree-domain sanitizer must agree byte-for-
+    byte or has_active_worker misses a live worker and the healer double-
+    dispatches:
+      - worktree_manager._sanitize_task_id   (inbox_watcher dispatch path)
+      - agent_runner._worktree_safe_stem     ('main'-agent dispatch path)
+      - heal_abandoned_inbox_tasks._worktree_safe_stem  (the matcher)
+    They MUST agree for every non-empty task_id. This contract test locks all
+    three together so a future edit to one without the others fails
+    CI-by-unittest.
+    """
+
+    # A corpus spanning the printable punctuation that real ids carry plus the
+    # hostile shapes the front-door validator now rejects (still exercised here
+    # because the two sanitizers must agree even on inputs that shouldn't reach
+    # them — defense in depth).
+    CORPUS = (
+        "task-001",
+        "feat/cool.thing",
+        "medic-silence-cpu:high@web-01",
+        "abc_123-XYZ",
+        "!@#$%",
+        "a" * 60,            # exceeds the 50-char cap
+        "../../etc",
+        "review-larry-work",
+        "alert#294",
+        "task with spaces",
+        "v1.2.3",
+    )
+
+    def test_all_three_sanitizers_agree_on_nonempty(self):
+        for tid in self.CORPUS:
+            wm_out = wm._sanitize_task_id(tid)
+            heal_out = heal._worktree_safe_stem(tid)
+            ar_out = agent_runner._worktree_safe_stem(tid)
+            self.assertEqual(
+                wm_out, heal_out,
+                f"worktree_manager/heal divergence on {tid!r}",
+            )
+            self.assertEqual(
+                ar_out, heal_out,
+                f"agent_runner/heal divergence on {tid!r}",
+            )
+
+    def test_all_three_cap_at_fifty_chars(self):
+        long_id = "a" * 120
+        self.assertEqual(len(wm._sanitize_task_id(long_id)), 50)
+        self.assertEqual(len(heal._worktree_safe_stem(long_id)), 50)
+        self.assertEqual(len(agent_runner._worktree_safe_stem(long_id)), 50)
+        self.assertEqual(wm.MAX_TASK_ID_LEN, 50)
+
+    def test_empty_divergence_is_intentional(self):
+        # The ONE intentional difference: worktree_manager returns 'task' for
+        # an empty id (it must name a dir); heal returns '' because
+        # has_active_worker guards on `if not safe` to avoid a spurious match.
+        self.assertEqual(wm._sanitize_task_id(""), "task")
+        self.assertEqual(heal._worktree_safe_stem(""), "")
+        self.assertFalse(heal.has_active_worker("", {"wt-forge-task-001"}))
 
 
 if __name__ == "__main__":

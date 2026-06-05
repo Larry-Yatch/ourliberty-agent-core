@@ -62,6 +62,79 @@ class CoreValidationTest(unittest.TestCase):
         self.assertIn('task_id', reason)
 
 
+class TaskIdPathSafetyTest(unittest.TestCase):
+    """PR-A follow-up (audit #53): task_id front-door path-safety gate.
+
+    task_id flows into inbox filenames (f'{task_id}.json') and worktree
+    dir names. The downstream sanitizers keep writes contained, but a
+    task_id with '/', '\\', NUL, a control byte, or a bare '.'/'..' is
+    rejected here so it can never (a) sanitize-collide onto a legit task's
+    inbox file (os.replace overwrites) or (b) diverge from the raw name the
+    idempotency readers reconstruct. Real ids — including ':' '@' '#' and
+    spaces — must still pass unchanged.
+    """
+
+    def test_forward_slash_rejected(self):
+        ok, reason = dv.validate_task(_make_task(task_id='../../etc/passwd'))
+        self.assertFalse(ok)
+        self.assertIn('unsafe path character', reason)
+
+    def test_backslash_rejected(self):
+        ok, reason = dv.validate_task(_make_task(task_id='a\\b'))
+        self.assertFalse(ok)
+        self.assertIn('unsafe path character', reason)
+
+    def test_nul_byte_rejected(self):
+        ok, reason = dv.validate_task(_make_task(task_id='a\x00b'))
+        self.assertFalse(ok)
+        self.assertIn('unsafe path character', reason)
+
+    def test_control_byte_rejected(self):
+        for ctrl in ('\n', '\t', '\r', '\x1b', '\x7f'):
+            ok, reason = dv.validate_task(_make_task(task_id=f'a{ctrl}b'))
+            self.assertFalse(ok, f'{ctrl!r} should be rejected')
+            self.assertIn('unsafe path character', reason)
+
+    def test_bare_dot_components_rejected(self):
+        for hostile in ('.', '..', '...', '....'):
+            ok, reason = dv.validate_task(_make_task(task_id=hostile))
+            self.assertFalse(ok, f'{hostile!r} should be rejected')
+            self.assertIn('all dots', reason)
+
+    def test_collision_pair_both_rejected(self):
+        # Two distinct hostile ids that would sanitize-COLLIDE to the same
+        # on-disk inbox name ('a-b.json') — neither may reach the writer.
+        for hostile in ('a/b', 'a\\b'):
+            ok, _ = dv.validate_task(_make_task(task_id=hostile))
+            self.assertFalse(ok)
+
+    def test_real_ids_with_colon_at_hash_space_still_pass(self):
+        # The whole point: do not regress valid ids that carry printable
+        # punctuation. These must remain dispatchable.
+        for good in (
+            'medic-silence-cpu:high@web-01',
+            'alert#294',
+            'v1.2.3',
+            'task with spaces',
+            'forge-supply-chain-3-20260605T090000Z',
+            'abc_123-XYZ',
+        ):
+            ok, reason = dv.validate_task(_make_task(task_id=good))
+            self.assertTrue(ok, f'{good!r} should pass: {reason}')
+
+    def test_embedded_dots_allowed(self):
+        # Only an ALL-dots id is rejected; embedded dots are fine.
+        ok, reason = dv.validate_task(_make_task(task_id='a..b'))
+        self.assertTrue(ok, reason)
+
+    def test_helper_returns_reason(self):
+        # Direct unit coverage of the named check.
+        ok, reason = dv._validate_task_id_chars('a/b')
+        self.assertFalse(ok)
+        ok, _ = dv._validate_task_id_chars('medic:1@web')
+        self.assertTrue(ok)
+
+
 class AllowedIntentsTest(unittest.TestCase):
     """Intent vocabulary, including D3.5 5a review-marker additions."""
 

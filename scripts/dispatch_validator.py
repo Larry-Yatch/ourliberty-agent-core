@@ -15,6 +15,7 @@ Usage:
 """
 # Adapted from GrowthMastery-ai/gm-agent-core for Larry-Yatch/ourliberty-agent-core (2026-05-08)
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -140,6 +141,57 @@ MAX_PROMPT_LEN = 50000
 MIN_TIMEOUT = 60      # seconds
 MAX_TIMEOUT = 14400
 
+# Bytes that make a task_id unsafe as a single filesystem path component.
+# task_id is interpolated into inbox filenames (f'{task_id}.json') and into
+# worktree directory names; '/' and '\' are path separators and NUL / ASCII
+# control bytes are filesystem-hostile and a log/JSONL-injection vector.
+# PR-A's downstream sanitizers already keep those writes INSIDE the target
+# directory, so this is defense-in-depth — but rejecting at the front door
+# also closes a residual: the inbox sanitizer (safe_write_inbox.
+# sanitize_component) REWRITES a '/'-bearing id before write while the
+# idempotency readers (outbox_notifier / heal_pipeline_stall) reconstruct
+# the RAW f'{task_id}.json' name, so the on-disk name and the rebuilt name
+# diverge; worse, two distinct malformed ids can sanitize-COLLIDE onto one
+# filename and os.replace (used by _atomic_write_json) silently overwrites
+# the legit task's inbox file (audit #53). Rejecting here means only ids that
+# round-trip cleanly ever reach the writer. Printable punctuation that real
+# ids carry (':' '@' '#' '-' '_' '.' and spaces) stays valid — it is not
+# path-structural, and worktree_manager's own aggressive sanitizer maps it
+# away for the (derived, non-round-tripped) worktree name.
+_TASK_ID_FORBIDDEN_RE = re.compile(r'[\x00-\x1f\x7f/\\]')
+
+
+def _validate_task_id_chars(task_id):
+    """Return (ok: bool, reason: str) for the path-safety of a task_id.
+
+    Rejects a task_id that cannot serve as a single safe path component:
+      - path separators ``/`` or ``\\``
+      - NUL or any other ASCII control byte (0x00–0x1f, 0x7f)
+      - a value consisting SOLELY of dots (``.``, ``..``, ``...``): that
+        names a directory entry, not a file.
+
+    A task_id with embedded dots (``v1.2.3``) is fine — only an all-dots id
+    is rejected. ``:`` ``@`` ``#`` and spaces are allowed: they are not
+    path-structural and real task ids carry them (e.g.
+    ``medic-silence-cpu:high@web-01``). Kept as its own named check so the
+    existing valid-id surface is unchanged and the rejection reason is
+    self-describing.
+    """
+    if not isinstance(task_id, str):
+        return False, 'task_id is not a string'
+    m = _TASK_ID_FORBIDDEN_RE.search(task_id)
+    if m:
+        return False, (
+            f'task_id contains an unsafe path character {m.group()!r} — '
+            f'separators, NUL, and ASCII control bytes are rejected'
+        )
+    if task_id.strip('.') == '':
+        return False, (
+            f'task_id {task_id!r} is all dots — names a directory entry, '
+            f'not a dispatchable id'
+        )
+    return True, 'ok'
+
 
 def validate_task(task):
     """Return (ok: bool, reason: str). ok=True means task is dispatchable."""
@@ -190,6 +242,14 @@ def validate_task(task):
     task_id = task.get('task_id', '')
     if not task_id or not isinstance(task_id, str):
         return False, 'task_id field missing or empty'
+
+    # task_id path-safety (PR-A follow-up, audit #53 defense-in-depth). See
+    # _TASK_ID_FORBIDDEN_RE for the rationale: reject ids that would either
+    # sanitize-COLLIDE on write or diverge from the raw name the idempotency
+    # readers reconstruct. Valid ids (including ':' '@' '#' and spaces) pass.
+    id_ok, id_reason = _validate_task_id_chars(task_id)
+    if not id_ok:
+        return False, id_reason
 
     # priority: if set, must be a known value
     priority = task.get('priority')
