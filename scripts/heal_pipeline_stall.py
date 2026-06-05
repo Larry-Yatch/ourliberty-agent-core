@@ -777,34 +777,64 @@ def _forge_pr_create_inferred_failure(task_id: str) -> Optional[str]:
     return _classify_outbox_error(data)
 
 
+def _outbox_shows_pr(data: dict) -> bool:
+    """True iff an archived outbox proves a PR was actually opened/updated by
+    that dispatch: a `PR opened:` / `PR updated:` terminal preamble in the
+    `result` (agents/forge/CLAUDE.md post-marker exit signals), or a non-empty
+    `pr_url` / `html_url` field.
+
+    A clarify outbox that merely resolved with `=== PROCEED ===` does NOT
+    count — PROCEED proves the clarification was resolved and a SEPARATE
+    downstream build was dispatched, not that any PR exists. Conflating the
+    two is the false-positive this guards: a PROCEED sibling whose downstream
+    build later crashed without opening a PR must NOT read as 'recovered'."""
+    for key in ('pr_url', 'html_url'):
+        v = data.get(key)
+        if isinstance(v, str) and v.strip():
+            return True
+    result = data.get('result')
+    if isinstance(result, str):
+        low = result.lower()
+        if 'pr opened:' in low or 'pr updated:' in low:
+            return True
+    return False
+
+
 def _forge_retry_succeeded(task_id: str) -> Optional[str]:
-    """If a retry-sibling outbox for `task_id` (`<task_id>.<N>.json`, e.g.
-    the marker-error retry `...-clarify1.1.json`) exited cleanly, return
-    that sibling's filename; else None.
+    """If a retry-sibling outbox for `task_id` (`<task_id>.<N>.json`, e.g. the
+    marker-error retry `...-clarify1.1.json`) exited cleanly AND carries proof
+    a PR was opened, return that sibling's filename; else None.
 
     `_forge_pr_create_inferred_failure` reads only the first-attempt outbox
     `<task_id>.json`. When the first attempt errored (exit_code=-1, 'All
-    retries exhausted') but the outbox-notifier re-dispatched a marker-error
-    retry that SUCCEEDED — resolving the clarify with PROCEED and triggering
-    a separate build that opened the PR — the first-attempt failure is NOT a
-    loss. This helper detects that recovery so Step 5 can suppress the false
-    `pr-create-inferred-failure` alert. Critically, it keys on the archived
-    OUTBOX (always present), not the PR list, so it stays correct even when
-    the sibling build PR re-keyed its branch family or aged out of the
-    merged-PR query window.
+    retries exhausted') but a marker-error retry SUCCEEDED and opened a PR, the
+    first-attempt failure is NOT a loss. This helper detects that recovery so
+    Step 5 can suppress the false `pr-create-inferred-failure` alert. It keys on
+    the archived OUTBOX (always present), so it stays correct even when the
+    sibling PR aged out of the merged-PR query window.
 
-    Production driver (2026-06-04): `forge-queue-api-preflight-
-    20260603T231401Z-clarify1.json` errored, but `...-clarify1.1.json`
-    succeeded with PROCEED -> PR #294 (merged), later generalized by PR
-    #324. Step 5 re-alarmed hourly for ~2 days because it never consulted
-    the retry sibling.
+    Two signals are BOTH required, because 'clean exit' alone is not proof of a
+    PR: a clarify retry that resolves with `=== PROCEED ===` exits cleanly but
+    only dispatches a SEPARATE downstream build, which can itself crash without
+    ever opening a PR. Suppressing on PROCEED alone silently masked genuine
+    no-PR stalls. So a sibling counts as recovery only when it is both:
+      1. clean — the inverse of `_classify_outbox_error` (exit_code==0/absent,
+         no error, no auth_401); and
+      2. PR-bearing — `_outbox_shows_pr` (a `PR opened:`/`PR updated:` preamble
+         or a `pr_url`/`html_url` field).
 
-    'Clean' is the inverse of `_classify_outbox_error` (exit_code==0/absent,
-    no error, no auth_401). The glob `<task_id>.*.json` requires a non-empty
-    middle segment, so it naturally excludes the first-attempt
-    `<task_id>.json`. Returns the first clean sibling's name; None if the
-    archive dir is missing, no retry siblings exist, or every sibling also
-    errored."""
+    The clarify-PROCEED-then-separate-build recovery is instead covered by the
+    caller's Step 1b `_preflight_family_shipped`, which cross-checks the live
+    open + 7-day merged PR list by branch family (widened to limit=300 in the
+    2026-06-04 fix so PR #294-class shipped siblings are no longer truncated).
+    That is the authoritative 'a PR exists' signal; this helper only adds the
+    residual case where a retry sibling opened a PR DIRECTLY that has since aged
+    out of that window.
+
+    The glob `<task_id>.*.json` requires a non-empty middle segment, so it
+    naturally excludes the first-attempt `<task_id>.json`. Returns the first
+    clean PR-bearing sibling's name; None if the archive dir is missing, no
+    retry siblings exist, or no sibling both succeeded and opened a PR."""
     try:
         siblings = sorted(FORGE_OUTBOX_ARCHIVE.glob(f'{task_id}.*.json'))
     except OSError:
@@ -815,7 +845,7 @@ def _forge_retry_succeeded(task_id: str) -> Optional[str]:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError):
             continue
-        if _classify_outbox_error(data) is None:
+        if _classify_outbox_error(data) is None and _outbox_shows_pr(data):
             return sib.name
     return None
 
