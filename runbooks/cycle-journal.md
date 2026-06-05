@@ -4,6 +4,72 @@
 
 ---
 
+## Iteration 970 — 2026-06-05 07:56 UTC (interactive, Tier 1→2 — DE-ESCALATION)
+
+**Health:** ✅ **Tier 1→2 DE-ESCALATION. consecutive_clean=3 → promoted to Tier 2. 0 new alerts. 8/8 services active. All inboxes empty. 3 audit-series PRs OPEN (#348/#349/#350), none at threshold. Tier 2 cadence now active (15-min); 3 more clean iters → Tier 3.**
+
+Alert watermark: **1326 lines / 2026-06-05T07:38:21Z** (unchanged — 0 new alerts since iter 969). Pipeline-stall heartbeat: 2026-06-05T07:50:47Z (✅ ~6 min at scan; within 90-min threshold). Stale-daemon heartbeat: 2026-06-05T07:33:49Z (✅ ~23 min at scan; within 60-min threshold). Sync: status=no-change, commit=3501e13, last_sync=2026-06-05T07:50:00Z (~6 min, ✅ within 2h). HEAD=244966a newer than sync commit — wrapper push landed after last sync.timer fire; self-clears on next hourly tick. Tier state at start: tier=1, consecutive_clean=2. Tier state at end: **tier=2, consecutive_clean=0** (promoted; 3 more clean iters → Tier 3).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1326/07:38:21Z unchanged — 0 new alerts since iter 969. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** No warning-level systemd logs in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** 1 active session (7998341473; unchanged). No new directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-05T07:50:47Z (~6 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** All inboxes empty: Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-05T07:33:49Z (~23 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=244966a "Pulse cycle 20260605T075433Z". ✅
+
+- **(Check B) Sync health: ✅ Clean.** sync.json: status=no-change, commit=3501e13, last_sync=2026-06-05T07:50:00Z (~6 min). HEAD=244966a newer than sync commit — wrapper push landed after last sync.timer fire; self-clears on next hourly tick (~08:50Z). ✅
+
+- **(Check C) Agent liveness: ✅ 8/8 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper — all systemd `active`. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check E) PRs: ⚠️ 3 audit-series PRs OPEN — watch, none at threshold.**
+  - PR #348 (author=Larry-Yatch, created 07:39:15Z): "fix(guards): concurrency ceiling 10→6 to match documented RAM budget" — CLEAN/MERGEABLE (confirmed via `gh pr view`), age ~17 min, **threshold 08:09:15Z** (~13 min remaining).
+  - PR #349 (author=Larry-Yatch, created 07:44:40Z): "fix(dispatch): reconcile schema source enum with validator + drift guard" — CLEAN/MERGEABLE, age ~12 min, **threshold 08:14:40Z** (~18 min remaining).
+  - PR #350 (author=Larry-Yatch, created 07:47:44Z): "fix(auth): harden /tmp secret handling in OAuth orchestrators" — CLEAN/MERGEABLE, age ~9 min, **threshold 08:17:44Z** (~21 min remaining).
+  - Automated cycle at next Tier-2 15-min fire (~08:10Z) will apply `gh pr merge <N> --auto --squash` at each threshold. G-rule `actor=larry-direct-merge` already beyond 3/3 — if Larry merges directly before thresholds, unreviewed-merge alerts will fire; expected behavior pending `actor-exemption-config` fix.
+  - ourliberty-dashboard: 0 open PRs. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~78d; outside 60d window). ✅
+
+- **(Check I):** Friday UTC — sentinel exists (fired 00:25Z iter 932) → skip. ✅
+- **(Check III):** next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** Friday → skip (Monday only). ✅
+
+- **PR #335 healing watch:** Watermark unchanged — 0 new `tier2_weekly_probe_failed` alerts. Next probe expected ~09:00Z. Watch continues. ✅
+
+- **G-rule updates:** `actor=larry-direct-merge` beyond 3/3 (PRs #348/#349/#350 = 7th/8th/9th consecutive). Beacon dispatch for `actor-exemption-config` still queued pending Larry's `go: actor-exemption-config`. No new G-rule occurrences this iter.
+
+- **PRIME DIRECTIVE ratio:** script-authoritative — interventions=722, systemic_fixes=13, ratio≈55.5, trend=flat. No new interventions or dispatches this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gates (all skipped, Friday).
+2. Confirmed 0 new alerts, all 8 services active, all inboxes empty.
+3. Noted 3 audit-series PRs OPEN (#348/#349/#350), none yet at 30-min auto-merge threshold. Next Tier-2 automated cycle (~08:10Z) will apply auto-merge at each threshold if still CLEAN and not yet merged.
+4. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **Tier 1→2 de-escalation**. tier=2, consecutive_clean=0. ✅
+
+**Escalated:** No new escalations. Prior standing items carry forward:
+- `[red]` PRs #345, #346, #347 (audit PRs F, G, H) unreviewed-merge — Larry confirmation still pending (iter 967). **Larry: confirm whether audit-PR series direct merges are intentional. Reply `go: actor-exemption-config` to dispatch Beacon spec.**
+- `[yellow]` G-rule `actor=larry-direct-merge` at 3/3+ — Beacon dispatch for `actor-exemption-config` queued pending Larry's go-ahead.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12 UTC June 4; Beacon awaiting "go" reply).
+- `[yellow]` `heal-stale-daemon-code:auto-restarted:*` untranslated — Forge brief missing; re-dispatch pending Larry go-ahead.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` open (self-recovered; root fix pending).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+- APPROVAL_REQUEST `medic-tier2auth401-beaconbot-20260529T045737Z` — watching PR #335 healing (next probe ~09:00Z).
+
+**Patterns:** 3 consecutive clean iters achieved → Tier 1→2 de-escalation. System steady: 8/8 services, empty inboxes, clean repo, synced, no new alerts. Audit-PR series continues (PRs #348–#350 open, Larry-direct); G-rule already past threshold. Next automated cycles at Tier-2 cadence (15-min); auto-merge will fire at 08:09Z/08:14Z/08:17Z thresholds.
+
+---
+
 ## Iteration 969 — 2026-06-05 07:51 UTC (interactive, Tier 1 — clean)
 
 **Health:** ✅ **Tier 1 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. 3 audit-series PRs OPEN (#348/#349/#350), none at threshold. 1 more clean iter → Tier 2 de-escalation.**
