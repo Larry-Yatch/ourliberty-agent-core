@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 951 — 2026-06-05 04:06 UTC (interactive, Tier 2→3)
+
+**Health:** ✅ **Tier 2→3 CLEAN. consecutive_clean=3 → de-escalating to Tier 3. 0 new alerts. 7/7 scanned services active. All inboxes empty. Sync CLEAN. 0 auto-fix actions.**
+
+Alert watermark: **1309 lines / 2026-06-05T02:43:28Z** (unchanged — 0 new alerts since iter 943). Pipeline-stall heartbeat: 2026-06-05T04:04:15Z (✅ ~2 min at cycle start). Stale-daemon heartbeat: 2026-06-05T04:02:14Z (✅ ~4 min; state JSON absent — heartbeat primary per MEMORY calibration). Sync: status=no-change, commit=47f4a92, last_sync=03:49:16Z (✅ CLEAN). Tier state at start: tier=2, consecutive_clean=2. Tier state at end: **tier=3, consecutive_clean=0** (3 consecutive clean Tier-2 iters → de-escalated to Tier 3; 30-min cadence).
+
+**Found:**
+
+- **(Check 0) Alert triage: ✅ Nominal.** Watermark 1309/02:43:28Z — 0 new alerts since iter 943. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** outbox-notifier.log: 1 stale WARN from 2026-06-04T14:51:21Z (MalformedForgeMarker on `debrittle-leak-gate-whitelist-001`; retry-handled, ~13h old, not a current-cycle signal). No new WARN/ERROR in last 30 min. ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new untracked Larry directives. Prior standing escalations carry forward. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat 04:04:15Z (~2 min; ✅). Stall state: all known patterns snoozed to 2099-12-31 (no active stalls). ✅
+
+- **(Check 4) Pending Larry directives: ✅ Nominal.** Inboxes: Forge=0, Beacon=0, Mirror=0, Pulse=0 (active only; .invalid/.archive/.hold/.quarantine excluded). ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal (heartbeat primary).** Heartbeat 04:02:14Z (~4 min; ✅). State JSON file absent — healer IS running per heartbeat; per MEMORY calibration use heartbeat as primary signal. ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, clean, HEAD=0fec787 "Pulse cycle 20260605T035407Z". ✅
+
+- **(Check B) Sync health: ✅ CLEAN.** sync.json: status=no-change, commit=47f4a92, last_sync=03:49:16Z (~17 min). Sync.json is one commit behind HEAD (47f4a92 vs 0fec787) — wrapper pushed 0fec787 post-iter-950 and sync timer hasn't re-fired; expected. ✅
+
+- **(Check C) Agent liveness: ✅ 7/7 scanned active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, cycle.timer, outbox-notifier — all systemd `active`. Carry iter-950: chain-event-shipper=active. ✅
+
+- **(Check D) Agent inboxes: ✅ All empty.** 0 active JSON files (251 in .invalid/.hold/.quarantine — not pending tasks). ✅
+
+- **(Check E) PRs: ⚠️ PR #336 CONFLICTING — journal note only.** PR #336 "fix(heal): pipeline-stall retry reconciliation + kill the poll-loop wedge class" opened 03:43:32Z (23 min old at check time). `gh pr view 336`: mergeable=CONFLICTING, mergeStateStatus=DIRTY, reviewDecision='' (no review). Branch: `fix/heal-pipeline-stall-retry-reconcile`. CONFLICTING → not auto-merge eligible; Forge must rebase onto current main. Below 72h escalation threshold. ourliberty-dashboard: 0 open PRs. ⚠️→journal note (no escalation; < 72h).
+
+- **Stale worktrees: ⚠️ G-rule 2/3 advance.** Two physical worktree directories persist 3+ hours post-PR #334 merge (01:09:33Z): `wt-forge-build-unreviewed-merge-detector-20260605T000816Z` and `wt-mirror-build-unreviewed-merge-detector-20260605T000816Z`. Hourly GC timer should have swept these; possible orphaned-dir pattern (de-registered from git but physical dir remains). G-rule `cleanup_stale_worktrees.py misses orphaned non-git-registered directories` (iter 716 = 1/3) → **advancing to 2/3**. At 3/3: dispatch Beacon. ⚠️→G-rule 2/3.
+
+- **Mirror PID 44633 (iter 943 escalation): ✅ SELF-RESOLVED.** Not visible in `ps` at cycle start. The stuck Mirror session has terminated. Stale worktrees above are the residual artifact. Watch item CLOSED.
+
+- **PR #335 healing watch:** Watermark unchanged at 1309/02:43:28Z — no new `tier2_weekly_probe_failed` alerts. Next probe expected ~09:00Z (6h cadence from 03:02:48Z first post-merge fire). Watch continues.
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~79d, outside 60d window). ✅
+
+- **(Check I):** sentinel `check-i-2026-06-05.json` present → skip. ✅
+- **(Check III):** today Thursday/Friday UTC; next gate Sunday 2026-06-07 → skip. ✅
+- **(Checks VIII/IX/X):** non-Monday → skip. ✅
+
+- **PRIME DIRECTIVE ratio:** interventions=719, systemic_fixes=12, ratio≈59.9 (unchanged). No interventions or systemic_fixes this iter.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation + periodic check gates (all skipped).
+2. Confirmed pipeline-stall healer fresh, all inboxes empty, sync CLEAN.
+3. Noted PR #336 CONFLICTING (Forge rebase needed; journal note only, < 72h).
+4. Advanced G-rule `orphaned-worktrees` to 2/3 (stale wt-forge/wt-mirror from PR #334 task, 3+ hours post-merge).
+5. Closed watch item: Mirror PID 44633 self-resolved.
+6. Updated cycle-tier.json → tier=3, consecutive_clean=0 (de-escalation from Tier 2).
+7. Wrote journal entry + MEMORY update.
+
+**Escalated:** No new escalations. Prior standing items carry forward (see iter 950).
+
+**Patterns:** System settled into Tier 3. Three consecutive clean Tier-2 iters de-escalated cadence to 30 min. PR #336 CONFLICTING is purely a Forge rebase-needed signal — not a system health alarm. Stale worktrees at 2/3 G-rule; one more observation → dispatch Beacon to spec GC directory-sweep fallback in `cleanup_stale_worktrees.py`.
+
+---
+
 ## Iteration 950 — 2026-06-05 03:52 UTC (interactive)
 
 **Health:** ✅ **Tier 2 — CLEAN. consecutive_clean=2. 0 new alerts. 8/8 services active. All inboxes empty. Sync CLEAN (sync.timer cleared SYNC-PUSH-REBASE-FALLBACK). PR #336 opened at 03:43Z (~9 min old, below 30-min threshold, UNKNOWN state). 0 auto-fix actions.**
