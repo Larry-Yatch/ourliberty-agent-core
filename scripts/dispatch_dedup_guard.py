@@ -75,6 +75,32 @@ def log_refusal(record: dict):
         f.write(json.dumps(record) + '\n')
 
 
+def record_dispatch(target_agent: str, prompt_hash_val: str, task_file: str) -> None:
+    """Append an approved dispatch to the ledger so a later invocation can see a
+    prompt-hash duplicate within HASH_DEDUP_MIN.
+
+    Without this the hash-dedup was DEAD: nothing populated `dispatch_ledger.jsonl`
+    with `prompt_hash`/`identity` rows, so `recent_dispatches` always came back
+    empty and the guard only ever enforced the filename-chain check. Recording
+    here is what arms the content-duplicate refusal.
+
+    Best-effort: a failure to write our own bookkeeping must NOT block an
+    otherwise-valid dispatch (fail-open on the ledger), so OSError is swallowed."""
+    record = {
+        'ts': datetime.now(tz=timezone.utc).isoformat(),
+        'identity': target_agent,
+        'target_agent': target_agent,
+        'prompt_hash': prompt_hash_val,
+        'task_file': task_file,
+    }
+    try:
+        LEDGER.parent.mkdir(parents=True, exist_ok=True)
+        with LEDGER.open('a') as f:
+            f.write(json.dumps(record) + '\n')
+    except OSError:
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--target-agent', required=True)
@@ -116,7 +142,10 @@ def main():
     h = prompt_hash(prompt)
     recent = recent_dispatches(args.target_agent, HASH_DEDUP_MIN)
     for d in recent:
-        if d.get('prompt_hash') == h and args.target_agent in d.get('identity', ''):
+        if d.get('prompt_hash') == h and (
+            d.get('target_agent') == args.target_agent
+            or args.target_agent in d.get('identity', '')
+        ):
             record = {
                 'ts': datetime.now(tz=timezone.utc).isoformat(),
                 'reason': 'prompt-hash-duplicate',
@@ -129,6 +158,7 @@ def main():
             print(f'REFUSE: prompt hash {h} matches recent dispatch within {HASH_DEDUP_MIN} min', file=sys.stderr)
             sys.exit(1)
 
+    record_dispatch(args.target_agent, h, str(p))
     print(f'OK: depth={depth} hash={h} target={args.target_agent}')
     sys.exit(0)
 

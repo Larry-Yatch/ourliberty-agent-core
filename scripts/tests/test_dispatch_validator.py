@@ -198,6 +198,35 @@ class RoutingSignalPromptPrefixExemptionTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn('prompt too short', reason)
 
+    def test_kickoff_prefix_with_no_seqid_is_not_exempt(self):
+        # Audit fix: the prefix alone must NOT bypass the min-length guard. A
+        # degenerate `kickoff` with no seq-id (an F24 empty-prompt bug that
+        # happens to carry the prefix) is not a routing signal and must be
+        # rejected.
+        ok, reason = dv.validate_task(_make_task(
+            prompt='kickoff ',  # stripped to 'kickoff' — no seq-id payload
+            target_agent='mirror',
+            phase='code-review',
+        ))
+        self.assertFalse(ok)
+        self.assertIn('prompt too short', reason)
+
+    def test_review_sequence_dag_prefix_with_no_seqid_is_not_exempt(self):
+        ok, reason = dv.validate_task(_make_task(
+            prompt='review-sequence-dag    ',  # whitespace-only seq-id
+            target_agent='mirror',
+            phase='code-review',
+        ))
+        self.assertFalse(ok)
+        self.assertIn('prompt too short', reason)
+
+    def test_routing_signal_prompt_helper_requires_payload(self):
+        self.assertTrue(dv._is_routing_signal_prompt('kickoff seq-123'))
+        self.assertTrue(dv._is_routing_signal_prompt('review-sequence-dag s1'))
+        self.assertFalse(dv._is_routing_signal_prompt('kickoff'))
+        self.assertFalse(dv._is_routing_signal_prompt('kickoff '))
+        self.assertFalse(dv._is_routing_signal_prompt('not-a-signal seq'))
+
 
 if __name__ == '__main__':
     unittest.main()
