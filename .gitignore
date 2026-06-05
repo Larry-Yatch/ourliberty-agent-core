@@ -67,6 +67,9 @@ gdoc_images/
 screenshots/
 .claude/cache/
 
+# --- Local audit/review report artifacts (working docs, never ship) ---
+AUDIT_*.md
+
 # --- Local Claude Code settings (per-user permission overrides) ---
 .claude/settings.local.json
 
