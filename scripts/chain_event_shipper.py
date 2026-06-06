@@ -368,9 +368,16 @@ def load_pulse_cursor() -> PulseCursor:
 
 
 def save_pulse_cursor(cursor: PulseCursor) -> None:
+    """Durably persist the pulse cursor (unique temp + fsync + os.replace).
+
+    Single-writer crash-atomicity sibling of save_log_cursors (audit M3): only
+    the shipper writes this file, so there is no lost-update/lock concern — but a
+    plain write_text could still leave a truncated file on a mid-write crash
+    (OOM/SIGTERM). load_pulse_cursor swallows the resulting JSONDecodeError and
+    returns a default PulseCursor() (mtime=0), re-reading the pulse file from the
+    start. The atomic write removes that torn-file window; no flock needed."""
     try:
-        PULSE_CURSOR_FILE.parent.mkdir(parents=True, exist_ok=True)
-        PULSE_CURSOR_FILE.write_text(json.dumps(cursor.to_dict()))
+        atomic_io.atomic_write_json(PULSE_CURSOR_FILE, cursor.to_dict())
     except OSError:
         pass
 
