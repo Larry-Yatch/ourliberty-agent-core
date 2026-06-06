@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone, timedelta
@@ -71,7 +72,16 @@ import safe_write_inbox  # noqa: E402
 import trust_policy      # noqa: E402
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / 'agents'
+# Single source of truth for the approval-state root. Honor
+# OURLIBERTY_AGENTS_ROOT (the repo-wide convention — see the ~50 other modules,
+# incl. heal_unregistered_approval.agents_root() and heal_stale_approvals'
+# AGENTS_ROOT, that resolve it this way) so the handler, both approval healers,
+# and the file_lock sidecar all agree on ONE pending-approvals file + ONE lock.
+# Before seam-audit L1 this was hardcoded to HOME/'agents'; when the override
+# was set (tests, alternate deployments) the handler wrote/locked a different
+# file than the healers read — three paths for one logical queue. Production
+# pins HOME and sets no override, so the divergence was latent.
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or HOME / 'agents')
 REPO_ROOT = _SCRIPT_DIR.parent
 # State lives in the RUNTIME tree (~/agents/state/), not the repo.
 # Runtime is writable by the bot's systemd unit; the repo is read-only.
