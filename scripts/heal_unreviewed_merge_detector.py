@@ -74,13 +74,19 @@ GH_TIMEOUT_S = 30
 # cap the query window so one slow/stale tick can't fan out into hundreds of
 # PRs. The cursor still advances normally; this only bounds a single query.
 MAX_LOOKBACK_DAYS = 7
-# Per-query row cap. gh returns merged PRs NEWEST-first; if a busy window has
-# more than this, the OLDER in-window merges are dropped — and since the cursor
-# advances to the newest mergedAt, they'd be skipped forever (the detector's
-# whole job is to catch exactly such a merge). Sized with headroom (matches
-# heal_pipeline_stall._MERGED_PR_FETCH_LIMIT); hitting it logs a loud WARN and
-# the tick HOLDS the cursor instead of advancing past the unscanned tail.
+# Per-PAGE row cap. gh returns merged PRs NEWEST-first capped at this many; a
+# busy window with more than this truncates the OLDER in-window merges off the
+# tail. fetch_merged_prs handles that by RANGE-PAGING within the tick (fetch
+# newest page in [cursor, now]; if full, page into the older sub-window via
+# `merged:<lower>..<oldest-scanned>` and repeat until a short page) so the tail
+# is fully scanned — the cursor only advances after every in-window merge has
+# been seen. Sized to match heal_pipeline_stall._MERGED_PR_FETCH_LIMIT.
 _MERGED_PR_FETCH_LIMIT = 300
+# Hard cap on range-paging iterations per tick, so a pathological merge burst (or
+# a bug) can't spin gh forever. 20 pages * 300 = 6000 merges/tick of headroom;
+# hitting it logs a loud WARN (an older tail may remain unscanned that tick — the
+# only residual gap, and far beyond any realistic window).
+_MAX_FETCH_PAGES = 20
 # Keep the alerted-PR ledger from growing without bound. Recent entries are all
 # that matter (the cursor only re-presents PRs near the boundary).
 MAX_ALERTED_LEDGER = 200
@@ -184,25 +190,32 @@ def _parse_iso(ts: str) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
+def _fmt_gh_ts(dt: datetime) -> str:
+    """Format an aware datetime as the date-qualifier gh search expects, e.g.
+    2026-06-04T18:05:03+00:00. The SOLE place this format is produced — both the
+    lower bound (cursor) and the range-paging upper bound must use it verbatim so
+    the two ends of a `merged:A..B` window are directly comparable."""
+    return dt.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S+00:00')
+
+
 def _gh_search_cursor(cursor_iso: Optional[str], now: datetime) -> str:
-    """The `merged:>=<ts>` value for the gh search. Floors the cursor to at
-    most MAX_LOOKBACK_DAYS ago so a stale cursor can't request a huge window.
-    GitHub's search accepts an ISO-8601 datetime with timezone offset."""
+    """The lower-bound `merged:>=<ts>` value for the gh search. Floors the cursor
+    to at most MAX_LOOKBACK_DAYS ago so a stale cursor can't request a huge
+    window. GitHub's search accepts an ISO-8601 datetime with timezone offset."""
     floor = now - timedelta(days=MAX_LOOKBACK_DAYS)
     cur = _parse_iso(cursor_iso) if cursor_iso else None
     eff = max(cur, floor) if cur else floor
-    # GitHub search wants e.g. 2026-06-04T18:05:03+00:00.
-    return eff.strftime('%Y-%m-%dT%H:%M:%S+00:00')
+    return _fmt_gh_ts(eff)
 
 
 # -------------------- gh + log I/O (mockable seams) --------------------
 
-def fetch_merged_prs(cursor_iso: Optional[str], now: datetime) -> list[dict[str, Any]]:
-    """Return parsed `gh pr list` rows for PRs merged into BASE since the
-    cursor. Each row: {number, mergedAt, url, author_login, title}. Tolerates
-    any gh failure (logs + returns []) — a detector must never crash the
-    healer."""
-    search = f'merged:>={_gh_search_cursor(cursor_iso, now)}'
+def _run_gh_pr_list(search: str) -> Optional[tuple[list[dict[str, Any]], int]]:
+    """Issue ONE `gh pr list` for the given `--search` value. Returns
+    (parsed_rows, raw_row_count) where raw_row_count is gh's pre-parse row count
+    (the truncation signal — it may exceed len(parsed_rows) if some rows were
+    malformed). Returns None on ANY gh failure (already logged) — a detector must
+    never crash the healer."""
     cmd = [
         'gh', 'pr', 'list',
         '--repo', REPO,
@@ -218,24 +231,104 @@ def fetch_merged_prs(cursor_iso: Optional[str], now: datetime) -> list[dict[str,
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         log(f'gh pr list failed: {type(e).__name__}: {e}', 'WARN')
-        return []
+        return None
     if proc.returncode != 0:
         log(f'gh pr list returned {proc.returncode}: '
             f'{proc.stderr.strip()[:300]}', 'WARN')
-        return []
+        return None
     rows = parse_merged_prs(proc.stdout)
-    # No silent caps: if we hit the row limit, older in-window merges were
-    # truncated. Surface it loudly so the limit gets bumped (the caller also
-    # holds the cursor on a capped tick so the tail isn't skipped forever).
     try:
         raw_count = len(json.loads(proc.stdout or '[]'))
     except (json.JSONDecodeError, TypeError):
         raw_count = len(rows)
-    if raw_count >= _MERGED_PR_FETCH_LIMIT:
-        log(f'fetch hit --limit {_MERGED_PR_FETCH_LIMIT} for window since '
-            f'{cursor_iso}: older in-window merges may be TRUNCATED and unscanned '
-            f'— bump _MERGED_PR_FETCH_LIMIT', 'WARN')
-    return rows
+    return rows, raw_count
+
+
+def _oldest_merged_dt(rows: list[dict[str, Any]]) -> Optional[datetime]:
+    """The oldest parseable mergedAt across the rows (the range-paging pivot)."""
+    oldest: Optional[datetime] = None
+    for r in rows:
+        dt = _parse_iso(r.get('mergedAt'))
+        if dt is None:
+            continue
+        if oldest is None or dt < oldest:
+            oldest = dt
+    return oldest
+
+
+def fetch_merged_prs(cursor_iso: Optional[str], now: datetime) -> list[dict[str, Any]]:
+    """Return parsed `gh pr list` rows for ALL PRs merged into BASE since the
+    cursor, RANGE-PAGED so a busy window can't drop its older tail.
+
+    gh returns merged PRs newest-first capped at _MERGED_PR_FETCH_LIMIT, so a
+    single fetch silently truncates the oldest in-window merges — and since the
+    cursor advances to the newest mergedAt, those dropped merges are never
+    re-scanned (the exact gap this detector exists to close). To avoid that we
+    page: fetch the newest page in [cursor, now]; while a page comes back FULL
+    (truncated), re-query the OLDER sub-window `merged:<lower>..<oldest-scanned>`
+    and merge the results, until a page returns fewer than the limit. The
+    inclusive upper bound re-presents the boundary PR(s), so we dedup by number.
+
+    Fail-safe: NEVER skip a merge. A page cap and a strict-decrease livelock
+    guard bound the loop; if either trips we WARN loudly (an older tail may
+    remain unscanned that tick) rather than spin. Any gh failure mid-paging
+    returns what was gathered so far. Each row: {number, mergedAt, url,
+    author_login, title}."""
+    lower = _gh_search_cursor(cursor_iso, now)
+    out: list[dict[str, Any]] = []
+    seen: set[Any] = set()
+    upper_str: Optional[str] = None  # None => open-ended newest-first first page
+    page = 0
+    while True:
+        page += 1
+        if page > _MAX_FETCH_PAGES:
+            log(f'fetch hit page cap {_MAX_FETCH_PAGES} '
+                f'(~{_MAX_FETCH_PAGES * _MERGED_PR_FETCH_LIMIT} merges) for window '
+                f'since {cursor_iso}; an older in-window tail may remain UNSCANNED '
+                f'this tick — investigate the merge burst', 'WARN')
+            break
+        search = (f'merged:>={lower}' if upper_str is None
+                  else f'merged:{lower}..{upper_str}')
+        result = _run_gh_pr_list(search)
+        if result is None:
+            break  # gh failure already logged; return what we have (fail-safe).
+        rows, raw_count = result
+        for r in rows:
+            n = r.get('number')
+            if n in seen:
+                continue  # boundary PR re-presented by the inclusive `..` upper.
+            seen.add(n)
+            out.append(r)
+        if raw_count < _MERGED_PR_FETCH_LIMIT:
+            break  # short page => the whole window is drained, no truncation.
+        # Page was full: an older in-window tail remains. Pivot to the older
+        # sub-window bounded above by the oldest mergedAt we just scanned. gh
+        # emits mergedAt at SECOND precision and GitHub's `merged:..U` qualifier
+        # compares at the same granularity, so the inclusive `..<oldest-second>`
+        # re-presents EVERY PR sharing that boundary second (deduped by number
+        # below) — none is skipped. The sole residual is >_MERGED_PR_FETCH_LIMIT
+        # merges inside one second, which the livelock guard catches + WARNs.
+        oldest = _oldest_merged_dt(rows)
+        if oldest is None:
+            log(f'fetch truncated but no parseable mergedAt to page older '
+                f'(since {cursor_iso}); an older tail may remain unscanned', 'WARN')
+            break
+        next_upper_str = _fmt_gh_ts(oldest)
+        # Livelock guard: the upper bound MUST strictly decrease, else the same
+        # window re-fetches forever (e.g. >_MERGED_PR_FETCH_LIMIT merges sharing
+        # one second so the pivot can't move below them). Compare the formatted
+        # query strings, since that is what actually gets issued.
+        if upper_str is not None and next_upper_str >= upper_str:
+            log(f'fetch range-paging stalled at {next_upper_str}: upper bound did '
+                f'not decrease below {upper_str} (>= {_MERGED_PR_FETCH_LIMIT} '
+                f'merges at one timestamp?); an older tail may remain unscanned '
+                f'— investigate', 'WARN')
+            break
+        upper_str = next_upper_str
+    if page > 1:
+        log(f'range-paged {page} window(s); {len(out)} merged PR(s) since '
+            f'{cursor_iso}')
+    return out
 
 
 def parse_merged_prs(raw_json: str) -> list[dict[str, Any]]:
@@ -452,13 +545,11 @@ def main() -> int:
         alerted[alert['pr_url']] = now.isoformat()
 
     # Advance the cursor over everything we scanned (advancing past clean merges
-    # too — they're verified-good and shouldn't be re-scanned). We advance even
-    # on a truncated tick (fetch_merged_prs already logged a loud WARN): gh has
-    # no pagination here (single newest-first --limit fetch), so HOLDING the
-    # cursor would re-fetch the same newest N forever and still never reach the
-    # older tail — a livelock with no forward progress. The real protection is
-    # the headroom in _MERGED_PR_FETCH_LIMIT plus that WARN driving a bump; a
-    # future improvement could range-page (`merged:A..B`) to fully close the tail.
+    # too — they're verified-good and shouldn't be re-scanned). fetch_merged_prs
+    # range-pages the entire [cursor, now] window, so a busy tick has already
+    # scanned the older tail rather than dropping it — advancing to the newest
+    # mergedAt no longer skips an unreviewed merge. (The only residual is an
+    # extreme burst that trips the page-cap/livelock guard, which WARNs loudly.)
     state['cursor_iso'] = advance_cursor(merged_prs, cursor_iso)
     save_state(state)
 
