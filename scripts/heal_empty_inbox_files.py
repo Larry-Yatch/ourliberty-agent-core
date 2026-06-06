@@ -49,6 +49,7 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,6 +60,19 @@ INBOXES_ROOT = AGENTS_ROOT / "inboxes"
 
 TRIVIAL_THRESHOLD_BYTES = 50
 TRIVIAL_JSON_VALUES = ({}, [], "", None)
+
+# Grace window before a file is eligible for empty/corrupt classification.
+# A file written in the last MIN_FILE_AGE_SECONDS may still be mid-write by a
+# NON-atomic producer (audit #55): inbox_watcher.bump_requeue rewrites a task
+# in place with write_text (truncate-then-stream → a transient 0-byte/partial
+# window), and the upstream/cron signal-*.json writers this healer was built
+# for fail between filename-creation and content-write (see module docstring) —
+# neither routes through safe_write_inbox's atomic os.replace. Judging such a
+# file empty/corrupt would archive a real task out from under its writer, which
+# the "reversible/idempotent" safety claims do not cover. Skipping it this tick
+# costs nothing: a genuinely empty file is still <grace> seconds old at most and
+# gets archived on the next 15-min run.
+MIN_FILE_AGE_SECONDS = 10
 
 
 def log(level: str, msg: str) -> None:
@@ -78,9 +92,17 @@ def log(level: str, msg: str) -> None:
 def classify(task_file: Path) -> tuple[bool, str, int]:
     """Return (is_empty_or_trivial, reason, file_size_bytes)."""
     try:
-        size = task_file.stat().st_size
+        stat = task_file.stat()
     except OSError:
         return False, "stat-failed", 0
+    size = stat.st_size
+    # Grace window (audit #55): never judge a just-touched file — a non-atomic
+    # writer may still be mid-write, and a 0-byte/partial read here would archive
+    # a real task. Gate BEFORE the zero-byte check (an in-progress write is
+    # exactly the 0-byte case we must not race).
+    age_seconds = time.time() - stat.st_mtime
+    if age_seconds < MIN_FILE_AGE_SECONDS:
+        return False, f"too-fresh ({age_seconds:.1f}s < {MIN_FILE_AGE_SECONDS}s grace)", size
     if size == 0:
         return True, "zero-byte-file", 0
     if size > TRIVIAL_THRESHOLD_BYTES:

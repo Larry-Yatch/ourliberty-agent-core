@@ -36,7 +36,7 @@ def get_manager():
         def report_success(self, _account_id):
             return None
     return _StubTokenManager()
-from concurrency_guard import get_guard
+from concurrency_guard import get_guard, MAX_CONCURRENT
 import active_tier
 
 AGENTS_ROOT = Path.home() / 'agents'
@@ -78,6 +78,11 @@ def get_agent_model(agent_id, context='default'):
         return 'sonnet', 'sonnet'
 
 MAX_RETRIES = 5
+# How long run_claude() blocks waiting for a concurrency slot before giving up.
+# Defined here (not inline at the call) so the WARN we log on timeout always
+# reports the real wait window — audit #52 found a hardcoded 'Waited 120s' string
+# that had drifted 15x from the actual 1800s timeout, misleading on-call triage.
+SLOT_WAIT_TIMEOUT = 1800
 # Exponential backoff base. Attempt N waits min(BASE * 2**N, RETRY_DELAY_MAX)
 # before retrying: 10 → 20 → 40 → 80 → 160s (total max patience ~5min before
 # "All retries exhausted"). Was fixed 10s × 3 = 30s — often not enough for a
@@ -830,8 +835,10 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
     prompt = _maybe_prepend_identity_assertion(prompt, expected_agent, session_id)
 
     # Wait for a concurrency slot (blocks if at capacity)
-    if not guard.wait_for_slot(agent_id, timeout=1800):
-        log(agent_id, 'Concurrency limit reached (' + str(guard.active_count()) + ' active). Waited 120s.', 'WARN')
+    if not guard.wait_for_slot(agent_id, timeout=SLOT_WAIT_TIMEOUT):
+        log(agent_id, 'Concurrency limit reached (' + str(guard.active_count()) +
+            '/' + str(MAX_CONCURRENT) + ' active). Waited ' +
+            str(SLOT_WAIT_TIMEOUT) + 's.', 'WARN')
         return False, 'Concurrency limit - too many parallel tasks. Try again shortly.', None
 
     try:
@@ -897,7 +904,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 ', tier=' + active_tier_name +
                 ', auth=' + auth_source +
                 ', attempt=' + str(attempt+1) + '/' + str(MAX_RETRIES) +
-                ', active=' + str(guard.active_count()) + '/10' +
+                ', active=' + str(guard.active_count()) + '/' + str(MAX_CONCURRENT) +
                 (', resume=' + session_id[:12] + '...' if session_id else '') +
                 ', effort=' + effort + ')')
 
