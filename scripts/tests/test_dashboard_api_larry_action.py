@@ -800,5 +800,141 @@ class AllowlistEndpointTest(_LarryActionBase):
         self.assertEqual(r.status_code, 401)
 
 
+# ---------- audit #31: best-effort audit write keeps the claim ----------
+
+class _AuditUpsertFailsClient(_RecordingClient):
+    """Recording client whose audit-row upsert always raises.
+
+    Models the #31 scenario: the atomic read_at claim + envelope write
+    succeed, then the larry_action audit upsert fails (e.g. transient
+    PostgREST/connection error). select + the conditional-claim update
+    behave exactly like the base stub; only upsert raises.
+    """
+
+    def execute(self):
+        if self._op == 'upsert':
+            # Record the attempt so the test can assert it was tried.
+            self.calls.append({
+                'table': self._table, 'op': 'upsert',
+                'upsert_rows': self._upsert_rows,
+                'upsert_kwargs': self._upsert_kwargs,
+            })
+            raise RuntimeError('simulated audit-row write failure')
+        return super().execute()
+
+
+class AuditWriteFailureTest(_LarryActionBase):
+    """#31: if the audit-row write raises AFTER the envelope is delivered and
+    read_at is claimed, the handler must NOT release the claim (releasing would
+    let a retry re-deliver the already-delivered envelope = double-delivery).
+    Instead it logs loudly, keeps the claim, and returns success with
+    audit_persisted=False so the audit gap is visible in-band."""
+
+    def setUp(self):
+        super().setUp()
+        # Swap the base stub for one whose upsert raises.
+        self.client_stub = _AuditUpsertFailsClient()
+        da._get_larry_action_supabase_client = lambda: self.client_stub  # type: ignore[assignment]
+        # Capture the audit-gap alert instead of hitting the real DM/cooldown
+        # path. The handler does `import larry_alerts; larry_alerts.append_alert`
+        # so patch the attribute on the imported module.
+        import larry_alerts
+        self._larry_alerts = larry_alerts
+        self._orig_append_alert = larry_alerts.append_alert
+        self.alerts: list[dict[str, Any]] = []
+        larry_alerts.append_alert = lambda **kw: (self.alerts.append(kw) or True)
+
+    def tearDown(self):
+        self._larry_alerts.append_alert = self._orig_append_alert
+        super().tearDown()
+
+    def test_audit_failure_keeps_claim_and_returns_success(self):
+        self._seed(
+            event_id='ev-audit-fail',
+            task_id='task-audit-fail',
+            event_type='approval_request',
+            payload={
+                'proposing_agent': 'beacon',
+                'target_agent': 'forge',
+                'prompt': 'Forge should X.',
+            },
+            read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action',
+            headers=AUTH,
+            json={'source_event_id': 'ev-audit-fail', 'action': 'approve'},
+        )
+        # Action succeeded — the envelope IS the action and it landed.
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        expected = self.tmp / 'inboxes' / 'beacon' / 'larry-approval-ev-audit-fail.json'
+        # Compare resolved paths — the handler resolves the envelope path, and
+        # on macOS /tmp is a symlink to /private/tmp.
+        self.assertEqual(Path(body['envelope_written']).resolve(), expected.resolve())
+        self.assertTrue(expected.exists(), 'envelope was delivered')
+
+        # Audit gap surfaced in-band, not as an opaque 500.
+        self.assertFalse(body['audit_persisted'])
+        self.assertIn('audit_error', body)
+        self.assertIsNone(body['action_event_id'])
+
+        # The upsert WAS attempted (and raised).
+        upserts = [c for c in self.client_stub.calls if c['op'] == 'upsert']
+        self.assertEqual(len(upserts), 1)
+
+        # CRITICAL: read_at claim was NOT released. The row stays claimed so a
+        # retry can't re-deliver the envelope.
+        row = self.client_stub.rows_by_event_id['ev-audit-fail']
+        self.assertIsNotNone(row['read_at'], 'claim must be kept, not released')
+        # No release-to-NULL update was issued.
+        null_releases = [
+            c for c in self.client_stub.calls
+            if c['op'] == 'update'
+            and (c['update_values'] or {}).get('read_at') is None
+            and c['filters'].get('event_id') == 'ev-audit-fail'
+        ]
+        self.assertEqual(null_releases, [], 'claim must not be released')
+
+        # The audit gap raised a real operator alert (not just a log line).
+        self.assertEqual(len(self.alerts), 1)
+        alert = self.alerts[0]
+        self.assertEqual(alert['severity'], 'critical')
+        self.assertIn('ev-audit-fail', alert['subject'])
+        self.assertIn('NO audit row', alert['message'])
+
+    def test_retry_after_audit_failure_409s_no_double_delivery(self):
+        """Because the claim is kept, a retry hits the already-acted-on 409 —
+        proving the envelope is delivered AT MOST ONCE."""
+        self._seed(
+            event_id='ev-audit-fail-2',
+            task_id='task-audit-fail-2',
+            event_type='approval_request',
+            payload={
+                'proposing_agent': 'beacon',
+                'target_agent': 'forge',
+                'prompt': 'Forge should X.',
+            },
+            read_at=None,
+        )
+        first = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-audit-fail-2', 'action': 'approve'},
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertFalse(first.json()['audit_persisted'])
+        envelope = self.tmp / 'inboxes' / 'beacon' / 'larry-approval-ev-audit-fail-2.json'
+        mtime_after_first = envelope.stat().st_mtime_ns
+
+        # Operator retries the same action.
+        second = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-audit-fail-2', 'action': 'approve'},
+        )
+        self.assertEqual(second.status_code, 409, second.text)
+        # Envelope untouched by the retry (no re-delivery / no re-write).
+        self.assertEqual(envelope.stat().st_mtime_ns, mtime_after_first)
+
+
 if __name__ == '__main__':
     unittest.main()

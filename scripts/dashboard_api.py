@@ -500,9 +500,19 @@ class LarryActionRequest(BaseModel):
 
 
 class LarryActionResponse(BaseModel):
-    action_event_id: str
+    # None when the action executed but its audit row could not be written
+    # (audit #31: best-effort audit, see _handle_larry_action). audit_persisted
+    # is then False and audit_error carries the cause.
+    action_event_id: Optional[str]
     envelope_written: Optional[str]
     target_agent: Optional[str]
+    # Audit #31: False when the side effect (envelope delivery / medic
+    # reconcile) succeeded but the larry_action audit-row write failed. The
+    # read_at claim is deliberately KEPT in that case (a retry must not
+    # re-deliver the envelope), so the action is reported as a success with the
+    # audit gap surfaced in-band rather than as an opaque 500.
+    audit_persisted: bool = True
+    audit_error: Optional[str] = None
     # Set only for decisions reconciled directly by the dashboard (Medic
     # silence): 'unsilenced' | 'unsilence-noop' | 'kept-silenced' | an error
     # tag. None for the normal envelope-routed actions.
@@ -2823,46 +2833,79 @@ def _handle_larry_action(
 
     # Insert the larry_action audit row. Top-level `actor` column per
     # migration 0006; payload mirrors spec § 5.2 verbatim.
-    compute_event_id, sanitize_payload = _import_chain_event_helpers()
+    #
+    # Audit #31 (2026-06-05): the side effect above (envelope delivery / medic
+    # reconcile) IS the action and is already irreversible by the time we reach
+    # here — read_at is flipped NULL→ts and, for non-mark_done, the envelope is
+    # in the agent inbox. The audit row is a RECORD of that action, not part of
+    # performing it. So we DELIBERATELY do NOT release the read_at claim if the
+    # audit write fails: releasing it would let an operator retry re-deliver the
+    # already-delivered envelope (double-delivery → the agent runs the approved
+    # action twice; cf. the PR-E paid-re-run hazard), which is strictly worse
+    # than a logged audit gap. Instead the audit write is best-effort: on
+    # failure we log loudly and return success with audit_persisted=False +
+    # audit_error so the gap is visible in-band (and the action — which truly
+    # happened — is reported as such rather than surfacing an opaque 500 that
+    # would 409 on retry with no record of what landed).
     source_task_id = source.get('task_id')
-    action_payload = {
-        'source_event_id': source_event_id,
-        'source_event_type': source.get('event_type'),
-        'action': action,
-        'comment': comment,
-        'envelope_written': envelope_written,
-        'target_agent': target_agent,
-    }
-    # Direct-reconcile decisions (Medic silence) record their outcome
-    # (unsilenced / kept-silenced / …) + fingerprint in the audit row.
-    if reconcile_detail:
-        action_payload.update(reconcile_detail)
-    # Audit #58: key the audit id on source_event_id too, so two distinct
-    # larry_actions on different source events sharing a task_id in the same
-    # microsecond produce distinct ids rather than silently dropping one row
-    # via ignore_duplicates.
-    action_event_id = compute_event_id(
-        source_task_id, 'larry_action', ts_iso, extra=source_event_id,
-    )
-    row: dict[str, Any] = {
-        'event_id': action_event_id,
-        'ts': ts_iso,
-        'agent': 'dashboard',
-        'event_type': 'larry_action',
-        'actor': actor,
-        'payload': sanitize_payload(action_payload),
-    }
-    if source_task_id:
-        row['task_id'] = source_task_id
-    supabase_client.table('chain_events').upsert(
-        [row], on_conflict='event_id', ignore_duplicates=True,
-    ).execute()
+    audit_persisted = True
+    audit_error: Optional[str] = None
+    action_event_id: Optional[str] = None
+    try:
+        compute_event_id, sanitize_payload = _import_chain_event_helpers()
+        action_payload = {
+            'source_event_id': source_event_id,
+            'source_event_type': source.get('event_type'),
+            'action': action,
+            'comment': comment,
+            'envelope_written': envelope_written,
+            'target_agent': target_agent,
+        }
+        # Direct-reconcile decisions (Medic silence) record their outcome
+        # (unsilenced / kept-silenced / …) + fingerprint in the audit row.
+        if reconcile_detail:
+            action_payload.update(reconcile_detail)
+        # Audit #58: key the audit id on source_event_id too, so two distinct
+        # larry_actions on different source events sharing a task_id in the same
+        # microsecond produce distinct ids rather than silently dropping one row
+        # via ignore_duplicates.
+        action_event_id = compute_event_id(
+            source_task_id, 'larry_action', ts_iso, extra=source_event_id,
+        )
+        row: dict[str, Any] = {
+            'event_id': action_event_id,
+            'ts': ts_iso,
+            'agent': 'dashboard',
+            'event_type': 'larry_action',
+            'actor': actor,
+            'payload': sanitize_payload(action_payload),
+        }
+        if source_task_id:
+            row['task_id'] = source_task_id
+        supabase_client.table('chain_events').upsert(
+            [row], on_conflict='event_id', ignore_duplicates=True,
+        ).execute()
+    except Exception as exc:  # noqa: BLE001 — best-effort audit; keep the claim
+        audit_persisted = False
+        audit_error = str(exc)
+        action_event_id = None
+        logger.exception(
+            'larry_action AUDIT GAP: action executed but audit-row write '
+            'failed for source event %s (action=%s, actor=%s, '
+            'envelope_written=%s, target_agent=%s). read_at claim is KEPT to '
+            'prevent envelope double-delivery on retry; this action has no '
+            'audit row.',
+            source_event_id, action, actor, envelope_written, target_agent,
+        )
 
     result = {
         'action_event_id': action_event_id,
         'envelope_written': envelope_written,
         'target_agent': target_agent,
+        'audit_persisted': audit_persisted,
     }
+    if audit_error is not None:
+        result['audit_error'] = audit_error
     if reconcile_detail:
         result['medic_reconcile'] = reconcile_detail['medic_reconcile']
     return result
@@ -3187,14 +3230,53 @@ def _handle_cleanup_review(
         ))
         backup_path = str(bpath)
 
+        # Audit #32 (2026-06-05): the clears are batched in chunks of 200
+        # because a single .in_(all_ids) would blow the PostgREST URL length,
+        # and PostgREST gives us no client-side transaction (there is no
+        # cleanup RPC in the schema). So a mid-loop .execute() failure leaves
+        # EARLIER chunks already cleared in the DB while the exception aborts
+        # the handler — previously surfacing as an opaque HTTP 500 that dropped
+        # the success payload, so the operator never learned which rows were
+        # cleared or where the (single, written-up-front) backup lives. We
+        # track cleared event_ids incrementally and, on failure, raise an
+        # HTTPException whose detail carries the backup_path + the cleared-so-
+        # far list so the read_at -> NULL reversal is recoverable. (The backup
+        # already contains ALL intended rows; reversing the uncleared ones is a
+        # harmless no-op since their read_at is still NULL.)
         ids = [r['event_id'] for r in rows if r.get('event_id')]
+        cleared_event_ids: list[str] = []
         for i in range(0, len(ids), 200):
-            supabase_client.table('chain_events').update(
-                {'read_at': ts_iso}
-            ).in_('event_id', ids[i:i + 200]).execute()
+            chunk = ids[i:i + 200]
+            try:
+                supabase_client.table('chain_events').update(
+                    {'read_at': ts_iso}
+                ).in_('event_id', chunk).execute()
+            except Exception as exc:  # noqa: BLE001 — surface partial progress
+                logger.exception(
+                    'cleanup-review PARTIAL CLEAR: chunk %d failed after %d/%d '
+                    'rows cleared; backup at %s',
+                    i // 200, len(cleared_event_ids), len(ids), backup_path,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail={
+                        'error': 'cleanup-review partial clear',
+                        'message': str(exc),
+                        'backup_path': backup_path,
+                        'cleared_event_ids': cleared_event_ids,
+                        'cleared_count': len(cleared_event_ids),
+                        'total_to_clear': len(ids),
+                    },
+                ) from exc
+            cleared_event_ids.extend(chunk)
 
+        # task_ids for the success payload, derived only from rows we actually
+        # cleared (every chunk succeeded if we reach here).
+        cleared_set = set(cleared_event_ids)
         seen: set[str] = set()
         for r, _why in to_clear:
+            if r.get('event_id') not in cleared_set:
+                continue
             tid = r.get('task_id')
             if tid and tid not in seen:
                 seen.add(tid)

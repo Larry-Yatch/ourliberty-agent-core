@@ -357,5 +357,84 @@ class TriageTest(_CleanupReviewBase):
         self.assertEqual(body['cleared'], [])
 
 
+# ---------- audit #32: mid-loop clear failure surfaces partial progress ----
+
+class _FailOnNthUpdateSupabase(_FakeSupabase):
+    """Fake supabase whose Nth (1-based) update .execute() raises.
+
+    Earlier update chunks mutate rows normally (so the test can observe that
+    those rows were really cleared in the DB); the failing chunk raises before
+    mutating, modelling a mid-loop PostgREST error.
+    """
+
+    def __init__(self, rows, fail_on_update=2):
+        super().__init__(rows)
+        self._fail_on_update = fail_on_update
+
+    def execute(self):
+        if self._op == 'update':
+            # update_calls is appended inside the parent's execute(); count the
+            # update we are ABOUT to perform.
+            if len(self.update_calls) + 1 == self._fail_on_update:
+                raise RuntimeError('simulated mid-loop clear failure')
+        return super().execute()
+
+
+class PartialClearFailureTest(_CleanupReviewBase):
+    """#32: the clears are batched in chunks of 200 with no transaction. If a
+    later chunk fails, earlier chunks are already cleared in the DB. The
+    handler must surface the backup_path + cleared-so-far list (instead of an
+    opaque 500 that drops the success payload) so the read_at -> NULL reversal
+    is recoverable."""
+
+    def _install_failing_client(self, rows, fail_on_update=2):
+        self.client = _FailOnNthUpdateSupabase(rows, fail_on_update=fail_on_update)
+        da._get_larry_action_supabase_client = lambda: self.client  # type: ignore[assignment]
+
+    def test_midloop_failure_surfaces_backup_and_cleared_list(self):
+        # 250 MOCK rows (task_id 'real-*' => MOCK => auto-clear) => two chunks
+        # of 200 + 50. The 2nd chunk's UPDATE raises.
+        rows = [
+            {'event_id': f'ev-{i:04d}', 'event_type': 'approval_request',
+             'task_id': f'real-pf-{i}', 'ts': '2026-06-01T00:00:00+00:00',
+             'read_at': None}
+            for i in range(250)
+        ]
+        self._install_failing_client(rows, fail_on_update=2)
+        self._write_beacon()
+
+        r = self.c.post('/api/larry/cleanup-review', headers=AUTH)
+        self.assertEqual(r.status_code, 500, r.text)
+        detail = r.json()['detail']
+        self.assertEqual(detail['error'], 'cleanup-review partial clear')
+
+        # backup_path is surfaced AND points at a real file holding ALL rows,
+        # so the operator can reverse read_at -> NULL.
+        self.assertIsNotNone(detail['backup_path'])
+        backup = json.loads(Path(detail['backup_path']).read_text())
+        self.assertEqual(len(backup['rows']), 250)
+        self.assertEqual(backup['triggered_by'], ALLOWED_ACTOR)
+
+        # cleared-so-far reflects exactly the first chunk (200 rows).
+        self.assertEqual(detail['cleared_count'], 200)
+        self.assertEqual(len(detail['cleared_event_ids']), 200)
+        self.assertEqual(detail['total_to_clear'], 250)
+        self.assertEqual(
+            set(detail['cleared_event_ids']),
+            {f'ev-{i:04d}' for i in range(200)},
+        )
+
+        # The DB state matches the report: the first 200 rows really were
+        # cleared (read_at flipped) and the last 50 were not.
+        by_id = {row['event_id']: row for row in self.client.rows}
+        self.assertIsNotNone(by_id['ev-0000']['read_at'])
+        self.assertIsNotNone(by_id['ev-0199']['read_at'])
+        self.assertIsNone(by_id['ev-0200']['read_at'])
+        self.assertIsNone(by_id['ev-0249']['read_at'])
+
+        # Only one chunk committed (the second raised before mutating).
+        self.assertEqual(len(self.client.update_calls), 1)
+
+
 if __name__ == '__main__':
     unittest.main()
