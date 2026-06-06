@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 1058 — 2026-06-06 07:12 UTC (interactive, Tier 2→3 DE-ESCALATION)
+
+**Health:** ✅ **Nominal. Tier 2→3 de-escalation fires this iter (consecutive_clean=2→3). 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. 0 open PRs.**
+
+Alert watermark: **1420 lines / 2026-06-06T06:40:34Z** (auto-restarted:ourliberty-beacon-bot.service) — unchanged from iter 1057. Session-start gitStatus: branch=main, tree=clean, HEAD=ee0fd9f "Pulse cycle 20260606T065935Z" (automated cycles between iter 1057 and this interactive session committed cleanly). Tier at start: tier=2, consecutive_clean=2, last_signal_at=2026-06-06T06:05:27Z. Sync: status=no-change, last_sync=2026-06-06T06:52:06Z (~20 min at scan; within 2h threshold). Pipeline-stall heartbeat: 2026-06-06T07:07:19Z (~5 min at scan; ✅). Stale-daemon heartbeat: 2026-06-06T07:10:32Z (~2 min at scan; ✅ very fresh). Tier state at end: **tier=3, consecutive_clean=0** (de-escalated from Tier 2; system now runs at 30-min cadence).
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1420 / 2026-06-06T06:40:34Z (same as iter 1057). No new entries in larry-alerts.jsonl. → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1419 (route=digest, auto-restarted:ourliberty-beacon-bot.service, 06:45:34Z UTC) — confirmed via log tail. No new Larry directives. Last Larry directive: 04:35Z UTC June 6 (Larry→Beacon "go" for PR #393 build). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-06T07:07:19Z (~5 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-06T07:10:32Z (~2 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** Session-start gitStatus: branch=main, tree=clean, HEAD=ee0fd9f "Pulse cycle 20260606T065935Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-06T06:52:06Z (~20 min at scan; within 2h threshold). No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Periodic checks (Saturday June 6 UTC):** Check I (Sunday only → skip). Check III (last 2026-05-31, ~6d ago; <14d threshold → skip; also requires Sunday gate). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark unchanged (1420 / 06:40:34Z). 0 new unreviewed-merge alerts this iter. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: No new auto-restarted alerts (watermark unchanged). Forge brief still missing. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence since 06:00:11Z (iter 1052). G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change, no new failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): No new occurrence (no PRs to merge). Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no auto-fix actions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gates (all skipped, Saturday UTC).
+2. Check 0: 0 new alerts. Watermark unchanged at 1420 / 06:40:34Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync nominal, 0 open PRs.
+4. `python3 scripts/cycle_tier_state.py record --checks-clean true` → **tier promoted 2→3**, consecutive_clean=0, last_updated=07:12:21Z.
+5. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** 3 consecutive clean Tier-2 iters (1056, 1057, 1058) → Tier 3 de-escalation fires. System now on 30-min cadence. Three standing yellow escalations continue awaiting Larry's `go:` replies in Telegram — none blocking operations.
+
+**Learned:** Nothing new. System steady-state, de-escalating to 30-min cadence as expected.
+
+---
+
 ## Iteration 1057 — 2026-06-06 06:57 UTC (interactive, Tier 2 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 2, consecutive_clean=1→2. 1 new alert (Tier 3 by-design). All other checks clean. 10/10 services active (beacon-bot auto-restarted post-PR #394; now running updated code). All inboxes empty. Heartbeats fresh. Sync nominal. 0 open PRs.**
