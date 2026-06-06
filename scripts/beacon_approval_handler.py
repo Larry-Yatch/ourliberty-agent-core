@@ -576,18 +576,47 @@ def _is_graduation_entry(entry: dict[str, Any]) -> bool:
     return isinstance(payload, dict) and payload.get('kind') == 'graduation'
 
 
+def _is_operator_dispatchable(entry: dict[str, Any]) -> bool:
+    """True iff a bare `approve` / `modify` / `reject` may resolve this entry.
+
+    Seam audit H2: this queue is shared by three producers — the bot (entries
+    Larry was DMed an approve-grammar prompt for), Phase-C graduations, and the
+    direction-ask healer (heal_unregistered_approval), which promotes stranded
+    alerts to the Approvals *tab*. Only the bot's entries are "operator
+    bare-approvable"; the others are resolved by their own explicit route (a
+    graduation by `approve graduation <template>`, a healer/dashboard-routed
+    entry by id from the tab buttons). Without this gate a healer tick that
+    appends a newer entry would steal a bare `approve` Larry meant for the
+    plan he was DMed about, dispatching the wrong card.
+
+    A bare-approve is allowed UNLESS the entry is a graduation OR its
+    dispatch_payload is explicitly stamped ``bare_approvable: False`` by a
+    non-operator producer. Entries with no such marker (every pre-existing bot
+    entry) stay dispatchable — backward compatible by construction.
+    """
+    if _is_graduation_entry(entry):
+        return False
+    payload = entry.get('dispatch_payload')
+    if isinstance(payload, dict) and payload.get('bare_approvable') is False:
+        return False
+    return True
+
+
 def most_recent_pending(state: Optional[dict[str, Any]] = None) -> Optional[dict[str, Any]]:
     """Return the most-recently-created pending entry, or None.
 
     Ignores entries that were queued during pause (they shouldn't be approved
     by a `/resume` follow-up unless the user picks them by id). Also EXCLUDES
-    graduation entries (Phase C): a bare `approve` must never grant Pulse new
-    autonomy — a graduation is resolved only by `approve graduation <template>`.
+    entries that aren't operator bare-approvable (see
+    :func:`_is_operator_dispatchable`): a bare `approve` must never grant Pulse
+    new autonomy (graduations are resolved only by `approve graduation
+    <template>`) nor dispatch a healer/dashboard-routed card Larry was not DMed
+    an approve-grammar prompt for (seam audit H2).
     """
     s = state if state is not None else load_state()
     pending = [e for e in s.get('pending', [])
                if not e.get('queued_during_pause')
-               and not _is_graduation_entry(e)]
+               and _is_operator_dispatchable(e)]
     if not pending:
         return None
     return max(pending, key=lambda e: e.get('created_at', ''))

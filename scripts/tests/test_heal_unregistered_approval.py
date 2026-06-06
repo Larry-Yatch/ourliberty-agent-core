@@ -150,6 +150,19 @@ class BuildPayloadTest(unittest.TestCase):
         for field in approval.REQUIRED_FIELDS['approval_request']:
             self.assertIn(field, payload)
 
+    def test_payload_is_not_bare_approvable(self):
+        """Seam audit H2: a promoted card is healer/dashboard-routed, so its
+        payload must carry bare_approvable=False (and origin) — that is the
+        stamp beacon_approval_handler.most_recent_pending filters on so a bare
+        `approve` never dispatches this card to the wrong target."""
+        key = h.alert_dedup_key(DEPLOY_NOTIFIER_ALERT)
+        payload = h.build_approval_payload(DEPLOY_NOTIFIER_ALERT, key)
+        self.assertIs(payload['bare_approvable'], False)
+        self.assertEqual(payload['origin'], h.HEALER_SOURCE)
+        # and the queue owner agrees this entry is not operator-dispatchable
+        self.assertFalse(
+            approval._is_operator_dispatchable({'dispatch_payload': payload}))
+
     def test_unparseable_falls_back_to_needs_triage(self):
         rec = dict(DEPLOY_NOTIFIER_ALERT,
                    suggested_action='Reply with your decision')
@@ -776,6 +789,70 @@ class ClearResolvedByTaskIdTest(unittest.TestCase):
     def test_no_task_ids_is_noop(self):
         import heal_stale_approvals as stale
         self.assertEqual(stale.clear_resolved_by_task_id(None, [], now=NOW), 0)
+
+
+class PromoteRaceTest(unittest.TestCase):
+    """Seam audit L2: the promote pass re-checks is_already_registered against a
+    FRESH load_state() under the shared lock before appending. A real
+    APPROVAL_REQUEST Beacon registers between the tick's lock-free snapshot and
+    the append must NOT be duplicated into a second card."""
+
+    def _drive_main(self, snapshot_state, fresh_state):
+        """Run h.main() with the slow/external collaborators stubbed, driving
+        the promote loop with one to-promote payload and a controlled
+        snapshot→fresh load_state() sequence. Returns the patched add_pending
+        mock so the caller can assert whether the append happened."""
+        import contextlib
+        key = h.alert_dedup_key(DEPLOY_NOTIFIER_ALERT)
+        payload = h.build_approval_payload(DEPLOY_NOTIFIER_ALERT, key)
+        payload['_source_ts'] = DEPLOY_NOTIFIER_ALERT['ts']
+        add_pending = mock.MagicMock(return_value={'id': payload['task_id']})
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=DEFAULT_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts',
+                               return_value=[DEPLOY_NOTIFIER_ALERT]), \
+             mock.patch.object(h, 'load_promoted', return_value={}), \
+             mock.patch.object(h, 'save_promoted'), \
+             mock.patch.object(h, 'reconcile_retire', return_value=([], {})), \
+             mock.patch.object(h, 'evaluate', return_value=[payload]), \
+             mock.patch.object(h, '_chat_id', return_value=None), \
+             mock.patch.object(h, 'emit_approval_event', return_value=True), \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'save_state'), \
+             mock.patch.object(approval, 'add_pending', new=add_pending), \
+             mock.patch.object(approval, 'load_state',
+                               side_effect=[snapshot_state, fresh_state]):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        return add_pending
+
+    def test_concurrent_registration_skips_duplicate_append(self):
+        key = h.alert_dedup_key(DEPLOY_NOTIFIER_ALERT)
+        # snapshot (top of tick): empty -> evaluate decides "promote it".
+        snapshot = {'pending': [], 'history': []}
+        # fresh (re-loaded inside the lock): Beacon already registered the REAL
+        # APPROVAL_REQUEST for the same decision (subject collision guard hits).
+        fresh = {'pending': [{'id': 'beacon-real-001',
+                              'plan_summary': key,
+                              'dispatch_payload': {'target_agent': 'beacon'}}],
+                 'history': []}
+        add_pending = self._drive_main(snapshot, fresh)
+        add_pending.assert_not_called()  # no duplicate card appended
+
+    def test_no_race_appends_once_under_lock(self):
+        # snapshot empty AND fresh still empty -> healer legitimately promotes,
+        # appending exactly once, with state threaded so the lock is held once.
+        snapshot = {'pending': [], 'history': []}
+        fresh = {'pending': [], 'history': []}
+        add_pending = self._drive_main(snapshot, fresh)
+        self.assertEqual(add_pending.call_count, 1)
+        # appended under the held lock: state=fresh passed (own=False), not None
+        _, kwargs = add_pending.call_args
+        self.assertIs(kwargs.get('state'), fresh)
 
 
 if __name__ == '__main__':
