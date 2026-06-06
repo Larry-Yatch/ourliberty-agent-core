@@ -57,6 +57,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from atomic_io import atomic_write_json  # noqa: E402
+
 
 # ---- AGENTS_ROOT + derived paths (env-overridable for test isolation) ----
 
@@ -162,8 +167,7 @@ def _empty_state() -> dict[str, Any]:
 
 def save_state(state: dict[str, Any]) -> None:
     try:
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True))
+        atomic_write_json(STATE_FILE, state, indent=2, sort_keys=True)
     except OSError as e:
         log(f'save_state failed: {e}', 'WARN')
 

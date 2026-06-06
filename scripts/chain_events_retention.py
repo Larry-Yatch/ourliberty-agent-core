@@ -46,6 +46,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from atomic_io import atomic_write_text  # noqa: E402
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'chain-events-retention.log'
@@ -184,8 +189,11 @@ def _archive(rows: list[dict[str, Any]], now: datetime, archive_dir: Path) -> Pa
     archive_dir.mkdir(parents=True, exist_ok=True)
     stamp = now.strftime('%Y%m%dT%H%M%SZ')
     path = archive_dir / f'chain-events-retention-{stamp}.json'
-    with open(path, 'w') as fh:
-        json.dump(rows, fh, indent=2, default=str)
+    # default=str: rows may carry datetime/Decimal from the DB client, which
+    # atomic_write_json can't serialize — render here, then write atomically so
+    # a mid-archive crash can't leave a torn file (preserves the "archive
+    # FIRST → reversible" guarantee before _apply_deletes runs).
+    atomic_write_text(path, json.dumps(rows, indent=2, default=str))
     return path
 
 
