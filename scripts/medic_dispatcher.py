@@ -708,11 +708,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         log('WARN', 'batch write failed; not advancing offset, not invoking operator')
         return 1
 
-    # No-double-record guard: snapshot which fingerprints already have an
-    # 'acted' ledger record BEFORE the operator runs. medic_actions.py writes
-    # its authoritative 'acted' record at action time; any fingerprint that
-    # becomes acted during this run must NOT also get an 'escalated' record
-    # from the dispatcher below (no double-recording for that fingerprint+run).
+    # No-double-record guard: snapshot which fingerprints already have a
+    # VERIFIED-SUCCESS ('acted') ledger record BEFORE the operator runs.
+    # medic_actions.py writes its authoritative 'acted' record at action time;
+    # any fingerprint that becomes acted during this run must NOT also get an
+    # 'escalated' record from the dispatcher below (no double-recording for
+    # that fingerprint+run). acted_fingerprints() counts VERIFIED SUCCESS only:
+    # a restart that ran but did not verify is recorded 'acted-failed', which
+    # is deliberately NOT in this set, so it falls through to the delivery /
+    # escalate-failed gating below instead of being silently skipped as
+    # "handled" (audit M2 -- the first failed restart must still escalate).
     acted_before = medic_ledger.acted_fingerprints()
     # Gate-at-emission: snapshot the queue length so we can read exactly the
     # records the operator appends, and confirm each owned alert actually got

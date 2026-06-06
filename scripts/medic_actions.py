@@ -33,9 +33,12 @@ Each handler, in strict order:
   (e) VERIFIES post-state (`systemctl is-active <unit>` == 'active'); if
       verification fails it returns a FAILURE result -- it does NOT report
       success.
-  (f) records the outcome to the ledger (classification='reversible',
-      outcome='acted' once the action was attempted on the system /
-      'skipped' on any pre-action refusal) with a short notes string.
+  (f) records the outcome to the ledger (classification='reversible';
+      outcome='acted' on a VERIFIED success / 'acted-failed' when the action
+      ran but verification failed / 'skipped' on any pre-action refusal) with
+      a short notes string. Both 'acted' and 'acted-failed' arm the recurrence
+      gate (no retry loop), but only 'acted' is counted as *handled* by the
+      dispatcher -- an 'acted-failed' restart still escalates (audit M2).
 
 Discipline:
 
@@ -298,9 +301,14 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
         verified = (rc == 0 and active_state == 'active')
 
         # (f) record. Once the restart subprocess was invoked an action was
-        # attempted on the system, so we record outcome='acted' regardless of
-        # verification -- this arms the recurrence gate so a failed restart is
-        # NOT retried in a loop. ok reflects verified success only.
+        # attempted on the system, so we arm the recurrence gate either way
+        # (a failed restart is NOT retried in a loop). But we record TWO
+        # distinct outcomes so the marker does not carry two meanings (audit
+        # M2): a VERIFIED success is 'acted' (handled -> dispatcher advances
+        # the cursor); an attempt that ran but did not verify is 'acted-failed'
+        # (still arms has_acted, but is NOT counted by acted_fingerprints, so
+        # the dispatcher does not treat it as handled and instead escalates).
+        # ok reflects verified success only.
         rec_source, rec_subject = _fp_parts(fp)
         if verified:
             notes = f'{action} ok: {target} verified active (rc={rc})'
@@ -312,16 +320,17 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
             return _result(action, target, fp, ok=True, outcome='acted',
                            reason='acted',
                            detail=f'{target} restarted and verified active.')
-        # action ran but did not verify
+        # action ran but did not verify -> 'acted-failed' (arms recurrence gate
+        # but is not counted as handled, so this still escalates).
         reason = 'restart-error' if rc != 0 else 'verify-failed'
         state_str = active_state or 'unknown'
         notes = (f'{action} FAILED: {target} rc={rc} is-active={state_str}')
         medic_ledger.append_record(
             source=rec_source, subject=rec_subject, classification='reversible',
-            outcome='acted', attempt=attempt_int, notes=notes)
+            outcome='acted-failed', attempt=attempt_int, notes=notes)
         _log('WARN', notes)
         return _result(
-            action, target, fp, ok=False, outcome='acted', reason=reason,
+            action, target, fp, ok=False, outcome='acted-failed', reason=reason,
             detail=(f'Restart of {target} ran (rc={rc}) but verification '
                     f'failed (is-active={state_str}). Escalate diagnose-only; '
                     f'do not retry -- the recurrence gate is now armed.'))

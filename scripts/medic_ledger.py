@@ -18,7 +18,7 @@ Record shape:
       "source": "<source>",
       "subject": "<subject or ''>",
       "classification": "reversible|privileged|judgment|unknown",
-      "outcome": "escalated|acted|skipped|escalate-failed",
+      "outcome": "escalated|acted|acted-failed|skipped|escalate-failed",
       "attempt": <int starting at 1>,
       "notes": "<optional short string>"
     }
@@ -53,7 +53,18 @@ LEDGER_FILE = AGENTS_ROOT / 'state' / 'medic-handled-ledger.jsonl'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'medic-dispatcher.log'
 
 VALID_CLASSIFICATIONS = ('reversible', 'privileged', 'judgment', 'unknown')
-VALID_OUTCOMES = ('escalated', 'acted', 'skipped', 'escalate-failed')
+VALID_OUTCOMES = ('escalated', 'acted', 'skipped', 'escalate-failed',
+                  'acted-failed')
+
+# The two outcomes that ARM the one-action-per-fingerprint recurrence gate
+# (has_acted): a verified-success mutation ('acted') AND a mutation that ran
+# but did NOT verify ('acted-failed'). Both mean "Medic already attempted a
+# mutation on this fingerprint; do not retry it in a loop." They are
+# DELIBERATELY split for the dispatcher: only 'acted' (verified success) is
+# counted as *handled* by acted_fingerprints() — a failed restart
+# ('acted-failed') must still flow to the dispatcher's escalate / escalate-
+# failed gating instead of being silently treated as handled (audit M2).
+_RECURRENCE_ARMING_OUTCOMES = ('acted', 'acted-failed')
 
 
 def _log(level: str, msg: str) -> None:
@@ -141,28 +152,40 @@ def escalate_failed_count(fp: str) -> int:
 
 
 def has_acted(fp: str) -> bool:
-    """True if any prior record for this fingerprint has outcome 'acted'.
+    """True if any prior record for this fingerprint has an outcome that arms
+    the recurrence gate -- 'acted' (verified success) OR 'acted-failed' (a
+    mutation that ran but did not verify). See _RECURRENCE_ARMING_OUTCOMES.
 
-    Backs two PR2 guards: medic_actions.py's hard one-action-per-fingerprint
-    gate (refuse a second mutating action on a fingerprint Medic already
-    acted on) and the dispatcher's no-double-record guard. Fail safe:
+    Backs medic_actions.py's hard one-action-per-fingerprint gate: refuse a
+    second mutating action on a fingerprint Medic already attempted, whether or
+    not that attempt verified, so a daemon that re-crashes does not trigger a
+    restart loop. Note this is INTENTIONALLY broader than acted_fingerprints()
+    (which counts verified success only) -- a failed restart must still
+    escalate even though it must not be retried (audit M2). Fail safe:
     missing / malformed file -> False.
     """
     if not isinstance(fp, str) or not fp:
         return False
     for rec in _iter_records():
-        if rec.get('fingerprint') == fp and rec.get('outcome') == 'acted':
+        if rec.get('fingerprint') == fp \
+                and rec.get('outcome') in _RECURRENCE_ARMING_OUTCOMES:
             return True
     return False
 
 
 def acted_fingerprints() -> set:
-    """Set of fingerprints with at least one outcome='acted' record.
+    """Set of fingerprints with at least one outcome='acted' record -- i.e.
+    VERIFIED-SUCCESS mutations only. A failed restart is recorded
+    'acted-failed' (it arms the recurrence gate via has_acted but is NOT a
+    success), so it is deliberately EXCLUDED here.
 
     The dispatcher snapshots this before/after the operator runs so it can
-    skip its own post-record for any fingerprint medic_actions.py recorded
-    as acted during the same run (the action-time record is authoritative).
-    Fail safe: missing / malformed file -> empty set.
+    skip its own post-record for any fingerprint medic_actions.py *successfully*
+    acted on during the same run (the action-time record is authoritative). A
+    failed restart is excluded precisely so the dispatcher does not treat it as
+    handled -- it instead reaches the escalate / escalate-failed gating so the
+    still-down daemon's first failed restart still escalates (audit M2). Fail
+    safe: missing / malformed file -> empty set.
     """
     out: set = set()
     for rec in _iter_records():

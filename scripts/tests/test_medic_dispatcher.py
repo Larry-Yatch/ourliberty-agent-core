@@ -893,6 +893,77 @@ class DeliveryGatingTest(_IsolatedDispatcher):
         self.assertEqual(len(failed),
                          medic_dispatcher.ESCALATE_FAILED_RETRY_LIMIT)
 
+    def test_failed_restart_still_escalates_not_silently_handled(self) -> None:
+        # Audit M2: a reversible-owned daemon restart that ran but did NOT
+        # verify records 'acted-failed' (NOT 'acted'). The dispatcher must NOT
+        # treat that as handled -- with the operator delivering no escalation,
+        # the fingerprint must be recorded 'escalate-failed' and its offset
+        # line HELD for retry, exactly as an undelivered escalation would be.
+        # (Before the fix the failed restart recorded 'acted', the dispatcher's
+        # newly_acted skip swallowed it, and the still-down daemon's first
+        # escalation was silently dropped while the offset advanced.)
+        fp = 'sentinel:inbox-stall:agent-a'
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+
+        def _failed_restart_operator(_batch_path):
+            # Simulate medic_actions.py recording an attempted-but-unverified
+            # restart, then NOT delivering any source='medic' escalation.
+            medic_ledger.append_record(
+                'sentinel', 'inbox-stall:agent-a', 'reversible',
+                'acted-failed', 1, notes='restart ran but did not verify')
+            return 0
+
+        with mock.patch.object(medic_dispatcher, '_invoke_operator',
+                               side_effect=_failed_restart_operator):
+            medic_dispatcher.main([])
+
+        recs = medic_ledger.read_recent(50)
+        outcomes = [r['outcome'] for r in recs if r['fingerprint'] == fp]
+        # The acted-failed row from the operator PLUS a dispatcher
+        # escalate-failed row (the failed restart was NOT treated as handled).
+        self.assertIn('acted-failed', outcomes)
+        self.assertIn('escalate-failed', outcomes)
+        # Offset HELD at 0 -- the still-down daemon's line retries next tick.
+        self.assertEqual(medic_dispatcher._read_offset(), 0)
+
+    def test_failed_restart_that_does_escalate_records_escalated(self) -> None:
+        # Companion to the above: if the operator records 'acted-failed' AND
+        # delivers a diagnose-only escalation (the CLAUDE.md ok=False fallback),
+        # the dispatcher confirms delivery and records 'escalated', advancing.
+        fp = 'sentinel:inbox-stall:agent-a'
+        _write_alerts(medic_dispatcher.ALERTS_FILE, [
+            _alert('sentinel', 'inbox-stall:agent-a'),
+        ])
+
+        def _failed_then_escalating_operator(_batch_path):
+            medic_ledger.append_record(
+                'sentinel', 'inbox-stall:agent-a', 'reversible',
+                'acted-failed', 1, notes='restart ran but did not verify')
+            with open(medic_dispatcher.ALERTS_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'ts': '2026-06-02T00:00:00+00:00',
+                    'source': 'medic',
+                    'kind': 'notification',
+                    'intent': 'medic-diagnosis',
+                    'message': (f'Diagnose-only for fingerprint {fp}. Restart '
+                                'ran but unit did not return to active.'),
+                    'chat_id': 123,
+                }) + '\n')
+            return 0
+
+        with mock.patch.object(medic_dispatcher, '_invoke_operator',
+                               side_effect=_failed_then_escalating_operator):
+            medic_dispatcher.main([])
+
+        recs = medic_ledger.read_recent(50)
+        outcomes = [r['outcome'] for r in recs if r['fingerprint'] == fp]
+        self.assertIn('escalated', outcomes)
+        self.assertNotIn('escalate-failed', outcomes)
+        # Delivered -> offset advances past the line.
+        self.assertEqual(medic_dispatcher._read_offset(), 1)
+
     def test_meta_alert_routes_to_non_owned_source(self) -> None:
         # The real meta-alert helper must write source='medic-dispatcher'
         # (NOT a Medic-owned class) so it cannot loop back into Medic's batch.
