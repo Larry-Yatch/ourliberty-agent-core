@@ -22,6 +22,9 @@ import sys
 import datetime as dt
 from collections import defaultdict
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
+
 PENDING_APPROVALS = "/home/larry/agents/state/beacon-pending-approvals.json"
 MOCK_MARKERS = ("real-", "prod-clr", "prod-fail", "task-cascade", "real-pf")
 # A marker identifies a mock task_id only as a whole leading component, not as a
@@ -205,10 +208,17 @@ def main():
     bpath = os.path.join(args.backup_dir, f"triage-decisions-{stamp}.json")
     json.dump(to_clear, open(bpath, "w"), indent=2, default=str)
     ids = [r["event_id"] for r in to_clear]
-    for i in range(0, len(ids), 200):
-        client.table("chain_events").update({"read_at": now.isoformat()}) \
-            .in_("event_id", ids[i:i + 200]).execute()
-    print(f"\nCleared {len(ids)} STALE+MOCK rows. Backup: {bpath}")
+    try:
+        cleared = chunked_clear(client, "chain_events", ids, {"read_at": now.isoformat()})
+    except ChunkedClearError as e:
+        # PARTIAL clear: the backup holds ALL matched rows, so reversing the
+        # cleared subset (read_at -> NULL) is exact; uncleared rows are still
+        # NULL so reversing them is a harmless no-op.
+        print(f"\nPARTIAL CLEAR: {e.cleared_count}/{e.total} STALE+MOCK rows "
+              f"cleared before failure ({e.cause}).")
+        print(f"Reverse the cleared rows from backup: {bpath}")
+        raise SystemExit(1)
+    print(f"\nCleared {len(cleared)} STALE+MOCK rows. Backup: {bpath}")
     print(f"LEFT untouched: LIVE={len(buckets.get('LIVE', []))}, "
           f"UNCERTAIN={len(buckets.get('UNCERTAIN', []))}")
 

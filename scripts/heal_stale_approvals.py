@@ -55,6 +55,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-stale-approvals.log'
@@ -228,15 +231,17 @@ def _backup(rows: list[dict[str, Any]], now: datetime, backup_dir: Path) -> Path
 
 
 def _apply_clears(client, rows: list[dict[str, Any]], now: datetime) -> int:
+    """Set read_at on every row, batched. Returns the count cleared.
+
+    Delegates to the shared `chunked_clear`, which on a mid-loop chunk failure
+    raises ChunkedClearError carrying the cleared-so-far list. Callers back the
+    rows up FIRST, so that partial state is reversible from the backup."""
     ids = [r['event_id'] for r in rows]
-    iso = now.isoformat()
-    cleared = 0
-    for i in range(0, len(ids), UPDATE_BATCH):
-        chunk = ids[i:i + UPDATE_BATCH]
-        client.table('chain_events').update({'read_at': iso}) \
-            .in_('event_id', chunk).execute()
-        cleared += len(chunk)
-    return cleared
+    cleared = chunked_clear(
+        client, 'chain_events', ids, {'read_at': now.isoformat()},
+        chunk_size=UPDATE_BATCH,
+    )
+    return len(cleared)
 
 
 def clear_resolved_by_task_id(
@@ -263,7 +268,13 @@ def clear_resolved_by_task_id(
     if not rows:
         return 0
     backup_path = _backup(rows, now, backup_dir)
-    cleared = _apply_clears(client, rows, now)
+    try:
+        cleared = _apply_clears(client, rows, now)
+    except ChunkedClearError as e:
+        log(f'PARTIAL clear: {e.cleared_count}/{e.total} retired decision '
+            f'row(s) cleared before failure ({e.cause}); reversible from '
+            f'backup -> {backup_path}', 'ERROR')
+        raise
     log(f'cleared {cleared} retired decision row(s) by task_id; '
         f'backup -> {backup_path}')
     return cleared
@@ -320,7 +331,13 @@ def run_once(
 
     if to_clear and not dry_run:
         backup_path = _backup(to_clear, now, backup_dir)
-        counts['cleared'] = _apply_clears(client, to_clear, now)
+        try:
+            counts['cleared'] = _apply_clears(client, to_clear, now)
+        except ChunkedClearError as e:
+            log(f'PARTIAL clear: {e.cleared_count}/{e.total} resolved decision '
+                f'row(s) cleared before failure ({e.cause}); reversible from '
+                f'backup -> {backup_path}', 'ERROR')
+            raise
         log(f'cleared {counts["cleared"]} resolved decision rows; '
             f'backup -> {backup_path}')
 

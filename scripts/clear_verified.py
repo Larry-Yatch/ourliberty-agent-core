@@ -10,7 +10,11 @@ Supabase connection or mutation (audit #64).
 import argparse
 import json
 import os
+import sys
 import datetime as dt
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
 
 VERIFIED_DONE = {
     "build-sequence-orchestrator-pr-s3a-droplet-api-endpoint",
@@ -62,10 +66,18 @@ def main() -> int:
         json.dump(rows, f, indent=2, default=str)
 
     ids = [r["event_id"] for r in rows]
-    for i in range(0, len(ids), 200):
-        c.table("chain_events").update({"read_at": now.isoformat()}) \
-            .in_("event_id", ids[i:i + 200]).execute()
-    print(f"Cleared {len(ids)} rows. Backup: {bpath}")
+    try:
+        cleared = chunked_clear(c, "chain_events", ids, {"read_at": now.isoformat()})
+    except ChunkedClearError as e:
+        # PARTIAL clear: earlier chunks are already written. The backup holds
+        # ALL matched rows, so read_at -> NULL for the cleared subset is the
+        # exact reversal; uncleared rows are still NULL (reversing them is a
+        # harmless no-op).
+        print(f"PARTIAL CLEAR: {e.cleared_count}/{e.total} rows cleared before "
+              f"failure ({e.cause}).")
+        print(f"Reverse the cleared rows from backup: {bpath}")
+        return 1
+    print(f"Cleared {len(cleared)} rows. Backup: {bpath}")
     return 0
 
 
