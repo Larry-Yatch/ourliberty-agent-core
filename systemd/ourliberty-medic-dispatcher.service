@@ -1,5 +1,5 @@
 [Unit]
-Description=Ourliberty Medic Dispatcher -- cheap trigger for the Medic alert-operator (PR1 escalate-only)
+Description=Ourliberty Medic Dispatcher -- cheap trigger for the Medic alert-operator (PR2 act-branch, silence-only -- Stage 1)
 Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/docs/medic-operator-brief.md
 After=network-online.target
 Wants=network-online.target
@@ -13,9 +13,17 @@ EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="AGENT=medic"
-# Enable-flag defaults to ON (ships active). To pause Medic without disabling
-# the timer, either touch ~/agents/medic.disabled, touch ~/agents/healers.disabled,
-# or `systemctl edit` this unit and set OURLIBERTY_MEDIC_ENABLED=0.
+# Hard enable-flag for the act-branch; ships ON (active). It has been ON since
+# the PR1 scaffold (the act-branch was held dark by the run_medic.sh prompt, not
+# this flag), so Stage 1 (silence-only) requires no change here -- the flag is
+# already truthy and inherits cleanly to the claude child:
+#   unit env -> medic_dispatcher.py (subprocess.run, no env=) -> run_medic.sh
+#   -> claude --print -> scripts/medic_actions.py:_enable_flag_ok().
+# With Stage 1, Medic auto-silences proven-benign alert CLASSES; auto-restart
+# stays OFF (config/medic-reversible-targets.json restart allowlists are empty).
+# To pause Medic without disabling the timer, either touch ~/agents/medic.disabled,
+# touch ~/agents/healers.disabled, or `systemctl edit` this unit and set
+# OURLIBERTY_MEDIC_ENABLED=0 (every gate is re-checked at action time).
 Environment="OURLIBERTY_MEDIC_ENABLED=1"
 
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/medic_dispatcher.py
