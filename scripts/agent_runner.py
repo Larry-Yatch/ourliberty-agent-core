@@ -38,6 +38,7 @@ def get_manager():
     return _StubTokenManager()
 from concurrency_guard import get_guard, MAX_CONCURRENT
 import active_tier
+from atomic_io import atomic_write_json  # noqa: E402  (shared durable atomic write, PR-E #366)
 
 AGENTS_ROOT = Path.home() / 'agents'
 
@@ -320,7 +321,12 @@ def _mark_paused_on_tier1(task_stem, failure_type, agent_id=None, tier=None):
         if tier:
             marker['tier'] = tier
         data['paused_on_tier1'] = marker
-        target.write_text(json.dumps(data, indent=2))
+        # Atomic replace so a concurrent reader (the same cross-process gate as
+        # _register_in_flight) never sees this read-modify-write half-applied.
+        # Single-writer per task_stem: only this task's run_claude mutates the
+        # file (the resume healer only unlinks it), so atomic replace alone is
+        # sufficient — no exclusive lock needed for the RMW.
+        atomic_write_json(target, data, indent=2)
     except OSError:
         pass
 
@@ -731,9 +737,19 @@ def _register_in_flight(task_stem, agent_id, pid):
         'pid': pid,
         'started_at': datetime.now(timezone.utc).isoformat(),
     }
+    # Atomic temp+fsync+rename: this file is a cross-process "a live worker is
+    # handling this task" gate read by ~20 modules (dispatch_sentinel,
+    # cleanup_stale_worktrees, heal_abandoned_inbox_tasks's has_in_flight_worker,
+    # inbox_watcher orphan reaping, dashboard_api, ...). A raw truncate-write left
+    # a window where a concurrent reader saw a partial file → JSONDecodeError →
+    # "not in flight", risking re-dispatch of a live (paid) task or GC of a live
+    # worktree. atomic_write_json publishes either the intact old or intact new
+    # file, never a torn one. Single-writer per task_stem (only this task's runner
+    # writes its own file; healers/reaper only unlink), so atomic replace is
+    # sufficient — no lock needed. Registration stays best-effort (the DM is the
+    # primary signal); we only harden the success path's durability.
     try:
-        with open(IN_FLIGHT_DIR / f'{task_stem}.json', 'w') as f:
-            json.dump(entry, f, indent=2)
+        atomic_write_json(IN_FLIGHT_DIR / f'{task_stem}.json', entry, indent=2)
     except OSError:
         pass
 
@@ -1815,8 +1831,9 @@ def process_inbox(agent_id):
                 'worktree': worktree_path,
             }
             result_file = outbox / (task_file.stem + '-result.json')
-            with open(result_file, 'w') as f:
-                json.dump(result, f, indent=2)
+            # Atomic write: outbox_notifier polls this file, so a torn read mid-
+            # write would surface a partial/invalid result.
+            atomic_write_json(result_file, result, indent=2)
 
             task_file.unlink()
             log(agent_id, 'Task ' + task_file.name + ' completed (success=' + str(success) + ')')
