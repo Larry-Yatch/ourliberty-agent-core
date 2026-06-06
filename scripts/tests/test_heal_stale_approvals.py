@@ -137,6 +137,47 @@ class _Base(unittest.TestCase):
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
 
 
+# -------------------- root resolution --------------------
+
+class TestAgentsRootResolution(unittest.TestCase):
+    """The approval-state root must resolve like the rest of the pending-approvals
+    trio (handler, heal_unregistered): an EMPTY OURLIBERTY_AGENTS_ROOT falls back
+    to ~/agents, NOT Path('') = cwd (audit L1 trio-consistency follow-up)."""
+
+    def setUp(self):
+        self._saved = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+
+    def tearDown(self):
+        if self._saved is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._saved
+        import heal_stale_approvals as mod
+        importlib.reload(mod)  # restore default-env module state for later tests
+
+    def _reload(self):
+        import heal_stale_approvals as mod
+        return importlib.reload(mod)
+
+    def test_empty_override_falls_back_to_home(self):
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = ''
+        mod = self._reload()
+        expected = Path.home() / 'agents'
+        self.assertEqual(mod.AGENTS_ROOT, expected)
+        self.assertEqual(mod.PENDING_APPROVALS,
+                         expected / 'state' / 'beacon-pending-approvals.json')
+
+    def test_unset_override_falls_back_to_home(self):
+        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        mod = self._reload()
+        self.assertEqual(mod.AGENTS_ROOT, Path.home() / 'agents')
+
+    def test_set_override_is_honored(self):
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = '/tmp/zz-fixture-root'
+        mod = self._reload()
+        self.assertEqual(mod.AGENTS_ROOT, Path('/tmp/zz-fixture-root'))
+
+
 # -------------------- classification --------------------
 
 class TestClassifyApproval(_Base):

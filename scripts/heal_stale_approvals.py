@@ -58,7 +58,13 @@ from typing import Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
 
-AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
+# Resolve the approval-state root identically to the other two modules in the
+# pending-approvals trio (beacon_approval_handler, heal_unregistered_approval):
+# `or`-fallback so an EMPTY OURLIBERTY_AGENTS_ROOT falls through to ~/agents
+# instead of being taken literally as Path('') = cwd. The bare `get(.., default)`
+# form treats '' as set; that was the lone trio outlier left after audit L1.
+# On the droplet Path.home() is /home/larry, so prod resolution is unchanged.
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-stale-approvals.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-stale-approvals.heartbeat'
