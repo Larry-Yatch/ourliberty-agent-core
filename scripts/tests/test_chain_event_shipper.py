@@ -726,5 +726,56 @@ class TestKnownEventTypesContract(unittest.TestCase):
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
 
+# -------------------- pulse cursor atomicity --------------------
+
+class TestSavePulseCursorAtomic(_IsolatedAgentsRoot):
+    """Single-writer crash-atomicity for the pulse cursor file (audit M3 sibling).
+
+    Only the shipper writes PULSE_CURSOR_FILE, so there is no lost-update/lock
+    concern — but a plain write_text could leave a truncated file on a mid-write
+    crash. load_pulse_cursor swallows the resulting JSONDecodeError and returns a
+    default PulseCursor() (mtime=0) → the shipper re-reads the pulse file from the
+    start. The atomic write removes that torn-file window. Mirrors
+    test_chain_cursors_atomic_lock.TestSaveLogCursorsAtomic."""
+
+    def test_round_trips_and_leaves_no_temp(self):
+        ces.save_pulse_cursor(ces.PulseCursor(mtime=123.5, sha256='abc'))
+        loaded = ces.load_pulse_cursor()
+        self.assertEqual(loaded.mtime, 123.5)
+        self.assertEqual(loaded.sha256, 'abc')
+        # No leftover atomic-write temp files alongside the cursor file.
+        state_dir = ces.PULSE_CURSOR_FILE.parent
+        leftovers = [p.name for p in state_dir.iterdir()
+                     if p != ces.PULSE_CURSOR_FILE]
+        self.assertEqual(leftovers, [])
+
+    def test_mid_write_failure_leaves_prior_file_intact(self):
+        # A valid prior cursor the shipper must never lose to a torn half-write.
+        ces.save_pulse_cursor(ces.PulseCursor(mtime=100.0, sha256='good'))
+
+        # Simulate a crash at the publish step (os.replace) of the atomic write.
+        orig_replace = ces.atomic_io.os.replace
+
+        def boom(src, dst):
+            raise OSError('simulated crash before rename')
+
+        ces.atomic_io.os.replace = boom
+        try:
+            # save_pulse_cursor is best-effort and swallows the OSError.
+            ces.save_pulse_cursor(ces.PulseCursor(mtime=999.0, sha256='torn'))
+        finally:
+            ces.atomic_io.os.replace = orig_replace
+
+        # The old cursor is still intact and parseable — never torn → never reset.
+        loaded = ces.load_pulse_cursor()
+        self.assertEqual(loaded.mtime, 100.0)
+        self.assertEqual(loaded.sha256, 'good')
+        # The failed write left no temp file behind.
+        state_dir = ces.PULSE_CURSOR_FILE.parent
+        leftovers = [p.name for p in state_dir.iterdir()
+                     if p != ces.PULSE_CURSOR_FILE]
+        self.assertEqual(leftovers, [])
+
+
 if __name__ == '__main__':
     unittest.main()
