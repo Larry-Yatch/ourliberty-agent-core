@@ -59,7 +59,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -255,24 +254,17 @@ def has_live_dispatch_lease(agent: str) -> bool:
     already >60 min old). A dead/stale watcher leaves the lease past TTL, which
     reads as not-held so recovery proceeds normally.
 
-    READ-ONLY by construction: it inspects the lease file directly and NEVER
-    calls try_acquire — acquiring would trip dispatch_lease's kill-before-reclaim
-    and SIGKILL the live watcher. In dispatch_lease 'off' mode no lease file is
-    written, so this gate is inert and the in-flight/worker gates still apply.
+    READ-ONLY by construction: dispatch_lease.is_held() only inspects the lease
+    file — it NEVER acquires (which would trip kill-before-reclaim and SIGKILL
+    the live watcher), and it does not even mkdir the leases dir. In
+    dispatch_lease 'off' mode no lease file is written, so this gate is inert and
+    the in-flight/worker gates still apply.
 
     Failsafe: any error returns False so a reconciliation hiccup never blocks
     recovery of a genuinely abandoned task."""
     try:
         import dispatch_lease  # local import: optional dependency, failsafe below
-        lease = dispatch_lease._read_lease(
-            dispatch_lease._lease_path(f"inbox:{agent}"))
-        if not lease:
-            return False
-        age = time.time() - lease.get("timestamp_renewed", 0)
-        if age >= dispatch_lease.TTL_SECONDS:
-            return False  # stale -> watcher gone; this is the abandoned case
-        return dispatch_lease._pid_alive_same_boot(
-            lease.get("holder_pid"), lease.get("boot_id", "unknown"))
+        return dispatch_lease.is_held(f"inbox:{agent}")
     except Exception as exc:  # noqa: BLE001 -- never block recovery on error
         log("WARN", f"dispatch-lease check failed for {agent}: {exc}")
         return False
