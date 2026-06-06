@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 1050 — 2026-06-06 05:46 UTC (interactive, Tier 3→1 — CONSERVATIVE RESET)
+
+**Health:** ⚠️ **Tier 3→1 (conservative reset — mass auto-restart burst). 16 new alerts since iter 1049: 8 unreviewed-merge (PRs #384–391), 8 auto-restarted:* (7-service simultaneous burst + 1 inbox-watcher). 0 auto-fixes. 9/9 + dashboard-api active. 0 open PRs. All inboxes empty. Sync fresh. All heartbeats nominal.**
+
+Alert watermark: **1414 lines / 2026-06-06T05:45:20Z** (unreviewed-merge:391). Was 1398 / 05:05:54Z (iter 1049). +16 alerts. Session-start gitStatus: branch=main, tree=clean, HEAD=1c4225c "fix(runner): atomic in-flight registry writes (PR-E2 sibling) (#389)". Tier at start: tier=3, consecutive_clean=2, last_signal_at=02:43:32Z. Sync: status=success, last_sync=2026-06-06T04:51:41Z (~50 min at scan; within 2h threshold). Pipeline-stall heartbeat: 05:28:19Z (✅ ~18 min at scan). Stale-daemon heartbeat: 05:40:19Z (✅ ~6 min at scan). Tier state at end: **tier=1, consecutive_clean=0** (conservative reset for mass-restart burst — see note below).
+
+**Found:**
+
+- **(Check 0) Alert triage: 16 new alerts.**
+  - **8 unreviewed-merge** (PRs #384–391, 05:25Z–05:45Z): Larry-direct merges, no Mirror review. Audit series + related fixes. Per established practice (iter 1049), gate-1 match under `heal-unreviewed-merge-detector` key → Tier-3 known pattern (the `tier: "NOW", never_silence: true` fields govern beacon-bot delivery urgency, not Pulse's Check 0 gate-1 classification). Consecutive count: **49 (PRs #343–#391)**. Actor-exemption-config G-rule pending Larry `go: actor-exemption-config`. No tier-reset per pattern. ✅
+  - **1 auto-restarted:ourliberty-inbox-watcher** (05:10Z): standalone restart. `heal-stale-daemon-code` not in alert-translations.json; per iter 1049 established practice with route=digest → Tier-3 by-design (healer working correctly). No tier-reset per pattern.
+  - **7 auto-restarted mass burst (05:40:23Z–05:40:50Z)**: chain-event-shipper, beacon-bot, forge-bot, mirror-bot, pulse-bot, outbox-notifier, dashboard-api — all restarted within 27 seconds. Root cause: stale-daemon healer detected stale .py file mtimes after PRs #384–#391 merged, and auto-restarted all affected services. Healer working as designed; all 7 services confirmed active post-restart. Per established practice this is Tier-3 by-design — however, this burst of 7 simultaneous restarts is the **largest observed to date** (prior max was 5 at iter 1041). Applied conservative tier-reset for monitoring verification.
+  - **Tier-reset decision note**: Per WARN-vs-INFO calibration, auto-restarted:* with all services back up and route=digest does NOT meet the "worse off if fires 100×" test and should be INFO/Tier-3. The tier-reset here is conservative (new worst burst, 7 simultaneous), not strict-spec-required. Next 3 clean iters will de-escalate naturally back to Tier 2→3.
+  - Watermark advanced: **1414 / 05:45:20Z**. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u ourliberty-*.service --priority warning --since "30 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_sessions.json: 1 active session. All inboxes: Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 05:28:19Z (~18 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Forge=0, Beacon=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 05:40:19Z (~6 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=1c4225c. Sync success at 04:51Z; wrapper-timing gap normal; self-clears on next hourly sync.timer. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=success, last_sync=04:51:41Z (~50 min). No SYNC-PUSH-REBASE-FALLBACK this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 9/9 + dashboard-api active post-restart.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer, chain-event-shipper — all `active`. dashboard-api: `active`. All 7 mass-restarted services confirmed healthy. ✅
+
+- **(Check D/E) Forge inbox / PRs: ✅ All clear.** Forge inbox empty. agent-core: 0 open PRs. ourliberty-dashboard: 0 open PRs. Audit series (PRs #384–391) fully merged and pipeline quiescent. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Periodic checks (Saturday June 6 UTC):** Check I (Monday → Sunday only → skip). Check III (next 2026-06-14). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **G-rule verify-before-reassert:**
+  - `actor=larry-direct-merge`: PRs #384–391 confirmed Larry-direct (8 new unreviewed-merge alerts). **49 consecutive** (PRs #343–#391). G-rule 3/3 dispatched. Pending Larry `go: actor-exemption-config`. ✅ still active.
+  - `auto-restarted:*` untranslated: 8 new occurrences (7 simultaneous = new worst burst). Forge brief missing (G-rule 3/3 dispatched iter 592; Beacon processed iter 594; brief never materialized). Pending Larry `go: redispatch auto-restarted-translation`. ✅ still active.
+  - `sync-push-rebase-fallback-001`: no new occurrence this iter. APPROVAL_REQUEST still open. ✅ carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no new auto-fix actions; mass restart healer-initiated, not Pulse-initiated). No new ledger rows.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate.
+2. Check 0: 16 new alerts triaged. Watermark advanced to **1414 / 05:45:20Z**.
+3. `cycle_tier_state.py record --checks-clean false` → tier 3→1 (conservative reset; mass auto-restart burst). consecutive_clean=0, last_signal_at=05:46:35Z.
+4. Wrote journal entry.
+
+**Escalated:** Nothing new DMed. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 49 consecutive Larry-direct merges (#343–#391). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: 8 new occurrences, largest burst (7 simultaneous at 05:40Z). Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — no new occurrence; still open for root fix.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*) pending Larry.
+
+**Patterns:**
+- PRs #384–391 merged in ~20-min window (05:25Z–05:45Z) — likely an audit-series burst. The 7-service simultaneous restart at 05:40Z is the stale-daemon healer working correctly but at its largest-ever scale. All services healthy post-restart.
+- Pipeline is fully quiescent post-burst: 0 open PRs, 0 inbox tasks, all inboxes empty.
+- Consecutive unreviewed-merge count at 49 (since PR #343). No systemic change — actor-exemption-config remains the single pending fix.
+
+**Learned:** The 7-service simultaneous restart at 05:40Z confirms that a batch of PR merges affecting many .py files triggers a fleet-level healer sweep. This is designed behavior. The Forge brief for auto-restarted:* translation remains the highest-leverage noise-reduction fix available (eliminates routine post-merge alert bursts from the monitoring signal entirely).
+
+---
+
 ## Iteration 1049 — 2026-06-06 05:07 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3 (consecutive_clean=1→2). 3 new Tier-3 alerts (auto-restarted:dashboard-api, review-pass:PR#382, unreviewed-merge:383). 9/9 services active. All inboxes empty. No open PRs. Heartbeats fresh. Sync success.**
