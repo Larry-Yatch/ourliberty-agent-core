@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration 1052 — 2026-06-06 06:06 UTC (interactive, Tier 1 — CHECK-A NON-NOMINAL)
+
+**Health:** ⚠️ **Tier 1 (consecutive_clean=1→0). 4 new Tier-3 alerts. Check A: local repo behind origin by PR #394 (always-fix blocked by interactive permission gate; self-clears on next automated cycle). PRs #393 + #394 both merged (52nd consecutive Larry-direct). cycle.timer stuck-healed at 06:00Z (known pattern). 10/10 services active. All inboxes empty. Concurrent automated cycle detected (cycle.service PID=208665, active/running).**
+
+Alert watermark: **1419 lines / 2026-06-06T06:00:12Z** (unreviewed-merge:393). Was 1415/05:50:16Z (iter 1051). +4 alerts. Session-start gitStatus: branch=main, tree=clean, HEAD=81eb762 "Pulse cycle 20260606T055703Z". Tier at start: tier=1, consecutive_clean=1, last_signal_at=2026-06-06T05:46:35Z. Sync: status=no-change, last_sync=2026-06-06T05:51:56Z (within 2h threshold). Pipeline-stall heartbeat: 05:44:58Z (✅ ~21 min at scan). Stale-daemon heartbeat: 05:40:19Z (✅ ~26 min at scan). Tier state at end: **tier=1, consecutive_clean=0** (Check A non-nominal: behind origin).
+
+**Found:**
+
+- **(Check 0) Alert triage: 4 new Tier-3 alerts.**
+  - `2026-06-06T06:00:09Z content-healed:ourliberty-medic-dispatcher.service` (heal-systemd-install-drift) — install-drift healer re-copied medic-dispatcher.service from repo (drifted after PR #393 merge), daemon-reloaded, restarted. Gate-1 match on `heal-systemd-install-drift`/`content-healed` → **Tier-3 known pattern** (INFO/FYI). No tier-reset. ✅
+  - `2026-06-06T06:00:11Z stuck-timer-healed:ourliberty-cycle.timer` (heal-systemd-install-drift) — cycle.timer entered infinity-trap after daemon-reload; healer recovered (daemon-reload + re-enable). Gate-1 match on `heal-systemd-install-drift`/`stuck-timer-healed` → **Tier-3 known pattern** (INFO/FYI). No tier-reset per § 3.0. Additional instance of `daemon-reload triggers cycle.timer stuck` G-rule (3/3 dispatched iter 848; pending `go: cycle-timer checkpoint`). ✅
+  - `2026-06-06T06:00:12Z unreviewed-merge:394` (heal-unreviewed-merge-detector) — PR #394 "fix(medic): coordinate restart with watchdog/systemd backoff before auto-restart (Stage-2 prereq)" merged by Larry-Yatch (direct, no Mirror review). → **Tier-3 known pattern** (established practice iter 1049; 52nd consecutive). No tier-reset. ✅
+  - `2026-06-06T06:00:12Z unreviewed-merge:393` (heal-unreviewed-merge-detector) — PR #393 "feat(medic): enable PR2 act-branch, silence-only (Stage 1)" merged by Larry-Yatch (direct, no Mirror review). → **Tier-3 known pattern** (51st consecutive). No tier-reset. ✅
+  - Watermark advanced: **1419 / 06:00:12Z**. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last entry 23:50:32 MDT (05:50:32Z UTC, idx=1414 unreviewed-merge:392 delivery). No new Larry directives. Last Larry directive: 04:35Z UTC June 6 (Larry→Beacon "go" for PR #393 build). No Pulse-specific directives since 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 05:44:58Z (~21 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 05:40:19Z (~26 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ⚠️ BEHIND ORIGIN.** Session-start HEAD=81eb762 ("Pulse cycle 20260606T055703Z"). PR #394 ("fix(medic): coordinate restart with watchdog/systemd backoff before auto-restart") merged on origin at 05:57:59Z — after session start. Local is 1 commit behind origin/main. **Always-fix attempted** (`git -C ~/agent-core pull --ff-only`) but **blocked by interactive session permission gate** (git pull not in pre-approved allow-list for interactive sessions). Self-clears on next automated cycle wrapper. → **Non-nominal → tier-reset.** ⚠️
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-06T05:51:56Z (~14 min at scan). Within 2h threshold. No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer, chain-event-shipper, dashboard-api — all systemd `active`. Note: cycle.timer's LAST activation = 06:00:11Z (5 min ago at scan); NEXT=`-` (cycle.service currently running — automated cycle PID=208665). ✅
+
+- **(Check D/E) Inboxes / PRs:**
+  - Inboxes: all 0. ✅
+  - **PR #393 MERGED ✅** — "feat(medic): enable PR2 act-branch, silence-only (Stage 1)" by Larry-Yatch at ~05:56Z. **Iter 1051 watch item CLOSED** (was 17 min old, < 30-min threshold at iter 1051 scan). ✅
+  - **PR #394 MERGED ✅** — "fix(medic): coordinate restart with watchdog/systemd backoff before auto-restart (Stage-2 prereq)" by Larry-Yatch at 05:57:59Z. New since iter 1051 (not visible in session-start git log; merged 2s before session start). 52nd consecutive Larry-direct merge (PRs #343–#394). ✅
+  - agent-core: 0 open PRs. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Periodic checks (Saturday June 6 UTC):** Check I (Sunday only → skip). Check III (last 2026-05-31, ~6d ago; <14d condition not met → skip). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **Concurrent automated cycle detected:** `ourliberty-cycle.service` active/running (PID=208665). cycle.timer was stuck-healed at 06:00:11Z; timer fired, automated cycle started. This interactive session also running from ~05:58Z. Both write to cycle-journal.md (appends; no data loss). Tier-state write-last-wins (atomic). No intervention needed; automated cycle will produce its own journal entry when it completes.
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: PRs #393+#394 confirmed Larry-direct (unreviewed-merge:393+394 at 06:00:12Z). **52 consecutive** (PRs #343–#394). ✅ still active. Pending Larry `go: actor-exemption-config`.
+  - `auto-restarted:*` untranslated: No new `auto-restarted:*` alerts this iter (medic-dispatcher restart used `content-healed:*` subject from install-drift healer, not stale-daemon healer). Forge brief still missing. ✅ carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: NEW OCCURRENCE at 06:00:11Z (install-drift healer daemon-reload → cycle.timer stuck → healer recovered). G-rule 3/3 dispatched iter 848; pending Larry `go: cycle-timer checkpoint`. ✅ still active.
+  - `gh pr merge --auto disabled`: No new occurrence. ✅ carry forward.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001`: No new occurrence. ✅ carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no new ledger rows; always-fix blocked). `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-06T06:05:27Z.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A–E) + credential rotation gate + periodic check gates (all skipped, Saturday UTC).
+2. Check 0: 4 new alerts triaged (all Tier-3). Watermark advanced to **1419 / 06:00:12Z**. No tier-reset from Check 0.
+3. Check A: always-fix `git pull --ff-only` attempted, blocked by interactive permission gate. Noted; self-clears on next automated cycle.
+4. Verified PRs #393 + #394 both merged. Iter 1051 watch item (PR #393 < 30 min) CLOSED.
+5. Verified cycle.timer healed at 06:00:11Z; automated cycle now active (PID=208665). No intervention.
+6. `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0.
+7. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Forge brief never materialized. Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: NEW OCCURRENCE 06:00:11Z (4th evidence instance post-dispatch). Larry: send "go: cycle-timer checkpoint" to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- PRs #393 (Stage 1) + #394 (Stage 2 prereq) both merged within 9 min of each other by Larry-direct. Install-drift healer correctly picked up medic-dispatcher content drift and restarted. This is the expected pattern for a two-PR medic build day.
+- cycle.timer stuck-healed at 06:00:11Z is the latest instance of the `daemon-reload triggers cycle.timer stuck` G-rule. Fix is dispatched (iter 848); Larry needs to send `go: cycle-timer checkpoint` to unblock. Every install-drift daemon-reload will cause this until the fix lands.
+- This interactive session ran concurrently with an automated cycle (PID=208665). Unusual but not harmful — the automated cycle started due to the timer being healed at 06:00:11Z. Future mitigation: `stuck-cycle timeout guard` (APPROVAL_REQUEST pending) would cap the automated cycle if it hangs; `cycle-timer-checkpoint` fix would prevent the stuck-heal→fire→double-cycle race.
+
+**Learned:** The cycle.timer stuck-healed event at 06:00:11Z fired the automated cycle *immediately after healing*, which overlapped with this already-running interactive session. The pattern: install-drift healer fires daemon-reload → cycle.timer stuck → healer heals → timer fires immediately → automated cycle starts. Two concurrent Pulse sessions result. No data corruption (append-only journal, atomic tier-state) but wasteful. The `cycle-timer-checkpoint` fix (pending `go:` from Larry) addresses the stuck-timer half; the concurrent-session-guard is a separate concern.
+
+---
+
 ## Iteration 1051 — 2026-06-06 06:07 UTC (interactive, Tier 1 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 1 (consecutive_clean=0→1). 1 new Tier-3 alert (unreviewed-merge:392, 50th consecutive Larry-direct). All 5 mandatory checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. New PR #393 OPEN (< 30 min, watch item).**
