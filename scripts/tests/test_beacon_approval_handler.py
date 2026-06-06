@@ -224,6 +224,50 @@ class StateCrudTest(unittest.TestCase):
         ah.add_pending(_good_payload(task_id='t-normal'), chat_id=1)
         self.assertEqual(ah.most_recent_pending()['id'], 't-normal')
 
+    def test_most_recent_excludes_healer_promoted(self):
+        """Seam audit H2: a healer/dashboard-routed entry (its dispatch_payload
+        stamped bare_approvable=False) must NEVER be picked by a bare `approve`
+        / most_recent_pending — EVEN when it is the newest pending entry. It is
+        resolved by id from the Approvals tab, not by a bare approve Larry
+        intended for a plan he was actually DMed about."""
+        # genuine operator-DMed entry first, forced OLDER
+        ah.add_pending(_good_payload(task_id='t-operator'), chat_id=1)
+        s = ah.load_state()
+        s['pending'][0]['created_at'] = '2026-05-11T20:00:00Z'
+        ah.save_state(s)
+        # healer promotes a stranded direction-ask LATER (newer created_at)
+        healer = _good_payload(task_id='heal-direction-ask',
+                               target_agent='beacon', bare_approvable=False,
+                               origin='heal-unregistered-approval')
+        ah.add_pending(healer, chat_id=1)
+        # a bare approve resolves the operator entry, NOT the newer healer card
+        recent = ah.most_recent_pending()
+        self.assertEqual(recent['id'], 't-operator')
+
+    def test_most_recent_with_only_healer_promoted_is_none(self):
+        """A healer card alone leaves nothing for a bare approve to dispatch —
+        so a stray `approve` can't fire a healer-promoted card at the wrong
+        target (the H2 dispatch-to-wrong-target bug)."""
+        healer = _good_payload(task_id='heal-direction-ask',
+                               target_agent='beacon', bare_approvable=False)
+        ah.add_pending(healer, chat_id=1)
+        self.assertIsNone(ah.most_recent_pending())
+
+    def test_is_operator_dispatchable(self):
+        # a plain bot entry (no marker) is bare-approvable
+        self.assertTrue(ah._is_operator_dispatchable(
+            {'dispatch_payload': _good_payload(task_id='t')}))
+        # an explicit bare_approvable=False (healer/dashboard) is not
+        self.assertFalse(ah._is_operator_dispatchable(
+            {'dispatch_payload': _good_payload(task_id='t',
+                                               bare_approvable=False)}))
+        # a graduation is not (subsumes the prior graduation exclusion)
+        grad = _good_payload(task_id='g')
+        grad['kind'] = 'graduation'
+        self.assertFalse(ah._is_operator_dispatchable({'dispatch_payload': grad}))
+        # backward compat: an entry with no dispatch_payload stays dispatchable
+        self.assertTrue(ah._is_operator_dispatchable({'id': 'x'}))
+
     def test_find_graduation_pending_exact_template(self):
         grad = _good_payload(task_id='graduation-restart-daemon')
         grad['kind'] = 'graduation'

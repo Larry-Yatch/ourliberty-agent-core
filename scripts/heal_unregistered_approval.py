@@ -637,6 +637,14 @@ def build_approval_payload(
         'prompt': prompt,
         'task_type': 'direction-ask',
         'promoted_from_alert': dedup_key,
+        # Seam audit H2: this is a healer/dashboard-routed card, NOT something
+        # Larry was DMed an approve-grammar prompt for. It reaches the Approvals
+        # tab and is resolved by id via the tab's approve/reject buttons. Stamp
+        # it so the bare-approve path (beacon_approval_handler.most_recent_pending
+        # → _is_operator_dispatchable) never steals a bare `approve` Larry meant
+        # for a genuinely DMed plan and dispatches this card to the wrong target.
+        'origin': HEALER_SOURCE,
+        'bare_approvable': False,
         # Transient: the raw subject, stashed so main() can record it in the
         # promoted ledger (for the retire pass's subject-based signals).
         # Stripped before the payload reaches add_pending / the chain helper.
@@ -874,20 +882,41 @@ def _clear_retired_read_at(task_ids: list[str]) -> int:
 
 # -------------------- registration (side-effectful) --------------------
 
+def _strip_helper_keys(payload: dict[str, Any]) -> Optional[str]:
+    """Pop the transient helper keys in-place and return ``_source_ts``.
+
+    ``_subject`` is dropped (recorded separately in the promoted ledger);
+    ``promoted_from_alert`` stays on the payload so add_pending persists it
+    under dispatch_payload, where the collision guard finds it on later ticks.
+    """
+    source_ts = payload.pop('_source_ts', None)
+    payload.pop('_subject', None)
+    return source_ts
+
+
+def emit_approval_event(payload: dict[str, Any], source_ts: Optional[str]) -> bool:
+    """Slow side of registration: the chain_event tab-feed upsert. Pure-ish
+    network I/O — runs OUTSIDE the shared approval-state lock. Returns True if
+    the upsert succeeded; the pending write is best-effort and not gating."""
+    kwargs = approval.build_approval_request_chain_event(payload, ts=source_ts)
+    return chain_event_emit.emit_event(**kwargs)
+
+
 def register_approval(payload: dict[str, Any], chat_id: Optional[int]) -> bool:
     """Register one approval_request: add_pending (Beacon state) + emit_event
     (the tab feed). Mirrors the bot's force_ask path. Returns True if the
     chain_event upsert succeeded (the tab write); the pending write is
     best-effort and not gating. Strips the internal helper keys before handing
-    the payload to the helpers."""
-    # Transient helper keys are stripped. promoted_from_alert stays on the
-    # payload so add_pending persists it under dispatch_payload, where the
-    # collision guard can find it on later ticks.
-    source_ts = payload.pop('_source_ts', None)
-    payload.pop('_subject', None)
+    the payload to the helpers.
+
+    Takes add_pending's own per-call state lock. `main()` does NOT use this for
+    the promote batch — it holds the lock once around a fresh-reload re-check +
+    add_pending (seam audit L2) and emits via :func:`emit_approval_event`
+    afterwards. Retained for single-shot callers and tests.
+    """
+    source_ts = _strip_helper_keys(payload)
     approval.add_pending(payload, chat_id=chat_id)
-    kwargs = approval.build_approval_request_chain_event(payload, ts=source_ts)
-    return chain_event_emit.emit_event(**kwargs)
+    return emit_approval_event(payload, source_ts)
 
 
 # -------------------- main --------------------
@@ -989,25 +1018,66 @@ def main() -> int:
 
     chat_id = _chat_id()
     promoted_count = 0
-    for payload in to_promote:
-        identity = payload.get('promoted_from_alert', '')
-        subject = payload.get('_subject', identity)
-        task_id = payload['task_id']
+    # Seam audit L2 (symmetric twin of the retire pass / PR-E2 #48): evaluate()'s
+    # is_already_registered check ran against the lock-free `state` snapshot
+    # loaded at the top of this tick. Between that snapshot and the append below,
+    # Beacon can emit the REAL APPROVAL_REQUEST for the same decision (its
+    # add_pending writes under the lock) — and a narrow per-call lock would let
+    # us append a duplicate card. Mirror the retire fix: take the shared lock
+    # ONCE around { fresh load_state() → per-entry is_already_registered re-check
+    # → add_pending(state=fresh) → save_state }, so the dedup check and the
+    # append share one critical section. Keep the SLOW work (the chain_event
+    # tab-feed upsert) OUTSIDE the lock and run it after the batch commits.
+    registered: list[dict[str, Any]] = []
+    with approval.state_lock():
+        fresh = approval.load_state()
+        for payload in to_promote:
+            identity = payload.get('promoted_from_alert', '')
+            subject = payload.get('_subject', identity)
+            task_id = payload['task_id']
+            if is_already_registered(subject, task_id, fresh):
+                # Beacon (or a concurrent healer) registered this decision after
+                # our snapshot; appending now would double the card. Skip — the
+                # real entry stands. Recording nothing in the promoted ledger is
+                # safe: the now-present entry makes is_already_registered short-
+                # circuit on the next tick too.
+                log(f'promote-skip: {task_id} registered concurrently '
+                    f'(identity={identity!r}); not duplicating the card')
+                continue
+            p = dict(payload)
+            source_ts = _strip_helper_keys(p)
+            try:
+                approval.add_pending(p, chat_id=chat_id, state=fresh)
+            except Exception as e:  # noqa: BLE001
+                log(f'add_pending failed for {task_id}: {type(e).__name__}: {e}',
+                    'ERROR')
+                continue
+            registered.append({
+                'payload': p, 'source_ts': source_ts,
+                'identity': identity, 'subject': subject, 'task_id': task_id,
+            })
+        approval.save_state(fresh)
+
+    # Slow side OUTSIDE the lock: the chain_event tab-feed upsert + ledger record.
+    for item in registered:
+        task_id = item['task_id']
+        identity = item['identity']
         try:
-            emitted = register_approval(dict(payload), chat_id)
+            emitted = emit_approval_event(item['payload'], item['source_ts'])
         except Exception as e:  # noqa: BLE001
-            log(f'register failed for {task_id}: {type(e).__name__}: {e}', 'ERROR')
+            log(f'tab-write failed for {task_id}: {type(e).__name__}: {e}', 'ERROR')
             _emit_self_failure(
                 message=(
-                    f'{HEALER_SOURCE} failed to register a promoted '
-                    f'approval_request ({task_id}): {type(e).__name__}: {e}.'
+                    f'{HEALER_SOURCE} registered a promoted approval_request '
+                    f'({task_id}) in Beacon state but the Approvals-tab write '
+                    f'failed: {type(e).__name__}: {e}.'
                 ),
                 suggested_action=(
                     'Check ~/agents/logs/heal-unregistered-approval.log; the '
-                    'stranded direction-ask is still only in larry-alerts.'
+                    'card is pending but may not show on the tab until re-emit.'
                 ),
             )
-            continue
+            emitted = False
         # Record the promotion regardless of the chain_event upsert result:
         # add_pending already registered it in Beacon's state, and the
         # event_id is deterministic over the source ts, so a retry would
@@ -1017,7 +1087,7 @@ def main() -> int:
         # later resolve + clear it without re-deriving from the raw alert.
         promoted[identity] = {
             'task_id': task_id,
-            'subject': subject,
+            'subject': item['subject'],
             'promoted_at': datetime.now(timezone.utc).isoformat(),
         }
         promoted_count += 1
