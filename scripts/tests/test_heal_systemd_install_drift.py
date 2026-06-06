@@ -410,8 +410,22 @@ class JustFiredGuardTest(_IsolatedAgentsRoot):
             [s['unit'] for s in self._detect('')], ['t.timer'])
 
     def test_parse_systemd_timestamp(self):
+        # Audit #23: a recognized zone abbreviation makes the parse tz-AWARE so
+        # the trigger carries its true instant (MDT = UTC-6).
         self.assertEqual(
             h._parse_systemd_timestamp('Mon 2026-06-01 18:00:09 MDT'),
+            datetime(2026, 6, 1, 18, 0, 9,
+                     tzinfo=timezone(timedelta(hours=-6))))
+        self.assertEqual(
+            h._parse_systemd_timestamp('Sun 2026-01-04 03:00:00 MST'),
+            datetime(2026, 1, 4, 3, 0, 0,
+                     tzinfo=timezone(timedelta(hours=-7))))
+        # Unknown / absent zone falls back to naive (prior behavior).
+        self.assertEqual(
+            h._parse_systemd_timestamp('Mon 2026-06-01 18:00:09 XYZ'),
+            datetime(2026, 6, 1, 18, 0, 9))
+        self.assertEqual(
+            h._parse_systemd_timestamp('Mon 2026-06-01 18:00:09'),
             datetime(2026, 6, 1, 18, 0, 9))
         self.assertIsNone(h._parse_systemd_timestamp(''))
         self.assertIsNone(h._parse_systemd_timestamp('n/a'))
@@ -425,6 +439,26 @@ class JustFiredGuardTest(_IsolatedAgentsRoot):
             h._recently_triggered('Mon 2026-06-01 11:00:00 MDT', now=now))
         # Unparseable -> None so the caller can fall back.
         self.assertIsNone(h._recently_triggered('n/a', now=now))
+
+    def test_recently_triggered_dst_spring_forward(self):
+        # Audit #23: at the spring-forward gap the timer fired 30 real seconds
+        # before `now`, but on opposite DST offsets. An absolute (aware)
+        # comparison must read it as JUST FIRED, not ~1h stale.
+        mdt = timezone(timedelta(hours=-6))
+        now = datetime(2026, 3, 8, 3, 0, 0, tzinfo=mdt)  # 09:00:00Z
+        # 01:59:30 MST (-7) == 08:59:30Z -> 30s before now.
+        self.assertTrue(
+            h._recently_triggered('Sun 2026-03-08 01:59:30 MST', now=now))
+
+    def test_recently_triggered_dst_fall_back(self):
+        # At the fall-back fold a full real hour elapsed across repeated
+        # wall-clock; the aware comparison must NOT treat it as just-fired
+        # (naive math would have called it 60s and skipped a wedged timer).
+        mst = timezone(timedelta(hours=-7))
+        # 01:30:00 MDT (-6) == 07:30:00Z; 01:31:00 MST (-7) == 08:31:00Z -> 61m.
+        now = datetime(2026, 11, 1, 1, 31, 0, tzinfo=mst)
+        self.assertFalse(
+            h._recently_triggered('Sun 2026-11-01 01:30:00 MDT', now=now))
 
 
 class SystemctlShowParserTest(_IsolatedAgentsRoot):

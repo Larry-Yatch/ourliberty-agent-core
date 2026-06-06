@@ -296,6 +296,24 @@ def artifact_path_for_date(date_str: str) -> Path:
     return PROPOSALS_DIR / f'check-vii-{date_str}.json'
 
 
+def _persisted_proposal_keys(path: Path) -> set[tuple[Any, Any]]:
+    """The (rule, band) keys already recorded in the artifact at ``path``.
+
+    Used by the content-aware same-day idempotency gate (audit #30). A missing
+    or corrupt artifact yields an empty set, so any fresh proposal counts as
+    new and is (re-)written rather than lost.
+    """
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return set()
+    keys: set[tuple[Any, Any]] = set()
+    for p in data.get('proposals', []):
+        if isinstance(p, dict):
+            keys.add((p.get('rule'), p.get('band')))
+    return keys
+
+
 def build_artifact(result: CheckVIIResult) -> dict[str, Any]:
     return {
         'as_of': result.as_of_iso,
@@ -415,9 +433,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     target_path = artifact_path_for_date(result.anchor_date)
     if (target_path.exists() and not args.force and not args.dry_run
             and result.proposals):
-        log(f'Check VII already wrote an artifact for anchor_date='
-            f'{result.anchor_date}; skipping (use --force to re-run).')
-        return 0
+        # Audit #30: the per-date sentinel was content-blind, so a SECOND
+        # qualifying signal the same calendar day (e.g. a high-band 'remove'
+        # after a low-band 'raise' already wrote the artifact) was silently
+        # skipped and never persisted/DM'd. Skip only when every freshly
+        # computed proposal is already in the persisted artifact (keyed by
+        # rule+band); if new ones appeared, fall through to re-write + DM.
+        persisted = _persisted_proposal_keys(target_path)
+        fresh = {(p.rule, p.band) for p in result.proposals}
+        new_keys = fresh - persisted
+        if not new_keys:
+            log(f'Check VII: no new proposals vs the {result.anchor_date} '
+                f'artifact; skipping (use --force to re-run).')
+            return 0
+        log(f'Check VII: {len(new_keys)} new proposal(s) since the '
+            f'{result.anchor_date} artifact; re-writing + DMing.')
 
     if args.dry_run:
         print(json.dumps(artifact, indent=2))

@@ -76,7 +76,7 @@ class WeeklyReport:
     anomalies: list[dict[str, Any]]
     retry_overhead: dict[str, float]
     top_5_tasks: list[dict[str, Any]]
-    delta_vs_prior_week: Optional[dict[str, float]]
+    delta_vs_prior_week: Optional[dict[str, Any]]
     sigma_flagging_active: bool
     rows: list[CostRow] = field(default_factory=list)
 
@@ -354,9 +354,31 @@ def compute_top_5(rows: list[CostRow]) -> list[dict[str, Any]]:
     ]
 
 
+def _weeks_back_of(
+    sidecar: dict[str, Any], week_ending: datetime
+) -> Optional[int]:
+    """How many whole weeks before ``week_ending`` this sidecar covers.
+
+    Reads the sidecar's own ``week_ending`` field. Returns None when it is
+    absent, unparseable, or not an exact multiple of 7 days back (audit #38).
+    """
+    we = sidecar.get("week_ending")
+    if not we:
+        return None
+    try:
+        prior_we = datetime.fromisoformat(we)
+    except (TypeError, ValueError):
+        return None
+    days = (week_ending.date() - prior_we.date()).days
+    if days <= 0 or days % 7 != 0:
+        return None
+    return days // 7
+
+
 def compute_delta(
-    total_usd: float, prior_sidecar: Optional[dict[str, Any]]
-) -> Optional[dict[str, float]]:
+    total_usd: float, prior_sidecar: Optional[dict[str, Any]],
+    weeks_back: Optional[int] = None,
+) -> Optional[dict[str, Any]]:
     if prior_sidecar is None:
         return None
     prior_total = prior_sidecar.get("total_usd")
@@ -364,7 +386,38 @@ def compute_delta(
         return None
     absolute = total_usd - prior_total
     percent = (absolute / prior_total * 100.0) if prior_total > 0 else 0.0
-    return {"absolute_usd": absolute, "percent": percent}
+    # weeks_back lets callers distinguish a genuine "vs prior week" (1) from a
+    # gapped comparison against an older baseline (≥2 / None) so neither the
+    # label nor the drift alert misrepresents the window (audit #38).
+    return {"absolute_usd": absolute, "percent": percent,
+            "weeks_back": weeks_back}
+
+
+def _delta_window_label(delta: dict[str, Any]) -> str:
+    """Human label for the delta's baseline window (audit #38).
+
+    'prior week' only when the baseline is genuinely last week; otherwise name
+    the real gap so the report never claims 'vs prior week' against an older
+    baseline."""
+    wb = delta.get("weeks_back")
+    if wb == 1:
+        return "prior week"
+    if isinstance(wb, int) and wb >= 2:
+        return f"{wb} weeks ago"
+    return "an earlier week"
+
+
+def _drift_is_real(delta: Optional[dict[str, Any]]) -> bool:
+    """True when the week-over-week drift gate should fire.
+
+    Only a genuine last-week baseline (weeks_back == 1) can be called drift; a
+    gapped comparison against an older week must not trip the anomaly DM/health
+    against the wrong window (audit #38)."""
+    return (
+        delta is not None
+        and delta.get("weeks_back") == 1
+        and abs(delta["percent"]) > DRIFT_PERCENT_THRESHOLD
+    )
 
 
 # --- main report assembly ---
@@ -396,7 +449,15 @@ def compute_weekly_report(
     anomalies = compute_anomalies(rows, baselines, sigma_active, len(prior_sidecars))
     retry_overhead = compute_retry_overhead(rows, total_usd)
     top_5 = compute_top_5(rows)
-    delta = compute_delta(total_usd, prior_sidecars[0] if prior_sidecars else None)
+    # _load_prior_sidecars skips missing/corrupt weeks, so prior_sidecars[0] is
+    # the most-recent EXISTING sidecar — not necessarily last week. Tag the
+    # delta with how many weeks back it actually is (audit #38).
+    prior_for_delta = prior_sidecars[0] if prior_sidecars else None
+    weeks_back = (
+        _weeks_back_of(prior_for_delta, week_ending)
+        if prior_for_delta is not None else None
+    )
+    delta = compute_delta(total_usd, prior_for_delta, weeks_back)
 
     report = WeeklyReport(
         week_ending=week_ending.date().isoformat(),
@@ -437,7 +498,8 @@ def render_markdown(report: WeeklyReport, skipped_rows: int) -> str:
         d = report.delta_vs_prior_week
         sign = "+" if d["absolute_usd"] >= 0 else "−"
         lines.append(
-            f"**Vs prior week:** {sign}${abs(_round2(d['absolute_usd'])):.2f} "
+            f"**Vs {_delta_window_label(d)}:** "
+            f"{sign}${abs(_round2(d['absolute_usd'])):.2f} "
             f"({sign}{abs(_round2(d['percent'])):.1f}%)"
         )
     else:
@@ -525,10 +587,7 @@ def render_dm_headline(report: WeeklyReport, report_path: Path) -> tuple[str, bo
     > DRIFT_PERCENT_THRESHOLD. The ramp-up notice is NOT a real anomaly.
     """
     real_anoms = [a for a in report.anomalies if a["task_id"] != "_ramp_up_notice"]
-    drift_high = (
-        report.delta_vs_prior_week is not None
-        and abs(report.delta_vs_prior_week["percent"]) > DRIFT_PERCENT_THRESHOLD
-    )
+    drift_high = _drift_is_real(report.delta_vs_prior_week)
     is_anomaly = bool(real_anoms) or drift_high
 
     if is_anomaly:
@@ -541,7 +600,10 @@ def render_dm_headline(report: WeeklyReport, report_path: Path) -> tuple[str, bo
         if report.delta_vs_prior_week is not None:
             d = report.delta_vs_prior_week
             sign = "+" if d["absolute_usd"] >= 0 else "−"
-            drift_phrase = f", {sign}{abs(_round2(d['percent'])):.1f}% vs prior week"
+            drift_phrase = (
+                f", {sign}{abs(_round2(d['percent'])):.1f}% "
+                f"vs {_delta_window_label(d)}"
+            )
         msg = (
             f"📒 Week of {report.week_ending}: ${_round2(report.total_usd):.2f} total"
             f"{drift_phrase}. {anom_phrase}. Report: {report_path}"
@@ -598,9 +660,7 @@ def append_journal(
     health = "✅ Nominal"
     if real_anoms:
         health = "🟡 Anomalies"
-    elif report.delta_vs_prior_week is not None and abs(
-        report.delta_vs_prior_week["percent"]
-    ) > DRIFT_PERCENT_THRESHOLD:
+    elif _drift_is_real(report.delta_vs_prior_week):
         health = "🟡 Drift"
     entry = []
     entry.append("")
@@ -613,7 +673,8 @@ def append_journal(
         d = report.delta_vs_prior_week
         sign = "+" if d["absolute_usd"] >= 0 else "−"
         entry.append(
-            f"**Vs prior:** {sign}${abs(_round2(d['absolute_usd'])):.2f} "
+            f"**Vs {_delta_window_label(d)}:** "
+            f"{sign}${abs(_round2(d['absolute_usd'])):.2f} "
             f"({sign}{abs(_round2(d['percent'])):.1f}%)"
         )
     else:
