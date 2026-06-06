@@ -30,6 +30,9 @@ import sys
 import datetime as dt
 from collections import Counter
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
+
 NOISE_TYPES = {"larry_alert", "sentinel_alert", "escalation"}
 DECISION_TYPES = {"approval_request", "clarify_request"}
 
@@ -149,15 +152,19 @@ def main():
         json.dump(to_clear, f, indent=2, default=str)
     print(f"\nBacked up {len(to_clear)} rows -> {backup_path}")
 
-    # Clear in batches.
+    # Clear in batches via the shared helper, which tracks progress and, on a
+    # mid-loop chunk failure, raises ChunkedClearError carrying the cleared-so-
+    # far list. The backup (written above) holds ALL rows, so reversing the
+    # cleared subset is exact and reversing the uncleared ones is a no-op.
     ids = [r["event_id"] for r in to_clear]
-    cleared = 0
-    for i in range(0, len(ids), 200):
-        chunk = ids[i:i + 200]
-        client.table("chain_events").update({"read_at": now.isoformat()}) \
-            .in_("event_id", chunk).execute()
-        cleared += len(chunk)
-        print(f"  cleared {cleared}/{len(ids)}")
+    try:
+        cleared_ids = chunked_clear(client, "chain_events", ids, {"read_at": now.isoformat()})
+    except ChunkedClearError as e:
+        print(f"\nPARTIAL CLEAR: {e.cleared_count}/{e.total} cleared before "
+              f"failure ({e.cause}).")
+        print(f"Reversible from backup: {backup_path}")
+        raise SystemExit(1)
+    cleared = len(cleared_ids)
     print(f"\nDONE. Cleared {cleared}. Remaining pending: {len(rows) - cleared}.")
     print(f"Reversible from backup: {backup_path}")
 

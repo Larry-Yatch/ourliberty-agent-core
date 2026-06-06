@@ -3047,6 +3047,16 @@ def _import_triage_decisions():
     return td
 
 
+def _import_supabase_chunk():
+    """Lazy import of the shared chunked-clear helper (stdlib-only, so it
+    always imports; kept lazy only to share the scripts_dir sys.path setup)."""
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import supabase_chunk  # noqa: PLC0415
+    return supabase_chunk
+
+
 def _beacon_pending_approvals_path(agents_root: Path) -> Path:
     return agents_root / 'state' / 'beacon-pending-approvals.json'
 
@@ -3237,38 +3247,36 @@ def _handle_cleanup_review(
         # EARLIER chunks already cleared in the DB while the exception aborts
         # the handler — previously surfacing as an opaque HTTP 500 that dropped
         # the success payload, so the operator never learned which rows were
-        # cleared or where the (single, written-up-front) backup lives. We
-        # track cleared event_ids incrementally and, on failure, raise an
-        # HTTPException whose detail carries the backup_path + the cleared-so-
-        # far list so the read_at -> NULL reversal is recoverable. (The backup
-        # already contains ALL intended rows; reversing the uncleared ones is a
-        # harmless no-op since their read_at is still NULL.)
+        # cleared or where the (single, written-up-front) backup lives. The
+        # shared `chunked_clear` helper enforces this contract: on failure it
+        # raises ChunkedClearError carrying the cleared-so-far list, which we
+        # turn into an HTTP 500 whose detail carries backup_path + that list so
+        # the read_at -> NULL reversal is recoverable. (The backup already
+        # contains ALL intended rows; reversing the uncleared ones is a harmless
+        # no-op since their read_at is still NULL.)
+        sc = _import_supabase_chunk()
         ids = [r['event_id'] for r in rows if r.get('event_id')]
-        cleared_event_ids: list[str] = []
-        for i in range(0, len(ids), 200):
-            chunk = ids[i:i + 200]
-            try:
-                supabase_client.table('chain_events').update(
-                    {'read_at': ts_iso}
-                ).in_('event_id', chunk).execute()
-            except Exception as exc:  # noqa: BLE001 — surface partial progress
-                logger.exception(
-                    'cleanup-review PARTIAL CLEAR: chunk %d failed after %d/%d '
-                    'rows cleared; backup at %s',
-                    i // 200, len(cleared_event_ids), len(ids), backup_path,
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail={
-                        'error': 'cleanup-review partial clear',
-                        'message': str(exc),
-                        'backup_path': backup_path,
-                        'cleared_event_ids': cleared_event_ids,
-                        'cleared_count': len(cleared_event_ids),
-                        'total_to_clear': len(ids),
-                    },
-                ) from exc
-            cleared_event_ids.extend(chunk)
+        try:
+            cleared_event_ids = sc.chunked_clear(
+                supabase_client, 'chain_events', ids, {'read_at': ts_iso},
+            )
+        except sc.ChunkedClearError as exc:
+            logger.exception(
+                'cleanup-review PARTIAL CLEAR: chunk %d failed after %d/%d '
+                'rows cleared; backup at %s',
+                exc.chunk_index, exc.cleared_count, exc.total, backup_path,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    'error': 'cleanup-review partial clear',
+                    'message': str(exc.cause),
+                    'backup_path': backup_path,
+                    'cleared_event_ids': exc.cleared_ids,
+                    'cleared_count': exc.cleared_count,
+                    'total_to_clear': exc.total,
+                },
+            ) from exc
 
         # task_ids for the success payload, derived only from rows we actually
         # cleared (every chunk succeeded if we reach here).
