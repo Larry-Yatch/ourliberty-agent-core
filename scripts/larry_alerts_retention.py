@@ -296,16 +296,20 @@ def _refresh_shipper_cursor(cursors_file: Path, key: str, alerts_file: Path) -> 
 
     try:
         # Point the shipper module's constant at OUR (possibly test-overridden)
-        # cursor file so load/save land in the right place.
+        # cursor file so load/save (and the lock derived from it) land in the
+        # right place.
         ces.LOG_CURSORS_FILE = cursors_file
-        cursors = ces.load_log_cursors()
         try:
             inode = alerts_file.stat().st_ino
         except OSError:
             inode = 0
         fp = ces._file_fingerprint(alerts_file)
-        cursors[key] = ces.FileCursor(inode=inode, offset=0, fp_sha=fp)
-        ces.save_log_cursors(cursors)
+        # Read-modify-write the SHARED cursors file under the shipper's own lock,
+        # so a concurrent shipper drain can't slip a save between our load and
+        # save and have its advanced offsets clobbered by our stale snapshot
+        # (audit M3). We mutate only our own key; other keys are preserved.
+        with ces.log_cursors_transaction() as cursors:
+            cursors[key] = ces.FileCursor(inode=inode, offset=0, fp_sha=fp)
         log(f'refreshed chain-shipper cursor {key!r}: inode={inode} offset=0 '
             f'(full re-read; dedup absorbs)')
         return True

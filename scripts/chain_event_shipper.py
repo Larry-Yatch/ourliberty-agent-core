@@ -66,6 +66,7 @@ from typing import Any, Iterable, Iterator, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import atomic_io  # noqa: E402  (shared durable atomic write, PR-E #366)
+import file_lock  # noqa: E402  (shared advisory flock, PR-E2 #16)
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 LOG_FILE = AGENTS_ROOT / 'logs' / 'chain-event-shipper.log'
@@ -311,14 +312,50 @@ def load_log_cursors() -> dict[str, FileCursor]:
         return {}
 
 
+def _write_log_cursors_locked(cursors: dict[str, FileCursor]) -> None:
+    """Atomically persist `cursors`. Caller MUST already hold the cursors lock."""
+    atomic_io.atomic_write_json(
+        LOG_CURSORS_FILE,
+        {k: c.to_dict() for k, c in cursors.items()},
+    )
+
+
 def save_log_cursors(cursors: dict[str, FileCursor]) -> None:
+    """Durably persist the log cursors under the shared advisory lock (audit M3).
+
+    Two hardenings over the old plain write_text:
+      * Atomic write (PR-E #366 helper): a mid-write crash (OOM/SIGTERM) can no
+        longer leave a truncated file. A torn file would parse-fail in
+        load_log_cursors, which swallows the error and returns {} — silently
+        resetting every cursor (outbox_log/larry_alerts/sentinel_alerts) to 0
+        and triggering a full re-read + mass re-upsert storm.
+      * Shared flock (PR-E2 #16 helper) on a dedicated sidecar serialises this
+        with larry_alerts_retention._refresh_shipper_cursor — the only other
+        writer of this file — so its read-modify-write can't clobber an offset
+        this writer just advanced (the non-torn lost-update variant).
+    """
     try:
-        LOG_CURSORS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        LOG_CURSORS_FILE.write_text(
-            json.dumps({k: c.to_dict() for k, c in cursors.items()}, indent=2)
-        )
+        with file_lock.exclusive_lock(
+            file_lock.sidecar_lock_path(LOG_CURSORS_FILE)
+        ):
+            _write_log_cursors_locked(cursors)
     except OSError:
         pass
+
+
+@contextlib.contextmanager
+def log_cursors_transaction() -> Iterator[dict[str, FileCursor]]:
+    """Hold the shared cursors lock across a full read-modify-write.
+
+    Yields the currently-persisted cursors; the caller mutates the mapping in
+    place and it is written atomically when the block exits normally. Use this
+    (not load_log_cursors + save_log_cursors) when mutating a SUBSET of keys, so
+    a concurrent writer can't advance another key between the load and the save
+    and have that advance clobbered by the stale snapshot (audit M3)."""
+    with file_lock.exclusive_lock(file_lock.sidecar_lock_path(LOG_CURSORS_FILE)):
+        cursors = load_log_cursors()
+        yield cursors
+        _write_log_cursors_locked(cursors)
 
 
 def load_pulse_cursor() -> PulseCursor:
