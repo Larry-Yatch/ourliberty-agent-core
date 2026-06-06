@@ -131,6 +131,60 @@ class AppendRecordTest(_IsolatedLedger):
         self.assertEqual(rec['attempt'], 1)
 
 
+class ActedMarkerContractTest(_IsolatedLedger):
+    """Audit M2: the recurrence-gate marker (has_acted) and the
+    handled/advance-the-cursor marker (acted_fingerprints) must NOT be the
+    same single outcome. A failed restart records 'acted-failed': it arms the
+    recurrence gate (no retry loop) but is NOT counted as a verified success,
+    so the dispatcher still escalates it instead of silently advancing."""
+
+    FP = 'watchdog:ourliberty-inbox-watcher.service'
+
+    def test_acted_failed_is_a_valid_outcome(self) -> None:
+        self.assertIn('acted-failed', medic_ledger.VALID_OUTCOMES)
+
+    def test_acted_failed_arms_recurrence_gate(self) -> None:
+        # A failed restart must arm has_acted so Medic refuses a second
+        # mutating action (no hot restart loop on a re-crashing daemon).
+        medic_ledger.append_record(
+            'watchdog', 'ourliberty-inbox-watcher.service', 'reversible',
+            'acted-failed', 1, notes='restart ran but did not verify')
+        self.assertTrue(medic_ledger.has_acted(self.FP))
+
+    def test_acted_failed_not_counted_as_handled(self) -> None:
+        # ...but it is NOT a verified success, so acted_fingerprints() (what
+        # the dispatcher diffs to decide "handled -> advance the cursor")
+        # must NOT include it -- otherwise the still-down daemon's first
+        # failed restart escalation is silently dropped (the M2 bug).
+        medic_ledger.append_record(
+            'watchdog', 'ourliberty-inbox-watcher.service', 'reversible',
+            'acted-failed', 1, notes='restart ran but did not verify')
+        self.assertNotIn(self.FP, medic_ledger.acted_fingerprints())
+
+    def test_verified_acted_is_counted_as_handled(self) -> None:
+        # Contrast: a verified success ('acted') arms the gate AND is counted
+        # as handled, so the dispatcher advances past it normally.
+        medic_ledger.append_record(
+            'watchdog', 'ourliberty-inbox-watcher.service', 'reversible',
+            'acted', 1, notes='verified active')
+        self.assertTrue(medic_ledger.has_acted(self.FP))
+        self.assertIn(self.FP, medic_ledger.acted_fingerprints())
+
+    def test_failed_then_verified_recurrence_counts_both(self) -> None:
+        # A failed restart followed (on a later attempt that the recurrence
+        # gate would actually block) by any record still leaves has_acted True
+        # and the verified one counted -- the two markers compose cleanly.
+        medic_ledger.append_record(
+            'watchdog', 'ourliberty-inbox-watcher.service', 'reversible',
+            'acted-failed', 1)
+        self.assertTrue(medic_ledger.has_acted(self.FP))
+        self.assertNotIn(self.FP, medic_ledger.acted_fingerprints())
+        medic_ledger.append_record(
+            'watchdog', 'ourliberty-inbox-watcher.service', 'reversible',
+            'acted', 2)
+        self.assertIn(self.FP, medic_ledger.acted_fingerprints())
+
+
 class FailSafeTest(_IsolatedLedger):
     def test_malformed_line_skipped(self) -> None:
         # Write one good entry, then a junk line, then another good entry.

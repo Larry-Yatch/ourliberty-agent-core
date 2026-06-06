@@ -374,6 +374,9 @@ class RestartSuccessTest(_IsolatedActions):
         # recurrence gate + dispatcher dedup line up.
         self.assertEqual(recs[0]['fingerprint'], ALERT_FP)
         self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+        # A VERIFIED success IS counted as handled (contrast with the
+        # 'acted-failed' path, which is not) -- the dispatcher advances past it.
+        self.assertIn(ALERT_FP, medic_ledger.acted_fingerprints())
 
     def test_retrigger_inbox_success(self) -> None:
         restart_p, active_p = self._patch_subprocess(rc=0, active='active')
@@ -391,11 +394,18 @@ class VerifyFailureTest(_IsolatedActions):
             res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
         self.assertFalse(res['ok'])
         self.assertEqual(res['reason'], 'verify-failed')
-        # An action WAS attempted on the system -> recorded acted so the
-        # recurrence gate is armed (no retry loop).
-        self.assertEqual(res['outcome'], 'acted')
+        # An action WAS attempted on the system but did NOT verify -> recorded
+        # 'acted-failed' (audit M2): it arms the recurrence gate (no retry loop)
+        # but is NOT counted as a verified success, so the dispatcher still
+        # escalates this still-down daemon rather than treating it as handled.
+        self.assertEqual(res['outcome'], 'acted-failed')
         self.assertIn('failed', res['detail'])
+        recs = self._ledger_records()
+        self.assertEqual(recs[-1]['outcome'], 'acted-failed')
+        # Recurrence gate armed...
         self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+        # ...but NOT counted as a handled/verified success.
+        self.assertNotIn(ALERT_FP, medic_ledger.acted_fingerprints())
 
     def test_restart_nonzero_rc_is_failure(self) -> None:
         restart_p, active_p = self._patch_subprocess(rc=1, active='active')
@@ -403,6 +413,10 @@ class VerifyFailureTest(_IsolatedActions):
             res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
         self.assertFalse(res['ok'])
         self.assertEqual(res['reason'], 'restart-error')
+        # A non-zero restart rc is likewise 'acted-failed': armed, not handled.
+        self.assertEqual(res['outcome'], 'acted-failed')
+        self.assertTrue(medic_ledger.has_acted(ALERT_FP))
+        self.assertNotIn(ALERT_FP, medic_ledger.acted_fingerprints())
 
 
 class UnsupportedActionTest(_IsolatedActions):
