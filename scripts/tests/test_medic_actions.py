@@ -479,5 +479,98 @@ class ConfigFailSafeTest(_IsolatedActions):
         self.assertEqual(loaded['retrigger_inbox_targets'], [])
 
 
+class Stage1SilenceOnlyPostureTest(SilenceFalsePositiveTest):
+    """Pin the SHIPPED Stage-1 production posture (config/medic-reversible-
+    targets.json with the act-branch live): the enable flag is ON, the restart
+    allowlists are EMPTY, and only the two proven-benign silence classes are
+    enabled. With this exact config:
+
+      - restart-daemon and retrigger-inbox are REFUSED not-permitted (the empty
+        allowlist makes every restart classification fall through to diagnose-
+        only escalation, exactly as in the prior escalate-only era), and NO
+        subprocess fires; and
+      - silence-false-positive still SUCCEEDS for either shipped benign class
+        and is REFUSED for any other fingerprint; and
+      - with the enable flag OFF, every action (restart and silence) refuses.
+
+    This locks the activation contract: turning the act-branch on must not let a
+    restart fire while the Stage-2 watchdog-coordination guard is unbuilt.
+    """
+
+    # The two benign classes actually shipped in silenceable_subjects.
+    SILENCEABLE_FORGE_NO_PR = ('heal-pipeline-stall:pipeline-stall:forge-no-pr:'
+                               'forge-queue-api-preflight-20260603T231401Z-clarify1')
+    SILENCEABLE_PR_INFERRED = ('heal-pipeline-stall:pipeline-stall:'
+                               'pr-create-inferred-failure:some-task-20260605T010101Z')
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Overwrite with the EXACT shipped Stage-1 config: empty restart arrays,
+        # both real benign silence classes.
+        (self.repo_dir / 'config' / 'medic-reversible-targets.json').write_text(
+            json.dumps({
+                '$schema_version': '1',
+                'restart_daemon_units': [],
+                'retrigger_inbox_targets': [],
+                'silenceable_subjects': [
+                    'pipeline-stall:forge-no-pr:',
+                    'pipeline-stall:pr-create-inferred-failure:',
+                ],
+            }))
+
+    def test_restart_daemon_refused_when_allowlist_empty(self) -> None:
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        self.assertEqual(res['outcome'], 'skipped')
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+
+    def test_retrigger_inbox_refused_when_allowlist_empty(self) -> None:
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.retrigger_inbox(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+        restart_m.assert_not_called()
+
+    def test_silence_forge_no_pr_class_succeeds(self) -> None:
+        res = medic_actions.silence_false_positive(
+            self.SILENCEABLE_FORGE_NO_PR, reason='build shipped as PR #294')
+        self.assertTrue(res['ok'], res)
+        self.assertEqual(res['reason'], 'silenced')
+        self.assertTrue(
+            medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FORGE_NO_PR))
+
+    def test_silence_pr_create_inferred_failure_class_succeeds(self) -> None:
+        res = medic_actions.silence_false_positive(
+            self.SILENCEABLE_PR_INFERRED, reason='inferred failure was benign')
+        self.assertTrue(res['ok'], res)
+        self.assertEqual(res['reason'], 'silenced')
+        self.assertTrue(
+            medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_PR_INFERRED))
+
+    def test_silence_unallowlisted_fingerprint_refused(self) -> None:
+        res = medic_actions.silence_false_positive(
+            'watchdog:disk-full-critical', reason='nope')
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'not-permitted')
+
+    def test_enable_flag_off_refuses_all_actions(self) -> None:
+        os.environ['OURLIBERTY_MEDIC_ENABLED'] = '0'
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            r_restart = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        r_silence = medic_actions.silence_false_positive(
+            self.SILENCEABLE_FORGE_NO_PR, reason='gate off')
+        self.assertEqual(r_restart['reason'], 'gate-enable-flag-off')
+        self.assertEqual(r_silence['reason'], 'gate-enable-flag-off')
+        restart_m.assert_not_called()
+        self.assertFalse(
+            medic_actions.larry_alerts.is_silenced(self.SILENCEABLE_FORGE_NO_PR))
+
+
 if __name__ == '__main__':
     unittest.main()
