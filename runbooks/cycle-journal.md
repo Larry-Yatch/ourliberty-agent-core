@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1051 — 2026-06-06 06:07 UTC (interactive, Tier 1 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 1 (consecutive_clean=0→1). 1 new Tier-3 alert (unreviewed-merge:392, 50th consecutive Larry-direct). All 5 mandatory checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. New PR #393 OPEN (< 30 min, watch item).**
+
+Alert watermark: **1415 lines / 2026-06-06T05:50:16Z** (unreviewed-merge:392). Was 1414/05:45:20Z (iter 1050). +1 alert. Session-start gitStatus: branch=main, tree=clean, HEAD=b85e396 "Pulse cycle 20260606T055111Z". Tier at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-06T05:46:35Z. Sync: status=success, last_sync=2026-06-06T04:51:41Z (~1h 15min at scan; within 2h threshold). Pipeline-stall heartbeat: 05:44:58Z (✅ ~22 min at scan). Stale-daemon heartbeat: 05:40:19Z (✅ ~27 min at scan). Tier state at end: **tier=1, consecutive_clean=1** (all checks clean; Tier-3 alert = silence = no tier-reset per § 3.0).
+
+**Found:**
+
+- **(Check 0) Alert triage: 1 new Tier-3 alert.** `2026-06-06T05:50:16Z unreviewed-merge:392` (heal-unreviewed-merge-detector) — PR #392 merged by Larry-Yatch (direct, no Mirror review). Gate-1 match under `heal-unreviewed-merge-detector` key in alert-translations.json → **Tier-3 known pattern** (50th consecutive Larry-direct merge; PRs #343–#392). No tier-reset. Watermark advanced: **1415 / 05:50:16Z**. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "No entries." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Larry messages in last 4h (04:19Z–04:35Z UTC): "What's the pulse?...", "i want you to fix [Check I duplicate-journal-block]", "i agree with fixing 2", "go" — all directed at Beacon; tracked by PR #393 ("feat(medic): enable PR2 act-branch, silence-only (Stage 1)" opened 05:49:39Z). No orphaned directives. No Pulse-specific directives since 2026-06-04T02:48Z UTC (unchanged). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-06T05:44:58Z (~22 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-06T05:40:19Z (~27 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=b85e396 "Pulse cycle 20260606T055111Z". Sync.json last_sync=04:51:41Z (success, commit=423f396a); HEAD is 05:51Z wrapper auto-commit — normal wrapper-timing gap; self-clears on next hourly sync.timer. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=success, last_sync=2026-06-06T04:51:41Z (~1h 15min at scan). Within 2h threshold. No SYNC-PUSH-REBASE-FALLBACK this iter. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer, chain-event-shipper, dashboard-api — all systemd `active`. ✅
+
+- **(Check D/E) Inboxes / PRs:**
+  - Inboxes: all 0. ✅
+  - **PR #393 OPEN** — "feat(medic): enable PR2 act-branch, silence-only (Stage 1)"; state=OPEN, mergeable=MERGEABLE, mergeState=CLEAN, reviewDecision="" (no Mirror review yet), created=2026-06-06T05:49:39Z. **Age at scan: ~17 min. Below 30-min auto-merge threshold. No action.** Watch: at 30 min (~06:19Z), check if Mirror has reviewed; if CLEAN/MERGEABLE + Mirror PASS + no auto-merge, enable. No worktrees active at scan. **Watch item: next iter.** ✅ carry.
+  - ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Periodic checks (Saturday June 6 UTC):** Check I (Sunday only → skip). Check III (last 2026-05-31, ~6d ago; ≥14d condition not met → skip). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: PR #392 confirmed Larry-direct (unreviewed-merge:392 at 05:50:16Z). **50 consecutive** (PRs #343–#392). ✅ still active. Pending Larry `go: actor-exemption-config`.
+  - `auto-restarted:*` untranslated: stale-daemon heartbeat at 05:40:19Z confirms healer active. No new auto-restarted alerts since iter 1050's burst. Forge brief still missing. ✅ carry forward.
+  - `gh pr merge --auto disabled` G-rule (1/3): no new occurrence. ✅ carry forward.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001`: no new occurrence this iter. Still open. ✅ carry forward.
+  - cycle-timer-checkpoint: no fix PR in git log (HEAD=b85e396 predates any such fix). ✅ carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no auto-fix actions this iter). No new ledger rows.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, D, E) + credential rotation gate + periodic check gate (all skipped, Saturday UTC).
+2. Check 0: 1 new alert (unreviewed-merge:392, Tier-3 known pattern). Watermark advanced to **1415 / 05:50:16Z**. No tier-reset.
+3. Observed PR #393 OPEN/CLEAN, < 30 min old. No auto-merge action. Watch next iter.
+4. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync nominal.
+5. `cycle_tier_state.py record --checks-clean true` → tier=1, consecutive_clean=1.
+6. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 50 consecutive Larry-direct merges (PRs #343–#392). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Largest burst (7 simultaneous, iter 1050). Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` cycle-timer-checkpoint G-rule (Larry forwarded DM to Beacon at 07:12Z June 4; Beacon awaiting "go" reply).
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:**
+- PR #393 appeared between iters 1050 and 1051 (~17 min after iter 1050 ended). This is the result of Larry's "go" directive to Beacon at 04:35Z → Forge built and opened PR in ~74 min. Normal build cadence.
+- Consecutive unreviewed-merge count now at 50 (PR #343–#392). Pattern fully established; actor-exemption-config remains the single pending fix.
+- System otherwise fully quiet. Second clean iter expected to bring consecutive_clean=2; third will de-escalate to Tier 2.
+
+**Learned:** Pipeline-stall heartbeat freshened from 05:28:19Z (iter 1050 scan) to 05:44:58Z (iter 1051 scan) — confirming healer is actively running its sweep cycle. Stale-daemon healer similarly active (heartbeat 05:40:19Z vs 05:40:19Z in iter 1050 — same file, same read).
+
+---
+
 ## Iteration 1050 — 2026-06-06 05:46 UTC (interactive, Tier 3→1 — CONSERVATIVE RESET)
 
 **Health:** ⚠️ **Tier 3→1 (conservative reset — mass auto-restart burst). 16 new alerts since iter 1049: 8 unreviewed-merge (PRs #384–391), 8 auto-restarted:* (7-service simultaneous burst + 1 inbox-watcher). 0 auto-fixes. 9/9 + dashboard-api active. 0 open PRs. All inboxes empty. Sync fresh. All heartbeats nominal.**
