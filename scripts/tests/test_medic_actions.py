@@ -31,6 +31,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -417,6 +418,192 @@ class VerifyFailureTest(_IsolatedActions):
         self.assertEqual(res['outcome'], 'acted-failed')
         self.assertTrue(medic_ledger.has_acted(ALERT_FP))
         self.assertNotIn(ALERT_FP, medic_ledger.acted_fingerprints())
+
+
+class WatchdogCoordinationTest(_IsolatedActions):
+    """Stage-2 restart guard: before actuating, _act_restart must refuse +
+    escalate diagnose-only when a peer (watchdog flap / a recent
+    watchdog-or-systemd restart) is already managing the unit, so Medic does
+    not reset systemd's StartLimit backoff on a flapping unit. Fail-safe: an
+    unreadable/corrupt marker must NOT block a legitimate restart."""
+
+    def _state_dir(self) -> Path:
+        d = self.agents_root / 'state'
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def _write_flap(self, unit: str, streak: int = 2, age_sec: float = 0.0) -> Path:
+        flap_dir = self._state_dir() / 'auto-restart-flap'
+        flap_dir.mkdir(parents=True, exist_ok=True)
+        name = unit[:-len('.service')] if unit.endswith('.service') else unit
+        path = flap_dir / name
+        path.write_text(str(streak))
+        if age_sec:
+            old = time.time() - age_sec
+            os.utime(path, (old, old))
+        return path
+
+    def _short(self, unit: str) -> str:
+        name = unit[:-len('.service')] if unit.endswith('.service') else unit
+        return name[len('ourliberty-'):] if name.startswith('ourliberty-') else name
+
+    def _write_mem_cooldown(self, unit: str, age_sec: float = 0.0) -> Path:
+        path = self._state_dir() / f'{self._short(unit)}-mem-restart-cooldown'
+        path.touch()
+        if age_sec:
+            old = time.time() - age_sec
+            os.utime(path, (old, old))
+        return path
+
+    def _write_reconcile_cooldown(self, unit: str, count: int = 1,
+                                  window_age_sec: float = 0.0,
+                                  body=None) -> Path:
+        path = self._state_dir() / f'{self._short(unit)}-reconcile-cooldown'
+        if body is None:
+            body = json.dumps({
+                'window_start': time.time() - window_age_sec,
+                'count': count,
+                'paged': False,
+            })
+        path.write_text(body)
+        return path
+
+    # ---- refuse paths ----
+
+    def test_fresh_flap_streak_refuses_restart(self) -> None:
+        self._write_flap(ALLOWED_DAEMON, streak=2)
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p as active_m:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['outcome'], 'skipped')
+        self.assertEqual(res['reason'], 'flapping-defer-to-systemd')
+        # No actuation: backoff is not reset.
+        restart_m.assert_not_called()
+        active_m.assert_not_called()
+        # Refusal is 'skipped' -> recurrence gate NOT armed; Medic may retry
+        # once the flap settles.
+        self.assertFalse(medic_ledger.has_acted(ALERT_FP))
+
+    def test_fresh_flap_streak_refuses_outbox_too(self) -> None:
+        self._write_flap(ALLOWED_OUTBOX, streak=3)
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(
+                ALLOWED_OUTBOX, 'watchdog:' + ALLOWED_OUTBOX)
+        self.assertEqual(res['reason'], 'flapping-defer-to-systemd')
+        restart_m.assert_not_called()
+
+    def test_fresh_mem_restart_cooldown_refuses(self) -> None:
+        self._write_mem_cooldown(ALLOWED_DAEMON)  # touched now
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'recently-restarted')
+        restart_m.assert_not_called()
+
+    def test_fresh_reconcile_cooldown_refuses(self) -> None:
+        self._write_reconcile_cooldown(ALLOWED_DAEMON, count=1)
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertFalse(res['ok'])
+        self.assertEqual(res['reason'], 'recently-restarted')
+        restart_m.assert_not_called()
+
+    def test_coordination_runs_after_recurrence_gate(self) -> None:
+        # A flap marker is present AND the fingerprint was already acted: the
+        # earlier recurrence gate wins (already-acted), confirming ordering.
+        src, subj = medic_actions._fp_parts(ALERT_FP)
+        medic_ledger.append_record(
+            source=src, subject=subj, classification='reversible',
+            outcome='acted', attempt=1, notes='prior act')
+        self._write_flap(ALLOWED_DAEMON)
+        restart_p, active_p = self._patch_subprocess()
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertEqual(res['reason'], 'already-acted')
+        restart_m.assert_not_called()
+
+    # ---- proceed paths ----
+
+    def test_no_markers_proceeds(self) -> None:
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_stale_flap_streak_proceeds(self) -> None:
+        # Marker older than the freshness window => watchdog stopped updating
+        # it; treat as stale and proceed.
+        self._write_flap(ALLOWED_DAEMON, streak=2,
+                         age_sec=medic_actions._FLAP_FRESH_WINDOW_SEC + 60)
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_stale_mem_cooldown_proceeds(self) -> None:
+        self._write_mem_cooldown(
+            ALLOWED_DAEMON,
+            age_sec=medic_actions._MEM_RESTART_COOLDOWN_SEC + 60)
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_expired_reconcile_window_proceeds(self) -> None:
+        self._write_reconcile_cooldown(
+            ALLOWED_DAEMON, count=3,
+            window_age_sec=medic_actions._RECONCILE_WINDOW_SEC + 120)
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_reconcile_marker_count_zero_proceeds(self) -> None:
+        # A fresh window with no recorded restart yet must not block.
+        self._write_reconcile_cooldown(ALLOWED_DAEMON, count=0)
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    # ---- fail-safe (read error -> proceed) ----
+
+    def test_corrupt_reconcile_marker_proceeds(self) -> None:
+        self._write_reconcile_cooldown(ALLOWED_DAEMON, body='{not json')
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p:
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
+
+    def test_marker_read_error_proceeds(self) -> None:
+        # An unreadable marker must NOT block: stat() on the flap marker raises
+        # OSError -> fail-safe treats it as absent and proceeds with the
+        # existing gates. Scope the fault to the flap-marker path only so the
+        # config/ledger IO under the same call is unaffected.
+        self._write_flap(ALLOWED_DAEMON)
+        real_stat = Path.stat
+
+        def flaky_stat(self, *a, **k):
+            if 'auto-restart-flap' in str(self):
+                raise OSError('simulated unreadable marker')
+            return real_stat(self, *a, **k)
+
+        restart_p, active_p = self._patch_subprocess(rc=0, active='active')
+        with restart_p as restart_m, active_p, \
+                mock.patch('pathlib.Path.stat', new=flaky_stat):
+            res = medic_actions.restart_daemon(ALLOWED_DAEMON, ALERT_FP)
+        self.assertTrue(res['ok'])
+        restart_m.assert_called_once_with(ALLOWED_DAEMON)
 
 
 class UnsupportedActionTest(_IsolatedActions):
