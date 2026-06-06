@@ -56,6 +56,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from atomic_io import atomic_write_json  # noqa: E402
+
 AGENTS_ROOT = Path(
     os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents'))
 )
@@ -307,8 +313,12 @@ def _persisted_proposal_keys(path: Path) -> set[tuple[Any, Any]]:
         data = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         return set()
+    if not isinstance(data, dict):
+        return set()
     keys: set[tuple[Any, Any]] = set()
-    for p in data.get('proposals', []):
+    # `.get('proposals') or []` (not a default arg): an explicit null value must
+    # also degrade to empty rather than crash the same-day gate.
+    for p in data.get('proposals') or []:
         if isinstance(p, dict):
             keys.add((p.get('rule'), p.get('band')))
     return keys
@@ -336,11 +346,11 @@ def build_artifact(result: CheckVIIResult) -> dict[str, Any]:
 
 
 def write_artifact(artifact: dict[str, Any]) -> Path:
-    PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
+    # Shared unique-tmp + fsync atomic write (PR-E #366): no fixed <path>.tmp
+    # two concurrent same-day writers could collide on, and no truncated file
+    # left on a crash.
     path = artifact_path_for_date(artifact['anchor_date'])
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(artifact, indent=2))
-    tmp.replace(path)
+    atomic_write_json(path, artifact, indent=2)
     return path
 
 

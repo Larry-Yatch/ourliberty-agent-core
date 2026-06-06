@@ -181,6 +181,21 @@ class TestCheckViiContentAwareSentinel(unittest.TestCase):
         path.write_text('{ corrupt')
         self.assertEqual(p7._persisted_proposal_keys(path), set())  # corrupt
 
+    def test_persisted_keys_tolerates_malformed_shapes(self):
+        path = p7.artifact_path_for_date('2026-06-01')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # explicit null proposals must NOT crash the gate (review fix)
+        path.write_text(json.dumps({'proposals': None}))
+        self.assertEqual(p7._persisted_proposal_keys(path), set())
+        # top-level non-dict
+        path.write_text(json.dumps([1, 2, 3]))
+        self.assertEqual(p7._persisted_proposal_keys(path), set())
+        # non-dict entries inside the list are skipped
+        path.write_text(json.dumps({'proposals': ['x', {'rule': 'raise',
+                                                        'band': 'low'}]}))
+        self.assertEqual(
+            p7._persisted_proposal_keys(path), {('raise', 'low')})
+
     def test_second_same_day_proposal_is_not_lost(self):
         # First run: low-band raise fires → artifact written, DM sent.
         p7.run_check = lambda **k: _result([_prop('raise', 'low')])
