@@ -416,11 +416,16 @@ def fetch_durations_from_supabase(
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
     cutoff_iso = cutoff.isoformat()
+    # Audit #28: a task_id can legitimately recur in the window (retries reuse a
+    # deterministic id). Pairing the EARLIEST start with the LATEST done spans
+    # ALL sessions for that id — turning a real 5-min session into hours and
+    # inflating the p90/p99 stuck-threshold proposal. Per the docstring intent,
+    # keep the LATEST start, and collect ALL dones so we can pair it with the
+    # EARLIEST done that lands at/after that start (one clean session span).
     starts: dict[str, dict[str, Any]] = {}
-    dones: dict[str, dict[str, Any]] = {}
+    dones_by_tid: dict[str, list[dict[str, Any]]] = {}
 
-    for event_type, dest in (('session_start', starts),
-                             ('session_done', dones)):
+    for event_type in ('session_start', 'session_done'):
         page = 0
         page_size = 1000
         while True:
@@ -436,32 +441,37 @@ def fetch_durations_from_supabase(
             rows = getattr(res, 'data', None) or []
             for row in rows:
                 tid = row.get('task_id')
-                if not tid:
+                if not tid or 'ts' not in row:
                     continue
-                # For starts: keep earliest; for dones: keep latest matching.
                 if event_type == 'session_start':
-                    if tid not in dest or row['ts'] < dest[tid]['ts']:
-                        dest[tid] = row
+                    if tid not in starts or row['ts'] > starts[tid]['ts']:
+                        starts[tid] = row  # keep latest start
                 else:
-                    if tid not in dest or row['ts'] > dest[tid]['ts']:
-                        dest[tid] = row
+                    dones_by_tid.setdefault(tid, []).append(row)
             if len(rows) < page_size:
                 break
             page += 1
 
     out: list[SessionDuration] = []
     for tid, start_row in starts.items():
-        done_row = dones.get(tid)
-        if not done_row:
-            continue
         try:
             t0 = datetime.fromisoformat(start_row['ts'].replace('Z', '+00:00'))
-            t1 = datetime.fromisoformat(done_row['ts'].replace('Z', '+00:00'))
         except (ValueError, KeyError):
             continue
-        if t1 <= t0:
+        # Earliest done strictly after the latest start — the clean span.
+        best_done_ts: Optional[datetime] = None
+        for done_row in dones_by_tid.get(tid, ()):
+            try:
+                t1 = datetime.fromisoformat(done_row['ts'].replace('Z', '+00:00'))
+            except (ValueError, KeyError):
+                continue
+            if t1 <= t0:
+                continue
+            if best_done_ts is None or t1 < best_done_ts:
+                best_done_ts = t1
+        if best_done_ts is None:
             continue
-        duration = (t1 - t0).total_seconds()
+        duration = (best_done_ts - t0).total_seconds()
         payload = start_row.get('payload') or {}
         task_type = payload.get('task_type') or '_default'
         agent = start_row.get('agent') or 'unknown'

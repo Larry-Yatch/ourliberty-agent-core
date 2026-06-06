@@ -309,15 +309,32 @@ def _systemctl_show(unit: str) -> Optional[dict[str, str]]:
     return props
 
 
+# systemd renders LastTriggerUSec wall-clock with a trailing zone ABBREVIATION
+# (e.g. "MDT"), not a numeric offset, so strptime can't recover the offset.
+# Map the abbreviations this host actually emits (droplet tz is America/Denver
+# per the .timer headers + INSTALL.md) plus the common US zones + UTC to a fixed
+# offset, so a parsed trigger carries its true instant. The abbreviation itself
+# disambiguates which side of a DST gap/fold the timestamp is on — which is
+# exactly what a naive parse threw away (audit #23).
+_TZ_ABBREV_OFFSET_HOURS: dict[str, int] = {
+    'UTC': 0, 'GMT': 0,
+    'EST': -5, 'EDT': -4,
+    'CST': -6, 'CDT': -5,
+    'MST': -7, 'MDT': -6,
+    'PST': -8, 'PDT': -7,
+}
+
+
 def _parse_systemd_timestamp(value: Optional[str]) -> Optional[datetime]:
-    """Parse systemctl's humanized timestamp into a naive *local* datetime.
+    """Parse systemctl's humanized timestamp into a datetime.
 
     `systemctl show -p LastTriggerUSec` renders e.g. "Mon 2026-06-01 18:00:09
     MDT" (there is no flag that yields epoch for `show`). We drop the leading
-    weekday and the trailing timezone abbreviation and compare in local time:
-    both this value and the `now` we measure against are in the droplet's
-    local zone, so a naive same-zone comparison is correct. (A DST boundary
-    could skew it by an hour, immaterial against the minute-scale grace.)
+    weekday and, when the trailing zone abbreviation is one we recognize,
+    attach its fixed UTC offset so the result is timezone-AWARE — an absolute
+    instant that compares correctly across a DST boundary. If the zone is
+    absent or unrecognized we fall back to a naive datetime (prior behavior),
+    and the caller compares it in local wall-clock as before.
 
     Returns None for empty / 'n/a' / anything unparseable.
     """
@@ -331,9 +348,15 @@ def _parse_systemd_timestamp(value: Optional[str]) -> Optional[datetime]:
     if len(parts) < 3:
         return None
     try:
-        return datetime.strptime(f'{parts[1]} {parts[2]}', '%Y-%m-%d %H:%M:%S')
+        parsed = datetime.strptime(
+            f'{parts[1]} {parts[2]}', '%Y-%m-%d %H:%M:%S')
     except ValueError:
         return None
+    if len(parts) >= 4:
+        off = _TZ_ABBREV_OFFSET_HOURS.get(parts[3].upper())
+        if off is not None:
+            return parsed.replace(tzinfo=timezone(timedelta(hours=off)))
+    return parsed
 
 
 def _recently_triggered(
@@ -344,16 +367,31 @@ def _recently_triggered(
     """Did the timer fire within `grace_s` seconds of `now`?
 
     Returns None when the trigger timestamp can't be parsed, so the caller can
-    fall back to its prior behavior rather than silently suppress. `now`
-    defaults to naive local wall-clock (to match the systemctl-local
-    timestamp). The window is two-sided (abs) to tolerate sub-second clock
-    skew where a just-fired timestamp reads slightly in the future.
+    fall back to its prior behavior rather than silently suppress. The window
+    is two-sided (abs) to tolerate sub-second clock skew where a just-fired
+    timestamp reads slightly in the future.
+
+    When the parsed trigger is timezone-aware (its zone abbreviation was
+    recognized), the comparison is done in absolute time — correct across DST
+    transitions (audit #23). `now` defaults to an aware UTC instant; a caller
+    supplying a *naive* `now` against an aware trigger is interpreted as
+    wall-clock in the trigger's own zone (the matching-zone same-instant case
+    the prior naive math assumed). When the trigger is naive (unknown zone), we
+    keep the original naive local comparison.
     """
     parsed = _parse_systemd_timestamp(last_trigger)
     if parsed is None:
         return None
-    now = now or datetime.now()
-    return abs((now - parsed).total_seconds()) <= grace_s
+    if parsed.tzinfo is not None:
+        ref = now if now is not None else datetime.now(timezone.utc)
+        if ref.tzinfo is None:
+            ref = ref.replace(tzinfo=parsed.tzinfo)
+        return abs((ref - parsed).total_seconds()) <= grace_s
+    # Naive trigger (zone absent/unrecognized): compare in local wall-clock.
+    ref = now if now is not None else datetime.now()
+    if ref.tzinfo is not None:
+        ref = ref.astimezone().replace(tzinfo=None)
+    return abs((ref - parsed).total_seconds()) <= grace_s
 
 
 def detect_stuck_timers(
@@ -381,7 +419,9 @@ def detect_stuck_timers(
     Per-unit shell-out failures are logged INFO and the unit is skipped;
     the function never raises.
     """
-    now = now or datetime.now()
+    # Aware UTC instant so the just-fired comparison against an aware,
+    # zone-resolved LastTriggerUSec is absolute (DST-correct, audit #23).
+    now = now or datetime.now(timezone.utc)
     stuck: list[dict[str, Optional[str]]] = []
     for unit in sorted(list_installed_units(installed_dir)):
         if not unit.endswith('.timer'):
