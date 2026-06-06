@@ -498,6 +498,60 @@ def _path_from_location(location: str) -> Path:
     return Path(p)
 
 
+def _claude_cli_tier_for_location(location: str) -> Optional[str]:
+    """Map a claude_cli storage location to its rotation tier, or None if the
+    path is not one active_tier owns.
+
+    Derives the per-tier canonical `.credentials.json` path from
+    `active_tier._credentials_path` so the drift scanner and `active_tier`
+    share ONE source of truth for which tier owns a given file — rather than
+    re-encoding the Tier 1 / Tier 2 path layout here (which would silently
+    diverge if active_tier's TIER*_HOME ever moved)."""
+    creds_path = _path_from_location(location)
+    for tier in ('tier1', 'tier2'):
+        if creds_path == active_tier._credentials_path(tier):
+            return tier
+    return None
+
+
+def _credential_recovery_in_progress(creds_path: Path) -> bool:
+    """True if `scripts/auth_orchestrator.py` has moved `creds_path` aside to a
+    `*.pre-orchestrator-*` backup for an operator-driven auth recovery (it
+    holds the live file aside for up to ~15 min, restoring it on exit).
+
+    During that window the credential is legitimately absent from its canonical
+    path, so a `MISSING_CREDENTIAL` drift would be a transient false positive —
+    treat the state as "recovery in progress, unknown; do not flag"."""
+    parent = creds_path.parent
+    pattern = creds_path.name + '.pre-orchestrator-*'
+    try:
+        return any(parent.glob(pattern))
+    except OSError:
+        return False
+
+
+def _missing_credential_suppressed(location: str) -> Optional[str]:
+    """Return a human-readable reason if a `MISSING_CREDENTIAL` drift for an
+    empty scan of `location` should be suppressed, else None.
+
+    Only claude_cli OAuth locations qualify. The setup-token-precedence
+    contract already taught to `check_tier_distinctness` is propagated here so
+    the two code paths agree on "is this tier actually configured":
+      - a long-lived setup-token is configured for that tier, so dispatch
+        authenticates via the token and does NOT depend on the tier's lapsed
+        `.credentials.json` (the documented, supported Tier 2 steady state); OR
+      - `auth_orchestrator` is mid-recovery (a `*.pre-orchestrator-*` sibling
+        backup of the credentials file exists)."""
+    if not location.startswith('claude_cli:'):
+        return None
+    tier = _claude_cli_tier_for_location(location)
+    if tier is not None and active_tier._setup_token_for_tier(tier):
+        return f'setup-token configured for {tier}'
+    if _credential_recovery_in_progress(_path_from_location(location)):
+        return 'auth recovery in progress (pre-orchestrator backup present)'
+    return None
+
+
 # -------------------- drift detection --------------------
 
 def detect_drift(
@@ -577,7 +631,15 @@ def detect_drift(
             }))
             live_keys.add(_drift_key(name, 'MISSING_REGISTRY_ENTRY'))
 
+        suppress_reason = (
+            _missing_credential_suppressed(location) if missing_in_store
+            else None
+        )
         for name in missing_in_store:
+            if suppress_reason is not None:
+                log(f'suppressing MISSING_CREDENTIAL for {name!r} at '
+                    f'{location}: {suppress_reason}', 'INFO')
+                continue
             entry = next(
                 (e for e in creds if e.get('name') == name), {'name': name},
             )

@@ -245,6 +245,152 @@ class DetectDriftTest(_IsolatedAgentsRoot):
         self.assertEqual(drifts, [])
 
 
+class MissingCredentialSuppressionTest(_IsolatedAgentsRoot):
+    """M1 (integration-seam audit 2026-06-06): the drift scanner must share
+    ONE notion of "is this tier configured" with `check_tier_distinctness`.
+
+    A claude_cli `.credentials.json` is allowed to be absent in two supported
+    states, and neither should fire a `MISSING_CREDENTIAL` drift:
+      - the tier dispatches via a long-lived setup-token (the Tier 2 steady
+        state where the operator lets creds.json lapse on purpose), and
+      - `auth_orchestrator` has moved the live file aside to a
+        `*.pre-orchestrator-*` backup mid-recovery.
+    """
+
+    _TIER2_LOC = ('claude_cli:/home/larry/.claude-larry-personal/.claude/'
+                  '.credentials.json')
+
+    def _tier2_registry(self):
+        reg = _registry([
+            _cred('LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2',
+                  location=self._TIER2_LOC),
+        ])
+        reg['known_storage_locations'][self._TIER2_LOC] = {
+            'description': 'Claude OAuth Tier 2',
+            'scanner_strategy': 'JSON parse',
+        }
+        return reg
+
+    @staticmethod
+    def _empty_scans(reg):
+        return {loc: set() for loc in reg['known_storage_locations']}
+
+    def test_setup_token_suppresses_missing_credential(self):
+        # (a) Tier 2 setup-token configured + creds.json absent → no drift.
+        reg = self._tier2_registry()
+        scans = self._empty_scans(reg)
+        with mock.patch.dict(
+            os.environ,
+            {'CLAUDE_CODE_OAUTH_TOKEN_TIER2': 'sk-ant-oat-redacted'},
+            clear=False,
+        ):
+            drifts, live_keys = h.detect_drift(reg, scan_overrides=scans)
+        missing = [name for name, kind, _ in drifts
+                   if kind == 'MISSING_CREDENTIAL']
+        self.assertNotIn('LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2', missing)
+        self.assertNotIn(
+            'LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2:MISSING_CREDENTIAL',
+            live_keys,
+        )
+
+    def test_unconfigured_tier_still_flags_missing_credential(self):
+        # (b) No setup-token and no recovery → genuine drift still fires.
+        reg = self._tier2_registry()
+        scans = self._empty_scans(reg)
+        with mock.patch.object(
+            h.active_tier, '_setup_token_for_tier', return_value=None,
+        ):
+            drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+        kinds = [(name, kind) for name, kind, _ in drifts]
+        self.assertIn(
+            ('LARRY_PERSONAL_CLAUDE_MAX_OAUTH_TIER2', 'MISSING_CREDENTIAL'),
+            kinds,
+        )
+
+    def test_pre_orchestrator_backup_suppresses_missing_credential(self):
+        # (c) auth_orchestrator moved the live file aside → suppress.
+        with tempfile.TemporaryDirectory() as td:
+            creds = Path(td) / '.credentials.json'
+            (Path(td) / '.credentials.json.pre-orchestrator-1700000000'
+             ).write_text('{}')
+            loc = f'claude_cli:{creds}'
+            reg = {
+                '$schema_version': 1,
+                'credentials': [_cred('CLAUDE_MAX_OAUTH', location=loc)],
+                'known_storage_locations': {
+                    loc: {'description': 'Claude OAuth',
+                          'scanner_strategy': 'JSON parse'},
+                },
+            }
+            scans = {loc: set()}
+            with mock.patch.object(
+                h.active_tier, '_setup_token_for_tier', return_value=None,
+            ):
+                drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+            missing = [name for name, kind, _ in drifts
+                       if kind == 'MISSING_CREDENTIAL']
+            self.assertNotIn('CLAUDE_MAX_OAUTH', missing)
+
+    def test_no_backup_and_no_token_still_flags(self):
+        # Control for (c): same path, no backup file → drift fires.
+        with tempfile.TemporaryDirectory() as td:
+            creds = Path(td) / '.credentials.json'
+            loc = f'claude_cli:{creds}'
+            reg = {
+                '$schema_version': 1,
+                'credentials': [_cred('CLAUDE_MAX_OAUTH', location=loc)],
+                'known_storage_locations': {
+                    loc: {'description': 'Claude OAuth',
+                          'scanner_strategy': 'JSON parse'},
+                },
+            }
+            scans = {loc: set()}
+            with mock.patch.object(
+                h.active_tier, '_setup_token_for_tier', return_value=None,
+            ):
+                drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+            kinds = [(name, kind) for name, kind, _ in drifts]
+            self.assertIn(('CLAUDE_MAX_OAUTH', 'MISSING_CREDENTIAL'), kinds)
+
+    def test_tier_mapping_tracks_active_tier_home(self):
+        # The location->tier map derives from active_tier._credentials_path, so
+        # moving TIER2_HOME there moves the mapping here too (no hardcoded
+        # substring to drift out of sync).
+        self.assertEqual(
+            h._claude_cli_tier_for_location(self._TIER2_LOC), 'tier2')
+        self.assertIsNone(
+            h._claude_cli_tier_for_location('claude_cli:/tmp/elsewhere.json'))
+        moved = '/home/larry/.claude-tier2-relocated'
+        with mock.patch.object(h.active_tier, 'TIER2_HOME', moved):
+            relocated = f'claude_cli:{moved}/.claude/.credentials.json'
+            self.assertEqual(
+                h._claude_cli_tier_for_location(relocated), 'tier2')
+            # The old path is no longer tier2 once the home moves.
+            self.assertIsNone(
+                h._claude_cli_tier_for_location(self._TIER2_LOC))
+
+    def test_setup_token_does_not_mask_non_claude_locations(self):
+        # The suppression is scoped to claude_cli only — an env_file drift is
+        # untouched even with both setup-tokens configured.
+        reg = _registry([_cred('GHOST_TOKEN')])
+        scans = {
+            'env_file:/home/larry/credentials/.env.larry': set(),
+            'gh_cli:/home/larry/.config/gh/hosts.yml': set(),
+            'claude_cli:/home/larry/.claude/.credentials.json': set(),
+            'workspace_mcp:/home/larry/.google_workspace_mcp/credentials/':
+                set(),
+        }
+        with mock.patch.dict(
+            os.environ,
+            {'CLAUDE_CODE_OAUTH_TOKEN_TIER1': 't1',
+             'CLAUDE_CODE_OAUTH_TOKEN_TIER2': 't2'},
+            clear=False,
+        ):
+            drifts, _ = h.detect_drift(reg, scan_overrides=scans)
+        kinds = [(name, kind) for name, kind, _ in drifts]
+        self.assertIn(('GHOST_TOKEN', 'MISSING_CREDENTIAL'), kinds)
+
+
 class DedupTest(_IsolatedAgentsRoot):
     def test_first_drift_is_re_dm_eligible(self):
         state = {'drifts': {}}
