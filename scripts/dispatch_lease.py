@@ -250,6 +250,33 @@ def release(identity, nonce=None):
         _log_op(f'RELEASE: {identity}')
 
 
+def is_held(identity) -> bool:
+    """Read-only predicate: is a LIVE lease currently held for `identity`?
+
+    True iff a lease file exists, is within TTL, and its holder PID is alive on
+    the current boot — the same "held" notion try_acquire enforces before it
+    refuses (see the age < TTL_SECONDS and _pid_alive_same_boot gate there), so
+    a peer process polling this sees exactly what the acquirer would.
+
+    Unlike try_acquire this NEVER acquires, reclaims, signals, or creates
+    anything: it reads the lease path directly (no LEASES_DIR mkdir) and never
+    kills the holder. That makes it safe for an unrelated process (e.g. a healer)
+    to ask "is the watcher mid-dispatch?" without disturbing the lease. In 'off'
+    mode no lease files are written, so this is always False."""
+    if mode() == 'off':
+        return False
+    # Read the path directly rather than via _lease_path(), which mkdirs the
+    # leases dir as a side effect — a write we must not do on this read path.
+    existing = _read_lease(LEASES_DIR / (_safe_identity(identity) + '.lease'))
+    if not existing:
+        return False
+    age = time.time() - existing.get('timestamp_renewed', 0)
+    if age >= TTL_SECONDS:
+        return False
+    return _pid_alive_same_boot(existing.get('holder_pid'),
+                                existing.get('boot_id', 'unknown'))
+
+
 def startup_sweep():
     """Clear any leases left over from a previous boot — PID reuse is possible."""
     if mode() == 'off':

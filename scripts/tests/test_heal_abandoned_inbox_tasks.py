@@ -17,6 +17,7 @@ import os
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -40,6 +41,10 @@ class _IsolatedRoot(unittest.TestCase):
             mock.patch.object(h, 'LOG_FILE', root / 'logs' / 'h.log'),
             mock.patch.object(h, 'INBOXES_ROOT', root / 'inboxes'),
             mock.patch.object(h, 'IN_FLIGHT_DIR', root / 'state' / 'in-flight'),
+            # Default the per-agent dispatch-lease gate to "free" so scan tests
+            # are hermetic (it otherwise reads dispatch_lease's real, un-isolated
+            # path). The gate itself is exercised directly in DispatchLeaseGateTest.
+            mock.patch.object(h, 'has_live_dispatch_lease', return_value=False),
         ]
         for p in self._patches:
             p.start()
@@ -148,6 +153,79 @@ class ResolvedGateTest(_IsolatedRoot):
         self.assertTrue(
             h.has_active_worker('configuration-management',
                                 {'wt-forge-configuration-management-001'}))
+
+
+class DispatchLeaseScanGateTest(_IsolatedRoot):
+    """The agent-level gate: while inbox_watcher holds inbox:<agent>, the healer
+    must defer the WHOLE agent (audit H1 — the in-flight/worker gates can't see a
+    task still in ensure_worktree_for_task setup)."""
+
+    def test_scan_defers_whole_agent_when_lease_live(self):
+        self._write_old_task('forge', 'mid-dispatch-001')
+        # Override the _IsolatedRoot default (free) -> lease held.
+        with mock.patch.object(h, 'has_live_dispatch_lease', return_value=True), \
+             mock.patch.object(h, 'get_active_claude_cwds', return_value=set()), \
+             mock.patch.object(h, 'task_already_resolved') as resolved_m, \
+             mock.patch.object(h, 'recover_task') as recover_m:
+            scanned, healed = h.scan_agent_inbox('forge', set())
+        # Deferred before any per-task gate is consulted; nothing renamed.
+        resolved_m.assert_not_called()
+        recover_m.assert_not_called()
+        self.assertEqual((scanned, healed), (0, 0))
+
+    def test_scan_proceeds_when_lease_free(self):
+        self._write_old_task('forge', 'lease-free-001')
+        with mock.patch.object(h, 'has_live_dispatch_lease', return_value=False), \
+             mock.patch.object(h, 'get_active_claude_cwds', return_value=set()), \
+             mock.patch.object(h, 'task_already_resolved', return_value=None), \
+             mock.patch.object(h, 'recover_task', return_value=True) as recover_m:
+            scanned, healed = h.scan_agent_inbox('forge', set())
+        recover_m.assert_called_once()
+        self.assertEqual(healed, 1)
+
+
+class DispatchLeaseGateTest(unittest.TestCase):
+    """has_live_dispatch_lease delegates the read-only "held?" decision to
+    dispatch_lease.is_held (the owning module), and fails open on any error.
+    The held/stale/dead/no-file/off-mode logic itself is tested against the real
+    predicate in test_dispatch_lease_is_held.py."""
+
+    def _fake_dispatch_lease(self, held):
+        fake = types.ModuleType('dispatch_lease')
+        fake.is_held = lambda identity: held
+        return mock.patch.dict(sys.modules, {'dispatch_lease': fake})
+
+    def test_delegates_true(self):
+        with self._fake_dispatch_lease(True):
+            self.assertTrue(h.has_live_dispatch_lease('forge'))
+
+    def test_delegates_false(self):
+        with self._fake_dispatch_lease(False):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
+
+    def test_passes_inbox_prefixed_identity(self):
+        seen = {}
+        fake = types.ModuleType('dispatch_lease')
+        fake.is_held = lambda identity: seen.setdefault('id', identity) and False
+        with mock.patch.dict(sys.modules, {'dispatch_lease': fake}):
+            h.has_live_dispatch_lease('beacon')
+        self.assertEqual(seen['id'], 'inbox:beacon')
+
+    def test_import_failure_is_failsafe_not_held(self):
+        # dispatch_lease unavailable -> failsafe False so recovery is never
+        # blocked by a missing optional dependency.
+        with mock.patch.dict(sys.modules, {'dispatch_lease': None}), \
+             mock.patch.object(h, 'log'):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
+
+    def test_error_in_is_held_is_failsafe_not_held(self):
+        fake = types.ModuleType('dispatch_lease')
+        def _boom(identity):
+            raise RuntimeError('lease subsystem broken')
+        fake.is_held = _boom
+        with mock.patch.dict(sys.modules, {'dispatch_lease': fake}), \
+             mock.patch.object(h, 'log'):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
 
 
 class PidAliveTest(unittest.TestCase):

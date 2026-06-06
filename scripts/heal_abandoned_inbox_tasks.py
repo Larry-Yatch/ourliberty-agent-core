@@ -75,14 +75,24 @@ AGENTS_ROOT = Path("/home/larry/agents")
 KILL_SWITCH = AGENTS_ROOT / "healers.disabled"
 LOG_FILE = AGENTS_ROOT / "logs" / "heal_abandoned_inbox_tasks.log"
 INBOXES_ROOT = AGENTS_ROOT / "inboxes"
-# The authoritative "this task is being processed by a live worker" signal:
+# The per-task "this task is being processed by a live worker" signal:
 # agent_runner writes state/in-flight/<task_stem>.json (with the worker `pid`)
 # for the WHOLE duration of the claude run, and removes it on completion. The
-# previous code checked state/dispatch-leases/<task_id>.lock, but nothing ever
-# writes that file — the real dispatch lease is the per-AGENT `inbox:<agent>.lock`
-# (dispatch_lease keys on identity `inbox:<agent>`), held only briefly during a
-# poll. So the old lease gate was dead (always passed) and never protected an
-# in-flight task; the in-flight registry is the correct per-task gate.
+# previous code checked state/dispatch-leases/<task_id>.lock, which nothing
+# writes; the in-flight registry is the correct PER-TASK gate that replaced it.
+#
+# But the in-flight file does NOT cover the watcher's whole dispatch window.
+# inbox_watcher acquires the per-AGENT lease `inbox:<agent>` and holds it across
+# the ENTIRE process_task (acquire→release in agent_loop's finally), which
+# includes the minutes-wide ensure_worktree_for_task setup (git fetch/add/WIP
+# commit) that runs BEFORE the in-flight file is written and BEFORE the claude
+# process exists. During that window has_in_flight_worker AND has_active_worker
+# both return False, all gates pass, and the healer renames a task the watcher
+# is actively dispatching — the work then gets double-billed (audit H1). An
+# earlier comment removed the lease check on the belief the lease is "held only
+# briefly during a poll"; that is wrong. The per-agent lease is the one signal
+# covering that pre-registration window, so has_live_dispatch_lease() re-adds it
+# (read-only — see that function) as an agent-level gate.
 IN_FLIGHT_DIR = AGENTS_ROOT / "state" / "in-flight"
 
 # Only scan these agents' top-level inboxes — they have the workflow pattern
@@ -225,6 +235,41 @@ def has_in_flight_worker(task_id: str) -> bool:
     return isinstance(entry, dict) and _pid_alive(entry.get("pid"))
 
 
+def has_live_dispatch_lease(agent: str) -> bool:
+    """True if inbox_watcher currently holds the per-agent dispatch lease
+    `inbox:<agent>` with a live holder PID on the current boot, within TTL.
+
+    This is the ONLY signal that covers the watcher's full dispatch window —
+    including the ensure_worktree_for_task setup that runs AFTER lease
+    acquisition but BEFORE the in-flight registry file or the claude process
+    exists (where has_in_flight_worker and has_active_worker both return False).
+    Without this gate the healer renames a task the watcher is mid-dispatch on
+    and the LLM work is double-billed (audit H1).
+
+    Gate granularity is per-AGENT, not per-task: the lease keys on `inbox:<agent>`
+    and does not name the specific task being dispatched, so we conservatively
+    defer recovery for the whole agent this tick when the watcher is active.
+    That is safe — a genuinely abandoned task is recovered on a later tick once
+    the watcher releases the lease (recovery is not time-critical; the task is
+    already >60 min old). A dead/stale watcher leaves the lease past TTL, which
+    reads as not-held so recovery proceeds normally.
+
+    READ-ONLY by construction: dispatch_lease.is_held() only inspects the lease
+    file — it NEVER acquires (which would trip kill-before-reclaim and SIGKILL
+    the live watcher), and it does not even mkdir the leases dir. In
+    dispatch_lease 'off' mode no lease file is written, so this gate is inert and
+    the in-flight/worker gates still apply.
+
+    Failsafe: any error returns False so a reconciliation hiccup never blocks
+    recovery of a genuinely abandoned task."""
+    try:
+        import dispatch_lease  # local import: optional dependency, failsafe below
+        return dispatch_lease.is_held(f"inbox:{agent}")
+    except Exception as exc:  # noqa: BLE001 -- never block recovery on error
+        log("WARN", f"dispatch-lease check failed for {agent}: {exc}")
+        return False
+
+
 def _canonical_task_id(task_file: Path) -> str:
     """The task_id the dispatcher keyed the worktree + in-flight registry on:
     the task body's `task_id` field, falling back to the filename stem — exactly
@@ -292,6 +337,14 @@ def scan_agent_inbox(agent: str, active_cwds: set[str]) -> tuple[int, int]:
     """Return (scanned, healed)."""
     inbox = INBOXES_ROOT / agent
     if not inbox.is_dir():
+        return 0, 0
+    # Defer the whole agent while inbox_watcher holds the dispatch lease — it is
+    # mid-process_task and the in-flight/worker gates do not yet see the work
+    # being set up (audit H1). Recovery resumes next tick once the lease frees.
+    if has_live_dispatch_lease(agent):
+        log("SKIP",
+            f"{agent} action=skip-agent reason=dispatch-lease-live — "
+            f"inbox_watcher actively dispatching; deferring recovery to next tick")
         return 0, 0
     scanned = 0
     healed = 0
