@@ -17,6 +17,7 @@ import os
 import sys
 import tempfile
 import time
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -40,6 +41,10 @@ class _IsolatedRoot(unittest.TestCase):
             mock.patch.object(h, 'LOG_FILE', root / 'logs' / 'h.log'),
             mock.patch.object(h, 'INBOXES_ROOT', root / 'inboxes'),
             mock.patch.object(h, 'IN_FLIGHT_DIR', root / 'state' / 'in-flight'),
+            # Default the per-agent dispatch-lease gate to "free" so scan tests
+            # are hermetic (it otherwise reads dispatch_lease's real, un-isolated
+            # path). The gate itself is exercised directly in DispatchLeaseGateTest.
+            mock.patch.object(h, 'has_live_dispatch_lease', return_value=False),
         ]
         for p in self._patches:
             p.start()
@@ -148,6 +153,80 @@ class ResolvedGateTest(_IsolatedRoot):
         self.assertTrue(
             h.has_active_worker('configuration-management',
                                 {'wt-forge-configuration-management-001'}))
+
+
+class DispatchLeaseScanGateTest(_IsolatedRoot):
+    """The agent-level gate: while inbox_watcher holds inbox:<agent>, the healer
+    must defer the WHOLE agent (audit H1 — the in-flight/worker gates can't see a
+    task still in ensure_worktree_for_task setup)."""
+
+    def test_scan_defers_whole_agent_when_lease_live(self):
+        self._write_old_task('forge', 'mid-dispatch-001')
+        # Override the _IsolatedRoot default (free) -> lease held.
+        with mock.patch.object(h, 'has_live_dispatch_lease', return_value=True), \
+             mock.patch.object(h, 'get_active_claude_cwds', return_value=set()), \
+             mock.patch.object(h, 'task_already_resolved') as resolved_m, \
+             mock.patch.object(h, 'recover_task') as recover_m:
+            scanned, healed = h.scan_agent_inbox('forge', set())
+        # Deferred before any per-task gate is consulted; nothing renamed.
+        resolved_m.assert_not_called()
+        recover_m.assert_not_called()
+        self.assertEqual((scanned, healed), (0, 0))
+
+    def test_scan_proceeds_when_lease_free(self):
+        self._write_old_task('forge', 'lease-free-001')
+        with mock.patch.object(h, 'has_live_dispatch_lease', return_value=False), \
+             mock.patch.object(h, 'get_active_claude_cwds', return_value=set()), \
+             mock.patch.object(h, 'task_already_resolved', return_value=None), \
+             mock.patch.object(h, 'recover_task', return_value=True) as recover_m:
+            scanned, healed = h.scan_agent_inbox('forge', set())
+        recover_m.assert_called_once()
+        self.assertEqual(healed, 1)
+
+
+class DispatchLeaseGateTest(unittest.TestCase):
+    """Unit tests for the read-only has_live_dispatch_lease helper itself.
+
+    A fake dispatch_lease module is injected so the test never touches the real,
+    un-isolated lease directory and never acquires/reclaims a lease."""
+
+    def _fake_dispatch_lease(self, lease, *, ttl=180, alive=True):
+        fake = types.ModuleType('dispatch_lease')
+        fake.TTL_SECONDS = ttl
+        fake._read_lease = lambda path: lease
+        fake._lease_path = lambda identity: Path('/does/not/matter') / identity
+        fake._pid_alive_same_boot = lambda pid, boot: alive
+        return mock.patch.dict(sys.modules, {'dispatch_lease': fake})
+
+    def test_live_lease_within_ttl_is_held(self):
+        lease = {'holder_pid': 4321, 'boot_id': 'b1',
+                 'timestamp_renewed': time.time()}
+        with self._fake_dispatch_lease(lease, alive=True):
+            self.assertTrue(h.has_live_dispatch_lease('forge'))
+
+    def test_no_lease_file_is_not_held(self):
+        with self._fake_dispatch_lease(None):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
+
+    def test_stale_lease_past_ttl_is_not_held(self):
+        # Watcher gone -> lease aged past TTL -> the genuinely-abandoned case.
+        lease = {'holder_pid': 4321, 'boot_id': 'b1',
+                 'timestamp_renewed': time.time() - 10_000}
+        with self._fake_dispatch_lease(lease, ttl=180, alive=True):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
+
+    def test_dead_holder_is_not_held(self):
+        lease = {'holder_pid': 4321, 'boot_id': 'b1',
+                 'timestamp_renewed': time.time()}
+        with self._fake_dispatch_lease(lease, alive=False):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
+
+    def test_import_failure_is_failsafe_not_held(self):
+        # dispatch_lease unavailable -> failsafe False so recovery is never
+        # blocked by a missing optional dependency.
+        with mock.patch.dict(sys.modules, {'dispatch_lease': None}), \
+             mock.patch.object(h, 'log'):
+            self.assertFalse(h.has_live_dispatch_lease('forge'))
 
 
 class PidAliveTest(unittest.TestCase):
