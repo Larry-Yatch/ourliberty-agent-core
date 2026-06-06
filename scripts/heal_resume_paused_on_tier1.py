@@ -51,6 +51,8 @@ from typing import Any, Optional
 # Allow imports of sibling modules in scripts/.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from atomic_io import atomic_write_json  # noqa: E402
+
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 IN_FLIGHT_DIR = AGENTS_ROOT / 'state' / 'in-flight'
@@ -148,8 +150,7 @@ def load_state() -> dict[str, Any]:
 
 def save_state(state: dict[str, Any]) -> None:
     try:
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        STATE_FILE.write_text(json.dumps(state, indent=2))
+        atomic_write_json(STATE_FILE, state, indent=2)
     except OSError as e:
         log(f'save_state failed: {e}', 'WARN')
 

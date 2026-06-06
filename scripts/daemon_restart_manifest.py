@@ -46,6 +46,10 @@ SCRIPTS_DIR = REPO_ROOT / 'scripts'
 SYSTEMD_DIR = REPO_ROOT / 'systemd'
 MANIFEST_PATH = REPO_ROOT / 'config' / 'daemon-restart-manifest.json'
 
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from atomic_io import atomic_write_json  # noqa: E402
+
 
 # -------------------- systemd unit introspection --------------------
 
@@ -257,8 +261,7 @@ def build_manifest() -> dict:
 
 def _cmd_regenerate() -> int:
     manifest = build_manifest()
-    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + '\n')
+    atomic_write_json(MANIFEST_PATH, manifest, indent=2, trailing_newline=True)
     print(f'wrote {MANIFEST_PATH} ({len(manifest_units(manifest))} units)')
     return 0
 

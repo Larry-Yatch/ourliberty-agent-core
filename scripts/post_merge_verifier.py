@@ -36,6 +36,11 @@ import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from atomic_io import atomic_write_json  # noqa: E402
+
 AGENTS_ROOT = Path('/home/larry/agents')
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'post-merge-verifications.json'
 LOG_FILE = AGENTS_ROOT / 'blackboard' / 'post-merge-verifier.log'
@@ -90,9 +95,7 @@ def load_state() -> dict:
 
 def save_state(state: dict) -> None:
     try:
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(STATE_FILE, 'w') as f:
-            json.dump(state, f, indent=2)
+        atomic_write_json(STATE_FILE, state, indent=2)
     except OSError as e:
         log(f'WARN: failed to save state: {e}')
 
@@ -351,8 +354,7 @@ doesn't already do, and creates cleanup work for the founder.
     INBOX_MAIN.mkdir(parents=True, exist_ok=True)
     task_file = INBOX_MAIN / f'verify-pr-{pr_num}-attempt{attempt}-{int(time.time())}.json'
     try:
-        with open(task_file, 'w') as f:
-            json.dump(task, f, indent=2)
+        atomic_write_json(task_file, task, indent=2)
     except OSError as e:
         log(f'  #{pr_num}: failed to write verification task: {e}')
         return False

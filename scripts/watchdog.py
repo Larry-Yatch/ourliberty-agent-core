@@ -62,6 +62,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import bot_liveness_policy  # noqa: E402
 import larry_alerts  # noqa: E402
+from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path.home() / 'agents'
 BLACKBOARD = AGENTS_ROOT / 'blackboard'
@@ -637,8 +638,7 @@ def _read_reconcile_marker(short: str, now: float) -> dict:
 def _write_reconcile_marker(short: str, state: dict) -> None:
     path = _reconcile_marker_path(short)
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state))
+        atomic_write_json(path, state)
     except OSError:
         pass
 
@@ -824,9 +824,7 @@ def run_all_checks() -> dict:
         results['overall'] = 'healthy'
 
     try:
-        BLACKBOARD.mkdir(parents=True, exist_ok=True)
-        with open(HEALTH_FILE, 'w') as f:
-            json.dump(results, f, indent=2)
+        atomic_write_json(HEALTH_FILE, results, indent=2)
     except OSError as e:
         log(f'health-file write failed: {e}', 'ERROR')
 
