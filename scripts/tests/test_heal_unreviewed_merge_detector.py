@@ -46,6 +46,33 @@ def _pr(number: int, merged_at: str, login: str = 'Larry-Yatch',
     }
 
 
+def _gh_corpus(prs: list) -> 'callable':
+    """Build a `_run_gh_pr_list` side_effect that simulates gh's newest-first,
+    limit-capped windowing over a fixed `prs` corpus. Honors `merged:>=L` and
+    `merged:L..U` (inclusive both ends — so the boundary PR recurs, exercising
+    dedup) and caps each page at `_MERGED_PR_FETCH_LIMIT`. Returns
+    (rows, raw_count) exactly as the real `_run_gh_pr_list` does."""
+    def _dt(s):
+        return h._parse_iso(s)
+
+    def side_effect(search: str):
+        body = search[len('merged:'):]
+        if body.startswith('>='):
+            lo, hi = _dt(body[2:]), None
+        else:
+            lo_s, hi_s = body.split('..')
+            lo, hi = _dt(lo_s), _dt(hi_s)
+        win = [p for p in prs
+               if _dt(p['mergedAt']) >= lo
+               and (hi is None or _dt(p['mergedAt']) <= hi)]
+        win.sort(key=lambda p: _dt(p['mergedAt']), reverse=True)  # newest-first
+        page = win[:h._MERGED_PR_FETCH_LIMIT]
+        rows = [dict(p) for p in page]  # already in the flat parsed shape
+        return rows, len(page)
+
+    return side_effect
+
+
 class _IsolatedAgentsRoot(unittest.TestCase):
     """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test so the
     module-level LOG/STATE/HEARTBEAT/KILL_SWITCH paths don't touch prod
@@ -350,25 +377,6 @@ class MainTest(_IsolatedAgentsRoot):
                          h._parse_iso('2026-06-04T18:00:00Z'),
                          'cursor must advance (no livelock) even on a full batch')
 
-    def test_fetch_warns_loudly_when_cap_hit(self):
-        # No silent caps: a gh result at the row cap logs a TRUNCATED warning so
-        # the limit gets bumped before an unreviewed merge slips off the tail.
-        rows = [{'number': i, 'mergedAt': '2026-06-04T18:00:00Z',
-                 'url': f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{i}',
-                 'author': {'login': 'x'}, 'title': 't'}
-                for i in range(h._MERGED_PR_FETCH_LIMIT)]
-        from datetime import datetime, timezone
-        proc = type('P', (), {'returncode': 0, 'stdout': json.dumps(rows), 'stderr': ''})()
-        logs: list[tuple[str, str]] = []
-        with mock.patch.object(h, 'subprocess') as sp, \
-                mock.patch.object(h, 'log', side_effect=lambda m, lvl='INFO': logs.append((lvl, m))):
-            sp.run.return_value = proc
-            out = h.fetch_merged_prs(
-                '2026-06-04T00:00:00Z', datetime(2026, 6, 5, tzinfo=timezone.utc))
-        self.assertEqual(len(out), h._MERGED_PR_FETCH_LIMIT)
-        self.assertTrue(any('limit' in m.lower() and lvl == 'WARN' for lvl, m in logs),
-                        'a cap-hit WARN must be logged')
-
     def test_idempotent_no_duplicate_alert_on_rescan(self):
         self._seed_cursor('2026-06-04T00:00:00Z')
         pr = _pr(324, '2026-06-04T18:00:00Z')
@@ -408,6 +416,36 @@ class MainTest(_IsolatedAgentsRoot):
         self.assertEqual(rc, 0)
         self.assertEqual(self._fake.calls, [])
 
+    def test_e2e_unreviewed_tail_pr_alerted_across_pages(self):
+        # THE regression for audit finding #3: in a >limit window the oldest
+        # in-window merge falls off gh's first (newest-first) page. With real
+        # range-paging in fetch_merged_prs, main() must still SCAN that tail PR
+        # and ALERT on it when it has no REVIEW_PASS. Drive the gh seam with a
+        # corpus that forces a second page (limit shrunk to 3, 5 PRs). #100 is
+        # the oldest (off page 1) and is the ONLY unreviewed one.
+        # Timestamps are anchored to real now so fetch's lookback floor (which
+        # uses the real clock inside main()) can't filter the corpus out.
+        base = datetime.now(timezone.utc).replace(microsecond=0)
+        prs = [_pr(100 + i,
+                   (base - timedelta(minutes=10 * (5 - i))).strftime(
+                       '%Y-%m-%dT%H:%M:%SZ'))
+               for i in range(5)]  # #100 oldest ... #104 newest
+        self._seed_cursor((base - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'))
+        # Every PR except the tail #100 has REVIEW_PASS evidence.
+        notifier = '\n'.join(
+            f'AUTO_MERGE task=t pr={p["url"]} outcome=merged'
+            for p in prs if p['number'] != 100)
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)) as gh, \
+                mock.patch.object(h, 'read_notifier_log', return_value=notifier):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        self.assertGreaterEqual(gh.call_count, 2, 'must range-page past page 1')
+        self.assertEqual(len(self._fake.calls), 1,
+                         'exactly the tail PR #100 must alert')
+        self.assertEqual(self._fake.calls[0]['subject'], 'unreviewed-merge:100')
+
 
 # -------------------- fetch gh-failure tolerance (subprocess seam) --------------------
 
@@ -424,6 +462,99 @@ class FetchToleranceTest(_IsolatedAgentsRoot):
                 h.subprocess, 'run',
                 side_effect=h.subprocess.TimeoutExpired('gh', 30)):
             self.assertEqual(h.fetch_merged_prs('2026-06-04T00:00:00Z', now), [])
+
+
+# -------------------- range-paging (audit finding #3) --------------------
+
+class RangePagingTest(_IsolatedAgentsRoot):
+    """fetch_merged_prs must drain the WHOLE [cursor, now] window by range-paging,
+    never dropping an older in-window merge off gh's first page."""
+
+    NOW = datetime(2026, 6, 4, 20, 0, 0, tzinfo=timezone.utc)
+    CURSOR = '2026-06-04T00:00:00Z'
+
+    def _records(self):
+        recs: list = []
+        return recs, (lambda m, lvl='INFO': recs.append((lvl, m)))
+
+    def test_drains_full_window_across_pages_dedup_boundary(self):
+        # 5 PRs at distinct descending times, page limit 3. The inclusive
+        # `..upper` re-presents the boundary PR each page (so a full page nets
+        # limit-1 new), draining in 3 pages: [104,103,102] / [102*,101,100] /
+        # [100*]. The result must contain every PR exactly once (no dup, none
+        # dropped); the final short page ends paging.
+        prs = [_pr(100 + i, f'2026-06-04T1{i}:00:00Z') for i in range(5)]
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)) as gh:
+            out = h.fetch_merged_prs(self.CURSOR, self.NOW)
+        self.assertEqual(gh.call_count, 3)
+        nums = sorted(r['number'] for r in out)
+        self.assertEqual(nums, [100, 101, 102, 103, 104])
+        self.assertEqual(len(nums), len(set(nums)), 'boundary PR must be deduped')
+
+    def test_unreviewed_tail_pr_is_scanned(self):
+        # The dropped-tail PR (#100, oldest) is reachable to run_once and alerts.
+        prs = [_pr(100 + i, f'2026-06-04T1{i}:00:00Z') for i in range(5)]
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)):
+            out = h.fetch_merged_prs(self.CURSOR, self.NOW)
+        passed = {p['url'] for p in prs if p['number'] != 100}
+        alerts = h.run_once(out, passed_urls=passed, alerted_prs={})
+        self.assertEqual([a['number'] for a in alerts], [100])
+
+    def test_first_page_short_circuits_no_extra_fetch(self):
+        # A window that fits in one page must NOT issue a second query.
+        prs = [_pr(100 + i, f'2026-06-04T1{i}:00:00Z') for i in range(2)]
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)) as gh:
+            out = h.fetch_merged_prs(self.CURSOR, self.NOW)
+        self.assertEqual(gh.call_count, 1)
+        self.assertEqual(sorted(r['number'] for r in out), [100, 101])
+
+    def test_livelock_guard_breaks_and_warns_on_identical_timestamps(self):
+        # >limit merges sharing ONE second: the pivot can't decrease, so paging
+        # would re-fetch the same window forever. The guard must break + WARN.
+        prs = [_pr(100 + i, '2026-06-04T12:00:00Z') for i in range(5)]
+        recs, sink = self._records()
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)) as gh, \
+                mock.patch.object(h, 'log', side_effect=sink):
+            out = h.fetch_merged_prs(self.CURSOR, self.NOW)
+        # Terminates (no hang); only the first page's 3 PRs are returned.
+        self.assertEqual(len(out), 3)
+        self.assertLessEqual(gh.call_count, 3)
+        self.assertTrue(any(lvl == 'WARN' and 'stall' in m.lower()
+                            for lvl, m in recs),
+                        'a livelock WARN must be logged')
+
+    def test_page_cap_guard_breaks_and_warns(self):
+        # More distinct-time pages than the cap allows -> bounded + loud WARN.
+        prs = [_pr(100 + i, f'2026-06-04T18:{i:02d}:00Z') for i in range(25)]
+        recs, sink = self._records()
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 2), \
+                mock.patch.object(h, '_MAX_FETCH_PAGES', 20), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=_gh_corpus(prs)) as gh, \
+                mock.patch.object(h, 'log', side_effect=sink):
+            h.fetch_merged_prs(self.CURSOR, self.NOW)
+        self.assertEqual(gh.call_count, 20, 'must stop at the page cap')
+        self.assertTrue(any(lvl == 'WARN' and 'page cap' in m.lower()
+                            for lvl, m in recs),
+                        'a page-cap WARN must be logged')
+
+    def test_gh_error_midpaging_returns_partial(self):
+        # A gh failure on page 2 returns page 1's rows (fail-safe), never crashes.
+        page1 = [_pr(100 + i, f'2026-06-04T1{i}:00:00Z') for i in range(3)]
+        with mock.patch.object(h, '_MERGED_PR_FETCH_LIMIT', 3), \
+                mock.patch.object(h, '_run_gh_pr_list',
+                                  side_effect=[(page1, 3), None]) as gh:
+            out = h.fetch_merged_prs(self.CURSOR, self.NOW)
+        self.assertEqual(gh.call_count, 2)
+        self.assertEqual(sorted(r['number'] for r in out), [100, 101, 102])
 
 
 if __name__ == '__main__':
