@@ -55,6 +55,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -166,6 +167,157 @@ def _load_reversible_targets() -> dict:
         'retrigger_inbox_targets': _clean_list('retrigger_inbox_targets'),
         'silenceable_subjects': _clean_list('silenceable_subjects'),
     }
+
+
+# ---------- watchdog/systemd coordination (Stage-2 restart guard) ----------
+#
+# Three other actors already restart the two allowlisted watcher units
+# (ourliberty-inbox-watcher.service, ourliberty-outbox-notifier.service):
+#   1. systemd `Restart=on-failure` (+ StartLimit backoff).
+#   2. scripts/watchdog.py `_check_auto_restart`: on a sustained auto-restart
+#      streak it DELIBERATELY does not actuate -- it emits a flapping critical
+#      and defers to systemd's backoff (watchdog.py ~:258 "deferring to systemd").
+#   3. watchdog's V2 process-memory restart, gated by a 15-min cooldown marker.
+#
+# Medic acts on the watchdog's alerts, so an enabled restart_daemon would land
+# ON TOP of these. The recurrence gate + the M2 acted-failed-escalates fix
+# already bound Medic to ~1 restart per fingerprint (no loop), and a Medic
+# restart adds real value when systemd has GIVEN UP (unit failed /
+# StartLimit-exhausted with no peer actively restarting it). The gap this guard
+# closes: Medic today has NO awareness of a recent watchdog/systemd restart or
+# an active flap, so it could reset systemd's backoff on a flapping unit --
+# undercutting the watchdog's deliberate defer-on-flap discipline. So AFTER the
+# allowlist + recurrence gates and BEFORE actuating, _act_restart consults the
+# markers below and refuses+escalates (diagnose-only) when a peer is already
+# managing the unit's restart.
+#
+# These path/window conventions MIRROR scripts/watchdog.py so the two agree.
+# They are REPLICATED rather than imported because watchdog.py hardcodes
+# AGENTS_ROOT = ~/agents and would not honor medic's OURLIBERTY_AGENTS_ROOT
+# override (which the env contract and test isolation depend on). Keep them in
+# sync with watchdog.py if its markers ever move.
+
+# watchdog.py _FLAP_STREAK_DIR -- per-service consecutive-auto-restart counter.
+# Keyed by the service name WITHOUT '.service' but WITH the 'ourliberty-' prefix
+# (the AUTO_RESTART_SERVICES entries), e.g. 'ourliberty-inbox-watcher'.
+_FLAP_STREAK_DIR = AGENTS_ROOT / 'state' / 'auto-restart-flap'
+# A flap marker is only treated as an ACTIVE flap if touched within this window;
+# an older marker is considered stale (watchdog stopped updating it) so a
+# forgotten marker can never permanently wedge a legitimate restart. Generously
+# covers watchdog's minutes-apart cadence and aligns with the reconcile window.
+_FLAP_FRESH_WINDOW_SEC = 30 * 60
+# watchdog.py PROC_MEM_RESTART_COOLDOWN_SEC -- V2 process-memory restart cooldown
+# (inbox-watcher only writes it, as 'inbox-watcher-mem-restart-cooldown').
+_MEM_RESTART_COOLDOWN_SEC = 15 * 60
+# watchdog.py RECONCILE_WINDOW_SEC -- desired-state reconciler rolling window.
+# (The inbox/outbox units are not currently in bot-liveness-policy.json, so this
+# marker would not exist for them today; checked defensively for consistency in
+# case they are added later -- the two agents then agree by construction.)
+_RECONCILE_WINDOW_SEC = 30 * 60
+
+# Coordination refusal reasons. All escalate diagnose-only and DELIBERATELY do
+# NOT reset systemd backoff -- a human sees a genuinely-stuck unit instead.
+REASON_FLAPPING = 'flapping-defer-to-systemd'
+REASON_RECENTLY_RESTARTED = 'recently-restarted'
+
+
+def _flap_marker_name(unit: str) -> str:
+    """watchdog keys the flap marker by the service name without the '.service'
+    suffix but keeping the 'ourliberty-' prefix (AUTO_RESTART_SERVICES), e.g.
+    ourliberty-inbox-watcher.service -> ourliberty-inbox-watcher."""
+    return unit[:-len('.service')] if unit.endswith('.service') else unit
+
+
+def _unit_short_name(unit: str) -> str:
+    """Map a unit to the short name watchdog uses for its cooldown markers:
+    strip the 'ourliberty-' prefix AND the '.service' suffix
+    (ourliberty-inbox-watcher.service -> inbox-watcher). Mirrors the literal
+    'inbox-watcher-mem-restart-cooldown' marker and the policy short keys used
+    for '<short>-reconcile-cooldown'."""
+    name = _flap_marker_name(unit)  # strips the '.service' suffix
+    if name.startswith('ourliberty-'):
+        name = name[len('ourliberty-'):]
+    return name
+
+
+def _recent_peer_restart(unit: str) -> tuple[bool, str, str]:
+    """Coordinate with watchdog/systemd BEFORE Medic restarts an allowlisted
+    unit. Returns (block, reason, detail). block=True means another actor is
+    actively managing this unit's restart -- an active watchdog flap streak or
+    a peer restart still within its cooldown window -- so Medic must NOT
+    restart: doing so would reset systemd's StartLimit backoff and undercut the
+    watchdog's deliberate defer-on-flap discipline. Medic instead escalates
+    diagnose-only so a human sees a genuinely-stuck unit.
+
+    Fail-safe stance: every marker read defaults to NOT blocking on ANY error
+    (missing/unreadable/corrupt marker -> proceed). An unreadable marker must
+    never permanently wedge a legitimate restart; the recurrence gate +
+    verify/acted-failed already bound Medic to ~1 restart per fingerprint, so
+    proceeding-on-read-error is safe."""
+    now = time.time()
+
+    # 1. Active watchdog flap streak. watchdog counts consecutive systemd
+    #    auto-restart ticks and DEFERS to systemd while the streak is live
+    #    (it never actuates during auto-restart). A freshly-touched marker =>
+    #    a flap is in progress; restarting now would reset systemd's backoff.
+    try:
+        flap = _FLAP_STREAK_DIR / _flap_marker_name(unit)
+        if flap.exists() and (now - flap.stat().st_mtime) < _FLAP_FRESH_WINDOW_SEC:
+            try:
+                streak = flap.read_text().strip() or '?'
+            except OSError:
+                streak = '?'
+            return (True, REASON_FLAPPING,
+                    f'watchdog reports {unit} flapping in systemd auto-restart '
+                    f'(streak={streak}); deferring to systemd backoff. Escalate '
+                    f'diagnose-only -- do NOT reset backoff on a flapping unit.')
+    except OSError:
+        pass  # fail-safe: unreadable marker -> do not block
+
+    short = _unit_short_name(unit)
+
+    # 2a. V2 process-memory restart cooldown. watchdog touches this marker on a
+    #     mem-restart (15-min window); a peer just restarted the unit.
+    try:
+        mem = AGENTS_ROOT / 'state' / f'{short}-mem-restart-cooldown'
+        if mem.exists():
+            age = now - mem.stat().st_mtime
+            if age < _MEM_RESTART_COOLDOWN_SEC:
+                return (True, REASON_RECENTLY_RESTARTED,
+                        f'watchdog mem-restarted {unit} {int(age)}s ago '
+                        f'(< {_MEM_RESTART_COOLDOWN_SEC}s cooldown); a peer '
+                        f'restart is in flight. Escalate diagnose-only.')
+    except OSError:
+        pass  # fail-safe
+
+    # 2b. Desired-state reconcile cooldown. watchdog writes JSON
+    #     {window_start, count, paged}; a recent reconcile restart means a peer
+    #     is managing recovery within the rolling window.
+    try:
+        rec = AGENTS_ROOT / 'state' / f'{short}-reconcile-cooldown'
+        if rec.exists():
+            data = json.loads(rec.read_text())
+            window_start = float(data['window_start'])
+            count = int(data['count'])
+            if count >= 1 and (now - window_start) <= _RECONCILE_WINDOW_SEC:
+                return (True, REASON_RECENTLY_RESTARTED,
+                        f'watchdog reconciler restarted {unit} {count}x in the '
+                        f'current {_RECONCILE_WINDOW_SEC // 60}m window; a peer '
+                        f'is managing recovery. Escalate diagnose-only.')
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        pass  # fail-safe: missing/corrupt marker -> do not block
+
+    return (False, '', '')
+
+
+# Note: a live `systemctl is-active` transitional-state probe (activating/
+# reloading == "restart already underway") is DELIBERATELY omitted here. It is
+# explicitly optional, and the Medic-triggering alerts for these units already
+# imply marker presence (a flapping critical fires only with the flap marker
+# set; a genuine down/start-FAILED alert fires only after watchdog confirmed the
+# unit NOT in auto-restart -- exactly when Medic should restart). Adding it would
+# double the `systemctl is-active` calls on every happy-path restart (one here,
+# one for the post-restart verify) for a case the flap marker already covers.
 
 
 # ---------- subprocess shims (patched in tests) ----------
@@ -290,6 +442,19 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
                 f'Medic already acted once on fingerprint {fp}; refusing a '
                 f'second action to avoid a restart loop. Escalate the '
                 f'recurrence.')
+
+        # (c.5) watchdog/systemd coordination gate (Stage-2 restart guard).
+        # If another actor (a live watchdog flap or a peer restart within its
+        # cooldown window) is already managing this unit's restart, REFUSE and
+        # escalate diagnose-only -- Medic must not reset systemd's StartLimit
+        # backoff on a flapping unit. Recorded outcome='skipped' (NOT
+        # acted/acted-failed), so the recurrence gate stays un-armed and Medic
+        # can legitimately act on a later cycle once the peer-restart settles.
+        # See _recent_peer_restart for the fail-safe (read errors -> proceed).
+        block, peer_reason, peer_detail = _recent_peer_restart(target)
+        if block:
+            return _refuse(action, target, fp, attempt_int, peer_reason,
+                           peer_detail)
 
         # (d) perform
         _log('INFO', f'{action}: restarting {target} (fp={fp}, '
