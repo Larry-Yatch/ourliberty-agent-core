@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 1091 — 2026-06-07 01:04 UTC (interactive, Tier 3→1 — SIGNAL)
+
+**Health:** ⚠️ **Tier-reset. Check 0 found 2 new Tier-4 novel alerts (source=ledger/weekly-2026-06-01 + source=pulse/check-i-2026-06-01) from iter 1090's Sunday Check I fire. Both expected-by-design; both already delivered to Larry by beacon-bot at 00:29Z. Not in alert-translations.json → Tier 4 → tier-reset 3→1. G-rule pulse/check-i-* hits 3/3 threshold. All other checks nominal. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync caught up. 0 open PRs.**
+
+Alert watermark: **1422 lines / 2026-06-07T00:26:40Z** (pulse/check-i-2026-06-01) — was 1420 / 06:40:34Z June 6. Session-start gitStatus: branch=main, tree=clean, HEAD=4237ada "Pulse cycle 20260607T003114Z" (wrapper commit from iter 1090). Tier at start: tier=3, consecutive_clean=32. Pipeline-stall heartbeat: 2026-06-07T00:49:19Z (~15 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-07T00:46:57Z (~17 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-07T00:54:15Z (commit=4237adae1c33 matches HEAD — fully caught up). Tier state at end: **tier=1, consecutive_clean=0, last_signal_at=2026-06-07T01:04:15Z**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 2 new Tier-4 alerts.** larry-alerts.jsonl = 1422 lines (was 1420). Two new alerts since watermark:
+  - **idx=1420**: source=ledger, subject=weekly-2026-06-01 (ts=2026-06-07T00:26:38Z). Ledger weekly cost report. Delivered to Larry by beacon-bot at 18:29:49 MDT. Expected-by-design. NOT in alert-translations.json → Tier 4 novel.
+  - **idx=1421**: source=pulse, subject=check-i-2026-06-01 (ts=2026-06-07T00:26:40Z). Pulse Check I digest for week 2026-06-01. Delivered to Larry by beacon-bot at 18:29:50 MDT. Expected-by-design. NOT in alert-translations.json → Tier 4 novel.
+  - Both alerts are by-design Sunday fire outputs (Larry already received them via Telegram DM from beacon-bot). Per actionable-only feedback discipline: NO additional escalation DM. Tier-reset applies (Tier 4 → non-clean). → **tier-reset 3→1**. New watermark: 1422 / 2026-06-07T00:26:40Z.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1421 (pulse/check-i-2026-06-01, 18:29:50 MDT June 6 = 00:29:50 UTC June 7). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-07T00:49:19Z (~15 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-07T00:46:57Z (~17 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=4237ada "Pulse cycle 20260607T003114Z". sync.json commit=4237adae1c33 matches HEAD — fully caught up. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-07T00:54:15Z (within 2h threshold; commit matches HEAD). No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~76d; outside 60d window). ✅
+
+- **Periodic checks (Sunday June 7 UTC):** Check I already fired this Sunday at iter 1090 (00:25Z). Skip re-fire. Check III last 2026-05-31 (~7d ago; <14d threshold → skip; next eligible 2026-06-14). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark advanced to 1422 — new alerts are source=ledger+pulse (NOT unreviewed-merge). 0 new unreviewed-merge alerts. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: 0 new occurrences. Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change, no new failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): No new occurrence (0 open PRs). Carry forward.
+
+- **G-rule updates this iter:**
+  - **`source:pulse / subject:check-i-* not in alert-translations.json`: G-rule 3/3 THRESHOLD MET** (iter 638=1/3; iter 933=2/3; iter 1091=3/3). These Check I digest alerts fire every Sunday when Check I runs; not in alert-translations.json → Tier-4 novel every time. Fix: add `source:pulse` with `check-i-*` subject pattern as Tier-3/FYI to alert-translations.json. **Action: add to existing `deploy-notifier-alert-xlate-split-fix` engine-fix scope APPROVAL_REQUEST** (currently 5 G-rules pending Larry; this is the 6th). Larry: when approving engine-fix scope, include pulse/check-i-* addition.
+  - **`source:ledger / subject:weekly-* not in alert-translations.json`: G-rule 2/3** (iter 638=1/3; iter 1091=2/3). Already in the pending engine-fix scope APPROVAL_REQUEST (`deploy-notifier-alert-xlate-split-fix`). No new dispatch needed. Carry forward at 2/3.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no auto-fix actions this iter; tier-reset from classification observation, not from a remediated finding). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate.
+2. Check 0: claimed 2 new alerts (idx=1420-1421). Both Tier-4 novel (ledger/weekly-2026-06-01 + pulse/check-i-2026-06-01). Expected-by-design Sunday fire outputs. No additional DM to Larry (already delivered by beacon-bot; actionable-only discipline). Tier-reset 3→1 applied.
+3. G-rule pulse/check-i-*: 3/3 threshold met. Noted as 6th item for `deploy-notifier-alert-xlate-split-fix` engine-fix scope.
+4. G-rule ledger/weekly-*: advanced to 2/3. Already in engine-fix batch. No new dispatch.
+5. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync fully caught up, 0 open PRs.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-07T01:04:15Z.
+7. Wrote journal entry.
+
+**Escalated:** None new (Check 0 Tier-4 alerts are by-design; already delivered to Larry). Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- `[yellow]` **engine-fix scope** (`deploy-notifier-alert-xlate-split-fix`): NOW 6 G-rules pending — medic-diagnosis, pulse-check-stale:*, outbox-notifier:reject, cycle-blocked:dirty-tree-*, ledger/weekly-*, **plus new pulse/check-i-*** (3/3 threshold met this iter). Approve and tell Forge to include all 6.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+
+**Patterns:** Tier-reset 3→1 caused by Check I + Ledger Sunday digests not yet in alert-translations.json. This is the **3rd consecutive Sunday** these fire as Tier-4 novel (iters 638, 933, 1091). The engine-fix scope APPROVAL_REQUEST is the permanent fix path — Larry's `go:` on the engine-fix scope will stop this recurrence. Until then, every Sunday Check I cycle will trigger a tier-reset.
+
+**Learned:** Sunday Check I always fires `source=ledger/weekly-*` and `source=pulse/check-i-*` alerts. Until these are in alert-translations.json (Tier-3), every Sunday Check I iter will tier-reset to 1. Recommend Larry prioritize the engine-fix scope approval to stabilize Sunday cadence.
+
+---
+
 ## Iteration 1090 — 2026-06-07 00:25 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3, consecutive_clean=31→32. 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully caught up. 0 open PRs. Check I fired (Sunday).**
