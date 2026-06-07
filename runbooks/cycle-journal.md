@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 1097 — 2026-06-07 02:11 UTC (interactive, Tier 2→3 DE-ESCALATION)
+
+**Health:** ✅ **Nominal. Tier 2 → Tier 3 de-escalation (consecutive_clean=3). 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully caught up (commit=HEAD). 0 open PRs.**
+
+Alert watermark: **1422 lines / 2026-06-07T00:26:40Z** (pulse/check-i-2026-06-01) — unchanged from iter 1096. Session-start gitStatus: branch=main, tree=clean, HEAD=c0bb699 "Pulse cycle 20260607T015249Z" (wrapper commit from iter 1096). Tier at start: tier=2, consecutive_clean=2, last_signal_at=2026-06-07T01:04:15Z. Pipeline-stall heartbeat: 2026-06-07T02:10:39Z (~1 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-07T01:47:19Z (~24 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-07T01:54:15Z, commit=c0bb699226ed **matches HEAD** — fully caught up (wrapper-push lag from iters 1092–1096 cleared by hourly sync.timer). Tier state at end: **tier=3, consecutive_clean=0** (Tier 2→3 de-escalation; 3 consecutive clean Tier-2 iters: 1095/1096/1097; last_signal_at preserved 2026-06-07T01:04:15Z).
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** larry-alerts.jsonl = 1422 lines — watermark unchanged at 1422 / 2026-06-07T00:26:40Z. Last alert = pulse/check-i-2026-06-01 (idx=1421). → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1421 (pulse/check-i-2026-06-01, 18:29:50 MDT June 6 = 00:29:50Z UTC June 7) — unchanged from iter 1096. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-07T02:10:39Z (~1 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-07T01:47:19Z (~24 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, tree=clean (session-start gitStatus), HEAD=c0bb699 "Pulse cycle 20260607T015249Z". sync.json commit=c0bb699226ed matches HEAD — fully synced. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-07T01:54:15Z (within 2h threshold). commit matches HEAD. No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~76d; outside 60d window). ✅
+
+- **Periodic checks (Sunday June 7 UTC):** Check I already fired at iter 1090 (00:25Z). Skip re-fire (same Sunday calendar day). Check III: last 2026-05-31 (~7d ago; <14d threshold → skip; next eligible 2026-06-14). Checks VIII/IX/X (Monday only → skip). ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark unchanged (1422 / 00:26:40Z). 0 new unreviewed-merge alerts this iter. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: Watermark unchanged. 0 new occurrences this iter. Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change, no new failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs, no new occurrence. Carry forward.
+  - `pulse/check-i-*`: 3/3 threshold met iter 1091; in engine-fix scope batch. No new action needed.
+  - `ledger/weekly-*`: 2/3. No new occurrence. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no auto-fix actions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + periodic check gates (all skipped).
+2. Check 0: 0 new alerts. Watermark unchanged at 1422 / 00:26:40Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, 0 open PRs.
+4. `python3 scripts/cycle_tier_state.py record --checks-clean true` → **tier=3, consecutive_clean=0** (Tier 2→3 de-escalation at consecutive_clean=3).
+5. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** 3 consecutive clean Tier-2 iters (1095/1096/1097) → promoted to Tier 3 (30-min cadence). System running fully steady. Sync lag from prior iters also cleared this cycle (commit now matches HEAD). Three standing yellow escalations unchanged — all await Larry's `go:` replies. Next Monday (June 8 UTC): Checks VIII/IX/X fire. Next Check III eligible: 2026-06-14.
+
+**Learned:** Sync.json commit=HEAD match confirmed — hourly sync.timer caught up on wrapper-push lag that accumulated across iters 1092–1096 during rapid interactive session.
+
+---
+
 ## Iteration 1096 — 2026-06-07 01:51 UTC (interactive, Tier 2 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 2, consecutive_clean=1→2. 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal (wrapper-push lag; self-clearing). 0 open PRs.**
