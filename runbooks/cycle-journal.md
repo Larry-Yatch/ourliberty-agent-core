@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 1090 — 2026-06-07 00:25 UTC (interactive, Tier 3 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 3, consecutive_clean=31→32. 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully caught up. 0 open PRs. Check I fired (Sunday).**
+
+Alert watermark: **1420 lines / 2026-06-06T06:40:34Z** (auto-restarted:ourliberty-beacon-bot.service) — unchanged from iter 1089. Session-start gitStatus: branch=main, tree=clean, HEAD=9286224 "Pulse cycle 20260606T235312Z" (wrapper commit from iter 1089). Tier at start: tier=3, consecutive_clean=31, last_signal_at=2026-06-06T06:05:27Z. Pipeline-stall heartbeat: 2026-06-07T00:15:49Z (~10 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-07T00:16:42Z (~9 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-06T23:54:01Z (commit=9286224cb9 matches HEAD — fully caught up). Tier state at end: **tier=3, consecutive_clean=32**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** larry-alerts.jsonl = 1420 lines — watermark unchanged at 1420 / 06:40:34Z. Last alert = auto-restarted:ourliberty-beacon-bot.service (idx=1419). → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1419 (route=digest, auto-restarted:ourliberty-beacon-bot.service, 06:45:34Z UTC) — unchanged from iter 1089. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-07T00:15:49Z (~10 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-07T00:16:42Z (~9 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (from session-start gitStatus), HEAD=9286224 "Pulse cycle 20260606T235312Z". sync.json commit=9286224cb9 matches HEAD — fully caught up. ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-06T23:54:01Z (within 2h threshold; commit matches HEAD). No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **(Check I — Sunday gate) FIRED.** `python3 scripts/pulse_check_i.py --force` ran successfully. Sidecar refreshed (exit=0, 2.4s). Artifact written to `~/agents/blackboard/pulse-check-i/check-i-2026-06-07.json`. DM queued. 0 auto-dispatched (medium effort). Spend data unavailable (as_of=None, spend_week=None — same as 2026-06-05 artifact; sidecar refresh succeeded but no new Ledger data). **Note:** script output showed "journal: skipped — block for 2026-06-01 already present" before refresh, then "journal: appended" at end, but file size unchanged (64565 lines before and after). Consistent with known idempotency-by-sidecar-date bug: script matches sidecar week date (2026-06-01) for journal dedup, finds existing block, skips. Journal block written here manually.
+
+**Check I (2026-06-07):**
+
+- Ledger total: unavailable (as_of=None — sidecar refresh ran, no new data); 0 anomaly(ies)
+- Retry overhead: unavailable
+- High-repeat tasks: `smoke-5a-pf-no-marker`×3
+- Mode: digest — 1 proposal(s):
+  1. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+- **Note:** `smoke-5a-pf-no-marker` medium proposal now 3rd consecutive Check I cycle (2026-06-01 Sunday, 2026-06-03 /optimize, 2026-06-07 Sunday). Pattern is persistent. Larry can `/dispatch 1` to send to Beacon.
+
+- **(Check III) skip.** Last fired 2026-05-31 (~7d ago). <14d threshold. Sunday gate required (today qualifies day-of, but <14d from last). Next eligible: 2026-06-14 (Sunday). ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark unchanged (1420 / 06:40:34Z). 0 new unreviewed-merge alerts this iter. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: Watermark unchanged. 0 new occurrences this iter. Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence this iter. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change, no new failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): No new occurrence (0 open PRs). Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=727, systemic_fixes=13, ratio≈55.92 (unchanged — no auto-fix actions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate.
+2. Check I (Sunday gate): fired `pulse_check_i.py --force`. Artifact written. DM queued. Wrote Check I block manually (script journal write silently no-op'd per known idempotency-date bug).
+3. Check III: skip (<14d since last, next eligible 2026-06-14).
+4. Check 0: 0 new alerts. Watermark unchanged at 1420 / 06:40:34Z.
+5. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync fully caught up, 0 open PRs.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=32, last_updated=00:26:59Z.
+7. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** System steady-state at Tier 3 (30-min cadence). consecutive_clean=32/∞. Check I Sunday firing clean — same `smoke-5a-pf-no-marker` medium proposal for 3rd consecutive Check I invocation; Larry can `/dispatch 1`. Check III next eligible 2026-06-14. Check I journal-write idempotency bug: script matched sidecar week date (2026-06-01) for dedup, skipped writing; manually written here (recurring pattern, not a new finding).
+
+**Learned:** `smoke-5a-pf-no-marker` has now appeared in 3 consecutive Check I invocations without dispatch. Larry can send `/dispatch 1` to unblock it.
+
+---
+
 ## Iteration 1089 — 2026-06-06 23:51 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3, consecutive_clean=30→31. 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully caught up. 0 open PRs.**
