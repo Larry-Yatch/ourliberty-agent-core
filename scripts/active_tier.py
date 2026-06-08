@@ -99,8 +99,14 @@ def _setup_token_from_env_file(env_name):
     NEVER logged."""
     path = _credentials_env_file()
     try:
-        text = path.read_text()
-    except OSError:
+        # Pin UTF-8 so parsing is deterministic across launch contexts (a
+        # C/POSIX-locale systemd process vs a UTF-8 interactive shell) and
+        # catch UnicodeError (NOT an OSError) so a binary / partial-write /
+        # non-UTF-8 file degrades to a clean miss instead of crashing the
+        # rotation auth gate — honoring this function's "None on any read
+        # error" contract.
+        text = path.read_text(encoding='utf-8')
+    except (OSError, UnicodeError):
         return None
     prefix = env_name + '='
     for raw in text.splitlines():

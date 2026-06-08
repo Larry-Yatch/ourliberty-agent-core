@@ -677,6 +677,13 @@ class SetupTokenFileFallbackTest(unittest.TestCase):
         self.assertEqual(
             active_tier._setup_token_for_tier('tier2'), 'sk-ant-t2')
 
+    def test_non_utf8_file_degrades_to_none_not_crash(self):
+        # A binary / partial-write / non-UTF-8 credentials file must NOT crash
+        # the auth gate (read_text would raise UnicodeDecodeError, which is not
+        # an OSError) — it must degrade to a clean miss.
+        self.env_file.write_bytes(b'CLAUDE_CODE_OAUTH_TOKEN_TIER2=\xff\xfe\x00bad\n')
+        self.assertIsNone(active_tier._setup_token_for_tier('tier2'))
+
     def test_tier_auth_ok_true_from_file_token_without_credentials_json(self):
         # The end-to-end fix: no env var, no credentials.json, but the durable
         # token is in the file -> tier_auth_ok is True (was a false "down").
