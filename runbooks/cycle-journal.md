@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 1146 — 2026-06-08 03:32 UTC (interactive, Tier 2 → consecutive_clean=2 — NOMINAL + FORGE DISPATCH)
+
+**Health:** ✅ **Nominal. Tier 2, consecutive_clean=1→2. 0 new alerts. All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync clean. 0 open PRs. Pipeline action: Forge preflight dispatched for Check VIII/X run_check shadow fix (Pulse-gate path).**
+
+Alert watermark: **1426 lines / 2026-06-08T01:57:53Z** (sync-blocked:auto-commit-push-failed) — UNCHANGED from iter 1145. Session-start gitStatus: branch=main, tree=clean, HEAD=b7f04cc "Pulse cycle 20260608T031246Z". Tier at start: tier=2, consecutive_clean=1, last_signal_at=2026-06-08T02:28:38Z. Pipeline-stall heartbeat: 2026-06-08T03:16:00Z (~16 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-08T03:25:19Z (~7 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-08T02:57:59Z, commit=d38e4fe (older than HEAD=b7f04cc — wrapper-pushed automated cycles between hourly sync.timer fires; self-clearing). Tier state at end: **tier=2, consecutive_clean=2**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** Watermark unchanged at 1426 / 2026-06-08T01:57:53Z. Last 5 entries confirmed: check-i-2026-06-01 (idx=1421), pulse-check-failed:viii (idx=1422), pulse-check-failed:x (idx=1423), check-ix-github-token-missing (idx=1424), sync-blocked:auto-commit-push-failed (idx=1425, route=digest). No new entries. → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1425 (route=digest, sync-blocked:auto-commit-push-failed, 2026-06-07T19:58:27-0600 = 01:58Z UTC June 8). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-08T03:16:00Z (~16 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty (pre-dispatch).** Beacon=0, Forge=0, Mirror=0, Pulse=0. (Forge inbox had 0 before this iter's dispatch; 1 file written this iter — see actions.) ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-08T03:25:19Z (~7 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean, HEAD=b7f04cc "Pulse cycle 20260608T031246Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-08T02:57:59Z (within 2h threshold). Sync commit=d38e4fe older than HEAD=b7f04cc — wrapper-pushed automated cycles since last hourly sync.timer fire; self-clearing. No SYNC-PUSH-REBASE-FALLBACK. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Monday periodic checks (Check VIII, IX, X):**
+  - **Check VIII** (burn-rate alarm): TypeError crash confirmed at iter 1137 (run_check name-shadow bug). Alerts idx=1422 already sent. Forge dispatch issued this iter — see actions. Do NOT re-run this iter (would generate duplicate alert).
+  - **Check IX** (dashboard operator friction): GITHUB_TOKEN missing on ourliberty-dashboard-api. Alerts idx=1424 already sent at iter 1137. Escalation stands. Fix: set GITHUB_TOKEN in systemd unit env (ask-then-do; outside allow-list).
+  - **Check X** (chain quality): Same TypeError crash as VIII. Alerts idx=1423 already sent. Covered by same Forge dispatch as VIII.
+
+- **Pipeline completion (Pulse-gate path):** Beacon processed dispatch `cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z` at 00:24Z June 8 (85s, $0.37). Verification: Beacon confirmed the bug in all 7 `__main__` blocks and produced APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001`. Per MEMORY doctrine, Pulse IS the approval gate for its own Beacon dispatches. The prior Pulse notification session (00:25Z, $0.22) consumed the notification but did NOT forward to Forge. This iter: dispatched `pulse-check-run-check-shadow-fix-001.json` to `~/agents/inboxes/forge/` (source=beacon, phase=preflight). Fix scope: rename `from pulse_check_heartbeat import run_check` → `from pulse_check_heartbeat import run_check as _hb_run_check` in the `__main__` blocks of scripts/pulse_check_{iii,iv,v,vi,vii,viii,x}.py. Success criterion: `pulse_check_viii.py --dry-run` and `pulse_check_x.py --dry-run` complete without TypeError.
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark unchanged (1426 / 01:57Z). 0 new unreviewed-merge alerts. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: Watermark unchanged. 0 new occurrences. Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change, no new failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): No new occurrence (0 open PRs). Carry forward.
+  - `pulse-check-failed:* not in alert-translations.json` (G-rule 1/3, iter 1138): Root cause (run_check shadow) now in Forge pipeline. At merge: both the TypeError crash and the pulse-check-failed:* untranslated alert will stop recurring. No new dispatch needed for the translation G-rule — watch whether it stops after the run_check fix lands.
+
+- **PRIME DIRECTIVE ratio:** interventions≈730, systemic_fixes=14 (+1 this iter: pulse-check-runcheck-shadow Forge dispatch), ratio≈52.14, trend=flat.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate + Monday periodic check status review.
+2. Check 0: 0 new alerts. Watermark unchanged at 1426 / 01:57:53Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync nominal, 0 open PRs.
+4. Identified that prior Pulse notification session (00:25Z) had received Beacon APPROVAL_REQUEST for `pulse-check-run-check-shadow-fix-001` but failed to forward to Forge.
+5. Dispatched `pulse-check-run-check-shadow-fix-001.json` to `~/agents/inboxes/forge/` (Pulse-gate path per MEMORY).
+6. Recorded systemic_fix in PRIME DIRECTIVE ledger (iter 1146, tier=2, template=pulse-check-runcheck-shadow).
+7. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2, last_updated=03:32:01Z.
+8. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: Set GITHUB_TOKEN env in ourliberty-dashboard-api systemd unit. Escalation idx=1424 stands.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope pending Larry.
+
+**Patterns:** System at Tier 2 (15-min cadence), consecutive_clean=2 (1 more clean iter → Tier 3). Monday Check VIII/X fix now in Forge pipeline — expect PR today; when it merges, Monday checks resume and pulse-check-failed:* alert noise stops. Check IX GITHUB_TOKEN still blocking mission registration; fix requires Larry to update the systemd env for ourliberty-dashboard-api.
+
+**Learned:** Pulse notification sessions receiving APPROVAL_REQUEST blocks must actively dispatch to Forge (Pulse-gate path) — the prior session missed this. The `notify-*` task prompt says "Do not generate new work unless the sender output explicitly asks you to" but an APPROVAL_REQUEST block IS an explicit ask. This boundary needs to be clearer. (No dispatch to Beacon needed — this is an existing-discipline clarification for Pulse's own notification sessions, not a new spec shape.)
+
+---
+
 ## Iteration 1145 — 2026-06-08 03:11 UTC (interactive, Tier 2 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 2, consecutive_clean=0→1. 0 new alerts. All mandatory checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully cleared (race from iter 1141 self-healed). 0 open PRs.**
