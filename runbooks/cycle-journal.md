@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 1138 — 2026-06-08 00:54 UTC (interactive, Tier 3 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 3, consecutive_clean=40→41. 3 new alerts in watermark — all iter 1137 artifacts, all handled. All mandatory checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync within threshold. 0 open PRs.**
+
+Alert watermark: **1425 lines / 2026-06-08T00:22:49Z** (check-ix-github-token-missing) — up 3 from iter 1137 (1422). Session-start gitStatus: branch=main, tree=clean, HEAD=1de7651 "Pulse cycle 20260608T002606Z" (wrapper commit from iter 1137). Tier at start: tier=3, consecutive_clean=40, last_signal_at=2026-06-07T01:04:15Z. Pipeline-stall heartbeat: 2026-06-08T00:49:49Z (~5 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-08T00:25:04Z (~29 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-07T23:57:29Z (~57 min at scan; within 2h threshold). Tier state at end: **tier=3, consecutive_clean=41, last_updated=2026-06-08T00:54:16Z**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 3 new alerts — all iter 1137 artifacts, all handled.** larry-alerts.jsonl = 1425 lines (up from 1422 / 2026-06-07T00:26:40Z). New alerts since last watermark:
+  - idx=1423: `pulse-check-failed:viii` (src=pulse-check, 2026-06-08T00:17:03Z) — liveness watcher detected Check VIII TypeError during iter 1137. Already diagnosed (run_check name-shadow bug) and dispatched to Beacon in iter 1137. Handled.
+  - idx=1424: `pulse-check-failed:x` (src=pulse-check, 2026-06-08T00:17:14Z) — same bug, Check X. Same dispatch. Handled.
+  - idx=1425: `check-ix-github-token-missing` (src=pulse-escalation, 2026-06-08T00:22:49Z) — iter 1137 Check IX escalation echo. Known noise (G-rule 3/3 already in engine-fix batch). Handled.
+  - Classification: all 3 backward-looking artifacts from iter 1137's already-dispatched findings. No tier-reset. → ✅ Nominal (no new unhandled findings).
+  - **G-rule 1/3 NEW: `pulse-check-failed:* not in alert-translations.json`.** `source:pulse-check / subject:pulse-check-failed:*` is a distinct variant from the existing `pulse-check-stale:*` G-rule (iter 784, 1/3). Liveness watcher emits `failed` on crash vs `stale` on no-run. At 3/3: batch into same Beacon dispatch as `pulse-check-stale:*` (both Tier-3 FYI once fix lands).
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Watermark 1425 / 00:22:49Z updated. No new Larry directives since iter 1137 alerts. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-08T00:49:49Z (~5 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. Forge inbox confirmed empty — APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001` awaiting Larry's approval before Forge preflight dispatches. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-08T00:25:04Z (~29 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, tree=clean (session-start gitStatus), HEAD=1de7651 "Pulse cycle 20260608T002606Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-07T23:57:29Z (~57 min at scan; within 2h threshold). ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~74d; outside 60d window). ✅
+
+- **Periodic/conditional checks:** Monday June 8 UTC — Checks VIII/IX/X already fired at iter 1137 (00:17–00:22Z same calendar day). Skip re-fire. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: No new unreviewed-merge alerts in the 3 new alerts (all different subjects). **52 consecutive** (PRs #343–#394). Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: No new auto-restarted alerts. Forge brief missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No service warnings in last 60 min. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync no-change — no failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs, no occurrence. Carry forward.
+  - `pulse/check-i-*` (3/3) and `ledger/weekly-*` (2/3): no new alerts in this window. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=729, systemic_fixes=13, ratio≈56.08 (unchanged — no new interventions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate.
+2. Check 0: classified 3 new alerts as iter 1137 artifacts. Updated watermark to 1425 / 2026-06-08T00:22:49Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, 0 open PRs.
+4. Monday periodic checks: skip (already fired iter 1137 same calendar day).
+5. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=41, last_updated=2026-06-08T00:54:16Z.
+6. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward unchanged from iter 1137:
+- `[yellow]` **APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001`**: Beacon registered (iter 1137); Forge inbox empty — awaiting Larry's approval. Fix: rename `from pulse_check_heartbeat import run_check` → `as _hb_run_check` in 7 scripts' `__main__` blocks (VIII, X confirmed; III/IV/V/VI/VII latent). Approve → Forge builds + merges → Checks VIII/X work next Monday.
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: GITHUB_TOKEN not set on `ourliberty-dashboard-api` service → mission registration fails. Alert written iter 1137 (larry_alerts subject: check-ix-github-token-missing).
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges. Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Reply `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** Tier 3, consecutive_clean=41. System fully nominal for 41 consecutive clean iters. `pulse-check-failed:*` is a new G-rule at 1/3 — will increment next Monday if VIII/X fix hasn't landed. If Forge PR for `pulse-check-run-check-shadow-fix-001` merges before next Monday (June 15), G-rule will not reach 2/3. This is the natural pressure signal to close the loop: approve the APPROVAL_REQUEST and the G-rule self-closes.
+
+**Learned:** `pulse-check-failed:*` (liveness watcher crash signal) is a distinct alert subject from `pulse-check-stale:*` (no-run signal). Both should be added to alert-translations.json as Tier-3 FYI in the same engine-fix batch. Priority: batch them at next 3/3 threshold or when the engine-fix scope is approved.
+
+---
+
 ## Iteration 1137 — 2026-06-08 00:22 UTC (interactive, Tier 3 — Monday conditional checks fired)
 
 **Health:** ⚠️ **Mandatory checks: ✅ Nominal. Conditional/periodic checks: 3 findings.** Tier 3, consecutive_clean=39→40 (conditional checks don't gate de-escalation per § 2.3). **Monday checks VIII, IX, X fired for the first time this week (Monday June 8 UTC).**
