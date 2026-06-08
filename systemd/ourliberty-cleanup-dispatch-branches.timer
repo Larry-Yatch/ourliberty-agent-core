@@ -1,0 +1,13 @@
+[Unit]
+Description=Hourly GC backstop for stale Forge/Mirror dispatch branches (48h grace, bounded batches)
+
+[Timer]
+# Offset from cleanup-stale-worktrees (:00) so the two GC sweeps don't contend
+# on the same git repo at once.
+OnBootSec=40min
+OnUnitActiveSec=1h
+Unit=ourliberty-cleanup-dispatch-branches.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -25,6 +25,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import agent_runner               # noqa: E402
+import cleanup_dispatch_branches as cdb  # noqa: E402
 import heal_abandoned_inbox_tasks as heal  # noqa: E402
 import inbox_watcher as iw          # noqa: E402
 import routing_validator as rv      # noqa: E402
@@ -214,14 +215,15 @@ class WorktreePathTraversalTest(unittest.TestCase):
 class WorktreeSanitizerConsistencyTest(unittest.TestCase):
     """PR-A follow-up (audit #53), Task-1 must-match invariant.
 
-    THREE live copies of the worktree-domain sanitizer must agree byte-for-
+    FOUR live copies of the worktree-domain sanitizer must agree byte-for-
     byte or has_active_worker misses a live worker and the healer double-
-    dispatches:
+    dispatches (and the dispatch-branch cleaner mis-derives an active branch):
       - worktree_manager._sanitize_task_id   (inbox_watcher dispatch path)
       - agent_runner._worktree_safe_stem     ('main'-agent dispatch path)
       - heal_abandoned_inbox_tasks._worktree_safe_stem  (the matcher)
+      - cleanup_dispatch_branches._sanitize_task_id  (active-branch reconstruct)
     They MUST agree for every non-empty task_id. This contract test locks all
-    three together so a future edit to one without the others fails
+    four together so a future edit to one without the others fails
     CI-by-unittest.
     """
 
@@ -248,6 +250,7 @@ class WorktreeSanitizerConsistencyTest(unittest.TestCase):
             wm_out = wm._sanitize_task_id(tid)
             heal_out = heal._worktree_safe_stem(tid)
             ar_out = agent_runner._worktree_safe_stem(tid)
+            cdb_out = cdb._sanitize_task_id(tid)
             self.assertEqual(
                 wm_out, heal_out,
                 f"worktree_manager/heal divergence on {tid!r}",
@@ -255,6 +258,13 @@ class WorktreeSanitizerConsistencyTest(unittest.TestCase):
             self.assertEqual(
                 ar_out, heal_out,
                 f"agent_runner/heal divergence on {tid!r}",
+            )
+            # cleanup_dispatch_branches matches worktree_manager (the dispatch
+            # namer it reconstructs), which equals heal for non-empty ids; the
+            # one intentional empty-id divergence is asserted separately below.
+            self.assertEqual(
+                cdb_out, wm_out,
+                f"cleanup_dispatch_branches/worktree_manager divergence on {tid!r}",
             )
 
     def test_all_three_cap_at_fifty_chars(self):
