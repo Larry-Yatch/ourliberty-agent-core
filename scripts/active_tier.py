@@ -64,15 +64,79 @@ _SETUP_TOKEN_ENV_BY_TIER = {
     'tier2': 'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
 }
 
+# Canonical on-disk home of the durable setup-tokens: the systemd
+# ``EnvironmentFile`` that exports CLAUDE_CODE_OAUTH_TOKEN_TIER{1,2}.
+# ``_setup_token_for_tier`` falls back to parsing this file when the token is
+# absent from ``os.environ`` — so an auth check is correct even from a process
+# that did NOT inherit the EnvironmentFile (manual SSH probes, ``run_*.sh``
+# debug runs, ad-hoc healer invocations, a Claude session on the droplet).
+#
+# Without this fallback, such a process found no token, fell through to the
+# intentionally-frozen ``.credentials.json`` under TIER2_HOME, and emitted a
+# FALSE "Tier 2 down" — the recurring false-negative where the system reports
+# Tier 2 unavailable while it is actually up on the durable token. The env var
+# remains the primary (hot-path) source; the file is read only on a miss, so
+# systemd-launched daemons never touch disk here. Override via
+# ``OURLIBERTY_CREDENTIALS_ENV_FILE`` (tests point it at a nonexistent path to
+# isolate the legacy credentials.json cases). Spec: account-rotation.md § 6.1.
+_CREDENTIALS_ENV_FILE = '/home/larry/credentials/.env.larry'
+
+
+def _credentials_env_file():
+    """Path to the credentials EnvironmentFile. Honors
+    ``OURLIBERTY_CREDENTIALS_ENV_FILE`` (tests / non-standard hosts); resolved
+    at call time so an override set after import takes effect."""
+    return Path(os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE',
+                               _CREDENTIALS_ENV_FILE))
+
+
+def _setup_token_from_env_file(env_name):
+    """Best-effort read of ``env_name``'s value from the credentials
+    EnvironmentFile. Returns the token, or None on any miss / read error.
+
+    Parses systemd ``EnvironmentFile`` / shell ``KEY=value`` lines, tolerating
+    a leading ``export`` and single/double-quoted values. The token value is
+    NEVER logged."""
+    path = _credentials_env_file()
+    try:
+        text = path.read_text()
+    except OSError:
+        return None
+    prefix = env_name + '='
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith('export '):
+            line = line[len('export '):].lstrip()
+        if not line.startswith(prefix):
+            continue
+        value = line[len(prefix):].strip()
+        # Strip a single matching pair of surrounding quotes.
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+            value = value[1:-1]
+        return value or None
+    return None
+
 
 def _setup_token_for_tier(tier):
     """Return the long-lived setup-token for ``tier`` or None if unconfigured.
-    Empty string counts as unset so a presence check is equivalent to a
-    usability check. Token values must never be logged."""
+
+    Source precedence:
+      1. ``os.environ`` — the systemd ``EnvironmentFile`` path (hot path; no
+         disk I/O for daemons that inherited the env).
+      2. The credentials ``EnvironmentFile`` on disk (fallback) — so the token
+         is readable from a process that did NOT inherit the env var (manual
+         SSH checks, ``run_*.sh`` debug runs, ad-hoc healer runs). This removes
+         the "token must be present in every process env" fragility behind the
+         recurring false "Tier 2 down".
+
+    Empty string counts as unset so a presence check equals a usability check.
+    Token values must never be logged."""
     env_name = _SETUP_TOKEN_ENV_BY_TIER.get(tier)
     if not env_name:
         return None
-    return os.environ.get(env_name) or None
+    return (os.environ.get(env_name)
+            or _setup_token_from_env_file(env_name)
+            or None)
 
 # Max backoff when the "resets <time>" message is unparseable. Spec § 6.3.
 _COOLDOWN_BACKOFF_CAP = timedelta(minutes=30)

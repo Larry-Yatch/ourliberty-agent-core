@@ -28,6 +28,27 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import heal_credential_registry_drift as h  # noqa: E402
 
+_PREV_CREDENTIALS_ENV_FILE = None
+
+
+def setUpModule():
+    # Isolate the durable-token file fallback. active_tier._setup_token_for_tier
+    # now reads ~/credentials/.env.larry when the env var is unset; point it at
+    # a nonexistent path so this module's no-token suppression and distinctness
+    # cases stay reachable on the droplet (where the real file exists). Tests
+    # that need a token set the env var (overrides) or patch the function.
+    global _PREV_CREDENTIALS_ENV_FILE
+    _PREV_CREDENTIALS_ENV_FILE = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+    os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = (
+        '/nonexistent-ourliberty-test/.env.larry')
+
+
+def tearDownModule():
+    if _PREV_CREDENTIALS_ENV_FILE is None:
+        os.environ.pop('OURLIBERTY_CREDENTIALS_ENV_FILE', None)
+    else:
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = _PREV_CREDENTIALS_ENV_FILE
+
 
 class _IsolatedAgentsRoot(unittest.TestCase):
     """Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir per test.

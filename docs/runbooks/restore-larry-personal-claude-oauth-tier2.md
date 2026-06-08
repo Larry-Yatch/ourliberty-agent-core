@@ -104,6 +104,32 @@ The orchestrator will DM Larry a one-time device-code URL.
 
 ## STEP 4 — Smoke test (REQUIRED — proves you didn't land in the wrong account)
 
+> **⚠️ These commands test the LEGACY `credentials.json` — correct HERE (this
+> runbook restores that file), but the WRONG way to answer the everyday question
+> "is Tier 2 up?"**
+>
+> Tier 2 dispatches authenticate via the **durable setup-token**
+> (`CLAUDE_CODE_OAUTH_TOKEN_TIER2` in `~/credentials/.env.larry`), NOT this
+> `credentials.json` — which is intentionally frozen-stale once the durable
+> token took over. A bare `HOME=…claude-larry-personal claude …` in a shell that
+> hasn't sourced `.env.larry` will 401 against the stale file and read as a
+> **false "Tier 2 down"** even when Tier 2 is healthy on the token. This is the
+> recurring false-negative. To check whether Tier 2 can *actually serve
+> requests*, use the token-bearing form:
+>
+> ```bash
+> source ~/credentials/.env.larry
+> CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN_TIER2" \
+>   HOME=/home/larry/.claude-larry-personal \
+>   claude -p 'say PROBE_OK'   # this is what a real dispatch does
+> ```
+>
+> (As of the durable-token-fallback fix, `active_tier._setup_token_for_tier`
+> reads the token from `~/credentials/.env.larry` directly when it's absent from
+> the process env, so the healers / weekly probe / rotation gate no longer
+> false-flag. Only bare `claude` invocations like the ones below bypass that and
+> need the token passed explicitly.)
+
 ```bash
 # Probe: a trivial prompt under the Tier 2 HOME
 HOME=/home/larry/.claude-larry-personal claude -p 'say PROBE_OK'

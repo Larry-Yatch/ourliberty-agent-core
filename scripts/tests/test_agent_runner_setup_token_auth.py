@@ -102,6 +102,13 @@ class _RunClaudeHarness(unittest.TestCase):
         # by setting them via monkeypatching.
         self._prev_t1 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER1', None)
         self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        # Isolate the durable-token file fallback: _setup_token_for_tier now
+        # reads ~/credentials/.env.larry when the env var is unset, so point it
+        # at a nonexistent path to keep the absent-token path reachable on the
+        # droplet (where the real file exists).
+        self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
+            self.root / 'no-such.env')
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
 
@@ -113,6 +120,7 @@ class _RunClaudeHarness(unittest.TestCase):
         for name, prev in (
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
+            ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_env_file),
         ):
             if prev is None:
                 os.environ.pop(name, None)
