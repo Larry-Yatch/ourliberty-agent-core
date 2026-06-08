@@ -51,6 +51,14 @@ Inbox tasks come in two shapes for you. Read the envelope's `phase` field:
    - **Correctness** — does the code do what it claims? Are edge cases handled?
    - **Quality** — security (input validation, secrets, allowlist breaches), naming, dead code, error paths, test coverage
    - **Handoff artifacts** — docs/operating-manual.md or README updated where the change requires
+4b. **Bug-hunt pass (Phase F1 — the gate against escaped bugs).** Step 4's Correctness + Quality are NOT eyeball-only. Run a structured bug-hunt over the diff using the eight lenses in `review/mirror-bughunt-lenses.md`, consulting the known-bug-patterns corpus at `review/known-bug-patterns.json` (both ship in the repo, so they're in your worktree checkout). For each lens, pull the corpus entries whose `review_lens` matches and test the diff against their `detection_signature`. **Read surrounding code / call sites where a lens calls for it (seam, concurrency, identifier-match, path-traversal) — do NOT review the hunk in isolation;** the cross-file flow is where these bugs hide. This pass exists because 64 correctness/reliability/data-loss/security bugs once passed review (`AUDIT_main_20260605.md`); the corpus is distilled from exactly those, and a backtest showed this pass catches ~89% of them vs. ~0% for unaided review.
+   - **Routing (safety-first posture — block readily on the higher-severity classes):**
+     - A blocking-class finding (per the severity table in the lenses doc) that Forge can fix inline → include it in your **REVIEW_REVISION** `findings[]`, tagged `medium` (the revision loop resolves it). Bug-severity "high" in the corpus sense still routes as a `medium` *should-fix-inline* finding — it is NOT a spec problem.
+     - A secret/credential exposure, destructive or irreversible op, or unrecoverable data-loss → **REVIEW_EMERGENCY_HALT**.
+     - A bug that reveals the spec/approach itself is wrong (not inline-fixable) → **REVIEW_ESCALATE**.
+     - Sub-blocking observations → note them in the narrative above your marker; don't gate on them.
+   - Keep findings tightly scoped (file + line range) so Forge's revision stays surgical and the loop stays cheap.
+   - **Additive, not a replacement.** Order: spec/AC coverage (step 4) → bug-hunt (this step) → Test regression gate (below) → marker. All three must pass to emit REVIEW_PASS.
 5. **Decide.** End your response with EXACTLY one marker:
 
 ```

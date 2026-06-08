@@ -1,0 +1,163 @@
+{
+  "meta": {
+    "purpose": "Machine-actionable corpus of recurring bug CLASSES for the Mirror bug-hunt gate (Phase 1). Both the per-PR gate and the Pulse self-tuning loop (Phase 2) read and append to this file.",
+    "source_audit": "AUDIT_main_20260605.md",
+    "seeded": "2026-06-08",
+    "posture": "safety-first",
+    "posture_note": "Block a PR on any higher-severity class (security / concurrency-atomicity / data-loss / input-path-safety / automation-honesty) at moderate confidence; lower-severity / cosmetic classes are advisory. See review/mirror-bughunt-lenses.md for the confidence thresholds.",
+    "distilled_by": "subagent over review/backtest/findings.json; human gate is on POSTURE + backtest RESULTS, not on individual detection signatures"
+  },
+  "classes": [
+    {
+      "class_id": "predictable-tmp-path-toctou",
+      "name": "Predictable/shared /tmp path opened or used without atomic-exclusive creation",
+      "description": "A secret- or identity-bearing file is created/used at a predictable path in a world-writable shared dir (usually /tmp) without O_EXCL + post-open owner/fstat check (or without unpredictable naming), so a local race or co-tenant can pre-plant a file, follow a symlink, or recreate a landmine in the window. Often the read path is hardened but the write path is not.",
+      "detection_signature": "os.open(...) with O_NOFOLLOW but missing O_EXCL and no follow-up os.fstat st_uid/st_dev check; any open()/write_text/shutil.move to an f-string path under /tmp built from a PID/counter/second-resolution timestamp; a scrub/unlink step decoupled from the spawn/write it protects (TOCTOU window between them); read side does an owner check the write side omits; prompts/docs instructing secrets be written to a guessable /tmp path with default umask.",
+      "review_lens": "input-path-safety",
+      "severity_default": "HIGH",
+      "example_finding_ids": [1, 13, 45, 60],
+      "blocking": true
+    },
+    {
+      "class_id": "type-checked-not-value-validated-boundary",
+      "name": "Value crosses a trust boundary type-checked but not value/charset/membership-validated",
+      "description": "A validator or handler at a designated trust boundary checks only that a field is a non-empty str/int, never its character set, length, '..'/separator content, or membership in an allowlist, then feeds it into a filesystem path or delivery target. Safety is silently deferred to a downstream layer that may be the only gate.",
+      "detection_signature": "validate_*/handler doing `if not x or not isinstance(x, str)` (or isinstance int) as the ONLY constraint on a task_id / filename / chat_id, then that raw value reaching ROOT / f'{x}.json', os.replace, mkdir(parents=True), or an append-to-delivery-queue; pathlib joins of caller-influenced strings (pathlib does NOT collapse '..'); a sibling module that DOES sanitize the same field while this path uses it raw; authorization that relies on a downstream `x in ALLOWED` check instead of validating at the writer.",
+      "review_lens": "input-path-safety",
+      "severity_default": "HIGH",
+      "example_finding_ids": [10, 11, 39, 57],
+      "blocking": true
+    },
+    {
+      "class_id": "identifier-matching-without-canonical-comparison",
+      "name": "Identifier matched by unbounded substring or compared after lossy truncation/sanitization",
+      "description": "Two identifiers (task_id, step_id, PR/issue number, mock marker, loop slug) are deemed 'the same' via an in/substring/startswith test with no length floor or word boundary, or after a lossy transform (sanitize-to-'-', slice[:50]) so distinct ids collide or a raw id fails to match its own sanitized form. Produces false-positive matches (skip/retire/advance the wrong thing) or false negatives (guard fails to fire).",
+      "detection_signature": "`task_id in title`, `slug in f.name`, `m in tid`, re.compile(r'#(\\d+)') then `if probe(n)`, or `task_id.lower() in title.lower()` with no MIN_LEN / boundary guard; comparing a RAW id against a value that elsewhere went through _sanitize_task_id/[:50] (raw != sanitized); a [:N]-truncated stem used as a dict key or path component where two ids can share the first N chars; an asymmetric guard where one branch has a length floor and the parallel branch does not.",
+      "review_lens": "identifier-matching",
+      "severity_default": "HIGH",
+      "example_finding_ids": [4, 9, 12, 19, 26, 36, 41, 53],
+      "blocking": true
+    },
+    {
+      "class_id": "action-on-insufficient-verification",
+      "name": "Consequential automated action/conclusion taken on a signal that does not establish the precondition",
+      "description": "Automation merges, advances, declares quiescence, or reports 'healed' based on a signal that is stale, single-legged, dead code, or otherwise fails to actually confirm the state it implies — often bypassing a stronger gate that exists elsewhere in the same system, then de-duping/silencing so the unverified failure never re-surfaces.",
+      "detection_signature": "a merge/advance/heal/quiescence decision keyed on a URL-only or title-only match, a historical log line, or a check that globs a path nothing writes (dead branch always returns False); a reconcile/backstop path that skips the dual-gate (chain AND gh) the primary path enforces; remediation that cp+reload but never `enable --now`/start, then returns rc=0 and emits 'healed'; success reported before verifying the effect occurred; the unverified item then dropped from re-alert/GC.",
+      "review_lens": "automation-honesty",
+      "severity_default": "HIGH",
+      "example_finding_ids": [2, 5, 15, 17],
+      "blocking": true
+    },
+    {
+      "class_id": "checkpoint-advanced-past-unprocessed-work",
+      "name": "Cursor/offset/existence-sentinel advanced or set such that legitimate work is permanently skipped",
+      "description": "A persistence checkpoint (journal/log cursor, consumer offset, or existence-only idempotency sentinel) is advanced or created before the corresponding work is durably committed, or is keyed too coarsely, so records streamed-but-uninserted, an unscanned truncated tail, a crash-truncated artifact, or a second same-day signal are never (re)processed.",
+      "detection_signature": "cursor/offset updated inside or right after a read loop but before the insert/delivery is confirmed durable (save_cursor unconditional after a fallible sink); a fetch capped by --limit N whose cursor still advances to newest on count>=N (truncated tail lost); journalctl --cursor-file owned by the subprocess with no yield-coupled checkpoint; path.write_text(...) (non-atomic) to a file that is ALSO the `if target.exists(): skip` sentinel; a sentinel keyed only on a date string while multiple distinct signals can fire that day.",
+      "review_lens": "state-persistence",
+      "severity_default": "HIGH",
+      "example_finding_ids": [3, 7, 18, 30, 47],
+      "blocking": true
+    },
+    {
+      "class_id": "non-atomic-uncompensated-multistep-mutation",
+      "name": "Multiple persistent mutations that must be all-or-nothing are not transactional or compensated",
+      "description": "Two or more durable side effects (file rewrite + offset write, claim + side-effect + audit row, batched DB updates, sequential inserts, move-aside + relogin) run sequentially with no transaction, no rollback, and no restore-on-failure, so a crash or exception mid-sequence leaves inconsistent/partial state — and the success response carrying recovery info is never returned.",
+      "detection_signature": "a `for i in range(0, len(ids), 200): ...update().execute()` loop or back-to-back .execute()/write calls with no surrounding transaction/try-compensate; a claim/CAS (read_at = ts) whose release try/except wraps only the side-effect block but not the later audit/insert; shutil.move(backup_aside) with no matching move-back on every failure/exit path; the success `return {...}` sitting after the fallible loop so a mid-loop raise yields a 500 with no payload.",
+      "review_lens": "concurrency-atomicity",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [8, 20, 31, 32, 51],
+      "blocking": true
+    },
+    {
+      "class_id": "unsynchronized-shared-state-rmw",
+      "name": "Lock-free read-modify-write of a shared file by multiple processes/invocations",
+      "description": "A JSON/state file is read fully, mutated, and rewritten by more than one process or concurrent invocation with no flock/lock, so a lost-update race silently drops a just-written row or resolution; atomic tmp+rename makes each write atomic but does not serialize the read->mutate->write sequence. A fixed (non-unique) tmp filename additionally lets concurrent writers clobber each other's temp.",
+      "detection_signature": "`state = read_state(); state[k]=v; write_state(state)` (or readlines->survivors->atomic_rewrite) in a module with NO fcntl/flock/FileLock anywhere, called from >1 systemd unit or CLI; two daemons both import+mutate the same *.json; appenders (O_APPEND) racing a full-file rewriter; `tmp = path.with_suffix('.tmp')` (fixed name shared across writers) rather than mkstemp with a random suffix.",
+      "review_lens": "concurrency-atomicity",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [16, 46, 48, 62],
+      "blocking": true
+    },
+    {
+      "class_id": "pid-kill-without-identity-recheck",
+      "name": "Destructive signal sent to a recorded PID with no process-identity re-verification",
+      "description": "Stale-lease/zombie reclaim issues os.kill(SIGTERM/SIGKILL) on a PID captured earlier, with only a liveness/boot check and no /proc starttime token, so a same-boot recycled PID gets an unrelated bystander process killed. Often a sibling module solves exactly this with a starttime token.",
+      "detection_signature": "os.kill(pid, SIGKILL/SIGTERM) where pid came from a prior scan/lease record and the only guard is os.kill(pid,0) liveness and/or boot_id match — no /proc/<pid>/stat starttime comparison at kill time; multi-second shell-outs (ps/gh/git/find) between the identity snapshot and the kill widening the TOCTOU window; a neighboring guard module that DOES pair PID with start-time (asymmetry tell).",
+      "review_lens": "concurrency-atomicity",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [14, 27],
+      "blocking": true
+    },
+    {
+      "class_id": "missing-or-error-value-treated-as-safe-fail-open",
+      "name": "A missing/empty/error/wrongly-typed value is treated as the safe/benign default (fail-open)",
+      "description": "Code conflates 'I couldn't read it / it's empty / it errored / it's a non-bool string' with 'healthy, clean, passing, or disabled', so a kill-switch enables, capacity accounting is wiped, a not-green check passes the gate, drift reads as none, prior state is clobbered, or a dedup guard silently disarms — the opposite of the documented fail-closed behavior.",
+      "detection_signature": "bool(cfg.get('enabled')) / truthiness on a value that can be the string 'false' (use `is True`); `except (...): return {}` or `return 0`/None then that empty/zero used as authoritative (over-commit, 'no drift', clobber-on-next-write); an allowlist that includes '' so conclusion == '' passes a check gate; `except OSError: pass` on the only writer of a guard ledger; a non-zero subprocess rc coerced to a clean count with no skip/alert. Compare against the function's own docstring promising fail-closed.",
+      "review_lens": "control-flow-correctness",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [6, 22, 37, 43, 50, 56],
+      "blocking": true
+    },
+    {
+      "class_id": "unguarded-operation-outside-safe-boundary",
+      "name": "Risky operation runs unguarded, with too-narrow an except, or at module-import time",
+      "description": "An operation that can raise (date/ISO parse, naive-vs-aware datetime compare, log file write, schema validation, mkdir, a destructive DB mutation) runs with no try/except, an except too narrow to catch it, or at module top level with no __main__/function guard — so it crashes a daemon/oneshot, misattributes a user-input error as a system failure, violates a documented never-raise/fail-closed contract, or mutates prod merely on import.",
+      "detection_signature": "datetime.fromisoformat(arg) / dt_a < dt_b (naive vs aware -> TypeError) inside an except ValueError-only block or no block; open(LOG_FILE,'a').write(...) with no except OSError in a Type=oneshot tool; schema checks that raise after the json/OSError fail-closed branch, in a function whose contract promises a default; create_client(...).table(...).update().execute() or WORKTREE_BASE.mkdir(...) at module scope with no `if __name__ == '__main__'`/def main and no --apply/dry-run gate.",
+      "review_lens": "control-flow-correctness",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [21, 29, 40, 42, 49, 64],
+      "blocking": true
+    },
+    {
+      "class_id": "unbounded-or-unguarded-remediation-action",
+      "name": "Remediation/automation action fires without the guard that should bound or gate it",
+      "description": "A retry/rerun/redispatch loop or a mutating auto-fix runs without the ceiling, precondition, or settle/age guard that should constrain it: the budget counter is incremented after an early return or keyed on a value that resets, or a mutation runs without checking the precondition it documents (clean tree, file-age/quiescence), racing a concurrent writer.",
+      "detection_signature": "a rerun/redispatch path that returns before `attempts += 1`, or whose budget is keyed on a stem/id that changes each retry (counter resets, ceiling never trips); a per-tick cap presented as if it were a cumulative cap; `git merge --ff-only` / shutil.move-archive gated only on one condition while a documented precondition (clean-tree, mtime/age, lease) is checked in a SEPARATE ungated function; a healer that acts on the first matching small/invalid file with no age/lease gate that sibling healers have.",
+      "review_lens": "automation-honesty",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [24, 25, 33, 55],
+      "blocking": true
+    },
+    {
+      "class_id": "state-machine-zombie-not-finalized",
+      "name": "State machine reaches a condition its finalize/recovery path does not cover, leaving a wedged/zombie state",
+      "description": "A terminal-or-near-terminal transition (step failed, all steps merged via skip) leaves an item listed as in-flight or a sequence un-rolled-up because the finalize/recovery logic is gated on a status that excludes the reached path, so it can never advance, re-fires its failure each tick, or requires manual repair.",
+      "detection_signature": "a failed/merged transition that still .append(step_id) back into current_steps while pausing; a finalize/rollup guarded by `if status not in ('active','pending'): return` that a paused+all-merged path can reach; an in-flight re-check with no guard on the item's own status so a terminal item re-queries and re-fires; the only documented recovery being manual file edits because the resume/retry tooling is unshipped.",
+      "review_lens": "control-flow-correctness",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [34, 35],
+      "blocking": true
+    },
+    {
+      "class_id": "insufficient-uniqueness-key-collision",
+      "name": "Dedup/identity/output key omits a discriminator, so distinct records collide and one is silently lost",
+      "description": "A filename or dedup key is built from too few discriminators (same-name archive, second-resolution timestamp, an event_id that omits source_event_id) and combined with overwrite mode or ignore-duplicates, so two genuinely distinct records map to one slot and the earlier/second one is silently destroyed — defeating an audit/'reversible by re-insert' guarantee.",
+      "detection_signature": "shutil.move(src, ARCHIVE/ f.name) or open(path,'w') where the name can repeat (no PID/microsecond/unique suffix, no exist_ok check, no O_EXCL); a dedup/upsert key like sha1(task_id|type|ts) with ignore_duplicates=True that omits a field distinguishing two real events; second-resolution strftime('%Y%m%dT%H%M%SZ') filenames that two passes can share.",
+      "review_lens": "state-persistence",
+      "severity_default": "LOW",
+      "example_finding_ids": [54, 58, 63],
+      "blocking": false
+    },
+    {
+      "class_id": "implementation-diverges-from-stated-contract",
+      "name": "Code behavior, displayed value, or selected record contradicts its own docstring/comment/intent",
+      "description": "The implementation does the opposite of, or something narrower than, what its own docstring/comment/log-literal claims: wrong pairing (earliest-start/latest-done), positional 'last week' that gaps shift, naive-local timestamps the comment calls 'immaterial', precedence inverted vs the documented order, an ignored function argument, a tri-state value not special-cased per its documented semantics, or a hardcoded log denominator out of sync with the real constant.",
+      "detection_signature": "diff the code against its own docstring/comment: keep-earliest+keep-latest when the doc says latest-start/earliest-done; prior[0] assumed 'prior week' while the loader silently skips gaps; datetime.now() vs a naive-local parsed systemd timestamp with a comment dismissing DST; checks ordered opposite to a documented rule list; a feature/pr_num arg never referenced in the block that claims to match it; a None tri-state the docstring says 'waits' but the code counts as a mismatch; hardcoded log strings ('/10', 'Waited 120s') not matching MAX_CONCURRENT/timeout.",
+      "review_lens": "control-flow-correctness",
+      "severity_default": "MEDIUM",
+      "example_finding_ids": [23, 28, 38, 44, 52, 59, 61],
+      "blocking": false
+    }
+  ],
+  "coverage": {
+    "unclassified": [],
+    "all_64_covered": true
+  },
+  "notes": [
+    "Automation/healer code dominates the dataset and shares a recurring 'acts or reports on a signal that never established the precondition' shape: declaring healed/quiescent/merged/alive without verifying the effect (action-on-insufficient-verification), and unbounded or precondition-free remediation (unbounded-or-unguarded-remediation-action). Highest-leverage classes to gate because the failure is then de-duped/silenced and never re-surfaces.",
+    "A single upstream root — dispatch_validator only type-checking task_id (non-empty str, no charset/length) — propagates into at least three distinct downstream bug classes: path traversal (10/11/39), substring/truncation identifier collisions (12/26/53), and worktree contamination. Fixing the boundary validator (reject separators, enforce a length floor, canonicalize) would retire many instances at once.",
+    "Crash-atomicity and concurrency are systematically under-handled on a memory-constrained VM whose documented failure mode is OOM/SIGKILL: non-atomic writes to sentinel/state files, lock-free read-modify-write across daemons, cursors advanced before durable commit, multi-step mutations with no transaction. Atomic tmp+rename is used inconsistently and does not serialize read->mutate->write, so its presence is not evidence of safety.",
+    "Many findings are environment- or timing-gated (PID reuse, DST window, >200-row batch, microsecond collisions, multi-tenant /tmp) and correctly latent rather than refuted; the code shape is always present and unguarded. A notable fraction explicitly contradict their own docstring/comment, making 'review the code against its own stated contract' a high-yield, low-false-positive lens.",
+    "SAFETY-FIRST posture (2026-06-08): unsynchronized-shared-state-rmw flipped to blocking=true (was advisory) per Larry's gate posture. Advisory remain: insufficient-uniqueness-key-collision (LOW), implementation-diverges-from-stated-contract (MEDIUM, cosmetic-leaning)."
+  ]
+}
