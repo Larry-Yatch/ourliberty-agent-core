@@ -472,5 +472,5 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 
 if __name__ == '__main__':
-    from pulse_check_heartbeat import run_check
-    sys.exit(run_check('vii', main, log_fn=log))
+    from pulse_check_heartbeat import run_check as _hb_run_check
+    sys.exit(_hb_run_check('vii', main, log_fn=log))
