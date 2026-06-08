@@ -3043,9 +3043,14 @@ def _handle_rotation_mode_post(
 
     # off → write the override file with the pinned tier as its contents;
     # auto → remove it. The scheduler reads contents/presence on its next tick.
+    # Atomic write (tmp + fsync + os.replace) so a scheduler tick that reads the
+    # file concurrently never observes a truncated/empty body mid-write — a
+    # partial read would strip()->'' -> tier1 fallback and force a spurious
+    # one-tick tier1 + manual_override event. Matches the repo's atomic-write
+    # discipline (atomic_io is the shared helper).
     if mode == 'off':
         override_path.parent.mkdir(parents=True, exist_ok=True)
-        override_path.write_text(resolved_tier)
+        _import_atomic_io().atomic_write_text(override_path, resolved_tier)
     else:  # auto
         try:
             override_path.unlink()
@@ -3111,6 +3116,16 @@ def _import_supabase_chunk():
         sys.path.insert(0, str(scripts_dir))
     import supabase_chunk  # noqa: PLC0415
     return supabase_chunk
+
+
+def _import_atomic_io():
+    """Lazy import of the shared atomic-write helper (stdlib-only; lazy only to
+    share the scripts_dir sys.path setup)."""
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import atomic_io  # noqa: PLC0415
+    return atomic_io
 
 
 def _beacon_pending_approvals_path(agents_root: Path) -> Path:
