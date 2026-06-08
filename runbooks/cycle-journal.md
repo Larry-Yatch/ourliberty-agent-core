@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 1137 — 2026-06-08 00:22 UTC (interactive, Tier 3 — Monday conditional checks fired)
+
+**Health:** ⚠️ **Mandatory checks: ✅ Nominal. Conditional/periodic checks: 3 findings.** Tier 3, consecutive_clean=39→40 (conditional checks don't gate de-escalation per § 2.3). **Monday checks VIII, IX, X fired for the first time this week (Monday June 8 UTC).**
+
+Alert watermark: **1422 lines / 2026-06-07T00:26:40Z** — unchanged from iter 1136. Session-start gitStatus: branch=main, tree=clean, HEAD=9379d56 "Pulse cycle 20260607T234310Z" (wrapper commit from iter 1136). Tier at start: tier=3, consecutive_clean=39, last_signal_at=2026-06-07T01:04:15Z. Pipeline-stall heartbeat: 2026-06-08T00:01:59Z (~14 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-07T23:54:59Z (~21 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-07T23:57:29Z, commit=9379d56=HEAD — fully synced. Tier state at end: **tier=3, consecutive_clean=40, last_updated=2026-06-08T00:23:12Z**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** larry-alerts.jsonl = 1422 lines — watermark unchanged at 1422 / 2026-06-07T00:26:40Z. Last alert = pulse/check-i-2026-06-01 (idx=1421). → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Watermark unchanged (1422 / 00:26:40Z). No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-08T00:01:59Z (~14 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-07T23:54:59Z (~21 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, tree=clean (session-start gitStatus), HEAD=9379d56 "Pulse cycle 20260607T234310Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-07T23:57:29Z, commit=9379d56=HEAD — fully synced. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~75d; outside 60d window). ✅
+
+- **(Check VIII — Monday) FATAL: TypeError.** `python3 scripts/pulse_check_viii.py` crashed with `TypeError: run_check() got an unexpected keyword argument 'dms'`. Root cause (confirmed): the `if __name__ == '__main__':` block does `from pulse_check_heartbeat import run_check`, which shadows the module-level `run_check(dms, events, costs, ...)` function in the globals. When `main()` calls `run_check(dms=dms, ...)`, Python resolves `run_check` from globals — now the heartbeat version — which doesn't accept `dms`. Last successful run: 2026-06-04T04:11:38Z (heartbeat confirms; mtime shows script updated 2026-06-05 13:00 UTC — bug introduced that day). **Beacon dispatch sent:** `cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z.json`. PRIME DIRECTIVE: intervention+verification_pending rows logged.
+
+- **(Check IX — Monday) Fired: alert-ignored signal. Mission registration failed (GITHUB_TOKEN missing).** `python3 scripts/pulse_check_ix.py`: fired=1, registered=0, errors=1. **Signal:** alert-ignored threshold crossed — 143 evidence events, 20 repeating subjects in trailing 7d. Top subjects: `auto-restarted:ourliberty-dashboard-api.service` (14 fires), `auto-restarted:ourliberty-beacon-bot.service` (14), `auto-restarted:ourliberty-outbox-notifier.service` (12), `sync-blocked:auto-commit-push-failed` (10), multiple other `auto-restarted:*` (8 each). **Registration failure:** POST /api/system/missions/new → 500 `github token missing` (GITHUB_TOKEN env not set on dashboard-api service). Artifact written to `~/agents/blackboard/pulse-check-ix-proposals/check-ix-2026-06-08.json`. Heartbeat written (rc=0). **This corroborates the standing G-rule `auto-restarted:*` untranslated (pending Larry `go: redispatch auto-restarted-translation`).** Escalation written via larry_alerts (subject: check-ix-github-token-missing). PRIME DIRECTIVE: intervention row logged.
+
+- **(Check X — Monday) FATAL: TypeError.** `python3 scripts/pulse_check_x.py` crashed with `TypeError: run_check() got an unexpected keyword argument 'clarify_events'`. Same root cause as Check VIII: heartbeat import in `__main__` block shadows the module-level `run_check(clarify_events, ...)`. Check X was introduced 2026-06-03 (mtime Jun 3 14:00) with the bug present from day one — has never successfully run. **Batched into same Beacon dispatch as Check VIII** (cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z). Latent: same bug present in pulse_check_iii.py, pulse_check_iv.py, pulse_check_v.py, pulse_check_vi.py, pulse_check_vii.py (different schedules, not yet failing).
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark unchanged (1422 / 00:26:40Z). 0 new unreviewed-merge alerts this iter. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: Check IX CONFIRMED this pattern (14 fires/7d for dashboard-api alone). Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward — NOW corroborated by independent Check IX signal.
+  - `daemon-reload triggers cycle.timer stuck`: No new occurrence (no service warnings in last 60 min). G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync fully synced (commit=HEAD) — no failure. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs, no new occurrence. Carry forward.
+  - `pulse/check-i-*`: 3/3 threshold met iter 1091; in engine-fix scope batch. No new action needed.
+  - `ledger/weekly-*`: 2/3. No new occurrence. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=729 (+2 this iter: check-viii-x-shadow + check-ix-github-token), systemic_fixes=13, ratio≈56.08.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate. All nominal.
+2. Ran Monday conditional checks: VIII (FATAL — TypeError), IX (fired alert-ignored; registration failed), X (FATAL — TypeError).
+3. Check VIII/X: diagnosed root cause (run_check name shadowing); dispatched Beacon for code fix (`cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z.json` in Beacon inbox). All 7 affected scripts scoped in dispatch (VIII + X confirmed broken; III/IV/V/VI/VII latent).
+4. Check IX: wrote escalation via larry_alerts (subject: check-ix-github-token-missing); artifact at `~/agents/blackboard/pulse-check-ix-proposals/check-ix-2026-06-08.json`.
+5. `python3 scripts/cycle_prime_ledger.py append` × 3 → interventions=729, verification_pending=4.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier=3, consecutive_clean=40, last_updated=2026-06-08T00:23:12Z.
+7. Wrote journal entry.
+
+**Escalated:**
+- `[yellow]` **Check VIII/X TypeError — Beacon dispatch sent.** Fix needed: rename `from pulse_check_heartbeat import run_check` to `from pulse_check_heartbeat import run_check as _hb_run_check` in __main__ block of 7 scripts. Dispatch: `cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z`. Check I still firing correctly (unaffected — no internal run_check).
+- `[yellow]` **Check IX GITHUB_TOKEN missing.** `GITHUB_TOKEN` env var not set on `ourliberty-dashboard-api` service → Check IX cannot register drafting missions. Fix: set GITHUB_TOKEN in the service environment. Alert written (larry_alerts subject: check-ix-github-token-missing).
+- Standing carry-forward:
+  - `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges (PRs #343–#394). Reply `go: actor-exemption-config` to Beacon bot.
+  - `[yellow]` **auto-restarted:* Forge brief missing**: Check IX now corroborates (14 fires/7d for dashboard-api alone). Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+  - `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+  - APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending.
+  - `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** Tier 3, consecutive_clean=40. Monday checks surface two code bugs (VIII/X) that have been dormant all week — dispatched to Beacon. Check IX confirms that `auto-restarted:*` alert noise is now measurable operator friction (143 events/7d). Next Check III eligible: 2026-06-14 (Sunday). Next Check I: 2026-06-14 (Sunday). Next Monday checks (VIII/IX/X): 2026-06-15 — VIII and X should be fixed by then if Forge PR merges this week.
+
+**Learned:** Check VIII/X name-shadow bug: scripts that define their own `run_check` AND integrate with `pulse_check_heartbeat` must import the heartbeat wrapper under an alias (`_hb_run_check`) or the heartbeat import overwrites the module-level function. III/IV/V/VI/VII have the same latent bug — first failure would surface on their respective next scheduled run without the Forge fix. **Catchment: 7 scripts fixed proactively vs 2 failing today.**
+
+**[Beacon result — 2026-06-08T00:22Z | task=cycle-finding-check-viii-x-runcheck-shadow-20260608T002218Z | status=SUCCESS]**
+Bug independently verified by Beacon. Findings match: all 7 scripts (iii, iv, v, vi, vii, viii, x) have both a module-level `def run_check(...)` AND a shadowing `from pulse_check_heartbeat import run_check` in their `__main__` block. i.py and ix.py import-only (no local def) — correctly out of scope. APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001` registered by Beacon; phase=preflight; target=Forge. Fix: one-line alias (`run_check as _hb_run_check`) across all 7 `__main__` blocks; success criterion = VIII and X pass `--dry-run` without TypeError. Larry's approval dispatches the Forge preflight + build sequence.
+
+---
+
 ## Iteration 1136 — 2026-06-07 23:41 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3, consecutive_clean=38→39. 0 new alerts. All checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync no-change (last_sync=2026-06-07T22:57:19Z, commit=e54e266c — 1 behind HEAD=e8f407d, normal post-wrapper lag). 0 open PRs.**
