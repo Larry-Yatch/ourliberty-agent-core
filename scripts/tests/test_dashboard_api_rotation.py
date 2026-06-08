@@ -134,6 +134,33 @@ class GetRotationTest(_RotationBase):
         self.assertFalse(body['override_active'])
         self.assertFalse(body['config_enabled'])
 
+    # ---- manual-pin (spec § 6.5): pinned_tier surfaced on GET ----
+
+    def test_auto_pinned_tier_is_null(self):
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'auto')
+        self.assertIsNone(body['pinned_tier'])
+
+    def test_off_override_tier2_reports_pinned_tier2(self):
+        self._override_path().write_text('tier2')
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertEqual(body['pinned_tier'], 'tier2')
+
+    def test_off_empty_override_reports_tier1(self):
+        # Legacy empty touch → tier1 (historical Off behavior).
+        self._override_path().touch()
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertEqual(body['pinned_tier'], 'tier1')
+
+    def test_off_config_disabled_reports_tier1(self):
+        # Off purely because config disabled (no override file) → tier1,
+        # matching the scheduler's config-disabled force.
+        self._write_config(enabled=False)
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['pinned_tier'], 'tier1')
+
     def test_missing_token_401(self):
         r = self.c.get('/api/system/rotation')
         self.assertEqual(r.status_code, 401)
@@ -196,6 +223,51 @@ class PostRotationTest(_RotationBase):
         self.assertEqual(r.status_code, 400)
         # No override file created on the rejected path.
         self.assertFalse(self._override_path().exists())
+
+    # ---- manual-pin (spec § 6.5): pinned_tier on POST ----
+
+    def test_off_with_pinned_tier2_writes_contents_and_audits(self):
+        r = self.c.post('/api/system/rotation', headers=AUTH,
+                        json={'mode': 'off', 'pinned_tier': 'tier2'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertEqual(body['pinned_tier'], 'tier2')
+        # The override file carries the pinned tier as its contents.
+        self.assertEqual(self._override_path().read_text().strip(), 'tier2')
+        # Audit payload records the pinned tier.
+        row = self.client_stub.calls[0]['upsert_rows'][0]
+        self.assertEqual(row['payload']['pinned_tier'], 'tier2')
+
+    def test_off_default_pins_tier1_when_pinned_tier_omitted(self):
+        # Back-compat: {mode:'off'} with no pinned_tier pins tier1.
+        r = self.c.post('/api/system/rotation', headers=AUTH, json={'mode': 'off'})
+        self.assertEqual(r.json()['pinned_tier'], 'tier1')
+        self.assertEqual(self._override_path().read_text().strip(), 'tier1')
+
+    def test_off_invalid_pinned_tier_400_no_file(self):
+        r = self.c.post('/api/system/rotation', headers=AUTH,
+                        json={'mode': 'off', 'pinned_tier': 'tier3'})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(self._override_path().exists())
+
+    def test_auto_ignores_pinned_tier(self):
+        self._override_path().write_text('tier2')
+        r = self.c.post('/api/system/rotation', headers=AUTH,
+                        json={'mode': 'auto', 'pinned_tier': 'tier2'})
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['mode'], 'auto')
+        self.assertIsNone(body['pinned_tier'])
+        self.assertFalse(self._override_path().exists())
+
+    def test_pin_tier2_then_tier1_rewrites_contents(self):
+        self.c.post('/api/system/rotation', headers=AUTH,
+                    json={'mode': 'off', 'pinned_tier': 'tier2'})
+        self.assertEqual(self._override_path().read_text().strip(), 'tier2')
+        self.c.post('/api/system/rotation', headers=AUTH,
+                    json={'mode': 'off', 'pinned_tier': 'tier1'})
+        self.assertEqual(self._override_path().read_text().strip(), 'tier1')
 
     def test_missing_token_401(self):
         r = self.c.post('/api/system/rotation',

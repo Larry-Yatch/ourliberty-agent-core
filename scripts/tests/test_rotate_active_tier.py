@@ -265,6 +265,10 @@ class RuntimeOverrideTest(RotateTickBaseTest):
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / 'rotation.disabled').touch()
 
+    def _write_override(self, contents):
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / 'rotation.disabled').write_text(contents)
+
     def _events_lines(self):
         path = self.root / 'blackboard' / 'rotation-events.jsonl'
         if not path.exists():
@@ -340,6 +344,77 @@ class RuntimeOverrideTest(RotateTickBaseTest):
         self._set_rotation(enabled=True)
         result = rotate_active_tier.tick(now=now, models_file=self.models_file)
         self.assertNotEqual(result['action'], 'disabled')
+
+    # --- manual-pin (spec § 6.5): override file CONTENTS pin a tier ---
+
+    def test_override_pins_tier2_from_tier1(self):
+        # Off + pinned tier2: the disabled branch must flip to tier2, not
+        # snap to tier1. This is the whole point of the manual pin.
+        self._set_state(tier='tier1', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._write_override('tier2')
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['action'], 'disabled')
+        self.assertEqual(result['reason'], 'override')
+        self.assertIn('forced-tier2', result['changes'])
+        self.assertEqual(result['tier'], 'tier2')
+        self.assertEqual(active_tier.read()['tier'], 'tier2')
+
+    def test_override_pin_tier2_emits_engage_event(self):
+        # A pin onto tier2 is direction-aware: action='engage', to_tier=tier2.
+        self._set_state(tier='tier1', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._write_override('tier2')
+        now = datetime(2026, 5, 28, 12, 0, 0, tzinfo=timezone.utc)
+        rotate_active_tier.tick(now=now, models_file=self.models_file)
+        lines = self._events_lines()
+        self.assertEqual(len(lines), 1)
+        ev = lines[0]
+        self.assertEqual(ev['trigger'], 'manual_override')
+        self.assertEqual(ev['action'], 'engage')
+        self.assertEqual(ev['from_tier'], 'tier1')
+        self.assertEqual(ev['to_tier'], 'tier2')
+
+    def test_override_pin_tier2_is_sticky_idempotent(self):
+        # Already on tier2 + pinned tier2 → no change, no event. The pin
+        # holds across ticks (re-pins are no-ops), which is what makes a
+        # manual tier2 selection survive the otherwise-disengaged scheduler.
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._write_override('tier2')
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['changes'], [])
+        self.assertEqual(result['tier'], 'tier2')
+        self.assertEqual(active_tier.read()['tier'], 'tier2')
+        self.assertEqual(self._events_lines(), [])
+
+    def test_override_pin_tier2_survives_low_load(self):
+        # Manual pin fully wins: even with load below the disengage gate
+        # (which in Auto would force tier1), the pin holds tier2.
+        self._set_state(tier='tier1', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._set_load_tokens(0)
+        self._write_override('tier2')
+        rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(active_tier.read()['tier'], 'tier2')
+
+    def test_override_unrecognized_contents_default_tier1(self):
+        # Garbage / legacy-empty contents fall back to tier1 (historical Off).
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._write_override('garbage\n')
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertEqual(result['tier'], 'tier1')
+        self.assertEqual(active_tier.read()['tier'], 'tier1')
+
+    def test_override_pin_tier1_explicit(self):
+        # Explicit 'tier1' contents behave like the empty-touch Off.
+        self._set_state(tier='tier2', since='2026-05-28T10:00:00+00:00')
+        self._set_rotation(enabled=True)
+        self._write_override('tier1')
+        result = rotate_active_tier.tick(models_file=self.models_file)
+        self.assertIn('forced-tier1', result['changes'])
+        self.assertEqual(active_tier.read()['tier'], 'tier1')
 
 
 class WindowElapseTest(RotateTickBaseTest):

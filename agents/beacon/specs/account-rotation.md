@@ -143,9 +143,58 @@ action (engage/switch/switch-back/disengage/drain-defer) to `blackboard/rotation
 Pulse Check to tune the ratio/thresholds. Tests: spend ≥ engage → engaged; spend between
 thresholds → state held (hysteresis); ledger lines well-formed.
 
+### 6.5 Manual tier pin via dashboard Off control (depends on 6.3 + the dashboard Auto/Off switch)
+
+**Why.** The load gate (§ 6.4) decides tiers from the rolling-5h token signal — but Larry can see
+the Anthropic-side usage walls (per-account session/weekly limits) earlier and more accurately than
+the system can infer them from `costs.jsonl`. When Tier 1 is exhausted, he needs to *hold* the
+agents on Tier 2 himself. Before this, the dashboard Off control force-pinned Tier 1, so there was
+no way to do that.
+
+**Decision (locked): manual pin fully wins.** While Off+pinned, the load gate is completely
+bypassed — the scheduler never flips off the pinned tier until the operator returns to Auto. No
+"pin is a floor, auto can escalate" coupling.
+
+**Mechanism — reuse the override file's CONTENTS, no new state file.** The runtime override file
+`~/agents/rotation.disabled` (the Auto/Off switch from `dashboard-rotation-switch-001`) now carries
+the pinned tier as its body:
+
+- absent → Auto (load-gated rotation runs; § 6.3/6.4 unchanged)
+- contains `tier1` / `tier2` → that tier is force-pinned; the scheduler's disabled branch re-pins it
+  every tick via `active_tier.set_tier(<pinned>)`
+- empty (the historical `touch`) or unrecognized → `tier1` — identical to the original Off behavior,
+  so a file written by a pre-pin dashboard build keeps pinning Tier 1 (backward compatible)
+
+`rotate_active_tier._override_pinned_tier()` reads the contents at call time. The disabled branch
+emits a direction-aware `manual_override` event (`engage`→tier2, `disengage`→tier1) so the existing
+tier1 event shape is preserved and a tier2 pin is observable in `rotation-events.jsonl`.
+
+**Dashboard API.** `GET /api/system/rotation` returns `pinned_tier` (`tier1`|`tier2` while off, `null`
+in auto). `POST` accepts an optional `pinned_tier`; `mode=off` writes it as the file contents (default
+`tier1`), `mode=auto` removes the file. An invalid `pinned_tier` is a 400 before any filesystem
+mutation. The larry_action audit row records the pinned tier.
+
+**Dashboard UI.** A "Pinned tier" Tier 1 / Tier 2 selector under the Auto/Off row, enabled only while
+Off (grayed in Auto). Copy notes that a rate-limited tier still auto-falls to the other per request
+(the § 6.2 dispatch-path fallback + cooldown is the safety net under any pin).
+
+**Known interaction (documented, not defeated).** Pinning a tier that then hits a 429 does NOT move
+the pin: agent_runner cools down the failing tier and falls *that* dispatch to the other home, while
+the drain gate blocks *new* top-level dispatches to the cooling tier until the cooldown clears
+(continuations still flow). The scheduler keeps re-pinning the operator's choice. The pin is the
+*preference*; the per-dispatch 429 fallback remains the *safety net*.
+
+**Enforcement:** scheduler behavior is locked by `test_rotate_active_tier.py` (tier2 pin sticks /
+idempotent / survives-low-load, direction-aware event, unknown→tier1); the API contract by
+`test_dashboard_api_rotation.py` (pinned_tier across modes, write/validate/round-trip); the UI +
+proxy by `RotationToggle.test.tsx` + the route test. Backward-compat (empty file → tier1) is asserted
+in both the scheduler and API suites.
+
 ## 7. Rollout
 
-Steps 6.1 and 6.2 are independent roots; 6.3 follows 6.2; 6.4 follows 6.3. After all merge, flip
-`rotation.enabled=true` and watch `rotation-events.jsonl` + `anthropic-quota-events.jsonl` for one
-heavy day before trusting it. Master kill at any time: `rotation.enabled=false` (scheduler forces
-tier1 on next tick).
+Steps 6.1 and 6.2 are independent roots; 6.3 follows 6.2; 6.4 follows 6.3; 6.5 follows 6.3 + the
+dashboard switch. After all merge, flip `rotation.enabled=true` and watch `rotation-events.jsonl` +
+`anthropic-quota-events.jsonl` for one heavy day before trusting it. Master kill at any time:
+`rotation.enabled=false` (scheduler forces tier1 on next tick). Manual override at any time: the
+dashboard Off control with a pinned tier (or write `tier1`/`tier2` into `~/agents/rotation.disabled`
+directly).

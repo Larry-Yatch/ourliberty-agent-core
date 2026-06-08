@@ -204,6 +204,13 @@ LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
 # Mirrors the ~/agents/healers.disabled idiom. Two-state only: no force-on.
 ROTATION_OVERRIDE_FILE_NAME = 'rotation.disabled'
 ROTATION_VALID_MODES: frozenset[str] = frozenset({'auto', 'off'})
+# Manual-pin (spec § 6.5): when mode='off', the override file's CONTENTS carry
+# the tier the operator pinned. The scheduler (rotate_active_tier._override_
+# pinned_tier) honors it every tick. An empty file maps to tier1 — the
+# historical Off behavior — so older clients that just touched the file still
+# pin tier1.
+ROTATION_VALID_TIERS: frozenset[str] = frozenset({'tier1', 'tier2'})
+ROTATION_DEFAULT_PINNED_TIER = 'tier1'
 
 # Approvals-queue-rework N1 (L8): the agent-reviewed "clean up" button.
 # POST /api/larry/cleanup-review runs the SAME triage as
@@ -526,8 +533,11 @@ class LarryAllowlistResponse(BaseModel):
 class RotationModeResponse(BaseModel):
     # Effective rotation mode the dashboard renders beside kill_switch_active.
     # 'off' when the runtime override file is present OR the config default is
-    # disabled; 'auto' only when neither forces it off.
+    # disabled; 'auto' only when neither forces it off. pinned_tier is the tier
+    # the operator pinned while 'off' (tier1|tier2); it is null in 'auto' mode,
+    # where the load-gated scheduler owns the tier.
     mode: str
+    pinned_tier: Optional[str]
     override_active: bool
     config_enabled: bool
     as_of: str
@@ -535,10 +545,15 @@ class RotationModeResponse(BaseModel):
 
 class RotationModeRequest(BaseModel):
     mode: str
+    # Required when mode='off' (which tier to pin); ignored for 'auto'.
+    # Defaults to tier1 when omitted on an 'off' request, preserving the
+    # pre-pin "Off = force Tier 1" behavior.
+    pinned_tier: Optional[str] = None
 
 
 class RotationModeUpdateResponse(BaseModel):
     mode: str
+    pinned_tier: Optional[str]
     override_active: bool
     config_enabled: bool
     action_event_id: str
@@ -2943,6 +2958,21 @@ def _read_rotation_config_enabled(models_path: Path) -> bool:
     return block.get('enabled') is True
 
 
+def _read_rotation_pinned_tier(agents_root: Path) -> str:
+    """Tier pinned by the override file's contents — mirrors
+    ``rotate_active_tier._override_pinned_tier`` so the dashboard reflects the
+    tier the scheduler will actually pin. Empty/unrecognized/unreadable maps to
+    tier1 (the historical Off behavior). Callers check override presence first;
+    this is only meaningful when the override file exists."""
+    path = agents_root / ROTATION_OVERRIDE_FILE_NAME
+    try:
+        raw = path.read_text()
+    except (FileNotFoundError, OSError):
+        return ROTATION_DEFAULT_PINNED_TIER
+    tier = raw.strip().lower()
+    return tier if tier in ROTATION_VALID_TIERS else ROTATION_DEFAULT_PINNED_TIER
+
+
 def _reader_rotation_mode(
     agents_root: Path, models_path: Path, now: Optional[datetime] = None,
 ) -> dict[str, Any]:
@@ -2950,12 +2980,24 @@ def _reader_rotation_mode(
 
     ``off`` whenever the override file is present OR the config default is
     disabled; ``auto`` only when neither forces it off. The component
-    signals are surfaced so the UI can show *why* it's off."""
+    signals are surfaced so the UI can show *why* it's off. ``pinned_tier`` is
+    the tier the scheduler will hold while off (file contents when the override
+    is present; tier1 when off purely because config is disabled), and ``None``
+    in auto mode where the load gate owns the tier."""
     override_active = (agents_root / ROTATION_OVERRIDE_FILE_NAME).exists()
     config_enabled = _read_rotation_config_enabled(models_path)
     mode = 'auto' if (config_enabled and not override_active) else 'off'
+    if mode == 'auto':
+        pinned_tier: Optional[str] = None
+    elif override_active:
+        pinned_tier = _read_rotation_pinned_tier(agents_root)
+    else:
+        # Off only because config is disabled (no override file). The
+        # scheduler's config-disabled path forces tier1; reflect that.
+        pinned_tier = ROTATION_DEFAULT_PINNED_TIER
     return {
         'mode': mode,
+        'pinned_tier': pinned_tier,
         'override_active': override_active,
         'config_enabled': config_enabled,
         'as_of': _now_utc_iso(now),
@@ -2969,28 +3011,46 @@ def _handle_rotation_mode_post(
     agents_root: Path,
     models_path: Path,
     supabase_client: Any,
+    pinned_tier: Optional[str] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Toggle the rotation override file + write the larry_action audit row.
 
     Raises HTTPException for 4xx; returns the resulting mode state on
-    success. Idempotent on the filesystem: touching an existing override
-    file or removing an absent one is a no-op.
+    success. Idempotent on the filesystem: re-pinning the same tier or
+    removing an absent override file is a no-op.
+
+    For ``mode='off'`` the chosen ``pinned_tier`` (tier1|tier2, default tier1)
+    is written as the override file's contents; the scheduler honors it every
+    tick. ``mode='auto'`` removes the file and ignores ``pinned_tier``.
     """
     if mode not in ROTATION_VALID_MODES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'invalid mode={mode!r}',
         )
+    # Resolve + validate the pinned tier up front so an invalid value 400s
+    # before we mutate the filesystem. Only meaningful for 'off'.
+    resolved_tier = (pinned_tier or ROTATION_DEFAULT_PINNED_TIER).strip().lower()
+    if mode == 'off' and resolved_tier not in ROTATION_VALID_TIERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid pinned_tier={pinned_tier!r}',
+        )
     now = now or datetime.now(timezone.utc)
     ts_iso = now.isoformat()
     override_path = agents_root / ROTATION_OVERRIDE_FILE_NAME
 
-    # off → create the override file; auto → remove it. The scheduler reads
-    # presence on its next tick.
+    # off → write the override file with the pinned tier as its contents;
+    # auto → remove it. The scheduler reads contents/presence on its next tick.
+    # Atomic write (tmp + fsync + os.replace) so a scheduler tick that reads the
+    # file concurrently never observes a truncated/empty body mid-write — a
+    # partial read would strip()->'' -> tier1 fallback and force a spurious
+    # one-tick tier1 + manual_override event. Matches the repo's atomic-write
+    # discipline (atomic_io is the shared helper).
     if mode == 'off':
         override_path.parent.mkdir(parents=True, exist_ok=True)
-        override_path.touch()
+        _import_atomic_io().atomic_write_text(override_path, resolved_tier)
     else:  # auto
         try:
             override_path.unlink()
@@ -3004,6 +3064,7 @@ def _handle_rotation_mode_post(
     action_payload = {
         'control': 'rotation_mode',
         'mode': mode,
+        'pinned_tier': resolved_tier if mode == 'off' else None,
         'override_file': str(override_path),
     }
     action_event_id = compute_event_id('rotation-mode', 'larry_action', ts_iso)
@@ -3055,6 +3116,16 @@ def _import_supabase_chunk():
         sys.path.insert(0, str(scripts_dir))
     import supabase_chunk  # noqa: PLC0415
     return supabase_chunk
+
+
+def _import_atomic_io():
+    """Lazy import of the shared atomic-write helper (stdlib-only; lazy only to
+    share the scripts_dir sys.path setup)."""
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import atomic_io  # noqa: PLC0415
+    return atomic_io
 
 
 def _beacon_pending_approvals_path(agents_root: Path) -> Path:
@@ -3545,6 +3616,7 @@ def post_system_rotation(
         )
     return _handle_rotation_mode_post(
         mode=body.mode,
+        pinned_tier=body.pinned_tier,
         actor=actor,
         agents_root=_agents_root(),
         models_path=_agent_models_json_path(),
