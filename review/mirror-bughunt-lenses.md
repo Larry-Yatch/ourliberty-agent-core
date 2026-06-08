@@ -1,12 +1,13 @@
 # Mirror bug-hunt lenses (Phase 1 per-PR gate)
 
-> DRAFT — pending backtest validation against the 64-finding ground-truth set.
-> This is the reviewer prompt Mirror runs on a PR diff, vendored from the
-> `/code-review` skill's fan-out shape but tuned for *this* codebase's escaped-bug
-> taxonomy (see `review/backtest/findings.json`). It is **additive** to Mirror's
+> v1 (shipped 2026-06-08) — validated by backtest at 17/19 HIGH = 89% in real
+> config (corpus injected + context), vs ~0% for unaided review. This is the
+> reviewer prompt Mirror runs on a PR diff, vendored from the `/code-review`
+> skill's fan-out shape but tuned for *this* codebase's escaped-bug taxonomy
+> (the corpus in `known-bug-patterns.json`). It is **additive** to Mirror's
 > existing spec/AC checklist and her `test_regression_check.py` gate — it does NOT
-> replace them. The same prompt is reused by the backtest harness as the reviewer
-> under test.
+> replace them. The thresholds below are the shipped v1 defaults; the Phase-2
+> Pulse loop calibrates them. The same prompt is reused by the backtest harness.
 
 ## Why this differs from the stock /code-review skill
 
@@ -29,7 +30,8 @@ of its defaults are reversed here:
 
 Run these lenses as parallel sub-agents over the PR diff. Each lens agent is given:
 the PR diff, permission to read surrounding context in the modified files, and the
-entries from `review/known-bug-patterns.yaml` whose `review_lens` matches its lens.
+entries from the corpus (read it by absolute path: `/home/larry/agent-core/review/known-bug-patterns.json`)
+whose `review_lens` matches its lens.
 Each returns a list of candidate findings: `{file, line_range, lens, severity,
 description, why_real, suggested_fix}`.
 
@@ -104,16 +106,21 @@ threshold for its class.
   finding(s) in her standard `{file, line_range, severity, description}` shape, so
   Forge's existing revision loop handles them. Keep findings tightly scoped
   (file/line) to preserve the cheap revision loop.
-- A safety / data-loss issue that is irreversible or actively dangerous →
-  `REVIEW_EMERGENCY_HALT` (existing path).
-- Sub-blocking findings → posted as a non-gating PR comment (advisory), not a
-  revision.
+- `REVIEW_EMERGENCY_HALT` is reserved for a dangerous/irreversible operation the
+  diff *performs* (secret exposure, `rm -rf`, force-push, unguarded prod-data
+  delete) — NOT for a latent data-loss *bug* in code logic (lock-free RMW,
+  non-atomic write, cursor-skip). Those data-loss bugs are inline-fixable and
+  route as `REVIEW_REVISION`.
+- Sub-blocking findings → noted in the review narrative above the marker (where
+  Beacon reads them), not gated on. (Do not open a separate PR comment — Mirror's
+  flow is marker-based.)
 - This runs **in addition to** the `test_regression_check.py` gate and the spec/AC
   checklist. Order: spec/AC → bug-hunt → test-regression gate. All three must pass
   for `REVIEW_PASS`.
 
-## Open knobs (decide after backtest)
-- Exact thresholds in the gating table (calibrate to hit a target catch-rate on the
-  64-finding set without blowing up false positives on recent clean PRs).
+## Tuning knobs (Phase-2 Pulse loop calibrates these)
+- Exact thresholds in the gating table — calibrate to hold the ~89% catch-rate on the
+  ground-truth set without blowing up false positives on recent clean PRs. **The
+  false-positive rate on clean PRs is not yet measured; watch the first live reviews.**
 - Whether the full 8-lens fan-out runs on every review or only first-review (revision
   re-reviews could run a lighter targeted pass — revisions are scoped edits).

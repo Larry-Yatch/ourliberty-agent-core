@@ -20,6 +20,11 @@ for ln in log:
         files = [x for x in git('show', '--name-only', '--pretty=format:', full).splitlines() if x.strip()]
         remed.append({'full': full, 'short': short, 'subj': subj, 'files': set(files)})
 
+if not remed:
+    print("WARNING: 0 remediation commits in window — is origin/main fetched and the date range right? "
+          "Every finding will map to 'unmapped'. Aborting before writing a vacuous mapping.")
+    raise SystemExit(1)
+
 mapped, unmapped = [], []
 for f in findings:
     cands = [c for c in remed if f['file'] in c['files']]
@@ -44,9 +49,12 @@ for f in findings:
         return overlap * 10 + (3 if f['category'] in c['subj'].lower() else 0), overlap
 
     if cands:
-        ranked = sorted(cands, key=lambda c: score(c)[0], reverse=True)
+        # rank by score; break ties toward the EARLIEST commit (the original fix,
+        # not a later refinement). remed is newest-first, so higher index = earlier.
+        sc_cache = {id(c): score(c) for c in cands}
+        ranked = sorted(cands, key=lambda c: (sc_cache[id(c)][0], cands.index(c)), reverse=True)
         chosen = ranked[0]
-        sc, ov = score(chosen)
+        sc, ov = sc_cache[id(chosen)]
         rev = git('show', '-R', '--pretty=format:', chosen['full'], '--', f['file'])
         mapped.append({**{k:f[k] for k in ('id','severity','confidence','category','file','line','title')},
                        'fix_commit': chosen['short'], 'fix_subj': chosen['subj'],

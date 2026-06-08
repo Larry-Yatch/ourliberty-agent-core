@@ -68,11 +68,26 @@ def call_claude(prompt):
     return p.stdout.strip()
 
 def extract_json(text, kind='array'):
-    # tolerant: pull the first JSON array/object out of the model's output
-    m = re.search(r'\[.*\]' if kind == 'array' else r'\{.*\}', text, re.S)
-    if not m: return None
-    try: return json.loads(m.group(0))
-    except Exception: return None
+    # robust: find the FIRST balanced [...] / {...} (string-aware), not a greedy
+    # \[.*\] that spans stray brackets in surrounding prose and fails to parse.
+    o, c = ('[', ']') if kind == 'array' else ('{', '}')
+    start = text.find(o)
+    if start < 0: return None
+    depth = 0; in_str = False; esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc: esc = False
+            elif ch == '\\': esc = True
+            elif ch == '"': in_str = False
+        elif ch == '"': in_str = True
+        elif ch == o: depth += 1
+        elif ch == c:
+            depth -= 1
+            if depth == 0:
+                try: return json.loads(text[start:i+1])
+                except Exception: return None
+    return None
 
 def main():
     ap = argparse.ArgumentParser()
@@ -94,11 +109,14 @@ def main():
 
     outpath = pathlib.Path(ROOT / args.out)
     # resume: keep already-judged findings from a prior (killed) run
+    scope_ids = {m['id'] for m in mapping}
     results, done = [], set()
     if args.resume and outpath.exists():
-        results = json.loads(outpath.read_text())
+        # keep ONLY prior results that are in THIS run's scope, else a resume with a
+        # different --severity/--ids would re-save stale entries and skew the summary.
+        results = [r for r in json.loads(outpath.read_text()) if r['id'] in scope_ids]
         done = {r['id'] for r in results if r.get('caught') is not None}
-        print(f"resuming: {len(done)} findings already judged, skipping them")
+        print(f"resuming: {len(done)} in-scope findings already judged, skipping them")
 
     for m in mapping:
         if m['id'] in done: continue

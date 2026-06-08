@@ -32,9 +32,25 @@ def claude(prompt, cwd):
     return p.stdout.strip()
 
 def jget(text, kind):
-    m = re.search(r'\[.*\]' if kind == 'array' else r'\{.*\}', text, re.S)
-    try: return json.loads(m.group(0)) if m else None
-    except Exception: return None
+    # balanced, string-aware scan for the first [...] / {...} (not a greedy regex)
+    o, c = ('[', ']') if kind == 'array' else ('{', '}')
+    start = text.find(o)
+    if start < 0: return None
+    depth = 0; in_str = False; esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc: esc = False
+            elif ch == '\\': esc = True
+            elif ch == '"': in_str = False
+        elif ch == '"': in_str = True
+        elif ch == o: depth += 1
+        elif ch == c:
+            depth -= 1
+            if depth == 0:
+                try: return json.loads(text[start:i+1])
+                except Exception: return None
+    return None
 
 REVIEW = """You are a code-review gate sub-agent. Review the PR diff below for correctness, \
 reliability, data-loss, and security bugs, using these lenses:
@@ -60,8 +76,12 @@ Return ONLY JSON: {{"caught": true|false, "reason": str}}."""
 
 results = []
 for fid in TARGETS:
+    if fid not in MAP:
+        print(f"#{fid}: not in mapping.json (unmapped finding) — skipping"); continue
     m = MAP[fid]
     cid, sig = sig_for(fid)
+    if sig is None:
+        print(f"#{fid}: no corpus class covers it — skipping (corpus-injection test is meaningless without a signature)"); continue
     wt = tempfile.mkdtemp(prefix=f'bt-{fid}-')
     git('worktree', 'add', '--detach', wt, m['fix_commit'] + '~1')
     try:

@@ -25,6 +25,12 @@ for i, m in enumerate(hdrs):
 out = pathlib.Path('review/backtest/findings.json')
 out.write_text(json.dumps(findings, indent=2))
 print(f"extracted {len(findings)} findings -> {out}")
+# loud sanity check: every `## N.` header must parse, else the ground-truth set is
+# silently incomplete and the catch-rate denominator is wrong.
+n_headers = len(re.findall(r'^## \d+\.', text, re.M))
+if n_headers != len(findings):
+    print(f"WARNING: {n_headers} '## N.' headers but only {len(findings)} parsed — "
+          f"{n_headers - len(findings)} dropped by the HDR regex (format drift). Fix HDR before trusting results.")
 from collections import Counter
 print("severity:", dict(Counter(f['severity'] for f in findings)))
 print("category:", dict(Counter(f['category'] for f in findings)))
