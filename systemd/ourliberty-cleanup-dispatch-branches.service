@@ -1,0 +1,36 @@
+[Unit]
+Description=Self-healing healer — prune stale Forge/Mirror dispatch branches (local + origin), the branch analogue of cleanup-stale-worktrees
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/cleanup_dispatch_branches.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# gh auth token + git credentials live here (remote --delete + gh pr list).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/cleanup_dispatch_branches.py
+# Remote deletes are network round-trips, batched; allow generous headroom while
+# the ~309-branch remote backlog drains over the first few runs.
+TimeoutStartSec=1200
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-cleanup-dispatch-branches
+
+# Hardening (matches ourliberty-ledger.service). ReadWritePaths covers both
+# canonical repos (config/agent-models.json repo_paths) plus the agents tree
+# (kill switch, inboxes, in-flight, logs, alert queue).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/ourliberty-dashboard /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
