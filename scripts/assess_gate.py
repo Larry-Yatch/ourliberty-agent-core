@@ -15,7 +15,9 @@ import os, re, json, glob, pathlib
 from datetime import datetime, timezone
 
 # --- knobs ---
-GO_LIVE_TS = '2026-06-08T21:26:53Z'   # PR #398 merge (gate live shortly after droplet sync)
+GO_LIVE_TS = '2026-06-08T21:26:53Z'   # PR #398 merge (gate live shortly after droplet sync).
+# Bounded failure mode: an off-by-hours value only shifts which archives count; it cannot
+# cause a double-fire (the sentinel guards that). Nudge later if the droplet synced much later.
 N_REVIEWS = 15                         # min gate reviews before we assess (volume gate)
 BASELINE_FIRST_PASS = 0.77             # pre-gate first-pass-PASS rate (302-review backtest)
 
@@ -26,10 +28,14 @@ VER = re.compile(r'===\s*(REVIEW_PASS|REVIEW_REVISION|REVIEW_ESCALATE|REVIEW_EME
 
 
 def _parse_ts(s):
+    # ALWAYS return tz-aware (or None). A legacy/foreign archive with a naive
+    # completed_at would otherwise make `ts < cutoff` raise TypeError (naive vs
+    # aware) OUTSIDE the try — crashing every cycle and never firing the DM.
     try:
-        return datetime.fromisoformat(str(s).replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(str(s).replace('Z', '+00:00'))
     except Exception:
         return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
 def _collect():
@@ -56,7 +62,9 @@ def _collect():
         ms = VER.findall(res)
         if not ms:
             continue
-        task = d.get('task_id') or f
+        task = d.get('task_id')
+        if not task:
+            continue   # can't dedup a review without its task_id; skip rather than key on path (would over-count)
         by_task.setdefault(task, []).append(
             {'verdict': ms[-1], 'ts': ts, 'result': res, 'pr': d.get('pr_url', '')})
     return by_task
@@ -97,12 +105,11 @@ def _already_fired():
 
 def _mark_fired(payload):
     try:
+        import atomic_io  # house standard (durable tmp+fsync+replace, unique tmp name)
         SENTINEL.parent.mkdir(parents=True, exist_ok=True)
-        tmp = SENTINEL.with_suffix('.tmp')
-        tmp.write_text(json.dumps({'fired_at': datetime.now(timezone.utc).isoformat(), **payload}, indent=2))
-        os.replace(tmp, SENTINEL)
+        atomic_io.atomic_write_json(SENTINEL, {'fired_at': datetime.now(timezone.utc).isoformat(), **payload})
         return True
-    except OSError as e:
+    except Exception as e:
         print(f"[assess-gate] WARN: sentinel write failed ({e}); deferring DM to avoid repeats")
         return False
 
@@ -128,7 +135,10 @@ def main(argv=None):
         return 0
 
     # final verdict per task = latest review by completed_at (replan-safe).
-    finals = {t: max(recs, key=lambda r: r['ts']) for t, recs in by_task.items()}
+    # latest review by completed_at; on an exact-ts tie prefer PASS (a resolved state)
+    # so the tie-break is deterministic rather than glob/OS-order dependent.
+    finals = {t: max(recs, key=lambda r: (r['ts'], r['verdict'] == 'REVIEW_PASS'))
+              for t, recs in by_task.items()}
     # first-pass-PASS = a task with exactly ONE review record that ended PASS (no
     # revisions/replans). revision_count-independent, so replan resets can't inflate it.
     first_try_pass = sum(1 for recs in by_task.values()
@@ -151,6 +161,7 @@ def main(argv=None):
         "\n"
         "NUMBERS:\n"
         f"  • First-pass-PASS rate: {fpr:.0%} (pre-gate baseline 77%) → loop health: {health}\n"
+        "    (approximate — a Beacon replan under a new task_id can shift this slightly)\n"
         f"  • Verdicts: {n_revision} revision, {n_escalate} escalate, {n_halt} emergency-halt\n"
         f"  • Non-regression-gate revision findings (spec + bug-hunt): {bh_count}\n"
         "  • Sample findings (eyeball for false positives):\n"
