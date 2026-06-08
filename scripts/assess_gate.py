@@ -33,7 +33,11 @@ def _parse_ts(s):
 
 
 def _collect():
-    """Return per-task final review records since go-live."""
+    """Return {task_id: [records...]} for all review outboxes since go-live.
+    Each record: {verdict, ts, result, pr}. We do NOT use revision_count to pick a
+    task's final verdict — it RESETS to 0 on every Beacon replan iteration
+    (outbox_notifier hardcodes revision_count:0 per replan), so a stale pre-replan
+    REVISION would outrank the real post-replan PASS. Order by completed_at instead."""
     cutoff = _parse_ts(GO_LIVE_TS)
     by_task = {}
     for f in glob.glob(ARCHIVE_GLOB):
@@ -52,34 +56,35 @@ def _collect():
         ms = VER.findall(res)
         if not ms:
             continue
-        rnd = d.get('revision_count') if isinstance(d.get('revision_count'), int) else 0
-        rec = {'verdict': ms[-1], 'round': rnd, 'result': res, 'pr': d.get('pr_url', '')}
         task = d.get('task_id') or f
-        # keep the highest-round record per task as its final outcome
-        if task not in by_task or rnd >= by_task[task]['round']:
-            by_task[task] = rec
+        by_task.setdefault(task, []).append(
+            {'verdict': ms[-1], 'ts': ts, 'result': res, 'pr': d.get('pr_url', '')})
     return by_task
 
 
-def _bughunt_findings(records):
-    """REVISION findings that are NOT the test-regression gate (i.e. spec/quality/bug-hunt).
-    Returns (count, sample_descriptions)."""
+def _bughunt_findings(by_task):
+    """REVISION findings across ALL review records that are NOT the test-regression
+    gate (i.e. spec/quality/bug-hunt). Returns (count, sample_descriptions). The
+    regression-gate split is a heuristic on Mirror's free-text 'regression gate'
+    phrasing — substring match (not startswith) to tolerate prefixes; the DM labels
+    this metric as approximate."""
     out = []
-    for r in records.values():
-        if r['verdict'] != 'REVIEW_REVISION':
-            continue
-        m = re.search(r'===\s*REVIEW_REVISION\s*===(.*?)===\s*END_REVIEW_REVISION\s*===', r['result'], re.S)
-        if not m:
-            continue
-        try:
-            j = json.loads(m.group(1).strip())
-        except Exception:
-            continue
-        for fn in (j.get('findings') or []):
-            desc = str(fn.get('description', ''))
-            if desc.lower().startswith('regression gate'):
-                continue   # pre-existing test-regression gate, not the bug-hunt
-            out.append(desc)
+    for recs in by_task.values():
+        for r in recs:
+            if r['verdict'] != 'REVIEW_REVISION':
+                continue
+            m = re.search(r'===\s*REVIEW_REVISION\s*===(.*?)===\s*END_REVIEW_REVISION\s*===', r['result'], re.S)
+            if not m:
+                continue
+            try:
+                j = json.loads(m.group(1).strip())
+            except Exception:
+                continue
+            for fn in (j.get('findings') or []):
+                desc = str(fn.get('description', ''))
+                if 'regression gate' in desc.lower():
+                    continue   # the pre-existing test-regression gate, not the bug-hunt
+                out.append(desc)
     return len(out), out[:3]
 
 
@@ -96,8 +101,10 @@ def _mark_fired(payload):
         tmp = SENTINEL.with_suffix('.tmp')
         tmp.write_text(json.dumps({'fired_at': datetime.now(timezone.utc).isoformat(), **payload}, indent=2))
         os.replace(tmp, SENTINEL)
+        return True
     except OSError as e:
-        print(f"[assess-gate] WARN: sentinel write failed ({e})")
+        print(f"[assess-gate] WARN: sentinel write failed ({e}); deferring DM to avoid repeats")
+        return False
 
 
 def _dm(body):
@@ -114,18 +121,23 @@ def main(argv=None):
     if _already_fired():
         print('[assess-gate] already fired; no-op.')
         return 0
-    records = _collect()
-    n = len(records)
+    by_task = _collect()
+    n = len(by_task)   # unique PRs reviewed since go-live
     if n < N_REVIEWS:
         print(f'[assess-gate] {n}/{N_REVIEWS} gate reviews since go-live; soaking, no-op.')
         return 0
 
-    first_try_pass = sum(1 for r in records.values() if r['round'] <= 0 and r['verdict'] == 'REVIEW_PASS')
+    # final verdict per task = latest review by completed_at (replan-safe).
+    finals = {t: max(recs, key=lambda r: r['ts']) for t, recs in by_task.items()}
+    # first-pass-PASS = a task with exactly ONE review record that ended PASS (no
+    # revisions/replans). revision_count-independent, so replan resets can't inflate it.
+    first_try_pass = sum(1 for recs in by_task.values()
+                         if len(recs) == 1 and recs[0]['verdict'] == 'REVIEW_PASS')
     fpr = first_try_pass / n if n else 0.0
-    n_revision = sum(1 for r in records.values() if r['verdict'] == 'REVIEW_REVISION')
-    n_escalate = sum(1 for r in records.values() if r['verdict'] == 'REVIEW_ESCALATE')
-    n_halt = sum(1 for r in records.values() if r['verdict'] == 'REVIEW_EMERGENCY_HALT')
-    bh_count, bh_samples = _bughunt_findings(records)
+    n_revision = sum(1 for r in finals.values() if r['verdict'] == 'REVIEW_REVISION')
+    n_escalate = sum(1 for r in finals.values() if r['verdict'] == 'REVIEW_ESCALATE')
+    n_halt = sum(1 for r in finals.values() if r['verdict'] == 'REVIEW_EMERGENCY_HALT')
+    bh_count, bh_samples = _bughunt_findings(by_task)
 
     delta = fpr - BASELINE_FIRST_PASS
     health = 'intact' if delta > -0.10 else 'DROPPED — possible over-blocking'
@@ -155,9 +167,13 @@ def main(argv=None):
         "  Full context: memory mirror-bughunt-gate-project + review/gate-soak-assessment.md.\n"
         "  (Deeper false-positive review happens in that session against the live data.)"
     )
+    # Write the sentinel FIRST; only DM if it landed. A persistent state-dir write
+    # failure then DEFERS the DM to a later cycle (retry) rather than re-sending it
+    # every cycle. _dm() prints the body to stdout on send failure, so it's recoverable.
+    if not _mark_fired({'reviews': n, 'first_pass_rate': round(fpr, 3), 'bughunt_findings': bh_count}):
+        print('[assess-gate] sentinel not written; deferring to next cycle (no DM this run).')
+        return 0
     queued = _dm(body)
-    _mark_fired({'reviews': n, 'first_pass_rate': round(fpr, 3), 'bughunt_findings': bh_count,
-                 'dm_queued': bool(queued)})
     print(f'[assess-gate] FIRED at {n} reviews (fpr={fpr:.0%}, dm_queued={queued}).')
     return 0
 
