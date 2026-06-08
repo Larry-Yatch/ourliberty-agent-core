@@ -87,6 +87,14 @@ EVENTS_FILE_NAME = 'rotation-events.jsonl'
 # idiom as the fleet-wide ~/agents/healers.disabled kill switch.
 OVERRIDE_DISABLE_FILE_NAME = 'rotation.disabled'
 
+# Manual-pin support (spec § 6.5). The override file's CONTENTS carry the tier
+# the operator has pinned: 'tier1' or 'tier2'. An empty file (the historical
+# `touch` the pre-pin dashboard Off control wrote) or unrecognized contents map
+# to tier1 — identical to the original force-tier1 Off semantics, so a file
+# written by an older dashboard build still pins tier1.
+_OVERRIDE_VALID_TIERS = ('tier1', 'tier2')
+_OVERRIDE_DEFAULT_TIER = 'tier1'
+
 # Spec §§ 6.3 + 6.4 default config values; only used when the rotation block
 # is missing OR partial. The shipped block in config/agent-models.json
 # carries the same numbers; this duplication is a defensive
@@ -132,6 +140,28 @@ def _override_disabled():
     means off. Resolved at call time so a touch/rm between ticks takes effect
     on the next tick."""
     return (_agents_root() / OVERRIDE_DISABLE_FILE_NAME).exists()
+
+
+def _override_pinned_tier():
+    """Return the tier the operator has pinned via the override file's
+    contents, or ``None`` when the file is absent (Auto).
+
+    Contents map: ``'tier1'``/``'tier2'`` → that tier; empty or unrecognized
+    → ``tier1`` (the historical Off behavior — a file written by an older
+    dashboard build, which just touched it, still pins tier1). A present-but-
+    unreadable file also maps to tier1 rather than None, so a transient read
+    error cannot silently re-engage load-gated rotation against the operator's
+    intent. Resolved at call time so an edit between ticks takes effect on the
+    next tick."""
+    path = _agents_root() / OVERRIDE_DISABLE_FILE_NAME
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return _OVERRIDE_DEFAULT_TIER
+    tier = raw.strip().lower()
+    return tier if tier in _OVERRIDE_VALID_TIERS else _OVERRIDE_DEFAULT_TIER
 
 
 def _events_file():
@@ -397,10 +427,19 @@ def tick(now=None, models_file=None, logger=None):
     # event line (below) so a future Pulse Check can correlate the manual
     # disable against the rate-limit ledger.
     if not enabled or override_off:
+        # Config-disabled (enabled=false) keeps the historical force-tier1.
+        # Override-off honors the operator's pinned tier from the file
+        # contents (default tier1), so a manual pin to tier2 sticks: every
+        # tick re-pins it, fully bypassing load-gated rotation (spec § 6.5
+        # manual-pin — "manual pin fully wins"; the load gate never overrides
+        # an operator pin).
+        target = _OVERRIDE_DEFAULT_TIER
+        if override_off:
+            target = _override_pinned_tier() or _OVERRIDE_DEFAULT_TIER
         actions = []
-        if tier != 'tier1':
-            active_tier.set_tier('tier1')
-            actions.append('forced-tier1')
+        if tier != target:
+            active_tier.set_tier(target)
+            actions.append('forced-' + target)
         if state['draining']:
             active_tier.set_draining(False)
             actions.append('cleared-draining')
@@ -408,17 +447,19 @@ def tick(now=None, models_file=None, logger=None):
             active_tier.set_next_switch_due(None)
             actions.append('cleared-next-switch-due')
         # Emit one manual_override event only when the override file drove an
-        # actual state change (snap to tier1 / drain abandon) — matches the
+        # actual state change (re-pin / drain abandon) — matches the
         # emit-on-transition discipline of the load-gate events and avoids a
         # per-tick event line while parked. Load is not consulted on this
         # fast path, so the token/threshold fields carry 0 sentinels; the
         # distinct trigger marks the row as a manual action, not a load
-        # event. Config-disabled keeps its historical silent behavior.
+        # event. action is direction-aware: a pin onto tier2 is an 'engage',
+        # a pin onto tier1 a 'disengage' (the historical Off direction).
+        # Config-disabled keeps its historical silent behavior.
         if override_off and actions:
             _emit_event(
-                action='disengage',
+                action='engage' if target == 'tier2' else 'disengage',
                 from_tier=tier,
-                to_tier='tier1',
+                to_tier=target,
                 trigger='manual_override',
                 rolling_5h_tokens=0,
                 threshold=0,
@@ -426,7 +467,7 @@ def tick(now=None, models_file=None, logger=None):
             )
         reason = 'override' if override_off else 'disabled'
         result = {'action': 'disabled', 'reason': reason,
-                  'changes': actions, 'tier': 'tier1'}
+                  'changes': actions, 'tier': target}
         logger.info('rotation disabled tick: ' + json.dumps(result))
         return result
 
