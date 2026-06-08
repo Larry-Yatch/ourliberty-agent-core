@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -447,6 +448,13 @@ class TierAuthOkTest(unittest.TestCase):
         # clobbered.
         self._prev_t1 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER1', None)
         self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        # Point the durable-token file fallback at a nonexistent path so these
+        # legacy credentials.json cases are isolated from the real
+        # ~/credentials/.env.larry on the dev box / droplet — which
+        # _setup_token_for_tier now reads when the env var is unset.
+        self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
+            self.root / 'no-such.env')
 
     def tearDown(self):
         import os
@@ -455,6 +463,7 @@ class TierAuthOkTest(unittest.TestCase):
         for name, prev in (
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER1', self._prev_t1),
             ('CLAUDE_CODE_OAUTH_TOKEN_TIER2', self._prev_t2),
+            ('OURLIBERTY_CREDENTIALS_ENV_FILE', self._prev_env_file),
         ):
             if prev is None:
                 os.environ.pop(name, None)
@@ -597,6 +606,92 @@ class TierAuthOkTest(unittest.TestCase):
         self.assertFalse(active_tier.tier_auth_ok('tier2', now=now))
         # Symmetric: tier1 IS auth-ok via its own setup-token.
         self.assertTrue(active_tier.tier_auth_ok('tier1', now=now))
+
+
+class SetupTokenFileFallbackTest(unittest.TestCase):
+    """The durable-token file fallback (the fix for the recurring false
+    "Tier 2 down"). When the setup-token env var is absent, _setup_token_for_tier
+    must read it from the credentials EnvironmentFile so an env-less process
+    (manual SSH check, run_*.sh debug run, ad-hoc healer) authenticates exactly
+    like a systemd daemon — instead of falling through to the frozen-stale
+    credentials.json and reporting a false "down"."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.env_file = self.root / '.env.larry'
+        self._prev = {
+            k: os.environ.get(k) for k in (
+                'CLAUDE_CODE_OAUTH_TOKEN_TIER1',
+                'CLAUDE_CODE_OAUTH_TOKEN_TIER2',
+                'OURLIBERTY_CREDENTIALS_ENV_FILE',
+            )
+        }
+        os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER1', None)
+        os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(self.env_file)
+
+    def tearDown(self):
+        for k, v in self._prev.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        self.tmp.cleanup()
+
+    def test_reads_token_from_file_when_env_absent(self):
+        self.env_file.write_text(
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER2=sk-ant-file-token\n')
+        self.assertEqual(
+            active_tier._setup_token_for_tier('tier2'), 'sk-ant-file-token')
+
+    def test_env_var_takes_precedence_over_file(self):
+        # Hot path: a process that inherited the env never reads the file.
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-ant-env-token'
+        self.env_file.write_text(
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER2=sk-ant-file-token\n')
+        self.assertEqual(
+            active_tier._setup_token_for_tier('tier2'), 'sk-ant-env-token')
+
+    def test_missing_file_returns_none(self):
+        # No env file at all -> None (then the caller's credentials.json path).
+        self.assertIsNone(active_tier._setup_token_for_tier('tier2'))
+
+    def test_handles_quotes_and_export_prefix(self):
+        self.env_file.write_text(
+            'export CLAUDE_CODE_OAUTH_TOKEN_TIER1="sk-ant-quoted"\n')
+        self.assertEqual(
+            active_tier._setup_token_for_tier('tier1'), 'sk-ant-quoted')
+
+    def test_empty_value_in_file_is_treated_as_unset(self):
+        self.env_file.write_text('CLAUDE_CODE_OAUTH_TOKEN_TIER2=\n')
+        self.assertIsNone(active_tier._setup_token_for_tier('tier2'))
+
+    def test_only_matching_tier_line_is_read(self):
+        self.env_file.write_text(
+            'OTHER_VAR=nope\n'
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER1=sk-ant-t1\n'
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER2=sk-ant-t2\n')
+        self.assertEqual(
+            active_tier._setup_token_for_tier('tier1'), 'sk-ant-t1')
+        self.assertEqual(
+            active_tier._setup_token_for_tier('tier2'), 'sk-ant-t2')
+
+    def test_non_utf8_file_degrades_to_none_not_crash(self):
+        # A binary / partial-write / non-UTF-8 credentials file must NOT crash
+        # the auth gate (read_text would raise UnicodeDecodeError, which is not
+        # an OSError) — it must degrade to a clean miss.
+        self.env_file.write_bytes(b'CLAUDE_CODE_OAUTH_TOKEN_TIER2=\xff\xfe\x00bad\n')
+        self.assertIsNone(active_tier._setup_token_for_tier('tier2'))
+
+    def test_tier_auth_ok_true_from_file_token_without_credentials_json(self):
+        # The end-to-end fix: no env var, no credentials.json, but the durable
+        # token is in the file -> tier_auth_ok is True (was a false "down").
+        from datetime import datetime, timezone
+        now = datetime(2026, 6, 8, 12, 0, 0, tzinfo=timezone.utc)
+        self.env_file.write_text(
+            'CLAUDE_CODE_OAUTH_TOKEN_TIER2=sk-ant-file-token\n')
+        self.assertTrue(active_tier.tier_auth_ok('tier2', now=now))
 
 
 if __name__ == '__main__':

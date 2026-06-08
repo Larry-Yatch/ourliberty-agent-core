@@ -78,6 +78,14 @@ class _ProbeHarness(unittest.TestCase):
         hp.HEARTBEAT_FILE = self.root / 'blackboard' / 'probe.heartbeat'
         hp.STATE_FILE = self.root / 'state' / 'probe-state.json'
         hp.KILL_SWITCH = self.root / 'healers.disabled'
+        # Isolate the durable-token file fallback: active_tier._setup_token_for_tier
+        # now reads ~/credentials/.env.larry when the env var is unset, so point
+        # it at a nonexistent path to keep the no-token path reachable on the
+        # droplet (where the real file exists). Restored via _prev_env above.
+        self._prev_env['OURLIBERTY_CREDENTIALS_ENV_FILE'] = os.environ.get(
+            'OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = str(
+            self.root / 'no-such.env')
 
     def tearDown(self):
         for name, prev in self._prev_env.items():

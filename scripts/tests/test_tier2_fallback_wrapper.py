@@ -262,6 +262,12 @@ class CallBeaconTier2Test(unittest.TestCase):
         # set; restore it on teardown. The token-present behavior is covered
         # by CallBeaconTier2SetupTokenTest below.
         self._prev_t2 = os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        # Isolate the durable-token file fallback (_setup_token_for_tier reads
+        # ~/credentials/.env.larry when the env var is unset) so the no-token
+        # HOME-swap path stays reachable on the droplet where the file exists.
+        self._prev_env_file = os.environ.get('OURLIBERTY_CREDENTIALS_ENV_FILE')
+        os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = (
+            '/nonexistent-ourliberty-test/.env.larry')
         self.bot = _BotImporter.load_with_env()
 
     def tearDown(self):
@@ -269,6 +275,10 @@ class CallBeaconTier2Test(unittest.TestCase):
             os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
         else:
             os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = self._prev_t2
+        if self._prev_env_file is None:
+            os.environ.pop('OURLIBERTY_CREDENTIALS_ENV_FILE', None)
+        else:
+            os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = self._prev_env_file
 
     def test_tier1_success_no_tier2_attempted(self):
         ok = mock.Mock(returncode=0, stdout=json.dumps({
