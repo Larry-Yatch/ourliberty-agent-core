@@ -1,0 +1,6 @@
+# Derived from the gitignored AUDIT_main_20260605.md — embeds its verbatim text.
+# Reproducible locally via extract_findings.py / map_fixes.py / run_backtest.py.
+# The committed, generalized distillate is review/known-bug-patterns.json.
+findings.json
+mapping.json
+results*.json
