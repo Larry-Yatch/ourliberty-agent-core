@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1141 — 2026-06-08 02:28 UTC (interactive, Tier 3→1 — sync-race)
+
+**Health:** ⚠️ **Tier-reset.** Mandatory checks: ✅ Nominal. Check 0: 1 new alert (sync-blocked:auto-commit-push-failed, idx=1426 — 56th occurrence of known SYNC-PUSH-REBASE-FALLBACK-001 pattern; self-recovering). All other checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. 0 open PRs.
+
+Alert watermark: **1426 lines / 2026-06-08T01:57:53Z** (sync-blocked:auto-commit-push-failed) — up 1 from iter 1139 (1425). Session-start gitStatus: branch=main, tree=clean, HEAD=cc94e06 "Pulse cycle 20260608T015802Z" (wrapper commit from iter 1140). Tier at start: tier=3, consecutive_clean=43, last_signal_at=2026-06-07T01:04:15Z. Pipeline-stall heartbeat: 2026-06-08T02:11:10Z (~17 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-08T02:25:17Z (~3 min at scan; ✅ within 60-min threshold). Sync: status=error / commit=7af4fc6 (OLDER than HEAD cc94e06) — self-clearing race (wrapper push succeeded; sync service timer fired at 01:57:52Z, raced with wrapper commit, lost; hourly timer will self-correct). Tier state at end: **tier=1, consecutive_clean=0, last_signal_at=2026-06-08T02:28:38Z**.
+
+**Found:**
+
+- **(Check 0) Alert triage: 1 new alert.** larry-alerts.jsonl = 1426 lines (up from 1425 / 2026-06-08T00:22:49Z). New alert since last watermark:
+  - idx=1426: `sync-blocked:auto-commit-push-failed` (src=pulse-cycle, 2026-06-08T01:57:53Z) — sync SERVICE timer raced with iter 1140's wrapper push; sync lost and rolled back to 7af4fc6. Confirmed self-recovering: HEAD=cc94e06 > sync.json commit=7af4fc6 → wrapper push succeeded. **56th occurrence** of SYNC-PUSH-REBASE-FALLBACK-001. Not in alert-translations.json Tier-3 allowlist → Tier 4 → tier-reset. No new DM (standing APPROVAL_REQUEST `sync-push-rebase-fallback-001` covers it). → **tier-reset** to Tier 1.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Only new alert is idx=1426 sync-blocked (self-recovering pattern, not a directive). No Larry directives detected. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-08T02:11:10Z (~17 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001` still awaiting Larry's approval before Forge preflight dispatches. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-08T02:25:17Z (~3 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Nominal.** branch=main, tree=clean (session-start gitStatus), HEAD=cc94e06. Sync error is a self-clearing race (wrapper push succeeded). ✅
+
+- **(Check B) Sync health: ⚠️ nominal-with-note.** status=error, last_sync=2026-06-08T01:57:52Z (~30 min at scan; within 2h threshold). commit=7af4fc6 (older than HEAD cc94e06) → wrapper push succeeded, sync service timer raced and lost. Self-clears on next hourly sync.timer fire. Not actionable. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~74d; outside 60d window). ✅
+
+- **Periodic/conditional checks (Monday June 8 UTC):** VIII/IX/X already fired at iter 1137 (00:17–00:22Z same calendar day). Check I: Sunday June 7 done (iter 1090). Check III: last 2026-05-31 (<14d; next eligible 2026-06-14). All gates: skip. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark up 1 (idx=1426 = sync-blocked, NOT unreviewed-merge). **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: idx=1426 is sync-blocked (NOT auto-restarted). Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: No service warnings in last 60 min. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: **NEW occurrence** idx=1426 — 56th total. Self-recovering. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs, no new occurrence. Carry forward.
+  - `pulse/check-i-*` (3/3): no new alerts. Engine-fix scope batch pending Larry. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): no new occurrence this iter. Carry forward — next Monday pressure clock.
+
+- **PRIME DIRECTIVE ratio:** interventions=730 (+1 this iter: sync-blocked:auto-commit-push-failed idx=1426), systemic_fixes=13, ratio≈56.15.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate.
+2. Check 0: claimed idx=1426 (sync-blocked:auto-commit-push-failed) — Tier 4, known self-recovering pattern. Updated watermark to 1426 / 2026-06-08T01:57:53Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, 0 open PRs.
+4. Monday periodic checks: skip (already fired iter 1137 same calendar day).
+5. `python3 scripts/cycle_prime_ledger.py append` → interventions=730.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-08T02:28:38Z.
+7. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward unchanged from iter 1139:
+- `[yellow]` **APPROVAL_REQUEST `pulse-check-run-check-shadow-fix-001`**: Beacon registered (iter 1137); Forge inbox empty — awaiting Larry's approval. Fix: rename `from pulse_check_heartbeat import run_check` → `as _hb_run_check` in 7 scripts' `__main__` blocks (VIII, X confirmed broken; III/IV/V/VI/VII latent). Approve → Forge builds + merges → Checks VIII/X work next Monday (2026-06-15).
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: GITHUB_TOKEN not set on `ourliberty-dashboard-api` service → mission registration fails. Alert written iter 1137 (larry_alerts subject: check-ix-github-token-missing).
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges. Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Reply `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — **56th occurrence** (idx=1426 this iter); self-recovering; root fix pending.
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** SYNC-PUSH-REBASE-FALLBACK-001 is a timing race — fires most often when an interactive cycle session runs close to the hourly sync.timer. System is otherwise fully nominal. Tier-reset to 1 is mechanical; expect rapid clean progression back to Tier 3 over the next 3 iters if no new signals arrive.
+
+**Learned:** Nothing new. Sync-race pattern well-understood; pressure remains on APPROVAL_REQUEST `sync-push-rebase-fallback-001`.
+
+---
+
 ## Iteration 1139 — 2026-06-08 01:22 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3, consecutive_clean=41→42. 0 new alerts. All mandatory checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync fully synced. 0 open PRs.**
