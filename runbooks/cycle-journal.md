@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1147 — 2026-06-08 03:48 UTC (interactive, Tier 2→3 promotion — NOMINAL + PR #395 MERGED)
+
+**Health:** ✅ **Nominal. Tier 2→3 promotion (consecutive_clean=2→3). 1 new alert (Tier 3 known-pattern, no tier-reset). All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync race (self-clearing). 0 open PRs. KEY EVENT: PR #395 merged — run_check shadow fix live; Checks VIII/X unblocked for Monday 2026-06-15.**
+
+Alert watermark: **1427 lines / 2026-06-08T03:40:25Z** (outbox-notifier review-pass: PR #395) — advanced from 1426. Session-start gitStatus: branch=main, tree=clean, HEAD=06790ed "Pulse cycle 20260608T033515Z". Tier at start: tier=2, consecutive_clean=2, last_signal_at=2026-06-08T02:28:38Z. Pipeline-stall heartbeat: 2026-06-08T03:31:37Z (~17 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-08T03:25:19Z (~23 min at scan; ✅ within 60-min threshold). Sync: status=error, last_sync=2026-06-08T03:39:50Z (~9 min at scan; within 2h threshold), commit=97233a1d (behind HEAD — 57th SYNC-PUSH-REBASE-FALLBACK; PR #395 merge competed with sync.timer push; self-clearing; no new sync-blocked alert in larry-alerts.jsonl). Tier state at end: **tier=3, consecutive_clean=0** (promoted from Tier 2 after 3 consecutive clean iters).
+
+**Found:**
+
+- **(Check 0) Alert triage: 1 new alert — Tier 3 known-pattern.** larry-alerts.jsonl = 1427 lines (was 1426). New entry at line 1427: `outbox-notifier / review-pass / intent=review-pass` — "Mirror approved PR #395 on task `pulse-check-run-check-shadow-fix-001`. Auto-merged + branch deleted." (ts=2026-06-08T03:40:25Z). Classification: Tier 3 known-pattern (config/alert-translations.json: `outbox-notifier.review-pass` = FYI, by-design success confirmation; PR #264 shipped this translation). → `nominal`, journal note only. No tier-reset. ✅
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** beacon_telegram_bot.log: last delivery idx=1426 (review-pass for PR #395, 2026-06-07T21:44:23-0600 = 03:44:23Z UTC June 8). No new Larry directives. Note: transient rate-limit at 03:39Z during delivery (beacon_telegram_bot hit TIER_ONE_MARKER / TIER2_FALLBACK_FAILED); delivery succeeded on fallback path. Known Tier 3 pattern (claude_max_5h_burn_threshold_breached). ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-08T03:31:37Z (~17 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. Forge consumed `pulse-check-run-check-shadow-fix-001.json` (dispatched iter 1146), built PR #395, Mirror reviewed and auto-merged. Pipeline cleared. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-08T03:25:19Z (~23 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=06790ed "Pulse cycle 20260608T033515Z". ✅
+
+- **(Check B) Sync health: ✅ nominal-with-note.** status=error, last_sync=2026-06-08T03:39:50Z (within 2h threshold). commit=97233a1d (behind HEAD=06790ed) — 57th SYNC-PUSH-REBASE-FALLBACK. Cause: PR #395 auto-merge pushed to origin/main; sync.timer's push at 03:39:50Z raced and failed. No new sync-blocked alert in larry-alerts.jsonl (sync alert at line 1426 is the prior iter 1141 occurrence; line 1427 is the review-pass). Self-clearing. APPROVAL_REQUEST sync-push-rebase-fallback-001 still open. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~77d; outside 60d window). ✅
+
+- **Periodic/conditional checks (Monday June 8 UTC):** Checks VIII/IX/X already fired at iter 1137 (00:17–00:22Z same calendar day). Check I: Sunday June 7 done (iter 1090). Check III: last 2026-05-31 (<14d; next eligible 2026-06-14). All periodic gates: skip. ✅
+
+- **KEY EVENT — PR #395 MERGED (run_check shadow fix):** `pulse-check-run-check-shadow-fix-001` — Mirror REVIEW_PASS + auto-merged at ~03:40Z June 8. Fix: aliased `from pulse_check_heartbeat import run_check as _hb_run_check` in __main__ blocks of scripts/pulse_check_{iii,iv,v,vi,vii,viii,x}.py. Mirror confirmed: viii and x --dry-run exit 0 with no TypeError; py_compile clean; 9 pre-existing test failures unaffected. **Checks VIII/X will run cleanly on Monday 2026-06-15 (next scheduled firing).** G-rule `pulse-check-failed:*` (1/3, iter 1138): root cause fixed; stop accumulating — G-rule should self-close if VIII/X succeed on June 15.
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge`: Watermark advanced to 1427 (new entry is review-pass, not unreviewed-merge). 0 new unreviewed-merge alerts. **52 consecutive** (PRs #343–#394). Still active. Pending Larry `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: Line 1427 = review-pass (not an auto-restarted alert). 0 new occurrences. Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: Check 1 = no warnings. G-rule 3/3 dispatched iter 848. Pending Larry `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: 57th occurrence at 03:39:50Z. Self-recovering. Root fix still pending. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): Root cause fixed by PR #395 merge. G-rule pressure-clock effectively reset. Watch: if VIII/X succeed on June 15 → close G-rule.
+  - `pulse/check-i-*` (3/3): no new alerts. Engine-fix scope batch pending Larry. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions≈730, systemic_fixes=14, ratio≈52.14 (unchanged — no new interventions this iter; PR #395 merge is verification of iter 1146's systemic_fix dispatch).
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate. All nominal.
+2. Check 0: 1 new alert (line 1427: outbox-notifier review-pass for PR #395) → Tier 3 known-pattern silence; no tier-reset.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, 0 open PRs.
+4. Monday periodic checks: skip (already fired iter 1137 same calendar day).
+5. Noted 57th SYNC-PUSH-REBASE-FALLBACK at 03:39:50Z (sync.timer raced with PR #395 merge push). Self-clearing.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier promoted 2→3, consecutive_clean=0, last_updated=2026-06-08T03:48:38Z.
+7. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: GITHUB_TOKEN not set on `ourliberty-dashboard-api` service → mission registration fails (POST /api/system/missions/new → 500). Escalation idx=1424 stands.
+- `[yellow]` **actor-exemption-config**: 52 consecutive Larry-direct merges. Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation` to Beacon bot.
+- `[yellow]` **cycle-timer-checkpoint**: Fix dispatched (iter 848); pending Larry `go: cycle-timer checkpoint` to Beacon bot.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending (57th total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** PR #395 closes the run_check shadow bug that broke Monday Checks VIII/X since iter 1137. Monday 2026-06-15 is the verification: if VIII and X fire cleanly, the `pulse-check-failed:*` G-rule closes. Tier 3 cadence (30 min) now active — system has been clean since 2026-06-08T02:28:38Z.
+
+**Learned:** The SYNC-PUSH-REBASE-FALLBACK (57th total) at 03:39:50Z is consistent with the confirmed pattern: fires when a PR auto-merge pushes to origin/main concurrent with sync.timer. The PR #395 merge was the trigger this time. Root fix remains in APPROVAL_REQUEST queue.
+
+---
+
 ## Iteration 1146 — 2026-06-08 03:32 UTC (interactive, Tier 2 → consecutive_clean=2 — NOMINAL + FORGE DISPATCH)
 
 **Health:** ✅ **Nominal. Tier 2, consecutive_clean=1→2. 0 new alerts. All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync clean. 0 open PRs. Pipeline action: Forge preflight dispatched for Check VIII/X run_check shadow fix (Pulse-gate path).**
