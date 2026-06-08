@@ -494,6 +494,22 @@ This check is additive — it fires every cycle and adds at most one line to the
 
 These checks fire only on specific weekdays, on top of the always-run mandatory + additive checks above. They do NOT gate tier de-escalation (a quiet conditional check is just quiet) — they're parallel observation surfaces with their own DM cadence.
 
+#### 5.0 Bug-hunt gate soak — one-shot assessment (TEMPORARY; remove after Phase-2 decision)
+
+Every cycle, run:
+
+```
+python3 ~/agent-core/scripts/assess_gate.py
+```
+
+It is **self-gating**: it no-ops (prints a one-line soak status, exits 0) until the Mirror
+bug-hunt gate (shipped PR #398) has reviewed N=15 PRs since go-live, then fires **exactly
+one** Telegram DM to Larry with the soak assessment + next step, writes a sentinel
+(`~/agents/state/gate-soak-assessment.json`), and no-ops forever after. It never raises and
+emits no heartbeat (so the staleness watcher does not track it — no cadence entry needed).
+Journal nothing unless it prints `FIRED`. This is a temporary checkpoint: once Larry decides
+keep / dial-back / Phase-2, delete this subsection and the script. Spec: `review/gate-soak-assessment.md`.
+
 #### 5.1 Check I — Optimization mode (Mon/Wed/Fri/Sun)
 
 Check I is **additive to all mandatory + additive checks, not a replacement**. It fires on Mon/Wed/Fri/Sun cycles, re-reading Ledger's most recent weekly sidecar each time. Tue/Thu/Sat cycles skip this block entirely.
