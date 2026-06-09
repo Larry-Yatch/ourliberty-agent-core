@@ -4,6 +4,60 @@
 
 ---
 
+## Iteration 1170 — 2026-06-09 17:58Z UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ Tier 1 — standing Forge build failure; no new signals this iter.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T17:48:54Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1387 lines — watermark UNCHANGED at 2026-06-09T17:11:18Z / forge-build-failed:register-ol-db-ro-url-credential. No new alerts. Nominal. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "No entries". ✅
+
+**Check 2 — Telegram sweep:** Larry sent 17:55Z UTC to Beacon bot: "What can we do about this? [forge-build-failed:register-ol-db-ro-url-credential]" — question about standing finding; Beacon handling. Prior: "go" at 16:25Z tracked by Forge build (failed at 16:30Z). No orphaned Pulse directives. ✅
+
+**Check 3 — Pipeline stall:** Heartbeat = 2026-06-09T17:43:49Z (~14 min; ✅ within 90-min threshold). ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat = 2026-06-09T17:34:59Z (~23 min; ✅ within 60-min threshold). ✅
+
+**Check A — Source repo:** branch=main, clean tree (session-start gitStatus), HEAD=4b7b0dd "Pulse cycle 20260609T174932Z". ✅
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-09T17:02:16Z (~56 min; within 2h threshold). ✅
+
+**Check C — Agent liveness:** 53 active ourliberty-*.service/.timer units. ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+**Check H — Forge activity digest:** Latest Forge archive = register-ol-db-ro-url-credential.1.json (exit_code=-1, completed_at=2026-06-09T16:30:22Z — VERIFIED this iter). 0 open Forge PRs. Nominal.
+
+**Rotations:** No entries due within 60 days. ✅
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build FAILED: register-ol-db-ro-url-credential** — VERIFIED. Forge archive exit_code=-1, completed_at=2026-06-09T16:30:22Z. 0 open PRs confirm no PR produced. Action on Larry: retry `go: register-ol-db-ro-url-credential` to Beacon bot.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — last alert 16:16Z Jun 9 (watermark unchanged; no new firing). Root fix blocked on failed Forge build. Next expected ~22:16Z Jun 9.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 57th total; no new sync failure this iter.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark UNCHANGED. No new unreviewed-merge alerts. Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` (G-rule 1/3, iter 1168): Confirmed — 0 triage entries, last_claimed_ts=None. Carry forward.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions (standing findings already recorded). 0 new systemic fixes.
+**Tier end-of-iter:** 1, consecutive_clean=0 (standing Forge build failure active).
+
+---
+
 ## Iteration 1169 — 2026-06-09 17:48Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build failure; no new signals this iter.
