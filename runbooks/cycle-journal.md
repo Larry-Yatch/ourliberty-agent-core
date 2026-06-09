@@ -4,6 +4,76 @@
 
 ---
 
+## Iteration 1171 — 2026-06-09 18:08Z UTC (interactive, Tier 1 — STANDING + NEW FINDING)
+
+**Health:** ⚠️ Tier 1 — standing pipeline stall; new finding: Forge build-phase re-dispatch blocked by outbox-notifier dedup.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:11:03Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1389 lines (prior watermark 2026-06-09T17:11:18Z / line 1387). One new alert past watermark:
+- Line 1388: `heal-systemd-install-drift stuck-timer-healed:ourliberty-cycle.timer` at 2026-06-09T18:00:18Z → Gate 1 match per alert-translations.json (`stuck-timer-healed` → tier: FYI). Tier 3 silence. Self-healed; no action. (Another occurrence of the daemon-reload/cycle.timer stuck pattern; cycle-timer-checkpoint Forge PR still pending. Carry forward.)
+- Line 1389: `pulse forge-build-dispatch-blocked:register-ol-db-ro-url-credential` at 18:10Z — written this iter (see Check H). Tier 2 escalation.
+Watermark advances to 2026-06-09T18:00:18Z / line 1388 (line 1389 is this iter's own escalation, not a pre-existing alert). ✅ (Tier 3 silence on stuck-timer-healed; Tier 2 escalation dispatched for build-dispatch-blocked.)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "No entries". ✅
+
+**Check 2 — Telegram sweep:** Larry's last 4h messages: 10:22Z "Beacon can you fix this [credential-drift]" → Beacon handled 10:24Z; 10:25Z "go" → forge dispatch; 11:55Z "What can we do about this? [forge-build-failed]" → Beacon handled 11:57Z; 12:02Z "go" → second forge dispatch. All directives tracked by register-ol-db-ro-url-credential pipeline. No orphan directives. ✅
+
+**Check 3 — Pipeline stall:** Heartbeat = 2026-06-09T17:59:19Z (~9 min at scan; ✅ within 90-min threshold). ✅
+
+**Check 4 — Pending directives (24h):** Same as Check 2 sweep — all Larry directives tracked. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat = 2026-06-09T18:05:10Z (~3 min at scan; ✅ within 60-min threshold). `heal-stale-daemon-code-state.json` returned read-error (state file may be transient during a healer run); heartbeat fresh confirms healer active. ✅
+
+**Check A — Source repo:** branch=main, clean tree, HEAD=ecd0f19 "Pulse cycle 20260609T180116Z". ✅
+
+**Check B — Sync health:** last_sync=2026-06-09T18:02:19Z (within 2h threshold), status=no-change. ✅
+
+**Check C — Agent liveness:** 9 active ourliberty-*.service units + 44 active timers. ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+**Check H — Forge activity digest (NEW FINDING):** ⚠️ **Build-phase re-dispatch BLOCKED.**
+- Larry's 12:02Z "go" triggered a second dispatch of `register-ol-db-ro-url-credential` → Forge ran preflight → PASSED at 18:03Z (exit_code=0, phase=preflight, `register-ol-db-ro-url-credential.2.json`). Duration=70s.
+- Outbox-notifier attempted to dispatch build-phase task → detected `build-register-ol-db-ro-url-credential.json` in Forge inbox `.archive` (dispatched 10:27Z, already executed as failed build `.1.json`) → logged: "build-phase already dispatched for task register-ol-db-ro-url-credential (file or archive or .invalid present); skipping duplicate write". No new build task created. No PR opened.
+- Root cause: outbox-notifier dedup logic checks for any prior dispatch artifact (pending, archived, or invalid) — but archived = already executed/failed, not in-flight. Re-dispatch after failure should check PENDING only.
+- **Escalation written:** larry_alerts idx=1389, source=pulse, subject=forge-build-dispatch-blocked:register-ol-db-ro-url-credential. Ask-then-do.
+- **Unblocking path for Larry:** move `~/agents/inboxes/forge/.archive/build-register-ol-db-ro-url-credential.json` out of the archive (rename/delete), then send "go: register-ol-db-ro-url-credential" to Beacon bot to trigger a fresh preflight+build cycle.
+- **G-rule 1/3 opened:** outbox-notifier dedup checks archive (already-processed entries), not just pending — blocks re-dispatch after build failure. At 3/3: dispatch Beacon to spec fix (dedup should check inbox pending-only, with archived entries excluded as non-blocking).
+- 0 open Forge PRs. ✅ (check passes; pipeline state flagged separately)
+
+**Rotations:** 19 credentials in registry; none within 60d window. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks (I, III, VIII, IX, X) skip. ✅
+
+**PRIME DIRECTIVE ratio discrepancy noted:** Script-authoritative value: interventions=732 (+1 this iter), systemic_fixes=14, ratio≈52.29. Prior MEMORY snapshot (iter 1170) claimed systemic_fixes=18 ratio≈40.61 — NOT VALIDATED. Script shows 14, same as pre-iter-1170 count. MEMORY status snapshot has inflated systemic_fix count; correcting in MEMORY update this iter.
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build re-dispatch BLOCKED: register-ol-db-ro-url-credential** — UPDATED from prior "Forge build FAILED." Second preflight PASSED 18:03Z; build-phase dispatch blocked by stale archive dedup. Escalation written (idx=1389). Action on Larry: see Check H unblocking path.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — last alert 16:16Z Jun 9 (watermark unchanged). Root fix blocked on build dispatch. Next expected ~22:16Z Jun 9.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 57th total; self-recovering; sync nominal.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark UNCHANGED (last 17:11Z Jun 9). Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-verified this iter (state file transient; carry forward at 1/3).
+- **NEW G-rule 1/3 (this iter): `outbox-notifier dedup checks archive not just pending — blocks build re-dispatch after failure`** — opened iter 1171.
+- `stuck-timer-healed:ourliberty-cycle.timer` (daemon-reload/cycle-timer-checkpoint): another occurrence at 18:00Z. Healer self-resolved. Cycle-timer-checkpoint Forge PR still pending.
+
+**Actions taken:** Escalation written to larry_alerts.jsonl (idx=1389).
+**Dispatches:** None.
+**PRIME DIRECTIVE:** +1 intervention (forge-build-dispatch-blocked:register-ol-db-ro-url-credential). interventions=732, systemic_fixes=14, ratio≈52.29.
+**Tier end-of-iter:** 1, consecutive_clean=0 (new finding active).
+
+---
+
 ## Iteration 1170 — 2026-06-09 17:58Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build failure; no new signals this iter.
