@@ -4,6 +4,45 @@
 
 ---
 
+## Iteration 1168 — 2026-06-09 17:41Z UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ Tier 1 — standing Forge build failure; no new signals this iter.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T17:37:22Z)
+
+**Check 0 — Alert triage:** No new alerts since watermark 2026-06-09T17:11:18Z (larry-alerts.jsonl at 1387 lines, unchanged). alert-triage.json shows last_claimed_ts=None (state file has 0 claimed rows; watermark maintained via MEMORY). Nominal. ✅
+
+**Check A — Source repo:** Branch=main, clean tree (session-start gitStatus). Sync status=no-change at 17:02Z (~40m ago, within 2h). ✅
+
+**Check C — Agent liveness:** All 8 expected units active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, sync.timer. Telegram silence: calibrated idle false-positive. No ERROR/WARN in journalctl last 1h. ✅
+
+**Check D — Inbox:** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. ✅
+
+**Check 1 — Log-noise:** No WARN/ERROR signatures above threshold in last 1h. ✅
+
+**Check 2 — Telegram sweep:** Beacon log: Larry directives at 16:22Z ("fix OL_DB_RO_URL") + 16:25Z ("go") — tracked by forge-build-failed escalation (idx=1386). No orphaned directives. ✅
+
+**Check 3 — chain_events:** heal-pipeline-stall.heartbeat at 17:26Z (15m ago), fresh. ✅
+
+**Check 4 — Pending directives:** All 24h directives tracked. ✅
+
+**Check 5 — Stale-daemon:** No new auto-restart events in last 1h. ✅
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build FAILED: register-ol-db-ro-url-credential** — VERIFIED. Forge archive exit_code=-1 ts=16:30Z Jun 9, pr_url=None. `gh pr list` confirms 0 PRs. Action on Larry: retry `go: register-ol-db-ro-url-credential` to Beacon bot.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — root fix blocked on failed Forge build. Firing every ~6h (last 16:16Z Jun 9). No new action until Forge re-dispatch succeeds.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z; Larry DM'd (beacon idx=1375). Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 57th total; self-recovering.
+
+**Note:** alert-triage.json last_claimed_ts=None — Check 0 triage state not persisting claims across cycles. Watermark maintained in MEMORY only. First observation of this specific gap. Will track toward G-rule 3/3 (at 3 observations: dispatch to Beacon to spec durable last_claimed_ts persistence in alert_triage_state.py).
+
+**Did:** Ran full health check suite. No always-fix conditions triggered. No new escalations (all standing items already DM'd in prior cycles).
+**PRIME DIRECTIVE:** interventions=731, systemic_fixes=18, ratio≈40.61 (per iter 1167 ledger). No new dispatches this iter.
+
+---
+
 ## Iteration 1167 — 2026-06-09 17:37 UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ **Standing finding: forge-build-failed:register-ol-db-ro-url-credential unchanged since iter 1163 (16:30Z Jun 9; no retry from Larry). All mandatory and additive checks clean. Tier 1 maintained (consecutive_clean=0 — standing Check H outstanding). 10/10+ services active. All inboxes empty. Both heartbeats fresh. Sync nominal. 0 open PRs.**
