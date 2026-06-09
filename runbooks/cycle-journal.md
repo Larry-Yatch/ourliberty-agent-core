@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 1175 — 2026-06-09 18:36Z UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; no new signals this iter.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1389 lines (UNCHANGED from iter 1174 watermark at 2026-06-09T18:10:17Z / line 1389). No new alerts since prior watermark. Nominal. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "No entries". ✅
+
+**Check 2 — Telegram sweep:** sessions=1 (7998341473). Beacon log: last activity 12:02:30 MDT Jun 9 — Larry's "go" → second register-ol-db-ro-url-credential dispatch to Forge. No new Larry directives since watermark. No orphaned directives. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T18:30:35Z (~6 min at scan; ✅ within 90-min threshold). stalls=[]. ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat = 2026-06-09T18:35:15Z (~1 min at scan; ✅ within 60-min threshold). ✅
+
+**Check A — Source repo:** branch=main, clean tree, HEAD=1d5a43b "Pulse cycle 20260609T183515Z". ✅
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-09T18:02:19Z (~34 min; within 2h threshold). ✅
+
+**Check C — Agent liveness:** 53 active ourliberty-*.service/.timer units. ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+**Check H — Forge activity digest (STANDING — verified):** `build-register-ol-db-ro-url-credential.json` still in Forge inbox `.archive/` (stale failed-build entry, mtime 10:27Z Jun 9). Forge inbox empty. No PR created. Build-phase dispatch still BLOCKED by stale archive dedup. Action on Larry: move `~/agents/inboxes/forge/.archive/build-register-ol-db-ro-url-credential.json` out of archive, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+
+**Rotations:** Watermark unchanged at 1389/18:10:17Z. credential-drift:OL_DB_RO_URL — no new alert this iter; next expected ~22:16Z Jun 9. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks (I, III, VIII, IX, X) skip. ✅
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build-phase re-dispatch BLOCKED: register-ol-db-ro-url-credential** — VERIFIED. Stale archive entry confirmed present. Forge inbox empty. No PR. Action on Larry: move `~/agents/inboxes/forge/.archive/build-register-ol-db-ro-url-credential.json` out of archive, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — No new alert this iter. Root fix blocked on build dispatch.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 57th total; self-recovering; sync nominal.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark UNCHANGED at 1389/18:10:17Z. No new unreviewed-merge alerts. Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-triggered. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): No new occurrences. Carry forward.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions. interventions=732, systemic_fixes=14, ratio≈52.29.
+**Tier end-of-iter:** 1, consecutive_clean=0 (standing Forge build-dispatch-blocked active).
+
+---
+
 ## Iteration 1174 — 2026-06-09 18:31Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; no new signals this iter.
