@@ -2398,6 +2398,211 @@ class BuildPhaseDispatchTest(unittest.TestCase):
         self.assertIn('PR title:', build_data['prompt'])
 
 
+class BuildDedupSpawnFailureOverrideTest(unittest.TestCase):
+    """Build-dedup wedge fix (2026-06-09): a stale archived build-<task>.json
+    must NOT permanently block re-dispatch when the prior build was a spawn-
+    failure (worker never ran, no PR). The override fires ONLY on a definitive
+    terminal spawn-failure; absence of a terminal result keeps the conservative
+    crash-recovery skip."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+            'ROUTING_EVENTS_LOG': swi.ROUTING_EVENTS_LOG,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+
+        self._rv_root = rv.REPO_ROOT
+        self._rv_models_path = rv.MODELS_CONFIG_PATH
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.MODELS_CONFIG_PATH = rv.REPO_ROOT / 'config' / 'agent-models.json'
+        rv.MODELS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        rv.MODELS_CONFIG_PATH.write_text(json.dumps({
+            'agents': {
+                'forge': {
+                    'worktree_enabled': True,
+                    'allowed_repos': ['ourliberty-agent-core'],
+                },
+            },
+        }))
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        rv.REPO_ROOT = self._rv_root
+        rv.MODELS_CONFIG_PATH = self._rv_models_path
+        rv.invalidate_cache()
+        rv.invalidate_models_cache()
+        self._tmp.cleanup()
+
+    # ---- seeding helpers -------------------------------------------------
+
+    def _seed_inbox_archive(self, task_id):
+        """Plant the stale build-<task>.json in Forge's inbox archive."""
+        archive = on.INBOXES_ROOT / 'forge' / '.archive'
+        archive.mkdir(parents=True, exist_ok=True)
+        (archive / f'build-{task_id}.json').write_text('{}')
+
+    def _seed_outbox_result(self, task_id, body, suffix='.1'):
+        """Plant a build-phase RESULT envelope in Forge's outbox archive."""
+        archive = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        archive.mkdir(parents=True, exist_ok=True)
+        f = archive / f'{task_id}{suffix}.json'
+        f.write_text(json.dumps(body))
+        return f
+
+    def _spawn_failure_result(self, task_id):
+        # Mirrors the real artifact register-ol-db-ro-url-credential.1.json:
+        # exit_code -1, 'All retries exhausted', duration null, no PR.
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'build',
+            'exit_code': -1,
+            'result': 'All retries exhausted',
+            'error': 'All retries exhausted',
+            'duration_sec': None,
+            'pr_url': None,
+            'account_tier': None,
+            'cost_usd': None,
+            'completed_at': '2026-06-09T16:30:22.620537+00:00',
+        }
+
+    def _ran_build_result(self, task_id):
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'build',
+            'exit_code': 0,
+            'result': (
+                'PR opened: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/401'
+                '\n\nImplemented the change.'
+            ),
+            'error': None,
+            'duration_sec': 142.5,
+            'cost_usd': 0.41,
+            'completed_at': '2026-06-09T17:00:00.000000+00:00',
+        }
+
+    def _build_data(self, task_id):
+        return {
+            'task_id': task_id,
+            'claude_session_id': 'sess-resume-xyz',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': f'forge/{task_id}',
+        }
+
+    # ---- tests -----------------------------------------------------------
+
+    def test_build_dedup_overridden_on_spawn_failure(self):
+        task_id = 'wedged-task'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._spawn_failure_result(task_id))
+
+        on._dispatch_build_phase(self._build_data(task_id))
+
+        # The override fired: a fresh build task is written to the live inbox.
+        live = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(len(live), 1, 'spawn-failure should allow re-dispatch')
+        self.assertIn('BUILD_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_build_dedup_still_skips_when_prior_build_ran(self):
+        task_id = 'really-built-task'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._ran_build_result(task_id))
+
+        on._dispatch_build_phase(self._build_data(task_id))
+
+        live = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(live, [], 'a real prior build must still skip')
+        self.assertNotIn('BUILD_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_build_dedup_skips_when_no_terminal_result(self):
+        # Notifier crashed mid-build: the inbox artifact is archived but NO
+        # terminal build result exists. The override must NOT fire.
+        task_id = 'crashed-midbuild-task'
+        self._seed_inbox_archive(task_id)
+        # (no outbox result seeded)
+
+        on._dispatch_build_phase(self._build_data(task_id))
+
+        live = list((on.INBOXES_ROOT / 'forge').glob('build-*.json'))
+        self.assertEqual(live, [], 'no terminal result -> conservative skip')
+        self.assertNotIn('BUILD_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_build_dedup_inbox_present_always_skips(self):
+        # A build currently in the LIVE inbox is in-flight; even with a prior
+        # spawn-failure result present, never double-dispatch it.
+        task_id = 'inflight-task'
+        live_inbox = on.INBOXES_ROOT / 'forge'
+        live_inbox.mkdir(parents=True, exist_ok=True)
+        (live_inbox / f'build-{task_id}.json').write_text('{}')
+        self._seed_outbox_result(task_id, self._spawn_failure_result(task_id))
+
+        on._dispatch_build_phase(self._build_data(task_id))
+
+        # Still exactly the one we planted; no second build written.
+        live = list(live_inbox.glob('build-*.json'))
+        self.assertEqual(len(live), 1)
+        self.assertNotIn('BUILD_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_spawn_failure_helper_defensive(self):
+        # Missing archive dir -> False.
+        self.assertFalse(on._prior_build_was_spawn_failure('no-such-task'))
+
+        # Corrupt result envelope -> False (parse error is conservative).
+        archive = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        archive.mkdir(parents=True, exist_ok=True)
+        (archive / 'corrupt-task.1.json').write_text('{not valid json')
+        self.assertFalse(on._prior_build_was_spawn_failure('corrupt-task'))
+
+        # A preflight (non-build) result must not satisfy the build check.
+        preflight = self._spawn_failure_result('pf-task')
+        preflight['phase'] = 'preflight'
+        self._seed_outbox_result('pf-task', preflight)
+        self.assertFalse(on._prior_build_was_spawn_failure('pf-task'))
+
+        # Prefix-collision guard: a result for `<task>-v2` must not match `<task>`.
+        self._seed_outbox_result(
+            'prefix-task-v2', self._spawn_failure_result('prefix-task-v2')
+        )
+        self.assertFalse(on._prior_build_was_spawn_failure('prefix-task'))
+
+        # The positive case still returns True.
+        self._seed_outbox_result(
+            'good-fail', self._spawn_failure_result('good-fail')
+        )
+        self.assertTrue(on._prior_build_was_spawn_failure('good-fail'))
+
+
 # ============================================================================
 # D3.5 commit 5a — Mirror review marker pipeline + preflight-discipline gate
 # ============================================================================
