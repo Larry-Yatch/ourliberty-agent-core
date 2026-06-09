@@ -143,6 +143,18 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # absent. The shipper never produces these rows; listing the type here
     # admits it to the weekly audit (heal_chain_event_type_audit.py).
     'ceo_digest',
+    # Missions v2 Phase 0 (missions-v2-phase0-desktop-session-feed.md): desktop
+    # Claude Code sessions push these directly to Supabase via the droplet
+    # ingest endpoint (POST /api/ingest/desktop-session), which calls
+    # chain_event_emit.emit_event with agent='desktop-claude'. They make a live
+    # desktop chat appear as a card on the Missions board (the board was
+    # previously blind to desktop work). _start opens a card, _done retires it,
+    # _active is an optional activity/blocked heartbeat. The shipper never
+    # produces these rows; listing them here admits them to the weekly audit
+    # (heal_chain_event_type_audit.py).
+    'desktop_session_start',
+    'desktop_session_active',
+    'desktop_session_done',
 })
 
 # PII / credential redaction. Any payload field key matching one of these
