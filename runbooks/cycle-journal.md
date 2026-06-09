@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 1206 — 2026-06-09 22:29Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Tier 1 — **PR #401 OPENED** (credential fix, Mirror reviewing); health-check-notify-script-missing G-rule 2/3 approaching 3/3 (fire at 22:30:39Z imminent, cannot observe); credential-drift:OL_DB_RO_URL root fix now in pipeline; all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1391 lines** (UNCHANGED from iter 1205 watermark at 1391/22:16:06Z). No new alerts since 22:16:06Z. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** Last Larry message 22:23:48Z UTC "go" (approving `register-ol-db-ro-url-credential-v2` dispatch) — tracked by PR #401 now open. No new operative directives. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T22:19:39Z (~10 min old). No active stalls. ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=1 (review-register-ol-db-ro-url-credential-v2.json — normal, in-flight), pulse=0. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.service ExecMainStatus=0, Result=success. State file absent (one-shot, normal). ✅
+
+**Check A — Source repo:** branch=main, clean tree. Local HEAD ahead of origin/main (normal inter-sync accumulation since 22:03Z push). Next push ~23:03Z via sync.timer. ✅
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-09T22:03:15Z. FRESH (~26 min ago). APPROVAL_REQUEST sync-push-rebase-fallback-001 open (root-cause fix pending). ✅
+
+**Check C — Agent liveness:** All 8/8 key services active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api. ourliberty-cycle.timer SubState=running (this session, normal). ✅
+
+**Check E — PRs:**
+- **PR #401 OPEN** — "config(credentials): register OL_DB_RO_URL in rotation schedule + add rotation runbook" — head=forge/register-ol-db-ro-url-credential-v2, state=CLEAN/MERGEABLE, reviewDecision="" (Mirror review pending), created=22:27:05Z UTC (age ~2 min — under 30m auto-merge threshold). Mirror inbox has `review-register-ol-db-ro-url-credential-v2.json`. Normal pipeline in progress. ✅ (no action)
+- ourliberty-dashboard: 0 open PRs. ✅
+
+**Check H — Forge activity digest — STANDING FINDING SUPERSEDED:** Prior iter 1205 standing "Forge build-phase dispatch BLOCKED" is **SUPERSEDED** by successful v2 dispatch. Forge archive now shows 5 entries: 3 old (`build-register-ol-db-ro-url-credential.json` 10:27Z, `register-ol-db-ro-url-credential.json` 10:25Z, `register-ol-db-ro-url-credential.1.json` 12:02Z) + 2 new v2 entries (`register-ol-db-ro-url-credential-v2.json` 16:23Z, `build-register-ol-db-ro-url-credential-v2.json` 16:25Z). Forge inbox empty. PR #401 opened at 22:27:05Z. ✅
+
+**Credential rotation check (VERIFY-BEFORE-REASSERT):** Watermark UNCHANGED at 1391/22:16:06Z. No new credential-drift alert (last was 22:16:06Z, 6h cadence; next expected ~04:16Z Jun 10). Root fix (PR #401) now in Mirror review — when merged, healer no longer flags OL_DB_RO_URL. ⚠️ (root fix in pipeline)
+
+**health-check-notify-script-missing G-rule (VERIFY-BEFORE-REASSERT):** Health service last result=exit-code=1 at 22:00:39Z UTC (ExecMainStatus=1; confirmed unchanged from prior iters). Timer next fire: 22:30:39Z UTC (~90 sec from cycle run at 22:29Z). Cannot observe 3rd fire in this session per post-cycle exit discipline. G-rule carries at **2/3**; next automated cycle (22:35Z+) observes + dispatches Beacon if 3/3 confirmed. ⚠️
+
+**Bug-hunt gate (§ 5.0):** 0/15 gate reviews since go-live; soaking, no-op. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks (I, III, VIII, IX, X) skip. ✅
+
+**Standing findings (verified this iter):**
+- [green] **Forge build-phase re-dispatch BLOCKED** → **SUPERSEDED.** PR #401 opened 22:27Z; Mirror reviewing. No Larry action needed (original unblock path no longer required).
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — Root fix (PR #401) in Mirror review. No new alert (watermark UNCHANGED). Next expected ~04:16Z Jun 10. Closes when PR merges.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. No fix landed. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing. No new activity.
+- [yellow] **health-check-notify-script-missing** — G-rule **2/3** (carries forward); 3/3 fire at 22:30:39Z UTC cannot observe; next automated cycle confirms + dispatches Beacon.
+- [blue] **ourliberty-cycle.timer** — SubState=running (normal in-progress). G-rule 3/3 dispatched (iter 848); permanent fix pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root-cause fix pending. Sync FRESH at 22:03:15Z.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark UNCHANGED at 1391. No new unreviewed-merge alerts. Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json no-change 22:03:15Z. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): PR #401 open but under 30m + Mirror reviewing (normal path). Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-triggered. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): Superseded by v2 workaround (fresh task_id bypasses the stale archive entry). G-rule still valid as systemic fix needed; carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 dispatched (iter 848): Timer SubState=running (normal). Carry forward as [blue monitoring].
+- `health-check-notify-script-missing` G-rule **2/3** (iter 1202): 22:30:39Z fire imminent; cannot observe. Carry forward 2/3.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this cycle. interventions=733, systemic_fixes=14, ratio≈52.36.
+**Tier end-of-iter:** 1, consecutive_clean=0 (credential-drift root fix in pipeline; health-check-notify-script-missing 2/3 active; PR #401 pending Mirror review).
+
+---
+
 ## Iteration 1205 — 2026-06-09 22:21Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; credential-drift cadence watch (next ~04:16Z Jun 10); health-check-notify-script-missing G-rule 2/3 approaching 3/3 (health timer fires ~22:30:39Z UTC in ~9 min — 3/3 expected imminently; next automated cycle confirms + dispatches Beacon); all other checks nominal.
