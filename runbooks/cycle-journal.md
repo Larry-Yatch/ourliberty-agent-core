@@ -4,6 +4,73 @@
 
 ---
 
+## Iteration 1210 — 2026-06-09 23:14Z UTC (interactive, Tier 1)
+
+**Health:** ✅/⚠️ Tier 1 — **PR #403 MERGED ✅** (systemic fix for outbox-notifier dedup G-rule now live; systemic_fixes→15, ratio≈48.87); all mandatory checks nominal; `health-check-notify-script-missing` APPROVAL_REQUEST `notify-larry-phase-d-channel-001` still pending Larry dashboard tap; unreviewed-merge streak 6 (no new occurrences); ff-main-when-behind session-guard-blocked.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T22:50:16Z; standing signals active)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1397 lines** (+3 from iter 1209 watermark 1394/22:50:39Z).
+- Line 1395: `auto-restarted:ourliberty-beacon-bot.service` at 23:06:43Z — heal-stale-daemon-code auto-restarted beacon-bot (script mtime +1611 min from PR #402 deploy; new code now live). route=digest. Tier 3 known-pattern. Journal note only. ✅
+- Line 1396: `auto-restarted:ourliberty-outbox-notifier.service` at 23:06:47Z — same trigger (beacon_approval_handler.py mtime +5290 min). route=digest. Tier 3. Journal note only. ✅
+- Line 1397: `review-pass` PR #403 at 23:08:27Z — Mirror approved + auto-merged "fix(notifier): build-phase dedup must not permanently wedge a task after a spawn-failure". Tier 3 known-pattern (pipeline completion). ✅
+- All 3 Tier 3 silences. No tier-reset from Check 0. Beacon-bot post-restart delivery confirmed working (idx=1394, 1395, 1396 all processed correctly at 23:11Z). Watermark → 1397/23:08:27Z.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** Last Larry messages at 22:49Z ("what about step two now that PR 401 merged") → answered by beacon 22:51:44Z (dedup fix dispatch); and "go" 22:51Z → tracked by PR #403 (now merged ✅). No new messages. No orphan directives. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall heartbeat = 2026-06-09T23:08:59Z (FRESH — ~5 min at scan). No stalls. ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅
+
+**Check 5 — Stale daemon:** State file absent (one-shot healer ran; normal pattern). 8/8 services active. Auto-restarts at 23:06:43-47Z were by-design (heal-stale-daemon-code, new code from PR #402). ✅
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start HEAD=e3c6da3 (Pulse cycle 23:07:45Z). PR #403 squash-merged at 23:08:27Z → local repo is 1 commit behind origin/main. **Always-fix `ff-main-when-behind`: attempted; blocked by session permission guard.** Next automated cycle (expected ~23:37Z sync pull) handles. ⚠️
+
+**Check B — Sync health:** status=error, last_sync=2026-06-09T23:07:01Z (FRESH — ~7 min at scan). sync-push-rebase-fallback-001 **60th+ occurrence** (self-recovering). APPROVAL_REQUEST standing. ✅ (known standing)
+
+**Check C — Agent liveness:** All 8/8 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api. beacon-bot and outbox-notifier restarted at 23:06:43-47Z (heal-stale-daemon-code, by-design). ✅
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #403 MERGED ✅ 23:08:27Z** — Mirror approved + auto-merged "fix(notifier): build-phase dedup must not permanently wedge a task after a spawn-failure" (commit: auto-squash). **G-rule 1/3 (iter 1171): SYSTEMIC FIX VERIFIED AND LIVE.** Bug-hunt gate: 1/15.
+- ourliberty-agent-core: 0 other open PRs. ourliberty-dashboard: 0 open PRs. ✅
+
+**Credential rotation check (§ 4.6):** OL_DB_RO_URL in registry (PR #401 merged). No credentials due within 60 days. ✅
+
+**Bug-hunt gate (§ 5.0):** 1/15 gate reviews since go-live. Soaking, no-op. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): PR #403 MERGED ✅ — **CLOSED. Systemic fix live.**
+- `actor=larry-direct-merge` streak (6): watermark +3 = Tier 3 silences only (no unreviewed-merge). UNCHANGED at 6. Carry forward pending `go: actor-exemption-config`.
+- `auto-restarted:*` untranslated: lines 1395+1396 = auto-restarted, route=digest, Tier 3 processed correctly. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: 60th+ at 23:07Z. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3: No new occurrence. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: Not re-triggered. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): Timer normal. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 dispatched (iter 1207): Forge inbox empty — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` still pending Larry dashboard approval. Monitor.
+
+**Standing findings (updated this iter):**
+- ~~[yellow] **`fix-build-dedup-spawn-failure-wedge`**~~ → **PR #403 MERGED ✅ — CLOSED. Systemic fix live.**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap. Forge preflight not yet dispatched.
+- [yellow] **unreviewed-merge streak: 6** (PRs #396–402) — No new occurrences. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. idx=1424 standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge streak**: G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 60th+ at 23:07Z; self-recovering.
+
+**Actions taken:** None (ff-main-when-behind attempted; blocked by session permission guard).
+**Dispatches:** None.
+**PRIME DIRECTIVE:** PR #403 merge = systemic_fix verified for G-rule outbox-notifier-dedup-archive-wedge (iter 1171 dispatch → 1210 verification). Ledger: `systemic_fix` row appended (iter=1210, template=outbox-notifier-dedup-archive-wedge). Script-authoritative ratio: interventions=733, systemic_fixes=15, verification_pending=5, ratio≈48.87 (improved from ~52.5; first new systemic_fix since iter 1146).
+**Tier end-of-iter:** 1, consecutive_clean=0 (standing items active; ff-main-when-behind pending; health-notify approval pending).
+
+---
+
 ## Iteration 1209 — 2026-06-09 23:05Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Tier 1 — PR #403 in Mirror review (dedup permanent fix, G-rule 1/3 iter 1171 → permanent fix advancing to review); `health-check-notify-script-missing` APPROVAL_REQUEST `notify-larry-phase-d-channel-001` in pipeline (Forge preflight pending); unreviewed-merge streak 6 pending `go: actor-exemption-config`; all mandatory checks nominal this iter.
