@@ -4,6 +4,86 @@
 
 ---
 
+## Result notification — 2026-06-09 22:45Z UTC (from=beacon | task=cycle-finding-health-notify-script-missing-20260609T224225Z | status=SUCCESS)
+
+**Beacon design complete. APPROVAL_REQUEST dispatched to Forge for preflight.**
+
+Root cause confirmed by Beacon: `NOTIFY_SCRIPT` (agent_core_health_check.py:56) resolves to `scripts/notify_larry.py`, which was never created → `alert_larry()` always takes the `not NOTIFY_SCRIPT.exists()` branch and drops every alert with a WARN-log. Fix is a thin wrapper onto `larry_alerts.append_alert(source='agent-core-health', severity='warning')` using the sibling-relative import pattern (`scripts/heal_droplet_git_drift.py` import model). Accepts `--tier / --subject / --message` (caller contract unchanged). `breakdown → warning` severity mapping; unknown tiers fall back to `warning`. Test in `scripts/tests/test_notify_larry.py`. Only permitted change to `agent_core_health_check.py`: update the stale TODO comment on line 56.
+
+**APPROVAL_REQUEST:** `notify-larry-phase-d-channel-001` → Forge preflight. PR title: `feat: add scripts/notify_larry.py so agent-core health alerts reach Larry`.
+
+**Standing finding update:** `health-check-notify-script-missing` → **Forge preflight in progress.** Monitor for Forge preflight result + PR open.
+
+---
+
+## Iteration 1207 — 2026-06-09 22:44Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Tier 1 — PR #401 MERGED ✅ (`credential-drift:OL_DB_RO_URL` CLOSES); `health-check-notify-script-missing` G-rule **3/3 confirmed + dispatched** to Beacon; ff-main-when-behind attempted, blocked by session guard (next automated cycle handles); sync-push-rebase-fallback-001 59th+ occurrence; all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1392 lines** (+1 from iter 1206 watermark 1391/22:16:06Z). New alert line 1392: `review-pass` for PR #401 at 22:35:03Z (outbox-notifier confirming Mirror approved + auto-merged). Tier 3 known-pattern — pipeline completion, no action. Watermark advances to 1392/22:35:03Z. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** No new operative directives since iter 1206. PR #401 merged at 22:35:02Z via Mirror auto-approve. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall heartbeat=2026-06-09T22:36:43Z (fresh). "no stalls detected". `FORGE_NO_PR_SKIP task=register-ol-db-ro-url-credential` INFO (stale v1 archive preflight_exit — expected). ✅
+
+**Check 4 — Agent inboxes:** beacon=1 (dispatch written this iter), forge=0, mirror=0, pulse=0. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code ran 22:36:34Z, inactive/dead (one-shot normal). INFO messages for zombie-workers + larry-alerts-retention (never ran; expected). ✅
+
+**Check A — Source repo:** branch=main, clean tree. Local HEAD `f7f1b45` behind origin/main `5bdf01c` (PR #401 squash merge at 22:35Z). **Always-fix `ff-main-when-behind` attempted; blocked by session permission guard. Next automated cycle handles.** ⚠️
+
+**Check B — Sync health:** `status=error, last_sync=2026-06-09T22:34:12Z`, message="Auto-commit push failed; rolled back". FRESH timestamp. Recurring **sync-push-rebase-fallback-001 (59th+ occurrence)**. Self-recovering; APPROVAL_REQUEST still open. ✅ (known standing)
+
+**Check C — Agent liveness:** All 8/8 services active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api. ourliberty-cycle.timer SubState=running (normal). ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. **PR #401 MERGED 22:35:02Z** (commit=5bdf01c, Mirror auto-approved + squash-merged). 0 open PRs in ourliberty-dashboard. ✅
+
+**health-check-notify-script-missing G-rule (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core-health.timer last trigger: 22:30:43Z UTC. Service: exit-code=1/FAILURE. Log: `WARN: notify script missing, alert dropped`. Findings: branch=✓, clean_tree=✗ (M runbooks/cycle-journal.md — mid-cycle race, resolved by wrapper commit at 22:31Z), sync_freshness=✓. Root cause confirmed: `NOTIFY_SCRIPT = scripts/notify_larry.py` (agent_core_health_check.py:56) — file never created, `# TODO(Larry): wire up Phase D notify`. **G-rule 3/3 CONFIRMED → DISPATCHED.** Envelope: `cycle-finding-health-notify-script-missing-20260609T224225Z.json` → Beacon inbox. ⚠️→DISPATCHED
+
+**PR #401 (VERIFY-BEFORE-REASSERT):** `gh pr view 401` → state=MERGED, mergedAt=2026-06-09T22:35:02Z, mergeCommit=5bdf01cd8. `credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL` standing finding **CLOSED ✅**. Healer will stop flagging OL_DB_RO_URL (now in rotation schedule). ✅
+
+**Bug-hunt gate (§ 5.0):** 0/15 since go-live; soaking, no-op. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Standing findings (updated this iter):**
+- ~~[yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL**~~ → **CLOSED ✅ PR #401 merged 22:35:02Z.**
+- [yellow] **health-check-notify-script-missing** → G-rule **3/3 DISPATCHED** (Beacon envelope written). Permanent fix: Forge to create `scripts/notify_larry.py` per spec.
+- [yellow] **ff-main-when-behind** — local HEAD f7f1b45 behind 5bdf01c; always-fix blocked by session guard; resolves on next automated cycle. (transient)
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST /api/system/missions/new → 500. idx=1424 standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). Pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 59th+ at 22:34Z.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark +1 = review-pass (not unreviewed-merge). Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: status=error 22:34Z confirmed. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Gate: 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-triggered. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 dispatched (iter 848): Timer normal. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule: **3/3 DISPATCHED this iter** → monitoring pending Forge PR.
+
+**Actions taken:**
+1. `ff-main-when-behind`: attempted `git pull --ff-only`, blocked by session permission guard. Logged. Next automated cycle handles.
+2. G-rule 3/3 dispatch: `cycle-finding-health-notify-script-missing-20260609T224225Z.json` written to Beacon inbox.
+
+**Dispatches:** `cycle-finding-health-notify-script-missing-20260609T224225Z.json` → Beacon inbox (Phase D health notify wiring).
+
+**PRIME DIRECTIVE:** 1 new intervention (health-check-notify-missing:g-rule-3of3-dispatch-beacon, ledger appended). interventions=734, systemic_fixes=14, ratio≈52.43.
+
+**Tier end-of-iter:** 1, consecutive_clean=0 (dispatch this iter + sync-push-rebase-fallback-001 + ff-main-behind pending).
+
+---
+
 ## Iteration 1206 — 2026-06-09 22:29Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Tier 1 — **PR #401 OPENED** (credential fix, Mirror reviewing); health-check-notify-script-missing G-rule 2/3 approaching 3/3 (fire at 22:30:39Z imminent, cannot observe); credential-drift:OL_DB_RO_URL root fix now in pipeline; all other checks nominal.
