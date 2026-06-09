@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 1159 — 2026-06-09 15:16 UTC (interactive, Tier 2 — NOMINAL)
+
+**Health:** ✅ **Nominal. Tier 2, consecutive_clean=1→2. 0 new alerts. All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. 0 open PRs.**
+
+Alert watermark: **2026-06-09T14:12:57Z** (pulse-cycle-down:claude-print-failing — iter 1154) — UNCHANGED. larry-alerts.jsonl = 1385 lines (same as iters 1155–1158). Session-start gitStatus: branch=main, tree=clean, HEAD=1e266ed "Pulse cycle 20260609T145903Z". Tier at start: tier=2, consecutive_clean=1, last_signal_at=2026-06-09T14:24:12Z. Pipeline-stall heartbeat: 2026-06-09T15:00:15Z (~16 min; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-09T15:04:19Z (~12 min; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-09T15:02:15Z (fresh, within 2h threshold), commit=1e266ed (matches session HEAD — fully synced). Tier state at end: **tier=2, consecutive_clean=2, last_signal_at=2026-06-09T14:24:12Z** (unchanged; one more clean iter toward Tier 3).
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts.** larry-alerts.jsonl = 1385 lines — watermark UNCHANGED at 1385 / 2026-06-09T14:12:57Z. Last 5 entries confirmed ≤ watermark (unreviewed-merge:400, summary, credential-drift×2, pulse-cycle-down:claude-print-failing). → ✅ Nominal. No tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** No new Larry directives since iter 1158. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-09T15:00:15Z (~16 min; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-09T15:04:19Z (~12 min; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=1e266ed "Pulse cycle 20260609T145903Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-09T15:02:15Z (within 2h threshold), commit=1e266ed matches HEAD — fully synced. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks skip. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge` (streak 5, PRs #396-400): watermark 1385, UNCHANGED. No new unreviewed-merge alerts. Carry forward.
+  - `auto-restarted:*` untranslated: No new occurrences (watermark unchanged). Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: Check 1 = no warnings. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean, 0 open PRs. Carry forward. Verification gate 2026-06-15.
+  - `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+  - `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions≈730, systemic_fixes=14, ratio≈52.14 (unchanged — no new interventions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E). All nominal.
+2. Check 0: 0 new alerts. Watermark UNCHANGED at 1385 / 2026-06-09T14:12:57Z.
+3. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync fully caught up, 0 open PRs.
+4. Tuesday periodic checks: skip.
+5. `python3 scripts/cycle_tier_state.py record --checks-clean true` → tier=2, consecutive_clean=2, last_signal_at unchanged.
+6. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: GITHUB_TOKEN not set on `ourliberty-dashboard-api` service → mission registration fails.
+- `[yellow]` **credential-drift:OL_DB_RO_URL**: Recurring every ~6h. Add to `config/token-rotation-schedule.json`.
+- `[yellow]` **actor-exemption-config**: Streak 5 (PRs #396-400). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation`.
+- `[yellow]` **cycle-timer-checkpoint**: Pending Larry `go: cycle-timer checkpoint`.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending (57th total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** Nothing new. System steady at Tier 2 (consecutive_clean=2/3 toward Tier 3). Next trigger: one more clean iter promotes to Tier 3 (30-min cadence). Next meaningful events: Sunday 2026-06-14 (Check I + Check III eligible); Monday 2026-06-15 (Checks VIII/X verification gate for G-rule `pulse-check-failed:*`).
+
+**Learned:** Nothing new.
+
+---
+
 ## Iteration 1158 — 2026-06-09 14:57 UTC (interactive, Tier 2 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 2, consecutive_clean=0→1. 0 new alerts. All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. 0 open PRs. Credentials outside 60d window.**
