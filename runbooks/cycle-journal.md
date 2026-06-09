@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 1166 — 2026-06-09 17:29 UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ **Standing finding: forge-build-failed:register-ol-db-ro-url-credential unchanged since iter 1163 (16:30Z Jun 9; no retry from Larry). All mandatory and additive checks clean. Tier 1 maintained (consecutive_clean=0 — standing Check H outstanding). 10/10+ services active. All inboxes empty. Both heartbeats fresh. Sync nominal. 0 open PRs.**
+
+Alert watermark: **2026-06-09T17:11:18Z / line 1387** — UNCHANGED. larry-alerts.jsonl = 1387 lines. Session-start gitStatus: branch=main, tree=clean, HEAD=2b6e3db "Pulse cycle 20260609T172605Z". Tier at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-09T17:24:42Z (set by iter 1165). Pipeline-stall heartbeat: 2026-06-09T17:26:42Z (~3 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-09T17:04:54Z (~25 min at scan; ✅ within 60-min threshold). Sync: last_sync=2026-06-09T17:02:16Z, status=no-change (within 2h threshold). Tier state at end: **tier=1, consecutive_clean=0, last_signal_at=2026-06-09T17:29:41Z** (recorded via `cycle_tier_state.py record --checks-clean false` — standing Check H keeps iter non-clean).
+
+**Context note (Check 2 / Check 4):** Beacon Telegram log confirms the forge-build chain: Larry directed Beacon 2026-06-09T16:22Z UTC ("Beacon can you fix this: credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL"), Beacon replied with spec marker at 16:24Z, Larry sent "go" at 16:25Z → Forge dispatched → Forge build register-ol-db-ro-url-credential FAILED at 16:30Z (infra layer, exit_code=-1, All retries exhausted). No further Larry messages post 16:25Z. Directive is tracked; not orphaned.
+
+**Found:**
+
+- **(Check 0) Alert triage: 0 new alerts past watermark.** larry-alerts.jsonl = 1387 lines — watermark UNCHANGED at 2026-06-09T17:11:18Z / line 1387. No new entries. → ✅ Nominal.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Interactive session — Larry invoked /cycle directly. Last Larry Telegram message: "go" at 2026-06-09T16:25Z (triggered Forge build — tracked as standing forge-build-failed). No unhandled directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-09T17:26:42Z (~3 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-09T17:04:54Z (~25 min at scan; ✅ within 60-min threshold). Note: `heal-stale-daemon-code-state.json` not present; heartbeat lives at `~/agents/blackboard/heal-stale-daemon-code.heartbeat`. ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=2b6e3db "Pulse cycle 20260609T172605Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** last_sync=2026-06-09T17:02:16Z (within 2h threshold), status=no-change. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10+ active.** All ourliberty-*.service and *.timer units listed as active. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **(Check H — Forge activity digest): ⚠️ forge-build-failed still standing.** Forge archive latest: `register-ol-db-ro-url-credential.1.json` (Jun 9 10:30 MDT, exit_code=-1, "All retries exhausted"). Beacon archive latest: `notify-register-ol-db-ro-url-credential.1.json` (Jun 9 10:31 MDT). No new Forge/Beacon activity since iter 1165 scan. No retry from Larry. → carry-forward ask-then-do.
+
+- **Credential rotations: ✅.** All entries outside 60d window. ✅
+
+- **Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks skip. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge` (streak 5, PRs #396-400): watermark UNCHANGED at 1387. No new unreviewed-merge alerts. Carry forward.
+  - `auto-restarted:*` untranslated: No new auto-restarted alerts in log scan. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: Check 1 = no warnings. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+  - `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+  - `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions=731, systemic_fixes=18, ratio≈40.61 (unchanged — no new interventions this iter).
+
+**Did:**
+1. Read continuity: iters 1163–1165, MEMORY, cycle-tier.json.
+2. Ran full mandatory checks (0–5) + additive checks (A, B, C, E, H) + credential rotation gate. All nominal except standing Check H carry-forward.
+3. Check 0: 0 new alerts. Watermark UNCHANGED at 2026-06-09T17:11:18Z / line 1387.
+4. Check 2/4: Verified forge-build chain via Beacon Telegram log — Larry "go" → Forge build → infra failure. Directive tracked; not orphaned.
+5. Confirmed 10/10+ services active, all inboxes empty, both heartbeats fresh, sync nominal, 0 open PRs.
+6. Credential rotation check: all outside 60d window.
+7. `python3 ~/agent-core/scripts/cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-09T17:29:41Z.
+8. Wrote journal entry.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **forge-build-failed:register-ol-db-ro-url-credential**: Build failed 16:30Z Jun 9 (infra layer, "All retries exhausted"). Larry triggered this build via "go" at 16:25Z after Beacon spec'd the OL_DB_RO_URL credential registry fix. Retry: send `go: register-ol-db-ro-url-credential` to Beacon bot to re-dispatch.
+- `[yellow]` **credential-drift:OL_DB_RO_URL**: Recurring ~6h; root fix is in the failed Forge build. Next expected firing ~23:00Z Jun 9. Action on Larry: retry the build.
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: `ourliberty-dashboard-api` → POST /api/system/missions/new returns 500.
+- `[yellow]` **actor-exemption-config**: Streak 5 (PRs #396-400). Reply `go: actor-exemption-config`.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation`.
+- `[yellow]` **cycle-timer-checkpoint**: Pending `go: cycle-timer checkpoint`.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending (57th total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:** forge-build-failed:register-ol-db-ro-url-credential — 1st occurrence (iter 1163); 0 new occurrences (still 1/3 threshold). credential-drift:OL_DB_RO_URL — 5+ occurrences since iter 1152 (~6h cadence; action on Larry to retry build).
+
+**Learned:** Beacon Telegram log is the ground-truth chain for Larry-initiated Forge builds. Confirmed: iter 1163's forge-build-failed was triggered by Larry's direct "go" command at 16:25Z Jun 9, not an automated dispatch. This doesn't change the escalation path (still retry via Beacon), but explains why no automated retry fired.
+
+---
+
 ## Iteration 1165 — 2026-06-09 17:24 UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ **Standing finding: forge-build-failed:register-ol-db-ro-url-credential unchanged since iter 1163 (16:30Z Jun 9, no retry from Larry). No new findings this iter. All mandatory checks clean. Tier 1 maintained (consecutive_clean=0 — standing Check H outstanding). 10/10 services active. All inboxes empty. Both heartbeats fresh. Sync nominal. 0 open PRs.**
