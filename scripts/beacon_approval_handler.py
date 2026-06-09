@@ -677,7 +677,27 @@ def resolve(
         s.setdefault('history', []).append(matched)
         if own:
             save_state(s)
-        return matched
+    # Lock released. On a self-committed resolution (the interactive Telegram
+    # approve/reject/modify paths), retire the dashboard's pending approval row
+    # right away — symmetric to the approval_request emit on the request side —
+    # so it doesn't read as "blocking the chain" until heal_stale_approvals
+    # reconciles (≤10 min). When `state` is passed in (own is False) the caller
+    # owns the commit, so the clear is left to the healer. Best-effort: never
+    # blocks or fails the resolution; the healer remains the backstop.
+    if own:
+        _clear_dashboard_pending(approval_id)
+    return matched
+
+
+def _clear_dashboard_pending(approval_id: str) -> None:
+    """Best-effort mirror of a committed resolution to the dashboard's Approvals
+    tab: clear the pending `approval_request` chain_event for `approval_id` so a
+    Telegram approval clears immediately instead of waiting on the
+    heal_stale_approvals timer. Swallows every failure — the resolution has
+    already committed locally and the healer backstops a dropped clear."""
+    with contextlib.suppress(Exception):
+        import chain_event_emit  # local: keeps the Supabase dep out of the
+        chain_event_emit.clear_approval_request(approval_id)  # import graph
 
 
 def pop_paused_backlog(state: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:

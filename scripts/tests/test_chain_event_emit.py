@@ -174,5 +174,115 @@ class TestEmitEvent(unittest.TestCase):
             cee.reset_client_for_testing()
 
 
+class _ClearResp:
+    def __init__(self, data, count):
+        self.data = data
+        self.count = count
+
+
+class _ClearClient:
+    """Mock supabase client capturing the keyed read_at UPDATE + its filters.
+
+    Mirrors the PostgREST fluent builder for the subset clear_approval_request
+    uses: table().update(values, count=).eq().eq().is_().execute()."""
+
+    def __init__(self, *, data=None, count=0, raise_on_execute=None):
+        self.captured_table = None
+        self.captured_update = None
+        self.captured_count_kw = None
+        self.filters = {}
+        self.is_null = []
+        self._data = data
+        self._count = count
+        self._raise = raise_on_execute
+        self.executed = False
+
+    def table(self, name):
+        self.captured_table = name
+        return self
+
+    def update(self, values, **kwargs):
+        self.captured_update = values
+        self.captured_count_kw = kwargs.get('count')
+        return self
+
+    def eq(self, col, val):  # noqa: A003 — mirrors supabase-py builder name
+        self.filters[col] = val
+        return self
+
+    def is_(self, col, val):
+        self.is_null.append((col, val))
+        return self
+
+    def execute(self):
+        self.executed = True
+        if self._raise is not None:
+            raise self._raise
+        return _ClearResp(self._data, self._count)
+
+
+class TestClearApprovalRequest(unittest.TestCase):
+    """clear_approval_request — the resolution-side mirror of emit_event: a
+    single keyed read_at UPDATE, idempotent on the read_at-null guard, best
+    effort (never raises). No healer sweep, no backup file."""
+
+    def setUp(self):
+        cee.reset_client_for_testing()
+        self._silent_logger = logging.getLogger('test-clear-approval')
+        self._silent_logger.setLevel(logging.CRITICAL)
+
+    def test_empty_task_id_returns_false_without_touching_client(self):
+        client = _ClearClient(data=[{'event_id': 'e'}], count=1)
+        ok = cee.clear_approval_request(
+            '', client=client, logger=self._silent_logger)
+        self.assertFalse(ok)
+        self.assertFalse(client.executed)
+
+    def test_success_sets_read_at_with_correct_filters(self):
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        ok = cee.clear_approval_request(
+            'task-42', ts='2026-06-09T22:00:00+00:00', client=client)
+        self.assertTrue(ok)
+        self.assertEqual(client.captured_table, 'chain_events')
+        # Sets read_at to the supplied ts...
+        self.assertEqual(client.captured_update, {'read_at': '2026-06-09T22:00:00+00:00'})
+        self.assertEqual(client.captured_count_kw, 'exact')
+        # ...scoped to this task's pending approval_request rows only.
+        self.assertEqual(client.filters.get('event_type'), 'approval_request')
+        self.assertEqual(client.filters.get('task_id'), 'task-42')
+        self.assertIn(('read_at', 'null'), client.is_null)
+
+    def test_true_when_only_count_reports_a_row(self):
+        # PostgREST may return count without echoing rows in data.
+        client = _ClearClient(data=[], count=2)
+        self.assertTrue(cee.clear_approval_request('task-x', client=client))
+
+    def test_false_when_no_row_matched(self):
+        client = _ClearClient(data=[], count=0)
+        self.assertFalse(cee.clear_approval_request('task-absent', client=client))
+
+    def test_supabase_error_returns_false_does_not_raise(self):
+        client = _ClearClient(raise_on_execute=RuntimeError('supabase down'))
+        ok = cee.clear_approval_request(
+            'task-err', client=client, logger=self._silent_logger)
+        self.assertFalse(ok)
+
+    def test_client_unavailable_returns_false(self):
+        # No client passed; module-level client never set; env unset.
+        original_url = cee.os.environ.pop('SUPABASE_URL', None)
+        original_key = cee.os.environ.pop('SUPABASE_SERVICE_ROLE_KEY', None)
+        try:
+            cee.reset_client_for_testing()
+            ok = cee.clear_approval_request(
+                'task-no-client', logger=self._silent_logger)
+            self.assertFalse(ok)
+        finally:
+            if original_url is not None:
+                cee.os.environ['SUPABASE_URL'] = original_url
+            if original_key is not None:
+                cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = original_key
+            cee.reset_client_for_testing()
+
+
 if __name__ == '__main__':
     unittest.main()

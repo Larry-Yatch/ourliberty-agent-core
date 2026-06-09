@@ -183,3 +183,69 @@ def emit_event(
             event_type, task_id, type(e).__name__, e,
         )
         return False
+
+
+def clear_approval_request(
+    task_id: Optional[str],
+    *,
+    ts: Optional[str] = None,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> bool:
+    """Retire the pending dashboard `approval_request` row(s) for `task_id`.
+
+    The resolution-side counterpart to `emit_event`. When a Telegram (or any
+    self-committed) approve/reject/modify retires an approval in the bot's
+    authoritative state, the dashboard's matching pending row keeps reading as
+    "pending / blocking the chain" until `heal_stale_approvals` reconciles it
+    on its 10-minute timer. Calling this at resolution time closes that window
+    immediately, the same way the dashboard's own Approve button sets `read_at`.
+
+    Mirror of `emit_event`'s single keyed write, not the healer's heuristic
+    sweep: one PostgREST UPDATE that sets `read_at` on the still-unread
+    `approval_request` rows for this exact `task_id` (identical filter shape to
+    the dashboard action's claim in `dashboard_api`, minus the event_id pin the
+    bot doesn't carry). The `read_at IS NULL` guard makes it idempotent, and
+    because the resolution is authoritative (not an inferred-staleness signal)
+    it skips the reversibility backup `heal_stale_approvals` writes — the same
+    way the emit side takes no backup.
+
+    Best-effort, fire-and-forget — same contract as `emit_event`: returns False
+    (never raises) when the resolution can't be mirrored (no Supabase creds,
+    supabase-py absent, test mode, or a Supabase error). `heal_stale_approvals`
+    stays the backstop, so a dropped clear self-heals within ≤10 min. A missing
+    client is the *expected* degrade (logged at DEBUG to keep test/local runs
+    quiet); a real Supabase failure is logged at WARN. Returns True iff ≥1 row
+    was cleared. `client`/`ts` are for tests; production callers omit them.
+    """
+    log = logger or _LOGGER
+    if not task_id:
+        return False
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        log.debug(
+            'clear_approval_request: Supabase client unavailable '
+            '(creds unset / supabase-py missing / test mode); leaving '
+            'task_id=%s for heal_stale_approvals to reconcile', task_id,
+        )
+        return False
+    use_ts = ts or ces.datetime.now(ces.timezone.utc).isoformat()
+    try:
+        resp = (
+            cli.table('chain_events')
+            .update({'read_at': use_ts}, count='exact')
+            .eq('event_type', 'approval_request')
+            .eq('task_id', task_id)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        rows = getattr(resp, 'data', None) or []
+        count = getattr(resp, 'count', None)
+        return bool(rows) or bool(count and count > 0)
+    except Exception as e:  # noqa: BLE001 — push writer must not crash producer
+        log.warning(
+            'clear_approval_request failed (task_id=%s): %s: %s — '
+            'heal_stale_approvals will reconcile on its next tick',
+            task_id, type(e).__name__, e,
+        )
+        return False

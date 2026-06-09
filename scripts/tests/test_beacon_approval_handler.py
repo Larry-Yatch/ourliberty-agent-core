@@ -295,6 +295,40 @@ class StateCrudTest(unittest.TestCase):
     def test_resolve_unknown_id_returns_none(self):
         self.assertIsNone(ah.resolve('t-missing', 'approved'))
 
+    def test_resolve_self_committed_clears_dashboard_pending(self):
+        """A bare (self-committing) resolve mirrors the resolution to the
+        dashboard so the Approvals tab clears immediately instead of waiting on
+        the heal_stale_approvals 10-min timer (the stale-'blocking' window)."""
+        import chain_event_emit as cee
+        cleared = []
+        orig = cee.clear_approval_request
+        cee.clear_approval_request = lambda tid, **kw: cleared.append(tid)
+        try:
+            ah.add_pending(_good_payload(task_id='t-clear'), chat_id=1)
+            ah.resolve('t-clear', 'approved')
+        finally:
+            cee.clear_approval_request = orig
+        self.assertEqual(cleared, ['t-clear'])
+
+    def test_resolve_with_caller_state_leaves_clear_to_healer(self):
+        """When the caller owns the txn (state passed in), resolve does NOT
+        mirror — the caller commits later and heal_stale_approvals reconciles.
+        Guards the own-is-False gate against a premature dashboard clear."""
+        import chain_event_emit as cee
+        cleared = []
+        orig = cee.clear_approval_request
+        cee.clear_approval_request = lambda tid, **kw: cleared.append(tid)
+        try:
+            state = {'pending': [{'id': 't-ext'}], 'history': []}
+            moved = ah.resolve('t-ext', 'approved', state=state)
+        finally:
+            cee.clear_approval_request = orig
+        self.assertIsNotNone(moved)
+        self.assertEqual(cleared, [])
+        # The caller's state was still mutated (moved to history) as before.
+        self.assertEqual(state['pending'], [])
+        self.assertEqual(len(state['history']), 1)
+
     def test_pop_paused_backlog(self):
         ah.add_pending(_good_payload(task_id='t1'), 1, queued_during_pause=True)
         ah.add_pending(_good_payload(task_id='t2'), 1, queued_during_pause=True)
