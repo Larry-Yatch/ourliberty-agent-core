@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 1208 — 2026-06-09 22:58Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Tier 1 — `unreviewed-merge:402` extends streak to 6 (PRs #396–402; pending `go: actor-exemption-config`); `fix-build-dedup-spawn-failure-wedge` Forge build in pipeline (G-rule 1/3 iter 1171 → permanent fix advancing); health-notify APPROVAL_REQUEST `notify-larry-phase-d-channel-001` in pipeline; all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T22:50:16Z — unreviewed-merge:402)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1394 lines** (+2 from iter 1207 watermark 1392/22:35:03Z).
+- Line 1393: `unreviewed-merge:402` at 22:50:16Z — PR #402 "feat(approvals): Telegram resolution clears the dashboard pending row immediately" merged by Larry-Yatch at 22:45:45Z without Mirror review. Streak now 6 (PRs #396–402). G-rule 3/3 met (iter 963); pending `go: actor-exemption-config`. outbox-notifier route=escalate DMs Larry automatically. tier-reset. ⚠️
+- Line 1394: `grule-health-notify-3of3-dispatched` at 22:50:39Z — by-design Pulse G-rule dispatch notification. Tier 3. Journal note only. ✅
+- Watermark advances to 1394/22:50:39Z.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** No new operative directives. unreviewed-merge:402 DM'd Larry automatically via route=escalate. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T22:52:17Z (FRESH — 6 min at scan). No active stalls. ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=1 (`build-fix-build-dedup-spawn-failure-wedge.json`, mtime=22:54:11Z, age ~4 min — build-phase task, Beacon preflight PROCEED, not stale), mirror=0, pulse=0. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.service Result=success, ExecMainStatus=0, ActiveState=inactive. One-shot complete. ✅
+
+**Check A — Source repo:** Session start (22:51Z): branch=main, clean tree. Recent commits include b00ef06 (Pulse cycle 22:51:20Z) on top of PR #401 + #402 squash-merges. `ff-main-when-behind` from iter 1207 **RESOLVED ✅** by automated cycle (22:51:20Z). Sync.json still 22:34:12Z error — pre-merge; hourly timer (~23:34Z) clears. ✅
+
+**Check B — Sync health:** status=error, last_sync=2026-06-09T22:34:12Z (UNCHANGED from iter 1207). Two PR merges since last successful sync; self-healing. APPROVAL_REQUEST sync-push-rebase-fallback-001 standing. ✅ (standing known)
+
+**Check C — Agent liveness:** All 8/8 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api. ✅
+
+**Check E — PRs:** 0 open in ourliberty-agent-core. 0 open in ourliberty-dashboard. PR #402 merged 22:45:45Z (Larry-Yatch, no Mirror review). ✅
+
+**`fix-build-dedup-spawn-failure-wedge` Forge build (VERIFY-BEFORE-REASSERT on G-rule 1/3 iter 1171):** Forge inbox confirmed `build-fix-build-dedup-spawn-failure-wedge.json` (source=beacon, mtime=22:54:11Z). Prompt: "Build phase. Your preflight returned PROCEED." PR title: "fix(notifier): build-phase dedup must not permanently wedge a task after a spawn-failure." This is the permanent fix for G-rule 1/3 (outbox-notifier dedup checks archive not pending). Build executing; monitor for PR open. ⚠️→in pipeline
+
+**`health-check-notify-script-missing` (VERIFY-BEFORE-REASSERT):** Beacon result at 22:45Z: APPROVAL_REQUEST `notify-larry-phase-d-channel-001` dispatched to Forge preflight. Forge inbox has `build-fix-build-dedup-spawn-failure-wedge.json` (different task). Health-notify Forge task not yet in inbox — in APPROVAL_REQUEST pipeline. Monitor next cycle. ⚠️ (in pipeline)
+
+**`credential-drift:OL_DB_RO_URL` (VERIFY-BEFORE-REASSERT):** Line 1393 = `unreviewed-merge:402` (NOT credential-drift). PR #401 merged 22:35:02Z confirmed. **CLOSED ✅** — no further reassertion.
+
+**`ff-main-when-behind` (VERIFY-BEFORE-REASSERT):** b00ef06 (Pulse cycle 22:51:20Z) is above PR #402 commit in local history — automated cycle pulled both PRs. **RESOLVED ✅**
+
+**Bug-hunt gate (§ 5.0):** 0/15 gate reviews since go-live; soaking, no-op. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` streak (5→6): Line 1393 = `unreviewed-merge:402` confirmed 22:50:16Z. Carry forward pending `go: actor-exemption-config`.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.json error 22:34:12Z. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3: No new occurrence. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: Still None. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3: Forge build in pipeline → permanent fix advancing.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): Timer normal. Pending `go: cycle-timer checkpoint`. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 dispatched (iter 1207): APPROVAL_REQUEST in pipeline → Forge task not yet in inbox. Monitor.
+
+**Standing findings (updated this iter):**
+- ~~[yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL**~~ → **CLOSED ✅**
+- ~~[yellow] **ff-main-when-behind**~~ → **RESOLVED ✅**
+- [yellow] **unreviewed-merge streak: 6** (PRs #396–402) — +1 PR #402 22:45:45Z Larry-direct. Pending `go: actor-exemption-config`.
+- [yellow] **health-check-notify-script-missing** → APPROVAL_REQUEST `notify-larry-phase-d-channel-001` in pipeline; Forge build task not yet in inbox. Monitor.
+- [yellow] **`fix-build-dedup-spawn-failure-wedge`** — Forge build in progress (22:54:11Z). PR expected soon.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. idx=1424 standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge streak**: G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 59th+ at 22:34Z.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 1 new intervention (unreviewed-merge:402 triage; tier-reset; carry-forward pending Larry). interventions=735, systemic_fixes=14, ratio≈52.5.
+**Tier end-of-iter:** 1, consecutive_clean=0 (unreviewed-merge:402 tier-reset; standing items active).
+
+---
+
 ## Result notification — 2026-06-09 22:45Z UTC (from=beacon | task=cycle-finding-health-notify-script-missing-20260609T224225Z | status=SUCCESS)
 
 **Beacon design complete. APPROVAL_REQUEST dispatched to Forge for preflight.**
