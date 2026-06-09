@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 1195 — 2026-06-09 21:17Z UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; sync push failure (self-healing); all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1390 lines (UNCHANGED from iter 1194 watermark at line 1390 / 21:03:15Z). No new alerts. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** Last Larry message 12:22:24-0600 MDT (18:22:24Z UTC) "Did this pr merge?" → Beacon replied 18:24Z (tracked by standing Forge build-dispatch-blocked finding). Last beacon-bot entry: 15:05:28-0600 (21:05:28Z) alert idx=1389 route=digest (sync-blocked). No new directives or agent distress. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T21:13:05Z (~4 min at scan; ✅ within 90-min threshold). Stalls=[]. ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat = 2026-06-09T21:06:15Z (~11 min at scan; ✅ within 60-min threshold). State file MISSING (one-shot service exited normally post-run; heartbeat freshness confirms success). ✅
+
+**Check A — Source repo:** branch=main, clean tree (session-start gitStatus: HEAD=ff03b71 "Pulse cycle 20260609T211633Z"). Note: run_cycle.sh push succeeded at ~21:16Z after iter 1194 — tree is clean on remote. ✅
+
+**Check B — Sync health:** agent-core-sync.json = status=error, last_sync=2026-06-09T21:03:15Z (push failed; rolled back to a01fe0ee). Self-healing via timer at ~22:03Z UTC. run_cycle.sh push succeeded at ~21:16Z (HEAD=ff03b71); sync.json only tracks sync.service runs, not wrapper pushes — stale but not broken. Known pattern (58th+ APPROVAL_REQUEST sync-push-rebase-fallback-001; root cause: `/dev/stdout` redirect in `_lib_push_with_rebase.sh` fails under systemd/no-TTY). ⚠️ (self-healing, no new action needed)
+
+**Check C — Agent liveness:** ourliberty-cycle.timer: SubState=running, NextElapseUSecRealtime=empty, NextElapseUSecMonotonic=infinity — NORMAL in-progress display artifact (timer currently executing this session; per MEMORY calibration iter 478: SubState=running + empty NextElapse is NOT the stuck-timer pattern). beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier: all 6/6 active. ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. ✅
+
+**Check H — Forge activity digest (STANDING — verified):** 3 register-ol-db-ro-url archive entries confirmed: `build-register-ol-db-ro-url-credential.json`, `register-ol-db-ro-url-credential.json`, `register-ol-db-ro-url-credential.1.json`. Forge inbox empty. No PR. Build-phase dispatch still BLOCKED. Action on Larry: move `~/agents/inboxes/forge/.archive/build-register-ol-db-ro-url-credential.json` out of archive, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+
+**Credential rotation check:** Watermark UNCHANGED at 1390/21:03:15Z. Last credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL at 18:10:17Z Jun 9 (idx=1389, iter 1171). Next occurrence expected ~22:10Z+ (6h cadence; not yet fired at scan). Root fix blocked on build dispatch. ✅ (for now)
+
+**Bug-hunt gate (§ 5.0):** 0/15 gate reviews since go-live; soaking, no-op. ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks (I, III, VIII, IX, X) skip. ✅
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build-phase re-dispatch BLOCKED: register-ol-db-ro-url-credential** — VERIFIED. 3 active-task archive entries confirmed. Forge inbox empty. No PR. Action on Larry: move stale archive entry, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — No new alert (watermark UNCHANGED at 1390/21:03:15Z). Next expected ~22:10Z+. Root fix blocked on build dispatch.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Stale-daemon healer heartbeat fresh (21:06:15Z ✅); no fix landed. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing. No new activity.
+- [blue] **ourliberty-cycle.timer** — SubState=running (normal in-progress state; not stuck). G-rule 3/3 dispatched (iter 848); permanent fix pending `go: cycle-timer checkpoint`. Monitoring.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 58th+ total; self-recovering. Root cause confirmed iter 1193: `/dev/stdout` redirect in `_lib_push_with_rebase.sh` fails under systemd (no TTY).
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark unchanged at 1390/21:03:15Z. No new unreviewed-merge alerts. Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync.service error at 21:03:15Z confirmed; self-healing. Carry forward.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-triggered. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): All 3 archive entries confirmed; no new dedup-block event. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 dispatched (iter 848): Timer currently SubState=running (normal in-progress; not stuck). Carry forward as [blue monitoring].
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions. interventions=733, systemic_fixes=14, ratio≈52.36.
+**Tier end-of-iter:** 1, consecutive_clean=0 (standing Forge build-dispatch-blocked active).
+
+---
+
 ## Iteration 1194 — 2026-06-09 21:12Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; sync push failure (self-healing); all other checks nominal.
