@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 1186 — 2026-06-09 20:01Z UTC (interactive, Tier 1 — STANDING)
+
+**Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T17:11:31Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1389 lines (UNCHANGED from iter 1185 watermark at 2026-06-09T18:10:17Z / line 1389). No new alerts since prior watermark. Nominal. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --". ✅
+
+**Check 2 — Telegram sweep:** Last Larry message: 12:22 MDT "Did this pr merge?" → Beacon replied 12:24 MDT (tracked by standing Forge build-dispatch-blocked finding). No new Larry directives since iter 1185 watermark. ✅
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T19:52:39Z (~8 min at scan; ✅ within 90-min threshold). ✅
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat = 2026-06-09T19:35:25Z (~26 min at scan; ✅ within 60-min threshold). ✅
+
+**Check A — Source repo:** branch=main, clean tree (session-start gitStatus: HEAD=d96e5e4 "Pulse cycle 20260609T195836Z"). ✅
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-09T19:02:27Z (~59 min at scan; within 2h threshold). ✅
+
+**Check C — Agent liveness:** beacon_telegram_bot.log shows activity at 12:24 MDT. No warnings in Check 1. ✅
+
+**Check E — PRs:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. ✅
+
+**Check H — Forge activity digest (STANDING — verified):** `build-register-ol-db-ro-url-credential.json` still present in Forge inbox `.archive/` (mtime Jun 9 10:27). Also `register-ol-db-ro-url-credential.1.json` (12:02Z) and `register-ol-db-ro-url-credential.json` (10:25Z) archived. Forge inbox empty. No PR. Build-phase dispatch still BLOCKED by stale archive dedup. Action on Larry: move `~/agents/inboxes/forge/.archive/build-register-ol-db-ro-url-credential.json` out of archive, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+
+**Credential rotation check:** All credentials within window. SUPABASE_SERVICE_ROLE_KEY next due 2026-08-22 (~74 days). OL_DB_RO_URL fix blocked on build dispatch. credential-drift next expected ~22:16Z Jun 9 (last at 18:10Z Jun 9; not yet fired this scan). ✅
+
+**Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks (I, III, VIII, IX, X) skip. ✅
+
+**Standing findings (verified this iter):**
+- [yellow] **Forge build-phase re-dispatch BLOCKED: register-ol-db-ro-url-credential** — VERIFIED. All three archive entries confirmed present (build=10:27Z, spec=10:25Z, spec.1=12:02Z). Forge inbox empty. No PR. Action on Larry: move stale archive entry, then resend "go: register-ol-db-ro-url-credential" to Beacon bot.
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — No new alert this iter (last at 18:10:17Z Jun 9; watermark unchanged at 1389). Next expected ~22:16Z Jun 9. Root fix blocked on build dispatch.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Stale-daemon healer heartbeat at 19:35Z Jun 9 (running ✅); no fix landed. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — ourliberty-dashboard-api → POST /api/system/missions/new → 500. Escalation idx=1424 standing. No new activity.
+- [blue] **unreviewed-merge streak: 5** (PRs #396–400). G-rule 3/3 met; dispatch pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 57th total; self-recovering; sync nominal.
+
+**Verify-before-reassert on carried-forward G-rules:**
+- `actor=larry-direct-merge` (streak 5): watermark UNCHANGED at 1389/18:10:17Z. No new unreviewed-merge alerts. Carry forward.
+- `auto-restarted:*` untranslated: Check 1 clean. Carry forward.
+- `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal (last_sync=19:02:27Z). Carry forward.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Carry forward. Verification gate 2026-06-15.
+- `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+- `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3 (iter 1168): Not re-triggered. Carry forward.
+- `outbox-notifier dedup checks archive not pending` G-rule 1/3 (iter 1171): All three archive entries confirmed present; no new dedup-block event this iter. Carry forward.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions. interventions=732, systemic_fixes=14, ratio≈52.29.
+**Tier end-of-iter:** 1, consecutive_clean=0 (standing Forge build-dispatch-blocked active).
+
+---
+
 ## Iteration 1185 — 2026-06-09 19:57Z UTC (interactive, Tier 1 — STANDING)
 
 **Health:** ⚠️ Tier 1 — standing Forge build-phase dispatch blocked; all other checks nominal.
