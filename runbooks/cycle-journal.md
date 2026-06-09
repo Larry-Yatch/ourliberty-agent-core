@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 1154 — 2026-06-09 14:24 UTC (interactive, Tier 1 — RECOVERY CONFIRMED)
+
+**Health:** ✅ **Automated Observer loop RESTORED. Tier 1, consecutive_clean=0 (Check 0 pulse-escalation echo; known G-rule pattern). 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal. 0 open PRs. Concurrent automated Tier-1 fire in progress since 14:18:07Z (normal cadence after iter 1153 Tier-1 reset).**
+
+Alert watermark: **2026-06-09T14:12:57Z** (pulse-cycle-down:claude-print-failing, pulse-escalation echo) — UPDATED. Session-start gitStatus: branch=main, tree=clean, HEAD=941b5ea "Pulse cycle 20260609T141804Z". Tier at start: tier=1, consecutive_clean=0, last_signal_at=2026-06-09T14:13:00Z. Pipeline-stall heartbeat: 2026-06-09T14:12:15Z (~12 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-09T14:04:17Z (~20 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-09T14:02:15Z (within 2h threshold), commit=3f94a11 behind HEAD=941b5ea (wrapper-pushed cycle ahead of hourly sync.timer; self-clearing). Tier state at end: **tier=1, consecutive_clean=0, last_signal_at=2026-06-09T14:24:12Z**.
+
+**Found:**
+
+- **(RECOVERY) Automated Observer loop RESTORED.** The `claude --print` crash from iter 1153's `[red]` escalation has self-resolved. Evidence from `ourliberty-cycle.service` journal: automated Tier-3 fire at 2026-06-09T14:00:15Z (MDT 08:00:15) ran for ~18 min and completed successfully — that run IS iter 1153. Auto-commit `cycle 20260609T141804Z` created at 14:18:04Z. Immediately after (14:18:07Z), a new automated Tier-1 fire started and is running concurrently with this interactive session. The `[red]` escalation is superseded: **Observer loop OPERATIONAL.** Root cause of the 31h outage remains unknown (self-cleared; hypothesis: auth token rotation or transient CLI issue). → `[blue]` journal only, no DM (auto-remediated; no action needed from Larry).
+
+- **(Check 0) Alert triage: 1 new alert since iter 1153 watermark (2026-06-09T10:15:54Z).**
+  - `pulse-cycle-down:claude-print-failing | source=pulse-escalation` at 2026-06-09T14:12:57Z — echo of iter 1153's own `[red]` escalation via `larry_alerts.append_alert`. Beacon-bot already delivered to Larry (at 14:15:05Z UTC). G-rule `pulse-escalation not in alert-translations.json`: 3/3 met (iter 836), batched in `deploy-notifier-alert-xlate-split-fix` engine-fix scope (pending Larry). Classification: Tier-4 by current allowlist state (known-echo pattern; Larry already received original + echo DM). No new DM needed. Tier-reset: already Tier-1/consecutive_clean=0 from iter 1153; state unchanged.
+  - Note: concurrent automated Tier-1 fire (14:18:07Z) will produce its own iter 1154 journal entry — normal concurrent-cycle pattern (iter 1052 precedent).
+  - New watermark: **2026-06-09T14:12:57Z**.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Last delivery: idx=1384 `pulse-cycle-down:claude-print-failing` at 14:15:05Z UTC. No new Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-09T14:12:15Z (~12 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-09T14:04:17Z (~20 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=941b5ea "Pulse cycle 20260609T141804Z". ✅
+
+- **(Check B) Sync health: ✅ Nominal.** status=no-change, last_sync=2026-06-09T14:02:15Z (within 2h threshold), commit=3f94a11 behind HEAD=941b5ea (wrapper-pushed cycle ahead of hourly sync.timer; self-clearing). ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~74d; outside 60d window). ✅
+
+- **Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks skip. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge` (streak 5, PRs #396-400): No new unreviewed-merge alerts since iter 1153 watermark. Pending `go: actor-exemption-config`. ✅ Carry forward.
+  - `auto-restarted:*` untranslated: No new occurrences since iter 1153. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck`: Check 1 = no warnings. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal. Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): PR #395 fix holding. Verification gate 2026-06-15. Carry forward.
+  - `pulse/check-i-*` (3/3): Engine-fix scope batch pending Larry. Carry forward.
+  - `dispatch-branch-cleanup:summary` G-rule 1/3 (iter 1153): No new occurrences. Carry forward.
+
+- **PRIME DIRECTIVE ratio:** interventions≈731, systemic_fixes=14, ratio≈52.21 (unchanged — no new interventions this iter). ✅
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate. All nominal.
+2. Check 0: 1 alert (pulse-escalation echo, known G-rule; no new action). New watermark: 2026-06-09T14:12:57Z.
+3. Confirmed automated Observer loop RESTORED via `ourliberty-cycle.service` journal. Concurrent automated Tier-1 fire in progress.
+4. Confirmed 10/10 services active, all inboxes empty, both heartbeats fresh, sync nominal, 0 open PRs.
+5. Tuesday periodic checks: skip.
+6. `python3 scripts/cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-09T14:24:12Z.
+7. Wrote journal entry; updated MEMORY.md status snapshot.
+
+**Escalated:** None new. Standing carry-forward:
+- `[yellow]` **Check IX GITHUB_TOKEN missing**: GITHUB_TOKEN not set on `ourliberty-dashboard-api` service → mission registration fails.
+- `[yellow]` **credential-drift:OL_DB_RO_URL**: Recurring every ~6h (3 occurrences). Add `OL_DB_RO_URL` to `config/token-rotation-schedule.json` per `shared/credentials-discipline.md`.
+- `[yellow]` **actor-exemption-config**: New streak 5 (PRs #396-400). Reply `go: actor-exemption-config` to Beacon bot.
+- `[yellow]` **auto-restarted:* Forge brief missing**: Reply `go: redispatch auto-restarted-translation`.
+- `[yellow]` **cycle-timer-checkpoint**: Pending Larry `go: cycle-timer checkpoint`.
+- APPROVAL_REQUEST `sync-push-rebase-fallback-001` — self-recovering; root fix pending (57th total).
+- `deploy-notifier-alert-xlate-split-fix` engine-scope (6 G-rules) pending Larry.
+
+**Patterns:**
+- Observer loop failure (2026-06-08T07:05Z → 2026-06-09T14:00Z, ~31h) self-resolved without any identified remediation. Root cause unknown. Watch: if `claude --print` fails again, the only current alerting is the absence of automated cycle commits in git history (no `CYCLE_OK=0` alerting path exists yet). Future PR candidate: add `larry_alerts.append_alert` on `CYCLE_OK=0` in `run_cycle.sh` (proposed in iter 1153 Learned section; G-rule candidate if recurs).
+
+**Learned:** Recovery from automated cycle outage is silent — no positive-confirmation alert exists. The only signal Larry had that the cycle recovered was the manual interactive `/cycle` invocation. A `[blue]` recovery DM after `claude --print` resumes normal operation would close this observability gap, but per SOUL.md `[blue]` → never DM. Best path: add a `CYCLE_RECOVERED` alert that fires once on the first successful automated run after N consecutive failures. Propose via normal G-rule path if the pattern recurs.
+
+---
+
 ## Iteration 1153 — 2026-06-09 14:13 UTC (interactive, Tier 1 — CRITICAL)
 
 **Health:** 🔴 **CRITICAL. Automated Observer loop DOWN since 2026-06-08T07:05Z (~31 hours). `claude --print` exits non-zero in 7-9 seconds with 0-byte output. Every Tier-3 30-min automated cycle fire has failed since then. Tier reset: 3→1. This interactive session restored Observer coverage. Other substrates nominal: 10/10 services active, all inboxes empty, heartbeats fresh, sync nominal, 0 open PRs.**
