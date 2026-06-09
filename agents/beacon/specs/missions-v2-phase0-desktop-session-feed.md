@@ -61,11 +61,11 @@ Rejected alternatives: **service key on the Mac** (security regression); **ssh-p
   "title": "Missions v2 Phase 0",           // optional; from .claude/desktop-session-tag line 2, else ""
   "blocked_on_larry": false,                // false on start; true via desktop_session_active when awaiting Larry
   "host": "larrys-mac",                     // hostname, for multi-machine disambiguation
-  "session_id": "<full claude code session id>",
-  "last_activity_ts": "2026-06-09T18:30:00Z"
+  "source": "startup",                      // hook source/reason (startup|resume|clear|…)
+  "last_activity_ts": "2026-06-09T18:30:00Z" // (desktop_session_active only)
 }
 ```
-Payload runs through `sanitize_payload` server-side (defense-in-depth redaction) before insert — same as every other pushed event.
+Payload runs through `sanitize_payload` server-side (defense-in-depth redaction) before insert — same as every other pushed event. **Note:** the raw `session_id` is deliberately NOT a payload field — `sanitize_payload` redacts any key containing `session_id`, so the short session ref is carried only inside `task_id` (`desktop-<session_id_short>`).
 
 ---
 

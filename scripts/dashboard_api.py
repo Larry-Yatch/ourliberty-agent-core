@@ -42,7 +42,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.utils import get_authorization_scheme_param  # noqa: F401  # reserved
 from pydantic import BaseModel, ConfigDict, Field
@@ -2493,6 +2493,130 @@ def _import_chain_event_helpers():
     return ces.compute_event_id, ces.sanitize_payload
 
 
+# ---------------------------------------------------------------------------
+# Missions v2 Phase 0 — desktop session ingest
+# (spec: agents/beacon/specs/missions-v2-phase0-desktop-session-feed.md)
+#
+# Desktop Claude Code sessions have no Supabase creds and must NOT hold the
+# all-access service-role key. They POST a desktop_session_* event here; this
+# endpoint (on the droplet, which DOES hold the key) writes it via the
+# canonical chain_event_emit.emit_event helper. The handler PINS agent to
+# 'desktop-claude' and rejects any event_type outside the desktop set, so a
+# leaked ingest token can only write desktop-session cards as desktop-claude —
+# nothing else.
+# ---------------------------------------------------------------------------
+
+DESKTOP_AGENT = 'desktop-claude'
+ALLOWED_DESKTOP_EVENT_TYPES = (
+    'desktop_session_start',
+    'desktop_session_active',
+    'desktop_session_done',
+)
+INGEST_HEADER_NAME = 'X-Ingest-Token'
+INGEST_TOKEN_ENV = 'DESKTOP_INGEST_TOKEN'
+
+
+class DesktopSessionIngestRequest(BaseModel):
+    event_type: str
+    task_id: Optional[str] = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class DesktopSessionIngestResponse(BaseModel):
+    ok: bool
+    event_id: Optional[str] = None
+
+
+def _expected_ingest_token() -> Optional[str]:
+    """Read the ingest token at request time so a restart picks up a rotation."""
+    tok = os.environ.get(INGEST_TOKEN_ENV, '').strip()
+    return tok or None
+
+
+def _require_ingest_token(request: Request) -> None:
+    """Auth dependency for the desktop ingest endpoint. A DEDICATED token,
+    separate from DASHBOARD_API_TOKEN, so the desktop holds a narrow-scope
+    secret rather than the read-everything dashboard token."""
+    provided = request.headers.get(INGEST_HEADER_NAME)
+    if provided is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'missing {INGEST_HEADER_NAME}',
+        )
+    expected = _expected_ingest_token()
+    if not expected:
+        # Server misconfigured — refuse to claim auth passed.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'invalid {INGEST_HEADER_NAME}',
+        )
+    if not secrets.compare_digest(
+        provided.encode('utf-8'), expected.encode('utf-8')
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f'invalid {INGEST_HEADER_NAME}',
+        )
+
+
+# Test seam: tests monkeypatch this to inject a recording fake emitter so the
+# handler can be exercised without supabase-py installed.
+def _get_desktop_emit():
+    """Return (emit_event, compute_event_id) from the chain-event helpers.
+
+    Lazy import (mirrors _import_chain_event_helpers) so dashboard_api loads
+    on hosts without supabase-py.
+    """
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import chain_event_emit  # noqa: PLC0415
+    import chain_event_shipper as ces  # noqa: PLC0415
+    return chain_event_emit.emit_event, ces.compute_event_id
+
+
+def _handle_desktop_session_ingest(
+    *,
+    event_type: str,
+    task_id: Optional[str],
+    payload: dict[str, Any],
+    now: Optional[datetime] = None,
+    emit_resolver: Any = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/ingest/desktop-session.
+
+    Validates event_type, pins agent='desktop-claude', writes the row via
+    emit_event. Returns {'ok', 'event_id'}; the route maps ok=False to 502.
+    Raises HTTPException(400) on a bad event_type / non-object payload.
+    """
+    if event_type not in ALLOWED_DESKTOP_EVENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid event_type={event_type!r}',
+        )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='payload must be a JSON object',
+        )
+    emit_event, compute_event_id = (emit_resolver or _get_desktop_emit)()
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+    # agent is PINNED here — the request body has no agent field, so a caller
+    # cannot emit as forge/mirror/beacon. event_id is deterministic over
+    # (task_id, event_type, ts); the same ts feeds emit_event so the returned
+    # id matches the written row.
+    ok = emit_event(
+        event_type=event_type,
+        agent=DESKTOP_AGENT,
+        task_id=task_id,
+        payload=payload,
+        ts=ts_iso,
+    )
+    event_id = compute_event_id(task_id, event_type, ts_iso) if ok else None
+    return {'ok': bool(ok), 'event_id': event_id}
+
+
 # Test seam: tests monkeypatch this to inject a recording mock.
 def _get_larry_action_supabase_client():
     """Build a service-role supabase client for the larry-action endpoint.
@@ -3572,6 +3696,33 @@ def post_larry_action(
         agents_root=_agents_root(),
         supabase_client=client,
     )
+
+
+# POST /api/ingest/desktop-session — the desktop's only write path. Token-gated
+# by the dedicated X-Ingest-Token (NOT the dashboard read token). See the
+# Missions v2 Phase 0 block above for why agent is pinned + event_type is
+# constrained.
+@app.post(
+    '/api/ingest/desktop-session',
+    response_model=DesktopSessionIngestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(_require_ingest_token)],
+)
+def post_desktop_session_ingest(
+    body: DesktopSessionIngestRequest,
+    response: Response,
+) -> dict[str, Any]:
+    result = _handle_desktop_session_ingest(
+        event_type=body.event_type,
+        task_id=body.task_id,
+        payload=body.payload,
+    )
+    if not result['ok']:
+        # emit_event returned False — Supabase unreachable / supabase-py
+        # missing. Best-effort contract: the hook ignores the body; the 502
+        # just signals "not persisted" to anyone watching.
+        response.status_code = status.HTTP_502_BAD_GATEWAY
+    return result
 
 
 @app.get(
