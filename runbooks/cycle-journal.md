@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration 1153 — 2026-06-09 14:13 UTC (interactive, Tier 1 — CRITICAL)
+
+**Health:** 🔴 **CRITICAL. Automated Observer loop DOWN since 2026-06-08T07:05Z (~31 hours). `claude --print` exits non-zero in 7-9 seconds with 0-byte output. Every Tier-3 30-min automated cycle fire has failed since then. Tier reset: 3→1. This interactive session restored Observer coverage. Other substrates nominal: 10/10 services active, all inboxes empty, heartbeats fresh, sync nominal, 0 open PRs.**
+
+Alert watermark: **2026-06-08T03:40:25Z → 2026-06-09T10:15:54Z** (retention healer pruned file from 1427 to 1384 lines; 16 new alerts triaged this iter). Session-start gitStatus: branch=main, tree=clean, HEAD=3f94a11 "feat(cleanup): dispatch-branch GC healer (#400)". Tier at start: tier=3, consecutive_clean=5, last_signal_at=2026-06-08T02:28:38Z. Pipeline-stall heartbeat: 2026-06-09T13:55:15Z (~18 min at scan; ✅ within 90-min threshold). Stale-daemon heartbeat: 2026-06-09T14:04:17Z (~9 min at scan; ✅ within 60-min threshold). Sync: status=no-change, last_sync=2026-06-09T14:02:15Z (~11 min at scan; within 2h threshold), commit=3f94a11=HEAD — fully synced. Tier state at end: **tier=1, consecutive_clean=0, last_signal_at=2026-06-09T14:13:00Z**.
+
+**Found:**
+
+- **(CRITICAL) Automated cycle down: `claude --print` failing since 2026-06-08T07:05Z (~31 hours).** `run_cycle.sh` invokes `claude --print --model claude-sonnet-4-6` which exits non-zero in 7-9 seconds with 0-byte output. Every Tier-3 30-min automated cycle fire has failed. Last successful automated cycle: `2026-06-08T06:32:41Z` (commit `cycle 20260608T063241Z`). Window of failure: succeeds at 06:32Z June 8 → fails at 07:05Z June 8 (33-minute window). Root cause unknown (likely auth token, CLI update, or headless-mode config). Impact: Pulse's Check 0 triage absent for 31 hours; beacon-bot has been delivering DMs per `route=escalate` correctly so Larry received individual alerts, but no Observer-level triage occurred. → ❌ **Never-auto. `[red]` escalation sent.** Tier-reset.
+
+- **(Check 0) New alerts since watermark — 16 total:**
+  - `tier2_weekly_probe_failed` ×1 (19:07Z June 8) — **Tier 3** (alert-translations.json, tier=SOON). DM delivered (idx=1375). Likely false positive — PR #397 "fix(auth): durable-token file fallback" merged at 19:57Z same day. Next weekly probe will confirm. → ✅ Nominal.
+  - `unreviewed-merge:396/397/398/399/400` ×5 (19:32Z-23:17Z June 8) — **Tier 2** (never_silence=true). DMs delivered (idx=1376/1377/1384/1385/1387). New 5-streak (PRs #396-400) following #395's Mirror-reviewed merge. G-rule 3/3 threshold already met; pending Larry `go: actor-exemption-config`. → ask-then-do (DMs delivered). Tier-reset.
+  - `auto-restarted:*` ×6 (ourliberty-{beacon-bot,forge-bot,mirror-bot,pulse-bot,inbox-watcher,dashboard-api} — 20:00-20:05Z June 8) — **Tier 3** (by-design per iter 1049, route=digest). Post-PR-merge service restarts. → ✅ Nominal.
+  - `credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL` ×3 (22:16Z June 8, 04:19Z+10:17Z June 9) — **Tier 3** (alert-translations.json, tier=SOON). DMs delivered. `OL_DB_RO_URL` is in `.env.larry` but absent from `config/token-rotation-schedule.json`. Recurring every ~6h. Likely new credential added by PR #397. Action on Larry: add 4-artifact registry entry per `shared/credentials-discipline.md`. → ✅ Tier-3 known-pattern.
+  - `dispatch-branch-cleanup:summary` ×1 (23:16Z June 8) — **Tier 4 novel** (not in alert-translations.json, route=digest, no DM sent). First fire of PR #400 dispatch-branch GC healer. Informational: pruned 354 local + 182 remote stale branches; 381 deferred. → G-rule 1/3: `dispatch-branch-cleanup:summary not in alert-translations.json`. Tier-reset.
+
+- **(Check 1) Log noise: ✅ Nominal.** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → "-- No entries --." ✅
+
+- **(Check 2) Telegram sweep: ✅ Nominal.** Alert deliveries correct (unreviewed-merge:396-400 ×5, credential-drift ×2, tier2_weekly_probe_failed ×1). One transient network error at 21:59Z June 8 (self-resolved 22:11Z). No orphaned Larry directives. ✅
+
+- **(Check 3) Pipeline stall: ✅ Nominal.** Heartbeat = 2026-06-09T13:55:15Z (~18 min at scan; ✅ within 90-min threshold). ✅
+
+- **(Check 4) Agent inboxes: ✅ All empty.** Beacon=0, Forge=0, Mirror=0, Pulse=0. ✅
+
+- **(Check 5) Stale daemon: ✅ Nominal.** Heartbeat = 2026-06-09T14:04:17Z (~9 min at scan; ✅ within 60-min threshold). ✅
+
+- **(Check A) Source repo: ✅ Clean.** branch=main, tree=clean (session-start gitStatus), HEAD=3f94a11 "feat(cleanup): dispatch-branch GC healer (#400)". ✅
+
+- **(Check B) Sync health: ✅ Fully synced.** status=no-change, last_sync=2026-06-09T14:02:15Z (~11 min at scan; within 2h threshold), commit=3f94a11=HEAD. ✅
+
+- **(Check C) Agent liveness: ✅ 10/10 active.** ourliberty-beacon-bot, ourliberty-forge-bot, ourliberty-mirror-bot, ourliberty-pulse-bot, ourliberty-inbox-watcher, ourliberty-outbox-notifier, ourliberty-cycle.timer, ourliberty-sync.timer, ourliberty-chain-event-shipper, ourliberty-dashboard-api — all systemd `active`. ✅
+
+- **(Check E) PRs: ✅ 0 open PRs.** ourliberty-agent-core: 0. ourliberty-dashboard: 0. ✅
+
+- **Credential rotations: ✅.** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~74d; outside 60d window). ✅
+
+- **Periodic/conditional checks (Tuesday June 9 UTC):** Not Sunday, not Monday. All periodic checks skip. ✅
+
+- **Verify-before-reassert on carried-forward G-rules:**
+  - `actor=larry-direct-merge` (3/3 met iter 967): 5 new occurrences (PRs #396-400, new streak after #395 Mirror-reviewed). Pending `go: actor-exemption-config`. Carry forward.
+  - `auto-restarted:*` untranslated: 6 new occurrences (batch post-PR-merge June 8). Forge brief still missing. Re-dispatch pending Larry `go: redispatch auto-restarted-translation`. Carry forward.
+  - `daemon-reload triggers cycle.timer stuck` (3/3, iter 848): Check 1 = no warnings. Pending `go: cycle-timer checkpoint`. Carry forward.
+  - `APPROVAL_REQUEST sync-push-rebase-fallback-001`: sync nominal (no new failure). Carry forward.
+  - `gh pr merge --auto disabled` (1/3): 0 open PRs this iter. Carry forward.
+  - `pulse-check-failed:*` (1/3, iter 1138): Root cause fixed by PR #395 (iter 1147). Verification gate: Monday 2026-06-15. Carry forward.
+  - `pulse/check-i-*` (3/3): engine-fix scope batch pending Larry. Carry forward.
+  - **NEW (this iter): `dispatch-branch-cleanup:summary not in alert-translations.json` 1/3.** At 3/3: dispatch Beacon to add as Tier 3/FYI (by-design GC summary, route=digest — safe to silence).
+
+- **PRIME DIRECTIVE ratio:** interventions≈731 (+1: cycle-down escalation), systemic_fixes=14, ratio≈52.21.
+
+**Did:**
+1. Ran full mandatory checks (0–5) + additive checks (A, B, C, E) + credential rotation gate.
+2. Check 0: 16 new alerts triaged (1 T3, 5 T2-DMs-delivered, 6 T3, 3 T3, 1 T4-novel).
+3. **Diagnosed automated `claude --print` failure: down since 2026-06-08T07:05Z UTC (~31 hours). Pattern confirmed via `journalctl -u ourliberty-cycle.service` — every Tier-3 fire failed since that time, 7-9 second crash, 0-byte output.**
+4. Sent `[red]` critical escalation via `larry_alerts.py append_alert` (subject=`pulse-cycle-down:claude-print-failing`).
+5. `python3 scripts/cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-06-09T14:13:00Z.
+6. Wrote journal entry.
+
+**Escalated:**
+- `[red]` **CRITICAL: Observer loop down ~31h.** `claude --print` fails in headless mode (0-byte output, 7-9s crash). Reproduce: `claude --print --model claude-sonnet-4-6 "say ok"` as larry user, inspect stderr. Window of failure: June 8 06:32Z (last success) → 07:05Z (first failure). Escalation in larry-alerts.jsonl subject=`pulse-cycle-down:claude-print-failing`.
+- `[yellow]` **credential-drift:MISSING_REGISTRY_ENTRY:OL_DB_RO_URL** — recurring every 6h. Add to `config/token-rotation-schedule.json` per `shared/credentials-discipline.md`.
+- Standing `[yellow]` carry-forwards: actor-exemption-config (`go: actor-exemption-config`); auto-restarted translation (`go: redispatch auto-restarted-translation`); cycle-timer checkpoint (`go: cycle-timer checkpoint`); APPROVAL_REQUEST `sync-push-rebase-fallback-001`; Check IX GITHUB_TOKEN missing; deploy-notifier-alert-xlate-split-fix engine-scope (6 G-rules).
+
+**Patterns:**
+- **CRITICAL: Observer loop has been silently down for ~31 hours.** The `run_cycle.sh` cycle script has no alerting on `CYCLE_OK=0`. If this pattern recurs, propose G-rule to add `larry_alerts.append_alert` in `run_cycle.sh` failure path (currently only writes to `cycle.last-output.json`).
+- `dispatch-branch-cleanup:summary` — first fire of PR #400 GC healer. G-rule 1/3. At 3/3: add Tier-3/FYI entry to alert-translations.json.
+- `tier2_weekly_probe_failed` — likely false positive (PR #397 "durable-token fallback" merged same hour). Next Sunday probe confirms.
+
+**Learned:** Observer loop failure was entirely silent — no Telegram alert from `run_cycle.sh` on failure. The failure was discovered only via this manual interactive cycle invocation. The `APPROVAL_REQUEST stuck-cycle timeout guard` (pending since iter 43) would catch stuck cycles; a parallel fix needed for non-zero-exit cycles that exit quickly (no timeout needed, just alerting). Future PR candidate: add `larry_alerts.append_alert` on `CYCLE_OK=0` in `run_cycle.sh`.
+
+---
+
 ## Iteration 1152 — 2026-06-08 06:31 UTC (interactive, Tier 3 — NOMINAL)
 
 **Health:** ✅ **Nominal. Tier 3, consecutive_clean=4→5. 0 new alerts. All mandatory + additive checks clean. 10/10 services active. All inboxes empty. Heartbeats fresh. Sync nominal (one commit ahead of sync.timer watermark; self-clearing). 0 open PRs.**
