@@ -108,6 +108,14 @@ class DesktopSessionIngestTest(unittest.TestCase):
         self.assertEqual(rec['task_id'], 'desktop-abc12345')
         self.assertIn('ts', rec)
 
+    def test_oversized_payload_413(self):
+        big = {'blob': 'x' * (da.MAX_DESKTOP_PAYLOAD_BYTES + 1)}
+        with mock.patch.object(da, '_get_desktop_emit', _fake_emit_resolver()):
+            r = self.client.post(ENDPOINT, headers=INGEST_AUTH, json={
+                'event_type': 'desktop_session_start',
+                'task_id': 'x', 'payload': big})
+        self.assertEqual(r.status_code, 413)
+
     def test_done_event_ok(self):
         with mock.patch.object(da, '_get_desktop_emit', _fake_emit_resolver()):
             r = self.client.post(ENDPOINT, headers=INGEST_AUTH, json={

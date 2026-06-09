@@ -2514,6 +2514,10 @@ ALLOWED_DESKTOP_EVENT_TYPES = (
 )
 INGEST_HEADER_NAME = 'X-Ingest-Token'
 INGEST_TOKEN_ENV = 'DESKTOP_INGEST_TOKEN'
+# Desktop session metadata is tiny (repo/branch/title/host/flags). Cap the
+# payload so a leaked ingest token can't bloat chain_events with multi-MB rows
+# (the dashboard fetches event payloads with SELECT *). Generous vs. real use.
+MAX_DESKTOP_PAYLOAD_BYTES = 16384
 
 
 class DesktopSessionIngestRequest(BaseModel):
@@ -2545,7 +2549,13 @@ def _require_ingest_token(request: Request) -> None:
         )
     expected = _expected_ingest_token()
     if not expected:
-        # Server misconfigured — refuse to claim auth passed.
+        # Server misconfigured — refuse to claim auth passed. Log it: a droplet
+        # restarted before its EnvironmentFile is sourced would otherwise 401
+        # every desktop ingest silently, and no cards would appear.
+        logger.warning(
+            'desktop ingest rejected: %s is not configured on this service — '
+            'every ingest request 401s until it is set.', INGEST_TOKEN_ENV,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f'invalid {INGEST_HEADER_NAME}',
@@ -2598,6 +2608,18 @@ def _handle_desktop_session_ingest(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='payload must be a JSON object',
+        )
+    try:
+        payload_bytes = len(json.dumps(payload).encode('utf-8'))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='payload is not JSON-serializable',
+        )
+    if payload_bytes > MAX_DESKTOP_PAYLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f'payload too large ({payload_bytes} > {MAX_DESKTOP_PAYLOAD_BYTES} bytes)',
         )
     emit_event, compute_event_id = (emit_resolver or _get_desktop_emit)()
     now = now or datetime.now(timezone.utc)

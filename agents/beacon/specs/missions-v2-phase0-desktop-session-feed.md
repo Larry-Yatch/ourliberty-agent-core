@@ -102,8 +102,8 @@ Sibling to `agents/beacon/missions.json`, version-controlled. Frozen here so Pha
 
 - **Route:** `POST /api/ingest/desktop-session` (new, in `scripts/dashboard_api.py`).
 - **Auth:** header `X-Ingest-Token` compared (constant-time) to `DESKTOP_INGEST_TOKEN` in the droplet env. **Dedicated token** — distinct from the dashboard read token; blast radius of a leak is limited to writing `desktop_session_*` events as `desktop-claude` and nothing else.
-- **Request body:** `{ event_type, task_id, payload }`. Server **pins** `agent='desktop-claude'`, **rejects** any `event_type` not in `{desktop_session_start, desktop_session_active, desktop_session_done}`, then calls `emit_event(...)`.
-- **Responses:** `202 {ok:true, event_id}` on success; `401` bad/missing token; `400` bad event_type/body; `502 {ok:false}` if `emit_event` returns False (Supabase down — best-effort, caller ignores).
+- **Request body:** `{ event_type, task_id, payload }`. Server **pins** `agent='desktop-claude'`, **rejects** any `event_type` not in `{desktop_session_start, desktop_session_active, desktop_session_done}`, caps `payload` at 16 KB (defense-in-depth vs. a leaked token), then calls `emit_event(...)`.
+- **Responses:** `202 {ok:true, event_id}` on success; `401` bad/missing token (+ a WARN log if the token env is unset); `400` bad event_type/body; `413` payload over the cap; `502 {ok:false}` if `emit_event` returns False (Supabase down — best-effort, caller ignores).
 - **Handler:** `_handle_desktop_session_ingest`; thread-safe (no shared mutable state; `emit_event` builds its own client).
 
 ---
