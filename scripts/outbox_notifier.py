@@ -2008,6 +2008,101 @@ def _dead_letter_marker_error_to_dispatcher(
     _maybe_dm_larry(data, synthetic_decision)
 
 
+def _prior_build_was_spawn_failure(task_id: str) -> bool:
+    """Return True only on a DEFINITIVE terminal build-phase spawn-failure.
+
+    Build-dedup wedge fix (2026-06-09). The dedup in ``_dispatch_build_phase``
+    skips re-dispatch when ``build-<task_id>.json`` is present in Forge's inbox
+    archive. That artifact gets archived even when the build worker FAILED TO
+    SPAWN — agent_runner records a terminal Forge outbox result with
+    ``exit_code == -1`` / ``'All retries exhausted'`` / ~0 duration / no PR.
+    Such a task could then never be re-dispatched under the same task_id (it
+    could only be unblocked by minting a fresh task_id — the footgun that hit
+    ``register-ol-db-ro-url-credential`` on 2026-06-09: failed twice, only the
+    v2 task_id landed PR #401).
+
+    This helper distinguishes 'never ran' from 'ran or in-flight' by scanning
+    the Forge outbox archive for the MOST RECENT build-phase RESULT envelope
+    for this task_id and returning True ONLY on the definitive spawn-failure
+    shape:
+      - ``exit_code == -1``
+      - error/result indicates a non-run (``'All retries exhausted'``)
+      - ``duration_sec`` is ~0 (None or < 2s — the real artifact records null)
+      - NO pr_url (neither a top-level field nor extractable from result text)
+
+    SAFETY INVARIANT: the override fires ONLY on this definitive terminal
+    failure. Absence of a terminal result (build still running, or the notifier
+    crashed mid-flight before archiving the result) must NEVER return True —
+    when in doubt, return False so the dedup keeps its conservative crash-
+    recovery skip. Any read/parse error → False (defensive: keep the skip).
+    """
+    try:
+        archive_dir = OUTBOXES_ROOT / 'forge' / '.archive'
+        if not archive_dir.exists():
+            return False
+        # Outbox result envelopes are keyed `<task_id>.json` / `<task_id>.N.json`
+        # (NOT `build-<task_id>`). Anchor the match so a task_id that is a
+        # prefix of another (e.g. 'foo' vs 'foo-v2') can't cross-match.
+        name_re = re.compile(rf'^{re.escape(task_id)}(\.\d+)?\.json$')
+        candidates: list[tuple[float, dict[str, Any]]] = []
+        for f in archive_dir.glob('*.json'):
+            if f.name.startswith('.') or not name_re.match(f.name):
+                continue
+            try:
+                envelope = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(envelope, dict):
+                continue
+            if envelope.get('agent') != 'forge' or envelope.get('phase') != 'build':
+                continue
+            candidates.append((_result_epoch(f, envelope), envelope))
+        if not candidates:
+            return False
+
+        # Most recent build-phase result wins.
+        _, latest = max(candidates, key=lambda item: item[0])
+
+        if latest.get('exit_code') != -1:
+            return False
+        # A PR (top-level field OR a `PR opened:`/`PR updated:` line in the
+        # result text) means a build actually ran — never override.
+        if latest.get('pr_url'):
+            return False
+        if _extract_pr_url_from_build_result(latest.get('result', '')):
+            return False
+        # Substantive duration means it ran; None/0/~0 is the never-spawned
+        # signal (the real spawn-failure artifact records duration_sec=null).
+        duration = latest.get('duration_sec')
+        if duration is not None:
+            try:
+                if float(duration) >= 2:
+                    return False
+            except (TypeError, ValueError):
+                return False
+        # Terminal non-run signal in error/result.
+        signals = (str(latest.get('error') or ''), str(latest.get('result') or ''))
+        if not any('all retries exhausted' in s.lower() for s in signals):
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def _result_epoch(f: Path, envelope: dict[str, Any]) -> float:
+    """Sortable recency for an outbox result: completed_at, else file mtime."""
+    ts = envelope.get('completed_at')
+    if isinstance(ts, str) and ts:
+        try:
+            return datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp()
+        except ValueError:
+            pass
+    try:
+        return f.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def _dispatch_build_phase(data: dict[str, Any]) -> None:
     """Write a build-phase task to Forge's inbox after a PROCEED marker.
 
@@ -2125,19 +2220,42 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
     # would otherwise write a second build task that would resume an
     # already-terminated session against potentially-dirty worktree state.
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+    # A build currently in the LIVE inbox is in-flight — always skip, never
+    # override (don't double-dispatch a queued/running build).
+    if (forge_inbox / build_filename).exists():
+        log(
+            f'build-phase already dispatched for task {task_id} '
+            f'(live inbox file present); skipping duplicate write'
+        )
+        return
+    # A stale `build-<task_id>.json` in .archive/ or .invalid/ normally means a
+    # build was already dispatched (crash-recovery protection: the notifier may
+    # have died between dispatch and archive of the preflight outbox, so a
+    # re-process must NOT resume an already-terminated session against dirty
+    # worktree state). EXCEPTION (build-dedup wedge fix, 2026-06-09): if the
+    # prior build was a DEFINITIVE spawn-failure (worker never ran, no PR), the
+    # archive artifact is a phantom that would permanently wedge the task_id.
+    # In that case allow the re-dispatch. The override fires ONLY on a definitive
+    # terminal failure result — absence of a terminal result (still running /
+    # notifier crashed mid-flight) returns False and keeps the conservative skip.
     if (
-        (forge_inbox / build_filename).exists()
-        or (forge_inbox / '.archive' / build_filename).exists()
+        (forge_inbox / '.archive' / build_filename).exists()
         # D3.5 5a M-1 review fix: also check .invalid/ — a prior dispatch that
         # was validator-rejected lives there, and we shouldn't re-dispatch a
         # duplicate that will hit the same rejection.
         or (forge_inbox / '.invalid' / build_filename).exists()
     ):
-        log(
-            f'build-phase already dispatched for task {task_id} '
-            f'(file or archive or .invalid present); skipping duplicate write'
-        )
-        return
+        if _prior_build_was_spawn_failure(task_id):
+            log(
+                f'BUILD_DEDUP_OVERRIDE task={task_id} — prior build was a '
+                f'spawn-failure (exit=-1, no PR, ~0s); allowing re-dispatch'
+            )
+        else:
+            log(
+                f'build-phase already dispatched for task {task_id} '
+                f'(archive or .invalid present); skipping duplicate write'
+            )
+            return
 
     # D3.5 5d cost-budget gate. AFTER the idempotency check (second-pass
     # review finding 2-#1): on a crash-recovery re-process where the
