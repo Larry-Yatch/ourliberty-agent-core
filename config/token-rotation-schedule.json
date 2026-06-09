@@ -324,6 +324,23 @@
       "owner_role": "larry",
       "scopes": ["full-account"],
       "notes": "rotate ONLY if compromised; rotation breaks all connections — requires re-running supabase link after. Also stored in 1Password — keep both copies in sync."
+    },
+    {
+      "name": "OL_DB_RO_URL",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "connection_string",
+      "purpose": "Read-only OurLiberty database connection URL (embedded RO-user credential). Consumer not yet wired in code; a repo-wide grep for OL_DB_RO_URL on 2026-06-05 found no Python/JS/TS/shell/systemd consumer. Present in env for an anticipated read-path (e.g. a read-only query path in scripts/dashboard_api.py or an ingestion/shipper reader) that has not yet landed.",
+      "rotation_type": "revocation_only",
+      "cadence_days": null,
+      "created_at": "2026-06-05",
+      "last_rotated_at": "2026-06-05",
+      "next_rotation_due": null,
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-ol-db-ro-url.md",
+      "severity_if_lapsed": "medium",
+      "owner_role": "larry",
+      "scopes": ["db-read"],
+      "notes": "Read-only DB connection URL with an embedded RO-user credential. revocation_only (no scheduled cadence) to match the sibling SUPABASE_URL / SUPABASE_DB_PASSWORD entries — the embedded credential rotates only when the underlying DB read-only user's password is rotated/revoked, at which point this URL must be updated in the same window. Registered retroactively 2026-06-05 to close credential-drift:MISSING_REGISTRY_ENTRY. Original provisioning date is unknown, so created_at and last_rotated_at both use the registration date 2026-06-05 as a best-effort floor (the validator requires last_rotated_at as a real date, and revocation_only has no scheduled rotation anyway). next_rotation_due is null because revocation_only has no scheduled cadence; if Larry wants a scheduled rotation instead, change rotation_type=scheduled + set cadence_days + create the calendar event."
     }
   ],
   "known_storage_locations": {
