@@ -4,6 +4,117 @@
 
 ---
 
+## Iteration 1372 — 2026-06-10 22:01Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline churning. `fix-classifier-session-lost-001` build FAILED at 21:59:13Z (session_lost, 5/5 retries; WIP preserved on branch). `fix-test-gate-sandbox-env-injection-001` first pass COMPLETE (21:56:17Z, $0.78), second pass active (21:59:19Z). Forge inbox: 3 tasks queued. 0 new alerts. 0 open PRs. 9/9 services active.
+**VERIFY-BEFORE-REASSERT (pipeline-stall):** heal-pipeline-stall ran 21:53:25Z (7 min ago) — "no stalls detected". Heartbeat file MISSING again (intermittent: iters 1369/1370 absent, 1371 present, 1372 absent). Using journalctl as authoritative source. ✅
+**VERIFY-BEFORE-REASSERT (classifier build):** `fix-classifier-session-lost-001` build-phase task hit session_lost at 21:59:13Z — 5/5 retries exhausted on `claude --resume 0f7d8507`. WIP preserved on branch `forge/fix-classifier-session-lost-001` (checkpoint pushed 21:56:18Z). Follow-on task `build-fix-classifier-session-lost-001.json` (fresh-start from WIP branch) queued in Forge inbox. Beacon `notify-fix-classifier-session-lost-001` started 21:59:19Z. Not a stall — pipeline handling it autonomously.
+**Tier state:** 1 (consecutive_clean=0; active Forge builds + standing pipeline issues)
+
+**Check 0 — Alert triage:**
+- alert-triage.json: watermark MISSING (known standing; G-rule dispatched iter 1251; Forge brief pending). Per spec recovery: claimed trailing 100 lines.
+- larry-alerts.jsonl: **1403 lines** — UNCHANGED since iter 1371. No new alerts. ✅ Nominal.
+- **Watermark: line 1403 / check-i-2026-06-08 / 2026-06-10T21:52:05Z (unchanged)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- New Larry message this iter: 15:52:16 MDT (21:52:16Z): `reject: Newer solution in process — superseded by fix-classifier-session-lost-001` — rejection of old `fix-tier1-classifier-envelope-not-content-scan` approval. Tracked; already superseded per iter 1371. No orphan directive. ✅
+- No other new messages. No orphan directives. ✅ Nominal.
+- beacon-pending-approvals.json: MISSING/empty. 0 pending approvals. ✅
+- `alert idx=0 delivery to 12345 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- heal-pipeline-stall ran 21:53:25Z (7 min ago) — "no stalls detected". ✅
+- Heartbeat file MISSING (intermittent; journalctl authoritative).
+- **Pipeline events this iter (vs iter 1371):**
+  - `fix-classifier-session-lost-001` (build-phase resume): FAILED 21:59:13Z — 5/5 retries of `--resume 0f7d8507` all returned "No conversation found with session ID". WIP on branch `forge/fix-classifier-session-lost-001`. `build-fix-classifier-session-lost-001.json` queued in Forge inbox as fresh build from branch. Beacon `notify-fix-classifier-session-lost-001` started 21:59:19Z.
+  - `fix-test-gate-sandbox-env-injection-001` (build-phase #1): COMPLETE 21:56:17Z ($0.78, 290s, success=True). Second pass started 21:59:19Z (resume=781676a9). Active now.
+  - `tier-alert-closeout-pr4-dashboard-routing-20260610` (Beacon): COMPLETE 21:56:34Z ($0.72). Produced `fix-dashboard-routing-denied-001.json` in Forge inbox (phase=preflight).
+  - `notify-fix-test-gate-sandbox-env-injection-001` (Beacon): COMPLETE 21:57:14Z ($0.31).
+- Forge inbox: 3 tasks — `build-fix-classifier-session-lost-001.json` (build), `build-fix-test-gate-sandbox-env-injection-001.json` (build), `fix-dashboard-routing-denied-001.json` (preflight).
+- Beacon inbox: 1 active (`notify-fix-classifier-session-lost-001`, started 21:59:19Z).
+- Standing: wedge-reaper still unbuilt. CCD S1 + headless-dedup blocked.
+- ⚠️ tier-reset: YES (active builds)
+
+**Check 4 — Pending directives:**
+- No new messages since iter 1371. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code ran 21:43:04Z (18 min ago, within 60 min threshold). `tick: fresh=75 unparseable=47`. ✅
+- heal-stale-daemon-code-state.json: MISSING (clean run, no stale daemons). ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T21:50:16Z` (~11 min old at 22:01Z), status=no-change. Within 2h threshold (expires 23:50:16Z). ✅ Nominal. (**WATCH:** trigger sync if next iter is after 23:50Z.)
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- `fix-classifier-session-lost-001` (build-phase): FAILED 21:59:13Z (session_lost; see Check 3). Beacon notified.
+- `fix-test-gate-sandbox-env-injection-001` (build-phase #2): Active (21:59:19Z, resume=781676a9).
+- `tier-alert-closeout-pr4-dashboard-routing-20260610` (Beacon): COMPLETE 21:56:34Z. Produced `fix-dashboard-routing-denied-001.json` (Forge preflight).
+- `silence-missions-card-gc-summary-alert-001`: standing drop. Carry.
+
+**Check I (Wednesday 2026-06-10):** Sentinel `check-i-2026-06-10.json` EXISTS (fired iter 1345). Idempotent skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** All three scripts: no-op (no committed audit baseline). ✅
+
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days). ✅
+
+**install-drift:** heartbeat `2026-06-10T18:00:03Z` (~4h1m old at 22:01Z). Next fire ~06:00Z June 11 (~7h59m). ✅
+
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1371 unchanged.
+- heal-pipeline-stall heartbeat file: MISSING again (iter 1372). Pattern: intermittent (1369/1370/1372 absent, 1371 present). Not monotonic; sub-threshold watch (not 3/3).
+- `fix-classifier-session-lost-001` session_lost: expected (the fix itself hasn't shipped yet; pipeline handling autonomously via fresh build task in inbox).
+
+**Actions taken:** None. Pipeline churning autonomously.
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build** — blocked pending PR-1 (`fix-classifier-session-lost-001` PR) + inbox-watcher restart. PR-1 recovering: `build-fix-classifier-session-lost-001.json` queued. **Action on Larry: watch for PR-1 open + Mirror review; then approve inbox-watcher restart.**
+- [yellow] CCD S1 build spawn-failure. Blocked on wedge fix + classifier PR.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — re-dispatch when wedge path cleared.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] alert-triage.json watermark MISSING (known standing; G-rule dispatched iter 1251; Forge brief pending).
+- [blue] heal-pipeline-stall heartbeat intermittent (1369/1370/1372 absent, 1371 present). Sub-threshold.
+
+**Watch items for iter 1373:**
+- **`build-fix-classifier-session-lost-001.json`**: Forge will pick this up; should build fresh from WIP branch. Watch for PR open.
+- **`fix-test-gate-sandbox-env-injection-001` second pass**: Active (resume=781676a9). Watch for completion + PR.
+- **`fix-dashboard-routing-denied-001.json`** (Forge preflight): Watch for Forge to start.
+- **`notify-fix-classifier-session-lost-001`** (Beacon): Active since 21:59:19Z. Watch for Beacon output.
+- **Check B sync**: expires 23:50:16Z — trigger if next iter is after that.
+
+**PRIME DIRECTIVE:** 0 new Pulse-initiated interventions this iter (pipeline autonomous). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. Iter non-clean (active builds + standing issues).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1371 — 2026-06-10 21:52Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline actively churning. Forge completed `fix-classifier-session-lost-001` build (21:50:24Z, $2.09) + resume pass (21:51:20Z, $0.20). Two active Forge builds in progress. 0 open PRs (classifier PR pending follow-on build task). Beacon cleared `fix-tier1-classifier-envelope-not-content-scan` pending approval (~21:51Z) as superseded. 9/9 services active.
