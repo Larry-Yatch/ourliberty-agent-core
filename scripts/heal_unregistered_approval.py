@@ -82,6 +82,17 @@ HEALER_SOURCE = 'heal-unregistered-approval'
 # lost (the deterministic id already lives in pending/history).
 PROMOTED_TASK_PREFIX = 'unreg-approval'
 
+# Per-tick cap on archived Beacon outboxes parsed during marker recovery, so an
+# unpruned outbox archive can't make the scan unbounded. Only in-window files
+# are eligible, newest-first; recovery is a best-effort enrichment, so a deeper
+# tail being skipped just falls back to the alert-derived card.
+MAX_ARCHIVE_FILES_READ = 200
+
+# Known dispatch targets. A recovered marker's target_agent is trusted only if it
+# names one of these; anything else falls back to 'beacon' (the always-safe
+# mediator), so a typo'd/exotic target can't advertise a bogus route on the card.
+KNOWN_TARGET_AGENTS = frozenset({'beacon', 'forge', 'mirror', 'pulse'})
+
 # "Choose A or B" / "Pick A vs B" / "Reply A or B" splitter for binary options.
 _BINARY_SPLIT_RE = re.compile(r'\s+(?:or|vs\.?|versus)\s+', re.IGNORECASE)
 _LEADING_VERB_RE = re.compile(
@@ -652,6 +663,175 @@ def build_approval_payload(
     }
 
 
+# -------------------- marker recovery from Beacon's outbox archive --------
+
+def beacon_outbox_archive() -> Path:
+    return agents_root() / 'outboxes' / 'beacon' / '.archive'
+
+
+def load_beacon_outbox_markers(
+    now: datetime,
+    window_hours: float,
+    archive_dir: Optional[Path] = None,
+) -> list[dict[str, Any]]:
+    """Recover the APPROVAL_REQUEST payloads Beacon actually emitted, by reading
+    her archived outbox records.
+
+    The bug this serves (the #412 class): Beacon emits a valid APPROVAL_REQUEST
+    in a result-notification / cycle-finding context (source not in the
+    notifier's gated approval sources), so the inline marker scanner never
+    registers it and it is stripped as narrative. The marker still lives,
+    verbatim, in the `result` field of her archived outbox record. Recovering it
+    here lets the healer register the REAL approval instead of synthesizing a
+    lossy needs-triage card from the downstream larry-alert.
+
+    Bounded + fail-safe: each file is stat'd ONCE; only in-window files are read,
+    most-recent first (so the freshest marker wins a match); at most
+    MAX_ARCHIVE_FILES_READ in-window files are parsed per tick so an unpruned
+    archive can't make this O(huge); any read/parse error skips that file; a
+    malformed marker is ignored. Returns the recovered marker payload dicts.
+    Never raises."""
+    arch = archive_dir or beacon_outbox_archive()
+    cutoff = now.timestamp() - window_hours * 3600
+    try:
+        if not arch.exists():
+            return []
+        # Stat each file once: build (mtime, path), then filter to the window and
+        # sort newest-first. (Previously stat ran up to 3x per file.)
+        stamped: list[tuple[float, Path]] = []
+        for p in arch.glob('*.json'):
+            if p.name.startswith('.'):
+                continue
+            try:
+                mtime = p.stat().st_mtime
+            except OSError:
+                continue
+            if mtime >= cutoff:
+                stamped.append((mtime, p))
+        stamped.sort(key=lambda t: t[0], reverse=True)  # most recent first
+    except OSError:
+        return []
+    out: list[dict[str, Any]] = []
+    for _mtime, f in stamped:
+        if len(out) >= MAX_ARCHIVE_FILES_READ:
+            break
+        try:
+            data = json.loads(f.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        result_text = data.get('result')
+        if not isinstance(result_text, str) or 'APPROVAL_REQUEST' not in result_text:
+            continue
+        try:
+            payload, _narrative = approval.extract_approval_request(result_text)
+        except Exception:  # noqa: BLE001 — malformed marker: ignore, never crash
+            continue
+        if isinstance(payload, dict) and payload.get('task_id'):
+            out.append(dict(payload))
+    return out
+
+
+def match_marker_for_record(
+    record: dict[str, Any], markers: list[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
+    """Pure: pick the recovered marker that corresponds to this alert, or None.
+
+    Primary signal (reliable): the marker's task_id appears verbatim in the
+    alert text — the pipeline-stall alert that triggers promotion names the
+    un-dispatched task (e.g. '...APPROVAL_REQUEST for mirror-review-pr412-001
+    but ...'). Secondary: a PR/issue ref the alert anchors on also appears in the
+    marker's summary/prompt. `markers` is most-recent-first, so the first match
+    is the freshest. Conservative — no signal → None (caller falls back to the
+    alert-derived card), so a wrong marker is never grafted onto a decision."""
+    if not markers:
+        return None
+    alert_text = ' '.join(
+        str(record.get(k, '')) for k in ('subject', 'message', 'suggested_action')
+    ).lower()
+    if not alert_text.strip():
+        return None
+    # Primary: marker task_id named in the alert, matched as a whole token (a
+    # word-boundary check, not a bare substring, so a short/compound id can't
+    # false-match inside an unrelated longer token).
+    for marker in markers:
+        tid = marker.get('task_id')
+        if not isinstance(tid, str) or len(tid) < 6:
+            continue
+        if re.search(r'(?<![a-z0-9])' + re.escape(tid.lower()) + r'(?![a-z0-9])',
+                     alert_text):
+            return marker
+    # Secondary: shared PR/issue ref anchor.
+    alert_refs = set(parse_ref_numbers(record.get('subject'))) | set(
+        parse_ref_numbers(record.get('message')))
+    if not alert_refs:
+        return None
+    for marker in markers:
+        marker_text = ' '.join(
+            str(marker.get(k, '')) for k in ('summary', 'prompt', 'task_id'))
+        if alert_refs & set(parse_ref_numbers(marker_text)):
+            return marker
+    return None
+
+
+def build_approval_payload_from_marker(
+    marker: dict[str, Any], record: dict[str, Any], dedup_key: str,
+) -> dict[str, Any]:
+    """Build a CLEAN approval payload from a recovered APPROVAL_REQUEST marker.
+
+    Structurally identical to `build_approval_payload` (same dedup/ledger/retire
+    keys: healer-deterministic `task_id`, `promoted_from_alert`, `_subject`,
+    `origin`, `bare_approvable=False`), but the user-facing summary/prompt and
+    `target_agent` come from what Beacon actually proposed — not a guess parsed
+    from the downstream alert. The full marker is preserved under
+    `recovered_marker` so the approve path has Beacon's original plan."""
+    task_id = derive_task_id(dedup_key)
+    subject = record.get('subject') or dedup_key
+    marker_summary = str(marker.get('summary') or '').strip() or '(no summary)'
+    raw_target = marker.get('target_agent')
+    # Trust the marker's target only if it's a real route; otherwise fall back to
+    # 'beacon', the always-safe mediator (a typo'd target can't advertise a bogus
+    # route on the card).
+    marker_target = raw_target if raw_target in KNOWN_TARGET_AGENTS else 'beacon'
+    marker_task = marker.get('task_id') or '(unknown)'
+    marker_type = marker.get('task_type') or 'direction-ask'
+    summary = f'Approval recovered from a missed marker: {marker_summary}'
+    prompt = (
+        'Beacon emitted this APPROVAL_REQUEST but it was never registered into '
+        'the approvals queue (it was emitted in a result-notification / '
+        'cycle-finding context that the inline marker scanner does not cover), '
+        f'so it never reached the Approvals tab. {HEALER_SOURCE} recovered the '
+        "original marker from Beacon's outbox archive and registered it here.\n\n"
+        f'Source alert subject: {subject}\n'
+        f'Proposed task: {marker_task}\n'
+        f'Target agent: {marker_target}\n'
+        f'Task type: {marker_type}\n'
+        f'Summary: {marker_summary}\n\n'
+        'Approve to let Beacon dispatch the proposed task; Reject to decline. '
+        'Resolved via the Approvals tab buttons.'
+    )
+    return {
+        'task_id': task_id,
+        'summary': summary,
+        'target_agent': marker_target,
+        'prompt': prompt,
+        'task_type': marker_type,
+        # The verbatim marker Beacon proposed, preserved in the local pending
+        # entry for reference and for any consumer that reads dispatch_payload.
+        # NOTE: the Approvals-tab chain_event carries only summary/target/prompt,
+        # so on approve Beacon re-shapes the dispatch from those fields (which
+        # name the real target + task_id + summary) — this is NOT an automatic
+        # verbatim re-dispatch, just a faithful, readable card.
+        'recovered_marker': {k: v for k, v in marker.items()
+                             if not k.startswith('_')},
+        'promoted_from_alert': dedup_key,
+        'origin': HEALER_SOURCE,
+        'bare_approvable': False,
+        '_subject': subject,
+    }
+
+
 # -------------------- registration matching (pure) --------------------
 
 def registered_identities(state: dict[str, Any]) -> tuple[set[str], list[str]]:
@@ -747,6 +927,7 @@ def evaluate(
     promoted: dict[str, Any],
     now: Optional[datetime] = None,
     resolution_check: Any = None,
+    marker_lookup: Any = None,
 ) -> list[dict[str, Any]]:
     """Return the list of approval payloads to register this tick.
 
@@ -761,10 +942,19 @@ def evaluate(
     returns a reason when the decision is already resolved (so it is skipped),
     else None. Defaults to a no-op so existing pure-logic callers keep
     promoting; main() wires the live gh/history/alert probe.
+
+    `marker_lookup` is an injected `callable(record) -> Optional[dict]` that
+    returns the original APPROVAL_REQUEST marker Beacon emitted for this decision
+    (recovered from her outbox archive), if found. When it returns a marker the
+    card is built from Beacon's real proposal (clean summary/target) instead of a
+    lossy reconstruction from the alert. Defaults to a no-op so existing callers
+    keep the alert-derived behavior.
     """
     now = now or datetime.now(timezone.utc)
     window = heuristics['scan_window_hours']
     check = resolution_check or (lambda rec: None)
+    find_marker = marker_lookup or (lambda rec: None)
+    used_marker_ids: set[str] = set()
     out: list[dict[str, Any]] = []
     seen_keys: set[str] = set()
     for record in alerts:
@@ -788,7 +978,26 @@ def evaluate(
             log(f'skip-before-promote: {identity!r} ({reason})')
             seen_keys.add(identity)
             continue
-        payload = build_approval_payload(record, identity)
+        marker = None
+        try:
+            marker = find_marker(record)
+        except Exception as e:  # noqa: BLE001 — recovery is best-effort; fall back
+            log(f'marker recovery raised for {identity!r}: '
+                f'{type(e).__name__}: {e}; using alert-derived card', 'WARN')
+        # One recovered marker backs at most one card per tick: if two distinct
+        # alerts both correlate to the same marker, only the first gets the clean
+        # card; the second falls back to its alert-derived form rather than
+        # proposing the same dispatch twice.
+        if marker is not None:
+            m_id = marker.get('task_id')
+            if isinstance(m_id, str) and m_id in used_marker_ids:
+                marker = None
+            elif isinstance(m_id, str):
+                used_marker_ids.add(m_id)
+        if marker is not None:
+            payload = build_approval_payload_from_marker(marker, record, identity)
+        else:
+            payload = build_approval_payload(record, identity)
         payload['_source_ts'] = record.get('ts')
         out.append(payload)
         seen_keys.add(identity)
@@ -986,11 +1195,28 @@ def main() -> int:
         _clear_retired_read_at([tid for tid, _ in retired])
         log(f'retired {len(retired)} resolved card(s) off the tab')
 
+    # Recover the real APPROVAL_REQUEST markers Beacon emitted (read once,
+    # outside the promote loop) so a promoted card carries Beacon's actual
+    # proposal instead of a needs-triage reconstruction. Best-effort: a failure
+    # here just means the alert-derived fallback is used.
+    now = datetime.now(timezone.utc)
+    try:
+        recovered_markers = load_beacon_outbox_markers(
+            now, heuristics['scan_window_hours'])
+    except Exception as e:  # noqa: BLE001
+        log(f'marker recovery scan failed: {type(e).__name__}: {e}; '
+            f'falling back to alert-derived cards', 'WARN')
+        recovered_markers = []
+
+    def _marker_lookup(record: dict[str, Any]) -> Optional[dict[str, Any]]:
+        return match_marker_for_record(record, recovered_markers)
+
     # --- SKIP-BEFORE-PROMOTE + PROMOTE (decisions 1 + 2) ---
     try:
         to_promote = evaluate(
             alerts, heuristics, state, promoted,
             resolution_check=_resolution_check,
+            marker_lookup=_marker_lookup,
         )
     except Exception as e:  # noqa: BLE001
         log(f'evaluate failed: {type(e).__name__}: {e}', 'ERROR')

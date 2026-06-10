@@ -855,5 +855,194 @@ class PromoteRaceTest(unittest.TestCase):
         self.assertIs(kwargs.get('state'), fresh)
 
 
+# ----- marker recovery from Beacon's outbox archive (the #412 BUG-2 fix) -----
+
+# The pipeline-stall alert that triggered #412's promotion: it NAMES the
+# un-dispatched task in its message, which is how the recovered marker is matched.
+PR412_STALL_ALERT = {
+    'ts': _ts(1),
+    'source': 'heal-pipeline-stall',
+    'severity': 'warning',
+    'route': 'escalate',
+    'subject': 'pipeline-stall:pr412-approval-request-not-dispatched',
+    'message': (
+        'PR #412 Mirror review still not dispatched. Beacon emitted '
+        'APPROVAL_REQUEST for mirror-review-pr412-001 but outbox-notifier did '
+        'NOT create the Mirror task.'
+    ),
+    'suggested_action': "Reply 'mirror-review 412' to Beacon to dispatch.",
+}
+
+# The real marker Beacon emitted, as it would be recovered from her outbox
+# archive (parsed payload of the APPROVAL_REQUEST block).
+PR412_MARKER = {
+    'task_id': 'mirror-review-pr412-001',
+    'summary': 'Dispatch Mirror review of PR #412 (test-only isolation '
+               'hardening); the auto-dispatch was missed.',
+    'target_agent': 'mirror',
+    'task_type': 'code-review',
+    'prompt': 'Review PR #412 ...',
+}
+
+
+def _marker_block(payload: dict) -> str:
+    return (
+        'Some narrative before.\n\n=== APPROVAL_REQUEST ===\n'
+        + json.dumps(payload)
+        + '\n=== END_APPROVAL_REQUEST ===\nTrailing narrative.'
+    )
+
+
+class LoadBeaconOutboxMarkersTest(unittest.TestCase):
+    def _write_outbox(self, d, name, result_text):
+        p = d / name
+        p.write_text(json.dumps({'agent': 'beacon', 'result': result_text}),
+                     encoding='utf-8')
+        return p
+
+    def test_recovers_marker_in_window(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            self._write_outbox(d, 'cycle-finding-pr412.json',
+                               _marker_block(PR412_MARKER))
+            got = h.load_beacon_outbox_markers(NOW, 24, archive_dir=d)
+            self.assertEqual([m['task_id'] for m in got], ['mirror-review-pr412-001'])
+
+    def test_skips_files_outside_window(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            p = self._write_outbox(d, 'old.json', _marker_block(PR412_MARKER))
+            old = (NOW - timedelta(hours=48)).timestamp()
+            os.utime(p, (old, old))
+            self.assertEqual(h.load_beacon_outbox_markers(NOW, 24, archive_dir=d), [])
+
+    def test_skips_outbox_without_marker_and_malformed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            self._write_outbox(d, 'no-marker.json', 'just narrative, no marker')
+            self._write_outbox(d, 'bad.json',
+                               '=== APPROVAL_REQUEST ===\n{not json\n'
+                               '=== END_APPROVAL_REQUEST ===')
+            self.assertEqual(h.load_beacon_outbox_markers(NOW, 24, archive_dir=d), [])
+
+    def test_missing_archive_dir_is_empty(self):
+        self.assertEqual(
+            h.load_beacon_outbox_markers(NOW, 24, archive_dir=Path('/no/such/dir')),
+            [])
+
+
+class MatchMarkerForRecordTest(unittest.TestCase):
+    def test_matches_by_task_id_named_in_alert(self):
+        m = h.match_marker_for_record(PR412_STALL_ALERT, [PR412_MARKER])
+        self.assertIsNotNone(m)
+        self.assertEqual(m['task_id'], 'mirror-review-pr412-001')
+
+    def test_matches_by_shared_pr_ref(self):
+        # task_id not named, but both anchor on PR #412 via a keyword ref.
+        alert = dict(PR412_STALL_ALERT,
+                     message='Mirror review for pr #412 was never dispatched.',
+                     subject='review gap')
+        marker = dict(PR412_MARKER, task_id='zzz', summary='review of pr #412')
+        self.assertIsNotNone(h.match_marker_for_record(alert, [marker]))
+
+    def test_no_match_returns_none(self):
+        alert = dict(PR412_STALL_ALERT, subject='unrelated', message='nothing',
+                     suggested_action='do x')
+        marker = dict(PR412_MARKER, task_id='other-task-999', summary='unrelated')
+        self.assertIsNone(h.match_marker_for_record(alert, [marker]))
+
+    def test_empty_markers_returns_none(self):
+        self.assertIsNone(h.match_marker_for_record(PR412_STALL_ALERT, []))
+
+    def test_short_task_id_not_substring_matched(self):
+        # A <6-char task_id is too collision-prone to match by substring.
+        alert = dict(PR412_STALL_ALERT, message='see abc', subject='x',
+                     suggested_action='')
+        self.assertIsNone(
+            h.match_marker_for_record(alert, [dict(PR412_MARKER, task_id='abc')]))
+
+    def test_task_id_not_matched_inside_longer_alnum_token(self):
+        # Word-boundary: the id must not match inside a longer alphanumeric run.
+        alert = dict(PR412_STALL_ALERT,
+                     message='unrelated task mirror-review-pr412-0019 elsewhere',
+                     subject='x', suggested_action='')
+        self.assertIsNone(h.match_marker_for_record(alert, [PR412_MARKER]))
+
+    def test_unknown_target_falls_back_to_beacon(self):
+        marker = dict(PR412_MARKER, target_agent='some-typo')
+        p = h.build_approval_payload_from_marker(marker, PR412_STALL_ALERT, 'k')
+        self.assertEqual(p['target_agent'], 'beacon')
+
+
+class BuildFromMarkerTest(unittest.TestCase):
+    def test_clean_payload_from_marker(self):
+        key = h.alert_dedup_key(PR412_STALL_ALERT)
+        p = h.build_approval_payload_from_marker(PR412_MARKER, PR412_STALL_ALERT, key)
+        # Real, readable summary — not the 'needs triage' fallback.
+        self.assertIn('Dispatch Mirror review of PR #412', p['summary'])
+        self.assertNotIn('needs triage', p['summary'])
+        self.assertEqual(p['target_agent'], 'mirror')
+        self.assertEqual(p['task_type'], 'code-review')
+        self.assertEqual(p['recovered_marker']['task_id'], 'mirror-review-pr412-001')
+        # Dedup/ledger keys preserved (same as the alert-derived payload).
+        self.assertEqual(p['task_id'], h.derive_task_id(key))
+        self.assertEqual(p['origin'], h.HEALER_SOURCE)
+        self.assertFalse(p['bare_approvable'])
+        self.assertEqual(p['promoted_from_alert'], key)
+
+    def test_recovered_marker_strips_private_keys(self):
+        marker = dict(PR412_MARKER, _outbox_mtime=123.0)
+        p = h.build_approval_payload_from_marker(marker, PR412_STALL_ALERT, 'k')
+        self.assertNotIn('_outbox_mtime', p['recovered_marker'])
+
+
+class EvaluateWithMarkerLookupTest(unittest.TestCase):
+    def _empty_state(self):
+        return {'pending': [], 'history': []}
+
+    def test_promotes_clean_card_when_marker_found(self):
+        out = h.evaluate(
+            [PR412_STALL_ALERT], DEFAULT_HEURISTICS, self._empty_state(), {},
+            now=NOW, marker_lookup=lambda rec: PR412_MARKER)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['target_agent'], 'mirror')
+        self.assertIn('recovered_marker', out[0])
+        self.assertNotIn('needs triage', out[0]['summary'])
+
+    def test_falls_back_to_alert_card_when_no_marker(self):
+        out = h.evaluate(
+            [PR412_STALL_ALERT], DEFAULT_HEURISTICS, self._empty_state(), {},
+            now=NOW, marker_lookup=lambda rec: None)
+        self.assertEqual(len(out), 1)
+        self.assertNotIn('recovered_marker', out[0])
+        self.assertEqual(out[0]['target_agent'], 'beacon')  # alert-derived default
+
+    def test_marker_lookup_exception_falls_back(self):
+        def boom(_rec):
+            raise RuntimeError('archive read blew up')
+        out = h.evaluate(
+            [PR412_STALL_ALERT], DEFAULT_HEURISTICS, self._empty_state(), {},
+            now=NOW, marker_lookup=boom)
+        self.assertEqual(len(out), 1)  # still promotes, via the fallback
+        self.assertNotIn('recovered_marker', out[0])
+
+    def test_one_marker_backs_at_most_one_card_per_tick(self):
+        # Two distinct approval-class alerts both correlate to the same marker;
+        # only the first gets the clean card, the second falls back (no double
+        # dispatch proposal for one marker).
+        alert_a = dict(PR412_STALL_ALERT, subject='pr412-stall-a')
+        alert_b = dict(PR412_STALL_ALERT, subject='pr412-stall-b')
+        out = h.evaluate(
+            [alert_a, alert_b], DEFAULT_HEURISTICS, self._empty_state(), {},
+            now=NOW, marker_lookup=lambda rec: PR412_MARKER)
+        self.assertEqual(len(out), 2)
+        with_marker = [p for p in out if 'recovered_marker' in p]
+        self.assertEqual(len(with_marker), 1)  # exactly one clean card
+
+
 if __name__ == '__main__':
     unittest.main()
