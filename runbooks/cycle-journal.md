@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration 1312 — 2026-06-10 ~13:46Z UTC (interactive, Tier 1)
+
+**Health:** ✅ **PR #46 (ourliberty-dashboard) MERGED** 13:41:07Z UTC ✅ — marker-error retry succeeded, auto-merge fired. All inboxes empty. PR #412 standing APPROVAL_REQUEST. All 9 services active. Beacon-bot stable (PID 1071697, sole process, MainPID confirmed).
+**Tier state:** 1 (consecutive_clean=0; PR #412 standing stall)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T13:32:49.892846+00:00 / wedged-review-reaped:wt-mirror-p2-resurface-and-digest-card / iter 1311. Scanned larry-alerts.jsonl:
+- **Count:** 1351 lines (UNCHANGED from iter 1311). 0 new alerts since watermark. ✅ Nominal.
+- Watermark: **UNCHANGED** (2026-06-10T13:32:49.892846+00:00 / wedged-review-reaped:wt-mirror-p2-resurface-and-digest-card / iter 1311).
+- Triage: 0 new alerts. ✅ No tier-reset from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1311 watch items:
+- "PR #46 (ourliberty-dashboard) — Mirror processing marker-error retry. Expect canonical verdict + auto-merge ~13:45–14:30Z UTC." → **CLOSED ✅**: PR #46 MERGED at 13:41:07Z UTC — marker-error retry produced valid verdict; auto-merge fired. Watch item CLOSED.
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY**: 13:46Z UTC, not yet 18:00Z.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN. ⚠️ [yellow]
+- "G-rule Check-C-launcher-liveness — APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 pending Larry sign-off" → **ACTIVE**: Beacon produced APPROVAL_REQUEST (per between-iter notification at 13:43Z). Pending Larry sign-off → Forge build. Carry.
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — Forge brief absent." → **CARRY**: All inboxes empty; no brief from Forge. Carry.
+
+**Check 1 — Log noise:** beacon_telegram_bot.log last entry 07:33:34 local (13:33:34Z UTC) — idx=1350 delivery. 409 loop entries from 07:19 local (13:19Z UTC) are pre-conflict-resolution stale entries. No new WARN/ERROR since conflict resolution. journalctl --priority warning last 90 min = clean (per iter 1311 Check 1). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon-bot last delivery 13:33:34Z UTC (13 min log silence — under 30-min idle threshold). No new Larry inbound. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: 2026-06-10T13:33:52Z (13 min at scan — slightly over 10-min freshness threshold). Manual verification confirms: stalls=0 per state file, PR #46 merged, PR #412 standing known-state, all inboxes empty. ✅ Nominal (healer mildly stale; manual check confirms clean).
+
+**Check 4 — Pending directives:** All inboxes empty: Forge ✅, Beacon ✅, Mirror ✅, Pulse ✅. No orphaned directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT (no recent daemon code restarts). ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean per session gitStatus (HEAD=228f0a6 "Pulse cycle 20260610T134219Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T13:16:23Z (30 min at scan — within 2h threshold), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- beacon-bot: `systemctl show ourliberty-beacon-bot` MainPID=1071697, ActiveState=active, stable since 12:22:47Z UTC. pgrep briefly showed 2 PIDs (1071697 + 1098472) but 1098472 absent from `ps -p` immediately after — ephemeral/transient. MainPID=1071697 confirmed sole survivor. ✅
+- forge/mirror/pulse bots: ourliberty-forge-bot=active, ourliberty-mirror-bot=active, ourliberty-pulse-bot=active. ✅
+- Infra: inbox-watcher=active, outbox-notifier=active, cycle.timer=active, chain-event-shipper=active, dashboard-api=active. ✅ 9/9 active.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-dashboard: 0 open PRs.** PR #46 MERGED ✅ at 13:41:07Z UTC. ✅
+- **PR #412 (ourliberty-agent-core): OPEN/UNKNOWN** — Standing APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** 0 credentials overdue, 0 within 60-day window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `Check C beacon-bot liveness via systemctl is-active gives false-inactive (launcher-type service)` — G-rule 3/3 DISPATCHED iter 1311. APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` produced by Beacon (between-iter notification 13:43Z). Pending Larry sign-off → Forge build. Carry.
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead/approval-gated PRs` — 3/3 DISPATCHED iter 1298. Beacon consumed ✅. Forge inbox EMPTY — no brief. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3 (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. No new occurrence. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3 (no new occurrence). Carry.
+
+**Standing findings:**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1313):**
+- **install-drift healer** — fires ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411 (install-drift-timer-gap verification).
+- **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
+- **G-rule Check-C-launcher-liveness** — APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — Forge brief absent. Monitor.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (PR #46 merged by pipeline; no new stalls; no Pulse actions). 0 new systemic_fixes. interventions≈752, systemic_fixes=16, ratio≈46.94, trend=flat. iter_non-clean (PR #412 standing stall).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1311 — 2026-06-10 ~13:38Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline advancing. Mirror review of PR #46 produced malformed marker → marker-error retry dispatched. G-rule 3/3 dispatched (Check C beacon-bot liveness). PR #412 standing APPROVAL_REQUEST. Beacon-bot single process (409 conflict CONFIRMED RESOLVED ✅). 5/5 infra services active; 4 bot processes running.
@@ -79,8 +155,26 @@ VERIFY-BEFORE-REASSERT of iter 1310 watch items:
 - **PR #46 (ourliberty-dashboard)** — Mirror processing marker-error retry. Expect canonical verdict + auto-merge ~13:45–14:30Z UTC. If not merged by iter 1312 and >30 min from retry dispatch → escalate.
 - **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411.
 - **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
-- **G-rule Check-C-launcher-liveness** — Pending Beacon spec → Forge PR.
+- **G-rule Check-C-launcher-liveness** — APPROVAL_REQUEST authored by Beacon (`cycle-prompt-check-c-pgrep-liveness-001`), pending Larry sign-off → Forge.
 - **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — Forge brief absent. Monitor.
+
+---
+
+### Between-iter notification — 2026-06-10 ~13:43Z UTC
+
+**Source:** Beacon result-notification for task `cycle-grule-check-c-launcher-liveness-20260610T133600Z`.
+
+**Result:** APPROVAL_REQUEST produced for `cycle-prompt-check-c-pgrep-liveness-001`. Beacon confirmed dispatch ready for Forge.
+
+**Spec premise corrected (material):** The four bot units (`ourliberty-{beacon,forge,mirror,pulse}-bot.service`) are `Type=simple, Restart=always` — they run `python3 ..._telegram_bot.py` **directly** under systemd. They are **not** launcher-type and do not spawn a tmux session and exit. The false-inactive in iter 1309–1311 came from Check C's ambiguous "tmux OR systemd" wording plus a wrong unit name (`ourliberty-beacon-telegram-bot.service` doesn't exist; real name is `ourliberty-beacon-bot.service`). The `systemctl is-active` check returns `active` correctly — the original stated rationale ("launcher-type, reports inactive after spawning tmux") was wrong.
+
+**Pgrep rationale (corrected):** pgrep is still the right signal, but for a different reason: `systemctl is-active` is fine for DOWN detection but **cannot see a 409 double-poller** (reports `active` whether 1 or 2 pollers exist; cannot detect a stray tmux-launched process). pgrep counts actual python processes and catches both DOWN (count=0) and the 409 condition (count≥2).
+
+**Trio shared-script caveat:** forge/mirror/pulse share `agent_telegram_bot.py` (differentiated only by AGENT env var, not in cmdline). Per-agent attribution uses `systemctl show ourliberty-<agent>-bot -p MainPID --value`; a stray PID matching none of the three MainPIDs is the extra poller behind a 409.
+
+**Root cause of the June 10 409:** Running `bash beacon_telegram_bot.sh` while systemd already ran the bot started a second poller. The `.sh` scripts are manual/dev-only launchers; `systemctl restart` is the ONLY correct cycle auto-remediation path. Forge/mirror have no `.sh` launcher at all.
+
+**Watch item updated:** G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off (Beacon is the registered approvals gate). After Larry approves → Forge builds cycle-prompt.md § 4.3 PR → Mirror reviews → auto-merge.
 
 **Actions taken:**
 1. [G-rule 3/3 dispatch] Wrote `cycle-grule-check-c-launcher-liveness-20260610T133600Z.json` to Beacon inbox. Spec: update cycle-prompt.md § 4.3 Check C to use pgrep for beacon-bot liveness instead of systemctl is-active.
