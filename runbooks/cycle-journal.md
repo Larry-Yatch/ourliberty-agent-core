@@ -4,6 +4,121 @@
 
 ---
 
+## Iteration 1378 — 2026-06-10 22:49Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline active — 2 PRs OPEN (#435 MERGEABLE ~25 min, Mirror reviewing; #436 UNKNOWN ~11 min, fresh). 4 items in Forge inbox (2 builds queued + 2 marker-error retries). 9/10 services active. 3 new larry-alerts (stale-daemon auto-restart events — outbox-notifier briefly down 22:43-22:44Z, self-recovered via watchdog). G-rule `test-fixture-batch-in-bot-log` **3/3** → Beacon dispatch sent.
+
+**VERIFY-BEFORE-REASSERT (iter 1377 watch items):**
+- PR #435 (fix-classifier-session-lost-002): MERGEABLE ✅ (22:24Z open, 25 min at scan). Mirror inbox: review-fix-classifier-session-lost-002.json present. Below 30-min auto-merge threshold. Watch next iter.
+- PR #436 (fix-test-gate-sandbox-env-injection-002): UNKNOWN (11 min — fresh; gh list returned UNKNOWN, expected during merge-state compute). Below threshold. ✅
+- Forge picks up fix-dashboard-routing-denied-002 + fix-systemd-tier2-home-readwrite-001: STILL QUEUED (27 min / 28 min). Forge has 4 inbox items — marker-error retries may be blocking pickup order. ✅ Watch.
+- Check B sync expires 23:50:16Z — ~61 min remaining. ✅ Nominal.
+- G-rule `test-fixture-batch-in-bot-log`: **RECURRED** at 22:47-22:48Z → **3/3 threshold met**. Beacon dispatch sent (action below). ✅ CLOSED.
+
+**Tier state:** 1 (consecutive_clean=0; active PRs + Forge queue + 3 new alerts)
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1408 lines** (+3 since iter 1377 watermark at line 1405). New alerts at lines 1406-1408:
+  - **L1406 (22:43:26Z):** `auto-restarted:ourliberty-inbox-watcher.service` (source=heal-stale-daemon-code, route=digest) — heal-stale-daemon-code detected inbox-watcher script newer than service-start by 248.4 min (commit 8afbd78 "fix(pulse): suppress smoke-5a-pf-no-marker fixture" landed at 22:18Z). Auto-restarted successfully. → **Tier 3** (auto-restarted:* with route=digest is known-pattern per MEMORY iter 1049). Nominal.
+  - **L1407 (22:43:30Z):** `auto-restart-failed:ourliberty-outbox-notifier.service` (source=heal-stale-daemon-code, route=escalate, rc=-1) — healer tried to restart outbox-notifier; systemctl restart went inactive after 3s. → **Tier 4** (novel — `auto-restart-failed:*` not in alert-translations.json). BUT: service self-recovered via watchdog (L1408). Classify as self-resolved. Journal only, no DM. New G-rule 1/3 (see below).
+  - **L1408 (22:45:01Z):** subject=`ourliberty-outbox-notifier` (source=watchdog, route=escalate) — watchdog caught outbox-notifier inactive, auto-restarted. → Service confirmed active (process 1242950 since 22:44:54Z). Self-resolved. Journal only, no DM.
+- Net: outbox-notifier was briefly down 22:43:27-22:44:54Z (~87 sec). New code now live. No action required.
+- **Watermark: line 1408 / ourliberty-outbox-notifier (watchdog) / 2026-06-10T22:45:01Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: pending=[] ✅
+- No new Larry messages since 15:52:16 MDT (iter 1372). No orphan directives. ✅ Nominal.
+- beacon_telegram_bot.log 16:47-16:48 MDT: `heal-x` fixture batch recurred (fixed-something/still-broken/routine-x/sig-1 + TIER_ONE_MARKER/resets 11:30am). **G-rule 3/3** → Beacon dispatch sent. Fixture per `feedback_fixture_leak_sentinels_not_tier_outage`.
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall-state.json: mtime=22:42Z (5.9 min old — FRESH). 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages since iter 1372. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale-daemon-code:**
+- heal-stale-daemon-code-state.json: MISSING (healer cleaned it up post-restart). Outbox-notifier now running (confirmed active). 0 stale daemons. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean (gitStatus at session start). ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T21:50:16Z (~59 min at scan), status=no-change. Expires 23:50:16Z (~61 min remaining). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/10 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅ (restarted 22:43Z new code live), outbox-notifier ✅ (watchdog restart 22:44Z new code live), cycle ✅, chain-event-shipper ✅, dashboard-api ✅). graph-refresh: inactive (expected oneshot). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 2 open PRs.
+  - PR #435 "fix(agent_runner): session_lost class + UUID-safe auth_401 classifier" — MERGEABLE, 22:24Z (~25 min). Mirror review in progress. Below 30-min auto-merge threshold. ✅ Watch next iter.
+  - PR #436 "fix(test-gate): inject sandbox env so #412/#428 engage under discover" — UNKNOWN (fresh; 11 min). Below threshold. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- Forge inbox (4 items):
+  - fix-dashboard-routing-denied-002.json: 22:19Z (~30 min) — at stale threshold. No Forge pickup yet. Monitor.
+  - fix-systemd-tier2-home-readwrite-001.json: 22:21Z (~28 min) — approaching stale threshold.
+  - marker-error-fix-classifier-session-lost-002-1.json: 22:24Z (~25 min) — pickup pending.
+  - marker-error-fix-test-gate-sandbox-env-injection-002-1.json: 22:38Z (~11 min) — fresh.
+- Beacon inbox: `cycle-finding-heal-x-fixture-bot-log-contamination-20260610T224932Z.json` dispatched THIS ITER. ✅
+- Mirror inbox: review-fix-classifier-session-lost-002.json (PR #435 review). ✅ In progress.
+- Wedge-reaper: blocked pending PR #435 merge. CCD S1 + headless-dedup: same block path.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS. Idempotent skip. ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22. ✅
+**install-drift:** Last fire 18:00:03Z (~4h49m old). Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- **test-fixture-batch-in-bot-log: 3/3 → DISPATCHED** ✅ Beacon dispatch `cycle-finding-heal-x-fixture-bot-log-contamination-20260610T224932Z.json` sent this iter. Spec request: identify heal-x fixture source feeding production alert path + add pre-delivery filter. Related: standing [yellow] log-contamination G-rule 3/3 iter 1281 (Forge brief still missing — consolidate if same root cause).
+- **auto-restart-failed:ourliberty-outbox-notifier.service: NEW G-rule 1/3** — heal-stale-daemon-code SIGTERM'd outbox-notifier then systemctl restart went rc=-1 (inactive after 3s). Likely race: SIGTERM exit and systemd state-settle haven't completed before restart fires. Watchdog recovered. At 3/3: dispatch Beacon to spec a post-SIGTERM settle delay in heal_stale_daemon_code.py.
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred — Forge queue still busy. Carry.
+- All other G-rule statuses: carry from iter 1377 unchanged.
+
+**Actions taken:**
+1. **[dispatch]** Wrote Beacon spec request for `test-fixture-batch-in-bot-log` G-rule 3/3: `~/agents/inboxes/beacon/cycle-finding-heal-x-fixture-bot-log-contamination-20260610T224932Z.json`. (systemic_fix dispatch, verification_pending)
+
+**Standing findings (carry with updates):**
+- [yellow] **Wedge-reaper build** — blocked pending PR #435 Mirror PASS + auto-merge.
+- [yellow] CCD S1 + headless-dedup spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING. (Note: new dispatch this iter for related heal-x pattern — check if Beacon consolidates.)
+- [blue] EROFS permanent fix: fix-systemd-tier2-home-readwrite-001.json queued in Forge inbox (~28 min).
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — **1/3** (new this iter; outbox-notifier healer race). Watch.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251; Forge brief pending).
+
+**Watch items for iter 1379:**
+- PR #435: NOW 25 min old — will hit 30-min auto-merge threshold next iter (~22:54Z). If MERGEABLE at next scan: apply `gh pr merge 435 --auto --squash`.
+- PR #436: expect Mirror review dispatch from outbox-notifier shortly.
+- Forge: fix-dashboard-routing-denied-002 and fix-systemd-tier2-home-readwrite-001 approaching 1-hour stale threshold (~23:20Z and ~23:21Z). If no pickup by then: escalate.
+- marker-error retries: Forge should process and re-emit PROCEED for both PRs.
+- Check B sync: expires 23:50:16Z — trigger sync if not already refreshed by then.
+- outbox-notifier: confirm stable after watchdog restart. Log should show processing activity.
+
+**PRIME DIRECTIVE:** 1 new intervention (outbox-notifier auto-restart triage), 1 verification_pending (heal-x-fixture dispatch). interventions=764, systemic_fixes=17, ratio≈44.94, trend=flat. Iter non-clean (active pipeline + 3 new alerts).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1377 — 2026-06-10 22:40Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline active — 2 PRs OPEN (#435 in Mirror review, #436 freshly opened at 22:38Z). 2 Forge builds still queued. 2 marker-error retries in Forge inbox. 9/10 services active. 0 new larry-alerts.
