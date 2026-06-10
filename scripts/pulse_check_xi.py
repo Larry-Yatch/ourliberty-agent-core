@@ -46,7 +46,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 GRAPH_DIR = Path(os.environ.get('OURLIBERTY_GRAPH_DIR', '/home/larry/ourliberty-graph'))
@@ -107,14 +107,28 @@ def run_meter() -> dict:
         raise MeterUnavailable(
             f'meter stdout was not valid JSON (rc={proc.returncode}): {e}; '
             f'stderr/stdout tail: {tail}') from e
-    if not isinstance(report, dict) or 'attention_rate' not in report:
-        raise MeterUnavailable('meter report missing expected fields')
+    if not isinstance(report, dict):
+        raise MeterUnavailable('meter report is not a JSON object')
+    # Fail-closed for real: validate every field build_artifact/escalate_drift
+    # depend on (counts, rates, the gate verdict), so a malformed report becomes
+    # MeterUnavailable (-> escalate) rather than crashing escalate_drift's
+    # f'{...:.0%}' / str.join into a misleading false check-failure. bool is an
+    # int subclass, so over_gate is checked before the numeric fields.
+    required = {
+        'over_gate': bool,
+        'cards_total': int, 'verified': int, 'needs_attention': int,
+        'attention_rate': (int, float), 'gate': (int, float),
+    }
+    for key, typ in required.items():
+        if not isinstance(report.get(key), typ):
+            raise MeterUnavailable(
+                f'meter report field {key!r} missing or wrong type')
     return report
 
 
-def build_artifact(report: dict, *, now: Optional[datetime] = None) -> dict:
+def build_artifact(report: dict) -> dict:
     """Distil the meter report into the dated check artifact."""
-    ts = (now or datetime.now(timezone.utc)).isoformat()
+    ts = datetime.now(timezone.utc).isoformat()
     drifted = [
         {'id': c.get('id') or c.get('card'), 'verdict': c.get('verdict'),
          'detail': c.get('detail', '')}
