@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 1367 — 2026-06-10 21:22Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing carries. Same pipeline block as iters 1352–1366. 0 new alerts. 0 open PRs. 9/9 services active.
+**VERIFY-BEFORE-REASSERT (pipeline-stall-state.json):** Prior iters 1365–1366 claimed "ALL values `2099-12-31T23:59:59+00:00`." Verified this iter: 43 entries, 30 are non-2099 (historical legacy timestamps May 26 – June 4), 13 are 2099-snooze. Healer's fresh clean run at 21:21Z confirms no active stalls — non-2099 entries are legacy artifacts never suppressed to 2099, not new stall signals. Correcting characterization; not escalating.
+**Tier state:** 1 (consecutive_clean=0; standing pipeline block + pending approval)
+
+**Check 0 — Alert triage:**
+- Prior watermark: `2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402` (iter 1366)
+- Current total: **1402 lines** — 0 new entries. ✅ Nominal.
+- **New watermark: unchanged (2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- beacon-bot last activity: 14:01:07 MDT (20:01:07Z) = idx=1401 (unreviewed-merge:433). 1h19m idle at scan. No new activity since iter 1366.
+- beacon-pending-approvals.json: VERIFIED at `~/agents/state/beacon-pending-approvals.json`. **1 pending: `fix-tier1-classifier-envelope-not-content-scan` (created_at=2026-06-10T19:30:19Z, ~1h52m at 21:22Z)**. Unchanged from iters 1361–1366.
+- No new Larry messages (last: 13:27:01 MDT / 19:27:01Z). Unchanged.
+- `alert idx=0 delivery to 12345 failed` (12:31–12:37 MDT) — standing known-pattern (chat_id=12345 is a test fixture, not Larry's ID). G-rule completion-DM delivery failure 1/3 carry.
+- ⚠️ tier-reset: YES (unresolved pending approval, standing)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- heal-pipeline-stall.heartbeat: `2026-06-10T21:21:11Z` (< 1 min old at 21:22Z) — healer running fresh. ✅
+- heal-pipeline-stall-state.json: 43 entries. 30 non-2099 (legacy May 26–June 4 artifacts: `mirror_pass_unmerged:e4-4e-...`, `forge_built_no_pr:build-sequence-orchestrator-...`, `tier2_fallback:forge:FAILED:rate_limit`, etc.); 13 with 2099 snooze timestamps. Healer's clean fresh run confirms none are active stalls. ✅
+- All agent inboxes (beacon, forge, mirror, pulse): EMPTY. 0 open PRs (ourliberty-agent-core + ourliberty-dashboard). ✅
+- Wedge-reaper fix: still unbuilt. CCD S1 + headless-dedup: blocked on wedge fix + classifier fix. Unchanged.
+- ⚠️ tier-reset: YES (standing pipeline block)
+
+**Check 4 — Pending directives:**
+- Last Larry message: 13:27:01 MDT (19:27:01Z). No new messages since iter 1366. Standing APPROVAL_REQUESTs carry. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code.heartbeat: `2026-06-10T21:12:55Z` (10 min old at 21:22Z) — healer running. ✅
+- heal-stale-daemon-code-state.json: MISSING (clean run: no stale daemons detected). ✅
+- journalctl: no warnings. 9/9 services active. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T20:50:16Z` (32 min old at 21:22Z), status=no-change. Within 2h threshold (expires 22:50:16Z). ✅ Nominal. (**WATCH:** trigger sync if next iter is after 22:50Z.)
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). beacon-bot idle 1h19m — consistent with no new inbound. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- All inboxes empty. No active Forge tasks. Pipeline quiescent.
+- silence-missions-card-gc-summary-alert-001: standing drop (carry iter 1360). No new action this iter.
+
+**Check I (Wednesday 2026-06-10):** Gate is Mon/Wed/Fri/Sun; today is Wednesday. Already fired iter 1345 (sentinel check-i-2026-06-10.json exists; mode=digest, proposals=2). Idempotent skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:**
+- audit_due_nudge.py: `[audit-due] no committed audit baseline; no-op.` ✅
+- distill_detector.py: `[distill-detector] no un-distilled audits; no-op.` ✅
+- audit_cadence_signal.py: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅
+
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days, outside 60d window). ✅
+
+**install-drift:** heal-systemd-install-drift.heartbeat: `2026-06-10T18:00:03Z` (~3h22m old at 21:22Z). Next fire ~06:00Z June 11 (~8h38m). ✅
+
+**ourliberty-cycle.timer:** `active running`, `Trigger: n/a` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1366 unchanged. No new occurrences verified this iter.
+
+**Actions taken:** None (no auto-fix thresholds crossed; all findings are standing carries).
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build dispatch DROPPED** (carry iter 1352) — **Action on Larry: say "go: redispatch wedge-reaper build" to Beacon in Telegram.**
+- [yellow] `fix-tier1-classifier-envelope-not-content-scan` — APPROVAL_REQUEST pending Larry (~1h52m since 19:30Z DM). **Action on Larry: say "go: fix-tier1-classifier-envelope-not-content-scan" in Telegram.**
+- [yellow] CCD S1 build spawn-failure. Blocked on wedge fix + classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 dispatch DROPPED — re-dispatch when wedge-reaper path cleared.
+- [blue] install-drift — watch 06:00Z June 11 (~8h38m from now).
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] catalog-accuracy-drift 1/3 (PR #433 root cause fixed; watching for re-occurrence).
+
+**Watch items for iter 1368:**
+- **Wedge-reaper build**: Watch for Larry's "go: redispatch wedge-reaper build" in Telegram.
+- **fix-tier1-classifier-envelope-not-content-scan**: Watch for Larry's "go" response (~1h52m pending at this iter).
+- **silence-missions-card-gc-summary-alert-001**: Re-dispatch when wedge path clear.
+- **install-drift**: watch 06:00Z June 11.
+- **Check B sync**: last_sync=20:50:16Z — 2h expires 22:50Z; trigger sync if next iter is after that.
+- **pipeline-stall-state.json**: 30 non-2099 legacy entries confirmed historical. Monitor: if healer starts flagging any as active stalls, re-escalate.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (all standing carries; no new dispatches). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. iter non-clean (standing pipeline block + pending approval).
+**Tier end-of-iter:** 1 (consecutive_clean=0; standing issues).
+
+---
+
 ## Iteration 1366 — 2026-06-10 21:11Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing carries. Same pipeline block as iters 1352–1365. 0 new alerts. 0 open PRs. 9/9 services active. TIER2_FALLBACK_FAILED at 12:39 MDT — VERIFIED fixture leak per memory ("tier2 distinct" = leaked mock, not real outage). Not escalated.
