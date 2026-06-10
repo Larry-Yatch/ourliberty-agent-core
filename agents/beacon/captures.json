@@ -136,6 +136,21 @@
       },
       "last_touched": "2026-06-10T20:02:36.962016+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-erofs-tier2-home-systemd-unit-fix-pr-5-b0ef",
+      "title": "EROFS tier2 home: systemd unit fix (PR-5)",
+      "note": "ROOT CAUSE of all 6/10 session-loss failures: inbox-watcher + 4 bot systemd units have ProtectHome=read-only and ReadWritePaths lists /home/larry/.claude (tier1) but NOT /home/larry/.claude-larry-personal (TIER2_HOME) \u2014 tier2 dispatch transcripts hit EROFS, silently never persist, every build-phase --resume fails 'No conversation found'. Exposed when rotate_active_tier went live flipping tiers hourly. PLAN: (1) pin tier1 via 'tier1' > ~/agents/rotation.disabled; (2) re-kick PR-1 fix-classifier-session-lost-001, PR-2 fix-test-gate-sandbox-env-injection-001, PR-4 fix-dashboard-routing-denied-001 fresh; (3) PR-5 add tier2 home to ReadWritePaths in ALL repo systemd/ agent units + make transcript-write failure loud; deploy needs daemon-reload + unit restarts (Larry approval); (4) verify tier2 transcript persists, then unpin to re-enable rotation; (5) also fix rotation forced_open_sequence flip (docstring says NEVER force, log shows forced flips). Memory: tier-alert-cycle-final-rootcause.md",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "HEAD",
+        "captured_at": "2026-06-10T22:12:33.270614+00:00"
+      },
+      "last_touched": "2026-06-10T22:12:33.270614+00:00",
+      "promoted_to": null
     }
   ]
 }
