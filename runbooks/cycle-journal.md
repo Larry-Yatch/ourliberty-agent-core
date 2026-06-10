@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration 1219 — 2026-06-10 00:16Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 3 new heal-stale-daemon-code digest alerts (deploy restarts following PR #404, already outbox-notifier processed, no Pulse action); standing items verified unchanged.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; all checks nominal this iter — wrapper will increment to 1 on commit)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1401 lines** (+3 since iter 1218 watermark 1398/2026-06-09T23:55:10Z). New alerts (lines 1399–1401):
+- `auto-restarted:ourliberty-chain-event-shipper.service` (00:07:23Z) — script mtime 23:53:29Z newer than active-since 2026-06-06T05:40:21Z by 5413 min; commit 15bd642 (PR #404). route=digest.
+- `auto-restarted:ourliberty-beacon-bot.service` (00:07:28Z) — script mtime 23:53:29Z newer than active-since 23:06:40Z by 46.8 min. route=digest.
+- `auto-restarted:ourliberty-outbox-notifier.service` (00:07:32Z) — script mtime 23:53:29Z newer than active-since 23:36:59Z by 16.5 min. route=digest.
+All 3 already processed by outbox-notifier: `route=digest; skipping DM` (beacon_telegram_bot.log 18:07–18:12 MDT). All 3 services confirmed active/running (systemctl verified: chain-event-shipper since 18:07:21 MDT, beacon-bot since 18:07:25 MDT, outbox-notifier since 18:07:29 MDT). Deploy-restart sequence following PR #404 merge — normal post-deploy behavior. No Pulse action required. New watermark: 1401 / 2026-06-10T00:07:32Z. ✅ Nominal (route=digest, already handled).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entries are heal-stale-daemon-code route=digest skips at 18:07–18:12 MDT. Last Larry directive: 22:49–22:51Z June 9 (tracked/resolved by PR #403). No new Larry messages. Known Tier 2 rate-limit at 17:06:17 MDT = standing item. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json mtime 2026-06-10T00:11:33Z (FRESH — ~5 min at scan). State keys: snooze/snoozed entries only; active stalls: 0. ✅ Nominal.
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json absent — one-shot healer ran and completed normally (3 services restarted, already in larry-alerts.jsonl as route=digest). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=fe516cc ("Pulse cycle 20260610T000918Z"). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T00:03:20Z, commit=c486796 (UNCHANGED from iter 1218 — same fresh no-change sync). Root cause APPROVAL_REQUEST sync-push-rebase-fallback-001 still open. ✅ (known [blue])
+
+**Check C — Agent liveness:** 9/9 active: chain-event-shipper (restarted 00:07:21Z), beacon-bot (restarted 00:07:25Z), outbox-notifier (restarted 00:07:29Z), forge-bot (Mon 14:00:20 MDT), mirror-bot (Mon 14:00:29 MDT), pulse-bot (Mon 14:00:32 MDT), inbox-watcher (Mon 14:00:24 MDT), dashboard-api (Tue 23:59:51Z), cycle.service (running this iter). 1 failed: ourliberty-agent-core-health.service (known standing — health-check-notify-script-missing). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Credential rotation check:** token-rotation-schedule.json: 0 overdue, 0 upcoming within 60 days. ✅ Nominal.
+
+**Bug-hunt gate (§ 5.0):** `assess_gate.py` → "2/15 gate reviews since go-live; soaking, no-op." ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service confirmed failed (systemctl). VERIFIED STILL ACTIVE. Carry forward.
+- `unreviewed-merge streak: 1` (PR #404): Alert count 1401; last 3 new alerts are heal-stale-daemon-code, not unreviewed-merge. VERIFIED NO NEW OCCURRENCE. Carry forward.
+- `Tier 2 weekly probe failed (auth_401)`: beacon_telegram_bot.log 17:06:17 MDT June 9 = same known standing log line (not new). Carry forward.
+- `Check IX GITHUB_TOKEN missing`: Not re-tested. Carry forward.
+- `sync-push-rebase-fallback-001`: sync.json no-change/fresh 00:03:20Z. Root cause standing. APPROVAL_REQUEST standing. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. No new occurrence. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): Timer running normally. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap; Forge inbox empty. Carry forward.
+
+**Ledger correction (VERIFY-BEFORE-REASSERT):** iter 1218 journal claimed interventions=734; ledger ground truth = 733 (python count from cycle-prime-ledger.jsonl). The +1 in iter 1217's PRIME DIRECTIVE accounting may not have been appended via `append_action` (interactive session). Using verified ledger count going forward.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: streak 1** (PR #404, 23:52Z) — DM delivered 23:57Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; sync self-recovered (no-change/fresh 00:03:20Z). Standing.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions (all checks nominal; 3 new heal-stale-daemon-code alerts are route=digest deploy-restart confirmations, already processed by outbox-notifier, no Pulse action). interventions=733 (VERIFIED ledger ground truth, correcting iter 1218 claimed 734), systemic_fixes=15, verification_pending=5, ratio≈48.87.
+**Tier end-of-iter:** 1, consecutive_clean=0 (per cycle-tier.json; wrapper will increment to 1 post-commit).
+
+---
+
 ## Iteration 1218 — 2026-06-10 00:07Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks nominal; 0 new alerts; sync self-recovered (no-change/fresh 00:03:20Z); standing items verified unchanged.
