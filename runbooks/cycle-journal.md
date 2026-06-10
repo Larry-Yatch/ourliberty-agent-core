@@ -78206,3 +78206,81 @@ ourliberty-dashboard: 0 open. ✅
 - [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
 - [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
 - [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 70th+ occurrence; root cause unfixed; self-recovering.
+
+---
+
+## Iteration 1293 — 2026-06-10 11:09Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Stall — PRs #412/#418/#420 open; #412 awaiting Larry APPROVAL_REQUEST; #418/#420 self-healing path now unblocked (PID 995053 reaped ✅ 10:59:28Z).
+**Tier state:** 1 (consecutive_clean=0; tier-reset — pipeline-stall finding)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1334 lines** (retention healer pruned; using timestamp watermark). New alerts after 2026-06-10T10:41:24Z:
+- `pipeline-stall:no-mirror-dispatch:PR#418` (10:54:25Z, heal-pipeline-stall, route=escalate): PR #418 open 130 min, MalformedForgeMarker blocked preflight chain. marker-error retry 1/3 in Forge inbox (08:44Z). PID 995053 was blocking Forge; now reaped — self-healing path unblocked. Monitoring. ⚠️
+- `pipeline-stall:unrouted-pr:PR#418` (10:54:25Z, heal-pipeline-stall, route=escalate): Same root cause as above. ⚠️
+- `wedged-review-reaped:wt-forge-p2-digest-generator` (10:59:28Z, heal-wedged-review-sessions, route=closure): **PID 995053 REAPED ✅** — terminal marker present, idle 7266s > grace 300s. Worktree removed. Tier-3 healer-normal. ✅
+- `medic-diagnosis:pipeline-stall:unrouted-pr:PR#418` (10:59:29Z, medic, DM'd Larry directly): Attempt 2. MalformedForgeMarker root confirmed; marker-error retry 1/3 still queued; medic recommends waiting one Forge cycle. ✅ Informational.
+
+New watermark: **2026-06-10T10:59:29Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#418 / iter 1293.**
+
+**G-rule:** `heal-pipeline-stall fires no-mirror-dispatch + unrouted-pr for PRs in marker-error retry`: 1/3 (iter 1292) → **2/3 this iter.** At 3/3: dispatch Beacon to spec suppress these alerts when marker-error retry is the active recovery path for a PR.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon log last entry 11:02:34Z (idx=1333 medic-diagnosis). Last Larry directive: "Go" at 08:32Z UTC approving dag-preflight-revision-autonomy-001. No new Larry directives. No agent distress beyond known pipeline stall pattern. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-10T10:54:17Z (FRESH — ~15 min old). Active stalls:
+- PR #412: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry. No Forge --resume possible (no session ID).
+- PR #418: MalformedForgeMarker preflight; marker-error retry 1/3 in Forge inbox (08:44Z); was blocked by PID 995053. Forge now free. Expected self-heal next cycle.
+- PR #420: marker-error-p2-digest-generator-1.json queued in Forge inbox at 11:01Z (fresh post-reap). Expected self-heal next cycle.
+⚠️ Tier-reset.
+
+**Check 4 — Pending directives / Inboxes:** Forge: dag-preflight-revision-autonomy-001.json (08:32Z, 2h37m — past soft 2h window; Forge now free), marker-error-p2-derive-endpoint-1.json (08:44Z), marker-error-p2-digest-generator-1.json (11:01Z fresh). Beacon: 0. Mirror: 0. Pulse: 0. All Forge tasks within active-pipeline context (blocked by PID 995053, now reaped). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer). 9/9 core services active. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: branch=main, clean tree. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-10T10:16:15Z (~53 min, within 2h threshold). ✅ Nominal. sync-push-rebase-fallback-001 [blue] standing.
+
+**Check C — Agent liveness:** 9/9 core services active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-agent-core-health.service: inactive/timer-driven (known [yellow]). ✅ Core nominal.
+
+**Check E — PRs:** PRs #412, #418, #420 all UNKNOWN/UNKNOWN (GitHub merge-state cache lag — expected per calibration; defer auto-merge). No clean+green PR with auto-merge missing. ✅ Nominal (deferred per calibration).
+
+**§5.0 assess_gate.py:** 7/15 gate reviews since go-live; soaking, no-op. ✅
+
+**Periodic/conditional (Wednesday 2026-06-10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§4.6):** No credentials due within 60 days. ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `PID 995053 (Forge p2-digest-generator session overlong)`: **REAPED ✅** (10:59:28Z). CLOSED — prior [yellow] ask-then-do DMs × 3 resolved.
+- `DAG-preflight-revision-autonomy-001 2h window EXPIRED`: File still in Forge inbox (08:32Z, 2h37m). Forge now free. Expected pick-up or dead-letter next cycle. Monitoring.
+- `PRs #418/#420 UNKNOWN/UNKNOWN`: Confirmed (GitHub cache). Marker-error retries queued. Self-heal expected. Carry.
+- `PR #412 APPROVAL_REQUEST harden-test-prod-write-isolation-rev-001`: Confirmed OPEN. Pending Larry sign-off. Carry [yellow].
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service inactive/timer-driven. APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry. Carry [yellow].
+- `unreviewed-merge streak`: No new unreviewed-merge this iter. Streak 3 (PRs #413, #417, #419). Pending `go: actor-exemption-config`. Carry [yellow].
+- `Tier 2 weekly probe (auth_401)`: Wednesday — not re-tested. Carry [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change/10:16:15Z. Self-recovering. [blue] carry.
+- `install-drift-timer-gap verification OPEN`: 0/2 clean healer cycles; next healer ~18:00Z UTC June 10. Carry.
+- `G-rule wedged-review-silent-wt:* 2/3`: No new occurrence this iter. Carry.
+- `G-rule hand-authored-envelope-dead-letter 2/3`: No new occurrence this iter. Carry.
+- `fix-beacon-mediated-review-routing-evidence-001 UNROUTED 2/3 WATCH`: **RETIRED** — absent from all inboxes/outboxes 2 consecutive iters per retire-at-next-absent-iter rule.
+
+**Actions taken:** None.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE (script-authoritative):** interventions=750, systemic_fixes=16, verification_pending=7, ratio=46.875, trend=flat. (+1 intervention this iter: `pipeline-stall-observed:prs-412-418-420-pid-995053-reaped`.)
+
+**Standing findings:**
+- [yellow] **PR #412** — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Mirror revision notes on file; Forge cannot --resume.
+- [yellow] **PRs #418/#420** — pipeline stall; marker-error retries in Forge inbox; self-healing path unblocked (PID 995053 reaped 10:59:28Z); monitor next cycle.
+- [yellow] **dag-preflight-revision-autonomy-001** — past 2h soft window in Forge inbox; Forge now free; expected pick-up or dead-letter next cycle.
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 3** (PRs #413, #417, #419) — DMs delivered. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 + today 08:52Z UTC. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [yellow] **install-drift-timer-gap verification OPEN** — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 70th+ occurrence; root cause unfixed; self-recovering.
