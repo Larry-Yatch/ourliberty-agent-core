@@ -4,6 +4,161 @@
 
 ---
 
+## Iteration 1317 — 2026-06-10 14:43Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal. 0 new healer alerts (1 new larry-alerts entry = Pulse self-notification from iter 1316; advance watermark only). All 9 services active. All inboxes empty. Pipeline healer fresh (active_stalls=0). No new actionable findings.
+**Tier state:** 1 → consecutive_clean=1 (clean iter; need 2 more for Tier 2 de-escalation)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T14:26:11.835781+00:00 / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412-attempt7 / iter 1316`
+- Current count: 1356 lines (was 1355 at iter 1316 scan). 1 new entry since watermark.
+- New entry: `2026-06-10T14:40:34.572889+00:00` / source=pulse / intent=unregistered-approval-requests — Pulse's own corrective notification from iter 1316, delivered as idx=1355 at 08:44:13-0600 MDT (confirmed in beacon_telegram_bot.log). Pulse self-notifications are not healer alerts requiring triage.
+- **New watermark: `2026-06-10T14:40:34.572889+00:00 / unregistered-approval-requests:pulse-self-notification / iter 1317`**
+- Triage: nominal (source=pulse; self-notification). No tier-reset.
+
+VERIFY-BEFORE-REASSERT of iter 1316 watch items:
+- "install-drift healer — fires ~18:00Z UTC June 10" → **CARRY**: heal-systemd-install-drift.heartbeat=2026-06-10T06:00:10Z (pre-PR #411; unchanged). ~3.3h until 18:00Z fire. 0/2 clean cycles. Verification OPEN.
+- "PR #412 APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` — Larry DM sent" → **CONFIRMED**: PR #412 OPEN/UNSTABLE/MERGEABLE, reviewDecision="". DM delivered (idx=1355, 08:44:13-0600 MDT per bot log). Awaiting Larry response. ⚠️ [yellow]
+- "`alert-translation-no-mirror-dispatch-001` — same DM" → **CARRY**: no Larry response yet.
+- "G-rule `heal-pipeline-stall unrouted-pr variant` — same G-rule. Carry." → **CARRY**: No new healer alert this iter (healer heartbeat 14:38Z; no new entries from heal-pipeline-stall since watermark). G-rule 3/3 dispatched; carry.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entries: outbound deliveries idx=1351–1355; latest at 08:44:13-0600 MDT / 14:44:13Z UTC. No Larry inbound messages. Last Larry inbound: 08:32Z UTC (~6.2h ago; all tracked per prior iters). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T14:38:53Z` (~5 min at scan — fresh). active_stalls=0. PR #412 = standing APPROVAL_REQUEST, not healer-actionable. ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty: Forge ✅, Beacon ✅, Mirror ✅, Pulse ✅. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat: `2026-06-10T14:40:59Z` (~3 min at scan — fresh). state=absent. ✅ Nominal.
+
+**Check A — Source repo:** session gitStatus (at session start): main, M MEMORY.md, M runbooks/cycle-journal.md (expected cycle files). HEAD=208ba05 "Pulse cycle 20260610T142258Z". sync=no-change per Check B. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T14:16:27Z (~27 min — within 2h threshold). status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.timer ✅, chain-event-shipper ✅, dashboard-api ✅. (APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry — standing item.) ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #412** — OPEN/UNSTABLE/MERGEABLE, reviewDecision="". Standing APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. DM delivered (idx=1355). ⚠️ [yellow]
+- **ourliberty-dashboard: 0 open PRs.** ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** No credentials overdue or within 60-day window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall misdiagnosis variants (no-mirror-dispatch, unrouted-pr) for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Beacon produced APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` (undelivered; Larry DM sent iter 1316). Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. DM delivered idx=1355.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry sign-off.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~3.3h).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1318):**
+- **install-drift healer** — fires ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411.
+- **PR #412 APPROVAL_REQUEST** — DM delivered (idx=1355); watch for Larry response.
+- **`alert-translation-no-mirror-dispatch-001`** — same DM; watch for Larry response.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (all checks nominal; standing items carry). interventions≈753, systemic_fixes=16, ratio≈46.88, trend=flat. iter_clean.
+**Tier end-of-iter:** 1 (consecutive_clean=1).
+
+---
+
+## Iteration 1316 — 2026-06-10 14:23Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ 2 new alerts (both Tier 4 recurring misdiagnoses, DMs auto-delivered); 2 undelivered APPROVAL_REQUESTs surfaced; corrective DM sent to Larry. All 9 services active. PR #412 standing APPROVAL_REQUEST gate.
+**Tier state:** 1 (consecutive_clean=0; Tier 4 alerts)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: `2026-06-10T13:56:44.859431+00:00 / medic-diagnosis:pipeline-stall:no-mirror-dispatch:PR#412-attempt7 / iter 1314`. New count: 1355 (was 1353). 2 new alerts:
+
+1. **`2026-06-10T14:22:22.773755+00:00` / heal-pipeline-stall / `pipeline-stall:unrouted-pr:PR#412`** (line 1354):
+   - Not in alert-translations.json → Gate 4 fallthrough → **Tier 4**.
+   - DM auto-delivered by bot at idx=1353 (08:24:02-0600 / 14:24:02Z UTC). No additional Pulse action needed.
+   - **VERIFY:** Routing-events.jsonl confirms Mirror DID review PR #412 (mirror-result intent=review-revision at 07:51:48Z, file notify-mirror-review-pr412-001.json). Healer `unrouted-pr` fires because it finds no direct forge-result→mirror dispatch line in outbox-notifier.log; it doesn't see the indirect routing path. This is a MISDIAGNOSIS (same root cause as `no-mirror-dispatch` variant). G-rule 3/3 dispatched iter 1298 — watch item carried.
+   - Tier-reset: YES.
+
+2. **`2026-06-10T14:26:11.835781+00:00` / medic / `medic-diagnosis`** (line 1355):
+   - Medic attempt 7 for `unrouted-pr` variant. Not in alert-translations → Tier 4.
+   - DM auto-delivered by bot at idx=1354 (08:29:05-0600 / 14:29:05Z UTC).
+   - **IMPORTANT — medic recommendation is MISLEADING:** Medic says "dispatch Forge revision via Beacon chat" but APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` is already queued (Beacon generated it at ~09:10Z from cycle-finding-pr412-forge-revision-20260610T090500Z-r1.json). Re-dispatching would duplicate. Larry needs to APPROVE the existing APPROVAL_REQUEST, not re-dispatch.
+   - Tier-reset: YES.
+
+**Advance watermark** to `2026-06-10T14:26:11.835781+00:00 / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412-attempt7 / iter 1316`.
+
+**UNDELIVERED APPROVAL_REQUESTs (surfaced this iter):**
+- **`harden-test-prod-write-isolation-rev-001`**: Beacon generated at ~09:10Z UTC as part of `cycle-finding-pr412-forge-revision-20260610T090500Z-r1.json`. Not in larry-alerts.jsonl (outbox-notifier processed the beacon-result but did not register the APPROVAL_REQUEST separately; likely routed depth=1 to Pulse as Pulse-gate, but Pulse between-iter session said "live in approval queue" without dispatching to Forge). Forge inbox is empty — revision task never sent.
+- **`alert-translation-no-mirror-dispatch-001`**: Beacon generated at ~11:57Z UTC as part of `cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json`. Not in larry-alerts.jsonl. Outbox-notifier only logged "notified pulse <- beacon (beacon-result, depth=1, ...)". heal-unregistered-approval ran at 14:30:55Z but no new alert produced.
+- **Action taken**: wrote `append_notification` to larry-alerts.jsonl (pulse-unregistered-approvals-20260610T142358Z) with both items + correction of medic's misleading guidance. [yellow] DM queued.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry inbound: 02:32:03-0600 / 08:32Z UTC (~5.9h ago). No orphaned directives (medic DMs are healer-auto; all PRs from earlier today confirmed merged). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T14:22:15Z` (fresh, ~2 min at scan). active_stalls=0 per state file. PR #412 APPROVAL_REQUEST gate (known standing; healer misfires `unrouted-pr` because it can't see the indirect routing path). ✅ Nominal (healer working; standing stall is APPROVAL_REQUEST, not healer-actionable).
+
+**Check 4 — Pending directives:** All inboxes empty (Forge, Beacon, Mirror, Pulse active inboxes all 0 pending JSON). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat: `2026-06-10T14:10:56Z` (~13 min at scan). 0 stale daemons. ✅ Nominal.
+
+**Check A — Source repo:** session gitStatus: main, clean, HEAD=208ba05 "Pulse cycle 20260610T142258Z" (wrapper committed iter 1315 journal). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T14:16:27Z` (7 min at scan — fresh), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 services active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.timer, chain-event-shipper, dashboard-api. journalctl warnings last 90 min: none. ✅ Nominal. (APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off — standing item.)
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #412** — OPEN/UNSTABLE/MERGEABLE, reviewDecision="", branch=forge/harden-test-prod-write-isolation-001. Confirmed via `gh pr list`. Gate = APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` (undelivered — see above). ⚠️ [yellow]
+- **ourliberty-dashboard: 0 open PRs.** ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** None overdue or within 60-day window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — G-rule 3/3 dispatched iter 1298; Beacon consumed (cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json, completed 11:57Z, 365s). Beacon produced APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` (doc-only FYI entry for `no-mirror-dispatch`) + noted healer code fix requires separate dispatch. **New variant `unrouted-pr` observed this iter** — different healer codepath, same root cause. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` undelivered; revision task NOT in Forge inbox. Larry DM sent (pulse-unregistered-approvals-20260610T142358Z) with correction.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` (doc-only no-mirror-dispatch FYI) — undelivered; Larry DM included in same notification.
+- [yellow] health-check-notify-script-missing — pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — pending.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417–421) — pending `go: actor-exemption-config`.
+- [blue] G-rule Check-C-launcher-liveness APPROVAL_REQUEST — pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1317):**
+- **install-drift healer** — fires ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411.
+- **PR #412 APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001`** — Larry DM sent (corrective); watch for Larry response.
+- **`alert-translation-no-mirror-dispatch-001`** — same DM; watch for Larry response.
+- **G-rule `heal-pipeline-stall unrouted-pr variant`** — new subject seen; same G-rule applies. Carry.
+
+**Actions taken:** Wrote `append_notification` to larry-alerts.jsonl (idx TBD; source=pulse, intent=unregistered-approval-requests) correcting medic's misleading guidance and surfacing both undelivered APPROVAL_REQUESTs.
+**PRIME DIRECTIVE:** 1 new intervention (unregistered-APPROVAL_REQUEST detection + corrective DM). 0 new systemic_fixes. Script-authoritative base: interventions≈752; +1 this iter = ≈753. ratio≈46.88, trend=flat. iter_non-clean (Tier 4 alerts).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1315 — 2026-06-10 14:20Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks clean. 0 new alerts. All 6 units active. Pipeline stall healer fresh, 0 stalls. No orphan directives.
