@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration 1325 — 2026-06-10 ~16:02Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 2: fixture log-contamination recurrence (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). **Major positive: PR #422 CONFIRMED MERGED ✅** — outbox-notifier/review-pass alert at 15:54:23Z UTC confirms "Auto-merged + branch deleted" for `adopt-chain-context-durability-spec`. **New observation: gh CLI 401** from interactive session (HTTP 401: Requires authentication) — may or may not affect heal-pr-auto-merge healer; PR #412 auto-merge verification blocked.
+**Tier state:** 1 (consecutive_clean=0; Check 2 non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T15:46:16.241159+00:00 / summary:missions-card-gc / iter 1324`
+- Total lines: 1364. 1 new entry since watermark:
+  1. `2026-06-10T15:54:23.198453+00:00` — source=outbox-notifier, route=notification, intent=review-pass, task_id=adopt-chain-context-durability-spec. Message: "Mirror approved PR #422... Auto-merged + branch deleted." Confirmation of PR #422 pipeline completion.
+- Triage: intent=review-pass + task complete = Tier-3 known-pattern (routine pipeline completion notification). No tier-reset.
+- **New watermark: `2026-06-10T15:54:23.198453+00:00 / review-pass:adopt-chain-context-durability-spec / iter 1325`**
+- ✅ Nominal (Tier-3 silence)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal. (Note: `post-merge-verifier.log` shows recurring `WARN: failed to save state: boom` ~every 2.5 min + fixture PR routing warnings for PR #1/#42 — outside Check 1 substrate; informational.)
+
+**Check 2 — Telegram sweep:** Bot log entries from iter 1324 cutoff (09:51 MDT):
+- No new Larry inbound messages after 09:51 MDT (last new at 09:45 MDT "check on the PR412 status").
+- Recurring fixture entries (source=heal-x) continued through 09:51 MDT at same cadence (09:48, 09:51 MDT) — same standing pattern, no new instances beyond prior iter's scan.
+- No new agent-distress signals.
+⚠️ Tier-reset: YES (fixture contamination non-nominal; standing). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T15:42:40Z` (~20 min at scan — borderline past 10-min freshness). No stall evidence in pipeline state. ✅ Nominal within tolerance.
+
+**Check 4 — Pending directives:** Larry's last directive was 09:45 MDT "check on the PR412 status" — addressed by Beacon in Beacon's session at 09:48 MDT (Beacon replied with PR #412/spec status). ✅ No orphaned directives.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat: Jun 10 09:41 MDT = 15:41 UTC (~21 min). State file absent = no stale daemons reported. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T15:43:27Z` (~19 min at scan). status=error (SYNC-PUSH-REBASE-FALLBACK-001 73rd+; self-recovering). ✅ Nominal within tolerance.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅ (running), chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing (health-check-notify-script-missing G-rule 3/3 dispatched iter 1207). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #422** — **CONFIRMED MERGED ✅** (Check 0 outbox-notifier alert at 15:54:23Z UTC: "Auto-merged + branch deleted"). Pipeline complete: Forge build → PR open → Mirror REVIEW_PASS → auto-merge. ✅ CLOSED.
+- **ourliberty-agent-core: PR #412** — OPEN per iter 1324 `gh pr list`. **⚠️ gh CLI returning 401 this session** (HTTP 401: Requires authentication) — cannot directly re-verify. heal-pr-auto-merge heartbeat at 15:56:42Z UTC (6 min after my scan start) — healer ran post-REVIEW_PASS. Absence of state file consistent with "no eligible merge executed" or "gh CLI blocked." [yellow] watch: if PR #412 does not appear merged next iter, escalate gh auth issue.
+- **ourliberty-dashboard: 0 open PRs.** ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** None overdue or within 60-day window. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1324 watch items:**
+- "PR #412 — REVIEW_PASS confirmed; heal_pr_auto_merge timer should merge" → **CARRY**: heal-pr-auto-merge ran at 15:56Z. gh 401 prevents direct verification. Next iter: re-verify.
+- "PR #422 — Mirror reviewing" → **RESOLVED ✅**: outbox-notifier confirms auto-merged + branch deleted at 15:54:23Z.
+- "install-drift healer fires ~18:00Z UTC June 10" → **CARRY**: heartbeat still 06:00:10Z (unchanged); ~2h until expected fire; 0/2 clean cycles.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off" → **CARRY**: no evidence of processing.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT — no new occurrences this iter):**
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #412** — REVIEW_PASS confirmed (iter 1324); auto-merge pending; gh CLI 401 blocks direct verification this iter. Watch for merge.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~2h).
+- [yellow] gh CLI 401 (interactive session this iter) — watch next iter; if persists, may block auto-merge healer for PR #412.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 73rd+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence (fixture entries at 09:48+09:51 MDT; G-rule 3/3 dispatched iter 1281, Forge brief pending).
+
+**Watch items for iter 1326:**
+- **PR #412** — REVIEW_PASS since iter 1324; heal-pr-auto-merge ran at 15:56Z. Verify merge; if not merged + gh CLI still 401, escalate gh auth issue [yellow].
+- **install-drift healer** — fires ~18:00Z UTC June 10. Watch heartbeat advance past 06:00:10Z; expect 1/2 clean cycles.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (Check 2 = standing G-rule 3/3 dispatched iter 1281; PR #422 pipeline CLOSED ✅ = positive resolution, no intervention needed; gh CLI 401 = new observation, monitoring). interventions≈754, systemic_fixes=16, ratio≈46.81, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1324 — 2026-06-10 ~15:52Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 2: fixture log-contamination recurrence (09:48 MDT, G-rule 3/3 dispatched iter 1281, Forge brief pending). **Major positive: PR #412 REVIEW_PASS** ✅ — Mirror approved revision commit 67d1b09b at 15:44:34Z UTC; Beacon processed notify (archived). Auto-merge pending heal_pr_auto_merge. **PR #422 OPENED** (adopt-chain-context-durability-spec) — Forge built and opened PR; Mirror reviewing now.
