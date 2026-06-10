@@ -1,0 +1,142 @@
+{
+  "chain_events": [
+    {
+      "event_type": "session_start",
+      "task_id": "p2-derive-endpoint",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T10:00:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "auto_merge",
+      "task_id": "p2-derive-endpoint",
+      "agent": "forge",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/501",
+      "ts": "2026-06-09T11:00:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "p2-digest-generator",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T09:00:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "marker_emit",
+      "task_id": "p2-dashboard-cutover",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-dashboard/pull/502",
+      "ts": "2026-06-09T12:00:00+00:00",
+      "payload": {"marker_type": "REVIEW_PASS"}
+    },
+    {
+      "event_type": "escalation",
+      "task_id": "p2-orphan-readability",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-dashboard/pull/503",
+      "ts": "2026-06-09T13:00:00+00:00",
+      "payload": {}
+    },
+
+    {
+      "event_type": "marker_emit",
+      "task_id": "orphan-inreview-now",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/505",
+      "ts": "2026-06-09T16:00:00+00:00",
+      "payload": {"marker_type": "REVIEW_PASS"}
+    },
+    {
+      "event_type": "desktop_session_active",
+      "task_id": "desktop-ab12cd34",
+      "agent": "desktop-claude",
+      "pr_url": null,
+      "ts": "2026-06-09T15:00:00+00:00",
+      "payload": {"title": "Scene graph interface", "repo": "ourliberty-graph", "branch": "main"}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "orphan-building-now",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T14:00:00+00:00",
+      "payload": {"repo": "ourliberty-agent-core", "branch": "feat/building"}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "orphan-shipped-pr",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-08T08:00:00+00:00",
+      "payload": {"repo": "ourliberty-agent-core", "branch": "feat/orphan-shipped"}
+    },
+    {
+      "event_type": "auto_merge",
+      "task_id": "orphan-shipped-pr",
+      "agent": "forge",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/480",
+      "ts": "2026-06-08T09:00:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "marker_emit",
+      "task_id": "orphan-stalled-old",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410",
+      "ts": "2026-05-20T10:00:00+00:00",
+      "payload": {"marker_type": "REVIEW_PASS", "repo": "ourliberty-agent-core", "branch": "feat/stalled"}
+    },
+
+    {
+      "event_type": "session_start",
+      "task_id": "orphan-deploy-thing",
+      "agent": "deploy-notifier",
+      "pr_url": null,
+      "ts": "2026-06-09T07:01:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "orphan-heal-thing",
+      "agent": "heal-pipeline-stall",
+      "pr_url": null,
+      "ts": "2026-06-09T07:02:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "notify-routing-xyz",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T07:03:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "this is an alert message",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T07:04:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "session_start",
+      "task_id": "t-zero",
+      "agent": "forge",
+      "pr_url": null,
+      "ts": "2026-06-09T07:05:00+00:00",
+      "payload": {}
+    },
+    {
+      "event_type": "marker_emit",
+      "task_id": "review-pr-501",
+      "agent": "mirror",
+      "pr_url": null,
+      "ts": "2026-06-09T07:06:00+00:00",
+      "payload": {"marker_type": "REVIEW_PASS"}
+    }
+  ]
+}

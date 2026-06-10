@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "missions": [
+    {
+      "id": "derive-endpoint-port",
+      "name": "Derive Endpoint Port",
+      "phase": "in_flight",
+      "brief": "Relocate the mission-phase derive to a droplet Python endpoint.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-derive-endpoint"],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-10",
+      "deferred_reason": null,
+      "tasks": [
+        {
+          "task_id": "p2-derive-endpoint",
+          "derived_phase": "shipped",
+          "last_event_ts": "2026-06-09T11:00:00+00:00",
+          "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/501",
+          "pr_state": null,
+          "agent": "forge"
+        }
+      ],
+      "aggregate_phase": "shipped"
+    },
+    {
+      "id": "digest-generator",
+      "name": "Parked-and-aging Digest Generator",
+      "phase": "drafting",
+      "brief": "Daily parked-and-aging digest producer.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-digest-generator"],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-10",
+      "deferred_reason": null,
+      "tasks": [
+        {
+          "task_id": "p2-digest-generator",
+          "derived_phase": "in_flight",
+          "last_event_ts": "2026-06-09T09:00:00+00:00",
+          "pr_url": null,
+          "pr_state": null,
+          "agent": "forge"
+        }
+      ],
+      "aggregate_phase": "in_flight"
+    },
+    {
+      "id": "dashboard-cutover",
+      "name": "Dashboard Cutover",
+      "phase": "ready",
+      "brief": "Cut the dashboard list route over to the relocated derive.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-dashboard-cutover", "p2-orphan-readability"],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-10",
+      "deferred_reason": null,
+      "tasks": [
+        {
+          "task_id": "p2-dashboard-cutover",
+          "derived_phase": "awaiting_merge",
+          "last_event_ts": "2026-06-09T12:00:00+00:00",
+          "pr_url": "https://github.com/Larry-Yatch/ourliberty-dashboard/pull/502",
+          "pr_state": null,
+          "agent": "mirror"
+        },
+        {
+          "task_id": "p2-orphan-readability",
+          "derived_phase": "awaiting_merge",
+          "last_event_ts": "2026-06-09T13:00:00+00:00",
+          "pr_url": "https://github.com/Larry-Yatch/ourliberty-dashboard/pull/503",
+          "pr_state": null,
+          "agent": "mirror"
+        }
+      ],
+      "aggregate_phase": "awaiting_merge"
+    },
+    {
+      "id": "programs-kanban",
+      "name": "Programs Kanban (drag-drop projects)",
+      "phase": "deferred",
+      "brief": "Switch Programs view to kanban + drag-drop.",
+      "spec_docs": ["agents/beacon/specs/e4-4-dashboard-ui-rebuild.md#e44b"],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-24",
+      "deferred_reason": "Prioritized Missions tab first per 2026-05-28 design pass",
+      "tasks": [],
+      "aggregate_phase": "deferred"
+    },
+    {
+      "id": "resurface-card",
+      "name": "Resurface + Digest Card",
+      "phase": "ready",
+      "brief": "Contextual resurfacing + parked-and-aging digest card.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-resurface-and-digest-card"],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-10",
+      "deferred_reason": null,
+      "tasks": [
+        {
+          "task_id": "p2-resurface-and-digest-card",
+          "derived_phase": "ready",
+          "last_event_ts": null,
+          "pr_url": null,
+          "pr_state": null,
+          "agent": null
+        }
+      ],
+      "aggregate_phase": "ready"
+    }
+  ],
+  "orphans": [
+    {
+      "task_id": "orphan-inreview-now",
+      "last_event_ts": "2026-06-09T16:00:00+00:00",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/505"
+    },
+    {
+      "task_id": "desktop-ab12cd34",
+      "last_event_ts": "2026-06-09T15:00:00+00:00",
+      "agent": "desktop-claude",
+      "pr_url": null
+    },
+    {
+      "task_id": "orphan-building-now",
+      "last_event_ts": "2026-06-09T14:00:00+00:00",
+      "agent": "forge",
+      "pr_url": null
+    },
+    {
+      "task_id": "orphan-shipped-pr",
+      "last_event_ts": "2026-06-08T09:00:00+00:00",
+      "agent": "forge",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/480"
+    },
+    {
+      "task_id": "orphan-stalled-old",
+      "last_event_ts": "2026-05-20T10:00:00+00:00",
+      "agent": "mirror",
+      "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410"
+    }
+  ]
+}

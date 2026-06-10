@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "captures": [
+    {
+      "id": "cap-aging-one",
+      "title": "Aging idea",
+      "state": "parked",
+      "origin": {"repo": "ourliberty-agent-core"},
+      "aging": true,
+      "last_touched": "2026-06-01T00:00:00+00:00"
+    },
+    {
+      "id": "cap-fresh-two",
+      "title": "Fresh idea",
+      "state": "parked",
+      "origin": {"repo": "ourliberty-dashboard"},
+      "last_touched": "2026-06-09T00:00:00+00:00"
+    },
+    {
+      "id": "cap-promoted",
+      "title": "Promoted idea",
+      "state": "promoted",
+      "origin": {"repo": "ourliberty-agent-core"},
+      "aging": true,
+      "last_touched": "2026-05-01T00:00:00+00:00"
+    }
+  ]
+}

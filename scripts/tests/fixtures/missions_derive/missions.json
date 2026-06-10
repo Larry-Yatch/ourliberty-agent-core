@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "missions": [
+    {
+      "id": "derive-endpoint-port",
+      "name": "Derive Endpoint Port",
+      "phase": "in_flight",
+      "brief": "Relocate the mission-phase derive to a droplet Python endpoint.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-derive-endpoint"],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-10",
+      "deferred_reason": null
+    },
+    {
+      "id": "digest-generator",
+      "name": "Parked-and-aging Digest Generator",
+      "phase": "drafting",
+      "brief": "Daily parked-and-aging digest producer.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-digest-generator"],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-06-10",
+      "deferred_reason": null
+    },
+    {
+      "id": "dashboard-cutover",
+      "name": "Dashboard Cutover",
+      "phase": "ready",
+      "brief": "Cut the dashboard list route over to the relocated derive.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-dashboard-cutover", "p2-orphan-readability"],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-10",
+      "deferred_reason": null
+    },
+    {
+      "id": "programs-kanban",
+      "name": "Programs Kanban (drag-drop projects)",
+      "phase": "deferred",
+      "brief": "Switch Programs view to kanban + drag-drop.",
+      "spec_docs": ["agents/beacon/specs/e4-4-dashboard-ui-rebuild.md#e44b"],
+      "task_ids": [],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-05-24",
+      "deferred_reason": "Prioritized Missions tab first per 2026-05-28 design pass"
+    },
+    {
+      "id": "resurface-card",
+      "name": "Resurface + Digest Card",
+      "phase": "ready",
+      "brief": "Contextual resurfacing + parked-and-aging digest card.",
+      "spec_docs": ["agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md"],
+      "task_ids": ["p2-resurface-and-digest-card"],
+      "repo": "ourliberty-dashboard",
+      "created": "2026-06-10",
+      "deferred_reason": null
+    }
+  ]
+}
