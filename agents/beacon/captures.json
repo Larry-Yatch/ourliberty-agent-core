@@ -105,6 +105,21 @@
       },
       "last_touched": "2026-06-10T17:23:23.467572+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-bug-hunt-phase-2-run-the-next-full-codebase-audi-5a20",
+      "title": "Bug-hunt Phase 2: run the next full-codebase audit (cadence decision then auto-fires)",
+      "note": "Phase 2 distillation loop shipped 2026-06-10 (PR #426, on main). DEFERRED open thread: whether to SCHEDULE recurring full-codebase audits vs keep them on-demand. This card is the standing reminder of that thread. Trigger you control = running the next full-codebase audit. When one lands: distill_detector DMs you to run 'python3 review/distill/run_distill.py' -> audit_cadence_signal then auto-fires the schedule-vs-on-demand decision with REAL convergence data (and drops its own card). No action needed until you choose to run that audit. NOTE: dismiss the earlier stray 'Decide full-codebase-audit cadence' card (fake 40% test data from a dry-run). Context: memory mirror-bughunt-gate-project.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/unittest-prod-write-tripwire",
+        "captured_at": "2026-06-10T18:05:35.843140+00:00"
+      },
+      "last_touched": "2026-06-10T18:05:35.843140+00:00",
+      "promoted_to": null
     }
   ]
 }
