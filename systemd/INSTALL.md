@@ -89,6 +89,13 @@ sudo systemctl enable --now ourliberty-agent-core-health.timer
 
 # Watchdog runs every 5 min (Phase D activation; depends on watchdog.py being wired)
 sudo systemctl enable --now ourliberty-watchdog.timer
+
+# Pulse Check XI — catalog accuracy meter runs daily (04:17 local).
+# Deterministic + LLM-free, so it runs on a timer rather than inside the Pulse
+# /cycle. Requires the ourliberty-graph checkout at /home/larry/ourliberty-graph
+# (set OURLIBERTY_GRAPH_DIR in the .service to override). Watched for liveness
+# by heal-pulse-check-staleness via its "xi" cadence entry.
+sudo systemctl enable --now ourliberty-pulse-check-xi.timer
 ```
 
 ### Self-healing healers (Phase D2.5 + E1.3 + E1.5.2 + E2.1 + E2.2)
