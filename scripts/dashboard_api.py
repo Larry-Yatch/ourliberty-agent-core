@@ -2172,14 +2172,43 @@ def _kebab_case(name: str) -> str:
     return _KEBAB_RE.sub('-', name.strip().lower()).strip('-')
 
 
+# Process-lifetime cache of the gh-CLI token so we don't shell out per request.
+# A sentinel object distinguishes "not looked up yet" from a cached miss/hit;
+# a successful lookup is cached, a failure is NOT (so a transient gh hiccup is
+# retried next call). Reset in tests via `_GH_CLI_TOKEN_CACHE = _UNSET`.
+_UNSET = object()
+_GH_CLI_TOKEN_CACHE: Any = _UNSET
+
+
 def _github_token() -> Optional[str]:
-    """Read the GitHub token at request time. Prefer GITHUB_TOKEN
-    (loaded from /home/larry/credentials/.env.larry by the systemd unit);
-    fall back to GH_TOKEN for parity with gh CLI conventions."""
+    """Read the GitHub token at request time. Prefer GITHUB_TOKEN / GH_TOKEN
+    (loaded from /home/larry/credentials/.env.larry by the systemd unit). When
+    neither env var is set, fall back to the gh CLI's stored auth
+    (`gh auth token`) — the dashboard-api host has gh authenticated but no token
+    env var, so the env-only read would leave every GitHub feature unauthed.
+    The gh result is cached for the process lifetime. Returns None if no source
+    yields a token (callers degrade fail-safe)."""
     tok = (
         os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN') or ''
     ).strip()
-    return tok or None
+    if tok:
+        return tok
+    global _GH_CLI_TOKEN_CACHE
+    if _GH_CLI_TOKEN_CACHE is not _UNSET:
+        return _GH_CLI_TOKEN_CACHE
+    try:
+        proc = subprocess.run(
+            ['gh', 'auth', 'token'],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None  # gh missing/hung — don't cache; retry next call
+    if proc.returncode == 0:
+        cli_tok = (proc.stdout or '').strip()
+        if cli_tok:
+            _GH_CLI_TOKEN_CACHE = cli_tok  # cache only a real success
+            return cli_tok
+    return None
 
 
 def _missions_repo_full() -> str:
