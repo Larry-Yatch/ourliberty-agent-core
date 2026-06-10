@@ -90,6 +90,34 @@ class TestRunMeterFailClosed(unittest.TestCase):
             pxi.run_meter()
 
 
+class TestBlindMeterGuard(unittest.TestCase):
+
+    def test_zero_import_edges_is_unavailable_not_drift(self):
+        # A meter pointed at non-existent source repos finds 0 import edges and
+        # reports 100% drift; that must fail-closed (escalate), not pass through
+        # as real catalog drift.
+        blind = _report(over_gate=True, drifted_ids=['a', 'b'])
+        blind['tool_health']['scanner_import_edges'] = 0
+        blind['tool_health']['graphify_coverage_ratio'] = None
+        fake = type('P', (), {'stdout': json.dumps(blind), 'stderr': '',
+                              'returncode': 1})()
+        with mock.patch.object(pxi, 'METER') as meter, \
+                mock.patch('subprocess.run', return_value=fake):
+            meter.exists.return_value = True
+            with self.assertRaises(pxi.MeterUnavailable):
+                pxi.run_meter()
+
+    def test_nonzero_edges_passes(self):
+        ok = _report(over_gate=False)  # tool_health edges = 100
+        fake = type('P', (), {'stdout': json.dumps(ok), 'stderr': '',
+                              'returncode': 0})()
+        with mock.patch.object(pxi, 'METER') as meter, \
+                mock.patch('subprocess.run', return_value=fake):
+            meter.exists.return_value = True
+            report = pxi.run_meter()
+        self.assertEqual(report['tool_health']['scanner_import_edges'], 100)
+
+
 class TestMain(unittest.TestCase):
 
     def test_clean_writes_artifact_no_alert(self):

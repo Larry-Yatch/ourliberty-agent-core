@@ -11,6 +11,12 @@ EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="OURLIBERTY_GRAPH_DIR=/home/larry/ourliberty-graph"
+# The meter's scanner (scan_deps) defaults to ~/dev/... which does not exist on
+# the droplet; point it at the droplet's real source trees, else it walks
+# nothing and reports false total drift (the pulse_check_xi blind-meter guard
+# turns that into an escalate, but setting these is the actual fix).
+Environment="OL_AGENT_CORE=/home/larry/agent-core"
+Environment="OL_DASHBOARD=/home/larry/ourliberty-dashboard"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pulse_check_xi.py
 TimeoutStartSec=900
 Nice=10
