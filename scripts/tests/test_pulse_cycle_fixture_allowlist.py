@@ -235,6 +235,26 @@ class CheckIRetryRepeatsFilterTest(unittest.TestCase):
                 f"exact-match fixture leaked into retry_repeats: {repeats}",
             )
 
+    def test_smoke_5a_pf_no_marker_is_dropped(self):
+        # Regression (2026-06-10): the no-marker preflight smoke fixture's
+        # 3 stale `marker-error-smoke-5a-pf-no-marker-N` artifacts tripped the
+        # HIGH_REPEAT_COUNT_THRESHOLD and re-surfaced the same Check I
+        # "template this shape" proposal for 3+ consecutive cycles. With the
+        # base added to FIXTURE_PATTERN_EXACT, gather_retry_repeats must drop it.
+        with tempfile.TemporaryDirectory() as tmp:
+            outbox_root = Path(tmp)
+            files = [
+                f"marker-error-smoke-5a-pf-no-marker-{i}.json"
+                for i in range(1, 5)
+            ]
+            self._seed_archive(outbox_root, "forge", files)
+
+            repeats = pci.gather_retry_repeats(outbox_root)
+            self.assertEqual(
+                repeats, [],
+                f"smoke fixture leaked into retry_repeats: {repeats}",
+            )
+
 
 class CheckISigmaAnomalyFilterTest(unittest.TestCase):
 
