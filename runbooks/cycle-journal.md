@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration 1328 — 2026-06-10 ~16:20Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 0: sync-blocked:auto-commit-push-failed (74th+ SYNC-PUSH-REBASE-FALLBACK-001; self-recovering). Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 core services active.
+**Tier state:** 1 (consecutive_clean=0; Check 0 new alert + Check 2 standing non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T16:11:34.302753+00:00 / pr412-merged-pulse-allowlist / iter 1327` (line 1369)
+- 1 new entry since watermark:
+  1. `2026-06-10T16:16:50.483870+00:00` — source=sync.service, route=digest, subject=`sync-blocked:auto-commit-push-failed`. Auto-committed Pulse runtime files but push to origin/main failed; rolled back Pulse paths to 286f13da (captures.json left live). Self-heals on next sync tick. 74th+ SYNC-PUSH-REBASE-FALLBACK-001 occurrence. → **Known pattern; NOT in Tier-3 allowlist per MEMORY → tier-reset.** No new action (APPROVAL_REQUEST `sync-push-rebase-fallback-001` parked; root fix pending Forge).
+- **New watermark: `2026-06-10T16:16:50.483870+00:00 / sync-blocked:auto-commit-push-failed / iter 1328`** (line 1370)
+- ⚠️ Tier-reset: YES (sync-blocked not in Tier-3 allowlist; known standing pattern; no new remediation)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last log entry: 10:14:07 MDT (16:14:07Z) — alert idx=1368 delivered (pr412-merged-pulse-allowlist, iter 1327 closure). No new entries since. No Larry inbound since 09:59 MDT (15:59Z). Fixture entries (source=heal-x) last at 09:51 MDT (15:51Z) — same standing pattern, no new occurrences beyond iter 1327 scan. TIER_ONE_MARKER / "resets 11:30am" / "tier2 distinct" = confirmed test fixtures per memory (not a real outage signal).
+⚠️ Standing: source=heal-x log-contamination. G-rule 3/3 dispatched iter 1281; Forge brief pending. No new action. Tier-reset: YES (standing non-nominal). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall state file: NOT FOUND. No current stall condition. 0 open PRs (carry from iter 1327; no new PR-related alerts in Check 0 scan). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes (beacon, forge, mirror, pulse) empty — 0 .json files. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code state file: MISSING. No stale daemons reported. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Local HEAD=cdf4d20 (Pulse cycle 20260610T161733Z — iter 1327 auto-commit). Locally 1 commit ahead of origin (sync push failed at 16:16:50Z, SYNC-PUSH-REBASE-FALLBACK-001 74th+; self-recovers on next sync). ✅ Nominal within standing pattern.
+
+**Check B — Sync health:** last_sync=`2026-06-10T16:16:50Z` (very fresh, ~3 min at scan start). status=error (auto-commit push failed; self-recovering). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing (health-check-notify-script-missing G-rule 3/3 dispatched iter 1207). `ourliberty-sync.service` failed = expected oneshot exit post-run (16:16:50Z). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** gh CLI blocked this iter. Carry iter 1327: 0 open PRs. No new PR-related alerts in Check 0 scan; no new evidence of change. ✅
+- **ourliberty-dashboard:** Carry: 0 open PRs. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** None overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1327 watch items:**
+- "install-drift healer — fires ~18:00Z UTC June 10" → heal-systemd-install-drift.json `last_dm_at=2026-06-10T06:00:11Z` (unchanged; ~1.67h until expected 18:00Z UTC fire). 0/2 clean healer cycles. **CARRY**.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off" → No evidence of processing. **CARRY**.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT — no new occurrences this iter):**
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~1.67h at scan).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 74th+; self-recovering; parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+
+**Watch items for iter 1329:**
+- **install-drift healer** — fires ~18:00Z UTC June 10. Watch heartbeat advance past 06:00:11Z; expect 1/2 clean cycles.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (sync-blocked:auto-commit-push-failed = 74th+ occurrence of standing SYNC-PUSH-REBASE-FALLBACK-001; no new remediation dispatched). interventions≈755, systemic_fixes=16, ratio≈47.2, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 0 new alert + Check 2 standing non-nominal).
+
+---
+
 ## Iteration 1327 — 2026-06-10 ~16:14Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 services active. PR #412 post-merge service effects: none — 9/9 active, no log noise.
