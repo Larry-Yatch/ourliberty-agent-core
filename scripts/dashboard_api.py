@@ -38,6 +38,7 @@ import re
 import secrets
 import subprocess
 import sys
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -107,6 +108,16 @@ def _agent_models_json_path() -> Path:
     if override:
         return Path(override)
     return _repo_root() / 'config' / 'agent-models.json'
+
+
+def _captures_json_path() -> Path:
+    """Path to the durable-capture sibling registry (Missions v2 Phase 1).
+    Env-overridable so tests redirect reads/writes to a tmpdir without
+    touching the deployed checkout's `agents/beacon/captures.json`."""
+    override = os.environ.get('OURLIBERTY_CAPTURES_JSON')
+    if override:
+        return Path(override)
+    return _repo_root() / 'agents' / 'beacon' / 'captures.json'
 
 
 # ---- agent + healer registries ----
@@ -481,6 +492,15 @@ class BuildSequencesResponse(BaseModel):
 
 class MissionsResponse(BaseModel):
     missions: list[dict[str, Any]]
+    last_synced_at: Optional[str]
+    schema_version: Optional[int] = None
+
+
+class CapturesResponse(BaseModel):
+    # Mirrors MissionsResponse: the captures array passes through verbatim
+    # (parked/promoted/dropped all present — the dashboard Parked lane filters
+    # to state=='parked'), plus an mtime-derived last_synced_at.
+    captures: list[dict[str, Any]]
     last_synced_at: Optional[str]
     schema_version: Optional[int] = None
 
@@ -2205,6 +2225,47 @@ def _reader_missions(missions_path: Path) -> dict[str, Any]:
     }
 
 
+def _reader_captures(captures_path: Path) -> dict[str, Any]:
+    """Return {captures, last_synced_at, schema_version} for GET
+    /api/missions/captures. Mirrors `_reader_missions`: missing file → 200
+    with an empty list + null timestamp; malformed JSON → HTTPException(500)
+    with a structured body (never a stack trace)."""
+    if not captures_path.exists():
+        return {
+            'captures': [],
+            'last_synced_at': None,
+            'schema_version': None,
+        }
+    try:
+        raw = captures_path.read_text()
+        data = json.loads(raw) if raw.strip() else {}
+    except (OSError, json.JSONDecodeError) as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'captures.json malformed', 'detail': first_line},
+        )
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'captures.json malformed',
+                'detail': 'top-level JSON is not an object',
+            },
+        )
+    captures = data.get('captures')
+    if not isinstance(captures, list):
+        captures = []
+    schema_version = data.get('schema_version')
+    if not isinstance(schema_version, int):
+        schema_version = None
+    return {
+        'captures': captures,
+        'last_synced_at': _iso(_safe_mtime(captures_path)),
+        'schema_version': schema_version,
+    }
+
+
 def _read_missions_registry(missions_path: Path) -> dict[str, Any]:
     """Load the registry as a dict (raw schema), or return a fresh empty
     registry shape if the file is missing. Raises HTTPException(500) on
@@ -2637,6 +2698,237 @@ def _handle_desktop_session_ingest(
     )
     event_id = compute_event_id(task_id, event_type, ts_iso) if ok else None
     return {'ok': bool(ok), 'event_id': event_id}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/ingest/capture — durable one-gesture capture (Missions v2 Phase 1)
+# (spec: agents/beacon/specs/missions-v2-phase1-durable-capture.md § 4)
+#
+# Reuses the SAME X-Ingest-Token as the desktop-session ingest (the desktop
+# holds no DB/git creds). Unlike that endpoint — which emits a chain_event —
+# a capture is appended atomically to the in-repo `agents/beacon/captures.json`
+# (tmp+rename) under a lock and is NOT turned into a PR: a PR-per-capture is
+# too heavy for a low-ceremony, multiple-per-day gesture. Durability + audit
+# come from the GC healer's batched commit (§ 6), which version-controls any
+# captures.json delta on its timer. The endpoint pins `source` to a fixed set
+# so a leaked ingest token can only write known capture sources.
+# ---------------------------------------------------------------------------
+
+CAPTURE_DEFAULT_SOURCE = 'desktop-chat'
+# Fixed set the server pins `source` to. The desktop gesture ships
+# 'desktop-chat'; the others are admitted now so future Telegram/agent capture
+# sources (spec § 9) need no schema change, only an emitter.
+CAPTURE_ALLOWED_SOURCES = ('desktop-chat', 'telegram', 'agent')
+# A capture is tiny (title + a sentence of note + origin). Cap it so a leaked
+# ingest token can't bloat captures.json with a multi-MB row. Spec § 4: 413.
+MAX_CAPTURE_PAYLOAD_BYTES = 4096
+# Re-POST collapse window: an identical (title, origin.session_id) within this
+# many seconds maps onto the existing capture id rather than double-parking.
+CAPTURE_IDEMPOTENCY_WINDOW_SEC = 600
+# Cap the slug so a long title can't produce an unwieldy id.
+_CAPTURE_SLUG_MAX = 48
+
+# Serializes the read-modify-write of captures.json within the single uvicorn
+# worker so concurrent POSTs can't lose an append (last-writer-wins on the
+# whole file). The atomic tmp+rename guards a reader from seeing a partial file.
+_CAPTURE_INGEST_LOCK = __import__('threading').Lock()
+
+
+class CaptureIngestRequest(BaseModel):
+    title: str
+    note: Optional[str] = None
+    origin: dict[str, Any] = Field(default_factory=dict)
+
+
+class CaptureIngestResponse(BaseModel):
+    ok: bool
+    capture_id: Optional[str] = None
+
+
+# Test seam: tests monkeypatch this to make generated ids deterministic.
+def _gen_capture_suffix() -> str:
+    """Short random suffix for a capture id (`cap-<slug>-<suffix>`)."""
+    return secrets.token_hex(2)
+
+
+def _parse_iso_utc(value: Any) -> Optional[datetime]:
+    """Parse an ISO-8601 string to an aware UTC datetime, or None."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _read_captures_registry(captures_path: Path) -> dict[str, Any]:
+    """Load captures.json as a mutable registry dict ({schema_version,
+    captures}). Missing file → a fresh empty registry. Malformed JSON →
+    HTTPException(500), so the write path never appends onto a corrupt file."""
+    if not captures_path.exists():
+        return {'schema_version': 1, 'captures': []}
+    try:
+        raw = captures_path.read_text()
+        data = json.loads(raw) if raw.strip() else {'schema_version': 1, 'captures': []}
+    except (OSError, json.JSONDecodeError) as e:
+        first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={'error': 'captures.json malformed', 'detail': first_line},
+        )
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                'error': 'captures.json malformed',
+                'detail': 'top-level JSON is not an object',
+            },
+        )
+    if not isinstance(data.get('captures'), list):
+        data['captures'] = []
+    data.setdefault('schema_version', 1)
+    return data
+
+
+def _atomic_write_captures(path: Path, registry: dict[str, Any]) -> None:
+    """Write `registry` to captures.json atomically (tmp in the same dir +
+    os.replace). A unique tmp name keeps concurrent writers from clobbering a
+    shared temp file even though the lock already serializes them."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent), prefix=path.name + '.', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w') as fh:
+            fh.write(json.dumps(registry, indent=2) + '\n')
+        os.replace(tmp_name, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _find_recent_capture(
+    captures: list[Any], title: str, session_id: Any,
+    now: datetime, window_sec: int,
+) -> Optional[dict[str, Any]]:
+    """Return the most recent capture matching (title, origin.session_id)
+    captured within `window_sec` of `now`, or None. Used to collapse a
+    duplicate re-POST onto an existing id."""
+    for cap in reversed(captures):
+        if not isinstance(cap, dict) or cap.get('title') != title:
+            continue
+        cap_origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
+        if cap_origin.get('session_id') != session_id:
+            continue
+        captured = _parse_iso_utc(cap_origin.get('captured_at'))
+        if captured is None:
+            continue
+        if 0 <= (now - captured).total_seconds() <= window_sec:
+            return cap
+    return None
+
+
+def _unique_capture_id(
+    title: str, captures: list[Any], suffix_gen: Any,
+) -> str:
+    """Generate `cap-<kebab(title)>-<suffix>` not already present in
+    `captures`. Falls back to a count-disambiguated form if the suffix
+    generator keeps colliding (e.g. a deterministic test stub)."""
+    slug = _kebab_case(title)[:_CAPTURE_SLUG_MAX].strip('-') or 'capture'
+    existing = {c.get('id') for c in captures if isinstance(c, dict)}
+    for _ in range(50):
+        cid = f'cap-{slug}-{suffix_gen()}'
+        if cid not in existing:
+            return cid
+    return f'cap-{slug}-{len(captures)}-{suffix_gen()}'
+
+
+def _handle_capture_ingest(
+    *,
+    title: Any,
+    note: Any,
+    origin: Any,
+    captures_path: Path,
+    now: Optional[datetime] = None,
+    window_sec: int = CAPTURE_IDEMPOTENCY_WINDOW_SEC,
+    suffix_gen: Any = None,
+) -> dict[str, Any]:
+    """Pure handler for POST /api/ingest/capture.
+
+    Validates the body, pins `source`, generates a `cap-…` id, sets
+    state='parked', and atomically appends to captures.json under a lock.
+    Idempotent: a re-POST with the same (title, origin.session_id) inside
+    `window_sec` returns the existing id without double-parking. Raises
+    HTTPException(400) on a bad body and (413) over the size cap.
+    """
+    title = title.strip() if isinstance(title, str) else ''
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='title is required and must be non-empty',
+        )
+    if note is not None and not isinstance(note, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='note must be a string',
+        )
+    if not isinstance(origin, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='origin must be a JSON object',
+        )
+    source = origin.get('source') or CAPTURE_DEFAULT_SOURCE
+    if source not in CAPTURE_ALLOWED_SOURCES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid origin.source={source!r}',
+        )
+    try:
+        body_bytes = len(json.dumps(
+            {'title': title, 'note': note, 'origin': origin}).encode('utf-8'))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='capture is not JSON-serializable',
+        )
+    if body_bytes > MAX_CAPTURE_PAYLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f'capture too large ({body_bytes} > {MAX_CAPTURE_PAYLOAD_BYTES} bytes)',
+        )
+
+    now = now or datetime.now(timezone.utc)
+    ts_iso = now.isoformat()
+    session_id = origin.get('session_id')
+    suffix_gen = suffix_gen or _gen_capture_suffix
+
+    with _CAPTURE_INGEST_LOCK:
+        registry = _read_captures_registry(captures_path)
+        captures = registry['captures']
+        existing = _find_recent_capture(captures, title, session_id, now, window_sec)
+        if existing is not None:
+            return {'ok': True, 'capture_id': existing.get('id')}
+        capture_id = _unique_capture_id(title, captures, suffix_gen)
+        captures.append({
+            'id': capture_id,
+            'title': title,
+            'note': note or '',
+            'state': 'parked',
+            'origin': {
+                'source': source,
+                'session_id': session_id,
+                'repo': origin.get('repo'),
+                'branch': origin.get('branch'),
+                'captured_at': ts_iso,
+            },
+            'last_touched': ts_iso,
+            'promoted_to': None,
+        })
+        _atomic_write_captures(captures_path, registry)
+    return {'ok': True, 'capture_id': capture_id}
 
 
 # Test seam: tests monkeypatch this to inject a recording mock.
@@ -3677,6 +3969,18 @@ def get_system_missions() -> dict[str, Any]:
     return _reader_missions(_missions_json_path())
 
 
+# GET /api/missions/captures — the Parked-lane data source (Missions v2
+# Phase 1 § 5). Serves captures.json verbatim + an mtime-derived
+# last_synced_at; the dashboard filters to state=='parked'.
+@app.get(
+    '/api/missions/captures',
+    response_model=CapturesResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_missions_captures() -> dict[str, Any]:
+    return _reader_captures(_captures_json_path())
+
+
 @app.post(
     '/api/system/missions/new',
     response_model=NewMissionResponse,
@@ -3745,6 +4049,24 @@ def post_desktop_session_ingest(
         # just signals "not persisted" to anyone watching.
         response.status_code = status.HTTP_502_BAD_GATEWAY
     return result
+
+
+# POST /api/ingest/capture — durable one-gesture capture. Same X-Ingest-Token
+# as desktop-session ingest; appends atomically to captures.json (no PR — the
+# GC healer batch-commits). See the Missions v2 Phase 1 block above.
+@app.post(
+    '/api/ingest/capture',
+    response_model=CaptureIngestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(_require_ingest_token)],
+)
+def post_capture_ingest(body: CaptureIngestRequest) -> dict[str, Any]:
+    return _handle_capture_ingest(
+        title=body.title,
+        note=body.note,
+        origin=body.origin,
+        captures_path=_captures_json_path(),
+    )
 
 
 @app.get(
