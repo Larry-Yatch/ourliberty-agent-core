@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration 1310 — 2026-06-10 ~13:21Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal advance. **beacon-bot 409 conflict SELF-RESOLVED** (PID 1089538 terminated ~13:20Z UTC, ~4 min after iter 1309 escalation — no Larry action required). **p2-resurface-and-digest-card build COMPLETE** → PR #46 (ourliberty-dashboard) OPEN/CLEAN/MERGEABLE, Mirror reviewing. PR #412 standing APPROVAL_REQUEST. 8/9 services (beacon-bot launcher = inactive EXPECTED; PID 1071697 running).
+**Tier state:** 1 (consecutive_clean=0; PR #412 stall; 3 new alerts)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T12:49:26.289872Z / medic-diagnosis:PR#412-attempt6 / iter 1307 (UNCHANGED iters 1308–1309). Scanned larry-alerts.jsonl:
+- **Count:** 1350 lines (was 1347 iter 1309). 3 new alerts since watermark.
+- **New alert 1:** `2026-06-10T13:17:11Z` / source=pulse / beacon-bot-duplicate-409 — Pulse's own iter 1309 escalation logging the 409 conflict. Gate 1: not in alert-translations.json allowlist. Gate 4 fallthrough → Tier 4 / known condition. RESOLVE: 409 conflict self-resolved this iter (PID 1089538 gone; PID 1071697 only survivor). Journal note only. Watermark: advance past.
+- **New alert 2:** `2026-06-10T13:17:27Z` / source=heal-pipeline-stall / pipeline-stall:unrouted-pr:PR#412 — PR #412 APPROVAL_REQUEST standing, unrouted-pr variant. Gate 4 fallthrough → Tier 4 recurring known condition (6th+ PR#412 stall family alert). Medic already covering. Journal note only.
+- **New alert 3:** `2026-06-10T13:19:12Z` / source=medic / medic-diagnosis — Medic delivery of alert 2 above (attempt 6 on unrouted-pr:PR#412). Tier 4 recurring. Larry already DM'd. Journal note only.
+- **Advance watermark** to `2026-06-10T13:19:12.132339Z / medic-diagnosis:PR#412-unrouted-pr-attempt6 / iter 1310`.
+- Triage: 3 new alerts (all Tier 4 recurring known conditions). ⚠️ Tier-reset.
+
+VERIFY-BEFORE-REASSERT of iter 1309 watch items:
+- "beacon-bot 409 conflict — Larry action pending: `tmux kill-session -t beacon-bot`" → **SELF-RESOLVED ✅**: pgrep shows only PID 1071697 (single process). PID 1089538 terminated ~13:20Z UTC. Conflict resolved without Larry intervention. Watch item CLOSED.
+- "p2-resurface-and-digest-card — Forge building (~15 min at scan). Expect PR ~13:20–13:40Z UTC." → **COMPLETE ✅**: Forge archived p2-resurface-and-digest-card.json (3 archive files). PR #46 OPEN/CLEAN/MERGEABLE on ourliberty-dashboard. Mirror inbox: review-p2-resurface-and-digest-card.json active.
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY**: 13:21Z UTC, not yet 18:00Z.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN. ⚠️ [yellow]
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — Forge brief absent." → **CARRY**: Forge inbox EMPTY, no G-rule brief. New stall alert at 13:17:27Z confirms fix urgency.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 / Check C — Telegram sweep + Agent liveness:**
+- beacon-bot: `ourliberty-beacon-telegram-bot.service` = inactive (EXPECTED: launcher-type). `pgrep -f beacon_telegram_bot.py` = PID 1071697 only. **409 conflict SELF-RESOLVED**: PID 1089538 terminated naturally ~13:20Z UTC (4 min after conflict started). Single survivor PID 1071697 operational. Bot log shows last delivery `idx=1349 at 13:19:21Z`; post-resolution log quiet (PID 1071697 logs to separate path or quietly polling — not the 409-loop file). ✅
+- No new inbound from Larry since "Go" at 08:32Z UTC. ✅
+- **G-rule 2/3: Check C beacon-bot liveness via `systemctl is-active` gives false-inactive for launcher-type service** — iter 1309=1/3, iter 1310=2/3. Correct check confirmed again: `pgrep -f beacon_telegram_bot.py`. At 3/3: dispatch to Beacon to update cycle-prompt.md Check C.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T13:17:19Z` (~4 min old at 13:21Z — fresh). 0 active stalls. Pipeline advancing: PR #46 OPEN + Mirror reviewing. ✅ Nominal.
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):**
+- Forge: EMPTY ✅ (p2-resurface-and-digest-card consumed; PR #46 opened)
+- Beacon: EMPTY ✅
+- Mirror: `review-p2-resurface-and-digest-card.json` active — normal pipeline state ✅
+- Pulse: EMPTY ✅
+- ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT (no recent restarts). 9/9 core services (8 systemctl active + beacon-bot launcher inactive=expected; PID 1071697 running). ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=3dbb69b "Pulse cycle 20260610T131955Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T13:16:23Z (~5 min at scan — within 2h threshold). status=no-change. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-dashboard: PR #46 OPEN/CLEAN/MERGEABLE** — "feat: contextual resurfacing + parked-and-aging digest card" (p2-resurface-and-digest-card). Mirror reviewing (`review-p2-resurface-and-digest-card.json` in Mirror inbox). Expect Mirror PASS + auto-merge ~13:30–14:00Z UTC. ✅
+- **PR #412 (ourliberty-agent-core): OPEN/UNKNOWN** — `forge/harden-test-prod-write-isolation-001`, no reviewDecision. Standing stall: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** 0 credentials overdue, 0 within-60d window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead/approval-gated PRs` — **3/3 DISPATCHED** (iter 1298). Beacon consumed ✅. Forge inbox EMPTY — no Forge brief yet. New pipeline-stall alert at 13:17:27Z (8th+ occurrence family). Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`. No new occurrence. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (no new occurrence). Carry.
+- **NEW 2/3: `Check C beacon-bot liveness via systemctl is-active gives false-inactive (launcher-type service)`** — iter 1309=1/3, iter 1310=2/3. Pattern confirmed again this iter. At 3/3: dispatch to Beacon to update cycle-prompt.md Check C to use `pgrep -f beacon_telegram_bot.py | wc -l` or `tmux has-session -t beacon-bot` instead.
+
+**Standing findings:**
+- ~~[yellow] beacon-bot-duplicate-409~~ **CLOSED ✅** — self-resolved iter 1310 (PID 1089538 terminated ~13:20Z UTC).
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Medic attempt 6 delivered 13:19Z.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] beacon-bot PID 1071697 post-conflict stability — watch 2 more iters for any new 409 errors.
+
+**Watch items for next iter (1311):**
+- **PR #46 (ourliberty-dashboard)** — Mirror reviewing. Expect Mirror PASS + auto-merge ~13:30–14:00Z UTC.
+- **beacon-bot stability** — PID 1071697 single survivor. Watch: next 2 iters for new 409 errors or delivery failures.
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411 merge.
+- **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — Forge brief absent. Monitor.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (beacon-bot 409 self-resolved; all Check 0 alerts are recurring known conditions). 0 new systemic_fixes. interventions=751, systemic_fixes=16, ratio≈46.94, trend=flat. iter_non-clean (PR #412 standing stall; Check 0 3 new alerts).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1309 — 2026-06-10 ~13:15Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Beacon-bot duplicate (Pulse calibration error). All other checks nominal. Forge building p2-resurface-and-digest-card. PR #412 standing APPROVAL_REQUEST. 8/9 services nominally active (beacon-bot: 2 competing processes — see below).
