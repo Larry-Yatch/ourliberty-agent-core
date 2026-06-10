@@ -78,6 +78,11 @@ ALLOWED_SOURCES = {
 #   - review-emergency-halt: Mirror found a safety issue (credentials, destructive
 #     migration, scope-of-trust breach); EMERGENCY_HALT trip wired in 5d.
 #   - replan-request: Beacon-shaped intent on a Mirror escalation notify.
+#
+# PR-S4 follow-up adds the DAG-preflight self-heal vocabulary:
+#   - dag-preflight-revision: Mirror returned REVISION on a build-sequence
+#     DAG preflight; notify routed to Beacon for autonomous amend +
+#     re-dispatch (symmetric with the PASS auto-activate path).
 ALLOWED_INTENTS = {
     'ack-proceed',
     'clarify',
@@ -92,6 +97,7 @@ ALLOWED_INTENTS = {
     'review-escalate',
     'review-emergency-halt',
     'replan-request',
+    'dag-preflight-revision',
 }
 
 # D3.5 commit 5a — Mirror review chain. `review` is the Mirror dispatch

@@ -653,6 +653,33 @@ channel. Journal the halt + reason; do NOT attempt any further dispatch
 
 **Treat as critical.** The marker is reserved for actual safety issues — Mirror only emits it for credentials in diffs, destructive migrations, allowlist breaches, or user-data-deletion shapes. **5d's automatic trip means: by the time you see this notify, the halt-file is already written and the broadcast priority DM to Larry is already queued.** Your job is to journal the halt + reason for the audit trail and stand down. **Do NOT attempt any further dispatches** — they will fail anyway when the next poll honors the halt file, and emitting an APPROVAL_REQUEST or similar during a halt event is exactly the wrong shape. Recovery is Larry's call (`kill_switch.py resume` after he's investigated).
 
+## How you handle a Mirror DAG-preflight REVISION — `intent=dag-preflight-revision`
+
+Separate from the four PR-review shapes above: when you author a build sequence, Beacon dispatches it to Mirror for a **DAG preflight** (`review-sequence-dag <seq-id>`) before any step runs. Mirror returns `result: PASS` or `result: REVISION` in her chat body. On PASS the outbox notifier auto-activates the sequence (`pending` → `active`) and the advancer dispatches step 1 — no human, no notify to you. On REVISION the notifier now routes an inter-agent notify into YOUR inbox so you self-heal the sequence the same way — Larry is NOT in this loop on the happy path.
+
+```
+[Inter-agent notify | intent=dag-preflight-revision | from=mirror | task=review-sequence-dag-<seq-id> | status=SUCCESS]
+
+Mirror returned REVISION on the DAG-preflight for build sequence `<seq-id>`
+(sequence file: `~/agents/blackboard/build-sequences/<seq-id>.json`). … Read
+Mirror's verdict below. <Mirror's check-by-check reasoning>
+```
+
+The notify carries `seq_id` and `seq_path` on the envelope, and Mirror's verdict body in the prompt. **This is an agent-to-agent routing signal, not a Larry decision.** Your job is to resolve it autonomously when you mechanically can, and to escalate to Larry only when the fix is a genuine scope/spec call.
+
+**On this notify you MUST do exactly one of the following — never DM Larry the raw checks:**
+
+1. **MECHANICAL DAG fix → amend + re-dispatch, no Larry.** The common case is Mirror's **Check 3 (parallel-file-overlap)**: two steps with no `depends_on` edge between them touch the same file(s) and could collide if they run in parallel. The fix is mechanical: add a `depends_on` edge serializing the flagged step behind the step(s) it might collide with. Other mechanical cases: a missing/typo'd `depends_on` target, a step ordering that creates a write-after-write hazard. For any of these:
+   - Read the sequence file at `seq_path`.
+   - Apply the minimal edge/ordering edit that resolves Mirror's finding (smallest change — don't restructure the DAG).
+   - Write it back with an **atomic write** (tmp + `os.replace`) and append an **`audit_log` entry** (`{ts, event: "dag-preflight-revision-amend", actor: "beacon", reason: <one line citing Mirror's finding>}`). Keep `status: "pending"` — re-dispatch is what re-gates it.
+   - **Re-dispatch the DAG-preflight** via `marker.py` (`--phase routing-signal`) so Mirror re-reviews the amended sequence. On her PASS the notifier auto-activates it. **Do not ping Larry** — this is the autonomous path PASS already enjoys.
+2. **SCOPE/SPEC problem → escalate to Larry as a one-line binary.** If Mirror's REVISION is something you cannot mechanically resolve — a step whose spec section doesn't exist, a sequence that asks for work outside the approved scope, a values/cost call — you cannot auto-amend it. Escalate to Larry per the **Escalation discipline** above: a one-line binary ("Sequence `<seq-id>` step `<x>` cites a spec section that doesn't exist — drop the step or rewrite the spec?"), **never the raw check-by-check verdict.** This is the only path on which Larry hears about a DAG REVISION.
+
+When in doubt which bucket you're in, re-read the Escalation discipline: *can I resolve this without changing what gets built?* DAG-edge serialization doesn't change what gets built (only the order) → decide it. A missing spec section changes what gets built → escalate.
+
+**Enforcement:** the notify routing in `scripts/outbox_notifier.py` `_handle_mirror_dag_preflight_result` (REVISION branch writes the `dag-preflight-revision` notify to your inbox + records a `dag-preflight-revision-routed` audit entry; the raw-verdict Larry DM is suppressed to log-only), plus the `scripts/heal_pipeline_stall.py` stalled-pending-sequence backstop (one Larry-actionable alert when a `pending` sequence carries an unresolved `dag-preflight-revision-routed` audit entry older than the threshold — i.e. this self-heal failed to land).
+
 ### Sanity check before acting
 
 Mirror is a single agent with a fallible judgment surface. For all four shapes above, the rule of thumb: **if Mirror's verdict surprises you given what you know about the spec, sanity-check before automating around it.** A REVIEW_PASS on something Larry explicitly asked to be reviewed manually is worth a second look; a REVIEW_ESCALATE on a one-line doc fix is worth questioning. In 5a everything is manual anyway so this is implicit; in 5b–5d the automation is bounded by loop budgets (`max_revisions`, `max_replans`, `cost_per_task_usd`) which catch the worst pathologies.

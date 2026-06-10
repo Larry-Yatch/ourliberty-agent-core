@@ -2057,5 +2057,110 @@ class TestMergedPrFetchTruncation(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(warns, [])
 
 
+def _iso(minutes_ago: int) -> str:
+    """ISO-8601 timestamp `minutes_ago` minutes before now — the shape the
+    notifier writes into build-sequence audit_log entries."""
+    dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    return dt.isoformat()
+
+
+class TestStalledPendingSequence(_TempAgentsRootMixin, unittest.TestCase):
+    """Check 9 — sequence stuck pending after an unresolved DAG REVISION."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seqdir = self.agents_root / 'blackboard' / 'build-sequences'
+        self.seqdir.mkdir(parents=True, exist_ok=True)
+
+    def _write_seq(self, seq_id, status='pending', audit=None):
+        seq = {
+            'seq_id': seq_id,
+            'status': status,
+            'steps': [],
+            'audit_log': audit or [],
+        }
+        (self.seqdir / f'{seq_id}.json').write_text(json.dumps(seq, indent=2))
+
+    @staticmethod
+    def _rev(minutes_ago, task='review-sequence-dag-seq'):
+        return {
+            'ts': _iso(minutes_ago),
+            'event': 'dag-preflight-revision-routed',
+            'actor': 'outbox-notifier',
+            'mirror_task_id': task,
+        }
+
+    @staticmethod
+    def _pass(minutes_ago):
+        return {
+            'ts': _iso(minutes_ago),
+            'event': 'dag-preflight-pass-kickoff',
+            'actor': 'outbox-notifier',
+        }
+
+    def test_fires_for_pending_unresolved_revision_past_threshold(self) -> None:
+        self._write_seq('stuck-seq', status='pending', audit=[self._rev(45)])
+        alerts = self.hps.check_stalled_pending_sequence({})
+        self.assertEqual(len(alerts), 1)
+        a = alerts[0]
+        self.assertEqual(a['subject'], 'stalled-pending-sequence:stuck-seq')
+        self.assertIn('stuck-seq', a['message'])
+        self.assertTrue(a['key'].startswith('stalled_pending_sequence:stuck-seq:'))
+
+    def test_silent_when_revision_recent(self) -> None:
+        # Within the threshold — give Beacon's resume time to land.
+        self._write_seq('fresh-seq', status='pending', audit=[self._rev(10)])
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_silent_when_pass_kickoff_newer_than_revision(self) -> None:
+        # REVISION resolved: Mirror PASSed the amended sequence.
+        self._write_seq(
+            'resolved-seq', status='pending',
+            audit=[self._rev(45), self._pass(5)],
+        )
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_silent_for_active_sequence(self) -> None:
+        self._write_seq('active-seq', status='active', audit=[self._rev(45)])
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_silent_for_pending_without_revision(self) -> None:
+        # Healthy pending sequence awaiting its first DAG preflight.
+        self._write_seq(
+            'healthy-seq', status='pending',
+            audit=[{'ts': _iso(120), 'event': 'sequence-created',
+                    'actor': 'beacon'}],
+        )
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_silent_when_revision_outside_scan_window(self) -> None:
+        # 2 days old — historical record, not a live stall.
+        self._write_seq(
+            'abandoned-seq', status='pending',
+            audit=[self._rev(2 * 24 * 60)],
+        )
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_uses_latest_revision_when_multiple(self) -> None:
+        # An old revision + a recent re-revision → keyed to the newest, and
+        # since the newest is within the threshold, no alert yet.
+        self._write_seq(
+            'rerev-seq', status='pending',
+            audit=[self._rev(200, task='t1'), self._rev(5, task='t2')],
+        )
+        self.assertEqual(self.hps.check_stalled_pending_sequence({}), [])
+
+    def test_dedup_key_stable_across_runs(self) -> None:
+        self._write_seq('stuck-seq', status='pending', audit=[self._rev(45)])
+        a1 = self.hps.check_stalled_pending_sequence({})[0]
+        a2 = self.hps.check_stalled_pending_sequence({})[0]
+        self.assertEqual(a1['key'], a2['key'])
+        # After recording, the shared cooldown suppresses a re-DM.
+        state: dict = {}
+        self.assertTrue(self.hps.should_alert(state, a1['key']))
+        self.hps.record_alert(state, a1['key'])
+        self.assertFalse(self.hps.should_alert(state, a1['key']))
+
+
 if __name__ == '__main__':
     unittest.main()
