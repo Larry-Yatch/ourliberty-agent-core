@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration 1347 — 2026-06-10 19:10Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1 (auth_401 at 18:57:24Z). Root-cause fix for spawn-failures is blocked until Larry re-auths Tier 1. Alert already DM'd by outbox-notifier (alert idx=1395, delivered 12:59:29 MDT). PR #431 "feat(pulse): Check XI — catalog accuracy meter" OPEN (Larry-direct, 18:58:29Z, MERGEABLE, age ~12 min at scan — below 30-min threshold). 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; auth_401 block + spawn-failures standing)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:55:08.643278+00:00 / unreviewed-merge:430 / line 1395` (iter 1346)
+- Current last entry: `ts=18:57:24Z source=agent-runner-forge severity=warning subject=claude_tier1_failed_tier2_unavailable:auth_401` — Forge task `fix-wedged-reaper-spares-active-build-worktree` hit Tier 1 auth_401; Tier 2 fallback unavailable (resume-mode task, session IDs account-bound); marked paused_on_tier1. Route=escalate.
+  - Classification: credential/auth category → **Tier 2 guarded**. Do NOT dispatch; DM Larry. Alert already delivered by outbox-notifier at 12:59:29 MDT (idx=1395 confirmed in bot log). Pulse claims; row lifecycle = triaged-tier-2.
+  - tier-reset: YES.
+- **New watermark: `2026-06-10T18:57:24.490251+00:00 / claude_tier1_failed_tier2_unavailable:auth_401 / line 1396`**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Most recent Larry message: "go" at 12:53:23 MDT → processed by Beacon, dispatched to Forge (iter 1346). No new messages from Larry since 12:53:23 MDT (confirmed: beacon_telegram_bot.log last entry at 12:59:29 MDT is notifier delivery confirmation, not a new message).
+- Forge auth_401 alert DM confirmed delivered 12:59:29 MDT. Larry is aware.
+- Standing auth_401 fixture contamination (TIER_ONE_MARKER, etc.) — G-rule 3/3 dispatched iter 1281; Forge brief pending.
+- ⚠️ tier-reset: YES (standing fixture contamination + active auth block).
+
+**Check 3 — Pipeline stall:**
+- `heal-pipeline-stall-state.json`: heartbeat=MISSING, stalls=0. Standing pattern (iters 1329+).
+- Forge inbox: EMPTY. In-flight state: `fix-wedged-reaper-spares-active-build-worktree.json` shows `paused_on_tier1: {failure_type: auth_401, at: 18:57:24Z}`.
+- CCD S1 (`ccd-s1-envelope-builder.5.json`) and headless-dedup (`fix-headless-approval-dedup-spawn-failure-wedge.1.json`) remain in archive (spawn-failure). Re-dispatch blocked: wedge fix is now doubly blocked — needs auth_401 resolution FIRST, then build can proceed.
+- ⚠️ Non-nominal; tier-reset: YES.
+
+**Check 4 — Pending directives:**
+- Larry "go" at 12:53:23 MDT → dispatched to Forge → Forge paused_on_tier1. Tracked. ✅ Not orphaned.
+- beacon-pending-approvals.json: MISSING (cleared post-dispatch, iter 1346). 0 pending. ✅ Nominal.
+- Forge inbox: empty (task paused, not in inbox). ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (standing known pattern, iters 1329+). 9/9 services active. ✅ Nominal (standing).
+
+**Check A — Source repo:** gitStatus: main, clean (session-start snapshot; two cycle commits 653897c + 18e2a4f likely ahead of origin — normal post-cycle state, wrapper will sync). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~19 min at scan), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active. `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** PR #431 OPEN `feat(pulse): Check XI — catalog accuracy meter as a live Pulse check` (author=Larry-Yatch, branch=feat/meter-pulse-check, 18:58:29Z, MERGEABLE, reviewDecision="".) Age ~12 min at scan — below 30-min Pulse threshold. Will trigger unreviewed-merge alert on merge. Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** 0 open Forge PRs. No recently merged Forge PRs in last 4h. Forge in-flight: 1 task paused_on_tier1. ✅ (paused state is expected given auth block).
+
+**§5.0 Bug-hunt gate Phase-2:**
+- `audit_due_nudge.py`: `[audit-due] no committed audit baseline; no-op.` ✅
+- `distill_detector.py`: `[distill-detector] no un-distilled audits; no-op.` ✅
+- `audit_cadence_signal.py`: script not found (known — §5.0 no-op path). ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1346 watch items:**
+- **Forge building fix-wedged-reaper** — **UPDATED**: hit auth_401 at 18:57:24Z; task paused_on_tier1. NOT building. Action on Larry: run `scripts/auth_orchestrator.py` from chat (re-auth Tier 1) per runbook `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. **CARRY (new status: paused_on_tier1).**
+- **unreviewed-merge:430 DM** — **VERIFIED DELIVERED**: bot log confirms alert idx=1395 delivered at 12:59:29 MDT. ✅ Resolved watch item.
+- **CCD S1 re-dispatch** — **VERIFIED**: no action. `.5.json` in archive. Now doubly blocked (auth + wedge fix). **CARRY.**
+- **fix-headless-approval-dedup-spawn-failure-wedge re-dispatch** — **VERIFIED**: `.1.json` in archive. Same block path. **CARRY.**
+- **install-drift** — 06:00Z UTC June 11. No new alerts. **CARRY.**
+- **alert-translation-no-mirror-dispatch-001** — no change. **CARRY.**
+
+**G-rule tracking:**
+- `missions-card-gc:summary not in alert-translations.json` — **2/3**. No new occurrence. Carry.
+- Others: carry as per iter 1346.
+
+**Standing findings:**
+- [yellow] Forge task paused_on_tier1 (auth_401): `fix-wedged-reaper-spares-active-build-worktree`. **Action on Larry: run `scripts/auth_orchestrator.py` from chat, or follow runbook `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.** DM delivered 12:59:29 MDT.
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Blocked on auth_401 + wedge fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge` build: `.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Now compounded: Forge Tier 1 auth also failed; same underlying auth state.
+- [blue] PR #431 OPEN — "feat(pulse): Check XI — catalog accuracy meter" (Larry-direct, 18:58:29Z). Auto-merge eligible at ~19:28:29Z UTC. Will trigger unreviewed-merge alert on merge.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] unreviewed-merge:429 and :430 — DM'd (Larry-direct). Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2` to send to Beacon.
+
+**Watch items for iter 1348:**
+- **Auth_401 resolution** — Action on Larry: run auth_orchestrator.py. Once re-authed, Forge can resume `fix-wedged-reaper-spares-active-build-worktree` and the spawn-failure chain unblocks.
+- **PR #431** — monitor for merge + unreviewed-merge alert. Auto-merge eligible ~19:28Z.
+- **CCD S1 + headless-dedup re-dispatch** — blocked on auth + wedge fix; no action until auth resolved.
+- **install-drift** — 06:00Z UTC June 11.
+
+**Actions taken:** None (auth_401 is guarded/never-auto; PR #431 below 30-min threshold; all other findings are standing or DM'd-by-notifier).
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (Check 0 triage: Forge auth_401, Tier-2 guarded, claimed by Pulse — already DM'd by notifier). 0 new systemic fixes. interventions=760, systemic_fixes=17, ratio≈44.71, trend=flat. iter_non-clean (auth block + spawn-failures + PR #431 open).
+**Tier end-of-iter:** 1 (consecutive_clean=0; auth_401 block + standing spawn-failures).
+
+---
+
 ## Iteration 1346 — 2026-06-10 18:59Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Root-cause fix in motion — `fix-wedged-reaper-spares-active-build-worktree` dispatched to Forge (phase=preflight) after Larry's "go" at 12:53 MDT. CCD S1 and headless-dedup spawn-failures standing; no re-dispatch until the wedge fix PR lands. 2 new unreviewed-merge alerts (#429, #430 — Larry-direct merges; both DM'd by notifier). 0 open PRs. 9/9 services active.
