@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import ast
 import os
+import shutil
 import sys
 import unittest
 from pathlib import Path
@@ -86,9 +87,10 @@ MIRRORED_AUTOUSE_FIXTURES: dict[str, dict[str, str]] = {
         "purpose": (
             "runtime backstop: stamp a run sentinel into production log() "
             "writes so a write that escapes the sandbox to the real ~/agents "
-            "tree is caught. The __init__ mirror sets the env var; the active "
-            "session-end scan is the pytest fixture's teardown (the unittest "
-            "bootstrap has no session-finish hook)."
+            "tree is caught. The __init__ mirror (_arm_runtime_tripwire) now "
+            "runs the full session lifecycle under the unittest gate — instrument "
+            "at package import, scan the real tree at process exit via atexit — "
+            "the counterpart to the pytest fixture's teardown."
         ),
     },
 }
@@ -338,6 +340,61 @@ class ConftestInitParityTest(unittest.TestCase):
             f"OURLIBERTY_AGENTS_ROOT resolves into the REAL agents tree "
             f"({resolved!r} under {real_agents!r}); test writes would hit "
             "production instead of the sandbox.",
+        )
+
+    def test_runtime_tripwire_armed_under_unittest_gate(self):
+        """The whole point of the unittest mirror: under the bare unittest gate
+        (the runner the regression check uses), importing scripts.tests must ARM
+        the session-end scan — not merely set the env var. Asserts the bootstrap
+        minted a sentinel and flagged itself armed. Under pytest the conftest
+        session fixture owns the scan instead, so this assertion is skipped."""
+        import scripts.tests as pkg  # noqa: F401  (idempotent; runs __init__)
+        if "pytest" in sys.modules:
+            self.skipTest("pytest path: scan owned by conftest session fixture")
+        self.assertTrue(
+            getattr(pkg, "_RUNTIME_TRIPWIRE_ARMED", False),
+            "scripts.tests did not arm the runtime production-write tripwire "
+            "under the unittest gate; a write escaping the sandbox to the real "
+            "~/agents tree would go uncaught (the exact leak class that polluted "
+            "~/agents/blackboard with fixture sentinels for days).",
+        )
+        sentinel = getattr(pkg, "_RUNTIME_TRIPWIRE_SENTINEL", None)
+        self.assertTrue(
+            sentinel and sentinel.startswith("OL-TEST-RUN-SENTINEL-"),
+            f"armed but the run sentinel looks wrong: {sentinel!r}",
+        )
+
+    def test_runtime_tripwire_instrumentation_is_live(self):
+        """Prove the stamp half is actually wired under this process: a
+        production log() helper writes the run sentinel. Without the sys.path
+        setup in _arm_runtime_tripwire, instrument_log_helpers' bare
+        `import agent_runner` would fail and silently no-op the stamping,
+        leaving the scan blind. Runner-agnostic: asserts the sentinel PREFIX,
+        which both the unittest and pytest sentinels carry."""
+        import tempfile
+        from pathlib import Path
+
+        import agent_runner
+
+        tmp = tempfile.mkdtemp(prefix="ol-parity-stamp-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        log_dir = Path(tmp) / "logs"
+        log_dir.mkdir()
+        prev = os.environ.get("OURLIBERTY_LOG_DIR")
+        os.environ["OURLIBERTY_LOG_DIR"] = str(log_dir)
+        try:
+            agent_runner.log("parity-stamp-agent", "instrumentation check")
+        finally:
+            if prev is None:
+                os.environ.pop("OURLIBERTY_LOG_DIR", None)
+            else:
+                os.environ["OURLIBERTY_LOG_DIR"] = prev
+        written = (log_dir / "parity-stamp-agent.log").read_text()
+        self.assertIn(
+            "OL-TEST-RUN-SENTINEL-", written,
+            "agent_runner.log did not carry the run sentinel — the production "
+            "log() helpers are not instrumented, so the tripwire scan cannot "
+            "attribute (and therefore cannot catch) an escaped write.",
         )
 
     def test_chain_event_client_is_blocked(self):

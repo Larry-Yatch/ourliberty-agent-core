@@ -204,6 +204,36 @@ class RunTestsInDirTest(_IsolatedAgentsRoot):
             with self.assertRaises(trc.AnalysisError):
                 trc.run_tests_in_dir(Path('/tmp/x'), 60, None)
 
+    def test_nonzero_exit_without_fail_lines_surfaces_synthetic_failure(self):
+        """A clean "Ran N tests" + OK summary but a non-zero exit (a session
+        guard like the production-write tripwire's atexit os._exit(1)) must NOT
+        be swallowed: run_tests_in_dir surfaces the stable synthetic id so the
+        gate can block on it. Regression for the gap where the tripwire's exit
+        code was invisible to the FAIL/ERROR-line parser."""
+        completed = _completed(stdout=_unittest_output(), returncode=1)
+        with patch.object(trc.subprocess, 'run', return_value=completed):
+            result = trc.run_tests_in_dir(Path('/tmp/x'), 60, None)
+        self.assertEqual(result, {trc.SUITE_EXITED_NONZERO_ID})
+
+    def test_clean_zero_exit_adds_no_synthetic_failure(self):
+        """The common path — all tests pass, exit 0 — must stay empty; the
+        synthetic id only appears on a non-zero exit (no false gate blocks)."""
+        completed = _completed(stdout=_unittest_output(), returncode=0)
+        with patch.object(trc.subprocess, 'run', return_value=completed):
+            result = trc.run_tests_in_dir(Path('/tmp/x'), 60, None)
+        self.assertEqual(result, set())
+
+    def test_real_fail_lines_take_precedence_over_synthetic(self):
+        """When the suite reports real FAIL/ERROR lines AND exits non-zero, the
+        parsed ids are returned as-is — the synthetic id is only a fallback for a
+        non-zero exit with NO parsed failures."""
+        out = _unittest_output(failures=[('test_x', 'scripts.tests.test_a.TA')])
+        completed = _completed(stdout=out, returncode=1)
+        with patch.object(trc.subprocess, 'run', return_value=completed):
+            result = trc.run_tests_in_dir(Path('/tmp/x'), 60, None)
+        self.assertEqual(result, {'scripts.tests.test_a.TA.test_x'})
+        self.assertNotIn(trc.SUITE_EXITED_NONZERO_ID, result)
+
 
 # -------------------- main() / CLI surface --------------------
 

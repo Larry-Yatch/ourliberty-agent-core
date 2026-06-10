@@ -113,10 +113,10 @@ def _production_write_runtime_tripwire():
     write that escaped the redirect = a genuine leak; daemon churn never carries
     the token, so a clean run is green on the live host and in CI alike.
 
-    The unittest mirror (scripts/tests/__init__.py) sets OURLIBERTY_TEST_RUN_
-    SENTINEL too, but the active session-end scan has no unittest equivalent
-    (the package bootstrap has no session-finish hook); it is this fixture's
-    teardown. See test_conftest_init_parity.py.
+    The unittest mirror (scripts/tests/__init__.py) runs the SAME session-end
+    scan via an atexit hook (both call runtime.run_session_end_tripwire); under
+    the unittest gate the leak surfaces as os._exit(1), which the regression gate
+    turns into a synthetic failure. See test_conftest_init_parity.py.
     """
     import test_no_production_writes_runtime as runtime
 
@@ -127,24 +127,12 @@ def _production_write_runtime_tripwire():
     try:
         yield
     finally:
-        for fn in undo:
-            try:
-                fn()
-            except Exception:
-                pass
-        hits = runtime.scan_roots_for_sentinel(
-            runtime.production_roots(), sentinel, session_start,
+        # Shared teardown (undo instrumentation + scan the real ~/agents tree),
+        # identical to the unittest atexit path so the two cannot drift.
+        _, message = runtime.run_session_end_tripwire(
+            sentinel, session_start, undo, runner='pytest session',
         )
         os.environ.pop('OURLIBERTY_TEST_RUN_SENTINEL', None)
-        if hits:
-            listing = '\n'.join(f"  - {h['path']}" for h in hits)
-            raise AssertionError(
-                'PRODUCTION-WRITE TRIPWIRE: the test session left its run '
-                f'sentinel in {len(hits)} file(s) under the real ~/agents '
-                'tree — a write escaped the sandbox redirect:\n' + listing +
-                '\nThis is the leak class the isolation hardening exists to '
-                'catch. Find the test that wrote through an un-redirected '
-                'production helper and route it through tmp_path / the '
-                'OURLIBERTY_*_ROOT sandbox.'
-            )
+        if message:
+            raise AssertionError(message)
 
