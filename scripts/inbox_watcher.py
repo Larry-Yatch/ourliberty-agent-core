@@ -600,6 +600,12 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             )
             bump_requeue(task_file, task)
             return
+        # The worktree ROOT has no top-level CLAUDE.md (agent identities live
+        # in agents/<agent>/ subdirs), so this cwd is NOT the worker's identity
+        # source. Identity is pinned deterministically downstream via
+        # expected_agent=<agent> below -> run_claude's identity_pin_args, which
+        # is independent of cwd/CLAUDE.md discovery. Do not infer the worker's
+        # identity from this working_dir.
         working_dir = str(wt_path)
         log(
             f"[{agent}] worktree ready: {wt_path} "
