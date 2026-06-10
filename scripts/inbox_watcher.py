@@ -42,6 +42,7 @@ import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
+import larry_alerts  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
 import worktree_manager  # noqa: E402
@@ -510,8 +511,26 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
         task.get("source", ""), agent,
     )
     if not route_ok:
+        src = task.get("source", "")
+        envelope_id = task.get("task_id") or task_file.stem
         log(f"[{agent}] routing denied for {task_file.name}: {route_reason}")
         write_invalid(task_file, f"routing: {route_reason}")
+        # A routing-denied drop means a (possibly user-facing) control surface
+        # silently lost an action — never let that be silent again. The
+        # 2026-05-28 dashboard gap dropped Larry's Approve/Reject envelopes to
+        # .invalid while the API returned 200; a warning alert here is the
+        # standing tripwire for any future layer-1/layer-2 mismatch.
+        larry_alerts.append_alert(
+            source="inbox-watcher",
+            severity="warning",
+            subject=f"routing-denied:{src}->{agent}",
+            message=(
+                f"Envelope {envelope_id} dropped to {agent}/.invalid — "
+                f"routing denied: {route_reason}. The {src!r} control surface "
+                f"lost this action silently (its API call may have returned "
+                f"success). No auto-replay; re-issue manually if needed."
+            ),
+        )
         return
 
     # Phase D3 commit 4b — defense in depth: re-check target_repo scope.

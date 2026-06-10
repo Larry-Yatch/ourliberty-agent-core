@@ -414,5 +414,14 @@
       "plain_language_summary": "An open Forge PR has no Mirror review, and the GitHub-truth backstop healer tried to dispatch one but it did not take (the review task is still absent after the dispatch attempt). The happy path here is silent -- the healer normally just dispatches the missed review and logs it; this alert only fires when the dispatch itself keeps failing (e.g. routing denied, missing target_repo), which means a PR will sit unreviewed until a human intervenes. This is the open-PR analogue of the unreviewed-merge detector and the durable fix for the #412 incident (a reaped build session left a clean PR with no review and no local outbox for the outbox-based reconcile to find). The subject carries the PR number after the colon.",
       "recommended_action": "Inspect why the Mirror review-request write is failing: grep the outbox-notifier log (~/agents/logs/outbox-notifier.log) for a 'review-request dispatch FAILED' / RoutingDenied / 'no target_repo' line referencing the task. Re-dispatch manually by writing a review task to ~/agents/inboxes/mirror/, and `gh pr view <N> --repo Larry-Yatch/ourliberty-agent-core` to confirm the PR state."
     }
+  },
+  "inbox-watcher": {
+    "routing-denied": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "An inbox envelope was dropped to <agent>/.invalid because the layer-2 routing table denied its (source -> target) pair, even though it passed layer-1 source validation. A control surface lost this action silently -- its API call may have returned success while the work was discarded. This is the standing tripwire for the 2026-05-28 dashboard gap (dashboard Approve/Reject envelopes passed source validation but had no FRESH_DISPATCH_ROUTES entry). The subject carries the source->target route after the colon; the body carries the dropped envelope id. No auto-replay -- the envelope is gone, not retried.",
+      "recommended_action": "Check whether the source legitimately should reach the target. If yes, add the route to routing_validator.FRESH_DISPATCH_ROUTES (the test_dispatch_route_parity guard exists for exactly this) and re-issue the dropped action manually (its id is in the alert body). If the denial is correct (a genuinely unlisted source), no action -- the alert confirms the gate held. Look in ~/agents/inboxes/<agent>/.invalid/ for the dropped envelope and its .reason sidecar."
+    }
   }
 }
