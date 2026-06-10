@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 1338 — 2026-06-10 ~17:47Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Check 0: 2 new alerts, both Tier-3 known patterns (unreviewed-merge:426, outbox-notifier:review-pass) — journal note only. **Key event:** PR #425 (`fix(orchestrator): pin dispatched-worker agent identity deterministically`) MERGED at 17:42Z UTC — Mirror-approved auto-merge. Systemic fix for `inbox_watcher.py:603 identity-nondeterminism` **VERIFIED LANDED**; G-rule 1/3 CLOSED. PR #426 (`feat(bughunt-gate): Phase 2 — self-tuning corpus distillation loop`) merged by Larry at ~17:36Z UTC; bug-hunt gate soak assessment cycle COMPLETE. All other checks nominal. 9/9 services active. Sync: SUCCESS (17:16:58Z, ~31 min at scan, within 2h). 0 open PRs.
+**Tier state:** 1 (consecutive_clean=0; Check 2 standing non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T17:15:37.141811+00:00 / unreviewed-merge:424` (line 1379, iter 1337)
+- Current total: 1381 lines. 2 new entries since watermark:
+  1. Line 1380 (`2026-06-10T17:36:02Z`) — source=heal-unreviewed-merge-detector, subject=unreviewed-merge:426. Larry-Yatch merged PR #426 (bughunt-gate Phase 2) without Mirror review. Standing Tier-3 known pattern (G-rule `actor=larry-direct-merge` 3/3 threshold met iter 959; APPROVAL_REQUEST `actor-exemption-config` pending `go`). Alert delivered idx=1379 at 11:40:13 MDT. No Pulse action. Journal note only.
+  2. Line 1381 (`2026-06-10T17:42:02Z`) — source=outbox-notifier, intent=review-pass. PR #425 Mirror-approved auto-merge completion notification. Delivered as notification idx=1380 at 11:45:16 MDT. ✅ Informational.
+- ✅ Nominal. No tier-reset from Check 0 (both Tier-3 known patterns).
+- **New watermark: `2026-06-10T17:42:02.018599+00:00 / outbox-notifier:review-pass:fix-worker-identity-pinning-inbox-watcher` (line 1381)**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Bot log since iter 1337 (~17:35Z UTC scan):
+  - 11:40:13 MDT (17:40:13Z): alert idx=1379 delivered (unreviewed-merge:426). Tier-3 standing pattern. No action.
+  - 11:45:16 MDT (17:45:16Z): notification idx=1380 delivered (intent=review-pass, PR #425). ✅
+  - No new Larry inbound messages since 11:14:58 MDT (addressed iter 1336). No agent distress keywords.
+- Standing: source=heal-x fixture log-contamination (09:52 MDT TIER_ONE_MARKER / "resets 11:30am" / "TIER 2 distinct" = confirmed test fixtures per memory). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+- **G-rule update (completion-DM delivery failure, 1/3):** no new delivery failure this iter; notification idx=1380 delivered successfully. G-rule stays at 1/3. No increment.
+⚠️ Tier-reset: YES (standing non-nominal). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json NOT FOUND. All inboxes empty (beacon, forge, mirror, pulse, build_sequence_advancer). No active Forge tasks. 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty. No orphan Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json NOT FOUND (standing per iters 1329+). No unhandled stale daemons. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Recent commits: 1360604 (Pulse cycle 20260610T174232Z), 3610d03 (PR #425 — identity-pinning fix), 041e46d (PR #426 — bughunt-gate Phase 2), d6e499c (Pulse cycle 20260610T172826Z). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=`2026-06-10T17:16:58Z` (~31 min at scan), status=**success**. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** `gh pr list` → `[]`. 0 open PRs. ✅
+- **ourliberty-dashboard:** `gh pr list` → `[]`. 0 open PRs. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** `gate-soak-assessment.json` present (`fired_at: 2026-06-10T16:39:48Z`, `reviews=15`, `first_pass_rate=0.933`, `bughunt_findings=1`). Larry merged PR #426 (bughunt-gate Phase 2) at ~17:36Z UTC — acted on soak assessment. Soak assessment cycle **COMPLETE** ✅. Watch item CLOSED.
+
+**Rotations:** 0 overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1337 watch items:**
+- "Forge build `fix-worker-identity-pinning-inbox-watcher` (deadline 19:18:38Z UTC)" → **RESOLVED ✅**: Mirror approved PR #425 at 11:41:56 MDT; auto-merged at 11:42:01 MDT (17:42:01Z UTC), well within the 2h deadline. Completion DM delivered 11:45:16 MDT. Outbox-notifier teardown: Forge+Mirror worktrees cleaned. G-rule `inbox_watcher.py:603 identity-nondeterminism` CLOSED — systemic fix landed and verified. PRIME DIRECTIVE systemic_fix row appended this iter (see Actions).
+- "install-drift healer fires ~18:00Z UTC June 10" → State file now exists: `_meta = {"activation_alerted": true}`, no `last_dm_at`. Healer fires at ~18:00Z UTC (~13 min from scan). **CARRY** — watch for noon fire to repopulate `last_dm_at`.
+- "CCD probe-retry — post-fix path" → PR #425 merged; `inbox_watcher.py` now pins `--append-system-prompt <agent>` on every worktree spawn per the fix. Identity nondeterminism root cause eliminated. No separate probe-retry dispatch observed. **CARRY** — path unblocked; Larry/Beacon to initiate ccd-s1 re-dispatch when ready.
+- "Bug-hunt gate soak DM — pending Larry decision" → **RESOLVED ✅**: Larry merged PR #426 (bughunt-gate Phase 2, self-tuning corpus distillation loop) in response to soak assessment. Watch item CLOSED.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off" → No evidence of processing in bot log. **CARRY**.
+
+**G-rule tracking:**
+- `inbox_watcher.py:603 identity-nondeterminism` — **RESOLVED ✅** (PR #425 merged 17:42Z UTC, SHA 3610d03). Systemic fix verified landed. Removed from active G-rule tracking.
+- `completion-DM pending-queue delivery failure` — 1/3 (iter 1337). No new occurrence. Notification idx=1380 delivered ✅. Stay at 1/3. Carry.
+- `unreviewed-merge:423+424+426` — G-rule 3/3 threshold met (iter 959); pending `go: actor-exemption-config`. PR #426 adds another known-pattern occurrence; no new Pulse action. Carry.
+- `missions-card-gc:summary not in alert-translations.json` — 1/3 (iter 1333). No new occurrence. Carry.
+- `mirror-dag-pass:chain-context-durability not in alert-translations.json` — 1/3 (iter 1332). Carry.
+- `dispatch-branch-cleanup:gh-unavailable not in alert-translations.json` — 1/3 (iter 1330). Carry.
+- `dispatch-branch-cleanup:summary not in alert-translations.json` — 1/3 (iter 1153). Carry.
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] CCD probe-retry unblocked: identity-pinning fix (PR #425) in production. Ccd-s1 can be re-dispatched with correct agent identity. No Pulse action required; Beacon/Larry to initiate.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; **verified this iter: no merged PR, no open PR, Forge inbox empty** — dispatch likely dead-lettered (consistent with `hand-authored Pulse dispatch envelope dead-letter` G-rule 2/3). Re-dispatch via Beacon needed.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — state file reset (`activation_alerted: true`); fires ~18:00Z UTC June 10 (~13 min from scan).
+- [blue] G-rule completion-DM delivery failure 1/3 (no new occurrence; prior notification delivered ✅).
+- [blue] G-rule missions-card-gc:summary 1/3 (iter 1333).
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3 (iter 1332).
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330).
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3 (iter 1153).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+
+**Watch items for iter 1339:**
+- **install-drift healer** — fires ~18:00Z UTC June 10 (~13 min from scan). Watch `heal-systemd-install-drift.json` `_meta.last_dm_at` to advance. Will be 1/2 clean post-PR #411 cycle if no drift packages found.
+- **CCD probe-retry** — identity-pinning fix in production. Watch for Larry or Beacon to initiate ccd-s1 re-dispatch.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:**
+1. Appended PRIME DIRECTIVE ledger row: `systemic_fix / inbox-watcher-identity-pinning / iter 1338 / closes iter 1334 intervention:ccd-s1-identity-nondeterminism / PR #425 SHA 3610d03`.
+
+**PRIME DIRECTIVE:** 0 new Pulse interventions (Check 0 = 2 Tier-3 known-pattern silences; no dispatches). Systemic fix verified: `inbox_watcher.py:603 identity-pinning` (PR #425). interventions=755, systemic_fixes=17, ratio≈44.4 (improvement from ≈47.2). trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 2 standing non-nominal).
+
+---
+
 ## Iteration 1337 — 2026-06-10 ~17:35Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Check 0: 0 new alerts (watermark unchanged, line 1379). Check 2: standing fixture log-contamination (G-rule 3/3 dispatched iter 1281, Forge brief pending) + NEW [blue] completion-DM delivery failure (alert idx=0 failing since 11:22 MDT; G-rule 1/3). All other checks nominal. Forge build `fix-worker-identity-pinning-inbox-watcher` in build phase (~16 min at scan, within 2h). 0 open PRs. 9/9 services active. Sync: SUCCESS (17:16:58Z, from iter 1336 — most recent sync, 18 min old at scan).
