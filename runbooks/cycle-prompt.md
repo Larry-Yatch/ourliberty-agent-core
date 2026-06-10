@@ -494,22 +494,33 @@ This check is additive — it fires every cycle and adds at most one line to the
 
 These checks fire only on specific weekdays, on top of the always-run mandatory + additive checks above. They do NOT gate tier de-escalation (a quiet conditional check is just quiet) — they're parallel observation surfaces with their own DM cadence.
 
-#### 5.0 Bug-hunt gate Phase-2 — distill detector + audit-cadence signal (self-gating one-shots)
+#### 5.0 Bug-hunt gate Phase-2 — audit-due nudge + distill detector + audit-cadence signal (self-gating one-shots)
 
 (The soak one-shot `assess_gate.py` lived here until 2026-06-10; it fired, Larry chose
 Phase-2, so it and its §5.0 block were retired per its own spec. Phase-2 is below.)
 
 Phase-2 (shipped: the distill→backtest→propose→approve loop) teaches the bug-hunt corpus
-from full-codebase audit findings. Two self-gating one-shots keep it from being missed.
-Every cycle, run both:
+from full-codebase audit findings. Three self-gating one-shots keep the loop fed and from
+being missed. Every cycle, run all three:
 
 ```
+python3 ~/agent-core/scripts/audit_due_nudge.py
 python3 ~/agent-core/scripts/distill_detector.py
 python3 ~/agent-core/review/distill/audit_cadence_signal.py
 ```
 
-Both follow the §5.0 contract exactly — **self-gating, fail-open (never raise), no
+All three follow the §5.0 contract exactly — **self-gating, fail-open (never raise), no
 heartbeat, journal nothing unless they print `FIRED`**:
+
+- **`audit_due_nudge.py`** is the forcing function for the loop's INPUT: it no-ops until
+  enough has changed since the latest `AUDIT_main_<date>.md` to be worth a fresh
+  full-codebase audit (≥60 PRs OR ≥12k non-test `scripts/` LOC — volume, not calendar,
+  since audits are untracked on-disk artifacts; it anchors on the filename date). Then it
+  DMs Larry **once per audit anchor** that an audit is due — he gates the spend (decides
+  whether to run it). Re-arms when a newer audit lands. Sentinel
+  `~/agents/state/audit-due-nudge.json`. Thresholds are tunable in the script; the DM
+  reports the live numbers. (As of 2026-06-10 the repo is already well over threshold, so it
+  fires on the first cycle = bootstrap.)
 
 - **`distill_detector.py`** no-ops until a NEW full-codebase audit (`AUDIT_main_<date>.md`,
   excluding the seed `AUDIT_main_20260605.md` and any non-dated `AUDIT_main_*` doc) lands
