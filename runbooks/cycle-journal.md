@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 1304 — 2026-06-10 ~12:35Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Pipeline advancing. PR #44 (p2-orphan-readability) MERGED ✅ 12:33:42Z UTC — Mirror-reviewed auto-merge. PR #45 (p2-dashboard-cutover) OPEN/MERGEABLE/Vercel-SUCCESS; Mirror review task queued (12:32Z). PR #412 APPROVAL_REQUEST standing. 9/9 core services active.
+**Tier state:** 1 (consecutive_clean=0; PR #412 stall; PR #45 open+awaiting Mirror)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark per iter 1303: 2026-06-10T12:15:22Z (UNCHANGED from iter 1302 — apparent miss of medic alert). Actual state: larry-alerts.jsonl = 1345 lines. Last entry: 12:20:17Z medic notification (`medic-diagnosis`, intent=pipeline-stall:unrouted-pr:PR#412, attempt 5, delivered to Larry at 12:20:31Z by Beacon bot). Iter 1303 reported count=1345 but watermark UNCHANGED — medic alert was not triaged in iter 1303. Correct now: advance watermark to 12:20:17Z. Classify medic alert: PR #412 standing known pattern, medic already DM'd Larry (chat_id confirmed), no new Pulse action warranted. 0 new alerts since 12:20:17Z.
+Watermark: **2026-06-10T12:20:17Z / medic-diagnosis:medic:PR#412-attempt5 / iter 1304**.
+Triage: 0 new alerts since advanced watermark. ✅ Nominal.
+
+VERIFY-BEFORE-REASSERT of iter 1303 watch items:
+- "p2-dashboard-cutover build — Forge building (12:18Z UTC). Expect PR ~12:40–13:00Z" → **AHEAD OF SCHEDULE ✅**: PR #45 opened 12:32:16Z UTC ("feat(missions-v2): cut dashboard Missions tab over to droplet derive (parity-gated)"), Vercel SUCCESS, Mirror review task queued.
+- "p2-orphan-readability build — Forge building (12:17Z UTC). Expect PR after cutover" → **CLOSED ✅**: PR #44 opened 12:26:53Z, Mirror reviewed, MERGED 12:33:42Z UTC.
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY**: ~12:35Z UTC, not yet 18:00Z.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN. ⚠️ [yellow]
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — monitoring for Beacon spec → Forge brief" → **CARRY**: Beacon EMPTY; no Forge brief yet.
+- "Beacon-bot lifecycle restart at 12:22:47Z — verify stable" → **CONFIRMED STABLE ✅**: beacon-bot active, Beacon inbox empty, log clean post-startup. CLOSED.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last entry 12:22:47Z UTC (clean startup). No new inbound from Larry. Last Larry message: "Go" at 08:32Z UTC (unchanged). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall state file age: 2.7 min (fresh). stalls=0. Forge builds completed: PR #44 merged ✅, PR #45 open (Mirror reviewing). No mirror_pass_unmerged gaps detected. Pipeline advancing. ✅ Nominal.
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):** Forge: EMPTY ✅ (builds complete). Beacon: EMPTY ✅. Mirror: 1 task (review-p2-dashboard-cutover.json, 12:32Z, <5 min old — within threshold). Pulse: EMPTY ✅. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT. All 9/9 services active (beacon-bot, chain-event-shipper, cycle.timer, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean, HEAD=20634c1 ("Pulse cycle 20260610T122531Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T12:16:19Z (~19 min at scan — within 2h threshold). status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 core services active (verified systemctl is-active). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #44 (ourliberty-dashboard): MERGED ✅** 12:33:42Z — "feat(missions-v2): orphan-lane readability". Watch item CLOSED.
+- **PR #45 (ourliberty-dashboard): OPEN** — forge/p2-dashboard-cutover, created 12:32:16Z (~3 min old), MERGEABLE, Vercel SUCCESS. Mirror review-p2-dashboard-cutover.json queued. < 30 min threshold; no auto-merge action needed.
+- **PR #412 (ourliberty-agent-core): OPEN/UNKNOWN** — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** token-rotation-schedule.json: 0 credentials overdue, 0 within-60d window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead PRs` — **3/3 DISPATCHED** (iter 1298). Beacon consumed ✅. No Forge brief yet. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (no new occurrence). Carry.
+
+**Standing findings (unchanged):**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Medic attempt 5 at 12:20Z; delivered to Larry.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419; #418/#421 no alert fired) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1305):**
+- **PR #45 (ourliberty-dashboard p2-dashboard-cutover)** — Mirror review-p2-dashboard-cutover.json queued (12:32Z). Expect Mirror PASS + auto-merge ~12:50–13:10Z UTC.
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean cycle post-PR #411.
+- **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — monitoring for Beacon spec → Forge brief.
+
+**Actions taken:** None. Pipeline self-advancing on all tracks.
+**PRIME DIRECTIVE:** 0 new interventions. 0 new systemic_fixes. interventions=750, systemic_fixes=16, verification_pending=7, ratio=46.875. iter_non-clean (PR #412 stall; PR #45 open).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1303 — 2026-06-10 ~12:22Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline self-advancing. `build-p2-dashboard-cutover.json` and `build-p2-orphan-readability.json` both in Forge inbox (dispatched ~12:17–12:18Z UTC; marker-error-p2-dashboard-cutover resolved ✅). 0 new alerts. 9/9 core services active.
