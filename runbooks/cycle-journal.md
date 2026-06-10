@@ -4,6 +4,68 @@
 
 ---
 
+## Iteration 1217 — 2026-06-10 00:03Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Drift — 1 new alert (unreviewed-merge:404); all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z; standing signals active + new occurrence)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1398 lines** (+1 since iter 1216 watermark 1397/23:08:27Z). New alert (line 1398): `unreviewed-merge:404` (ts=2026-06-09T23:55:10Z, source=heal-unreviewed-merge-detector, severity=critical, route=escalate). PR #404 "feat(missions-v2): Phase 0 — desktop session feed (ingest endpoint + hook)" merged by Larry-Yatch at 23:52:43Z, reviews=[]. DM **ALREADY DELIVERED** by outbox-notifier at 23:57:08Z (beacon_telegram_bot.log idx=1397). Known G-rule pattern (3/3 threshold met iter 967; `actor=larry-direct-merge`). Prior streak of 6 (PRs #396–402) ended with PR #403 (Mirror-reviewed at 23:08Z). PR #404 starts **new streak: 1**. No corrective dispatch needed — G-rule already dispatched pending `go: actor-exemption-config`. ⚠️ Non-clean; tier-reset. New watermark: 1398 / 2026-06-09T23:55:10Z.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last Larry directives at 22:49/22:51Z ("what about step two now that PR 401 merged" / "go") — both tracked/resolved by PR #403 (merged 23:08Z). Rate-limit at 17:06:17 MDT = known standing item. No new Larry messages, no orphan directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T23:56:17Z (FRESH — ~7 min old at scan). State file snooze map: 5 cooldown keys (forge_built_no_pr:*, mirror_marker_invisible:*, no_session_revision:* — all old snoozed entries). Active stalls: 0. ✅ Nominal.
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json absent (one-shot healer; normal pattern). 8/8 services active. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=c486796 ("Pulse cycle 20260609T235328Z"). Git commands blocked by interactive session permission guard (expected). ✅ Nominal.
+
+**Check B — Sync health:** status=error, last_sync=2026-06-09T23:07:01Z (UNCHANGED from iter 1216). sync-push-rebase-fallback-001 60th+ occurrence, self-recovering. APPROVAL_REQUEST standing. ✅ (known [blue])
+
+**Check C — Agent liveness:** 8/8 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api. ourliberty-agent-core-health.service: failed (known standing — health-check-notify-script-missing). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Credential rotation check:** Alert count 1398; the 1 new alert is unreviewed-merge (not credential-drift). credential-drift:OL_DB_RO_URL VERIFIED CLOSED ✅. No credentials due within 60 days. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open Forge PRs. Last merge: PR #404 (23:52Z, Larry-direct) + PR #403 (23:08Z, Mirror auto-merge). ✅
+
+**Bug-hunt gate (§ 5.0):** Not re-run (Wednesday June 10, same soak period). 2/15 gate reviews — soaking. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward standing items:**
+- `credential-drift:OL_DB_RO_URL`: Alert count 1398; new alert is unreviewed-merge, not credential-drift. VERIFIED CLOSED ✅.
+- `unreviewed-merge streak: 6` (PRs #396–402): OLD STREAK ENDED with PR #403 Mirror-review. UPDATED: new streak = 1 (PR #404). Carry forward with corrected streak count.
+- `health-check-notify-script-missing`: Forge inbox empty. APPROVAL_REQUEST `notify-larry-phase-d-channel-001` still pending Larry dashboard tap. Not re-run this iter. Carry forward.
+- `Tier 2 weekly probe failed (auth_401)`: 17:06:17 MDT June 9 = same known standing log line. Not a new occurrence. Carry forward.
+- `Check IX GITHUB_TOKEN missing`: Not re-tested. Carry forward.
+- `sync-push-rebase-fallback-001`: sync.json status=error, 23:07:01Z unchanged. VERIFIED STILL ACTIVE [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. No new occurrence. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): Cycle timer running normally. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): Forge inbox empty; APPROVAL_REQUEST pending. Carry forward.
+
+**Standing findings (updated):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: new streak 1** (PR #404) — DM delivered 23:57Z. Pending `go: actor-exemption-config`. (Prior streak 6 PRs #396–402 ended with PR #403 Mirror-reviewed.)
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 60th+ at 23:07Z; self-recovering.
+
+**Actions taken:** None. (DM for unreviewed-merge:404 delivered automatically by outbox-notifier at 23:57Z — no further Pulse action required.)
+**Dispatches:** None.
+**PRIME DIRECTIVE:** +1 intervention (Check 0 triage: unreviewed-merge:404 known-pattern occurrence noted, DM already in-flight). interventions=734, systemic_fixes=15, verification_pending=5, ratio≈48.93 (was 48.87).
+**Tier end-of-iter:** 1, consecutive_clean=0 (new Check 0 signal this iter).
+
+---
+
 ## Iteration 1216 — 2026-06-09 23:51Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all mandatory checks clean; 0 new alerts since iter 1215 watermark; standing items unchanged.
