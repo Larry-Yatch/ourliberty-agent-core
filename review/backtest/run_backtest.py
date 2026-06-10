@@ -17,11 +17,12 @@ Reviewer backend is pluggable via --backend:
 
 Scope flags: --pilot N (first N, severity-sorted), --severity HIGH, --ids 1,11,9.
 """
-import json, subprocess, argparse, pathlib, re, sys, tempfile
+import json, subprocess, argparse, pathlib, re, sys, tempfile, shutil
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LENSES = (ROOT / 'review' / 'mirror-bughunt-lenses.md').read_text()
 SEV_ORDER = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
+MAP_PATH = ROOT / 'review/backtest/mapping.json'
 
 def git(*a):
     return subprocess.run(['git', *a], cwd=ROOT, capture_output=True, text=True).stdout
@@ -88,6 +89,105 @@ def extract_json(text, kind='array'):
                 try: return json.loads(text[start:i+1])
                 except Exception: return None
     return None
+
+# --- Phase-2 reuse: signature-injected, context-reading backtest of a SINGLE finding ---
+# This is the "real config" backtest (corpus signature injected + context-reading in the
+# buggy worktree) that rerun_misses.py pioneered, packaged as an import-safe function so
+# review/distill/run_distill.py can mini-CI a proposed/sharpened class (guardrail c).
+
+REVIEW_PROMPT_SIG = """You are a code-review gate sub-agent. Review the PR diff below for \
+correctness, reliability, data-loss, and security bugs, using these lenses:
+
+{lenses}
+
+KNOWN BUG PATTERN to weight heavily this review (class `{cid}`):
+{sig}
+
+{context_note} PR diff under review:
+```diff
+{diff}
+```
+Return ONLY a JSON array, each: {{"file","line_hint","lens","severity","description"}}. \
+[] if none."""
+
+CTX_NOTE_WORKTREE = ("The full repository (at this PR's resulting state) is your working "
+                     "directory — Read/grep any file to check call sites and cross-file "
+                     "seams before deciding.")
+CTX_NOTE_TOOLFREE = ("You MAY assume the rest of the repo exists; reason about call sites "
+                     "from the diff alone (no file access).")
+
+
+def _call_claude_ctx(prompt, cwd):
+    # context-reading variant: read-only tools allowed, runs inside the buggy worktree.
+    p = subprocess.run(
+        ['claude', '-p', '--allowedTools', 'Read', 'Grep', 'Glob', 'Bash(grep:*)', 'Bash(sed:*)'],
+        input=prompt, capture_output=True, text=True, timeout=900, cwd=cwd)
+    return p.stdout.strip()
+
+
+_MAP_CACHE = None
+
+
+def _load_map():
+    # mapping.json is static ground truth; backtest_class is called once per finding in a
+    # loop, so memoize rather than re-parse it on every call.
+    global _MAP_CACHE
+    if _MAP_CACHE is None:
+        _MAP_CACHE = {m['id']: m for m in json.loads(MAP_PATH.read_text())['mapped']}
+    return _MAP_CACHE
+
+
+def backtest_class(finding, detection_signature, class_id, *,
+                   synthetic_diff=None, read_context=True):
+    """Would the gate, armed with `detection_signature` for `class_id`, catch this
+    finding? Returns {'caught': bool|None, 'reviewer_n': int, 'reason': str}.
+
+    Diff source:
+      - finding id in mapping.json (and no synthetic_diff) -> reverse its fix commit in a
+        worktree at fix~1 (the buggy state), reviewer reads context there. Deterministic;
+        used by the LOCO acceptance proof.
+      - else -> requires `synthetic_diff` (the finding's own cited buggy hunk at HEAD),
+        reviewed tool-free. The path for genuinely NOVEL audit findings with no fix yet.
+    """
+    fid = finding['id']
+    mp = _load_map()
+    use_worktree = synthetic_diff is None and fid in mp and read_context
+    wt = None
+    try:
+        if synthetic_diff is not None:
+            diff, cwd, note, caller = synthetic_diff, ROOT, CTX_NOTE_TOOLFREE, call_claude
+        elif fid in mp:
+            m = mp[fid]
+            diff = buggy_diff(m['fix_commit'], m['file'])
+            if not diff.strip():
+                return {'caught': None, 'reviewer_n': 0, 'reason': 'empty reverse diff'}
+            if use_worktree:
+                wt = tempfile.mkdtemp(prefix=f'distill-bt-{fid}-')
+                git('worktree', 'add', '--detach', wt, m['fix_commit'] + '~1')
+                cwd, note, caller = wt, CTX_NOTE_WORKTREE, _call_claude_ctx
+            else:
+                cwd, note, caller = ROOT, CTX_NOTE_TOOLFREE, call_claude
+        else:
+            return {'caught': None, 'reviewer_n': 0,
+                    'reason': 'no mapping.json row and no synthetic_diff — cannot reconstruct a buggy diff'}
+
+        rprompt = REVIEW_PROMPT_SIG.format(lenses=LENSES, cid=class_id,
+                                           sig=detection_signature, context_note=note,
+                                           diff=diff[:24000])
+        reviewer = caller(rprompt, cwd) if caller is _call_claude_ctx else caller(rprompt)
+        rfindings = extract_json(reviewer, 'array') or []
+        jprompt = JUDGE_PROMPT.format(
+            id=fid, severity=finding.get('severity', '?'), category=finding.get('category', '?'),
+            file=finding.get('file', '?'), line=finding.get('line', '?'),
+            title=finding.get('title', ''), reviewer=json.dumps(rfindings)[:6000])
+        verdict = extract_json(call_claude(jprompt), 'object') or {'caught': None}
+        return {'caught': verdict.get('caught'), 'reviewer_n': len(rfindings),
+                'reason': verdict.get('reason', '')}
+    finally:
+        if wt:
+            git('worktree', 'remove', '--force', wt)
+            shutil.rmtree(wt, ignore_errors=True)
+
 
 def main():
     ap = argparse.ArgumentParser()

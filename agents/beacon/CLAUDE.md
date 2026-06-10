@@ -748,6 +748,23 @@ When you see either shape on Telegram, dispatch a Claude-as-Forge config-only PR
 
 **Cross-reference:** `agents/pulse/CLAUDE.md` Check VIII section (producer side); `docs/check-viii-burn-rate-signal-brief.md` § 2 PR-2b (analyzer spec); `scripts/pulse_check_viii.py` (implementation). Same shortcut shape and idempotency rule as Check III above — pattern is identical, only the target config field differs.
 
+## Bug-hunt corpus distillation approvals — `approve distill-update-<date>` / `reject distill-update-<date>`
+
+Phase-2 of the Mirror bug-hunt gate teaches the corpus. The desktop distiller (`review/distill/run_distill.py`) writes a proposal artifact to `~/agents/blackboard/pulse-distill-proposals/distill-<audit-date>.json` carrying proposed corpus changes already validated by a mini-backtest: `new_classes[]` (full corpus-schema entries with a `backtest` result), `recurrence_updates[]` (bump `example_finding_ids` on existing classes; a non-null `signature_edit` is a sharpened detection signature), `dedup_merges[]`, `lens_gaps[]`, `convergence{}`, and `corpus_regression_backtest{}`. **Larry gates the corpus CHANGE; the distiller already gated on backtest RESULTS.** This is the approve leg that turns an approved artifact into a config-only PR appending to the ONE canonical corpus `review/known-bug-patterns.json` — a near-clone of the Check VIII handler above.
+
+Larry approves with `approve distill-update-<date>` (or `reject distill-update-<date>: <reason>`). When you see either shape on Telegram:
+
+1. **Locate the artifact.** Read `~/agents/blackboard/pulse-distill-proposals/distill-<date>.json` — the path is the source of truth (`<date>` is the audit date in the filename). **Do not act on an artifact that doesn't exist** — abort and DM Larry.
+2. **Idempotency check.** If the artifact already has `applied: true`, this approval is a no-op WARN: *"distill-update-`<date>` was already applied; no action."* Do NOT emit another APPROVAL_REQUEST. The `applied: true` flag is the gate — same rule as Check VIII.
+3. **Sanity gate before dispatch.** Refuse to dispatch if `corpus_regression_backtest.pass` is `false` (a sharpened signature regressed the existing ground-truth catch-rate) — DM Larry that the proposal failed its regression backtest and needs a desktop re-run. Surface any `lens_gaps[]` (a proposed class needs a NEW review lens) in the approval dialog: those require a lenses-doc edit too, not just a corpus append — confirm with Larry before dispatching.
+4. **Reject path.** If Larry sent `reject`, write `applied: false, rejected: true, rejected_reason: <text>` to the artifact. No PR. Confirm to Larry.
+5. **Approve dispatch.** Emit an APPROVAL_REQUEST marker via `marker.py`. `task_id` = `distill-update-<date>-001`. The `prompt` instructs Forge to edit ONLY `review/known-bug-patterns.json`: append each `new_classes[]` entry (minus its `backtest` field) to `classes[]`, apply each `recurrence_updates[]` (extend that class's `example_finding_ids`; replace `detection_signature` iff `signature_edit` is non-null), and bump `meta` provenance to name the source audit. Include the artifact path for cross-reference. Set `task_type: doc-only` so trust policy auto-approves a config-only PR. The distiller NEVER edits the corpus itself (guardrail b — one writer); this handler is that writer.
+6. **Flip applied flag after merge.** When Mirror's REVIEW_PASS notify arrives for that task, edit the artifact's `applied: true`. Future replays become a no-op WARN.
+
+**Shortcut idempotency is non-negotiable** — same rule as Check VIII: an already-applied date must never produce a second corpus PR.
+
+**Cross-reference:** memory `mirror-bughunt-gate-project`; producers `review/distill/run_distill.py` + `review/distill/distill_findings.py`; cycle-prompt § 5.0b (the detector + cadence one-shots).
+
 ## Mission registration discipline (E4.4f)
 
 The mission registry at `agents/beacon/missions.json` is the canonical record of every technical multi-PR initiative the chain is working on. The Missions tab on the dashboard reads this file (via `GET /api/system/missions`) and joins it with `chain_events` + open-PR state to render the kanban (spec `agents/beacon/specs/e4-4f-missions-tab-v1.md` § 5.1, § 5.2).
