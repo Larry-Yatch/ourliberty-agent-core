@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 1361 — 2026-06-10 20:42Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing carries. Wedge-reaper build dispatch DROPPED (carry iter 1352). `fix-tier1-classifier-envelope-not-content-scan` APPROVAL_REQUEST pending Larry (~1h12m since 19:30Z DM). CCD S1 + headless-dedup blocked. **Discipline 1 correction: `heal-stale-daemon-code` was labeled "healer-down" in iters 1358–1360 based on missing state JSON; heartbeat file shows healer IS running (20:42:46Z = now).** 0 new alerts. 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; standing pipeline block + pending approval)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402` (iter 1360)
+- Current total: **1402 lines** — 0 new entries. ✅ Nominal.
+- Alert-triage.json: 0 open alerts. ✅ Nominal.
+- **New watermark: unchanged (2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- beacon-bot.log last modified: 14:01:07 MDT (20:01:07Z). Bot idle since then — no new Larry messages, no new alerts to deliver (last alert at 14:01:07 MDT = alert 1401 from heal-unreviewed-merge-detector). Idle state matches absence of activity, not a hang.
+- beacon-pending-approvals.json: EXISTS at `~/agents/state/` (VERIFIED). 1 pending: `fix-tier1-classifier-envelope-not-content-scan` (created_at=2026-06-10T19:30:19Z, ~1h12m at scan). No approval in bot log after DM time. Approval genuinely still pending Larry.
+- ⚠️ tier-reset: YES (unresolved pending approval, standing)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- heal-pipeline-stall-state.json: EXISTS, mtime 20:34Z (~8 min). Fresh. All stall entries snoozed to 2099 = no active stalls. ✅
+- Forge inbox: EMPTY. All agent inboxes (beacon, forge, mirror): EMPTY. 0 open PRs.
+- Wedge-reaper fix: still unbuilt. No new dispatch since iter 1352 archive.
+- CCD S1 + headless-dedup: blocked on wedge fix + classifier fix. Unchanged.
+- ⚠️ tier-reset: YES (standing pipeline block)
+
+**Check 4 — Pending directives:**
+- Last Larry message: 13:27:01 MDT (19:27Z). No new messages since iter 1360. Standing APPROVAL_REQUESTs carry. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code-state.json: MISSING (no state JSON in current healer implementation).
+- **heal-stale-daemon-code.heartbeat: 2026-06-10T20:42:46Z = NOW.** Healer IS running. Prior "healer-down" label was wrong — based on state-file absence, not heartbeat. Healer runs, finds nothing, doesn't write state JSON when clean. This is nominal.
+- MANUAL CHECK: outbox-notifier service started after its script mtime. No stale-daemon condition. ✅
+- 9/9 services active. journalctl: no warnings. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T19:50:16Z` (~52 min at 20:42Z), status=no-change. Within 2h threshold (expires 21:50:16Z). ✅ Nominal. (**WATCH:** next iter after 21:50Z should trigger sync.)
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). agent-core-health.service "failed" — expected (one-shot). Beacon-bot log last modified 20:01:07Z (41 min ago); idle state consistent with no new activity since last alert delivery. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- All inboxes empty. Outbox-notifier last entry 14:04:44 MDT (20:04:44Z) — pipeline quiescent.
+- Wedge-reaper build archived (no new dispatch).
+- silence-missions-card-gc-summary-alert-001: standing drop (carry iter 1360). No new action this iter.
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** no-op. ✅
+
+**Credential rotations:** 0 overdue (nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, ~73 days). ✅
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1360 unchanged. No new occurrences verified this iter.
+- **Discipline 1 note:** heal-stale-daemon-code "healer-down" standing item is RETRACTED — healer heartbeat confirms it is running. Remove from standing list.
+
+**Actions taken:** None (no auto-fix thresholds crossed; all findings are standing carries).
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build dispatch DROPPED** (carry iter 1352) — **Action on Larry: say "go: redispatch wedge-reaper build" to Beacon in Telegram.**
+- [yellow] `fix-tier1-classifier-envelope-not-content-scan` — APPROVAL_REQUEST pending Larry (~1h12m since 19:30Z DM). **Action on Larry: say "go: fix-tier1-classifier-envelope-not-content-scan" in Telegram.**
+- [yellow] CCD S1 build spawn-failure. Blocked on wedge fix + classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 dispatch DROPPED — APPROVAL_REQUEST (doc-only) emitted by Beacon at ~20:06Z iter 1354 result; never reached Forge; no PR. Lower priority (doc-only config change). Re-dispatch when wedge-reaper path is cleared.
+- [blue] install-drift — watch 06:00Z June 11 (~9.3h from now). heal-systemd-install-drift heartbeat 18:00:03Z today — healer running normally.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] catalog-accuracy-drift 1/3 (PR #433 root cause fixed; watching for re-occurrence).
+
+**Watch items for iter 1362:**
+- **Wedge-reaper build**: Watch for Larry's "go: redispatch wedge-reaper build" in Telegram.
+- **fix-tier1-classifier-envelope-not-content-scan**: Watch for Larry's "go" response (~1h12m pending as of this iter).
+- **silence-missions-card-gc-summary-alert-001**: Re-dispatch when wedge path clear.
+- **install-drift**: watch 06:00Z June 11.
+- **Check B sync**: last_sync=19:50:16Z — 2h expires 21:50Z; trigger sync if next iter is after that.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (all standing carries; no new dispatches). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. iter non-clean (standing pipeline block + pending approval).
+**Tier end-of-iter:** 1 (consecutive_clean=0; standing issues).
+
+---
+
 ## Iteration 1360 — 2026-06-10 20:40Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing carries. Wedge-reaper build dispatch DROPPED (carry iter 1352). `fix-tier1-classifier-envelope-not-content-scan` APPROVAL_REQUEST pending Larry (~1h10m since 19:30Z DM). CCD S1 + headless-dedup blocked. **NEW FINDING: `silence-missions-card-gc-summary-alert-001` build dispatch DROPPED** — Beacon emitted APPROVAL_REQUEST (doc-only, auto-approve expected) at ~20:06Z iter 1354 result-notification, but it is NOT in beacon-pending-approvals.json and Forge never received the task. PR not in merged history. "Forge brief MISSING" watch (iters 1355–1359) was correct: build was dropped, not just slow. 0 new alerts. 0 open PRs. 9/9 services active.
