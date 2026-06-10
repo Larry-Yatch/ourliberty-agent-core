@@ -412,6 +412,63 @@ def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id,
         pass
 
 
+def _verify_transcript_persisted(agent_id, home, tier, cwd, session_id,
+                                 task_stem=None):
+    """Fail LOUD when a successful run's transcript did not persist to disk.
+
+    A session whose transcript never landed cannot be resumed: the next
+    phase's ``--resume <session_id>`` finds no conversation file and dies with
+    'No conversation found'. The session_id comes back fine, so creation looks
+    successful — the failure only surfaces (silently, fatally) at the next
+    resume. 2026-06-10 EROFS incident: tier2 dispatches wrote transcripts under
+    a HOME that ProtectHome=read-only left unwritable, so every tier2
+    build-phase resume failed this way. Surface it at creation time instead.
+
+    Claude Code stores the transcript at
+    ``<home>/.claude/projects/<cwd-with-slashes-as-dashes>/<session_id>.jsonl``
+    (slug rule mirrors heal_wedged_review_sessions.cwd_to_slug). Returns True
+    if the transcript exists, False (after logging ERROR + emitting a
+    larry-alert keyed subject=transcript-not-persisted:<tier>) if it is absent.
+    """
+    slug = cwd.replace('/', '-')
+    transcript = (
+        Path(home) / '.claude' / 'projects' / slug / (session_id + '.jsonl')
+    )
+    if transcript.exists():
+        return True
+    log(agent_id,
+        'TRANSCRIPT_NOT_PERSISTED tier=' + tier +
+        ' session=' + session_id[:12] + '...' +
+        ' expected=' + str(transcript) +
+        " — session cannot be resumed; next --resume will fail with "
+        "'No conversation found'",
+        'ERROR')
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+        la.append_alert(
+            source='agent-runner-' + agent_id,
+            severity='critical',
+            message=(
+                'Task `' + (task_stem or 'unknown-task') + '` (' + agent_id +
+                ') ran successfully on ' + tier.replace('tier', 'Tier ') +
+                ' but its transcript did not persist to ' + str(transcript) +
+                '. The session cannot be resumed — the next build/revision '
+                "phase's --resume will fail with 'No conversation found'."
+            ),
+            subject='transcript-not-persisted:' + tier,
+            suggested_action=(
+                "Verify the agent's systemd unit lists the active tier's HOME "
+                'in ReadWritePaths (2026-06-10 EROFS incident: tier2 HOME '
+                '/home/larry/.claude-larry-personal was missing). Then '
+                'sudo systemctl daemon-reload + restart the unit.'
+            ),
+        )
+    except Exception:
+        pass
+    return False
+
+
 def _build_cmd_for_tier(base_cmd, model, fallback, session_id):
     """Return a fresh command list for a Tier 2 retry. Keeps everything
     identical to the Tier 1 invocation EXCEPT we never thread --resume on
@@ -966,6 +1023,14 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             active_tier_name = active_tier.read()['tier']
             auth_source = _apply_tier_auth(env, active_tier_name, token)
 
+            # Track the HOME/tier that actually produces the successful result,
+            # for the post-run transcript-persistence check. Defaults to the
+            # primary tier; the tier2-fallback branch overrides both when its
+            # retry is the one that succeeds (its transcript lands under the
+            # fallback HOME, not this one).
+            effective_home = env['HOME']
+            effective_tier = active_tier_name
+
             if model_override:
                 model, fallback = model_override, 'sonnet'
             else:
@@ -1328,6 +1393,11 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                         t2.returncode, t2.stdout, t2.stderr,
                                     )
                                     output = result.stdout + result.stderr
+                                    # The fallback retry's transcript lands
+                                    # under the fallback HOME/tier, so the
+                                    # persistence check must target those.
+                                    effective_home = fallback_home
+                                    effective_tier = other_tier_name
                                 else:
                                     log(agent_id,
                                         'TIER2_FALLBACK_FAILED reason=' +
@@ -1436,6 +1506,17 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
 
                     if result.returncode == 0 and not is_error:
                         tm.report_success(account_id)
+                        # Fail LOUD if the transcript didn't persist: a
+                        # session whose .jsonl never landed cannot be resumed,
+                        # so the next phase's --resume would die with 'No
+                        # conversation found'. Surface it now (ERROR +
+                        # larry-alert) instead of silently stranding the next
+                        # dispatch. 2026-06-10 EROFS incident.
+                        if new_session_id:
+                            _verify_transcript_persisted(
+                                agent_id, effective_home, effective_tier,
+                                cwd, new_session_id, task_stem=task_stem,
+                            )
                         cost = response.get('total_cost_usd')
                         cost_str = ', $' + f'{cost:.4f}' if cost else ''
                         log(agent_id, 'Completed successfully (account=' + account_id +
