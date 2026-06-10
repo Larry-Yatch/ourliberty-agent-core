@@ -18,7 +18,10 @@ REPO_DIR="${REPO_DIR:-/home/larry/agent-core}"
 LIVE_ROOT="${LIVE_ROOT:-/home/larry/agents}"
 STAGING_ROOT="${STAGING_ROOT:-/home/larry/agents/.sync-staging}"
 BACKUP_ROOT="${BACKUP_ROOT:-/home/larry/agents/.sync-backup}"
-BLACKBOARD_DIR="/home/larry/agents/blackboard"
+# Derived from LIVE_ROOT (default /home/larry/agents/blackboard, unchanged in
+# production) so the test harness, which already redirects LIVE_ROOT into a
+# tmpdir, doesn't trip write_status on the hardcoded /home/larry path.
+BLACKBOARD_DIR="${BLACKBOARD_DIR:-${LIVE_ROOT}/blackboard}"
 SYNC_STATUS_FILE="${BLACKBOARD_DIR}/agent-core-sync.json"
 SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -136,53 +139,75 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
-# Machine-owned runtime auto-commit (sync resilience). Closes the 2026-05-28
-# iter-98 incident class and its 2026-06-10 captures.json sibling: automation
-# leaves a machine-owned runtime file uncommitted (an interactive Pulse /cycle's
-# cycle-journal/cycle-actions/MEMORY, or agents/beacon/captures.json between the
-# missions ingest write and the heal_missions_card_gc commit), and sync refuses
-# to pull for hours/until the other committer's next tick.
+# Machine-owned runtime handling (sync resilience). Two distinct classes of
+# machine-owned dirt, handled differently so each has exactly ONE committer:
 #
-# Posture change (bounded): sync, which has historically been pull-only,
-# gains the ability to push EXACTLY ONE commit to origin/main, and only when
-# every modified file is inside the hardcoded auto-commit allowlist
-# (SYNC_AUTOCOMMIT_PATHS) in scripts/_lib_pulse_runtime.sh. Any non-allowlist
-# dirt falls through to the existing refuse-and-alert path unchanged.
+#  * Pulse runtime files (PULSE_RUNTIME_PATHS): an interactive Pulse /cycle can
+#    leave runbooks/cycle-journal.md, runbooks/cycle-actions.jsonl, or pulse
+#    MEMORY files uncommitted (the 2026-05-28 iter-98 incident class). Sync, which
+#    is otherwise pull-only, auto-commits + pushes EXACTLY ONE commit of these so
+#    it isn't blocked for hours until run_cycle.sh's next tick.
 #
-# Failure mode: if the push fails (non-FF, network, auth), the local commit is
-# hard-reset to its pre-auto-commit HEAD so we never leave a local-only commit
-# on main that would break the next fast-forward. The fixture-pattern guard
-# (mirrored from run_cycle.sh) refuses to auto-commit any staged change whose
-# diff mentions a fixture-leak task_id.
+#  * captures.json (SYNC_EXTRA_RUNTIME_PATHS): machine-owned missions-capture
+#    state whose SOLE committer is heal_missions_card_gc.py (every ~10min). Sync
+#    must NOT also commit it. #409 originally made sync a second committer, which
+#    created a dual-committer race on origin/main and, on a failing push, sync's
+#    `git reset --hard` reverted captures.json on disk and lost the ingests
+#    written during the push window. Sync now TOLERATES this dirt: it neither
+#    commits nor resets captures.json and proceeds to the ff-pull. The healer
+#    remains the single committer and persists it on its own tick. The ff-pull is
+#    safe because the healer commits to THIS working tree first, so its
+#    captures.json commits are already in local HEAD before origin advances — an
+#    incoming ff never carries a captures.json change, and git fast-forwards
+#    cleanly past commits that don't touch a dirty file.
+#
+# Any dirt outside both sets falls through to the refuse-and-alert path below.
 # shellcheck source=_lib_pulse_runtime.sh
 source "${SCRIPTS_DIR}/_lib_pulse_runtime.sh"
 # shellcheck source=_lib_push_with_rebase.sh
 source "${SCRIPTS_DIR}/_lib_push_with_rebase.sh"
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    if all_modified_in_sync_autocommit_allowlist "$REPO_DIR"; then
+    # Auto-commit ONLY Pulse runtime dirt, and only when ALL dirt is
+    # machine-owned (Pulse + healer-owned extras) and at least one Pulse file is
+    # dirty. captures.json, if also dirty, is intentionally NOT staged — it is
+    # left for its sole committer (the GC healer).
+    if all_modified_in_sync_autocommit_allowlist "$REPO_DIR" \
+       && any_modified_in_pulse_runtime_allowlist "$REPO_DIR"; then
         AUTO_PRE_HEAD="$(git rev-parse HEAD)"
-        log "Machine-owned runtime allowlist dirty (no other modifications) — auto-commit + push"
-        git add -- "${SYNC_AUTOCOMMIT_PATHS[@]}" 2>/dev/null || true
+        log "Pulse runtime allowlist dirty — auto-commit + push (captures.json, if dirty, left for the GC healer)"
+        git add -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
 
         TS=$(date -u +%Y%m%dT%H%M%SZ)
-        if git commit -q -m "runtime: auto-commit machine-owned runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only machine-owned runtime files dirty (see SYNC_AUTOCOMMIT_PATHS in scripts/_lib_pulse_runtime.sh). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
-            log "Auto-committed machine-owned runtime files; pushing to origin/main"
+        if git commit -q -m "runtime: auto-commit Pulse runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: Pulse-owned runtime files were dirty (see PULSE_RUNTIME_PATHS in scripts/_lib_pulse_runtime.sh). captures.json, if also dirty, is left to heal_missions_card_gc.py (its sole committer). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
+            log "Auto-committed Pulse runtime files; pushing to origin/main"
             # Reuse run_cycle.sh's rebase fallback: a bare push loses the race
             # when an interactive PR merge advances origin/main mid-cycle. Rebase
             # onto origin and retry instead of rolling back + alerting on every
             # routine non-FF (SYNC-PUSH-REBASE-FALLBACK-001).
             if push_with_rebase origin main /dev/stdout; then
-                log "Pushed machine-owned runtime auto-commit to origin/main (rebase fallback available)"
+                log "Pushed Pulse runtime auto-commit to origin/main (rebase fallback available)"
             else
-                log "ERROR: push of machine-owned runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD}"
+                log "ERROR: push of Pulse runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD} (captures.json preserved)"
                 git rebase --abort 2>/dev/null || true
-                git reset --hard "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
+                # Undo the auto-commit WITHOUT touching the working tree: a
+                # `--mixed` reset moves HEAD+index back to AUTO_PRE_HEAD (so no
+                # local-only commit lingers to break the next fast-forward, and
+                # the index is clean) while leaving every worktree file alone.
+                # captures.json keeps its live on-disk content (a plain
+                # `git reset --hard` would have reverted it and lost the ingests
+                # written during the push window — the data-loss class this
+                # change removes). The Pulse worktree dirt is retained and simply
+                # re-attempted on the next sync tick. We deliberately do NOT
+                # `git checkout`/`restore` the Pulse paths to discard their dirt:
+                # such a pathspec list aborts entirely when any entry (e.g. an
+                # absent cycle-actions.jsonl) doesn't match a tracked file.
+                git reset --mixed "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
                 write_status "error" "Auto-commit push failed; rolled back"
-                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed machine-owned runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
-                # Routine self-healing transient: the rollback restored a clean,
+                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back Pulse paths to ${AUTO_PRE_HEAD} (captures.json left live). Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
+                # Routine self-healing transient: the rollback restored a
                 # pushable tree and sync retries the push on the next tick — no
                 # action required, so route to the digest, not a DM (fix-first).
-                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed machine-owned runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8} (clean tree restored). Self-heals on the next sync tick; no action needed." "digest"
+                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back Pulse paths to ${AUTO_PRE_HEAD:0:8} (captures.json left live). Self-heals on the next sync tick; no action needed." "digest"
                 exit 1
             fi
         else
@@ -191,14 +216,22 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     fi
 fi
 
-# Refuse to operate with uncommitted changes — same rationale.
+# Refuse to operate with uncommitted changes — UNLESS the only remaining dirt is
+# healer-owned captures.json (SYNC_EXTRA_RUNTIME_PATHS), which sync tolerates and
+# the GC healer commits on its own tick. Any other dirt (human edits, or Pulse
+# dirt mixed with non-allowlisted files that the block above declined to commit)
+# falls through to refuse-and-alert.
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
-    write_status "error" "Uncommitted changes in working tree"
-    DIRTY_FILES=$(git status --short | head -10)
-    alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because ${REPO_DIR} has uncommitted modifications. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
-    emit_larry_alert_envelope "sync-blocked:uncommitted-changes" "ourliberty-sync.service refusing to pull: ${REPO_DIR} has uncommitted modifications. Working tree will not receive PR merges from origin/main until cleaned. Recovery: cd ${REPO_DIR} && git status; commit or stash the changes."
-    exit 1
+    if all_modified_in_sync_extra_allowlist "$REPO_DIR"; then
+        log "Only healer-owned runtime dirt (captures.json) present — tolerating; heal_missions_card_gc.py is its committer. Proceeding to pull."
+    else
+        log "ERROR: Working tree has uncommitted changes. Sync refuses to operate."
+        write_status "error" "Uncommitted changes in working tree"
+        DIRTY_FILES=$(git status --short | head -10)
+        alert_larry "uncommitted changes block sync" "sync_agent_core.sh refused to run because ${REPO_DIR} has uncommitted modifications. First 10 files: $DIRTY_FILES. Action: ssh ourliberty-vm, commit or stash the changes."
+        emit_larry_alert_envelope "sync-blocked:uncommitted-changes" "ourliberty-sync.service refusing to pull: ${REPO_DIR} has uncommitted modifications. Working tree will not receive PR merges from origin/main until cleaned. Recovery: cd ${REPO_DIR} && git status; commit or stash the changes."
+        exit 1
+    fi
 fi
 
 # Store current HEAD before fetch

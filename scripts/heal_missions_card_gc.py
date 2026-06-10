@@ -571,6 +571,19 @@ def commit_and_push_captures(repo: Path, audit_msg: str) -> str:
         if _git(repo, 'push', '-q', 'origin', 'main', timeout=PUSH_TIMEOUT_SEC).returncode == 0:
             return 'committed'
         return 'push-failed'
+    # Rebase failed (a conflict): abort and retain the local commit, leaving the
+    # branch local-ahead of origin until the next successful push. This healer is
+    # the sole captures.json committer (sync no longer commits it — #409
+    # follow-up), so the orphan is benign in the normal case: it is part of THIS
+    # working tree's HEAD, so the next tick that finds a fresh delta pushes it
+    # along, and sync's `git merge --ff-only` is a no-op when origin is merely
+    # behind local. The only non-benign outcome — origin diverging so sync's
+    # ff-only fails and pages — requires a rebase CONFLICT, which for a
+    # single-committer linear file is near-impossible (no second writer to
+    # conflict with); even then the fail-safe is a page, not data loss. So we
+    # accept the rare orphan over a retry loop: retrying would re-run `pull
+    # --rebase --autostash`, briefly stashing a possibly-dirty live captures.json
+    # off disk — a worse trade than the rare page.
     log('captures.json rebase failed; aborting (commit retained locally)')
     _git(repo, 'rebase', '--abort')
     return 'push-failed'

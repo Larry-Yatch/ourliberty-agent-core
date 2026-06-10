@@ -20,6 +20,11 @@ mkdir -p "$LOCK_DIR" "$LOG_DIR"
 # Helper: push_with_rebase (with non-FF rebase fallback). See header.
 # shellcheck source=_lib_push_with_rebase.sh
 source "${HOME}/agent-core/scripts/_lib_push_with_rebase.sh"
+# Single source of truth for the Pulse-owned runtime paths this script
+# auto-commits (PULSE_RUNTIME_PATHS) — shared with sync_agent_core.sh so the set
+# can't drift between the two committers.
+# shellcheck source=_lib_pulse_runtime.sh
+source "${HOME}/agent-core/scripts/_lib_pulse_runtime.sh"
 
 log() {
     echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] run_cycle: $*" | tee -a "$LOG_FILE"
@@ -181,13 +186,16 @@ fi
 # trips agent_core_health_check.py's working-copy discipline check every 30 min.
 # Commit + push so the tree returns clean. Best-effort: failures are logged
 # but do not abort the cycle.
+#
+# The path set is PULSE_RUNTIME_PATHS, sourced from _lib_pulse_runtime.sh so it
+# stays identical to the set sync_agent_core.sh auto-commits (no inline drift).
 REPO_DIR="${HOME}/agent-core"
 if [ "$CYCLE_OK" = "1" ] && [ -d "$REPO_DIR/.git" ]; then
     cd "$REPO_DIR"
-    if ! git diff --quiet -- runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null \
-       || ! git diff --quiet --cached -- runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null \
-       || git ls-files --others --exclude-standard -- agents/pulse/memory/ runbooks/ | grep -q .; then
-        git add runbooks/cycle-journal.md runbooks/cycle-actions.jsonl agents/pulse/MEMORY.md agents/pulse/memory/ 2>/dev/null || true
+    if ! git diff --quiet -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null \
+       || ! git diff --quiet --cached -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null \
+       || git ls-files --others --exclude-standard -- "${PULSE_RUNTIME_PATHS[@]}" | grep -q .; then
+        git add -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
 
         TS=$(date -u +%Y%m%dT%H%M%SZ)
         if git commit -q -m "Pulse cycle ${TS}" -m "Auto-committed by run_cycle.sh after successful /cycle." 2>>"$LOG_FILE"; then
