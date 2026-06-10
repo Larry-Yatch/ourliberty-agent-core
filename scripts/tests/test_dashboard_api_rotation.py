@@ -106,6 +106,13 @@ class _RotationBase(unittest.TestCase):
     def _override_path(self) -> Path:
         return self.tmp / 'rotation.disabled'
 
+    def _write_active_tier(self, tier: str):
+        # Mirror the live state file rotate_active_tier maintains via the
+        # active_tier helpers: blackboard/active-tier.json with a "tier" key.
+        state = self.tmp / 'blackboard' / 'active-tier.json'
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text(json.dumps({'tier': tier}))
+
 
 # ---------- GET ----------
 
@@ -161,6 +168,39 @@ class GetRotationTest(_RotationBase):
         body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
         self.assertEqual(body['pinned_tier'], 'tier1')
 
+    # ---- current_tier: the live tier Auto is actually running on ----
+
+    def test_auto_reports_current_tier_from_state_file(self):
+        # Auto owns the tier via the load gate; current_tier reflects the live
+        # state file even though pinned_tier stays null.
+        self._write_active_tier('tier2')
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'auto')
+        self.assertIsNone(body['pinned_tier'])
+        self.assertEqual(body['current_tier'], 'tier2')
+
+    def test_current_tier_defaults_tier1_when_state_missing(self):
+        # No state file yet → tier1 fallback (matches active_tier.read).
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['current_tier'], 'tier1')
+
+    def test_current_tier_independent_of_pinned_tier(self):
+        # Off-pinned tier1, but the scheduler hasn't switched off tier2 yet:
+        # current_tier reports the live tier, not the pin.
+        self._override_path().write_text('tier1')
+        self._write_active_tier('tier2')
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['mode'], 'off')
+        self.assertEqual(body['pinned_tier'], 'tier1')
+        self.assertEqual(body['current_tier'], 'tier2')
+
+    def test_current_tier_malformed_state_defaults_tier1(self):
+        state = self.tmp / 'blackboard' / 'active-tier.json'
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text('{not json')
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        self.assertEqual(body['current_tier'], 'tier1')
+
     def test_missing_token_401(self):
         r = self.c.get('/api/system/rotation')
         self.assertEqual(r.status_code, 401)
@@ -196,6 +236,14 @@ class PostRotationTest(_RotationBase):
         self.assertEqual(row['payload']['control'], 'rotation_mode')
         self.assertEqual(row['payload']['mode'], 'off')
         self.assertEqual(call['upsert_kwargs'].get('on_conflict'), 'event_id')
+
+    def test_post_response_carries_current_tier(self):
+        # The POST result reuses _reader_rotation_mode, so current_tier rides
+        # through on the update response too.
+        self._write_active_tier('tier2')
+        body = self.c.post('/api/system/rotation', headers=AUTH,
+                           json={'mode': 'auto'}).json()
+        self.assertEqual(body['current_tier'], 'tier2')
 
     def test_auto_removes_override(self):
         self._override_path().touch()
