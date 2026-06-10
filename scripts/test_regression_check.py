@@ -61,6 +61,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -80,6 +81,14 @@ EXIT_ANALYSIS_FAIL = 2
 _FAILURE_LINE_RE = re.compile(
     r'^(?:FAIL|ERROR):\s+([\w_]+)\s+\(([\w\.]+)\)\s*$'
 )
+
+# Mirror of SENTINEL_PREFIX in
+# scripts/tests/test_no_production_writes_runtime.py. Kept as a literal (not
+# imported) so this production gate script never takes a dependency on a test
+# module; the meta-test (test_gate_sandbox_env_injection.py) asserts the two
+# stay in parity.
+_TEST_RUN_SENTINEL_PREFIX = 'OL-TEST-RUN-SENTINEL-'
+
 
 # Synthetic failure id for a suite that exited non-zero while printing a clean
 # "Ran N tests" summary with no FAIL/ERROR lines — a session-level guard
@@ -124,6 +133,52 @@ def parse_unittest_failures(output: str) -> set[str]:
     return failures
 
 
+def build_sandbox_env(
+    isolated_agents_root: Optional[Path] = None,
+    base_env: Optional[dict] = None,
+) -> dict:
+    """Return a copy of ``base_env`` with the test-sandbox env vars that
+    ``scripts/tests/__init__.py`` would set were it executed.
+
+    Why this exists (the #412/#428 dead-code bug): the gate invokes
+    ``python3 -m unittest discover -s scripts/tests``. unittest discover imports
+    each test module as a TOP-LEVEL module (top_level_dir defaults to the start
+    dir) and NEVER executes the ``scripts/tests`` package ``__init__.py``. So
+    everything __init__ arms — the #412 OURLIBERTY_*_ROOT / LOG_DIR sandbox and
+    the #428 DISABLE_LIVE_EMIT guard + run sentinel — is dead code under the
+    production gate invocation; a test that writes through a production helper
+    before any test happens to ``import scripts.tests`` hits the REAL ~/agents
+    tree / live chain_events ledger. Env vars are process-wide and immune to
+    import semantics, so we reproduce __init__'s vars here and inject them into
+    the discover subprocess instead of relying on __init__ running.
+
+    ``isolated_agents_root`` (when provided by ``collect_failures_at_sha``)
+    doubles as the sandbox root so the per-SHA OURLIBERTY_AGENTS_ROOT redirect
+    and the log/worktrees sandbox all share one tmp tree; when omitted a fresh
+    one is minted.
+    """
+    env = dict(os.environ if base_env is None else base_env)
+
+    if isolated_agents_root is None:
+        sandbox_root = Path(tempfile.mkdtemp(prefix='ourliberty-gate-sandbox-'))
+    else:
+        sandbox_root = Path(isolated_agents_root)
+
+    log_dir = sandbox_root / 'logs'
+    worktrees_root = sandbox_root / 'worktrees'
+    log_dir.mkdir(parents=True, exist_ok=True)
+    worktrees_root.mkdir(parents=True, exist_ok=True)
+
+    env['OURLIBERTY_AGENTS_ROOT'] = str(sandbox_root)
+    env['OURLIBERTY_WORKTREES_ROOT'] = str(worktrees_root)
+    env['OURLIBERTY_LOG_DIR'] = str(log_dir)
+    env['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
+    env['OURLIBERTY_TEST_RUN_SENTINEL'] = (
+        _TEST_RUN_SENTINEL_PREFIX + uuid.uuid4().hex
+    )
+    return env
+
+
 def run_tests_in_dir(
     workdir: Path,
     timeout_s: int,
@@ -135,10 +190,12 @@ def run_tests_in_dir(
     indicates it didn't complete (negative return code, no recognizable
     output). A non-zero exit code with parseable FAIL/ERROR lines is
     NOT an error — that's just "tests failed," which is the signal we want.
+
+    The subprocess env is built by ``build_sandbox_env`` so the #412 sandbox
+    and #428 live-emit guard engage even though ``unittest discover`` never runs
+    ``scripts/tests/__init__.py``.
     """
-    env = os.environ.copy()
-    if isolated_agents_root is not None:
-        env['OURLIBERTY_AGENTS_ROOT'] = str(isolated_agents_root)
+    env = build_sandbox_env(isolated_agents_root)
     try:
         result = subprocess.run(
             ['python3', '-m', 'unittest', 'discover', '-s', 'scripts/tests', '-v'],
