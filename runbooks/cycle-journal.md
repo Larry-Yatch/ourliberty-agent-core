@@ -4,6 +4,63 @@
 
 ---
 
+## Iteration 1266 — 2026-06-10 ~06:44Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ One new signal — `unreviewed-merge:409` (Larry-direct, known pattern). All services nominal.
+**Tier state:** 1 (consecutive_clean=0; tier-reset: new signal this iter; last_signal_at will update on commit)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1419 lines** (was 1418 at iter 1265; retention healer or append raised to 1419). Timestamp watermark iter 1265: 06:30:08Z / unreviewed-merge:410. 1 new alert since watermark:
+- `unreviewed-merge:409` (06:40:05Z, severity=critical, route=escalate) — PR #409 "fix(sync): auto-commit captures.json so the missions-capture race stops paging" merged by Larry-Yatch without Mirror review. alert-translations.json entry: `tier=NOW, never_silence=true`. **Known standing pattern** (G-rule 3/3, actor-exemption-config APPROVAL_REQUEST pending `go: actor-exemption-config`). No new DM — same actor/pattern as #410; original DM sent for streak-start; action on Larry: reply `go: actor-exemption-config` to Beacon. ⚠️ tier-reset. New watermark: 06:40:05Z / unreviewed-merge:409 / iter 1266.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot last activity 00:14:58 MDT (06:14:58Z UTC) — Larry said `go` for harden-test dispatch. TIER2_FALLBACK at 00:37–00:39Z (standing known pattern). No new Larry directives since iter 1265. ✅ Nominal (standing Tier 2 auth issue only).
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-10T06:36:39Z (~8 min old at scan). heal-pipeline-stall-state.json: 34 entries (first 3 verified with 2099-12-31 infinite-suppression; state file Jun 10 00:36 local = 06:36Z UTC). ✅ Nominal (heartbeat fresh within 60 min threshold).
+
+**Check 4 — Pending directives:** Forge inbox: `build-harden-test-prod-write-isolation-001.json` — created Jun 10 00:21 local (06:21Z UTC), ~23 min old at scan; Forge session resumed 06:20:31Z per iter 1265; active build, within 2h stale threshold. Beacon: empty. Mirror: empty. Pulse: empty. ✅ Nominal (active build within window).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=585c683 ("Pulse cycle 20260610T064035Z"). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T06:38:46Z (~6 min old at scan). ✅ Nominal (< 2h). APPROVAL_REQUEST `sync-push-rebase-fallback-001` standing. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core ourliberty-*.service units active/running: beacon-bot ✅, chain-event-shipper ✅, dashboard-api ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. ourliberty-agent-core-health.service: **inactive** (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open (PR #409 merged Larry-direct 06:40Z — see Check 0). ourliberty-dashboard: 0 open (unchanged from iter 1265). ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Verify-before-reassert — iter 1265 standing items:**
+- `health-check-notify-script-missing`: agent-core-health.service inactive (confirmed Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon bot 00:37Z TIER2_FALLBACK confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: watermark at 1419 (unchanged in terms of pending-approval resolution). Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: all inboxes empty — no resolution visible. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change at 06:38:46Z; no new occurrence this iter. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: **NEW occurrence PR #409 this iter** (06:40:05Z). Carry forward [blue]. G-rule remains at 3/3; action on Larry: `go: actor-exemption-config`.
+- `Forge build harden-test-prod-write-isolation-001`: task placed 06:21Z, ~23 min old at scan; active, within 2h window. [blue] watch.
+
+**Standing findings (unchanged except watermark advance):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:37Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready; pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; PR #409 + #410 both this cycle; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 66th+ occurrence; self-recovering; root code fix pending.
+
+**Watch item:** Forge build `harden-test-prod-write-isolation-001` — active (06:21Z, ~23 min). Next iter: verify Forge completion + PR open + Mirror dispatch.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1266 --template unreviewed-merge --detail 409-larry-direct` → row appended (06:44:20Z).
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 1 new intervention (unreviewed-merge:409). interventions=740, systemic_fixes=16, ratio=46.25, trend=flat (script-authoritative base iter 1265 was 739).
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: unreviewed-merge:409 new signal). last_signal_at will update on wrapper commit.
+
+---
+
 ## Iteration 1265 — 2026-06-10 ~06:38Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ One new signal — `unreviewed-merge:410` (Larry-direct, known pattern). All services nominal.
