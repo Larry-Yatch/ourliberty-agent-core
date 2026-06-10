@@ -81,6 +81,13 @@ _FAILURE_LINE_RE = re.compile(
     r'^(?:FAIL|ERROR):\s+([\w_]+)\s+\(([\w\.]+)\)\s*$'
 )
 
+# Synthetic failure id for a suite that exited non-zero while printing a clean
+# "Ran N tests" summary with no FAIL/ERROR lines — a session-level guard
+# (the production-write tripwire's atexit os._exit, a teardown crash) that the
+# line parser cannot see. Stable so the base-vs-head diff treats it like any
+# other test id. The colon form cannot collide with a real dotted test id.
+SUITE_EXITED_NONZERO_ID = 'scripts.tests:session-guard:suite-exited-nonzero'
+
 
 class AnalysisError(Exception):
     """Raised when the analysis itself can't complete (exit 2)."""
@@ -161,6 +168,19 @@ def run_tests_in_dir(
             f'test runner output looks malformed (no "Ran N tests" summary, '
             f'no FAIL/ERROR lines) in {workdir}; exit={result.returncode}'
         )
+    # Non-zero exit + a clean "Ran N tests" summary + NO FAIL/ERROR lines means
+    # the assertions all passed but a SESSION-LEVEL guard failed the process
+    # after reporting — e.g. the production-write tripwire's atexit os._exit(1)
+    # (scripts/tests/__init__.py), or a sys.exit/crash in teardown. The
+    # FAIL/ERROR-line parser above cannot see it, so without this the non-zero
+    # exit is silently swallowed and such a guard could never block a PR. Surface
+    # it as a synthetic failure with a STABLE id so the base-vs-head diff blocks a
+    # PR that NEWLY trips it (present at head, absent at parent) while tolerating
+    # one already failing at parent — same regress-on-new-only contract as a real
+    # test. Ordered after the malformed-output guard so a truly aborted run still
+    # raises AnalysisError rather than masquerading as this clean-exit case.
+    if result.returncode != 0 and not failures:
+        failures.add(SUITE_EXITED_NONZERO_ID)
     return failures
 
 

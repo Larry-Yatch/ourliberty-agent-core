@@ -25,13 +25,18 @@ reached the bot's internal log() helper, which wrote test sentinel strings
 into the live beacon_telegram_bot.log. Closing both pytest + unittest
 invocation paths prevents the regression.
 
-The temp dir is left for the OS's normal /tmp cleanup; no atexit hook
-because (a) test runs are short-lived, (b) the worst case is a few KB of
-test log lines accumulating until /tmp is cleared, (c) atexit makes
-debugging harder when a test crashes and we want to inspect the logs.
+The sandbox temp dirs are left for the OS's normal /tmp cleanup; we add no
+atexit hook to REMOVE them (test runs are short-lived, the worst case is a few
+KB of test logs until /tmp is cleared, and keeping them aids debugging a
+crashed test). The Gap B runtime tripwire below DOES register an atexit hook —
+but only to SCAN the real ~/agents tree at process end; it never deletes the
+sandbox.
 """
+import atexit
 import os
+import sys
 import tempfile
+import time
 import uuid
 
 if not os.environ.get('OURLIBERTY_LOG_DIR'):
@@ -64,14 +69,89 @@ if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
 # import. chain_event_emit._get_client() returns None when this is set.
 os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
 
-# Runtime production-write tripwire sentinel (Gap B) — the unittest mirror of
-# conftest.py's _production_write_runtime_tripwire fixture. We mint the run
-# sentinel and expose it via OURLIBERTY_TEST_RUN_SENTINEL so it is set under
-# both runners. NOTE: the active session-end scan of the real ~/agents tree is
-# the pytest fixture's TEARDOWN; the unittest package bootstrap has no
-# session-finish hook, so under the unittest gate this sets the env (and lets
-# instrumented writes carry the token) but cannot run the end-of-session
-# assertion. Parity is enforced by test_conftest_init_parity.py.
-os.environ.setdefault(
-    'OURLIBERTY_TEST_RUN_SENTINEL', 'OL-TEST-RUN-SENTINEL-' + uuid.uuid4().hex,
-)
+# Runtime production-write tripwire (Gap B) — the unittest mirror of
+# conftest.py's _production_write_runtime_tripwire session fixture. The fixture
+# mints a run sentinel, stamps it through the production log() helpers, and at
+# session-end TEARDOWN scans the REAL ~/agents tree for the token; any hit is a
+# write that escaped the Gap A sandbox. Under the regression gate
+# (python3 -m unittest) that fixture never runs, so we replicate its session
+# lifecycle here: arm at package import, scan at process exit via atexit.
+#
+# State is exposed as module attributes for test_conftest_init_parity.py to
+# assert the unittest gate actually arms the scan (not just sets the env var).
+_RUNTIME_TRIPWIRE_ARMED = False
+_RUNTIME_TRIPWIRE_SENTINEL = None
+
+
+def _arm_runtime_tripwire():
+    """Mint the sentinel, instrument the production log() helpers, and register
+    an atexit scan of the real ~/agents tree. Mirrors the conftest fixture's
+    setup/teardown across the package-import / process-exit boundary.
+
+    Fail-open by design: if the tripwire infrastructure can't be imported the
+    gate still runs (degraded), it just loses this backstop — better than a
+    bootstrap that hard-fails every test invocation."""
+    global _RUNTIME_TRIPWIRE_ARMED, _RUNTIME_TRIPWIRE_SENTINEL
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    scripts_dir = os.path.dirname(here)
+    # The tripwire module is imported by bare name (as conftest does); its
+    # instrument_log_helpers in turn imports agent_runner by bare name. Put BOTH
+    # the tests dir and scripts/ on the path or instrumentation silently no-ops
+    # (import fails -> nothing stamped -> the scan can never see a leak).
+    for p in (here, scripts_dir):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+    try:
+        import test_no_production_writes_runtime as runtime
+    except Exception:
+        return
+
+    sentinel = runtime.mint_sentinel()
+    os.environ['OURLIBERTY_TEST_RUN_SENTINEL'] = sentinel
+    session_start = time.time()
+    undo = runtime.instrument_log_helpers(sentinel)
+    _RUNTIME_TRIPWIRE_SENTINEL = sentinel
+    _RUNTIME_TRIPWIRE_ARMED = True
+
+    def _scan_at_exit(runtime=runtime, sentinel=sentinel,
+                      session_start=session_start, undo=undo):
+        try:
+            _, message = runtime.run_session_end_tripwire(
+                sentinel, session_start, undo, runner='unittest gate',
+            )
+        except Exception as exc:
+            # A scan bug must not red-flag a clean gate (the GateSelfCheck tests
+            # cover scan correctness); warn and let the real exit code stand.
+            print(f'[production-write-tripwire] scan skipped ({exc!r})',
+                  file=sys.stderr)
+            return
+        if not message:
+            return
+        print(message, file=sys.stderr)
+        # Force a non-zero gate exit. os._exit only fires on a CONFIRMED leak
+        # (rare alarm), so the green path is untouched; flush first so a piped
+        # capture (Mirror's gate) keeps the runner's already-printed results.
+        # NB: the regression gate (scripts/test_regression_check.py) keys off
+        # this non-zero exit and surfaces it as a synthetic failure — without
+        # that, the exit code alone is swallowed by its FAIL/ERROR-line parser.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(1)
+
+    atexit.register(_scan_at_exit)
+
+
+# pytest owns the scan via conftest's session-scoped fixture; arming here too
+# would double-instrument the helpers and double-fire the exit. Detect the
+# pytest path (pytest is imported well before this package is collected) and
+# only arm the atexit scan under the bare unittest gate. Under pytest, still
+# set the env var so the OURLIBERTY_TEST_RUN_SENTINEL mirror stays present for
+# parity (the fixture overwrites it with its own minted value).
+if 'pytest' in sys.modules:
+    os.environ.setdefault(
+        'OURLIBERTY_TEST_RUN_SENTINEL', 'OL-TEST-RUN-SENTINEL-' + uuid.uuid4().hex,
+    )
+else:
+    _arm_runtime_tripwire()

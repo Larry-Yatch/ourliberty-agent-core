@@ -188,6 +188,39 @@ def instrument_log_helpers(sentinel: str) -> list:
     return undo
 
 
+def format_tripwire_failure(hits: list[dict], runner: str) -> str:
+    """The canonical failure message for a detected escaped write. Shared so the
+    pytest fixture and the unittest atexit hook can't drift in wording."""
+    listing = '\n'.join(f'  - {h["path"]}' for h in hits)
+    return (
+        f'PRODUCTION-WRITE TRIPWIRE ({runner}): the test run left its run '
+        f'sentinel in {len(hits)} file(s) under the real ~/agents tree — a '
+        'write escaped the sandbox redirect:\n' + listing +
+        '\nThis is the leak class the isolation hardening exists to catch. Find '
+        'the test that wrote through an un-redirected production helper and route '
+        'it through tmp_path / OURLIBERTY_LOG_DIR / the OURLIBERTY_*_ROOT sandbox.'
+    )
+
+
+def run_session_end_tripwire(sentinel: str, session_start: float,
+                             undo: list, runner: str):
+    """Shared session-end teardown for BOTH runners: undo the log-helper
+    instrumentation, then scan the REAL ~/agents tree for the run sentinel.
+
+    Returns ``(hits, message)`` — ``message`` is None on a clean run, else the
+    formatted failure text. The CALLER decides how to fail: the pytest fixture
+    raises AssertionError; the unittest atexit hook prints + os._exit(1). Undo is
+    always attempted first (each callable guarded) so a scan error never leaves
+    the production log() helpers monkeypatched."""
+    for fn in undo:
+        try:
+            fn()
+        except Exception:
+            pass
+    hits = scan_roots_for_sentinel(production_roots(), sentinel, session_start)
+    return hits, (format_tripwire_failure(hits, runner) if hits else None)
+
+
 # ---------------------------------------------------------------------------
 # Self-checks — synthetic temp trees only, never the real ~/agents. These run
 # under both pytest and `unittest`, host-independent, and prove the scan/stamp
@@ -316,6 +349,69 @@ class StampSelfCheckTest(unittest.TestCase):
                          [str(log_dir / 'selfcheck-agent.log')])
         # undo restored the original callable.
         self.assertIs(agent_runner.log, before)
+
+
+class UnittestGateExitSelfCheck(unittest.TestCase):
+    """End-to-end proof that the unittest bootstrap's atexit tripwire actually
+    FAILS the process on an escaped write — the wiring the ScannerSelfCheck
+    above does not exercise (it tests scan_roots_for_sentinel in isolation, not
+    the atexit -> os._exit(1) path armed by scripts/tests/__init__.py).
+
+    Both cases run a child interpreter with HOME pointed at a temp dir, so
+    production_roots() (which resolves Path.home()/agents, deliberately not
+    through env) sees the sandbox, never the real ~/agents. The child imports
+    scripts.tests (arming the tripwire), optionally plants a file carrying the
+    armed run sentinel under HOME/agents/logs, then exits normally — letting
+    atexit run the scan."""
+
+    _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+    def _run_child(self, plant_leak: bool):
+        home = tempfile.mkdtemp(prefix='ol-gate-exit-home-')
+        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
+        prog = (
+            'import scripts.tests as pkg\n'
+            'from pathlib import Path\n'
+            's = pkg._RUNTIME_TRIPWIRE_SENTINEL\n'
+            'assert pkg._RUNTIME_TRIPWIRE_ARMED and s, "tripwire not armed"\n'
+        )
+        if plant_leak:
+            prog += (
+                'd = Path.home() / "agents" / "logs"\n'
+                'd.mkdir(parents=True, exist_ok=True)\n'
+                '(d / "escaped.log").write_text("leaked write " + s + "\\n")\n'
+            )
+        env = dict(os.environ)
+        env['HOME'] = home
+        env.pop('OURLIBERTY_TEST_RUN_SENTINEL', None)  # let the child mint fresh
+        import subprocess
+        return subprocess.run(
+            [sys.executable, '-c', prog],
+            cwd=str(self._REPO_ROOT), env=env,
+            capture_output=True, text=True, timeout=120,
+        )
+
+    def test_clean_run_exits_zero(self):
+        """No escaped write -> the atexit scan finds nothing -> normal exit."""
+        res = self._run_child(plant_leak=False)
+        self.assertEqual(
+            res.returncode, 0,
+            f'clean child exited {res.returncode}; stderr:\n{res.stderr}',
+        )
+        self.assertNotIn('PRODUCTION-WRITE TRIPWIRE', res.stderr)
+
+    def test_escaped_write_fails_the_gate(self):
+        """A sentinel-bearing file under the real-tree path -> the atexit scan
+        flags it -> os._exit(1). This is the regression gate going red on the
+        exact leak class the hardening exists to catch."""
+        res = self._run_child(plant_leak=True)
+        self.assertEqual(
+            res.returncode, 1,
+            f'leak child exited {res.returncode} (expected 1); '
+            f'stderr:\n{res.stderr}',
+        )
+        self.assertIn('PRODUCTION-WRITE TRIPWIRE', res.stderr)
+        self.assertIn('escaped.log', res.stderr)
 
 
 if __name__ == '__main__':
