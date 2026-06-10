@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration 1271 — 2026-06-10 ~07:35Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Two active signals — PR #412 pipeline stall persists (new failure mode: Beacon APPROVAL_REQUEST not processed by outbox-notifier); VM behind origin/main by 1 commit (PR #415, merged 07:26:49Z).
+**Tier state:** 1 (consecutive_clean=0; tier-reset: pipeline stall ongoing)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1435 lines** (iter 1270 effective watermark: 07:11:40Z / pipeline-stall:harden-test-prod-write-isolation-001 / line 1431). 4 new alerts since watermark:
+- `unreviewed-merge:413` (07:15:24Z) — PR #413 "fix(sync): make GC healer the sole committer of captures.json" merged Larry-direct. Tier 3 known-pattern. [blue]
+- `unreviewed-merge:414` (07:25:16Z) — PR #414 "test(pulse): drop stale gather_retry_repeats test" merged Larry-direct. Tier 3 known-pattern. [blue]
+- `pipeline-stall:no-mirror-dispatch:PR#412` (07:25:25Z) — heal-pipeline-stall confirmed PR #412 still has no Mirror dispatch. ⚠️ Tier 2/ask-then-do. Ongoing stall. `tier-reset`.
+- `unreviewed-merge:415` (07:30:59Z) — PR #415 "spec(missions-v2): Phase 2" merged Larry-direct at 07:26:49Z. Tier 3 known-pattern. [blue]
+New watermark: 07:30:59Z / unreviewed-merge:415 / iter 1271.
+Note: alert-triage.json = 0 alerts (known broken watermark — PARKED APPROVAL_REQUEST issue unchanged).
+
+**VERIFY-BEFORE-REASSERT — Inter-iteration note claim "PR #412 pipeline stall RESOLVED":** Re-verified against ground truth. **Claim is false.** Mirror inbox EMPTY. No mirror-review-pr412 in Mirror archive. No Mirror worktree. heal-pipeline-stall fired again 07:25:25Z. Root cause: Beacon emitted `APPROVAL_REQUEST mirror-review-pr412-001` inside a `result-notification` response (not a standard pipeline task response). The outbox-notifier processed the Beacon result file, notified Pulse (depth=1, logged 07:24:08Z), but did NOT create a Mirror task from the embedded APPROVAL_REQUEST. Trust-policy dispatch is not wired for APPROVAL_REQUESTs in result-notification response contexts. The inter-iteration note's "RESOLVED" claim was premature — PR #412 stall is live.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry sent "The missions-v2-phase2 build sequence is staged pending on the blackboard. Run the Mirror DAG-preflight and kick it off" at 07:29:09Z. Beacon responded 07:30:58Z ("I can't run the DAG-preflight or kick off" — truncated log; full response delivered to Larry's Telegram). Not an orphan — Beacon handled. missions-v2-phase2 is `pending` (5 steps) in build-sequences; Beacon is blocked, likely because PR #412 has not cleared review. ✅ Nominal (directive handled), ℹ️ missions-v2-phase2 unblocking requires PR #412 merge.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall state file = 0 stalls (only old suppressed entries). Healer DID fire `pipeline-stall:no-mirror-dispatch:PR#412` at 07:25:25Z — real stall. PR #412: UNKNOWN mergeable, 0 reviews, Mirror inbox empty. ⚠️ Stall persists.
+
+**Check 4 — Pending directives:** All inboxes (Beacon, Forge, Mirror, Pulse) empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing). All services active. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean, HEAD=578bd72 ("Pulse cycle 20260610T072638Z"). PR #415 merged to origin/main at 07:26:49Z (11 sec after 578bd72 push). VM is 1 commit behind origin/main. ⚠️ `always-fix`: `git pull --ff-only` — attempted; command requires interactive approval (git hook trust). Sync service will cover on next run.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T07:16:13Z (~19 min old at scan, < 2h). Sync will pull PR #415 on next run. ✅ Within 2h threshold.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** All 8 core services active: beacon-bot ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅, chain-event-shipper ✅, dashboard-api ✅. ourliberty-agent-core-health.service: failed (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 UNKNOWN/0-reviews. ⚠️ Stall (see Check 3). ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Check H — Forge activity:** 3 recently merged (Larry-direct): PR #413 (07:13Z), #414 (07:21Z), #415 (07:26Z). 0 Forge-opened PRs this cycle. PR #412 still open (Forge-opened, blocked on Mirror review).
+
+**Credential rotation (4.6):** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Verify-before-reassert — iter 1270 standing items:**
+- `health-check-notify-script-missing`: agent-core-health.service failed (confirmed Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon bot TIER2_FALLBACK 00:37-00:46 MDT confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: all inboxes empty. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json 07:16:13Z no-change; no new occurrence. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: PRs #413, #414, #415 all new occurrences this iter. G-rule 3/3 standing. Action on Larry: `go: actor-exemption-config` to Beacon.
+- `install-drift-timer-gap verification_pending (iter 1262)`: healer next run 18:00Z UTC; 0 of 2 required clean healer cycles post-merge. OPEN.
+- `wt-mirror-dag-preflight-missions-v2-phase1-captures`: worktree present, last mtime Jun 9 21:58 MDT (~3.5h), no active PIDs. Not yet reaped by heal-wedged-review-sessions. ℹ️ Monitor — if still present next cycle, escalate.
+
+**New finding:**
+- [yellow] **PR #412 pipeline stall (new failure mode — outbox-notifier APPROVAL_REQUEST gap)** — Beacon's APPROVAL_REQUEST for `mirror-review-pr412-001` was embedded in a `result-notification` response context. The outbox-notifier processed the file and notified Pulse (depth=1) but did NOT create a Mirror task from the APPROVAL_REQUEST. Trust-policy dispatch is not wired for APPROVAL_REQUESTs from result-notification contexts. PR #412 has 0 reviews; heal-pipeline-stall confirmed 07:25:25Z. Alert sent 07:35Z. **Action on Larry: reply `mirror-review 412` to Beacon. Missions-v2-phase2 DAG-preflight is blocked until PR #412 clears.**
+
+**Systemic pattern — outbox-notifier APPROVAL_REQUEST gap:** APPROVAL_REQUESTs in result-notification responses are not processed by the trust policy. Code-shape fix: outbox-notifier should scan APPROVAL_REQUEST blocks in any Beacon result file regardless of source task type. Dispatch to Beacon/Forge when missions-v2-phase2 unblocks.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready; pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; PRs #413, #414, #415 new; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 68th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #412 — needs Mirror dispatch; Larry action: reply `mirror-review 412` to Beacon.
+- Missions-v2-phase2 DAG-preflight — blocked on PR #412 merge.
+- wt-mirror-dag-preflight-missions-v2-phase1-captures — still present ~3.5h. Next cycle: escalate if not reaped.
+- install-drift healer: next run 18:00Z UTC → 1 of 2 clean cycles needed.
+- VM behind origin by PR #415 — sync service will pull on next run.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1271 --template pipeline-stall --detail PR-412-outbox-notifier-did-not-process-beacon-APPROVAL_REQUEST` → row appended (07:35:18Z). `larry_alerts.append_alert pipeline-stall:pr412-approval-request-not-dispatched` → escalation sent (07:35Z).
+**Dispatches:** None (pipeline stall requires Larry action; systemic fix is code-shape, will route to Beacon/Forge after missions-v2-phase2 unblocks).
+**PRIME DIRECTIVE:** 1 new intervention (pipeline-stall:PR-412-outbox-notifier-APPROVAL_REQUEST). interventions=744, systemic_fixes=16, ratio=46.5, trend=flat (script-authoritative).
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: pipeline stall ongoing).
+
+---
+
 ## Inter-iteration note — 2026-06-10 ~07:22Z UTC
 
 **Source:** Beacon result-notification (`cycle-finding-pr412-mirror-review-20260610T072228Z`)
