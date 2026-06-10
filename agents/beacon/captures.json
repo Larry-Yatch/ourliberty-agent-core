@@ -60,6 +60,21 @@
       },
       "last_touched": "2026-06-10T06:35:24.627125+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
+      "title": "Operator Action Queue is full of benign/auto-handled alerts (101) \u2014 fix at the source",
+      "note": "The /api/operations/action-queue surfaces ~101 NOW items that are mostly already-handled (auto-restarted services the healers fixed, days-old unreviewed-merges, credential-drift, sync-blocked). Violates the alert-toil principle (only irreversible/ambiguous should reach Larry). Fix at the SOURCE: auto-silence/reconcile benign alerts (same direction as Medic auto-silence rollout) so the queue \u2014 wherever it lives (Approvals/Operations) \u2014 shows only genuinely-actionable items. Removed from Missions tab 2026-06-10; this is the deeper source fix.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "work/larry-session",
+        "captured_at": "2026-06-10T07:05:19.863345+00:00"
+      },
+      "last_touched": "2026-06-10T07:05:19.863345+00:00",
+      "promoted_to": null
     }
   ]
 }
