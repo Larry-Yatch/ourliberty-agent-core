@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 1272 — 2026-06-10 ~07:38Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ missions-v2-phase2 DAG-preflight REVISION (Mirror found parallel-step file-enumeration gap in `p2-resurface-and-digest-card`; Larry DM'd 07:41Z). PR #412 Mirror review now IN PROGRESS (worktree created 07:41Z — multi-iter stall resolving).
+**Tier state:** 1 (consecutive_clean=0; tier-reset: mirror-dag-revision new alert)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1438 lines** (iter 1271 effective watermark: 07:30:59Z / unreviewed-merge:415 / line 1435). 3 new lines since watermark:
+- Line 1436 (07:31:32Z): `medic:medic-diagnosis` about PR #412 stall — informational, iter 1271 already handled. Tier 3 known-pattern. [blue]
+- Line 1437 (07:35:33Z): `pulse-cycle:pipeline-stall:pr412-approval-request-not-dispatched` — iter 1271's own escalation alert, already handled. [blue]
+- Line 1438 (07:39:44Z): `outbox-notifier:mirror-dag-revision:missions-v2-phase2` — **NEW**. Mirror returned REVISION on the `p2-resurface-and-digest-card` parallel-step safety check. Outbox-notifier escalated route=escalate. Larry DM'd 07:41:11Z (beacon_telegram_bot.log confirmed). ⚠️ tier-reset.
+New watermark: 07:39:44Z / mirror-dag-revision:missions-v2-phase2 / line 1438 / iter 1272.
+
+**VERIFY-BEFORE-REASSERT — iter 1271 claim "PR #412 pipeline stall persists":** Re-verified. `wt-mirror-mirror-review-pr412-001` worktree created 07:41Z UTC (beacon_telegram_bot.log: Larry replied 'go' at 07:36:06Z; Beacon dispatched dag-preflight AND mirror-review-pr412-001 at 07:36:07Z; Mirror review worktree live). Stall is **RESOLVING** — Mirror is now actively reviewing PR #412. Pipeline stall healer state file: empty (no active stall entries). Claim updated: stall was live in iter 1271; this iter it is resolving.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last meaningful entry: 07:36:06Z Larry replied 'go' (dag-preflight approval). 07:41:11Z: REVISION alert delivered to Larry. No new Larry directives requiring Pulse action. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: empty (no stall entries). Mirror dispatched for PR #412. ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes (Beacon, Forge, Mirror, Pulse) empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing). All services active (carry-forward from iter 1271 post-restart). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=2e9c99f ("Pulse cycle 20260610T073809Z" — wrapper commit from iter 1271). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T07:16:13Z (~22 min old, < 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** No new service alerts or restarts since iter 1271's post-restart recovery (07:09Z). No log noise. Carry forward: all 8/8 core services active. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 CLEAN/MERGEABLE/0-reviews — Mirror review IN PROGRESS (`wt-mirror-mirror-review-pr412-001` created 07:41Z). Not a stall. ℹ️ Watch for Mirror verdict. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Credential rotation (4.6):** 0 overdue, 0 upcoming within 60d. ✅ Nominal. (Note: `DESKTOP_INGEST_TOKEN` missing from rotation schedule — standing; credentials drift per earlier alert at 04:16Z; PR #407 registered it; watch for rotation schedule update.)
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Verify-before-reassert — iter 1271 standing items:**
+- `health-check-notify-script-missing`: still failing (carry forward [yellow]).
+- `Tier 2 weekly probe failed (auth_401)`: no new probe since last check; carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested; carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change; carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: inboxes empty; carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync=no-change 07:16Z, no new occurrence. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: no new unreviewed-merge alerts this iter. [blue] standing.
+- `install-drift-timer-gap verification_pending (iter 1262)`: healer next run 18:00Z UTC; still 0 of 2 required clean cycles. OPEN.
+- `wt-mirror-dag-preflight-missions-v2-phase1-captures`: still present, no live PIDs, last mtime 03:58Z UTC (~7.7h old). [blue] Escalate if still present next cycle.
+
+**New finding:**
+- [yellow] **missions-v2-phase2 DAG-preflight REVISION** — Mirror completed preflight at ~07:36Z. Check 3 (parallel-step file safety) returned REVISION: `p2-resurface-and-digest-card` (step 5) runs concurrently with `p2-dashboard-cutover` and `p2-orphan-readability` on `ourliberty-dashboard`, but its dispatch_text cites §5.4+§6 without enumerating specific files — the merge-conflict surface cannot be verified. Checks 1, 2, 4: all PASS. Outbox-notifier escalated 07:39:44Z; Larry DM'd 07:41:11Z with full Mirror verdict. **Action: Beacon must amend `agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md` §5.4 and §6 to enumerate the specific `ourliberty-dashboard` files `p2-resurface-and-digest-card` touches, then re-dispatch the DAG-preflight. missions-v2-phase2 sequence cannot launch until PASS.**
+
+**ℹ️ PR #412 Mirror review in progress** — `wt-mirror-mirror-review-pr412-001` created 07:41Z. The 3-iter pipeline stall (iters 1269–1271) is resolving. Watch: Mirror verdict expected within next 1-2 cycles. When Mirror returns REVIEW_PASS, PR #412 can auto-merge (CLEAN/MERGEABLE); missions-v2-phase2 sequence can launch after spec amended + dag-preflight re-dispatched.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 68th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #412 — Mirror review in progress; watch for verdict.
+- missions-v2-phase2 — blocked on spec amendment (Beacon) + dag-preflight re-dispatch.
+- `wt-mirror-dag-preflight-missions-v2-phase1-captures` — ~7.7h, no PIDs; next cycle escalate if not reaped.
+- `wt-mirror-dag-preflight-missions-v2-phase2` — dag-preflight complete; worktree pending heal-wedged reap.
+- install-drift healer: next run 18:00Z UTC → check for 1st of 2 clean cycles post-PR #411 merge.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1272 --template dag-preflight-revision --detail missions-v2-phase2-p2-resurface-and-digest-card-file-enumeration-gap` → row appended (07:45Z). No auto-fixes applied (dag-preflight spec amendment is Beacon's scope; PR #412 review in progress via automated pipeline).
+**Dispatches:** None (outbox-notifier already escalated REVISION to Larry; Mirror review for PR #412 dispatched by automated pipeline).
+**PRIME DIRECTIVE:** 1 new intervention (mirror-dag-revision:missions-v2-phase2). interventions=745, systemic_fixes=16, ratio=46.5625, trend=flat (script-authoritative, iter 1272).
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: mirror-dag-revision new finding).
+
+---
+
 ## Iteration 1271 — 2026-06-10 ~07:35Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Two active signals — PR #412 pipeline stall persists (new failure mode: Beacon APPROVAL_REQUEST not processed by outbox-notifier); VM behind origin/main by 1 commit (PR #415, merged 07:26:49Z).
