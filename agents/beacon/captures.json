@@ -95,7 +95,7 @@
       "id": "cap-decide-full-codebase-audit-cadence-abac",
       "title": "Decide full-codebase-audit cadence",
       "note": "Phase-2 convergence avg novel-share 40% over 1 audit(s). SCHEDULE recurring audits \u2014 the corpus is still learning new bug classes, so regular audits keep teaching the gate. See memory mirror-bughunt-gate-project.",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -103,8 +103,9 @@
         "branch": "fix/unittest-prod-write-tripwire",
         "captured_at": "2026-06-10T17:23:23.467572+00:00"
       },
-      "last_touched": "2026-06-10T17:23:23.467572+00:00",
-      "promoted_to": null
+      "last_touched": "2026-06-10T18:32:39.789945+00:00",
+      "promoted_to": null,
+      "dropped_at": "2026-06-10T18:32:39.789945+00:00"
     },
     {
       "id": "cap-bug-hunt-phase-2-run-the-next-full-codebase-audi-5a20",
