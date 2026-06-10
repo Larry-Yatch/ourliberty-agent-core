@@ -4,6 +4,67 @@
 
 ---
 
+## Iteration 1249 — 2026-06-10 04:23Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ 1 new finding — `credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN` (healer DM already delivered via outbox-notifier; action on Larry).
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z; non-clean iter — credential-drift finding; tier stays 1)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1408 lines** (+1 since iter 1248 watermark of line 1407). New alert (line 1408, ts=2026-06-10T04:16:17Z): source=heal-credential-registry-drift, subject=credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN. `DESKTOP_INGEST_TOKEN` is present in `credentials/.env.larry` but has no entry in `config/token-rotation-schedule.json` — rotation tracking blind spot. alert-translations.json entry: `tier: "SOON"` (not Tier-3/silence). Gate 2: credential operations → **Tier 2 (guarded)**. Outbox-notifier already delivered DM (beacon-bot idx=1407 at 22:19:49 MDT). Pulse claims alert, classifies Tier 2, no additional DM needed. Advance watermark to ts=2026-06-10T04:16:17Z / line 1408. → `ask-then-do` + tier-reset.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last real entry 22:19:49 MDT (04:19:49Z) — credential-drift alert idx=1407 delivered. Prior entries: TIER2_FALLBACK_FAILED at 22:12:10/22:16:33 MDT (standing auth_401), fixture test output at 22:14:39 MDT (source=heal-x — confirmed test fixture). No new Larry directives. No real agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-10T04:12:57Z (fresh, ~10 min old). heal-pipeline-stall-state.json = snooze/suppress registry (34 entries, all snoozed to 2099). No active stalls. [blue] NOTE CLOSED: prior iters flagged "heartbeat key missing from state.json" — confirmed per iter-846 calibration that heal-pipeline-stall.heartbeat IS the separate heartbeat file; state.json contains the cooldown registry, not the heartbeat. No format anomaly. ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: step-captures-core.json (active missions-v2 Phase 1 step 1a build, source=beacon). Beacon, mirror, pulse: 0 items. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (oneshot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=d2845bb ("Pulse cycle 20260610T041901Z" — iter 1248 wrapper commit). Local ahead of origin by 1 commit (sync.json shows push-failed at 04:17:23Z). [blue] SYNC-PUSH-REBASE-FALLBACK-001 standing (61st+ occurrence; APPROVAL_REQUEST open). ✅ Nominal per standing classification.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-10T04:17:23Z (< 2h ago). 61st+ occurrence of sync-push-rebase-fallback-001. Self-recovering. [blue] standing. ✅ Nominal per standing classification.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 53 ourliberty-* units loaded. Running services: beacon-bot ✅, chain-event-shipper ✅, cycle.service ✅ (this iter), dashboard-api ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. All timers: active/waiting ✅. ourliberty-agent-core-health.service: oneshot (absent/inactive between fires — expected). ✅ Core nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§5.0):** 2/15 gate reviews since go-live — soaking, no-op. ✅
+
+**Check I (§5.1, Wednesday June 10):** check-i-2026-06-10.json sentinel PRESENT (fired iter 1246). Idempotent skip. ✅
+
+**Credential rotation (§4.6):** DESKTOP_INGEST_TOKEN not yet in rotation schedule (healer alert just fired). §4.6 only checks credentials already in schedule: 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Forge/pipeline digest:** step-captures-core.json in Forge inbox (missions-v2 Phase 1 step 1a, source=beacon, active). 0 open PRs. Pipeline healthy.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001`: Forge inbox = step-captures-core.json only (no preflight-reminder task). Still pending. Carry forward [yellow].
+- `health-check-notify-script-missing`: agent-core-health.timer active/waiting. Service between oneshot runs. Carry forward [yellow].
+- `unreviewed-merge streak 2` (PR #404 + #405): No new unreviewed-merge alerts in new line 1408 (credential-drift only). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: TIER2_FALLBACK_FAILED confirmed in beacon log 22:12:10/22:16:33 MDT. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: New occurrence confirmed 04:17:23Z (61st+). [blue] standing.
+- `pulse-auto-dispatch task_id mismatch → APPROVAL_REQUEST silently dropped` G-rule (iter 1247, 1/3): No new occurrence. Carry forward 1/3.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: Carry forward.
+
+**Standing findings:**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 2** (PR #404 + #405) — pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001** — Beacon spec ready; notifier dropped (task_id mismatch). Pending Larry action (paste APPROVAL_REQUEST block from artifact into Beacon-bot, or approve via dashboard).
+- [yellow] **NEW: credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN** — `DESKTOP_INGEST_TOKEN` in `.env.larry` not in rotation schedule. DM delivered (beacon-bot idx=1407). Action on Larry: add entry to `config/token-rotation-schedule.json` + runbook per `shared/credentials-discipline.md`.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 61st+ occurrence; root cause unfixed; self-recovering.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --template credential-drift-missing-registry --detail DESKTOP_INGEST_TOKEN-healer-dmd-line-1408` → row appended.
+**Dispatches:** None. (DM already delivered via outbox-notifier/beacon-bot path; no duplicate needed.)
+**PRIME DIRECTIVE:** +1 intervention (credential-drift-missing-registry). interventions=736, systemic_fixes=15, ratio≈49.1, trend=flat (script-authoritative).
+**Tier end-of-iter:** 1, consecutive_clean=0 (non-clean; credential-drift Tier-2 finding).
+
+---
+
 ## Iteration 1248 — 2026-06-10 04:17Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all mandatory + additive checks nominal; 1 new alert (Pulse self-escalation from iter 1247, already handled); sync-push-rebase-fallback-001 new occurrence (60th+, [blue] self-recovering, APPROVAL_REQUEST open).
