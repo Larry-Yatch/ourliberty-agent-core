@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 1346 — 2026-06-10 18:59Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Root-cause fix in motion — `fix-wedged-reaper-spares-active-build-worktree` dispatched to Forge (phase=preflight) after Larry's "go" at 12:53 MDT. CCD S1 and headless-dedup spawn-failures standing; no re-dispatch until the wedge fix PR lands. 2 new unreviewed-merge alerts (#429, #430 — Larry-direct merges; both DM'd by notifier). 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; spawn-failures standing + new Tier-4 alerts + auth_401 fixture)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:45:14.780181+00:00 / unreviewed-merge:428 / line 1392` (iter 1345)
+- Current total: 1395 lines. **3 new entries** since watermark:
+  - Line 1393: `ts=18:48:37Z source=pulse severity=warning subject=check-i-2026-06-08` — my own Check I DM emit. Not an actionable external alert; classify Tier-3 (own-emit, no action). → `resolved` directly.
+  - Line 1394: `ts=18:50:17Z source=heal-unreviewed-merge-detector severity=critical subject=unreviewed-merge:429` — PR #429 merged without Mirror review (actor=Larry-Yatch). `never_silence: true` → Tier-4. DM delivered by notifier at 12:54:24 MDT (bot log confirmed, alert idx=1393). Pulse claims; no new action.
+  - Line 1395: `ts=18:55:08Z source=heal-unreviewed-merge-detector severity=critical subject=unreviewed-merge:430` — PR #430 merged without Mirror review (actor=Larry-Yatch). `never_silence: true` → Tier-4. DM delivery pending (alert timestamp 18:55:08Z; delivery loop picks up within minutes).
+- **New watermark: `2026-06-10T18:55:08.643278+00:00 / unreviewed-merge:430 / line 1395`**
+- tier-reset: YES (new Tier-4 alerts)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- **KEY UPDATE:** Larry sent `go` at 12:53:23 MDT (18:53:23Z UTC). Beacon processed immediately: `approved fix-wedged-reaper-spares-active-build-worktree -> dispatched to /home/larry/agents/inboxes/forge/fix-wedged-reaper-spares-active-build-worktree.json` (bot log confirmed). beacon-pending-approvals.json cleared (FILE MISSING = file removed post-dispatch). ✅ Approval processed.
+- No new Larry messages since 12:53:23 MDT.
+- Standing: auth_401 fixture contamination (TIER_ONE_MARKER, resets 11:30am, TIER 2 distinct outputs). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+- ⚠️ tier-reset: YES (standing fixture contamination).
+
+**Check 3 — Pipeline stall:**
+- `fix-wedged-reaper-spares-active-build-worktree.json` in Forge's inbox, `phase=preflight` (dispatched ~6 min ago at scan time). No PR yet — Forge is building.
+- CCD S1: `ccd-s1-envelope-builder.5.json` still in archive (spawn-failure). No re-dispatch — awaiting wedge fix PR.
+- `fix-headless-approval-dedup-spawn-failure-wedge.1.json` still in archive (spawn-failure). Same.
+- `heal-pipeline-stall-state.json` heartbeat: MISSING (standing, iters 1329+). Stalls: 0.
+- ⚠️ Non-nominal (spawn-failures standing); tier-reset: YES.
+
+**Check 4 — Pending directives:**
+- Larry's "go" at 12:53:23 MDT → processed by Beacon, dispatched to Forge. ✅ Not orphaned.
+- beacon-pending-approvals.json: MISSING (cleared post-dispatch). 0 pending. ✅ Nominal.
+- Forge inbox: 1 task in-flight (`fix-wedged-reaper`, phase=preflight). ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (standing, iters 1329+). 9/9 services active. ✅ Nominal (standing known pattern).
+
+**Check A — Source repo:** main, clean, up to date with origin. Last commit: `653897c Pulse cycle 20260610T185343Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~9 min at scan), status=success (synced 08a924c → 0255e38). Note: 2 newer commits landed post-sync (549511b #430, 653897c Pulse cycle); within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅ PRs #428–430 all merged. Forge has no open PRs (wedge fix still in preflight).
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** 1 task in-flight (`fix-wedged-reaper-spares-active-build-worktree`, phase=preflight). 0 open Forge PRs. Recently merged (last 2h, Larry-direct): #428 (18:40Z), #429 (18:48Z), #430 (18:51Z). ✅ Nominal (Forge in preflight is expected).
+
+**Check I (Wednesday 2026-06-10):** Already fired in iter 1345 (DM delivered 12:48:58 MDT, alert idx=1392). Script has same-day idempotency; skip re-invocation. ✅
+
+**§5.0 Bug-hunt gate Phase-2:**
+- `audit_due_nudge.py`: `[audit-due] no committed audit baseline; no-op.` ✅
+- `distill_detector.py`: `[distill-detector] no un-distilled audits; no-op.` ✅
+- `audit_cadence_signal.py`: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅
+
+**Credential rotations:** Carry iter 1345: 0 overdue, 0 within 60-day window. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1345 watch items:**
+- **APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree`** — **VERIFIED RESOLVED**: Larry sent "go" at 12:53:23 MDT; Beacon dispatched to Forge immediately. Task in inbox (phase=preflight). ✅ Approval no longer pending.
+- **PR #429** — **VERIFIED**: MERGED at 18:48:32Z (Larry-direct). ✅ Resolved.
+- **CCD S1 build** — **VERIFIED**: No re-dispatch. `.5.json` in archive. Awaiting wedge fix. **CARRY.**
+- **`fix-headless-approval-dedup-spawn-failure-wedge`** — **VERIFIED**: No re-dispatch. `.1.json` in archive. Same. **CARRY.**
+- **install-drift** — 06:00Z UTC June 11. No new alerts. **CARRY.**
+- **`alert-translation-no-mirror-dispatch-001`** — no change. **CARRY.**
+
+**G-rule tracking:**
+- `missions-card-gc:summary not in alert-translations.json` — **2/3**. No new occurrence. Carry.
+- `completion-DM pending-queue delivery failure` — 1/3. No new occurrence. Carry.
+- Others: carry as per iter 1345.
+
+**Standing findings:**
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Root cause fix in Forge's inbox (phase=preflight). Watch for PR.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge` build: `.1.json` spawn-failure. Same fix path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] unreviewed-merge:429 and :430 — DM'd (Larry-direct merges). Actor-exemption-config G-rule 3/3 still standing; pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2` to send to Beacon.
+
+**Watch items for iter 1347:**
+- **Forge building fix-wedged-reaper** — phase=preflight at 18:59Z. Watch for build start → PR → Mirror review → merge.
+- **CCD S1 re-dispatch** — no action until wedge fix PR lands on main.
+- **unreviewed-merge:430 DM** — verify delivered by notifier.
+- **install-drift** — 06:00Z UTC June 11.
+
+**Actions taken:** None (no auto-fix conditions met; alerts DM'd by notifier; wedge fix dispatched by Beacon post-approval).
+
+**PRIME DIRECTIVE:** 2 new interventions this iter (Check 0 triage: unreviewed-merge:429 and :430, both Tier-4, DMs delivered/pending by notifier). 0 new systemic fixes. interventions=759, systemic_fixes=17, ratio≈44.65, trend=flat. iter_non-clean (spawn-failures + auth_401 + new alerts).
+**Tier end-of-iter:** 1 (consecutive_clean=0; spawn-failures + Tier-4 alerts standing).
+
+---
+
 ## Iteration 1345 — 2026-06-10 18:47Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Root cause of spawn-failure chain identified and fix dispatched. Both builds (`ccd-s1-envelope-builder.5.json`, `fix-headless-approval-dedup-spawn-failure-wedge.1.json`) remain in spawn-failure; re-dispatch still blocked pending Beacon auth recovery + Larry approval of `fix-wedged-reaper-spares-active-build-worktree`. PR #429 "spec(missions-v2): Phase 3 — write-back + auto-registration" OPEN (Larry-direct, 18:45:55Z, ~1 min at scan). New alert: `unreviewed-merge:428` (DM delivered by notifier 12:48:57 MDT). 9/9 services active.
