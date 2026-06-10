@@ -4,6 +4,122 @@
 
 ---
 
+## Iteration 1381 — 2026-06-10 23:11Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ New CRITICAL alerts — L1412/L1413 `transcript-not-persisted` (tier1+tier2) from Forge build session. PR #438 opened 23:08Z to fix root cause (EROFS / ReadWritePaths) — in Mirror review. PR #437 in Mirror review (15 min old, below threshold). 9/9 services active. Pipeline advancing.
+
+**VERIFY-BEFORE-REASSERT (iter 1380 watch items):**
+- PR #437 (fix-routing): MERGEABLE ✅ at scan. Mirror review task dispatched at 23:10Z (`review-fix-dashboard-routing-denied-002.json`). Below 30-min threshold (23:26Z). ✅ Watch.
+- build-fix-systemd-tier2-home-readwrite-001: PR #438 OPENED ✅ 23:08Z. Mirror reviewing (`review-fix-systemd-tier2-home-readwrite-001.json`). ✅ CLOSED for build-phase watch.
+- marker-error retries (PR #435+#436): marker-error-fix-test-gate-sandbox-env-injection-002-2.json still in Forge inbox (23:02Z). Stale re-emit for merged PR #436. Low-priority. Watch.
+- Beacon inbox: EMPTY from prior items (notify-fix-classifier-session-lost-002 + notify-fix-systemd-tier2-home-readwrite-001 at 23:08Z — pipeline tracking notifications for new PRs). ✅ Normal.
+- Check B sync: last_sync=22:50:16Z, expires 00:50:16Z. ✅ Nominal (99 min remaining at scan).
+
+**Tier state:** 1 (consecutive_clean=0; active PRs + new alerts)
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1413 lines** (+2 since iter 1380 watermark at 1411). New alerts at lines 1412-1413:
+  - **L1412 (23:07:26Z):** `transcript-not-persisted:tier2` (source=agent-runner-forge, severity=critical, route=escalate) — Forge build task ran successfully on Tier 2 but transcript did not persist to `/home/larry/.claude-larry-personal/.claude/projects/.../sid-new.jsonl`. EROFS root cause: tier2 HOME missing from forge-bot ReadWritePaths. → **Tier 2** (novel pattern, critical severity, actionable after PR #438 merges). DM Larry [yellow].
+  - **L1413 (23:07:26Z):** `transcript-not-persisted:tier1` (source=agent-runner-forge, severity=critical, route=escalate) — same build session; tier1 path `/home/larry/.claude/projects/.../sid-new.jsonl` also failed to persist. Both tier paths failing indicates the forge-bot systemd unit is missing ReadWritePaths for both HOMEs. → **Tier 2** (same finding, same DM). Combined as one escalation.
+  - Both alerts are from the `fix-systemd-tier2-home-readwrite-001` build session that created PR #438. The new "loud transcript-persistence check" (part of PR #438's scope) fired at build-end and detected the failure. PR #438 is the fix: adds ReadWritePaths for all agent units.
+  - Risk: if Mirror requests changes on PR #437 or PR #438, Forge's revision phase will hit session_lost (transcript didn't persist, resume will fail with "No conversation found").
+- Net: 2 new Tier-2 alerts. DM Larry [yellow] sent via `larry_alerts.append_alert`. PRIME DIRECTIVE intervention recorded.
+- **Watermark: line 1413 / transcript-not-persisted:tier1 / 2026-06-10T23:07:26Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: pending=[] ✅
+- No new Larry messages since 15:52:16 MDT (iter 1372). No orphan directives. ✅ Nominal.
+- Bot log: G-rule `test-fixture-batch-in-bot-log` 3/3 dispatched iter 1378. Beacon processed (Root Cause Result notification in journal post-iter-1380). Forge brief `fix-test-log-isolation-heal-x-tier-sentinels-001` authored; dispatch to Forge pending Beacon re-emit (trust policy didn't auto-fire from `source: pulse`). Carry.
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T22:58:19Z (13 min old at 23:11Z — within 30-min cadence). ✅ Nominal.
+- heal-pipeline-stall-state.json: no active stalls (Check-8 cursor only; no stall state file). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages since iter 1372. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean at session start (gitStatus). ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T22:50:16Z (21 min old), status=no-change. Expires 00:50:16Z. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 2 open PRs.
+  - PR #437 "fix(routing): dashboard FRESH_DISPATCH_ROUTES entry + routing-denied alert tripwire" — OPEN/MERGEABLE, 22:56Z (~15 min at 23:11Z scan). Mirror review dispatched 23:10Z. Below 30-min threshold. ✅ Watch.
+  - PR #438 "fix(systemd): tier2 HOME in ReadWritePaths for all agent units + loud transcript-persistence check" — OPEN/MERGEABLE, 23:08Z (~3 min at scan). Mirror review dispatched. Fresh. ✅ Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- Forge inbox (2 items):
+  - `build-fix-dashboard-routing-denied-002.json` (23:03Z, phase=build, session_id=5a977b5d): ⚠️ Stale artifact — PR #437 was already opened at 22:56Z (7 min earlier). This file was re-dispatched by outbox-notifier AFTER the PR was created (likely because Forge's transcript didn't persist and the task cleanup failed). If Forge picks this up and tries to --resume session `5a977b5d`, it will get session_lost. [blue] Watch: if session_lost fires → new G-rule instance for outbox-notifier re-dispatch-after-transcript-failure.
+  - `marker-error-fix-test-gate-sandbox-env-injection-002-2.json` (23:02Z): stale re-emit for merged PR #436. Low-priority PROCEED emit. Forge will process and archive.
+- Beacon inbox: 2 items — pipeline tracking notifications for PRs #437/#438. Beacon processing normally.
+- Mirror inbox: 2 reviews active — `review-fix-dashboard-routing-denied-002.json` (23:10Z), `review-fix-systemd-tier2-home-readwrite-001.json` (23:08Z). ✅ Both in review.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS. Idempotent skip. ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22. ✅
+**install-drift:** Last fire 18:00:03Z (~5h11m old). Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- **test-fixture-batch-in-bot-log: 3/3 DISPATCHED** (iter 1378). Beacon produced brief `fix-test-log-isolation-heal-x-tier-sentinels-001`; dispatch to Forge pending Beacon re-emit. Carry.
+- **auto-restart-failed:ourliberty-outbox-notifier.service: 1/3** — no new occurrence. Carry.
+- **wedged-review-silent-wt: 2/3** — no new occurrence this iter. Carry.
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred. Carry.
+- All other G-rule statuses: carry from iter 1380 unchanged.
+
+**Actions taken:**
+- [yellow] larry_alerts escalation sent: `transcript-not-persisted:iter1381` — L1412/L1413, PR #438 in Mirror review, action needed after merge: `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-forge-bot.service`.
+- PRIME DIRECTIVE ledger: 1 intervention recorded (uncategorized:iter-0, tier=1).
+
+**Standing findings (carry with updates):**
+- [yellow] **L1412/L1413 transcript-not-persisted (tier1+tier2)**: PR #438 in Mirror review. After merge: daemon-reload + restart forge-bot. If Mirror requests changes: Forge revision will hit session_lost (transcript from PR #438 build didn't persist). Larry notified.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: Beacon brief ready; Forge dispatch pending Beacon re-emit.
+- [blue] PR #437: Mirror reviewing. Threshold at 23:26Z. Expect auto-merge after Mirror PASS.
+- [blue] PR #438: Mirror reviewing. Fresh. Expect auto-merge after Mirror PASS.
+- [blue] build-fix-dashboard-routing-denied-002.json: stale re-dispatch in Forge inbox. Watch for session_lost re-fire.
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251). Carry.
+
+**Watch items for iter 1382:**
+- PR #437: threshold 23:26Z. If Mirror PASS → auto-merge fires. If Mirror requests changes → Forge revision will hit session_lost (transcript didn't persist); monitor for new session_lost alert.
+- PR #438: Fresh. Mirror reviewing. Watch for PASS → auto-merge. After merge: Larry must run daemon-reload + restart forge-bot.
+- build-fix-dashboard-routing-denied-002.json: if Forge picks up and fails → new session_lost alert. Watch.
+- Check B sync: expires 00:50:16Z (~99 min remaining). Trigger sync if not refreshed.
+- marker-error-fix-test-gate-sandbox-env-injection-002-2.json: expect Forge to process and archive (low-priority stale re-emit for merged PR #436).
+
+**PRIME DIRECTIVE:** 1 new Pulse intervention this iter (L1412/L1413 transcript-not-persisted). interventions=765, systemic_fixes=17, ratio≈45.0, trend=flat. Iter non-clean (active PRs + new alerts).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1380 — 2026-06-10 23:05Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing — PR #436 MERGED 23:03:40Z (Mirror PASS → auto-merge ✅). PR #437 OPEN (22:56Z, ~9 min — fresh). Forge inbox: 4 items (2 build-notification tasks + 2 marker-error retries). 9/9 services active. 2 new alerts (L1410-L1411: both Tier 3 / known patterns).
