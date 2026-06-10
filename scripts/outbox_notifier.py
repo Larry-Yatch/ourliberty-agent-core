@@ -6619,6 +6619,60 @@ def _handle_build_sequence_advancer_kickoff(
         )
         return f'sequence-kickoff:already-active:{seq_id}'
 
+    # spec_doc presence guard (incident 2026-06-10). status is `pending`
+    # here — this is the one transition that arms the advancer. The
+    # sequence file is local, so validate_dag passes even when the spec_doc
+    # it references hasn't synced into this checkout yet. Without this guard
+    # the kickoff would transition pending→active and the advancer would
+    # dispatch a first step whose dispatch_text cites a spec_doc that
+    # Forge/Mirror can't read — surfacing downstream as the misleading
+    # "spec never authored". Distinguish a sync-lag (spec exists on
+    # origin/main) from a genuinely-missing spec, and emit the correct,
+    # actionable message. Placed AFTER the idempotency no-op above so a
+    # re-dispatched kickoff on an already-active sequence still dedups
+    # silently rather than tripping this guard.
+    presence = bsv.check_spec_doc_presence(seq.get('spec_doc'))
+    if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
+        msg = (
+            f'Sequence `{seq_id}` kickoff deferred: this checkout is behind '
+            f'origin/main, so its spec_doc is not yet readable here — but the '
+            f'spec EXISTS on main. Do NOT re-author it. {presence.message} '
+            f'Then re-dispatch the kickoff. Sequence file: `{seq_path}`.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} DEFERRED spec-doc-behind-origin '
+            f'task={task_id} spec_doc={presence.spec_doc!r} '
+            f'behind_by={presence.behind_by}',
+            'WARN',
+        )
+        return f'sequence-kickoff:spec-behind-origin:{seq_id}'
+    if presence.status == bsv.SPEC_DOC_NOT_AUTHORED:
+        msg = (
+            f'Sequence `{seq_id}` kickoff failed: {presence.message} '
+            f'Sequence file: `{seq_path}`.'
+        )
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=msg,
+            subject=f'sequence-kickoff-{seq_id}',
+        )
+        log(
+            f'BUILD_SEQUENCE_KICKOFF seq={seq_id} FAILED spec-doc-not-authored '
+            f'task={task_id} spec_doc={presence.spec_doc!r}',
+            'WARN',
+        )
+        return f'sequence-kickoff:spec-not-authored:{seq_id}'
+    # present / indeterminate → proceed. Indeterminate (origin/main doesn't
+    # resolve) must not block kickoff: it's the authoring-on-Mac and
+    # non-synced-checkout case, where hard-failing would be a false negative.
+
     # Transition pending → active and append audit_log entry. Use the
     # advancer's atomic-write convention (tmp + os.replace via stdlib).
     #

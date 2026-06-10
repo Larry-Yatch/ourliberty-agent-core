@@ -478,5 +478,164 @@ class TestCLI(unittest.TestCase):
         self.assertIn('not a file', proc.stderr)
 
 
+def _fake_git(table: dict, default=(1, '')):
+    """Build an injectable git runner from a {argv-tuple: (rc, stdout)} map.
+
+    Records every argv it's asked to run on the returned function's
+    `.calls` list so tests can assert which git probes fired."""
+    def run(argv):
+        run.calls.append(list(argv))
+        return table.get(tuple(argv), default)
+    run.calls = []
+    return run
+
+
+class SpecDocPresenceTest(unittest.TestCase):
+    """Incident 2026-06-10 sync-lag guard: distinguish a spec_doc that is
+    merged-but-not-yet-synced (behind origin) from one that was never
+    authored. git + local_exists are injected so the test is hermetic."""
+
+    SPEC = 'agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md'
+
+    def test_present_locally_short_circuits(self):
+        git = _fake_git({})
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/nope'),
+            git=git, local_exists=lambda: True,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_PRESENT)
+        self.assertTrue(res)  # __bool__ is True only when present
+        self.assertEqual(git.calls, [])  # no git probes when present
+
+    def test_missing_locally_present_on_origin_is_behind_origin(self):
+        """The incident case: spec exists on origin/main, absent locally."""
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (0, 'abc123'),
+            ('cat-file', '-e', f'origin/main:{self.SPEC}'): (0, ''),
+            ('rev-list', '--count', 'HEAD..origin/main'): (0, '1'),
+        })
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/repo'),
+            git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_BEHIND_ORIGIN)
+        self.assertFalse(res)
+        self.assertEqual(res.behind_by, 1)
+        self.assertIn('ourliberty-sync.service', res.message)
+        self.assertIn('do not re-author', res.message.lower())
+
+    def test_missing_locally_absent_on_origin_is_not_authored(self):
+        """The genuine missing-spec case: absent locally AND on origin/main."""
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (0, 'abc123'),
+            ('cat-file', '-e', f'origin/main:{self.SPEC}'): (1, ''),
+        })
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/repo'),
+            git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_NOT_AUTHORED)
+        self.assertFalse(res)
+        self.assertIn('author', res.message.lower())
+
+    def test_missing_locally_no_origin_main_is_indeterminate(self):
+        """Not a synced checkout (origin/main unresolved) → don't guess."""
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (1, ''),
+        })
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/repo'),
+            git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_INDETERMINATE)
+        self.assertFalse(res)
+
+    def test_behind_origin_with_uncountable_commits_still_classifies(self):
+        """rev-list failing to return a count doesn't break classification."""
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (0, 'abc'),
+            ('cat-file', '-e', f'origin/main:{self.SPEC}'): (0, ''),
+            ('rev-list', '--count', 'HEAD..origin/main'): (1, ''),
+        })
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/repo'),
+            git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_BEHIND_ORIGIN)
+        self.assertIsNone(res.behind_by)
+
+    def test_behind_origin_zero_count_avoids_contradictory_message(self):
+        """rev-list returning '0' (file on origin/main yet absent locally
+        while HEAD is not behind — e.g. an uncommitted local deletion) must
+        NOT print the self-contradictory 'behind by 0 commit(s)'."""
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (0, 'abc'),
+            ('cat-file', '-e', f'origin/main:{self.SPEC}'): (0, ''),
+            ('rev-list', '--count', 'HEAD..origin/main'): (0, '0'),
+        })
+        res = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=Path('/repo'),
+            git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_BEHIND_ORIGIN)
+        self.assertNotIn('by 0 commit', res.message)
+        self.assertIn('one or more commits', res.message)
+
+    def test_empty_spec_doc_is_indeterminate(self):
+        res = bsv.check_spec_doc_presence('', repo_root=Path('/repo'),
+                                          git=_fake_git({}))
+        self.assertEqual(res.status, bsv.SPEC_DOC_INDETERMINATE)
+
+    def test_non_string_spec_doc_is_indeterminate(self):
+        res = bsv.check_spec_doc_presence(None, repo_root=Path('/repo'),
+                                          git=_fake_git({}))
+        self.assertEqual(res.status, bsv.SPEC_DOC_INDETERMINATE)
+
+
+class SpecDocCliTest(unittest.TestCase):
+    """CLI `check-spec-doc <seq-id|path>` against the real repo checkout
+    (origin/main resolves), exercising the present and not-authored exit
+    codes. The behind-origin branch is covered hermetically at the function
+    level (SpecDocPresenceTest) since it needs a crafted git state."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self._tmp.name)
+        self.script = _SCRIPTS_DIR / 'build_sequence_validator.py'
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _seq_file(self, spec_doc: str) -> Path:
+        f = self.tmpdir / 'seq.json'
+        seq = _valid_sequence()
+        seq['spec_doc'] = spec_doc
+        f.write_text(json.dumps(seq))
+        return f
+
+    def _run(self, path: Path) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(self.script), 'check-spec-doc', str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+
+    def test_cli_present_spec_exits_zero(self):
+        # A file that exists in this checkout, relative to the repo root.
+        proc = self._run(self._seq_file('agents/mirror/CLAUDE.md'))
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK', proc.stdout)
+
+    def test_cli_absent_spec_exits_one_not_authored(self):
+        proc = self._run(self._seq_file(
+            'agents/beacon/specs/__this_spec_does_not_exist__.md'))
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn('NOT_AUTHORED', proc.stderr)
+
+    def test_cli_missing_sequence_file_exits_one(self):
+        proc = self._run(self.tmpdir / 'nope.json')
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn('not a file', proc.stderr)
+
+
 if __name__ == '__main__':
     unittest.main()
