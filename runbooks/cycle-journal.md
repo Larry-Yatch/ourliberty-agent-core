@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration 1309 — 2026-06-10 ~13:15Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Beacon-bot duplicate (Pulse calibration error). All other checks nominal. Forge building p2-resurface-and-digest-card. PR #412 standing APPROVAL_REQUEST. 8/9 services nominally active (beacon-bot: 2 competing processes — see below).
+**Tier state:** 1 (consecutive_clean=0; beacon-bot 409 conflict; PR #412 standing stall)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T12:49:26.289872Z / medic-diagnosis:PR#412-attempt6 / iter 1308. Scanned larry-alerts.jsonl:
+- **Count:** 1347 lines (UNCHANGED from iter 1308). 0 new alerts since 12:49:26Z watermark. ✅ Nominal.
+- Watermark: **UNCHANGED** (2026-06-10T12:49:26.289872Z / medic-diagnosis:PR#412-attempt6 / iter 1308).
+- Triage: 0 new alerts. ✅ No tier-reset from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1308 watch items:
+- "p2-resurface-and-digest-card — Forge building (~14 min at scan). Expect PR ~13:20–13:40Z UTC." → **ACTIVE**: build-p2-resurface-and-digest-card.json in Forge inbox; forge-bot active. Carry.
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY**: 13:15Z UTC, not yet 18:00Z.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN/no-reviewDecision. ⚠️ [yellow]
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — Forge brief still absent." → **CARRY**: Forge inbox has only p2-resurface-and-digest-card; no G-rule brief from Beacon yet.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal. (beacon_telegram_bot.log 409 errors are application-level, not systemd journal events.)
+
+**Check 2 / Check C — Telegram sweep + Agent liveness (FINDING):**
+- `systemctl is-active ourliberty-beacon-telegram-bot.service` = **inactive** — CALIBRATION ERROR IDENTIFIED. This service is a launcher script (creates tmux session then exits). "inactive" = expected post-launch state, NOT a signal the bot is down.
+- `pgrep -f beacon_telegram_bot.py`: found PID 1071697 (orphaned from prior tmux session, winning Telegram poll) + PID 1089538 (my new tmux instance, 409-looping).
+- **Root cause of conflict**: Pulse iter 1309 ran `beacon_telegram_bot.sh` based on false-inactive misread → killed the original tmux session → orphaned PID 1071697 → started PID 1089538 in new tmux → two competing pollers.
+- **Current state**: Bot functionally delivering via PID 1071697 (winning Telegram poll). PID 1089538 stuck in 409 retry loop, generating log noise at ~3s intervals.
+- **Cannot self-resolve without human intervention**: 409 conflict ongoing 5+ minutes with no sign of natural resolution.
+- ⚠️ [yellow] Escalation written: `💓 [yellow] Iter 1309 — beacon-bot 409 conflict (calibration error). Fix: tmux kill-session -t beacon-bot` — larry-alerts.jsonl idx written; beacon bot PID 1071697 will deliver.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: 2026-06-10T13:02:09Z (~13 min at scan — fresh). State: 0 active stalls. Pipeline advancing (p2-resurface-and-digest-card in Forge). ✅ Nominal.
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):**
+- Forge: 1 task (build-p2-resurface-and-digest-card.json — build-phase; forge-bot active) ✅
+- Beacon: EMPTY ✅
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+- ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT (no recent daemon code restarts). ✅ Nominal. (409 noise is application-level, not a stale-daemon event.)
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=681bc78 "Pulse cycle 20260610T130215Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T12:16:19Z (~59 min at scan — within 2h threshold). status=no-change. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-dashboard: 0 open PRs.** ✅ Forge building p2-resurface-and-digest-card.
+- **PR #412 (ourliberty-agent-core): OPEN/UNKNOWN** — `forge/harden-test-prod-write-isolation-001`, no reviewDecision. Standing stall: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** 0 credentials overdue, 0 within-60d window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead/approval-gated PRs` — **3/3 DISPATCHED** (iter 1298). Beacon consumed ✅. No Forge brief in Forge inbox. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`. No new occurrence. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (no new occurrence). Carry.
+- **NEW G-rule 1/3: `Check C beacon-bot liveness via systemctl is-active gives false-inactive (launcher-type service)`** — iter 1309=1/3. At 3/3: dispatch to Beacon to update cycle-prompt.md Check C to use `tmux has-session -t beacon-bot` or `pgrep -f beacon_telegram_bot.py | wc -l` instead.
+
+**Standing findings:**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [yellow] **NEW: beacon-bot 409 conflict** — iter 1309 calibration error created duplicate process. Fix: `tmux kill-session -t beacon-bot`. Bot delivery functional via PID 1071697 in interim. Escalation delivered.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1310):**
+- **beacon-bot 409 conflict** — Larry action pending: `tmux kill-session -t beacon-bot`. Watch: if conflict persists after Larry action, check pgrep for surviving orphan.
+- **p2-resurface-and-digest-card** — Forge build active (~15 min at scan). Expect PR ~13:20–13:40Z UTC.
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean healer cycle post-PR #411 merge.
+- **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — Forge brief absent. Monitor.
+
+**Actions taken:**
+1. [allow_list:relaunch-missing-bot — INCORRECT FIX] Ran `bash ~/agent-core/scripts/beacon_telegram_bot.sh` based on false-inactive misread of launcher-type service. Created duplicate; 409 conflict. Logged to cycle-actions.jsonl.
+2. Escalation appended to larry-alerts.jsonl (beacon-bot-duplicate-409, route=escalate) — will be delivered by PID 1071697.
+
+**PRIME DIRECTIVE:** 1 new intervention (beacon-bot incorrect relaunch), 0 new systemic_fixes. interventions=751, systemic_fixes=16, ratio≈46.94. iter_non-clean (Check 2/C: 409 conflict; Check E: PR #412 standing stall).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1308 — 2026-06-10 ~13:00Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing. Forge building p2-resurface-and-digest-card (~14 min into build at scan). PR #412 standing stall (APPROVAL_REQUEST pending Larry sign-off). 9/9 core services active.
