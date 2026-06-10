@@ -151,6 +151,21 @@
       },
       "last_touched": "2026-06-10T22:12:33.270614+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-phantom-build-phase-after-marker-error-retry-pr-4d78",
+      "title": "Phantom build-phase after marker-error retry (PR-6 candidate)",
+      "note": "Observed 2026-06-10 ~23:00Z: forge terminal markers for PRs #436/#437 were malformed -> outbox-notifier marker-error retry; the retry session for fix-classifier-session-lost-002 re-emitted PROCEED and the notifier classified it as a preflight verdict, dispatching build-fix-classifier-session-lost-002 for a PR (#435) that had ALREADY MERGED. Chat agent cancelled it via blackboard/cancel-task-fix-classifier-session-lost-002.json. FIX SHAPE: notifier must not treat a PROCEED from a marker-error-retry session as a fresh preflight verdict when the task is already terminal (PR merged/opened) \u2014 guard with GitHub-truth (like #417) or task-state check before build-phase dispatch. Same risk exists for the #436/#437 retries; watch for phantom build-fix-test-gate-sandbox-env-injection-002 / build-fix-dashboard-routing-denied-002 dispatches and cancel the same way.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "HEAD",
+        "captured_at": "2026-06-10T23:01:33.065559+00:00"
+      },
+      "last_touched": "2026-06-10T23:01:33.065559+00:00",
+      "promoted_to": null
     }
   ]
 }
