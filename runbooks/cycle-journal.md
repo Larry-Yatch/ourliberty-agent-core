@@ -4,6 +4,24 @@
 
 ---
 
+## Result notify: cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z — 2026-06-10 ~09:40Z UTC (inter-agent)
+
+**Event:** Beacon result-notification received for task `cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z` (status=SUCCESS). G-rule 3/3 dispatch for `heal-pipeline-stall:unrouted-pr` false-positives.
+
+**What Beacon found (ground-truth verified):**
+- Check 7 (`check_unrouted_open_prs` in `heal_pipeline_stall.py`) counts a PR as "routed" only if `routing-events.jsonl` contains a record with `source_agent=beacon, target=mirror, phase=review` whose `task_id` matches the PR's branch.
+- The notifier's **auto**-dispatch path (`_dispatch_mirror_review`) keys by the build/branch task_id → matches → no false positive.
+- The **Beacon-mediated** path (APPROVAL_REQUEST keyed `mirror-review-pr<N>-001`, target=mirror) emits **no** `phase=review` routing event AND keys by PR number, not branch. PR #412 was genuinely reviewed by Mirror at 07:51Z yet has zero matching routing event — hence the 3/3 misfire.
+- A pure additive routing-write keyed `mirror-review-pr412-001` would **still** miss: that id isn't a substring of the branch. Fix requires BOTH an emit-at-dispatch routing record carrying the PR number AND a Check 7 change to match on PR number (OR Forge may instead rekey the event by branch task_id and leave Check 7 unchanged — left to Forge's discretion).
+
+**What Beacon dispatched:** APPROVAL_REQUEST `fix-beacon-mediated-review-routing-evidence-001` → Forge inbox for preflight. Next: Forge returns PROCEED / CLARIFY / REJECT.
+
+**G-rule tracking update:** `heal-pipeline-stall:unrouted-pr fires false positive for recovery-dispatched reviews not in routing-events.jsonl` — G-rule 3/3 dispatch complete ✅. Fix pipeline: Forge preflight → build → PR → Mirror review → merge. Watch for Forge preflight response.
+
+**No new work required from Pulse.** Standing watch item updated in MEMORY.md.
+
+---
+
 ## Iteration 1282 — 2026-06-10 ~09:20Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ G-rule finding — `heal-pipeline-stall:unrouted-pr` false-positive (G-rule 3/3; dispatched to Beacon). PR #420 OPENED ✅ (p2-digest-generator, Forge build complete). PR #419 MERGED ✅ (fix(approvals) Larry-direct). Beacon completed PR #412 revision dispatch + emitted APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. SYNC-PUSH-REBASE-FALLBACK-001 70th+ at 09:16Z (known [blue], self-recovered). All mandatory checks nominal.
@@ -77183,3 +77201,72 @@ ourliberty-dashboard: 0 open. ✅
 - [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
 - [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
 - [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; self-recovering.
+
+---
+
+## Iteration 1286 — 2026-06-10 09:32Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 0 new alerts; missions-v2-phase2 pipeline in-flight normally.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1455 lines** (UNCHANGED — watermark confirmed; `tail -n +1455` returned exactly 1 line: the sync-blocked:auto-commit-push-failed at 09:16:16Z from iter 1282, which IS the watermark itself). No new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry `[2026-06-10T03:27:19-0600]` = 09:27:19Z (heal-pr-auto-merge service tick — routine INFO). Last Larry message: "Go" at 02:32Z MDT (08:32Z UTC), approved dag-preflight-revision-autonomy-001. No new Larry directives since. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall heartbeat = 2026-06-10T09:17:41Z (FRESH — 14 min at scan). Stall state shows only historical 2099-suppressed entries. PR #412 stall addressed: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` created by Beacon at 09:13Z, pending Larry sign-off. Active pipeline (missions-v2-phase2 + dag-preflight) in-flight; no timeout-exceeded sessions. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Beacon: 1 task — `cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z.json` (~09:20Z, ~12 min old; G-rule 3/3 dispatch from iter 1282, fresh). ✅
+- Forge: 3 tasks in-flight:
+  - `p2-digest-generator.json` (08:25Z, ~67 min) — Forge is ACTIVELY PROCESSING: worktree `wt-forge-p2-digest-generator` exists + PR #420 opened (08:58Z); inbox file present = Forge in-progress / completion pending archive. NOT stale.
+  - `dag-preflight-revision-autonomy-001.json` (08:32Z, ~60 min) — Larry-approved task dispatched 08:32Z; Forge active, will pick up next. At threshold boundary.
+  - `marker-error-p2-derive-endpoint-1.json` (08:44Z, ~48 min) — marker-error retry 1/3 for PR #418 routing. Normal recovery in-flight.
+- Mirror: 0. Pulse: 0. ✅ All within active-pipeline norms.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. One-shot healer completed normally. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=ec9c189 "Pulse cycle 20260610T092218Z". Repo on main+clean. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, message="Auto-commit push failed; rolled back", commit=ee60231b, last_sync=2026-06-10T09:16:16Z. ourliberty-sync.service: **failed** (exit-code 1; root = `_lib_push_with_rebase.sh: /dev/stdout: No such device or address`). This is SYNC-PUSH-REBASE-FALLBACK-001 (70th+ occurrence). ourliberty-sync.timer: active/waiting — will re-trigger on next hourly fire. Self-recovering. APPROVAL_REQUEST for root fix pending. [blue] standing. ✅
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core services active: beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. ourliberty-agent-core-health.service: **failed** (known [yellow]). ourliberty-sync.service: **failed** (known [blue] rebase-fallback). ourliberty-cycle.service: active (current run). All timers active/waiting. ✅ Core nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- PR #412 (UNSTABLE/MERGEABLE, reviewDecision=""): Mirror REVISION at 01:51:48Z June 10. APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` in queue (Beacon 09:13Z; pending Larry sign-off → Forge revision → Mirror re-review). In-pipeline. ⚠️
+- PR #418 (CLEAN/MERGEABLE, autoMergeRequest=null, created 08:44:08Z): p2-derive-endpoint. marker-error retry 1/3 (`marker-error-p2-derive-endpoint-1.json`) recovering outbox routing. Forge archive confirms p2-derive-endpoint completed (inbox + outbox archived). Mirror dispatch pending marker-error resolution. In-flight. ✅
+- PR #420 (CLEAN/MERGEABLE, autoMergeRequest=null, created 08:58:06Z): p2-digest-generator. Forge actively processing (worktree present; inbox task still live = in-progress). Once Forge emits completion marker, outbox-notifier will route Mirror review. In-flight. ✅
+- ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday (Check I, Check III skip). Not Monday (Checks VIII/IX/X skip). ✅
+
+**Credential rotation (§ 4.6):** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73d, outside 60d window). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service = **failed** (confirmed Check C systemctl listing). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry [yellow].
+- `unreviewed-merge streak 3` (PRs #413, #417, #419): larry-alerts.jsonl = 1455 lines UNCHANGED since watermark (last unreviewed-merge:419 at 08:56Z June 10). No new unreviewed-merge alerts this iter. Streak at 3 (not growing). Pending `go: actor-exemption-config`. Carry [yellow].
+- `PR #412 APPROVAL_REQUEST harden-test-prod-write-isolation-rev-001`: Pending Larry sign-off (Beacon created 09:13Z). Carry [yellow].
+- `Tier 2 weekly probe (auth_401)`: beacon log shows auth_401 at 02:52Z + 02:54Z MDT (08:52Z + 08:54Z UTC) today. [yellow] standing; action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry [yellow].
+- `sync-push-rebase-fallback-001`: Confirmed (sync.service failed, sync.json status=error/09:16:16Z). Self-recovering via timer. [blue] carry.
+- `install-drift-timer-gap verification_pending`: PR #411 merged 06:41:49Z June 10. 0/2 clean healer cycles; next healer run ~18:00Z UTC (12h cadence from MDT midnight). Verification OPEN.
+- `G-rule heal-pipeline-stall:unrouted-pr false-positive 3/3`: Dispatch `cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z.json` CONFIRMED in Beacon inbox at this scan. Awaiting Beacon processing.
+- `G-rule wedged-review-silent-wt:* 2/3`: Worktrees wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 still present. No new occurrence this iter. Carry.
+- `G-rule hand-authored-envelope-dead-letter 2/3`: No new occurrences this iter. Carry.
+
+**Actions taken:** None.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 0 new alerts; pipeline in-flight normally). interventions≈748, systemic_fixes≈17, ratio≈43.9 (script-authoritative, unchanged from iter 1285).
+
+**Standing findings:**
+- [yellow] **PR #412** — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off (Beacon 09:13Z).
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 3** (PRs #413, #417, #419) — DMs delivered. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + today 08:52/08:54Z UTC. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [yellow] **install-drift-timer-gap verification OPEN** — 0/2 clean healer cycles post-PR #411; next ~18:00Z UTC June 10.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 70th+ occurrence; root cause unfixed; self-recovering.
