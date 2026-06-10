@@ -1,0 +1,67 @@
+{
+  "orphan_readability": {
+    "orphan-inreview-now": {
+      "derived_phase": "awaiting_merge",
+      "state_badge": "in-review",
+      "terminal": false,
+      "stalled": false,
+      "label": "Orphan Inreview Now",
+      "repo": null,
+      "branch": null
+    },
+    "desktop-ab12cd34": {
+      "derived_phase": "ready",
+      "state_badge": "building",
+      "terminal": false,
+      "stalled": false,
+      "label": "Scene graph interface",
+      "repo": "ourliberty-graph",
+      "branch": "main"
+    },
+    "orphan-building-now": {
+      "derived_phase": "in_flight",
+      "state_badge": "building",
+      "terminal": false,
+      "stalled": false,
+      "label": "ourliberty-agent-core/feat/building",
+      "repo": "ourliberty-agent-core",
+      "branch": "feat/building"
+    },
+    "orphan-shipped-pr": {
+      "derived_phase": "shipped",
+      "state_badge": "shipped",
+      "terminal": true,
+      "stalled": false,
+      "label": "ourliberty-agent-core/feat/orphan-shipped",
+      "repo": "ourliberty-agent-core",
+      "branch": "feat/orphan-shipped"
+    },
+    "orphan-stalled-old": {
+      "derived_phase": "awaiting_merge",
+      "state_badge": "stalled",
+      "terminal": false,
+      "stalled": true,
+      "label": "ourliberty-agent-core/feat/stalled",
+      "repo": "ourliberty-agent-core",
+      "branch": "feat/stalled"
+    }
+  },
+  "parked": [
+    {
+      "capture_id": "cap-aging-one",
+      "title": "Aging idea",
+      "repo": "ourliberty-agent-core",
+      "area": null,
+      "aging": true,
+      "last_touched": "2026-06-01T00:00:00+00:00"
+    },
+    {
+      "capture_id": "cap-fresh-two",
+      "title": "Fresh idea",
+      "repo": "ourliberty-dashboard",
+      "area": null,
+      "aging": false,
+      "last_touched": "2026-06-09T00:00:00+00:00"
+    }
+  ]
+}

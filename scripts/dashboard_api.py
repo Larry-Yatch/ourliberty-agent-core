@@ -505,6 +505,22 @@ class CapturesResponse(BaseModel):
     schema_version: Optional[int] = None
 
 
+class MissionsDerivedResponse(BaseModel):
+    # Missions v2 Phase 2 § 3.3 — the relocated derive endpoint's canonical
+    # shape. `missions` + `orphans` match the dashboard's pre-Phase-2
+    # MissionListResponse byte-for-byte (sans the additive orphan-readability
+    # keys), which is what the § 4 parity test pins. `parked` + the orphan
+    # state_badge/terminal/label fields are additive (existing reads ignore
+    # unknown keys). `schema_version` is the endpoint contract version (1),
+    # NOT the registry's schema_version.
+    schema_version: int
+    missions: list[dict[str, Any]]
+    orphans: list[dict[str, Any]]
+    parked: list[dict[str, Any]]
+    last_synced_at: Optional[str]
+    as_of: str
+
+
 class NewMissionRequest(BaseModel):
     name: str = Field(..., min_length=1)
     brief: str = Field(..., min_length=1)
@@ -2524,6 +2540,605 @@ def _handle_new_mission(
     }
 
 
+# ---------------------------------------------------------------------------
+# Missions v2 Phase 2 — the relocated derive endpoint (GET /api/missions/derived)
+# (spec: agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md § 3-4)
+#
+# The mission-phase derive (phase / aggregate / orphan) is lifted VERBATIM from
+# the dashboard's `lib/mission-queries.ts` so there is one derive, no TS↔Python
+# drift. The pure helpers below (derive_phase_for_task, aggregate_mission_phase,
+# detect_orphans + the infrastructure-task filter set, summarize_task_events)
+# are byte-faithful ports — the § 4 parity test deep-equals their output against
+# a committed expected-output JSON that the dashboard side asserts against too.
+#
+# Read-only: no consumer writes through this endpoint, and it makes NO live
+# GitHub PR-state reads (pr_state stays None everywhere, exactly as the current
+# dashboard route passes it). That keeps it cheap, low-latency, and free of any
+# new credential — the 4-artifact credential obligation does NOT trigger.
+
+# Phase rank for mission-level aggregation. Higher = more advanced.
+# "deferred" is handled separately (mission-level override).
+_PHASE_RANK: dict[str, int] = {
+    'drafting': 0,
+    'ready': 1,
+    'in_flight': 2,
+    'awaiting_merge': 3,
+    'shipped': 4,
+}
+
+# Orphan readability (§ 3.4). An unmerged orphan quiet for longer than this is
+# badged `stalled` — kept VISIBLE and flagged, NEVER hidden. Single tunable
+# constant; the parity test pins the invariant that no unmerged orphan is ever
+# terminal regardless of age.
+_STALE_AFTER_DAYS = 14
+
+# Trailing window for orphan detection (matches the dashboard route).
+_ORPHAN_WINDOW_DAYS = 30
+
+
+def _ev_payload(ev: dict[str, Any]) -> dict[str, Any]:
+    p = ev.get('payload')
+    return p if isinstance(p, dict) else {}
+
+
+def _is_session_start(ev: dict[str, Any]) -> bool:
+    if ev.get('event_type') != 'session_start':
+        return False
+    agent = (ev.get('agent') or '').lower()
+    return agent == 'forge' or agent == 'mirror'
+
+
+def _is_auto_merge(ev: dict[str, Any]) -> bool:
+    return ev.get('event_type') == 'auto_merge'
+
+
+def _is_mirror_review_pass(ev: dict[str, Any]) -> bool:
+    if ev.get('event_type') != 'marker_emit':
+        return False
+    payload = _ev_payload(ev)
+    # `(payload.marker_type ?? payload.marker) ?? ''` — null-coalesce, so an
+    # explicit empty string is NOT replaced by payload.marker (matches TS).
+    marker_type = payload.get('marker_type')
+    if marker_type is None:
+        marker_type = payload.get('marker')
+    if marker_type is None:
+        marker_type = ''
+    if not isinstance(marker_type, str):
+        marker_type = ''
+    upper = marker_type.upper()
+    return upper == 'REVIEW_PASS' or upper == 'MIRROR_REVIEW_PASS'
+
+
+def _is_escalation(ev: dict[str, Any]) -> bool:
+    return ev.get('event_type') == 'escalation'
+
+
+def derive_phase_for_task(
+    events: list[dict[str, Any]],
+    pr_state: Optional[str],
+) -> str:
+    """Port of `derivePhaseForTask` (mission-queries.ts § 5.2 rule order).
+
+    Most-specific first: shipped > awaiting_merge > in_flight > ready.
+    """
+    if any(_is_auto_merge(e) for e in events) or pr_state == 'MERGED':
+        return 'shipped'
+    if any(_is_mirror_review_pass(e) for e in events) or any(
+        _is_escalation(e) for e in events
+    ):
+        return 'awaiting_merge'
+    if any(_is_session_start(e) for e in events):
+        return 'in_flight'
+    return 'ready'
+
+
+def aggregate_mission_phase(
+    entry: dict[str, Any],
+    tasks: list[dict[str, Any]],
+) -> Optional[str]:
+    """Port of `aggregateMissionPhase`. deferred override; no tasks → entry
+    phase hint; shipped only when every task is shipped; else most-advanced
+    non-shipped phase."""
+    if entry.get('phase') == 'deferred':
+        return 'deferred'
+    if not tasks:
+        return entry.get('phase')
+    non_shipped = [t for t in tasks if t.get('derived_phase') != 'shipped']
+    if not non_shipped:
+        return 'shipped'
+    best = 'drafting'
+    for t in non_shipped:
+        dp = t.get('derived_phase')
+        if dp == 'deferred':
+            continue
+        if _PHASE_RANK.get(dp, 0) > _PHASE_RANK.get(best, 0):
+            best = dp
+    return best
+
+
+# Agents that exclusively emit infrastructure plumbing events. Tasks they own
+# are never user-facing missions; surfacing them buries the real one-off PRs.
+INFRASTRUCTURE_AGENT_NAMES: frozenset[str] = frozenset({
+    'deploy-notifier',
+    'watchdog',
+    'sync.service',
+    'outbox-notifier',
+    'dead-letter',
+    'sentinel',
+})
+
+# task_id prefixes that mark infrastructure plumbing regardless of emitter.
+INFRASTRUCTURE_TASK_ID_PREFIXES: tuple[str, ...] = (
+    'notify-',
+    'dead-letter-',
+    'dead-letter:',
+    'install-drift:',
+    'deploy-notifier:',
+    'sync-blocked:',
+    'sync-blocked-',
+    'pr-url-unrewritable:',
+    'bots:',
+    'auto-restarted:',
+    'pulse-auto-',
+    'cycle-finding-',
+    'pulse-thread-',
+    'synthetic-fixture-',
+    'claude_max_',
+    'inbox-stall:',
+)
+
+_TEST_FIXTURE_LENGTH_CAP = 35
+
+
+def _looks_like_alert_message_not_task_id(task_id: str) -> bool:
+    return ' ' in task_id
+
+
+def _looks_like_test_fixture(task_id: str) -> bool:
+    if len(task_id) > _TEST_FIXTURE_LENGTH_CAP:
+        return False
+    return task_id.startswith('t-') or task_id.startswith('task-')
+
+
+def _looks_like_mirror_review_session(task_id: str) -> bool:
+    return task_id.startswith('review-')
+
+
+def is_infrastructure_task(task_id: str, agent: Optional[str]) -> bool:
+    """Port of `isInfrastructureTask`."""
+    if agent and (agent in INFRASTRUCTURE_AGENT_NAMES or agent.startswith('heal-')):
+        return True
+    for prefix in INFRASTRUCTURE_TASK_ID_PREFIXES:
+        if task_id.startswith(prefix):
+            return True
+    if _looks_like_alert_message_not_task_id(task_id):
+        return True
+    if _looks_like_test_fixture(task_id):
+        return True
+    if _looks_like_mirror_review_session(task_id):
+        return True
+    return False
+
+
+def _ts_key(ts: Optional[str]) -> datetime:
+    """Sort key: parsed ts, with unparseable/missing sorting oldest."""
+    return _ts_to_dt(ts) or datetime.min.replace(tzinfo=timezone.utc)
+
+
+def detect_orphans(
+    events: list[dict[str, Any]],
+    registered_task_ids: set[str],
+) -> list[dict[str, Any]]:
+    """Port of `detectOrphans`. task_ids in chain_events but not registered in
+    any mission; infrastructure events filtered out. Output newest-first by
+    last event ts. The caller supplies the time window (no filtering here)."""
+    by_task: dict[str, dict[str, Any]] = {}
+    for ev in events:
+        tid = ev.get('task_id')
+        if not tid or tid in registered_task_ids:
+            continue
+        if is_infrastructure_task(tid, ev.get('agent')):
+            continue
+        existing = by_task.get(tid)
+        if existing is None:
+            by_task[tid] = {
+                'task_id': tid,
+                'last_event_ts': ev.get('ts'),
+                'agent': ev.get('agent'),
+                'pr_url': ev.get('pr_url'),
+            }
+            continue
+        ev_dt = _ts_to_dt(ev.get('ts'))
+        ex_dt = _ts_to_dt(existing['last_event_ts'])
+        if ev_dt is not None and ex_dt is not None and ev_dt > ex_dt:
+            by_task[tid] = {
+                'task_id': tid,
+                'last_event_ts': ev.get('ts'),
+                'agent': ev.get('agent') if ev.get('agent') is not None
+                else existing['agent'],
+                'pr_url': ev.get('pr_url') if ev.get('pr_url') is not None
+                else existing['pr_url'],
+            }
+        elif not existing.get('pr_url') and ev.get('pr_url'):
+            existing['pr_url'] = ev.get('pr_url')
+    orphans = list(by_task.values())
+    orphans.sort(key=lambda o: _ts_key(o.get('last_event_ts')), reverse=True)
+    return orphans
+
+
+def summarize_task_events(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Port of `summarizeTaskEvents`. events are newest-first."""
+    if not events:
+        return {'last_event_ts': None, 'pr_url': None, 'agent': None}
+    newest = events[0]
+    pr_event = next((e for e in events if e.get('pr_url')), None)
+    return {
+        'last_event_ts': newest.get('ts'),
+        'pr_url': pr_event.get('pr_url') if pr_event else None,
+        'agent': newest.get('agent') if newest.get('agent') is not None else None,
+    }
+
+
+# Common technical acronyms — kept fully uppercase in humanized labels so
+# "Structural Pr Url Validator" reads as "Structural PR URL Validator". Ported
+# from the dashboard's OrphansLane humanizer so the relocated `label` renders
+# identically (one derive, no drift).
+_ACRONYMS: frozenset[str] = frozenset({
+    'api', 'cd', 'ci', 'cli', 'css', 'db', 'dag', 'dm', 'e2e', 'fk', 'gh',
+    'html', 'http', 'https', 'id', 'io', 'ip', 'jsx', 'json', 'ms', 'oauth',
+    'pm', 'pr', 'qa', 'rls', 'sdk', 'sql', 'ssh', 'tcp', 'tls', 'ts', 'tsx',
+    'ui', 'url', 'ux', 'v1', 'v2', 'v3', 'wip', 'yaml',
+})
+
+_HUMANIZE_SPLIT_RE = re.compile(r'[_:]')
+
+
+def _humanize_task_id(task_id: str) -> str:
+    """Port of OrphansLane.humanizeTaskId — kebab/underscore/colon → Title Case
+    with known acronyms uppercased."""
+    parts = _HUMANIZE_SPLIT_RE.sub('-', task_id).split('-')
+    out: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        lower = part.lower()
+        if lower in _ACRONYMS:
+            out.append(lower.upper())
+        else:
+            out.append(part[0:1].upper() + part[1:])
+    return ' '.join(out)
+
+
+def _orphan_label_and_location(
+    events: list[dict[str, Any]],
+    task_id: str,
+) -> tuple[str, Optional[str], Optional[str]]:
+    """Resolve an orphan's readable label + repo/branch (§ 3.4).
+
+    Label resolution order: desktop chat title (latest desktop_session_*
+    event's payload.title) > repo/branch (from event payload) > humanized
+    task_id. Events are newest-first. Degrades gracefully when title is absent
+    (the desktop emitter may not yet populate payload.title)."""
+    title: Optional[str] = None
+    repo: Optional[str] = None
+    branch: Optional[str] = None
+    for ev in events:  # newest-first
+        payload = _ev_payload(ev)
+        et = ev.get('event_type') or ''
+        if title is None and isinstance(et, str) and et.startswith('desktop_session'):
+            t = payload.get('title')
+            if isinstance(t, str) and t.strip():
+                title = t.strip()
+        if repo is None:
+            r = payload.get('repo')
+            if isinstance(r, str) and r.strip():
+                repo = r.strip()
+                b = payload.get('branch')
+                branch = b.strip() if isinstance(b, str) and b.strip() else None
+    if title:
+        label = title
+    elif repo and branch:
+        label = f'{repo}/{branch}'
+    elif repo:
+        label = repo
+    else:
+        label = _humanize_task_id(task_id)
+    return label, repo, branch
+
+
+def _derive_orphan_readability(
+    orphan: dict[str, Any],
+    events: list[dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Additive Phase-2 orphan fields (§ 3.4). Hiding is driven by a REAL
+    terminal signal (shipped), never by a clock.
+
+    `closed` (deliberately-dropped PR) needs a live GitHub PR-state read, which
+    this endpoint does NOT do (no new credential, no latency cost). Per the § 3.4
+    cost-note fallback we collapse ONLY `shipped`; a closed-but-unmerged PR is
+    badged conservatively (stalled when quiet, building/in-review when recent) so
+    it stays VISIBLE. Strictly conservative: nothing incomplete is ever hidden.
+    """
+    now = now or datetime.now(timezone.utc)
+    # No live PR-state read — pr_state stays None (read-only, cheap).
+    derived_phase = derive_phase_for_task(events, None)
+    last_dt = _ts_to_dt(orphan.get('last_event_ts'))
+    stale_cutoff = now - timedelta(days=_STALE_AFTER_DAYS)
+    is_stale = last_dt is not None and last_dt < stale_cutoff
+
+    if derived_phase == 'shipped':
+        state_badge, terminal, stalled = 'shipped', True, False
+    elif is_stale:
+        # Unmerged + quiet past the threshold: overlooked-important bucket.
+        state_badge, terminal, stalled = 'stalled', False, True
+    elif derived_phase == 'awaiting_merge':
+        state_badge, terminal, stalled = 'in-review', False, False
+    else:  # in_flight / ready — active, unmerged
+        state_badge, terminal, stalled = 'building', False, False
+
+    label, repo, branch = _orphan_label_and_location(events, orphan.get('task_id', ''))
+    return {
+        'derived_phase': derived_phase,
+        'state_badge': state_badge,
+        'terminal': terminal,
+        'stalled': stalled,
+        'label': label,
+        'repo': repo,
+        'branch': branch,
+    }
+
+
+def _parked_from_captures(captures: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
+    captures; `aging` is the GC healer's persisted flag (Phase 1 — never
+    recomputed here). `area` is reserved (always None today — scene-graph T8)."""
+    out: list[dict[str, Any]] = []
+    for cap in captures:
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
+        out.append({
+            'capture_id': cap.get('id'),
+            'title': cap.get('title'),
+            'repo': origin.get('repo'),
+            'area': origin.get('area'),
+            'aging': cap.get('aging') is True,
+            'last_touched': cap.get('last_touched'),
+        })
+    return out
+
+
+def _fetch_events_for_task_ids(
+    supabase_client: Any,
+    task_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Port of `fetchEventsForTaskIds`. Single query for a set of task_ids;
+    returns a dict keyed by task_id with events newest-first. Degrades to {}
+    when the client is None (no creds / test env) or on any query error."""
+    if supabase_client is None or not task_ids:
+        return {}
+    try:
+        resp = (
+            supabase_client.table('chain_events')
+            .select('event_type,task_id,agent,pr_url,ts,payload')
+            .in_('task_id', task_ids)
+            .order('ts', desc=True)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — never 500 a read-only derive
+        return {}
+    rows = list(getattr(resp, 'data', None) or [])
+    rows.sort(key=lambda r: _ts_key(r.get('ts')), reverse=True)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for ev in rows:
+        tid = ev.get('task_id')
+        if not tid:
+            continue
+        out.setdefault(tid, []).append(ev)
+    return out
+
+
+def _fetch_recent_chain_events(
+    supabase_client: Any,
+    days: int = _ORPHAN_WINDOW_DAYS,
+    now: Optional[datetime] = None,
+) -> list[dict[str, Any]]:
+    """Port of `fetchRecentChainEvents`. All chain_events in the trailing
+    window, newest-first. Degrades to [] when the client is None or on error."""
+    if supabase_client is None:
+        return []
+    since = ((now or datetime.now(timezone.utc)) - timedelta(days=days)).isoformat()
+    try:
+        resp = (
+            supabase_client.table('chain_events')
+            .select('event_type,task_id,agent,pr_url,ts,payload')
+            .gte('ts', since)
+            .order('ts', desc=True)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — never 500 a read-only derive
+        return []
+    rows = list(getattr(resp, 'data', None) or [])
+    rows.sort(key=lambda r: _ts_key(r.get('ts')), reverse=True)
+    return rows
+
+
+def _build_derived_response(
+    *,
+    entries: list[dict[str, Any]],
+    last_synced_at: Optional[str],
+    captures: list[dict[str, Any]],
+    events_by_task_id: dict[str, list[dict[str, Any]]],
+    recent_events: list[dict[str, Any]],
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure derive: build the full /api/missions/derived response (pre-filter).
+
+    `missions` + `orphans` (minus the additive orphan-readability keys) match
+    the dashboard's MissionListResponse byte-for-byte — that's what § 4 pins.
+    """
+    now = now or datetime.now(timezone.utc)
+
+    registered_task_ids: set[str] = set()
+    for entry in entries:
+        tids = entry.get('task_ids')
+        if isinstance(tids, list):
+            registered_task_ids.update(t for t in tids if isinstance(t, str))
+
+    missions: list[dict[str, Any]] = []
+    for entry in entries:
+        task_ids = entry.get('task_ids')
+        task_ids = task_ids if isinstance(task_ids, list) else []
+        tasks: list[dict[str, Any]] = []
+        for tid in task_ids:
+            events = events_by_task_id.get(tid, [])
+            summary = summarize_task_events(events)
+            tasks.append({
+                'task_id': tid,
+                'derived_phase': derive_phase_for_task(events, None),
+                'last_event_ts': summary['last_event_ts'],
+                'pr_url': summary['pr_url'],
+                'pr_state': None,
+                'agent': summary['agent'],
+            })
+        mission = dict(entry)  # spread the raw registry entry verbatim
+        mission['tasks'] = tasks
+        mission['aggregate_phase'] = aggregate_mission_phase(entry, tasks)
+        missions.append(mission)
+
+    # Group recent events by task_id (newest-first preserved) for orphan
+    # readability, then derive orphans + enrich.
+    events_by_orphan: dict[str, list[dict[str, Any]]] = {}
+    for ev in recent_events:
+        tid = ev.get('task_id')
+        if tid:
+            events_by_orphan.setdefault(tid, []).append(ev)
+
+    orphans = detect_orphans(recent_events, registered_task_ids)
+    for o in orphans:
+        o.update(_derive_orphan_readability(
+            o, events_by_orphan.get(o['task_id'], []), now,
+        ))
+
+    return {
+        'schema_version': 1,
+        'missions': missions,
+        'orphans': orphans,
+        'parked': _parked_from_captures(captures),
+        'last_synced_at': last_synced_at,
+        'as_of': _now_utc_iso(now),
+    }
+
+
+def _apply_derived_filters(
+    response: dict[str, Any],
+    *,
+    repo: Optional[str],
+    task_id: Optional[str],
+) -> dict[str, Any]:
+    """Apply the optional, AND-combined ?repo= / ?task_id= filters (§ 3.2).
+
+    repo narrows missions (entry repo), orphans (derived repo), and parked
+    (capture repo). task_id narrows to that task plus its collisions — other
+    ACTIVE (non-shipped / non-terminal) tasks on the same repo.
+    """
+    missions = response['missions']
+    orphans = response['orphans']
+    parked = response['parked']
+
+    if repo:
+        missions = [m for m in missions if m.get('repo') == repo]
+        orphans = [o for o in orphans if o.get('repo') == repo]
+        parked = [p for p in parked if p.get('repo') == repo]
+
+    if task_id:
+        target_repo: Optional[str] = None
+        for m in missions:
+            for t in m.get('tasks', []):
+                if t.get('task_id') == task_id:
+                    target_repo = m.get('repo')
+        if target_repo is None:
+            for o in orphans:
+                if o.get('task_id') == task_id:
+                    target_repo = o.get('repo')
+        # AND with an explicit ?repo= — a mismatch yields no collisions.
+        if repo is not None and target_repo is not None and target_repo != repo:
+            target_repo = None
+
+        if target_repo is None:
+            # Unknown task (or repo mismatch): no active set to report.
+            missions = []
+            orphans = []
+        else:
+            collisions: list[dict[str, Any]] = []
+            for m in missions:
+                if m.get('repo') != target_repo:
+                    continue
+                kept = [
+                    t for t in m.get('tasks', [])
+                    if t.get('task_id') == task_id
+                    or t.get('derived_phase') != 'shipped'
+                ]
+                if kept:
+                    mm = dict(m)
+                    mm['tasks'] = kept
+                    collisions.append(mm)
+            missions = collisions
+            orphans = [
+                o for o in orphans
+                if o.get('repo') == target_repo
+                and (o.get('task_id') == task_id or not o.get('terminal'))
+            ]
+
+    response['missions'] = missions
+    response['orphans'] = orphans
+    response['parked'] = parked
+    return response
+
+
+def _handle_missions_derived(
+    *,
+    missions_path: Path,
+    captures_path: Path,
+    supabase_client: Any,
+    repo: Optional[str],
+    task_id: Optional[str],
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Pure handler for GET /api/missions/derived. Reads the registry +
+    captures, fetches chain_events, derives, applies filters."""
+    missions_data = _reader_missions(missions_path)
+    captures_data = _reader_captures(captures_path)
+    entries = missions_data.get('missions') or []
+
+    registered: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        tids = entry.get('task_ids')
+        if not isinstance(tids, list):
+            continue
+        for tid in tids:
+            if isinstance(tid, str) and tid not in seen:
+                seen.add(tid)
+                registered.append(tid)
+
+    events_by_task_id = _fetch_events_for_task_ids(supabase_client, registered)
+    recent_events = _fetch_recent_chain_events(
+        supabase_client, _ORPHAN_WINDOW_DAYS, now,
+    )
+
+    response = _build_derived_response(
+        entries=entries,
+        last_synced_at=missions_data.get('last_synced_at'),
+        captures=captures_data.get('captures') or [],
+        events_by_task_id=events_by_task_id,
+        recent_events=recent_events,
+        now=now,
+    )
+    return _apply_derived_filters(response, repo=repo, task_id=task_id)
+
+
 # ---- /api/larry/* handler (E4.4e PR-B2) ----
 #
 # Spec § 5.2, § 6.3, § 6.4, § 7.1, § 7.2, § 7.3 — Larry-action endpoint
@@ -3979,6 +4594,30 @@ def get_system_missions() -> dict[str, Any]:
 )
 def get_missions_captures() -> dict[str, Any]:
     return _reader_captures(_captures_json_path())
+
+
+# GET /api/missions/derived — the relocated mission-phase derive (Missions v2
+# Phase 2 § 3). Source-of-truth phase/aggregate/orphan derivation, ported
+# byte-faithfully from the dashboard's lib/mission-queries.ts (parity-gated,
+# § 4), plus the additive parked[] array + orphan-readability fields. Optional
+# ?repo= / ?task_id= filters (§ 3.2). Read-only; no live GitHub reads; same
+# X-Dashboard-Token gate as /api/system/missions.
+@app.get(
+    '/api/missions/derived',
+    response_model=MissionsDerivedResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_missions_derived(
+    repo: Optional[str] = Query(None),
+    task_id: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    return _handle_missions_derived(
+        missions_path=_missions_json_path(),
+        captures_path=_captures_json_path(),
+        supabase_client=_get_larry_action_supabase_client(),
+        repo=repo,
+        task_id=task_id,
+    )
 
 
 @app.post(
