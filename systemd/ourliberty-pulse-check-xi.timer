@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily run of Pulse Check XI — catalog accuracy meter
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson: keeps
+# firing even if a run is missed/slow. Daily is ample — the catalog moves at
+# merge cadence, not minute-by-minute, and larry_alerts' per-subject cooldown
+# dedups repeats within a window. 04:17 local: off-peak, away from the busy
+# top-of-hour where the heal/cleanup timers cluster.
+OnCalendar=*-*-* 04:17:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-pulse-check-xi.service
+
+[Install]
+WantedBy=timers.target
