@@ -1,0 +1,22 @@
+[Unit]
+Description=Healer — dispatch a Mirror review for any open Forge PR that has none (GitHub-truth backstop)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_undispatched_pr_review.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# The act (dispatch a Mirror review) is idempotent and always desired, so this
+# defaults ON. Set to "false" to run dry-run (detect + log, dispatch nothing)
+# during initial verification.
+Environment="OURLIBERTY_UNDISPATCHED_PR_REVIEW_ENABLED=true"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_undispatched_pr_review.py
+TimeoutStartSec=90
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-undispatched-pr-review

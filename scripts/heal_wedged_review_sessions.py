@@ -160,6 +160,25 @@ SIGTERM_GRACE_SECONDS = 5
 
 GIT_TIMEOUT_SEC = 60
 
+# For the Forge-PR reap guard: a Forge session that has already opened a PR has
+# delivered its work, and reaping it before that PR's Mirror review is dispatched
+# risks orphaning the PR (the #412 incident). We check GitHub directly for an open
+# PR on the session's branch. The durable recovery is heal_undispatched_pr_review
+# (GitHub-truth, runs independently), so this guard is a best-effort optimization
+# that fails SAFE toward normal reaping on any gh error — the healer nets it.
+GH_TIMEOUT_SEC = 30
+REPO = 'Larry-Yatch/ourliberty-agent-core'
+FORGE_WORKTREE_NAME_PREFIX = 'wt-forge-'
+# Upper bound on how long the Forge-PR guard will protect a session from reaping.
+# The guard releases as soon as a review is dispatched (the normal case, within
+# ~the healer's grace+interval), but a case1 (marker-present) build session never
+# transitions to the 60-min hard backstop, so without an explicit cap a session
+# whose review never dispatches (e.g. heal_undispatched_pr_review disabled, or an
+# exotic non-round-tripping task_id) would be protected forever and leak a fleet
+# slot. After this age the deliverable (the PR) is long safe; reap and let
+# heal_undispatched_pr_review remain the net for the review.
+GUARD_MAX_PROTECT_HOURS = 2
+
 # --- classification verdicts ---
 REAP_CASE1 = 'reap_case1'              # provably done (marker present)
 SILENT_CASE2 = 'silent_case2'          # no marker, idle past silent grace (alert/ladder)
@@ -722,6 +741,103 @@ def remove_worktree(worktree: str) -> bool:
         return False
 
 
+# ==================== forge-PR reap guard ====================
+
+def _open_pr_created_at(branch: str) -> Optional[str]:
+    """The createdAt (ISO string) of the OPEN PR whose head is `branch`, or None
+    if there is no open PR for it. Read-only. Returns None on ANY gh failure
+    (fail-safe toward normal reaping — the heal_undispatched_pr_review healer is
+    the durable net that recovers a review even if a reap proceeds)."""
+    try:
+        out = subprocess.run(
+            ['gh', 'pr', 'list', '--repo', REPO, '--head', branch,
+             '--state', 'open', '--json', 'number,createdAt'],
+            capture_output=True, text=True, timeout=GH_TIMEOUT_SEC,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        log(f'gh pr list (open PR check for {branch}) failed: '
+            f'{type(e).__name__}: {e}; assuming no open PR', 'WARN')
+        return None
+    if out.returncode != 0:
+        log(f'gh pr list (open PR check for {branch}) returned '
+            f'{out.returncode}: {out.stderr.strip()[:200]}; assuming no open PR',
+            'WARN')
+        return None
+    try:
+        rows = json.loads(out.stdout or '[]')
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(rows, list) or not rows:
+        return None
+    created = rows[0].get('createdAt') if isinstance(rows[0], dict) else None
+    return created if isinstance(created, str) and created else None
+
+
+def _pr_age_hours(created_at: str, now: Optional[datetime] = None) -> Optional[float]:
+    """Hours since `created_at` (ISO-8601, tolerating a trailing Z). None if
+    unparseable."""
+    try:
+        dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    return (now - dt).total_seconds() / 3600.0
+
+
+def _review_already_dispatched_for_task(task_id: str) -> bool:
+    """True iff a Mirror review task for `task_id` already exists (inbox / archive
+    / .invalid), reusing the EXACT predicate the inline dispatch + outbox
+    reconcile + heal_undispatched_pr_review use, so the three can't drift. On any
+    import failure returns False (treat as not-dispatched) — combined with an open
+    PR that makes the guard protect the session, the safe direction."""
+    try:
+        import outbox_notifier as notifier
+        import safe_write_inbox
+    except Exception as e:  # noqa: BLE001
+        log(f'could not import dispatch deps for review-presence check: '
+            f'{type(e).__name__}: {e}; treating task {task_id} as undispatched',
+            'WARN')
+        return False
+    try:
+        fname = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
+        return bool(notifier._review_request_already_dispatched(fname))
+    except Exception as e:  # noqa: BLE001
+        log(f'review-presence check raised for task {task_id}: '
+            f'{type(e).__name__}: {e}; treating as undispatched', 'WARN')
+        return False
+
+
+def _forge_branch_has_open_unreviewed_pr(cwd: str) -> bool:
+    """True iff this Forge worktree's branch has an OPEN PR for which no Mirror
+    review has been dispatched yet — the state in which reaping would orphan the
+    PR. Once a review IS dispatched the deliverable is captured and this returns
+    False (the session is safe to reap). Non-Forge / non-conventional cwds return
+    False (no protection)."""
+    name = Path(cwd).name  # e.g. wt-forge-<task-id>
+    if not name.startswith(FORGE_WORKTREE_NAME_PREFIX):
+        return False
+    task_id = name[len(FORGE_WORKTREE_NAME_PREFIX):]
+    if not task_id:
+        return False
+    branch = f'forge/{task_id}'
+    created_at = _open_pr_created_at(branch)
+    if created_at is None:
+        return False  # no open PR (or gh unknown) → nothing to protect
+    # Bound the protection so a session whose review never dispatches can't be
+    # held forever (a case1 build session never reaches the hard backstop).
+    age_h = _pr_age_hours(created_at)
+    if age_h is not None and age_h > GUARD_MAX_PROTECT_HOURS:
+        log(f'forge PR on {branch} is {age_h:.1f}h old (> '
+            f'{GUARD_MAX_PROTECT_HOURS}h protection cap); allowing reap — '
+            f'heal_undispatched_pr_review remains the net for the review', 'INFO')
+        return False
+    if _review_already_dispatched_for_task(task_id):
+        return False  # review already in flight → safe to reap
+    return True
+
+
 # ==================== notify seams ====================
 
 def _emit_healed_event(*, tier: str, cwd: str, case: str, reason: str) -> None:
@@ -964,7 +1080,7 @@ def run_cycle(
     summary: dict[str, Any] = {
         'scanned': len(candidates), 'case1_reaped': 0, 'case2_alerted': 0,
         'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
-        'true_positives': 0, 'false_positives': 0,
+        'true_positives': 0, 'false_positives': 0, 'forge_pr_protected': 0,
         'mode_before': state.mode,
     }
 
@@ -995,6 +1111,24 @@ def run_cycle(
             continue  # no activity log → cannot assess
         verdict = classify(
             marker_present=cand.marker_present, idle_secs=cand.idle_secs, cfg=cfg)
+        # Forge-PR reap guard: never destroy (or alert on) a Forge session whose
+        # branch has an OPEN PR with no Mirror review yet — reaping it before the
+        # review is dispatched is the #412 orphaned-review incident. We hold off
+        # only until a review exists (then this returns False and the session is
+        # reaped normally next cycle); heal_undispatched_pr_review dispatches that
+        # review independently, so the wait is bounded and self-resolving. Only
+        # incurred when a reap/alert would actually fire, so the gh cost is ~never
+        # paid in steady state.
+        if (verdict in (REAP_CASE1, REAP_CASE2_HARD, SILENT_CASE2)
+                and cand.tier == 'forge'
+                and _forge_branch_has_open_unreviewed_pr(cand.cwd)):
+            log(f'reap/alert skipped for {cand.session_id} '
+                f'({Path(cand.cwd).name}): Forge branch has an OPEN PR with no '
+                f'Mirror review yet — not destroying until the review is '
+                f'dispatched (heal_undispatched_pr_review will dispatch it; '
+                f'reap resumes once a review exists)', 'INFO')
+            summary['forge_pr_protected'] += 1
+            continue
         if verdict == REAP_CASE1:
             if reap(cand, case='case1',
                     reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '

@@ -1,0 +1,18 @@
+[Unit]
+Description=Undispatched-PR-review backstop — dispatch a Mirror review for any open Forge PR with none
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow. Every
+# 5 min so a PR whose review dispatch was dropped (e.g. its build session was
+# reaped before the outbox hop fired) is recovered within minutes. The
+# DISPATCH_GRACE_MINUTES age gate keeps it from front-running the normal inline
+# dispatch on a freshly opened PR; the dispatch's own presence check makes
+# repeats idempotent.
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=ourliberty-heal-undispatched-pr-review.service
+
+[Install]
+WantedBy=timers.target
