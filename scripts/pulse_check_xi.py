@@ -123,6 +123,18 @@ def run_meter() -> dict:
         if not isinstance(report.get(key), typ):
             raise MeterUnavailable(
                 f'meter report field {key!r} missing or wrong type')
+    # Blind-meter guard: the scanner walking two real source repos always finds
+    # many cross-file import edges. ZERO edges means it was pointed at nothing
+    # (e.g. OL_AGENT_CORE / OL_DASHBOARD unset, so it walked non-existent
+    # ~/dev/... paths). In that state EVERY card resolves to "no files" and the
+    # meter reports 100% drift — a false alarm, not real drift. Treat it as a
+    # blind meter (-> escalate "misconfigured"), NOT as catalog drift (-> digest).
+    edges = (report.get('tool_health') or {}).get('scanner_import_edges')
+    if not isinstance(edges, int) or edges == 0:
+        raise MeterUnavailable(
+            'meter resolved 0 import edges across both source repos — the '
+            'scanner is pointed at nothing (check OL_AGENT_CORE / OL_DASHBOARD '
+            'in the service). Treating as a blind meter, not as total drift.')
     return report
 
 
