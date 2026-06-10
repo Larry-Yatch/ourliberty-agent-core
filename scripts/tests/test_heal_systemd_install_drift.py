@@ -252,7 +252,13 @@ class OrchestrationTest(_IsolatedAgentsRoot):
             self.assertEqual(counts['dm_sent'], 1)
 
     def test_reconciled_unit_garbage_collected(self):
-        with tempfile.TemporaryDirectory() as td:
+        # Patch the alert-retraction helper so the GC pass cannot touch the real
+        # prod larry-alerts queue, and assert the reconciled unit's stale alert
+        # is retracted exactly once.
+        resolved: list[str] = []
+        with mock.patch.object(
+            h, '_resolve_install_alert', side_effect=resolved.append,
+        ), tempfile.TemporaryDirectory() as td:
             r = _make_repo_systemd(Path(td), ['a.timer'])
             i = _make_installed(Path(td), [])
             state = {'units': {}}
@@ -261,6 +267,7 @@ class OrchestrationTest(_IsolatedAgentsRoot):
                 dry_run_override=False,
             )
             self.assertIn('a.timer', state['units'])
+            self.assertEqual(resolved, [])  # nothing reconciled yet
             # Operator installs it.
             (Path(i) / 'a.timer').write_text('# a.timer\n')
             counts = h.run_once(
@@ -269,6 +276,7 @@ class OrchestrationTest(_IsolatedAgentsRoot):
             )
             self.assertNotIn('a.timer', state['units'])
             self.assertEqual(counts['reconciled_gc'], 1)
+            self.assertEqual(resolved, ['a.timer'])
 
     def test_kill_switch_exits_clean(self):
         with tempfile.TemporaryDirectory() as td:
@@ -970,6 +978,51 @@ class RemediateMissingInstallTest(_IsolatedAgentsRoot):
             rc, stderr = h._remediate_missing_install('foo.timer')
         self.assertNotEqual(rc, 0)
         self.assertIn('verify failed', stderr)
+
+    def test_timer_just_fired_empty_next_fire_is_success(self):
+        # Prod 2026-06-10 false-negative: a `Persistent=true` timer whose
+        # `enable --now` catches a missed schedule fires its service
+        # IMMEDIATELY; for ~1s afterward systemd reports NextElapseUSecRealtime
+        # empty / NextElapse=infinity while it recomputes the next elapse. That
+        # transient is a SUCCESSFUL install — the just-fired grace
+        # (_recently_triggered against LastTriggerUSec) must make this rc==0, not
+        # a verify failure that falls back to a 🔴 URGENT manual-dance alert.
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        just_fired = datetime.now().strftime('%a %Y-%m-%d %H:%M:%S')
+        props = {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': just_fired,
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=props):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertEqual(rc, 0)
+        self.assertEqual(stderr, '')
+
+    def test_timer_empty_next_fire_no_recent_trigger_still_fails(self):
+        # The inverse: empty NextElapse + a STALE last-trigger (well outside the
+        # grace window) is a genuine verify failure — the install did not take.
+        # The just-fired grace must not mask a real failure.
+        def plan(cmd):
+            return mock.MagicMock(returncode=0, stdout='', stderr='')
+        ran, fake_run = self._fake_runs_record(plan)
+        stale = (datetime.now() - timedelta(hours=1)).strftime(
+            '%a %Y-%m-%d %H:%M:%S')
+        props = {
+            'ActiveState': 'active',
+            'NextElapseUSecRealtime': '',
+            'NextElapseUSecMonotonic': 'infinity',
+            'LastTriggerUSec': stale,
+        }
+        with mock.patch.object(h.subprocess, 'run', side_effect=fake_run), \
+                mock.patch.object(h, '_systemctl_show', return_value=props):
+            rc, stderr = h._remediate_missing_install('foo.timer')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('NextElapseUSecRealtime empty', stderr)
 
 
 class InstallRemediationOrchestrationTest(_IsolatedAgentsRoot):

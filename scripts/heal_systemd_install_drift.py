@@ -160,6 +160,32 @@ def dm_larry(
         return False
 
 
+def _resolve_install_alert(unit: str) -> None:
+    """Retract any stale `install-drift:<unit>` escalate alert for a unit that
+    has been reconciled (it left `live_set`).
+
+    The larry-alerts queue is append-only: a 🔴 URGENT manual-dance alert
+    emitted by `_render_missing_install` / `_render_content_drift_dry_run`
+    (subject `install-drift:<unit>`) stays in the queue forever even after the
+    drift resolves out-of-band — the GC below only prunes this healer's internal
+    re-DM dedup state, never the emitted alert. `larry_alerts.resolve_alert`
+    removes the stale escalate line(s) under the queue flock and keeps the
+    beacon/medic line cursors consistent. Best-effort: any failure is logged and
+    swallowed so it can never break the reconciliation GC."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+        removed = la.resolve_alert(
+            f'heal-systemd-install-drift:install-drift:{unit}'
+        )
+        if removed:
+            log(f'retracted {removed} stale install-drift alert line(s) for '
+                f'{unit} (reconciled out-of-band)')
+    except Exception as e:  # noqa: BLE001
+        log(f'_resolve_install_alert failed for {unit}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+
+
 def _classify_route(subject: str, healed: bool) -> str:
     """Delegate to larry_alerts.classify_route (single-source significance).
 
@@ -644,9 +670,24 @@ def _remediate_missing_install(unit: str) -> tuple[int, str]:
         return -1, (
             f'post-enable verify failed: ActiveState={post.get("ActiveState")!r}'
         )
-    # A timer must additionally have a scheduled next fire.
+    # A timer must additionally have a scheduled next fire — UNLESS it just
+    # fired. When a `Persistent=true` timer's `enable --now` catches a missed
+    # schedule it fires its service IMMEDIATELY, and for ~1s afterward systemd
+    # reports NextElapseUSecRealtime empty / NextElapse=infinity while it
+    # recomputes the next elapse. That transient is a SUCCESSFUL install+enable,
+    # not a failure (prod 2026-06-10: ourliberty-heal-missions-card-gc.timer was
+    # active+firing yet got rc=-1 here, falling back to a 🔴 URGENT manual-dance
+    # alert). Reuse the exact just-fired grace detect_stuck_timers already
+    # applies (_recently_triggered against the just-fetched LastTriggerUSec) so a
+    # timer that fired within JUST_FIRED_GRACE_S is not treated as a verify
+    # failure. An unparseable / absent LastTriggerUSec makes _recently_triggered
+    # return None (falsy) → we keep the fail-loud -1, never a silent false pass.
     if unit.endswith('.timer') and not post.get('NextElapseUSecRealtime'):
-        return -1, 'post-enable verify failed: NextElapseUSecRealtime empty'
+        if not _recently_triggered(
+            post.get('LastTriggerUSec'), grace_s=JUST_FIRED_GRACE_S,
+        ):
+            return -1, 'post-enable verify failed: NextElapseUSecRealtime empty'
+        # else: just-fired transient — the install genuinely succeeded.
 
     return 0, ''
 
@@ -1146,10 +1187,16 @@ def run_once(
             log(f'DM append suppressed for {unit}', 'WARN')
 
     # GC entries that have been reconciled (missing-install OR content drift).
+    # A reconciled unit that was previously alerted may have left a stale 🔴
+    # escalate line in the append-only queue; retract it so the operator's queue
+    # clears with the drift (defense-in-depth alongside the just-fired-grace fix
+    # that stops the false alert being emitted in the first place).
     for gone in list(state['units'].keys()):
         if gone not in live_set:
             state['units'].pop(gone, None)
             counts['reconciled_gc'] += 1
+            if not dry_run:
+                _resolve_install_alert(gone)
 
     # Stuck-timer pass — independent of the missing-install loop. The
     # _should_re_dm cooldown (separate `stuck_timers` state bucket) throttles

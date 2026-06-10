@@ -566,6 +566,161 @@ class SilenceLayerTest(_IsolatedQueueTest):
         self.assertTrue(larry_alerts.is_silenced(key))
 
 
+class ResolveAlertTest(unittest.TestCase):
+    """resolve_alert: retract pending escalate line(s) for a key and keep the
+    line-index consumer cursors (beacon, medic) consistent so the next real
+    alert is never skipped. Paths injected per-call for full isolation."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.td = Path(self._tmp.name)
+        self.alerts = self.td / 'larry-alerts.jsonl'
+        self.beacon = self.td / 'beacon-alerts-offset.txt'
+        self.medic = self.td / 'medic-alerts-offset.txt'
+        self.addCleanup(self._tmp.cleanup)
+
+    @staticmethod
+    def _line(source, subject, route='escalate', **extra):
+        rec = {'source': source, 'subject': subject, 'route': route,
+               'message': 'm'}
+        rec.update(extra)
+        return json.dumps(rec) + '\n'
+
+    def _write_lines(self, lines):
+        self.alerts.write_text(''.join(lines))
+
+    def _resolve(self, key):
+        return larry_alerts.resolve_alert(
+            key, consumer_offset_files=[self.beacon, self.medic],
+            alerts_file=self.alerts)
+
+    def test_removes_matching_escalate_line_and_returns_count(self):
+        self._write_lines([
+            self._line('s', 'a'),
+            self._line('heal-systemd-install-drift', 'install-drift:x.timer'),
+            self._line('s', 'b'),
+        ])
+        removed = self._resolve(
+            'heal-systemd-install-drift:install-drift:x.timer')
+        self.assertEqual(removed, 1)
+        survivors = self.alerts.read_text().splitlines()
+        self.assertEqual(len(survivors), 2)
+        self.assertNotIn('x.timer', self.alerts.read_text())
+
+    def test_no_match_is_noop(self):
+        original = [self._line('s', 'a'), self._line('s', 'b')]
+        self._write_lines(original)
+        removed = self._resolve('nope:nothing')
+        self.assertEqual(removed, 0)
+        self.assertEqual(self.alerts.read_text(), ''.join(original))
+
+    def test_missing_file_returns_zero(self):
+        self.assertEqual(self._resolve('any:key'), 0)
+
+    def test_closure_and_digest_lines_are_not_retracted(self):
+        # Only escalate (or legacy no-route) lines retract; a self-healed
+        # closure/digest line for the same key is harmless and must remain.
+        self._write_lines([
+            self._line('src', 'k', route='closure'),
+            self._line('src', 'k', route='digest'),
+        ])
+        self.assertEqual(self._resolve('src:k'), 0)
+        self.assertEqual(len(self.alerts.read_text().splitlines()), 2)
+
+    def test_legacy_no_route_line_is_retracted(self):
+        # A record written before the route field existed rendered as escalate.
+        rec = {'source': 'src', 'subject': 'k', 'message': 'm'}  # no 'route'
+        self._write_lines([json.dumps(rec) + '\n'])
+        self.assertEqual(self._resolve('src:k'), 1)
+        self.assertEqual(self.alerts.read_text(), '')
+
+    def test_cursor_decrement_before_cursor_no_skip(self):
+        # The load-bearing bookkeeping: remove a line BEFORE a consumer's cursor
+        # → that cursor decrements so it keeps pointing at the same logical
+        # next-unread line (never skips it). A removal AT/AFTER the cursor leaves
+        # it untouched (the line was undelivered anyway).
+        # Lines: L0, L1(target), L2, L3.  beacon=3 (next=L3), medic=1 (next=L1).
+        self._write_lines([
+            self._line('s', 'L0'),
+            self._line('heal', 'install-drift:t'),  # L1 — removed
+            self._line('s', 'L2'),
+            self._line('s', 'L3'),
+        ])
+        self.beacon.write_text('3')
+        self.medic.write_text('1')
+        removed = self._resolve('heal:install-drift:t')
+        self.assertEqual(removed, 1)
+
+        survivors = self.alerts.read_text().splitlines()
+        self.assertEqual(len(survivors), 3)  # L0, L2, L3
+
+        # beacon was at 3 (about to deliver L3); a line before it was removed, so
+        # it decrements to 2 — which is L3's NEW index. Without the decrement it
+        # would read index 3 (past EOF) and silently skip L3.
+        self.assertEqual(self.beacon.read_text(), '2')
+        self.assertEqual(
+            json.loads(survivors[int(self.beacon.read_text())])['subject'],
+            'L3')
+
+        # medic was at 1 (about to deliver the now-removed L1); the removal is
+        # NOT strictly before the cursor, so it stays at 1 — which is now L2, the
+        # correct next undelivered line. medic never skips L2.
+        self.assertEqual(self.medic.read_text(), '1')
+        self.assertEqual(
+            json.loads(survivors[int(self.medic.read_text())])['subject'],
+            'L2')
+
+    def test_backup_written_before_rewrite(self):
+        self._write_lines([
+            self._line('s', 'keep'),
+            self._line('heal', 'install-drift:t'),
+        ])
+        self._resolve('heal:install-drift:t')
+        backup = self.alerts.parent / (self.alerts.name + '.resolve.bak')
+        self.assertTrue(backup.exists())
+        # Backup holds the full PRE-rewrite content (both lines).
+        self.assertEqual(len(backup.read_text().splitlines()), 2)
+
+    def test_cursor_decrement_happens_before_file_rewrite(self):
+        # Crash-safety invariant: consumer cursors must be decremented BEFORE the
+        # live file is rewritten, so a crash between the two leaves cursors
+        # pointing into the still-intact file (re-deliver, never skip). Lock the
+        # ordering in by spying on the write order.
+        self._write_lines([
+            self._line('s', 'L0'),
+            self._line('heal', 'install-drift:t'),  # removed (index 1)
+            self._line('s', 'L2'),
+        ])
+        self.beacon.write_text('3')  # both removals fall before this cursor
+        self.medic.write_text('3')
+        order: list[Path] = []
+        real = larry_alerts.atomic_io.atomic_write_text
+
+        def spy(path, text, **kw):
+            order.append(Path(path))
+            return real(path, text, **kw)
+
+        with mock.patch.object(
+            larry_alerts.atomic_io, 'atomic_write_text', side_effect=spy,
+        ):
+            self._resolve('heal:install-drift:t')
+        # Both offset files must be written strictly before the live alerts file.
+        self.assertIn(self.alerts, order)
+        alerts_pos = order.index(self.alerts)
+        self.assertLess(order.index(self.beacon), alerts_pos)
+        self.assertLess(order.index(self.medic), alerts_pos)
+
+    def test_notification_and_approval_records_never_match(self):
+        self._write_lines([
+            json.dumps({'source': 'src', 'kind': 'notification',
+                        'subject': 'k', 'message': 'm'}) + '\n',
+            json.dumps({'source': 'src', 'kind': 'approval_request',
+                        'subject': 'k'}) + '\n',
+        ])
+        self.assertEqual(self._resolve('src:k'), 0)
+        self.assertEqual(len(self.alerts.read_text().splitlines()), 2)
+
+
 class SafeKeyTest(unittest.TestCase):
     def test_clean_key_unchanged(self):
         # A key with only filesystem-safe chars passes through verbatim (no
