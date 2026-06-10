@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 1355 — 2026-06-10 20:08Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing: Wedge-reaper build dispatch DROPPED (carry; routing gap `source=auto-retry, original_source=None`). `fix-tier1-classifier-envelope-not-content-scan` pending Larry (beacon-pending-approvals.json **RECOVERED** — file NOW EXISTS, was MISSING iters 1353–1354; 1 pending approval confirmed). CCD S1 + headless-dedup blocked. **NEW CLOSURE: PR #433 MERGED ✅ 19:57:26Z (commit 77223ec) — Check XI droplet paths + blind-meter guard. catalog-accuracy-drift G-rule CLOSED (root cause fixed).** 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; standing pipeline block + pending approval)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T19:50:43Z / catalog-accuracy-drift / line 1401` (iter 1354)
+- Current total: **1402 lines** — 1 new entry:
+  - Line 1402: `ts=2026-06-10T20:00:01Z source=heal-unreviewed-merge-detector subject=unreviewed-merge:433` — PR #433 merged Larry-direct at 19:57:26Z. Expected pattern. DM delivered by beacon bot (14:01 MDT). **Tier 3 known pattern → silence + log.**
+- **New watermark: `2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402`**
+- tier-reset: NO (Tier 3 only → nominal)
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Beacon bot log last entry: `14:01:07 MDT` (unreviewed-merge:433 DM delivery). No new messages from Larry since 13:27:01 MDT.
+- beacon-pending-approvals.json: **NOW EXISTS** (was MISSING iters 1353–1354; file created_at=19:30:19Z, consistent with Beacon DM at 13:30:20 MDT; likely recreated after Beacon session restart). 1 pending: `fix-tier1-classifier-envelope-not-content-scan` (target=forge). Larry still needs to respond "go" in Telegram.
+- ⚠️ tier-reset: YES (unresolved pending approval)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall-state.json`: present, dict format (heartbeat-only), 0 active stalls.
+- Forge inbox: EMPTY. Forge in-flight: MISSING. No active Forge tasks.
+- Wedge-reaper fix: still unbuilt (standing, no new movement since 19:34Z). `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z.json` remains in Forge outbox archive (phase=preflight, PROCEED, build never dispatched).
+- CCD S1 (`ccd-s1-envelope-builder.5.json`) archive (spawn-failure). `fix-headless-approval-dedup-spawn-failure-wedge.1.json` archive (spawn-failure). Blocked on wedge fix + classifier fix.
+- missions-card-gc dispatch (from iter 1354): Beacon consumed from inbox (file in beacon inbox archive). No Forge brief produced yet; beacon bot log shows no new processing after 14:01 MDT. Watch.
+- ⚠️ tier-reset: YES (standing pipeline block)
+
+**Check 4 — Pending directives:**
+- No new Larry directives since 13:27:01 MDT. APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` pending (no orphaned directives). ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- 9/9 services active. No log warnings. outbox-notifier service started 06:24 MDT, script mtime 05:54 MDT — no stale-daemon condition. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, M agents/beacon/captures.json (expected, wrapper-handled). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T19:50:16Z` (~18 min at scan), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. PR #433 MERGED ✅ at 19:57:26Z (Larry-direct, commit 77223ec). unreviewed-merge:433 alert expected + DM'd.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- 0 active Forge tasks. 0 open Forge PRs. Wedge-reaper build still archived (no new dispatch). ⚠️ Standing.
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window (nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, ~73 days). ✅
+
+**G-rule tracking:**
+- **catalog-accuracy-drift**: 1/3 opened iter 1354. PR #433 MERGED — root cause FIXED (Check XI now uses droplet paths + blind-meter guard). **G-rule CLOSED** (root cause eliminated; no re-occurrence expected).
+- **unreviewed-merge:433**: extends Larry-direct streak (PR #433). Actor-exemption-config `go: actor-exemption-config` pending Larry. Tier-3 by-design.
+- **missions-card-gc:summary**: G-rule 3/3 dispatched iter 1354 → Beacon consumed dispatch (inbox archive confirmed). No Forge brief yet. Watch for Beacon→Forge relay.
+- **`auto-retry source=auto-retry drops build dispatch` 1/3**: no new occurrence this iter. Carry.
+- All others: carry from iter 1354 unchanged.
+
+**Actions taken:** None (no auto-fix thresholds crossed; all findings are standing carries or Tier 3).
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build dispatch DROPPED** (carry iter 1352) — `source=auto-retry, original_source=None → no routable target`. Build never dispatched. **Action on Larry: say "go: redispatch wedge-reaper build" to Beacon in Telegram.**
+- [yellow] `fix-tier1-classifier-envelope-not-content-scan` — beacon-pending-approvals.json NOW EXISTS (recovered); approval genuinely pending Larry. **Action on Larry: say "go: fix-tier1-classifier-envelope-not-content-scan" in Telegram.**
+- [yellow] CCD S1 build: spawn-failure. Blocked on wedge fix + classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] PR #433 MERGED ✅ 19:57:26Z — Check XI droplet paths + blind-meter guard. catalog-accuracy-drift G-rule CLOSED.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] missions-card-gc dispatch: Beacon consumed from inbox. Watch for Forge brief.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+
+**Watch items for iter 1356:**
+- **Wedge-reaper build**: Watch for Larry's "go: redispatch wedge-reaper build" in Telegram.
+- **fix-tier1-classifier-envelope-not-content-scan**: Watch for Larry's "go" response.
+- **missions-card-gc Forge brief**: Beacon consumed dispatch. Watch for Forge brief to appear.
+- **install-drift**: watch 06:00Z June 11.
+- **Check B sync**: last_sync=19:50:16Z. If next iter is > 2h after that, trigger sync.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (Tier 3 alert, known pattern). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. iter_non-clean (standing pipeline block + pending approval).
+**Tier end-of-iter:** 1 (consecutive_clean=0; standing issues).
+
+---
+
 ## Iteration 1354 — 2026-06-10 20:01Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing: Wedge-reaper build dispatch DROPPED (carry iter 1352–1353; routing gap `source=auto-retry, original_source=None`). `fix-tier1-classifier-envelope-not-content-scan` APPROVAL_REQUEST pending Larry (~6.5h since 13:30 MDT DM, no response). CCD S1 + headless-dedup blocked. **NEW: PR #433 opened by Larry at 19:55Z** (`fix(pulse): Check XI — droplet source paths + blind-meter guard`) — awaiting Mirror review. **NEW: missions-card-gc:summary G-rule 3/3 reached → dispatched permanent fix to Beacon.** 0 open Forge PRs. 9/9 services active.
@@ -106,11 +205,18 @@
 - [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
 - [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
 
+**[Result notification — ~20:04Z] missions-card-gc:summary dispatch → Beacon SUCCESS:**
+- Beacon processed `cycle-fix-missions-card-gc-summary-tier3-silence-20260610T200042Z` and authored a corrected APPROVAL_REQUEST.
+- **Schema correction noted by Beacon:** the dispatch proposed a flat `{pattern, tier:3}` shape; actual `config/alert-translations.json` uses nested `source->subject->meta` with `tier` values `NOW/SOON/FYI` (not numeric). Beacon corrected to `severity=INFO, tier=FYI`, matching the `heal-systemd-install-drift:install-healed` shape.
+- APPROVAL_REQUEST emitted: `task_id=silence-missions-card-gc-summary-alert-001`, `task_type=doc-only`, `target_agent=forge`, `target_repo=ourliberty-agent-core`. `doc-only` → trust policy should auto-approve.
+- Watch: Forge build dispatch + config/alert-translations.json PR. Success criteria: `classify --alert '{"source":"missions-card-gc","subject":"summary"}'` returns `tier=3, route=digest, decision=silence`.
+- G-rule standing: verification_pending (iter 1354) → upgrade to APPROVAL_REQUEST emitted. No further Pulse action needed until Forge PR opens.
+
 **Watch items for iter 1355:**
 - **PR #433** — Mirror auto-review should trigger. Watch for Mirror PASS + auto-merge. If not reviewed within 30 min, Check E escalates.
 - **Wedge-reaper build**: Watch for Larry's "go: redispatch wedge-reaper build" to Beacon in Telegram.
 - **fix-tier1-classifier-envelope-not-content-scan**: Watch for Larry's "go" response.
-- **missions-card-gc dispatch**: Watch for Beacon to pick up and relay to Forge.
+- **missions-card-gc:summary APPROVAL_REQUEST**: `doc-only` → expect auto-approve + Forge build dispatch. Watch for Forge PR.
 - **install-drift** — 06:00Z June 11.
 - **Check B sync**: last_sync=19:50:16Z. If next iter is > 2h later, may need trigger.
 
