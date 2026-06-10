@@ -1,0 +1,38 @@
+[Unit]
+Description=Missions v2 GC healer — retire stale desktop-session cards, age parked captures, commit captures.json delta (Phase 1 § 6)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_missions_card_gc.py
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/missions-v2-phase1-durable-capture.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+# Carries SUPABASE_* (chain_events read + synthetic-done emit via chain_event_emit),
+# gh auth token + git credentials (merged-PR lookup + push captures.json to main).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_missions_card_gc.py
+# A tick fetches chain_events, optionally `gh pr list` + `git fetch --prune` per
+# tracked repo, then a push round-trip — generous headroom for the network legs.
+TimeoutStartSec=600
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-missions-card-gc
+
+# Hardening (matches ourliberty-cleanup-dispatch-branches.service). ReadWritePaths
+# covers agent-core (captures.json write + git commit/push), the agents tree (kill
+# switch, logs, alert queue), and credentials.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
