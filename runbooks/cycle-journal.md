@@ -4,6 +4,44 @@
 
 ---
 
+## Iteration 1315 — 2026-06-10 14:20Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks clean. 0 new alerts. All 6 units active. Pipeline stall healer fresh, 0 stalls. No orphan directives.
+**Tier state:** 1 → consecutive_clean=1 (clean iter; need 2 more before de-escalation to Tier 2)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = 1353 lines. Watermark: `2026-06-10T13:56:44.859431+00:00 / medic-diagnosis / iter 1314 / idx=1352`. New alerts since watermark: **0**. Triage: nominal.
+
+**Check 1 — Log noise:** journalctl last 30 min: no WARN/ERROR patterns above threshold. beacon_telegram_bot.log: last 409 at 13:19 UTC (claimed by iter 1314, self-resolved; confirmed beacon is sole Python process PID 1071697, bash launcher PID 1102255 is normal wrapper). nominal.
+
+**Check 2 — Telegram sweep (4h):** No Larry messages in last 4h (last at 02:32 MDT = 08:32 UTC — all tracked by PRs #417-421 + dashboard #44-46). No agent-distress keywords in current logs. nominal.
+
+**Check 3 — chain_events stall:** Pipeline stall healer heartbeat: `2026-06-10T14:06:42Z` (fresh, 13m ago). heal-pipeline-stall-state.json: active_stalls=0. PR #412 (OPEN/UNSTABLE/MERGEABLE) gated on APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` — not a chain_events stall; gated on Larry sign-off. nominal.
+
+**Check 4 — Pending Larry directives (24h):** Larry directives today: "go" (00:14 MDT), missions-v2 build sequence (01:29–02:32 MDT). All tracked: PRs #417, #419 merged 08:35-08:53 UTC; PRs #418, #420, #421 merged 11:43-12:01 UTC; dashboard PRs #44-46 merged 12:33-13:41 UTC. No orphans. nominal.
+
+**Check 5 — Stale daemon code:** Healer last run: 14:10:57 UTC (9 min ago), output `fresh=75 unparseable=44` — 0 stale daemons. Heartbeat file fresh (`~/agents/blackboard/heal-stale-daemon-code.heartbeat`). `heal-stale-daemon-code-state.json` absent (healer doesn't write that file; heartbeat is the correct liveness signal per calibration). nominal.
+
+**Check A — Repo:** ✅ main, clean, up-to-date with origin.
+**Check B — Sync:** ✅ last_sync=2026-06-10T14:16:27Z, status=no-change.
+**Check C — Liveness:** ✅ 6/6 units active (beacon, forge, mirror, inbox-watcher, outbox-notifier, cycle.timer). Beacon sole Python process (MainPID=1071697 confirmed; bash launcher=1102255 is normal pgrep artifact). APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+**Check E — PRs:** agent-core: PR #412 OPEN/UNSTABLE/MERGEABLE (standing, APPROVAL_REQUEST gate). Dashboard: 0 open; #44-46 merged today. nominal.
+**Check H — Forge:** 0 open Forge-branch PRs. Recently merged: #421 (11:43Z), #420 (12:01Z), #418 (11:53Z), #419 (08:53Z), #417 (08:35Z) — all Larry-direct (actor-exemption-config pending `go: actor-exemption-config`). nominal.
+**Rotations:** None overdue/upcoming in 60d window. nominal.
+
+**Standing items (verified this iter):**
+- **PR #412** `harden-test-prod-write-isolation-rev-001`: confirmed OPEN/UNSTABLE/MERGEABLE; gate = Larry APPROVAL_REQUEST sign-off.
+- **install-drift-timer-gap**: 0/2 clean healer cycles post-PR #411. Next fire ~18:00Z UTC June 10 = check 1 of 2.
+- **actor-exemption-config**: 5 new Larry-direct merges today (#417-421); pending `go: actor-exemption-config`.
+- **sync-push-rebase-fallback-001**: no occurrence this iter (sync=no-change). APPROVAL_REQUEST still open.
+- **health-check-notify-script-missing**: G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- **Check IX GITHUB_TOKEN**: standing, pending.
+- **APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001`**: pending Larry.
+
+**Did:** Nothing. All checks nominal.
+**PRIME DIRECTIVE:** Clean iter — no new intervention rows. Script-authoritative base: interventions≈752, systemic_fixes=16, ratio≈46.94.
+
+---
+
 ## Iteration 1314 — 2026-06-10 ~14:09Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing: PR #412 APPROVAL_REQUEST pending Larry sign-off. 1 new Tier 4 alert (medic-diagnosis attempt 7, DM auto-delivered idx=1352 at 13:58:48Z UTC). All 9 services active. Beacon-bot stable (PID 1071697, sole process, MainPID confirmed). Inboxes empty.
