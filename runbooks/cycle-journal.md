@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 1298 — 2026-06-10 ~11:51Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Pipeline advancing. PR #421 (dag-preflight-revision-autonomy-001) MERGED ✅ 11:43:10Z (Mirror review-pass auto-merge). Mirror now in-flight on PR #418 (p2-derive-endpoint, PID 1051592, started 11:43:08Z). G-rule 3/3 threshold met: heal-pipeline-stall fires `pipeline-stall:no-mirror-dispatch` for PR #412 in revision-dead state — Beacon dispatch sent. PR #412 UNSTABLE/APPROVAL_REQUEST standing (CI FAILURE). 9/9 core services active.
+**Tier state:** 1 (consecutive_clean=0; G-rule 3/3 dispatch this iter; PR #412 stall ongoing)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T11:11:56Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / iter 1297. Scanned larry-alerts.jsonl:
+- **Count:** 1338 lines (+2 since iter 1297 watermark 1336). 2 new alerts since 11:11:56Z:
+  1. **11:42:23Z** `pipeline-stall:no-mirror-dispatch:PR#412` (heal-pipeline-stall): healer asserts "Mirror review was never dispatched for harden-test-prod-write-isolation-001 (opened 291 min ago)." NOT in alert-translations.json. VERIFY: per medic diagnosis 11:09:27Z, Mirror DID review PR #412 at 07:51Z (notify-mirror-review-pr412-001, intent=review-revision) — real state is revision-dead (no_session_revision_skip), not true no-mirror-dispatch. **G-rule 3/3** advance (iter 1292=1/3, iter 1293=2/3, iter 1298=3/3). → `route-to-beacon` + `tier-reset`. Beacon dispatch: `cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json`.
+  2. **11:43:11Z** `review-pass:dag-preflight-revision-autonomy-001` (outbox-notifier): PR #421 Mirror-approved + auto-merged ✅. alert-translations.json `outbox-notifier:review-pass` tier=FYI → **Tier 3 silenced** → journal note only.
+
+Watermark: **2026-06-10T11:43:11.925169+00:00 / review-pass:dag-preflight-revision-autonomy-001 / iter 1298**.
+Triage: 1 Tier-3 silenced (review-pass PR #421), 1 G-rule-3/3 → Beacon dispatch. ⚠️ tier-reset.
+
+VERIFY-BEFORE-REASSERT of iter 1297 carried findings:
+- "Mirror PID 1045379 reviewing PR #421 (dag-preflight)" → **SUPERSEDED**: PID 1045379 COMPLETED. Mirror REVIEW_PASS at 11:43:11Z. PR #421 MERGED ✅ 11:43:10Z. Self-healed.
+- "PRs #418/#420 UNKNOWN/UNKNOWN; Mirror review tasks queued" → **UPDATED**: PR #418 CLEAN/—; Mirror in-flight PID 1051592 (started 11:43:08Z, ~8 min elapsed). PR #420 UNKNOWN/—; review-p2-digest-generator.json queued in Mirror inbox. ✅ Self-healing.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: gh pr view 412 → UNSTABLE/—. CI FAILURE on file. ⚠️ [yellow]
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY FORWARD**: 11:51Z UTC, not yet 18:00Z. No change.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last inbound from Larry: "Go" at 08:32Z UTC (unchanged). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: 2026-06-10T11:42:15.768800+00:00 (fresh, fired 11:42Z). heal-pipeline-stall-state.json: 40 cooldown files in alert-cooldown/warning/. ✅ Healer active. Pipeline advancing (Mirror in-flight PR #418).
+
+**Check 4 — Pending directives:** Forge inbox: EMPTY ✅. Mirror inbox: `review-p2-derive-endpoint.json` (in-flight PID 1051592), `review-p2-digest-generator.json` (queued). Beacon inbox: `cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json` (written this iter). Pulse inbox: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT (no new daemon restarts; normal). All 9/9 core services active (beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus (start): branch=main, clean tree, HEAD=90dc70b ("Pulse cycle 20260610T114009Z"). ✅ Nominal. SYNC-PUSH-REBASE-FALLBACK-001 [blue] standing (self-recovering via hourly timer).
+
+**Check B — Sync health:** last_sync=2026-06-10T11:16:17Z (~35 min at check — within 2h threshold). status=no-change. SYNC-PUSH-REBASE-FALLBACK-001 [blue] standing. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 core services active. Mirror PID 1051592 active (claude review session, p2-derive-endpoint). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #421: MERGED ✅** (dag-preflight-revision-autonomy-001) — auto-merged 11:43:10Z. CLOSED.
+- **PR #418: CLEAN/—** — Mirror in-flight (PID 1051592, started 11:43:08Z, ~8 min). Self-healing. ✅
+- **PR #420: UNKNOWN/—** — review-p2-digest-generator.json queued in Mirror inbox. Pending PR #418 review completion. ✅
+- **PR #412: UNSTABLE/—** — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. CI FAILURE confirmed. ⚠️ [yellow]
+- ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead PRs` — **3/3 THRESHOLD MET** (iter 1292=1/3, iter 1293=2/3, iter 1298=3/3). Beacon dispatch filed: `cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json`. Proposed fix: (1) add `pipeline-stall:no-mirror-dispatch` to `config/alert-translations.json` tier=FYI; (2) code fix — healer should check routing-events history before emitting no-mirror-dispatch.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (unchanged). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (unchanged). Carry.
+
+**Standing findings (unchanged):**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. CI FAILURE on file. Revision chain dead.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak 3 (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1299):**
+- **Mirror PID 1051592** reviewing PR #418 (p2-derive-endpoint) — expect completion ~12:00Z. On PASS: auto-merge PR #418, then Mirror processes PR #420 (review-p2-digest-generator).
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean cycle post-PR #411.
+- **PR #412** — CI FAILURE + APPROVAL_REQUEST standing. Larry sign-off pending.
+- **Beacon G-rule dispatch** — `cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json` in Beacon inbox. Monitor for spec output → Forge brief.
+
+**Actions taken:** 1 — Beacon dispatch written: `~/agents/inboxes/beacon/cycle-finding-pipeline-stall-no-mirror-dispatch-misdiag-20260610T115052Z.json` (G-rule 3/3: pipeline-stall:no-mirror-dispatch false-positive spec request).
+**PRIME DIRECTIVE:** 1 new intervention (G-rule 3/3 Beacon dispatch). interventions=750, systemic_fixes=16, verification_pending=7, ratio=46.875. iter_non-clean (G-rule dispatch this iter; PR #412 stall ongoing).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1297 — 2026-06-10 ~11:37Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing. dag-preflight-revision-autonomy-001 **build completed** → PR #421 opened 11:32:20Z → Mirror review PID 1045379 in-flight (started 11:32:41Z, ~5 min). p2-derive-endpoint (PR #418) + p2-digest-generator (PR #420) build tasks also completed — both Mirror review tasks queued in Mirror inbox. Forge inbox now EMPTY. PR #412 APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` standing (CI FAILURE confirmed). 9/9 core services active.
