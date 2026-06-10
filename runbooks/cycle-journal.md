@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration 1323 — 2026-06-10 ~15:47Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 2: standing fixture log-contamination (09:37+09:40 MDT recurrence; G-rule 3/3 dispatched iter 1281, Forge brief pending). **Positive progress:** APPROVAL_REQUEST `adopt-chain-context-durability-spec` RESOLVED ✅ — Larry approved 09:39 MDT, Forge received build task 09:39:04 MDT (confirmed in Forge inbox). PR #412 pipeline continues to advance: Forge revision complete (commit 67d1b09b, reaped clean at 15:41:27Z), Beacon has Forge notify, Mirror actively reviewing.
+**Tier state:** 1 (consecutive_clean=0; Check 2 non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T15:33:43.465428+00:00 / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / iter 1322`
+- Total lines: 1363. 1 new entry since watermark:
+  1. `2026-06-10T15:41:27.364530+00:00` — source=heal-wedged-review-sessions, route=closure, subject=`wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-pr412-revision`
+- Triage: route=closure = normal worktree GC after Forge revision session completed (terminal marker present, idle 368s > grace 300s). Tier-3 known-pattern; no tier-reset.
+- **New watermark: `2026-06-10T15:41:27.364530+00:00 / wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-pr412-revision / iter 1323`**
+- ✅ Nominal (Tier-3 silence; no tier-reset)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log last entries (scan from iter 1322 09:36 MDT cutoff):
+- 09:37:31 MDT: fixture entries (source=heal-x, subjects=routine-1, sig-1, routine-2) — log-contamination recurrence; G-rule 3/3 dispatched iter 1281. [yellow] carry.
+- 09:38:04 MDT: beacon delivery to Larry + completion-claim kickback 1/3.
+- 09:39:04 MDT: `<- 7998341473: 'go'` → `approved adopt-chain-context-durability-spec -> dispatched to /home/larry/agents/inboxes/forge/adopt-chain-context-durability-spec.json` ✅
+- 09:39:04 MDT (second): `<- 7998341473: 'i sent go for the "🪔 Plan ready..." but I did not see the approval'` — Larry confirming the 'go' worked; Beacon confirmed dispatch.
+- 09:39:38 MDT: TIER2_FALLBACK auth_401 + rate_limit (standing Tier 2 OAuth issue).
+- 09:40:39 MDT: more fixture entries (heal-x: fixed-something, still-broken, auto-restarted:foo, etc.) — log-contamination recurrence.
+- 09:41:37 MDT: alert idx=1361 delivered (source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-pr412-revision) — closure notice for completed Forge revision session ✅.
+- 09:42:39 MDT: TIER2_FALLBACK auth_401 + rate_limit (standing).
+- No Larry inbound since 09:39 MDT.
+⚠️ Tier-reset: YES (fixture contamination non-nominal; standing). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T15:42:40Z` (~5 min at scan — fresh). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- **Forge inbox**: `adopt-chain-context-durability-spec.json` — NEW ✅ (Larry approved 09:39 MDT; dispatched 15:39Z UTC; fresh). Active build task.
+- **Beacon inbox**: `notify-harden-test-prod-write-isolation-pr412-revision.json` — NEW (Forge revision complete notify; Beacon will process when available).
+- **Mirror inbox**: `review-harden-test-prod-write-isolation-001.json` — carry from iter 1322 (Mirror actively reviewing PR #412 revision). Still live.
+- **Pulse inbox**: empty. ✅
+- All tasks are live pipeline activity (<30 min); none stale. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat: `2026-06-10T15:41:06Z` (~6 min at scan — fresh). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus (start): main, clean (sync.json commit=912bf46e — local ahead pending sync; SYNC-PUSH-REBASE-FALLBACK rollback; self-recovering). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T15:43:27Z` (~4 min at scan — fresh, within 2h threshold). status=error (SYNC-PUSH-REBASE-FALLBACK-001 73rd+; "Auto-commit push failed; rolled back"; self-recovering). ✅ Nominal within tolerance.
+
+**Check C — Agent liveness:** systemctl list-units shows 9/9 core ourliberty services active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.timer ✅, chain-event-shipper ✅, dashboard-api ✅. pgrep -a confirms beacon_telegram_bot.py PID 1071697 (2-count pgrep result = self-match artifact from pgrep's own bash wrapper, NOT a 409 conflict). `ourliberty-agent-core-health.service` failed = standing (health-check-notify-script-missing G-rule 3/3 dispatched iter 1207). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #412** — OPEN/UNKNOWN/UNKNOWN (GitHub merge-state recomputing after revision commit 67d1b09b). VERIFIED ✅: Forge revision pushed 15:33:48Z UTC; Forge worktree reaped 15:41:27Z (terminal marker; normal GC; closure alert delivered to Larry idx=1361). Forge → Beacon notify in Beacon inbox. Mirror has review task in inbox. Pipeline at Mirror-review stage. ⚠️ [yellow] watch for REVIEW_PASS.
+- **NEW: `adopt-chain-context-durability-spec`** — Forge inbox has build task (dispatched 15:39Z UTC after Larry approval). Not a PR yet. Watch for PR creation.
+- **ourliberty-dashboard: 0 open PRs.** ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** None overdue or within 60-day window. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1322 watch items:**
+- "Mirror review of PR #412 revision — active" → **CARRY ✅**: Mirror inbox has `review-harden-test-prod-write-isolation-001.json` (unchanged); Beacon also has Forge notify. Pipeline progressing.
+- "install-drift healer fires ~18:00Z UTC June 10" → **CARRY**: heartbeat=2026-06-10T06:00:10Z (UNCHANGED; pre-PR#411). ~2.2h until expected fire. 0/2 clean healer cycles. Verification OPEN.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry" → **CARRY**: no processing evidence.
+- "APPROVAL_REQUEST `adopt-chain-context-durability-spec` — Larry received" → **RESOLVED ✅**: Larry sent 'go' at 09:39 MDT; dispatched to Forge 09:39:04 MDT; Forge inbox confirmed.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] **PR #412** — Mirror reviewing revision (commit 67d1b09b); Beacon has Forge notify. Watch for REVIEW_PASS + auto-merge.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~2.2h).
+- [blue] `adopt-chain-context-durability-spec` — RESOLVED ✅ Larry approved; Forge has build task. Watch for PR.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 73rd+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence (fixture entries at 09:37+09:40 MDT; G-rule 3/3 dispatched iter 1281, Forge brief pending).
+
+**Watch items for iter 1324:**
+- **Mirror review of PR #412 revision** — `review-harden-test-prod-write-isolation-001.json` in inbox. Watch for REVIEW_PASS + auto-merge dispatch.
+- **Beacon processing Forge revision notify** — `notify-harden-test-prod-write-isolation-pr412-revision.json` in Beacon inbox.
+- **`adopt-chain-context-durability-spec`** — Forge has build task; watch for PR creation.
+- **install-drift healer** — fires ~18:00Z UTC June 10. Watch heartbeat advance past 06:00:10Z; expect 1/2 clean healer cycles post-fire.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (Check 2 non-nominal = standing G-rule 3/3 dispatched iter 1281, no new action; sync error = standing self-recovering; APPROVAL_REQUEST `adopt-chain-context-durability-spec` resolved positively). interventions≈754, systemic_fixes=16, ratio≈46.81, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1322 — 2026-06-10 15:39Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 2: additional fixture entries (source=heal-x at 09:30 MDT) — continuation of standing log-contamination, G-rule 3/3 already dispatched iter 1281. **Positive progress: PR #412 pipeline unblocked — Forge pushed revision commit 67d1b09b at 15:33:48Z UTC; Mirror has review task in inbox.**
