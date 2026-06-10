@@ -4,6 +4,127 @@
 
 ---
 
+## Iteration 1384 — 2026-06-10 23:35Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ PR #438 fix(systemd) MERGED 23:25:20Z — transcript-persistence fix live in repo but NOT yet active (bots active-since 23:13Z, before merge). Daemon-reload + restart required. DM sent. PR #437 Mirror review in progress (35 min at scan, not yet clean+green). PR #439 below threshold. 9/9 services active. cycle-tier.json G-rule 3/3 dispatched to Beacon.
+
+**VERIFY-BEFORE-REASSERT (iter 1383 watch items):**
+- PR #437 threshold 23:26Z + escalate-by 23:50Z: OPEN, reviewDecision="" at 23:31Z scan. Mirror inbox has `review-fix-dashboard-routing-denied-002.json`. Mirror is reviewing — not clean+green yet. Escalate threshold not yet hit (23:50Z). ✅ Watch.
+- PR #438 threshold 23:38Z: **MERGED 23:25:20Z ✅** — Mirror PASS → auto-merge. CLOSED for PR watch. POST-MERGE ACTION NEEDED (see below).
+- PR #439 threshold 23:41Z: OPEN, reviewDecision="". Mirror inbox has only PR #437 review task — no PR #439 review dispatch visible yet. Below threshold (23:41:57Z). ✅ Watch.
+- Check B sync: last_sync=22:50:16Z, expires 00:50Z (~79 min remaining at 23:31Z scan). ✅ Nominal.
+- ourliberty-agent-core-health.service: ExecMainExitTimestamp=23:07:30Z, still showing FAILED state. Next systemd timer fire expected ~23:37Z (not yet hit at 23:31Z scan). ✅ Watch.
+- cycle-tier.json `last_signal_at` stale: **3rd consecutive observation (iters 1382+1383+1384). G-rule 3/3 TRIGGERED.** Dispatched direction-ask to Beacon inbox (pulse-direction-ask-cycle-tier-last-signal-stale-20260610Z.json). ✅ Dispatched.
+- L1412/L1413/L1419/L1420/L1421 transcript-not-persisted: PR #438 MERGED → root cause fixed in repo. Bots need daemon-reload + restart. DM sent to Larry. SCOPE: all 4 bots (forge-bot active-since 23:13:39Z UTC, before merge). ✅ Updated.
+
+**NEW since iter 1383:**
+- **PR #438 MERGED 23:25:20Z** — fix(systemd): tier2 HOME in ReadWritePaths for all agent units + loud transcript-persistence check. Mirror reviewed and auto-merge fired. New code is in the repo; systemd units updated. Bots need daemon-reload to pick up the new ReadWritePaths. forge-bot active-since=23:13:39Z (< merge at 23:25Z) → fix NOT yet active. [yellow] DM sent to Larry with daemon-reload command. → Tier 2 (action gated on Larry).
+- **No new larry-alerts.jsonl entries**: count remains 1421 (same as iter 1383 watermark). ✅ Nominal.
+
+**Tier state:** 1 (consecutive_clean=0; active PRs + post-merge daemon-reload pending)
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1421 lines** (UNCHANGED from iter 1383 watermark). No new alerts since 23:23:08Z. ✅ Nominal.
+- **Watermark: line 1421 / agent-runner-pulse:transcript-not-persisted:tier1 / 2026-06-10T23:23:08Z (carry)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: MISSING → pending=[]. ✅
+- No new Larry messages since 15:52:16 MDT. No orphan directives. ✅ Nominal.
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T23:15:12Z (16 min old at 23:31Z scan — within 30-min cadence). ✅ Nominal.
+- heal-pipeline-stall-state.json: no active stalls. ✅ Nominal.
+- ourliberty-heal-pipeline-stall.service: activating (oneshot running at scan time). ✅ Expected.
+
+**Check 4 — Pending directives:**
+- No new Larry messages. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅ (gitStatus at session start). Working tree: clean ✅. Local HEAD includes commit e1f3a66 "Pulse cycle 20260610T233014Z" (post-PR #438 merge). ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T22:50:16Z (41 min old at 23:31Z scan), status=no-change. Expires 00:50Z (~79 min remaining). ✅ Nominal.
+
+**Check C — Agent liveness:**
+- Core bots (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+- `ourliberty-agent-core-health.service`: FAILED (standing from 23:07Z run). Expected next fire ~23:37Z UTC. ✅ Watch.
+- `ourliberty-heal-pipeline-stall.service`: activating (oneshot, expected). ✅
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 2 open PRs.
+  - PR #437 "fix(routing)": OPEN, mergeable=UNKNOWN, reviewDecision="". Created 22:56:24Z (35 min at 23:31Z scan). Mirror review task in inbox. Not clean+green. Escalate-if-no-merge threshold: 23:50Z. ✅ Watch.
+  - PR #438 "fix(systemd)": **MERGED 23:25:20Z ✅**. CLOSED for PR watch.
+  - PR #439 "spec: park-the-nudge": OPEN, mergeable=UNKNOWN, reviewDecision="". Created 23:11:57Z (19 min at scan). No Mirror review dispatch in inbox yet. Threshold 23:41:57Z (10 min away). ✅ Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge/Beacon/Mirror inboxes:**
+- Forge inbox: EMPTY ✅.
+- Beacon inbox: 1 item (pulse-direction-ask-cycle-tier-last-signal-stale-20260610Z.json — just dispatched). ✅
+- Mirror inbox: 1 item (`review-fix-dashboard-routing-denied-002.json` — PR #437 review in progress). ✅
+
+**Check I (Wednesday 2026-06-10):** Weekday-gate skip (not Monday). ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue. ✅ Nominal.
+**install-drift:** Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** Standing G-rule. Carry.
+
+**G-rule tracking:**
+- **cycle-tier.json `last_signal_at` stale: 3/3 DISPATCHED** — Direction-ask to Beacon inbox. Root cause: interactive-mode iters bypass run_cycle.sh wrapper → `record_iter_result()` not called. Fix: add `cycle_tier_state.py record_iter_result()` call in the cycle's journal-write phase for all invocation modes.
+- **test-fixture-batch-in-bot-log: 3/3 DISPATCHED** (iter 1378). Carry pending Beacon/Forge processing.
+- **auto-restart-failed:ourliberty-outbox-notifier.service: 1/3** — no recurrence. Carry.
+- **wedged-review-silent-wt: 2/3** — no new occurrence. Carry.
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred. Carry.
+- All other G-rule statuses: carry from iter 1383 unchanged.
+
+**Actions taken:**
+- [yellow] DM Larry: `transcript-persistence-fix-ready-daemon-reload-needed` — PR #438 merged, daemon-reload + restart all 4 bots required.
+- Dispatched direction-ask to Beacon inbox: `pulse-direction-ask-cycle-tier-last-signal-stale-20260610Z.json` — G-rule 3/3 for `last_signal_at` stale.
+- PRIME DIRECTIVE ledger: 1 intervention + 1 systemic_fix appended (iter 1384, tier 1).
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #438 MERGED — daemon-reload + restart PENDING LARRY**: `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-forge-bot.service ourliberty-pulse-bot.service ourliberty-beacon-bot.service ourliberty-mirror-bot.service`. Fix is live in repo; bots will not pick it up until Larry runs this. DM sent iter 1384.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: Beacon brief ready; Forge dispatch pending Beacon re-emit.
+- [blue] PR #437: Mirror reviewing. Escalate-if-no-merge threshold 23:50Z.
+- [blue] PR #439: Below threshold (23:41:57Z). Mirror review dispatch pending.
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] cycle-tier.json `last_signal_at` stale — G-rule 3/3 DISPATCHED to Beacon iter 1384.
+
+**Watch items for iter 1385:**
+- PR #437: escalate-if-no-merge by 23:50Z. If Mirror PASS + auto-merge fires → CLOSED. If no merge by 23:50Z, investigate Mirror progress.
+- PR #439: threshold 23:41:57Z. If no Mirror review dispatch in inbox by 23:42Z, investigate outbox-notifier.
+- ourliberty-agent-core-health.service: expect clean pass at ~23:37Z next fire. Verify FAILED → active at next scan.
+- Check B sync: expires 00:50Z (~75 min from 23:35Z). Trigger sync if not refreshed by ~00:30Z.
+- daemon-reload: verify whether Larry ran it (look for bot restart timestamps > 23:35Z UTC). If bots restarted, transcript-persistence finding RESOLVED.
+- Beacon inbox: pulse-direction-ask-cycle-tier-last-signal-stale-20260610Z — expect Beacon to process and author Forge task.
+
+**PRIME DIRECTIVE:** 1 intervention (daemon-reload-needed post-PR#438-merge) + 1 systemic_fix (cycle-tier G-rule dispatch) this iter. interventions=766, systemic_fixes=18, ratio≈42.6, trend=flat (improving slightly vs iter 1383's 45.0).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1383 — 2026-06-10 23:25Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ transcript-not-persisted scope confirmed wider (L1419-L1421): Pulse bot cycle sessions now also failing transcript persistence — all 4 agent bots affected by the ReadWritePaths gap. PR #438 is the fix, in Mirror review. 3 open PRs (#437/#438/#439) all in normal review range — none clean+green stale. 9/9 services active.
