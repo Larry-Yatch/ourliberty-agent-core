@@ -52,6 +52,30 @@ Add a top-level source block keyed `"sync.service"` (matches `--source sync.serv
 
 Match the existing schema exactly (`severity`, `tier`, `plain_language_summary`, `recommended_action`). Mirror the recovery text from the emit calls in `sync_agent_core.sh` so the plain-language action stays accurate.
 
+## Addendum 2026-06-10 — captures.json (same incident class, second file)
+
+Option A shipped. The hourly sync tick then began refusing on a *different*
+machine-owned runtime file: `agents/beacon/captures.json`, written by the
+missions ingest endpoint (`dashboard_api.py`) and committed every ~10 min by
+`heal_missions_card_gc.py`. When sync lands in the gap between an ingest write
+and the GC healer's next commit tick, it refuses-and-pages on a purely
+automation-owned file — identical in spirit to the Pulse iter-98 case.
+
+Fix: the auto-commit allowlist that was implicitly "the Pulse runtime set" is
+now an explicit, named superset — `SYNC_AUTOCOMMIT_PATHS` in
+`scripts/_lib_pulse_runtime.sh` = `PULSE_RUNTIME_PATHS` + `SYNC_EXTRA_RUNTIME_PATHS`
+(currently just `captures.json`). Sync gates on
+`all_modified_in_sync_autocommit_allowlist`; `run_cycle.sh` is unaffected (it
+hardcodes the narrow Pulse set inline and is not a consumer of this lib).
+
+Criteria for adding the next path to `SYNC_EXTRA_RUNTIME_PATHS` (documented at
+the array): (1) written exclusively by automation, never hand-edited; (2) writes
+are atomic (tmp+rename) so a git snapshot is never torn; (3) some other
+automation already commits it on its own cadence — sync only absorbs the race
+window. Conflict with the other committer is benign: both push to main with a
+rebase/autostash fallback, and once either commits the delta the other sees a
+no-op (idempotent). Non-allowlist dirt still blocks sync unchanged.
+
 ## Acceptance
 
 - Interactive-cycle runtime dirt no longer blocks sync (per chosen option); a clean end-to-end demonstration.

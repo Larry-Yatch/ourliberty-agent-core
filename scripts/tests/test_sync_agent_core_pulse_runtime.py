@@ -4,8 +4,15 @@
 Closes the 2026-05-28 iter-98 incident class: an interactive Pulse /cycle
 leaves runbooks/cycle-journal.md, runbooks/cycle-actions.jsonl, or pulse
 MEMORY files uncommitted, and sync refuses for hours. Sync now auto-commits
-+ pushes when the dirty set is fully inside the Pulse runtime allowlist
-defined in scripts/_lib_pulse_runtime.sh.
++ pushes when the dirty set is fully inside the auto-commit allowlist
+(SYNC_AUTOCOMMIT_PATHS) defined in scripts/_lib_pulse_runtime.sh.
+
+The 2026-06-10 sibling: agents/beacon/captures.json is machine-owned
+missions-capture state, written by the ingest endpoint and committed every
+~10min by heal_missions_card_gc.py. The hourly sync tick can land between the
+write and that commit and refuse-and-page on a purely machine-owned file. It
+is now part of SYNC_AUTOCOMMIT_PATHS, so sync absorbs that race the same way
+it does Pulse runtime dirt (see CapturesJsonAutoCommitTest below).
 
 The behavior under test:
   - allowlist-only dirt → auto-commit + push, sync proceeds.
@@ -88,6 +95,13 @@ class _SyncResilienceBase(unittest.TestCase):
         (pulse_dir / 'MEMORY.md').write_text('seed memory\n')
         (pulse_dir / 'memory').mkdir()
         (pulse_dir / 'memory' / '.gitkeep').write_text('')
+        # Beacon captures.json: machine-owned missions-capture state, normally
+        # committed by heal_missions_card_gc.py. Seed it tracked so a later
+        # modification registers as tracked-modified (the sync-only extra in
+        # SYNC_AUTOCOMMIT_PATHS).
+        beacon_dir = self.repo_dir / 'agents' / 'beacon'
+        beacon_dir.mkdir(parents=True)
+        (beacon_dir / 'captures.json').write_text('{"captures": []}\n')
         (self.repo_dir / 'README').write_text('seed\n')
         self._git('add', '-A')
         self._git('commit', '-q', '-m', 'seed')
@@ -312,6 +326,84 @@ class FixturePatternGuardTest(_SyncResilienceBase):
         self.assertEqual(
             [s for s in subjects if s.startswith('sync-blocked')], [],
             f'unexpected sync-blocked alerts: {alerts}',
+        )
+
+
+class CapturesJsonAutoCommitTest(_SyncResilienceBase):
+    """agents/beacon/captures.json is a sync-only auto-commit extra: machine-
+    owned missions state that the GC healer commits on a 10min cadence. Sync
+    must absorb the write↔commit race instead of refusing and paging Larry."""
+
+    def test_captures_json_only_dirt_is_auto_committed_and_pushed(self):
+        pre_head = self._head()
+        # Dirty exactly captures.json (tracked-modified), simulating the gap
+        # between an ingest write and the GC healer's next commit tick.
+        (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
+            '{"captures": [{"title": "note", "origin": "desktop"}]}\n',
+        )
+
+        result = self._run_sync()
+        self.assertEqual(
+            result.returncode, 0,
+            f'sync should auto-commit captures.json; stdout={result.stdout!r} '
+            f'stderr={result.stderr!r}',
+        )
+        status = subprocess.run(
+            ['git', 'status', '--porcelain'],
+            cwd=self.repo_dir, check=True, stdout=subprocess.PIPE,
+        ).stdout.decode()
+        self.assertEqual(status.strip(), '')
+        new_head = self._head()
+        self.assertNotEqual(new_head, pre_head)
+        self.assertEqual(new_head, self._origin_head())
+        alerts = self._read_alerts()
+        sync_blocked = [
+            a for a in alerts if a.get('subject', '').startswith('sync-blocked')
+        ]
+        self.assertEqual(sync_blocked, [], f'unexpected alerts: {alerts}')
+
+    def test_captures_json_plus_pulse_dirt_auto_committed_together(self):
+        # captures.json + a Pulse runtime file are both inside
+        # SYNC_AUTOCOMMIT_PATHS, so the mixed-but-all-allowlisted set still
+        # auto-commits in one shot.
+        pre_head = self._head()
+        (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
+            '{"captures": [{"title": "a"}]}\n',
+        )
+        (self.repo_dir / 'runbooks' / 'cycle-journal.md').write_text(
+            'seed journal\ncycle line\n',
+        )
+
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            subprocess.run(
+                ['git', 'status', '--porcelain'],
+                cwd=self.repo_dir, check=True, stdout=subprocess.PIPE,
+            ).stdout.decode().strip(),
+            '',
+        )
+        new_head = self._head()
+        self.assertNotEqual(new_head, pre_head)
+        self.assertEqual(new_head, self._origin_head())
+
+    def test_captures_json_plus_non_allowlist_file_still_blocks(self):
+        # captures.json (allowlisted) + README (not) is still mixed dirt: the
+        # refuse-and-alert path is unchanged so genuine human dirt never gets
+        # silently swept into an auto-commit.
+        pre_head = self._head()
+        (self.repo_dir / 'agents' / 'beacon' / 'captures.json').write_text(
+            '{"captures": [{"title": "b"}]}\n',
+        )
+        (self.repo_dir / 'README').write_text('human edit\n')
+
+        result = self._run_sync()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self._head(), pre_head)
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1, f'expected 1 alert, got {alerts}')
+        self.assertEqual(
+            alerts[0]['subject'], 'sync-blocked:uncommitted-changes',
         )
 
 
