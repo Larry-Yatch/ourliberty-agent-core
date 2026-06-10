@@ -1578,6 +1578,7 @@ Exact-match patterns:
 - `dead-letter-gc`
 - `dead-letter-bad-task`
 - `envelope-id`
+- `smoke-5a-pf-no-marker`
 
 **Discipline when you match:**
 

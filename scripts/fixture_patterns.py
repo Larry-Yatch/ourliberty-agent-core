@@ -73,6 +73,20 @@ FIXTURE_PATTERN_EXACT: frozenset[str] = frozenset({
     # whose task_id is `envelope-id`. matched_fixture_envelope peels routing
     # wrappers (`marker-error-envelope-id-1` etc.) automatically.
     "envelope-id",
+    # 2026-06-10: smoke-test marker-discipline fixture. `smoke-5a-pf-no-marker`
+    # is the no-marker preflight smoke scenario — a task crafted to omit its
+    # forge marker so the marker-error retry cascade is exercised, so it ONLY
+    # ever appears wrapped as `marker-error-smoke-5a-pf-no-marker-N`. Collision-
+    # proof: the literal appears nowhere in the repo as real work — only as a
+    # test string in tests/scripts/test_ledger_retry_overhead.py and
+    # test_task_type_inference.py; there is no production `smoke-5a` harness.
+    # Without this, its 3 stale archive artifacts tripped gather_retry_repeats'
+    # HIGH_REPEAT_COUNT_THRESHOLD and re-surfaced the SAME "template this shape"
+    # Check I proposal for 3+ consecutive cycles (a templating proposal for a
+    # smoke test is meaningless). Exact-match (not a `smoke-` prefix) keeps the
+    # collision proof tight; broaden only with an archive scan proving no real
+    # `smoke-*` task_id exists.
+    "smoke-5a-pf-no-marker",
 })
 
 
