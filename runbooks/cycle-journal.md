@@ -4,6 +4,92 @@
 
 ---
 
+## Iteration 1333 — 2026-06-10 ~16:50Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 0: missions-card-gc:summary (novel Tier-4; [blue]; G-rule 1/3). Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 core services active. CCD DAG: Beacon archived ccd-s1 rejection items ~16:49Z; Forge inbox empty; Beacon processing rejection.
+**Tier state:** 1 (consecutive_clean=0; Check 0 non-nominal + Check 2 standing)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T16:40:08.350039+00:00 / mirror-dag-pass:chain-context-durability` (line 1373, iter 1332)
+- Total lines: 1374. 1 new entry since watermark:
+  1. Line 1374 (`2026-06-10T16:47:27.530136+00:00`) — source=missions-card-gc, subject=summary, route=digest. GC healer: retired 4 stale session cards; 0 parked captures aged; 1 session kept; commit=nothing. Bot log confirms `alert idx=1373 route=digest; skipping DM` (10:49:25 MDT). source=missions-card-gc NOT in alert-translations.json → Tier-4 (novel). WARN-vs-INFO test: GC healer informational summary, route=digest, system not worse if fires 100×/24h without action → apply [blue] threshold per SOUL.md. Journal-note only, no DM. G-rule `missions-card-gc:summary not in alert-translations.json` → NEW 1/3.
+- **New watermark: `2026-06-10T16:47:27.530136+00:00 / missions-card-gc:summary` (line 1374)**
+- ⚠️ Tier-reset: YES (non-Tier-3 novel alert per Check 0 rules).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot log entry: `[2026-06-10T10:49:25-0600]` (16:49:25Z) — alert idx=1373 route=digest, skipped DM. No Larry inbound since 10:38:48 MDT (go for dag-preflight, addressed iter 1331). No new agent-distress keywords. Standing: source=heal-x fixture log-contamination (09:52 MDT entries — TIER_ONE_MARKER / "resets 11:30am" / "TIER 2 distinct" = confirmed test fixtures per memory). G-rule 3/3 dispatched iter 1281; Forge brief pending. No new instances this iter.
+⚠️ Tier-reset: YES (standing non-nominal). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json EXISTS. 0 open PRs on both repos. CCD DAG: ccd-s1-envelope-builder Forge reject at 10:42:43 MDT (MalformedForgeMarker → retry 1/3 → session-log-scan classified as reject → notify→Beacon); outbox-notifier log confirms dispatch. Beacon archived all CCD inbox items (notify-ccd-s1-envelope-builder.json + seq-chain-context-durability-step-ccd-s1-envelope-builder.json + earlier notify-adopt-* items) between ~16:47Z–16:50Z; Forge inbox empty; no APPROVAL_REQUEST DM to Larry; Beacon processing rejection (deciding re-dispatch vs. revision). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (Beacon CCD items archived ~16:49Z; Forge/Mirror/Pulse empty). No orphan Larry directives (last directive 10:38:48 MDT addressed iter 1331). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json NOT FOUND (consistent iters 1329–1333). ✅ Nominal.
+
+**Check A — Source repo:** main, clean (wrapper committed iter 1332 auto-commit). Standing SYNC-PUSH-REBASE-FALLBACK-001 (74th+; self-recovering; parked). ✅ Nominal within standing pattern.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T16:16:50Z` (~33 min at 16:50Z scan). status=error (SYNC-PUSH-REBASE-FALLBACK-001; self-recovering). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing (health-check-notify-script-missing G-rule 3/3 dispatched iter 1207). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Forge:** 0 open Forge PRs. ccd-s1-envelope-builder archived (Forge rejected; Beacon handling). ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** Sentinel at `~/agents/state/gate-soak-assessment.json` (fired iter 1331). No new action. ✅
+
+**Rotations:** 0 overdue, 0 upcoming-within-60d. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1332 watch items:**
+- "ccd DAG step 1 rejection — Beacon inbox: notify-ccd-s1-envelope-builder.json (intent=reject, 3 min at 16:45Z). Watch for Beacon to process and re-dispatch or surface to Larry." → UPDATED: Beacon archived all CCD inbox items ~16:49Z (outbox-notifier log confirms ccd-s1 reject classified + notify→Beacon at 10:42:43 MDT; Forge inbox empty; no new Larry DM/APPROVAL_REQUEST). Pipeline active, Beacon deciding. **CARRY** — watch for Forge re-dispatch or APPROVAL_REQUEST.
+- "Bug-hunt gate soak DM — delivered. Watch for Larry decision (keep/dial-back/Phase-2)." → No Larry response in bot log. **CARRY**.
+- "install-drift healer — fires ~18:00Z UTC June 10. Watch heartbeat advance past 06:00:10Z; expect 1/2 clean cycles post-PR #411." → heartbeat=`2026-06-10T06:00:10.016818+00:00` (unchanged; ~1h10min until expected 18:00Z UTC fire). **CARRY**.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off." → No evidence of processing. **CARRY**.
+
+**G-rule tracking:**
+- `missions-card-gc:summary not in alert-translations.json` — **NEW 1/3** (this iter).
+- `mirror-dag-pass:chain-context-durability not in alert-translations.json` — 1/3 (iter 1332). No new occurrences this iter. Carry.
+- `dispatch-branch-cleanup:gh-unavailable not in alert-translations.json` — 1/3 (iter 1330). Carry.
+- `dispatch-branch-cleanup:summary not in alert-translations.json` — 1/3 (iter 1153). Carry.
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~1h10min at scan).
+- [blue] G-rule missions-card-gc:summary 1/3 (new this iter).
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3 (iter 1332).
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 74th+; self-recovering; parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+
+**Watch items for iter 1334:**
+- **ccd DAG step 1** — Beacon archived ccd-s1 rejection ~16:49Z. Watch for Forge re-dispatch (revised ccd-s1) or APPROVAL_REQUEST to Larry.
+- **Bug-hunt gate soak DM** — delivered iter 1331. Watch for Larry decision (keep/dial-back/Phase-2).
+- **install-drift healer** — fires ~18:00Z UTC June 10 (~1h10min at scan). Watch heartbeat advance past 06:00:10Z; expect 1/2 clean cycles post-PR #411.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (Check 0 line 1374 = missions-card-gc:summary = zero-impact digest-only GC event, [blue] journal-note per WARN-vs-INFO test; Check 2 = standing G-rule 3/3 already recorded iter 1281). interventions≈755, systemic_fixes=16, ratio≈47.2, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 0 novel Tier-4 + Check 2 standing non-nominal).
+
+---
+
 ## Iteration 1332 — 2026-06-10 ~16:45Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 0: mirror-dag-pass:chain-context-durability (novel Tier-4; [blue]; G-rule 1/3). Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 core services active. DAG ccd-s1-envelope-builder: Forge rejected, Beacon notified (3 min). Bug-hunt gate: sentinel confirmed (already fired iter 1331; no-op).
