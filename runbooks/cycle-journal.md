@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1276 — 2026-06-10 ~08:30Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — 1 Tier-3 alert silenced (auto-restarted:outbox-notifier post-PR #416 code delta; by-design). All standing watches carry forward unchanged.
+**Tier state:** 1 (consecutive_clean=3 → de-escalation threshold met; Tier 2 next wrapper-driven iter; consecutive_clean resets to 0)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1445 lines** (iter 1275 watermark: 08:02:24Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / line 1444). 1 new line since watermark:
+- Line 1445 (08:09:24Z): `heal-stale-daemon-code:auto-restarted:ourliberty-outbox-notifier.service` — script mtime newer than active-since by 50 min; commit 2e2e781 (PR #416 "fix(build-sequence): distinguish sync-lag from missing spec") landed between iter 1275 and this iter; healer restarted notifier with new code. Route=digest. Tier 3 known-pattern per iter 1049: `auto-restarted:*` with route=digest = healer working by design. [blue]
+New watermark: 08:09:24Z / auto-restarted:ourliberty-outbox-notifier.service / line 1445 / iter 1276.
+Triage: 1 alert, 0 Tier-1, 0 Tier-2, 1 Tier-3 silenced. ✅ Nominal. No tier-reset from Check 0.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since 07:36:06Z "go" (iter 1273, handled). No agent-distress signals in log data. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: 0 active stalls (all entries are 2099-suppressed historical artifacts). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (beacon, forge, mirror, pulse confirmed). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code fired 08:09:24Z — auto-restarted ourliberty-outbox-notifier.service per PR #416 code delta (healer working as designed). All 8/8 services active (systemctl confirmed). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=fd36d18 ("Pulse cycle 20260610T081155Z" — iter 1275 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-10T08:16:15Z (~14 min old, < 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001: no new occurrence this iter. [blue] standing.
+
+**Check C — Agent liveness:** 8/8 core services active (beacon-bot, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, chain-event-shipper, dashboard-api). ourliberty-agent-core-health: failed/inactive (standing [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 OPEN/UNKNOWN/0-reviews — REVIEW_REVISION state (no change from iter 1275). ourliberty-dashboard: 0 open. ✅ Nominal (carry forward [yellow] PR #412 standing).
+
+**Credential rotation (4.6):** Carry forward from iter 1275 — 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate soak (§5.0):** 7/15 (from iter 1275 assess_gate.py). ✅ No action.
+
+**Worktrees (VERIFY-BEFORE-REASSERT iter 1275 watch items):**
+- `wt-mirror-dag-preflight-missions-v2-phase2` — **STILL PRESENT** (not reaped by heal-wedged). Terminal marker (REVISION). ℹ️ Monitor.
+- `wt-mirror-mirror-review-pr412-001` — **STILL PRESENT** (not reaped by heal-wedged). Terminal marker (Mirror completed review 07:51Z). ℹ️ Monitor.
+
+**Verify-before-reassert — iter 1275 standing items:** All standing items confirmed unchanged or carry-forward. No reversals.
+
+**G-rule tracking:**
+- `heal-pipeline-stall:unrouted-pr fires false positive for recovery-dispatched reviews not in routing-events.jsonl` — 1/3 (iter 1274). No new occurrence this iter.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z + 01:45/01:48Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [yellow] **PR #412 no-session-revision** — Mirror REVIEW_REVISION returned. Re-dispatch Forge via Beacon with fresh task_id.
+- [yellow] **missions-v2-phase2 DAG-preflight REVISION** — `p2-resurface-and-digest-card` file-enumeration gap. Spec amendment pending Beacon dispatch (requires Larry direction).
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 69th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #412 — REVIEW_REVISION, no auto-resume. **Action on Larry/Beacon:** re-dispatch Forge via Beacon with fresh task_id to apply Mirror's parity-coverage finding.
+- missions-v2-phase2 — blocked on spec amendment + DAG-preflight re-dispatch.
+- wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 — still present; pending heal-wedged reap.
+- install-drift healer: next run 18:00Z UTC → 0 of 2 clean cycles needed.
+
+**Actions taken:** None (no new findings requiring auto-fix).
+**Dispatches:** None (all standing items already escalated).
+**PRIME DIRECTIVE:** 0 new interventions this iter. interventions=746, systemic_fixes=16, ratio=46.625, trend=flat (script-authoritative; iter 1276 nominal).
+**Tier end-of-iter:** 1→2 pending (consecutive_clean=3, de-escalation threshold met; wrapper will update cycle-tier.json on next timer-driven fire).
+
+---
+
 ## Iteration 1275 — 2026-06-10 ~08:16Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — no new findings. All standing watches carry forward unchanged.
