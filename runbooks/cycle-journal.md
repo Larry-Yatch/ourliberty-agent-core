@@ -4,6 +4,114 @@
 
 ---
 
+## Iteration 1345 — 2026-06-10 18:47Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Root cause of spawn-failure chain identified and fix dispatched. Both builds (`ccd-s1-envelope-builder.5.json`, `fix-headless-approval-dedup-spawn-failure-wedge.1.json`) remain in spawn-failure; re-dispatch still blocked pending Beacon auth recovery + Larry approval of `fix-wedged-reaper-spares-active-build-worktree`. PR #429 "spec(missions-v2): Phase 3 — write-back + auto-registration" OPEN (Larry-direct, 18:45:55Z, ~1 min at scan). New alert: `unreviewed-merge:428` (DM delivered by notifier 12:48:57 MDT). 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; spawn-failures standing + new alert + auth_401 fixture)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:16:37.795570+00:00 / heal-wedged-review-sessions:wedged-review-reaped:wt-forge-ccd-s1-envelope-builder` (line 1391, iters 1342–1344)
+- Current total: 1392 lines. **1 new entry** since watermark:
+  - Line 1392: `ts=18:45:14Z source=heal-unreviewed-merge-detector severity=critical subject=unreviewed-merge:428 route=escalate` — PR #428 merged by Larry-Yatch without Mirror review.
+  - alert-translations.json entry: `never_silence: true` → does NOT qualify for Tier-3 silence; surfaces as Tier-4.
+  - DM already delivered by outbox-notifier at 12:48:57 MDT (alert idx=1391 confirmed in bot log). No double-DM needed.
+  - Pulse claims and records: tier-4, already-DM'd, no new Pulse action.
+- **New watermark: `2026-06-10T18:45:14.780181+00:00 / unreviewed-merge:428 / line 1392`**
+- tier-reset: YES (new non-Tier-3 alert)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Larry 12:44:22 MDT: "If you think unsticking S1 now is just going to have it get stuck again, then let's diagnose deeper and fix the issue an..." — Beacon responded at 12:48:54 MDT with APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree`. ✅ Handled.
+- Beacon pending-approvals.json: 1 pending — `fix-wedged-reaper-spares-active-build-worktree` (created 18:48:55Z). **Pending Larry's "go" in Telegram.**
+- Standing auth_401 fixture contamination continuing (TIER_ONE_MARKER, resets 11:30am, TIER 2 distinct outputs). G-rule 3/3 dispatched iter 1281; Forge brief still pending.
+- ⚠️ tier-reset: YES (standing fixture contamination + new APPROVAL_REQUEST).
+
+**Check 3 — Pipeline stall:**
+- `heal-pipeline-stall-state.json`: heartbeat=MISSING, stalls=0. Standing pattern (iters 1329+).
+- Forge inbox: EMPTY. Both spawn-failure builds in archive (no re-dispatch).
+- ROOT CAUSE (confirmed by Beacon 12:48Z): `heal_wedged_review_sessions.py` reaped `wt-forge-ccd-s1-envelope-builder` mid-build using a STALE idle clock — the clock read from the 10:42 terminal marker while the 12:05 build was actively running. Same race stalled tasks 06-03..06-10. Fix: guard the reap on the in-flight registry and/or actual worktree activity.
+- Fix: APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree` DM'd to Larry 12:48:57 MDT. Pending Larry's "go."
+- ⚠️ Non-nominal; tier-reset: YES.
+
+**Check 4 — Pending directives:**
+- Larry 12:44:22 MDT directive: Beacon responded with APPROVAL_REQUEST at 12:48:54 MDT. ✅ Not orphaned.
+- beacon-pending-approvals.json: `"pending": ["fix-wedged-reaper-spares-active-build-worktree"]` (1 item, created 18:48:55Z). Action on Larry: send "go" to Beacon in Telegram to dispatch the root-cause fix to Forge.
+- Forge inbox: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (standing known pattern, iters 1329+). 9/9 services active. No new daemon restarts. ✅ Nominal (standing).
+
+**Check A — Source repo:** Session gitStatus: main, clean. Last commit: `08a924c Pulse cycle 20260610T184536Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:08:22Z` (~38 min at scan), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, cycle.service, chain-event-shipper, dashboard-api). `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** PR #429 OPEN MERGEABLE "spec(missions-v2): Phase 3 — write-back + auto-registration" (Larry-direct, 18:45:55Z, ~1 min old at scan). ReviewDecision="" (no Mirror review yet). Below 30-min Pulse threshold. Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** Forge inbox empty. 0 open Forge PRs. No recently merged Forge PRs in last 4h. ✅ Nominal.
+
+**Check I (Wednesday 2026-06-10):**
+- Firing condition met (Wednesday, EMERGENCY_HALT not present). Ran `pulse_check_i.py`.
+- mode=digest; 2 proposals: [1] [small] medic-operator-scaffold-001 high-σ anomaly; [2] [medium] smoke-5a-pf-no-marker (4th consecutive Check I with this proposal).
+- Journal block for 2026-06-08 already present; no re-append. DM queued and delivered at 12:48:58 MDT (alert idx=1392). Auto-dispatch: 0. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** distill_detector: no-op (no un-distilled audits). audit_cadence_signal: no-op (no post-seed distills yet). ✅
+
+**Credential rotations:** Carry iter 1344: 0 overdue, 0 within 60-day window. (Schedule read error this iter — carrying prior state.) ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1344 watch items:**
+- **CCD S1 build re-dispatch** — Forge inbox still empty. `.5.json` confirmed spawn-failure (in archive). Root cause NOW IDENTIFIED: stale-idle-clock reap by wedged-review healer. Fix pending Larry "go". **CARRY.**
+- **`fix-headless-approval-dedup-spawn-failure-wedge` re-dispatch** — `.1.json` confirmed spawn-failure. Same root cause. **CARRY.**
+- **Dirty working tree** — gitStatus at session start: clean. `captures.json` appears committed or reverted between iters. ✅ Resolved.
+- **install-drift** — 06:00Z UTC June 11. No new alerts. **CARRY.**
+- **`alert-translation-no-mirror-dispatch-001`** — no change. **CARRY.**
+
+**G-rule tracking:**
+- **NEW: `heal_wedged_review_sessions.py` stale-idle-clock reap causes spawn-failure` — DISPATCHED immediately** (Beacon diagnosed root cause; APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree` pending Larry). Not a G-rule accumulation — Beacon already has the fix brief; this closes as soon as Larry approves + Forge builds.
+- `missions-card-gc:summary not in alert-translations.json` — **2/3**. No new occurrence. Carry.
+- `completion-DM pending-queue delivery failure` — 1/3. No new occurrence. Carry.
+- Others: carry as per iter 1344.
+
+**Standing findings:**
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Root cause: stale-idle-clock reap (confirmed). Fix: APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree` pending Larry's "go". **Action on Larry: send "go" to Beacon in Telegram.**
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge` build: `.1.json` spawn-failure. Same root cause. Same fix path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [blue] PR #429 OPEN — "spec(missions-v2): Phase 3 — write-back + auto-registration" (Larry-direct, 18:45:55Z). Auto-merge eligible at ~19:15:55Z UTC.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2` to send to Beacon.
+
+**Watch items for iter 1346:**
+- **APPROVAL_REQUEST `fix-wedged-reaper-spares-active-build-worktree`** — pending Larry's "go" in Telegram. On approval: Beacon dispatches to Forge → build → PR. Watch for Forge PR.
+- **PR #429** — OPEN at 18:45:55Z. Auto-merge eligible at ~19:15:55Z UTC. Watch: if still open with no Mirror review at that threshold, apply always-fix.
+- **CCD S1 build** — no re-dispatch until root-cause fix lands. After Larry "go" → watch for Forge build → PR.
+- **install-drift** — 06:00Z UTC June 11.
+
+**Actions taken:** None (no auto-fix conditions met; new alert already DM'd by notifier; APPROVAL_REQUEST already dispatched by Beacon).
+
+**PRIME DIRECTIVE:** 1 new intervention this iter (Check 0 triage: unreviewed-merge:428, tier-4, DM delivered-by-notifier). 0 new systemic fixes. interventions=757, systemic_fixes=17, ratio≈44.53, trend=flat. iter_non-clean (spawn-failures + new alert + standing non-nominal).
+**Tier end-of-iter:** 1 (consecutive_clean=0; spawn-failures + auth_401 + new alert + APPROVAL_REQUEST pending).
+
+---
+
 ## Iteration 1344 — 2026-06-10 18:42Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Both spawn-failed builds persist with no re-dispatch (~18 min since failure, Forge inbox empty). PR #428 MERGED ✅ (Larry-direct, 18:40:16Z, ~16 min after creation). Dirty working tree: `agents/beacon/captures.json` modified 18:32:39Z uncommitted (Beacon session ended auth-failed). Beacon auth_401 recurrences at 12:33/12:35/12:37 MDT (standing). 0 new alerts. 9/9 services active.
