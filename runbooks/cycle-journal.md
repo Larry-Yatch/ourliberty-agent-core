@@ -4,6 +4,123 @@
 
 ---
 
+## Iteration 1380 — 2026-06-10 23:05Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Pipeline advancing — PR #436 MERGED 23:03:40Z (Mirror PASS → auto-merge ✅). PR #437 OPEN (22:56Z, ~9 min — fresh). Forge inbox: 4 items (2 build-notification tasks + 2 marker-error retries). 9/9 services active. 2 new alerts (L1410-L1411: both Tier 3 / known patterns).
+
+**VERIFY-BEFORE-REASSERT (iter 1379 watch items):**
+- PR #436 (fix-test-gate-sandbox-env-injection-002): **MERGED 23:03:40Z ✅** — reviewDecision="" per GitHub API (Mirror PASS via chain_events, same pattern as PR #435). ✅ CLOSED.
+- PR #437 (fix-routing): created 22:56Z at scan. NEW since iter 1379. Forge consumed fix-dashboard-routing-denied-002.json → PR #437 opened ✅. Mirror review not yet dispatched (outbox-notifier expected to dispatch shortly). Below threshold.
+- fix-systemd-tier2-home-readwrite-001: `build-fix-systemd-tier2-home-readwrite-001.json` appeared in Forge inbox at 22:59Z (build-phase task). No PR yet (~6 min old at scan — well within normal range). ✅ Watch.
+- Forge queue: fix-dashboard-routing-denied-002 consumed → PR #437 ✅. fix-systemd-tier2: build task queued 22:59Z ✅. marker-error retries: marker-error-fix-classifier-session-lost-002-1 consumed → build-fix-classifier-session-lost-002.json ✅. marker-error-fix-test-gate-sandbox-env-injection-002-1 still pending (22:38Z, ~27 min). ✅ Normal queue depth.
+- Beacon inbox: EMPTY at scan. Beacon processed items from iter 1378 dispatch or pipeline cleared. ✅
+- Check B sync: refreshed 22:50:16Z, expires 00:50:16Z. ✅ Nominal.
+- G-rule `test-fixture-batch-in-bot-log` 3/3 dispatched iter 1378: Beacon dispatch standing. No new fixture batch instance this iter (L1410-L1411 are non-fixture sources). ✅ Carry.
+
+**Tier state:** 1 (consecutive_clean=0; active PR #437 + Forge queue)
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1411 lines** (+2 since iter 1379 watermark at 1409). New alerts at lines 1410-1411:
+  - **L1410 (23:00:20Z):** `wedged-review-reaped:wt-forge-fix-test-gate-sandbox-env-injection-002` (source=heal-wedged-review-sessions, route=closure) — "terminal marker present, idle 1306s > grace 300s. Worktree removed: True." Terminal marker = Forge's build session completed cleanly; reaper cleaned up stale worktree. → **Tier 3** (route=closure, terminal marker = normal cleanup). Does NOT advance wedged-review-silent-wt G-rule (that tracks sessions with NO terminal marker). Journal only.
+  - **L1411 (23:02:34Z):** `summary` (source=missions-card-gc, route=digest) — "retired 1 stale session card(s) ['desktop-44d27007']". → **Tier 3** (silence-missions-card-gc-summary-alert-001 standing per iters 1354+; G-rule dispatched). Journal only.
+- Net: 2 new alerts, both Tier 3. No DMs, no dispatches.
+- **Watermark: line 1411 / missions-card-gc:summary / 2026-06-10T23:02:34Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: pending=[] ✅
+- No new Larry messages since 15:52:16 MDT (iter 1372). No orphan directives. ✅ Nominal.
+- Bot log: no new fixture batch this iter (last batch noted 16:52Z MDT in iter 1379). G-rule 3/3 dispatch standing via iter 1378. ✅
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T22:58Z (~7 min old at scan — within 30-min cadence). ✅ Nominal.
+- heal-pipeline-stall-state.json: 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages since iter 1372. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean at session start (gitStatus). Latest commit: bf56610 "Pulse cycle 20260610T230018Z" (iter 1379 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T22:50:16Z (~15 min old at scan), status=no-change. Expires 00:50:16Z. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle ✅, chain-event-shipper ✅, dashboard-api ✅). graph-refresh: not listed (expected oneshot). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 1 open PR.
+  - PR #436 "fix(test-gate): inject sandbox env so #412/#428 engage under discover" — **MERGED 23:03:40Z ✅** (Mirror PASS → auto-merge). CLOSED.
+  - PR #437 "fix(routing): dashboard FRESH_DISPATCH_ROUTES entry + routing-denied alert tripwire" — OPEN/MERGEABLE, 22:56Z (~9 min at scan). Fresh. Mirror review not yet dispatched. Below 30-min threshold. ✅ Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- Forge inbox (4 items):
+  - build-fix-classifier-session-lost-002.json: 23:00Z (~5 min) — PROCEED accounting for merged PR #435. Forge to process.
+  - build-fix-systemd-tier2-home-readwrite-001.json: 22:59Z (~6 min) — build-phase task for EROFS fix. Forge to implement and open PR. Fresh, within normal range.
+  - marker-error-fix-dashboard-routing-denied-002-1.json: 22:56Z (~9 min) — PROCEED re-emit for PR #437. Forge to process.
+  - marker-error-fix-test-gate-sandbox-env-injection-002-1.json: 22:38Z (~27 min) — PROCEED re-emit for merged PR #436. Forge to emit accounting marker.
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: review-fix-test-gate-sandbox-env-injection-002.json still present (PR #436 now merged — Mirror likely completed review via chain_events; inbox file cleanup pending). ✅ Normal post-merge stale artifact.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS. Idempotent skip. ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22. ✅
+**install-drift:** Last fire 18:00:03Z (~5h02m old). Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- **test-fixture-batch-in-bot-log: 3/3 DISPATCHED** (iter 1378). No new occurrence this iter. ✅ Carry pending Beacon processing.
+- **auto-restart-failed:ourliberty-outbox-notifier.service: 1/3** — no recurrence since iter 1378. ✅ Carry.
+- **wedged-review-silent-wt: 2/3** — L1410 has terminal marker (not silent); G-rule counter unchanged. ✅ Carry at 2/3.
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred — Forge queue still active. Carry.
+- All other G-rule statuses: carry from iter 1379 unchanged.
+
+**Actions taken:** None. PR #436 merged autonomously (Mirror PASS → GitHub auto-merge). No always-fix actions required this iter.
+
+**Standing findings (carry with updates):**
+- [yellow] **Wedge-reaper + CCD S1 + headless-dedup** — UNBLOCKED by PR #435 merge (iter 1379). Expect Forge pickup of build-fix-systemd-tier2 task next scan.
+- [yellow] CCD S1 + headless-dedup spawn-failure — unblocked by PR #435 merge, pending Forge build of fix-systemd-tier2-home-readwrite-001.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] EROFS permanent fix: build-fix-systemd-tier2-home-readwrite-001.json in Forge inbox (22:59Z). Expect PR soon.
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry. L1411 another instance.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue still active).
+- [blue] G-rule `auto-restart-failed:*` — 1/3 (outbox-notifier healer race, self-resolved iter 1378). Watch.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry (L1410 terminal-marker — not silent).
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251; Forge brief pending).
+- [blue] test-fixture-batch-in-bot-log G-rule 3/3 dispatched iter 1378. Carry pending Beacon processing.
+
+**Watch items for iter 1381:**
+- PR #437: created 22:56Z — will hit 30-min threshold at 23:26Z. If MERGEABLE at scan and Mirror PASS complete: auto-merge should fire. Watch.
+- build-fix-systemd-tier2-home-readwrite-001: in Forge inbox (22:59Z, ~6 min). Expect PR within 15-20 min. Watch for threshold breach at ~23:59Z.
+- marker-error retries (both): Forge should process PROCEED emissions for PRs #435 (merged) and #437.
+- Mirror inbox: review-fix-test-gate-sandbox-env-injection-002.json — expect archive post PR #436 merge. Watch.
+- Check B sync: expires 00:50:16Z (~107 min away). Trigger sync if not refreshed before then.
+- Beacon inbox: empty — watch for Forge-triggered chain events routing back to Beacon.
+
+**PRIME DIRECTIVE:** 0 new Pulse interventions this iter (PR #436 merged autonomously). interventions=764, systemic_fixes=17, ratio≈44.94, trend=flat. Iter non-clean (active PR #437 + Forge queue).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1379 — 2026-06-10 22:57Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing — PR #435 MERGED 22:53:27Z (Mirror SUCCESS auto-merge ✅). 1 PR still OPEN (#436, Mirror reviewing). 4 Forge inbox tasks queued (oldest ~39 min, below 1h). 1 new alert (Tier-3 informational). 9/9 services active.
@@ -116,6 +233,28 @@
 
 **PRIME DIRECTIVE:** 0 new Pulse interventions this iter (PR #435 merged autonomously). interventions=764, systemic_fixes=17, ratio≈44.94, trend=flat. Iter non-clean (active PR #436 + Forge queue).
 **Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
+## Result-notification — 2026-06-10 ~23:02Z UTC (inter-cycle)
+
+**Source:** Beacon / task `cycle-finding-heal-x-fixture-bot-log-contamination-20260610T224932Z` (Pulse dispatch iter 1378)
+**Status:** SUCCESS
+
+**Beacon's findings:**
+- Root cause confirmed: `unittest discover -s scripts/tests` imports test modules by bare name, skipping `scripts/tests/__init__.py` log-redirect. This is why `heal-x` fixture batches (+ TIER_ONE_MARKER / "resets 11:30am" sentinels) write to the live bot log. No real delivery — `larry-alerts.jsonl` is clean, DMs are mocked.
+- Beacon authored Forge brief `fix-test-log-isolation-heal-x-tier-sentinels-001`: import-time `OURLIBERTY_LOG_DIR` guard in the two leaking test modules. Consolidates this G-rule + the standing log-contamination G-rule (iter 1281 Forge brief MISSING) into one PR.
+- Beacon rejected Pulse's proposed production-side filter as wrong-mechanism. ✅ Correct call.
+
+**Dispatch status (verified):**
+- beacon-pending-approvals.json `pending: []` — no active approval gate registered.
+- Forge brief is NOT yet in Forge inbox. Dispatch requires Beacon to re-emit the approval marker via interactive Telegram session (trust policy didn't auto-fire from `source: pulse`).
+
+**G-rule update:**
+- `test-fixture-batch-in-bot-log` (iter 1378 dispatch): ROOT CAUSE CONFIRMED + BRIEF AUTHORED. Dispatch to Forge pending Beacon re-emit. Standing recurrence expected until fix lands.
+- log-contamination G-rule (iter 1281 Forge brief MISSING): **CONSOLIDATED** into `fix-test-log-isolation-heal-x-tier-sentinels-001`. Remove separate tracking once Forge brief lands in inbox.
+
+**No further Pulse action.** Beacon owns the re-emit path. Journal standing findings updated below (see iter 1380).
 
 ---
 
