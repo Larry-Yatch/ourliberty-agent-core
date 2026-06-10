@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+"""test_no_production_writes_runtime.py — runtime backstop for the
+test->production write-isolation discipline.
+
+Every other isolation gate is STATIC analysis:
+  - test_no_production_path_leaks.py  — flags prod-path string literals.
+  - test_no_production_log_writes.py  — flags prod-module imports from
+    external test dirs.
+Static gates are blind to a leak via a novel mechanism (a new daemon, a
+constant frozen at import before the redirect, a write that bypasses
+resolve_log_dir()). Each prior incident — 2026-05-27 (TIER_ONE_MARKER /
+'401 Unauthorized' into beacon_telegram_bot.log) and 2026-06-02 (real-*/
+prod-* rows) — slipped through exactly that blind spot.
+
+This module adds the RUNTIME half: a session-scoped tripwire (the fixture
+lives in conftest.py; the scan + stamp logic and its self-checks live here)
+that verifies the running suite wrote NOTHING to the real ~/agents tree.
+
+Mechanism — content-sentinel attribution (chosen over a raw size/mtime diff
+because this suite runs on the LIVE droplet, where daemons mutate
+~/agents/{logs,blackboard,state} every few seconds; a size diff would
+false-positive on daemon churn, a sentinel cannot):
+
+  1. At session start mint a unique run sentinel (UUID-based) and expose it
+     via OURLIBERTY_TEST_RUN_SENTINEL.
+  2. Stamp the sentinel into the known production log() write helpers
+     (instrument_log_helpers) so any TEST-originated log line carries it.
+     The per-test OURLIBERTY_LOG_DIR redirect still sends those writes to a
+     tmp dir — the stamp only matters if a write escapes to the real tree.
+  3. At session end scan the REAL ~/agents/{logs,inboxes,blackboard,state}
+     — resolved from the ACTUAL home, deliberately NOT through the sandbox
+     env vars — for the sentinel. Any hit = a write that bypassed the
+     redirect = a genuine leak. Daemon churn never carries the token, so no
+     false positive on the live host. Clean run = zero hits, on the live
+     droplet and in quiescent CI identically.
+
+Grain (accepted): sentinel attribution catches leaks flowing through the
+instrumented write helpers — the actual incident shape (production log()
+helpers writing fixture strings). It deliberately does NOT try to catch
+arbitrary un-instrumented writes; that was the size-diff approach rejected
+for its live-host false positives.
+
+The GateSelfCheck tests below operate ONLY on synthetic temp trees (never
+the real one), so they are host-independent and deterministic: they prove
+the scan flags a synthetic production write and ignores an unchanged tree,
+so a silent regression in the scan logic can't make the backstop permissive.
+
+Run:
+    cd ~/agent-core && python3 -m unittest \\
+        scripts.tests.test_no_production_writes_runtime
+"""
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+import tempfile
+import time
+import unittest
+import uuid
+from pathlib import Path
+
+# Subdirs under the REAL ~/agents tree where a leaked test write would land.
+PRODUCTION_SUBDIRS: tuple[str, ...] = ('logs', 'inboxes', 'blackboard', 'state')
+
+# Chunked read size for scanning possibly-large active logs. Reading in
+# bounded blocks (with a small overlap so a token straddling a boundary is
+# still found) keeps memory flat even for a multi-MB live log.
+_SCAN_CHUNK = 1 << 20  # 1 MiB
+
+# Distinguishes this run's sentinel from any literal in source/fixtures.
+SENTINEL_PREFIX = 'OL-TEST-RUN-SENTINEL-'
+
+
+def mint_sentinel() -> str:
+    """A fresh, collision-proof run sentinel. UUID4 hex means no file written
+    before this run (residue, daemon output, a prior run) can contain it."""
+    return SENTINEL_PREFIX + uuid.uuid4().hex
+
+
+def production_roots() -> list[Path]:
+    """The real production roots, resolved from the ACTUAL home directory and
+    DELIBERATELY NOT through OURLIBERTY_AGENTS_ROOT / OURLIBERTY_LOG_DIR.
+
+    The backstop's whole job is to detect a write that escaped the sandbox
+    env redirects, so it must look at the true ~/agents tree even while those
+    vars point at a tmp sandbox. Resolving via Path.home() (which ignores the
+    sandbox vars) is the load-bearing detail — route this through the env and
+    the tripwire would inspect the sandbox and never see a real leak."""
+    base = Path.home() / 'agents'
+    return [base / sub for sub in PRODUCTION_SUBDIRS]
+
+
+def file_contains_token(path: Path, token: bytes) -> bool:
+    """True if `token` (bytes) appears anywhere in `path`.
+
+    Reads in bounded chunks, carrying the trailing len(token)-1 bytes across
+    the boundary so a token split across two reads is still matched.
+    Unreadable files (permissions, races, FIFOs, directories) are treated as
+    no-match — the scan must never crash the session on an odd file."""
+    if not token:
+        return False
+    overlap = len(token) - 1
+    try:
+        with open(path, 'rb') as fh:
+            carry = b''
+            while True:
+                chunk = fh.read(_SCAN_CHUNK)
+                if not chunk:
+                    return False
+                if token in carry + chunk:
+                    return True
+                carry = (carry + chunk)[-overlap:] if overlap else b''
+    except OSError:
+        return False
+
+
+def scan_roots_for_sentinel(roots, sentinel: str,
+                            since_mtime: float) -> list[dict]:
+    """Return [{'path', 'mtime'}] for every regular file under `roots` modified
+    at/after `since_mtime` AND whose bytes contain `sentinel`.
+
+    The mtime pre-filter is the cheap first pass: files untouched during the
+    session (rotated logs, the bulk of the tree) are skipped without a read.
+    Only files that grew during the window are opened, so a daemon-churned
+    file that does not carry the token costs one read and yields no hit — the
+    reason a live host produces no false positive."""
+    token = sentinel.encode('utf-8')
+    hits: list[dict] = []
+    seen: set[str] = set()
+    for root in roots:
+        root = Path(root)
+        if not root.exists():
+            continue
+        for path in root.rglob('*'):
+            try:
+                if not path.is_file():
+                    continue
+                st = path.stat()
+            except OSError:
+                continue
+            if st.st_mtime < since_mtime:
+                continue
+            key = str(path)
+            if key in seen:
+                continue
+            seen.add(key)
+            if file_contains_token(path, token):
+                hits.append({'path': key, 'mtime': st.st_mtime})
+    return hits
+
+
+def instrument_log_helpers(sentinel: str) -> list:
+    """Monkeypatch the known production log() helpers so every test-originated
+    log line carries `sentinel`. Returns a list of zero-arg undo callables the
+    caller MUST invoke at teardown.
+
+    Scope (the accepted grain): the documented file-write leak vectors,
+    agent_runner.log and beacon_telegram_bot.log. agent_runner is safe to
+    import eagerly; beacon_telegram_bot is patched ONLY if already imported,
+    because importing it requires Telegram env vars and runs import-time side
+    effects — we never force that for a run that doesn't touch the bot."""
+    undo: list = []
+
+    try:
+        import agent_runner
+        _orig_ar = agent_runner.log
+
+        def _wrapped_ar(agent_id, message, level='INFO',
+                        _orig=_orig_ar, _s=sentinel):
+            return _orig(agent_id, f'{message} {_s}', level)
+
+        agent_runner.log = _wrapped_ar
+        undo.append(lambda: setattr(agent_runner, 'log', _orig_ar))
+    except Exception:
+        pass
+
+    bot = sys.modules.get('beacon_telegram_bot')
+    if bot is not None and hasattr(bot, 'log'):
+        _orig_bot = bot.log
+
+        def _wrapped_bot(msg, _orig=_orig_bot, _s=sentinel):
+            return _orig(f'{msg} {_s}')
+
+        bot.log = _wrapped_bot
+        undo.append(lambda: setattr(bot, 'log', _orig_bot))
+
+    return undo
+
+
+# ---------------------------------------------------------------------------
+# Self-checks — synthetic temp trees only, never the real ~/agents. These run
+# under both pytest and `unittest`, host-independent, and prove the scan/stamp
+# primitives can't silently regress into permissiveness.
+# ---------------------------------------------------------------------------
+class ScannerSelfCheckTest(unittest.TestCase):
+    def _mk_tree(self) -> Path:
+        td = tempfile.mkdtemp(prefix='ol-runtime-selfcheck-')
+        self.addCleanup(shutil.rmtree, td, ignore_errors=True)
+        root = Path(td)
+        (root / 'logs').mkdir()
+        return root
+
+    def test_flags_recent_file_with_sentinel(self):
+        """A synthetic production write (file carrying the sentinel, recent
+        mtime) MUST be flagged — proves the backstop would fail on a leak."""
+        sentinel = mint_sentinel()
+        root = self._mk_tree()
+        start = time.time() - 1
+        leak = root / 'logs' / 'beacon_telegram_bot.log'
+        leak.write_text(f'[ts] [beacon] [INFO] fixture line {sentinel}\n')
+        hits = scan_roots_for_sentinel([root], sentinel, start)
+        self.assertEqual([h['path'] for h in hits], [str(leak)])
+
+    def test_ignores_clean_tree(self):
+        """An unchanged tree with NO sentinel (e.g. ordinary daemon churn)
+        MUST yield zero hits — proves the backstop is not trivially red."""
+        sentinel = mint_sentinel()
+        root = self._mk_tree()
+        (root / 'logs' / 'daemon.log').write_text(
+            'heartbeat 1\nheartbeat 2\n401 Unauthorized\n')
+        hits = scan_roots_for_sentinel([root], sentinel, time.time() - 1)
+        self.assertEqual(hits, [])
+
+    def test_ignores_old_file_even_with_sentinel(self):
+        """A file containing the sentinel but with mtime BEFORE session start
+        is skipped by the pre-filter — models a pre-existing file the scan
+        must not misattribute to this session."""
+        sentinel = mint_sentinel()
+        root = self._mk_tree()
+        old = root / 'logs' / 'pre-existing.log'
+        old.write_text(f'wrote {sentinel} long ago\n')
+        old_ts = time.time() - 3600
+        os.utime(old, (old_ts, old_ts))
+        session_start = time.time()
+        hits = scan_roots_for_sentinel([root], sentinel, session_start)
+        self.assertEqual(hits, [])
+
+    def test_survives_unreadable_and_binary_files(self):
+        """Binary / odd files must not crash the scan or false-positive."""
+        sentinel = mint_sentinel()
+        root = self._mk_tree()
+        (root / 'logs' / 'blob.bin').write_bytes(b'\x00\x01\x02\xff' * 256)
+        hits = scan_roots_for_sentinel([root], sentinel, time.time() - 1)
+        self.assertEqual(hits, [])
+
+    def test_finds_token_spanning_chunk_boundary(self):
+        """The chunked reader must catch a token straddling a 1 MiB read
+        boundary — otherwise a leak into a large active log could hide."""
+        sentinel = mint_sentinel()
+        token = sentinel.encode('utf-8')
+        root = self._mk_tree()
+        big = root / 'logs' / 'big.log'
+        head = b'a' * (_SCAN_CHUNK - len(token) // 2)
+        big.write_bytes(head + token + b'b' * 32)
+        hits = scan_roots_for_sentinel([root], sentinel, time.time() - 1)
+        self.assertEqual([h['path'] for h in hits], [str(big)])
+
+    def test_production_roots_ignore_sandbox_env(self):
+        """production_roots() must resolve under the REAL home even when the
+        sandbox env vars point elsewhere — else the scanner inspects the
+        sandbox and is blind to real leaks."""
+        prev = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        bogus = tempfile.mkdtemp(prefix='ol-bogus-agents-root-')
+        self.addCleanup(shutil.rmtree, bogus, ignore_errors=True)
+        os.environ['OURLIBERTY_AGENTS_ROOT'] = bogus
+        try:
+            roots = production_roots()
+        finally:
+            if prev is None:
+                os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+            else:
+                os.environ['OURLIBERTY_AGENTS_ROOT'] = prev
+        home_agents = Path.home() / 'agents'
+        for r in roots:
+            self.assertEqual(r.parent, home_agents,
+                             f'{r} is not under the real {home_agents}')
+            self.assertFalse(str(r).startswith(bogus),
+                             f'{r} leaked through the sandbox env var')
+        self.assertEqual({r.name for r in roots}, set(PRODUCTION_SUBDIRS))
+
+
+class StampSelfCheckTest(unittest.TestCase):
+    """Prove the instrumentation half: a stamped production log() call writes
+    the sentinel, and undo cleanly restores the original helper."""
+
+    def test_instrument_stamps_agent_runner_log_and_undoes(self):
+        import agent_runner
+        sentinel = mint_sentinel()
+        tmp = tempfile.mkdtemp(prefix='ol-runtime-stamp-')
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        log_dir = Path(tmp) / 'logs'
+        log_dir.mkdir()
+
+        before = agent_runner.log
+        prev_env = os.environ.get('OURLIBERTY_LOG_DIR')
+        os.environ['OURLIBERTY_LOG_DIR'] = str(log_dir)
+        undo = instrument_log_helpers(sentinel)
+        try:
+            agent_runner.log('selfcheck-agent', 'hello world')
+        finally:
+            for fn in undo:
+                fn()
+            if prev_env is None:
+                os.environ.pop('OURLIBERTY_LOG_DIR', None)
+            else:
+                os.environ['OURLIBERTY_LOG_DIR'] = prev_env
+
+        written = (log_dir / 'selfcheck-agent.log').read_text()
+        self.assertIn(sentinel, written)
+        self.assertIn('hello world', written)
+        # The stamped line, had it leaked, would carry the token the scan
+        # looks for — end-to-end proof the two halves compose.
+        hits = scan_roots_for_sentinel([Path(tmp)], sentinel, time.time() - 5)
+        self.assertEqual([h['path'] for h in hits],
+                         [str(log_dir / 'selfcheck-agent.log')])
+        # undo restored the original callable.
+        self.assertIs(agent_runner.log, before)
+
+
+if __name__ == '__main__':
+    unittest.main()

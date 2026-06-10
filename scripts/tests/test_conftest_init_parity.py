@@ -42,6 +42,10 @@ HOW IT WORKS
 4. Assert each mirror is actually live in *this* process (the unittest path):
    the env var is set after ``import scripts.tests``, and the chain-event guard
    makes chain_event_emit._get_client() return None.
+5. Cover Gap A separately (MIRRORED_IMPORT_TIME_REDIRECTS): the OURLIBERTY_*_ROOT
+   sandbox is an import-time, module-level redirect — NOT an autouse fixture — so
+   AST-assert that conftest.py AND __init__.py each actually set those vars at
+   import, and that OURLIBERTY_AGENTS_ROOT is live and non-~/agents in process.
 
 Run:
     cd /home/larry/agent-core && python3 -m unittest scripts.tests.test_conftest_init_parity
@@ -77,6 +81,40 @@ MIRRORED_AUTOUSE_FIXTURES: dict[str, dict[str, str]] = {
         "env_var": "OURLIBERTY_DISABLE_LIVE_EMIT",
         "purpose": "block live Supabase chain_events writes during tests",
     },
+    "_production_write_runtime_tripwire": {
+        "env_var": "OURLIBERTY_TEST_RUN_SENTINEL",
+        "purpose": (
+            "runtime backstop: stamp a run sentinel into production log() "
+            "writes so a write that escapes the sandbox to the real ~/agents "
+            "tree is caught. The __init__ mirror sets the env var; the active "
+            "session-end scan is the pytest fixture's teardown (the unittest "
+            "bootstrap has no session-finish hook)."
+        ),
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Registry — import-time (module-level) redirects. These are NOT autouse
+# fixtures, so MIRRORED_AUTOUSE_FIXTURES above does not — and must not — cover
+# them (adding them there would wrongly trip test_no_unregistered_autouse_
+# fixtures). The Gap A OURLIBERTY_*_ROOT sandbox is established at MODULE IMPORT
+# in conftest.py AND __init__.py because production modules bind
+#   AGENTS_ROOT = os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents')
+# AT IMPORT; a function-scoped fixture runs after collection has already frozen
+# that constant to the live tree (the filesystem analog of the 2026-06-02
+# chain_events leak). Each var below must be SET at import time by BOTH
+# bootstraps, or the unittest gate can silently leak inbox/blackboard/state
+# writes to the real ~/agents tree.
+# ---------------------------------------------------------------------------
+MIRRORED_IMPORT_TIME_REDIRECTS: dict[str, str] = {
+    "OURLIBERTY_AGENTS_ROOT": (
+        "sandbox the AGENTS_ROOT family so import-time-frozen path constants "
+        "cannot write inbox/blackboard/state to the real ~/agents tree"
+    ),
+    "OURLIBERTY_WORKTREES_ROOT": (
+        "sandbox the worktrees root alongside AGENTS_ROOT"
+    ),
 }
 
 
@@ -113,6 +151,70 @@ def _autouse_fixtures_in_conftest() -> set[str]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if any(_is_autouse_fixture_decorator(d) for d in node.decorator_list):
                 found.add(node.name)
+    return found
+
+
+def _environ_subscript_key(target: ast.expr) -> str | None:
+    """If ``target`` is ``os.environ['<literal>']`` return the literal key."""
+    if not isinstance(target, ast.Subscript):
+        return None
+    val = target.value
+    if not (isinstance(val, ast.Attribute) and val.attr == "environ"
+            and isinstance(val.value, ast.Name) and val.value.id == "os"):
+        return None
+    key = target.slice
+    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+        return key.value
+    return None
+
+
+def _environ_setdefault_key(call: ast.Call) -> str | None:
+    """If ``call`` is ``os.environ.setdefault('<literal>', ...)`` return key."""
+    func = call.func
+    if not (isinstance(func, ast.Attribute) and func.attr == "setdefault"):
+        return None
+    obj = func.value
+    if not (isinstance(obj, ast.Attribute) and obj.attr == "environ"
+            and isinstance(obj.value, ast.Name) and obj.value.id == "os"):
+        return None
+    if call.args and isinstance(call.args[0], ast.Constant) \
+            and isinstance(call.args[0].value, str):
+        return call.args[0].value
+    return None
+
+
+def _module_level_env_setters(path: Path) -> set[str]:
+    """Env-var names the file SETS on ``os.environ`` at IMPORT time — via
+    ``os.environ['X'] = ...`` or ``os.environ.setdefault('X', ...)`` — counting
+    only statements that run at module import (excluding anything inside a
+    function/fixture body, which does not run at import).
+
+    Crucially this is an AST check, not a substring scan: a comment that merely
+    *mentions* the var does NOT count, so deleting the real redirect while
+    leaving the explanatory comment still trips the parity assertions."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+
+    func_spans: list[tuple[int, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            func_spans.append(
+                (node.lineno, getattr(node, "end_lineno", node.lineno))
+            )
+
+    def _runs_at_import(lineno: int) -> bool:
+        return not any(lo <= lineno <= hi for lo, hi in func_spans)
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for tgt in node.targets:
+                name = _environ_subscript_key(tgt)
+                if name is not None and _runs_at_import(node.lineno):
+                    found.add(name)
+        elif isinstance(node, ast.Call):
+            name = _environ_setdefault_key(node)
+            if name is not None and _runs_at_import(node.lineno):
+                found.add(name)
     return found
 
 
@@ -184,6 +286,58 @@ class ConftestInitParityTest(unittest.TestCase):
             os.environ.get("OURLIBERTY_DISABLE_LIVE_EMIT"), "1",
             "OURLIBERTY_DISABLE_LIVE_EMIT != '1'; live chain_events writes are "
             "not blocked.",
+        )
+
+    def test_import_time_redirects_set_in_both_bootstraps(self):
+        """Gap A's OURLIBERTY_*_ROOT redirect is the spec's PRIMARY mechanism,
+        but it is import-time/module-level, not an autouse fixture — so the
+        MIRRORED_AUTOUSE_FIXTURES checks above never touch it. Assert (via AST,
+        not substring) that BOTH conftest.py and __init__.py actually SET each
+        registered var at import time. Removing the redirect from either file
+        fails here even if the explanatory comment is left behind."""
+        conftest_setters = _module_level_env_setters(_CONFTEST)
+        init_setters = _module_level_env_setters(_INIT)
+        for env_var in MIRRORED_IMPORT_TIME_REDIRECTS:
+            with self.subTest(env_var=env_var, file="conftest.py"):
+                self.assertIn(
+                    env_var, conftest_setters,
+                    f"conftest.py no longer sets {env_var!r} at import time "
+                    "(module-level os.environ assignment/setdefault). The Gap A "
+                    "redirect is gone for the pytest path; an import-time-frozen "
+                    "AGENTS_ROOT constant can leak inbox/blackboard/state writes "
+                    "to the real ~/agents tree.",
+                )
+            with self.subTest(env_var=env_var, file="__init__.py"):
+                self.assertIn(
+                    env_var, init_setters,
+                    f"scripts/tests/__init__.py no longer sets {env_var!r} at "
+                    "import time. The Gap A redirect is gone for the unittest "
+                    "gate (python3 -m unittest) — the exact path the regression "
+                    "gate uses — so a frozen AGENTS_ROOT can leak writes to the "
+                    "real ~/agents tree with nothing failing.",
+                )
+
+    def test_agents_root_redirect_is_live_and_sandboxed(self):
+        """Runtime counterpart for Gap A (mirrors test_mirror_env_vars_are_live_
+        in_process for OURLIBERTY_LOG_DIR): after ``import scripts.tests`` the
+        unittest bootstrap must have left OURLIBERTY_AGENTS_ROOT pointing at a
+        sandbox path, NOT the real ~/agents tree. Fails if the __init__.py
+        redirect is removed (var unset) or resolves back into the live root."""
+        import scripts.tests  # noqa: F401  (idempotent; runs __init__.py once)
+        agents_root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
+        self.assertTrue(
+            agents_root,
+            "OURLIBERTY_AGENTS_ROOT is unset after importing scripts.tests; the "
+            "Gap A import-time sandbox is not live, so import-time AGENTS_ROOT "
+            "captures resolve to the production default /home/larry/agents.",
+        )
+        real_agents = str(Path.home() / "agents")
+        resolved = str(Path(agents_root).resolve())
+        self.assertFalse(
+            resolved == real_agents or resolved.startswith(real_agents + os.sep),
+            f"OURLIBERTY_AGENTS_ROOT resolves into the REAL agents tree "
+            f"({resolved!r} under {real_agents!r}); test writes would hit "
+            "production instead of the sandbox.",
         )
 
     def test_chain_event_client_is_blocked(self):

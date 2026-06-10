@@ -24,8 +24,44 @@ Keep them in sync.
 from __future__ import annotations
 
 import os
+import sys
+import tempfile
+import time
 
 import pytest
+
+# --- Import-time sandbox for the OURLIBERTY_*_ROOT family (Gap A) ----------
+# Many production modules bind their root AT IMPORT, e.g.
+#   AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
+# (chain_event_shipper, build_sequence_advancer, larry_alerts_retention,
+# heal_* ...). The per-test fixtures below are function-scoped and so run
+# AFTER collection imports those modules — too late to redirect a constant
+# already frozen to the live ~/agents. A test that imports such a module at
+# collection time and later triggers an inbox/blackboard/state write would
+# hit the REAL tree (the filesystem analog of the 2026-06-02 chain_events
+# leak). Establish the sandbox HERE, before any test module is collected.
+#
+# setdefault (not assignment): an outer harness that already pinned these
+# wins, and a test that intentionally exercises production-default resolution
+# can still delenv. The per-test OURLIBERTY_LOG_DIR override below still wins
+# per test; this default only catches import-time path captures.
+_SANDBOX_AGENTS_ROOT = tempfile.mkdtemp(prefix='ol-test-agents-root-')
+os.makedirs(os.path.join(_SANDBOX_AGENTS_ROOT, 'logs'), exist_ok=True)
+os.environ.setdefault('OURLIBERTY_AGENTS_ROOT', _SANDBOX_AGENTS_ROOT)
+os.environ.setdefault(
+    'OURLIBERTY_WORKTREES_ROOT',
+    os.path.join(_SANDBOX_AGENTS_ROOT, 'worktrees'),
+)
+os.environ.setdefault(
+    'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_AGENTS_ROOT, 'logs'),
+)
+
+# The runtime tripwire's scan/stamp logic + self-checks live in the sibling
+# test module; the session fixture below imports them. Ensure this directory
+# is importable by plain module name regardless of pytest's import mode.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
 
 
 @pytest.fixture(autouse=True)
@@ -57,3 +93,58 @@ def _block_live_chain_event_emit(monkeypatch):
         monkeypatch.setattr(cee, '_get_client', lambda: None)
     except Exception:
         pass
+
+
+@pytest.fixture(scope='session', autouse=True)
+def _production_write_runtime_tripwire():
+    """Runtime backstop (Gap B): assert the whole session wrote NOTHING to the
+    real ~/agents tree.
+
+    Every other isolation gate is static analysis and is blind to a leak via a
+    novel mechanism (a frozen constant, a new daemon, a write bypassing
+    resolve_log_dir()). This is the additive belt-and-suspenders runtime check.
+
+    Content-sentinel attribution, not a size/mtime diff: this suite runs on the
+    LIVE droplet where daemons mutate ~/agents/{logs,blackboard,state} every few
+    seconds, so a size diff would false-positive on churn. We mint a unique run
+    sentinel, stamp it through the production log() helpers so test-originated
+    writes carry it, and at session end scan the REAL tree (resolved from the
+    actual home, NOT through the sandbox env vars) for the token. Any hit = a
+    write that escaped the redirect = a genuine leak; daemon churn never carries
+    the token, so a clean run is green on the live host and in CI alike.
+
+    The unittest mirror (scripts/tests/__init__.py) sets OURLIBERTY_TEST_RUN_
+    SENTINEL too, but the active session-end scan has no unittest equivalent
+    (the package bootstrap has no session-finish hook); it is this fixture's
+    teardown. See test_conftest_init_parity.py.
+    """
+    import test_no_production_writes_runtime as runtime
+
+    sentinel = runtime.mint_sentinel()
+    os.environ['OURLIBERTY_TEST_RUN_SENTINEL'] = sentinel
+    session_start = time.time()
+    undo = runtime.instrument_log_helpers(sentinel)
+    try:
+        yield
+    finally:
+        for fn in undo:
+            try:
+                fn()
+            except Exception:
+                pass
+        hits = runtime.scan_roots_for_sentinel(
+            runtime.production_roots(), sentinel, session_start,
+        )
+        os.environ.pop('OURLIBERTY_TEST_RUN_SENTINEL', None)
+        if hits:
+            listing = '\n'.join(f"  - {h['path']}" for h in hits)
+            raise AssertionError(
+                'PRODUCTION-WRITE TRIPWIRE: the test session left its run '
+                f'sentinel in {len(hits)} file(s) under the real ~/agents '
+                'tree — a write escaped the sandbox redirect:\n' + listing +
+                '\nThis is the leak class the isolation hardening exists to '
+                'catch. Find the test that wrote through an un-redirected '
+                'production helper and route it through tmp_path / the '
+                'OURLIBERTY_*_ROOT sandbox.'
+            )
+
