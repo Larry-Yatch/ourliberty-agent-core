@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration 1351 — 2026-06-10 19:35Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing: spawn-failures (CCD S1 + headless-dedup) still blocked. **CLOSED: Forge task `fix-wedged-reaper-spares-active-build-worktree` no longer paused_on_tier1 — RESUMED via auto-retry as `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z`, now ACTIVE in Forge (preflight, pid=1191674, started 19:30:56Z).** PR #432 MERGED ✅ (Larry-direct, ~19:25Z). NEW: APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` pending Larry (DM'd by Beacon at 13:30:20 MDT). 1 new alert (unreviewed-merge:432, expected, DM delivered 13:25:32 MDT). 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; active Forge preflight + pending approval)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T19:10:27Z / unreviewed-merge:431 / line 1397` (iter 1350)
+- Current total: **1398 lines** — 1 new entry:
+  - Line 1398: `ts=2026-06-10T19:25:16Z source=heal-unreviewed-merge-detector severity=critical subject=unreviewed-merge:432` — PR #432 merged without Mirror review (actor=Larry-Yatch). **DM already delivered by outbox-notifier at 13:25:32 MDT (alert idx=1397).** Predicted in iter 1350 watch items. Pulse claims; no new DM action.
+- **New watermark: `2026-06-10T19:25:16Z / unreviewed-merge:432 / line 1398`**
+- tier-reset: YES (new Tier-4 alert, even though DM already delivered)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Last bot log entry: `13:30:20 MDT approval DMed for fix-tier1-classifier-envelope-not-content-scan`. No new messages from Larry since 13:30:20 MDT.
+- **beacon-pending-approvals.json: 1 PENDING** — `fix-tier1-classifier-envelope-not-content-scan` (created 2026-06-10T19:30:19Z). Beacon DM'd Larry at 13:30:19 MDT with the APPROVAL_REQUEST block. Larry has NOT yet responded.
+- This is the root-cause fix for the fixture contamination: `agent_runner.classify_tier1_failure` does a content scan of the agent's full output for 'hit your limit'/'401' phrases; when the test suite runs `test_beacon_tier2_fallback.py`, the mock strings match and the real task is misclassified as a real Tier1 failure → falsely paused. Fix: gate the decision on the API error envelope/exit signature, not a content scan.
+- **Action on Larry**: say "go: fix-tier1-classifier-envelope-not-content-scan" to Beacon in Telegram to approve the dispatch to Forge.
+- ⚠️ tier-reset: YES (pending approval unresolved)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall-state.json`: heartbeat=NONE (standing), stalls=0 entries. Nominal.
+- Forge inbox: 1 task ACTIVE — `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z.json` (source=auto-retry, phase=preflight, _resumed_from=fix-wedged-reaper-spares-active-build-worktree, started 19:30:56Z, pid=1191674).
+- **CLOSED: prior `paused_on_tier1` state superseded.** Old in-flight file gone; new resume task running.
+- CCD S1 (`ccd-s1-envelope-builder.5.json`) in archive (spawn-failure). `fix-headless-approval-dedup-spawn-failure-wedge.1.json` in archive (spawn-failure). Still blocked until wedge fix lands.
+- ⚠️ Non-nominal; tier-reset: YES (active Forge task in flight)
+
+**Check 4 — Pending directives:**
+- `fix-tier1-classifier-envelope-not-content-scan` APPROVAL_REQUEST: waiting for Larry's "go" (see Check 2). No other orphaned directives. ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (standing). 9/9 services active. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~45 min at scan), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅ PR #432 merged (Larry-direct, unreviewed-merge:432 DM delivered).
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** 1 task ACTIVE in preflight: `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z`. Expect preflight PROCEED marker and build dispatch within ~20–30 min. No new Forge PRs yet.
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** No new alerts. Carry. ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window. ✅
+
+**G-rule tracking:**
+- `unreviewed-merge:432` — actor=Larry-Yatch, expected per standing pattern. 54th+ consecutive Larry-direct merge without Mirror review (ongoing streak PRs #343–#432, with known breaks). Actor-exemption-config G-rule 3/3 still pending `go: actor-exemption-config`.
+- All others: carry from iter 1350.
+
+**State changes this iter:**
+- ✅ CLOSED: "Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1" — superseded by ACTIVE resume (auto-retry).
+- ✅ CLOSED: iter 1350 watch item "PR #432 30-min threshold" — Larry merged directly before threshold.
+- ⚠️ OPEN: APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` pending Larry.
+- ⚠️ ACTIVE: Forge preflight for wedge-reaper resume task.
+
+**Standing findings:**
+- [yellow] Forge task ACTIVE: `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z` (preflight, pid=1191674, started 19:30:56Z). Watch for PROCEED marker and build dispatch.
+- [yellow] APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` — Beacon DM'd Larry 13:30:20 MDT. **Action on Larry: say "go: fix-tier1-classifier-envelope-not-content-scan" in Telegram.**
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Blocked on wedge fix landing + fixture classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING; FUNCTIONAL IMPACT: partially addressed by `fix-tier1-classifier-envelope-not-content-scan` classifier fix (pending approval), but sanitization brief still missing.
+- [blue] PR #432 MERGED ✅ — unreviewed-merge:432 DM delivered. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+
+**Watch items for iter 1352:**
+- **Forge preflight `fix-wedged-reaper-spares-active-build-worktree-resume`** — expect PROCEED/REJECT marker from Forge. If PROCEED: build dispatch follows; watch for PR. 2h build deadline from 19:30:56Z → deadline ~21:30:56Z.
+- **APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan`** — watch for Larry "go" response in Telegram. If approved, Forge gets the classifier fix task.
+- **CCD S1 + headless-dedup** — blocked until wedge fix PR merges.
+- **install-drift** — 06:00Z June 11.
+- **unreviewed-merge:432** — DM delivered (standing). No new action.
+
+**Actions taken:** None (no auto-fix thresholds crossed; unreviewed-merge:432 DM already delivered by outbox-notifier before Pulse ran).
+
+**PRIME DIRECTIVE:** +1 intervention (Check 0 claim unreviewed-merge:432). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. iter_non-clean (standing: active Forge task + pending approval + spawn-failures).
+**Tier end-of-iter:** 1 (consecutive_clean=0; active tasks + pending approval).
+
+---
+
 ## Iteration 1350 — 2026-06-10 19:25Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing: Forge task `fix-wedged-reaper-spares-active-build-worktree` still paused_on_tier1 (fixture-caused, Larry+Beacon diagnosing — no dispatch yet from the 13:11–13:17 MDT exchange). NEW: PR #432 "feat(mirror): Lens I — advisory reuse/reinvention check against the shelf" opened at 19:21:20Z by Larry-Yatch; CLEAN/MERGEABLE, 0 reviews, age ~4 min (below 30-min threshold). 0 new alerts. 9/9 services active.
