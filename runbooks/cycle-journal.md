@@ -74248,3 +74248,56 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 **Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
 
 ---
+
+## Iteration 1244 — 2026-06-10 03:30Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 0 new alerts since iter 1243 watermark (1402 lines unchanged); standing items verified against current state.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1402 lines** (UNCHANGED from iter 1243 watermark at sync-blocked:auto-commit-push-failed 02:03:27Z). No new alerts since claimed watermark. alert-triage.json last_claimed_ts=None (G-rule 1/3 still active — durable persistence gap). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry idx=1401 route=digest (sync-blocked:auto-commit-push-failed, 02:08:29Z June 10 — UNCHANGED from iter 1243). No new Larry directives. No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heartbeat = 2026-06-10T03:25:49Z (fresh — healer fired seconds before check). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon=0, forge=0, mirror=0, pulse=0 inbox files. All empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. Last healer fire: 00:07Z June 10 (auto-restarted ourliberty-chain-event-shipper + ourliberty-beacon-bot + ourliberty-outbox-notifier on PR #404 code update). All 3 services confirmed active per Check C. One-shot healer completed normally. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree. git status requires Bash approval; using sync.json proxy (status=no-change, last_sync=2026-06-10T03:03:39Z) + git log HEAD=8299e92 ("Pulse cycle 20260610T031931Z"). Automated wrapper cycles committing and pushing normally. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T03:03:39Z (~27 min ago, well within 2h threshold). ✅ Nominal. Root code fix (sync-push-rebase-fallback-001) still outstanding [blue].
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8 core ourliberty-*.service units active (beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-agent-core-health.service: **failed** (known [yellow] standing). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§ 4.6):** Not re-run (no change since iter 1243 — SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, outside 60d window). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service = **failed** (confirmed Check C). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry forward [yellow].
+- `unreviewed-merge streak 1` (PR #404): alert count 1402 UNCHANGED. No new unreviewed-merge alerts since 23:55:10Z June 9. Streak at 1 (not growing). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: No new auth_401 in beacon log. Standing [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change/03:03:39Z. Service inactive exit=0 (clean). [blue] outstanding.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: CONFIRMED — alert-triage.json still has 0 claimed rows. No new occurrence threshold crossed. Carry forward.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: streak 1** (PR #404, 23:55:10Z) — DM delivered 23:57Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; sync self-recovered (no-change/03:03:39Z). Next occurrence on next commit-and-push day.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 0 new alerts; standing items verified). interventions=733 (script-authoritative), systemic_fixes=15, verification_pending=5, ratio≈48.87 (unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
+
+---
