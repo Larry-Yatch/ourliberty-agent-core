@@ -4,6 +4,116 @@
 
 ---
 
+## Iteration 1371 — 2026-06-10 21:52Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline actively churning. Forge completed `fix-classifier-session-lost-001` build (21:50:24Z, $2.09) + resume pass (21:51:20Z, $0.20). Two active Forge builds in progress. 0 open PRs (classifier PR pending follow-on build task). Beacon cleared `fix-tier1-classifier-envelope-not-content-scan` pending approval (~21:51Z) as superseded. 9/9 services active.
+**VERIFY-BEFORE-REASSERT (pipeline-stall):** heal-pipeline-stall ran at 21:36:44Z (16 min ago) — "no stalls detected". Heartbeat file PRESENT at `2026-06-10T21:36:41.726029+00:00` — restored after 2 absent iters (1369, 1370). ✅
+**VERIFY-BEFORE-REASSERT (pending approval):** beacon-pending-approvals.json confirmed: `pending: []` — ZERO pending approvals ✅. Note: `fix-tier1-classifier-envelope-not-content-scan` WAS still pending when iter 1370 ran (verified from file contents at that time); it was cleared by Beacon's `notify-fix-classifier-session-lost-001` task completing at 21:51:54Z. Iter 1370's claim that it was "already GONE" was premature — the approval was cleared mid-session, not before iter 1370.
+**Tier state:** 1 (consecutive_clean=0; active Forge builds)
+
+**Check 0 — Alert triage:**
+- alert-triage.json: watermark MISSING (known standing issue — G-rule dispatched iter 1251, Forge brief still pending). Per spec watermark-missing recovery: claimed trailing 100 lines as catchup.
+- larry-alerts.jsonl: **1403 lines** (+1 since iter 1370). New entry: line 1403 `2026-06-10T21:52:05.457061+00:00 pulse check-i-2026-06-08` — Check I DM queued by this iter's §5.1 invocation (idempotent, DM queued). Known-pattern Tier 3; no escalation.
+- **New watermark: line 1403**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- beacon-bot last activity: 14:01:07 MDT (20:01:07Z) = idx=1401. No new Larry messages since iter 1370.
+- beacon-pending-approvals.json: VERIFIED `pending: []`. ✅ (`fix-tier1-classifier-envelope-not-content-scan` cleared ~21:51Z by Beacon notify task.)
+- TIER2_FALLBACK_FAILED (12:35, 12:39 MDT): fixture leak per memory. Not escalated.
+- `alert idx=0 delivery to 12345 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- heal-pipeline-stall: ran 21:36:44Z (16 min ago) — "no stalls detected". Heartbeat PRESENT. ✅
+- PIPELINE MOVEMENT THIS ITER (vs iter 1370):
+  - `fix-classifier-session-lost-001` COMPLETED: first pass 21:50:24Z ($2.09, 535s); resume pass 21:51:20Z ($0.20, 50s). WIP checkpoint pushed to `forge/fix-classifier-session-lost-001` branch. Beacon `notify-fix-classifier-session-lost-001` completed 21:51:54Z ($0.30). No PR opened yet — follow-on task `build-fix-classifier-session-lost-001.json` queued in Forge inbox.
+  - `fix-test-gate-sandbox-env-injection-001`: Forge started 21:51:27Z. Active build (~1 min elapsed at cycle start, timeout=14400s). Task: "inject sandbox env into the discover subprocess + meta-test proving containment engages under the production invocation."
+  - `tier-alert-closeout-pr2-followup-20260610`: Beacon completed 21:50:44Z ($0.28, 60s).
+  - `tier-alert-closeout-pr4-dashboard-routing-20260610`: Beacon started 21:53:04Z (dashboard routing denial from iter 1370 sub-threshold watch → system auto-dispatched a Beacon closeout task).
+- Inbox: forge has `build-fix-classifier-session-lost-001.json` + `fix-test-gate-sandbox-env-injection-001.json`; beacon/mirror/pulse EMPTY.
+- Standing: wedge-reaper still unbuilt. CCD S1 + headless-dedup blocked on wedge + classifier PR landing.
+- ⚠️ tier-reset: YES (active Forge builds)
+
+**Check 4 — Pending directives:**
+- Last Larry message: 13:27:01 MDT (19:27:01Z). No new messages. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code ran at 21:43:04Z (9 min ago). fresh=75, unparseable=47. State file MISSING (no stale daemons). ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T21:50:16Z` (~2 min old at 21:52Z), status=no-change. Within 2h threshold (expires 23:50:16Z). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅ (classifier PR not yet opened — pending `build-fix-classifier-session-lost-001`)
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- `fix-classifier-session-lost-001`: built, WIP pushed. PR open via `build-fix-classifier-session-lost-001` (queued).
+- `fix-test-gate-sandbox-env-injection-001`: active (started 21:51:27Z).
+- `tier-alert-closeout-pr2-followup-20260610`: complete (21:50:44Z).
+- silence-missions-card-gc-summary-alert-001: standing drop. Carry.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS (already fired iter 1345). Invoked §5.1 (mandatory); script queued DM (check-i-2026-06-08 block already in journal; no new journal block written). Idempotent. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:**
+- audit_due_nudge.py: `[audit-due] no committed audit baseline; no-op.` ✅
+- distill_detector.py: `[distill-detector] no un-distilled audits; no-op.` ✅
+- audit_cadence_signal.py: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅
+
+**Credential rotations:** config/token-rotation-schedule.json missing from disk. Carrying from iter 1370: 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days, outside 60d window). ✅
+
+**install-drift:** heartbeat: `2026-06-10T18:00:03.509140+00:00` (~3h52m old). File PRESENT (restored from MISSING state in iter 1370). Next fire ~06:00Z June 11 (~8h). ✅
+
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1370.
+- **Resolved watch (dashboard routing denial):** Dispatched via `tier-alert-closeout-pr4-dashboard-routing-20260610` (Beacon started 21:53:04Z). Removing from active watch.
+- **Resolved watch (heal-pipeline-stall heartbeat):** PRESENT again after iters 1369/1370 absences. File back at expected path. Not a structural change.
+
+**Actions taken:** None. Pipeline churning autonomously through Beacon→Forge dispatch chain; no auto-fix thresholds crossed.
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build** — blocked pending PR-1 (`fix-classifier-session-lost-001`) merge + inbox-watcher restart approval. PR-1 nearly ready: `build-fix-classifier-session-lost-001` queued. **Action on Larry: watch for PR-1 open + Mirror review; then approve inbox-watcher restart.**
+- [yellow] CCD S1 build spawn-failure. Blocked on wedge + classifier PR.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — re-dispatch when wedge-reaper path cleared.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] alert-triage.json watermark MISSING (known standing; G-rule dispatched iter 1251; Forge brief pending).
+
+**Watch items for iter 1372:**
+- **`build-fix-classifier-session-lost-001`**: Watch for PR open → Mirror review → merge.
+- **`fix-test-gate-sandbox-env-injection-001`**: Active build. Watch for completion + PR.
+- **`tier-alert-closeout-pr4-dashboard-routing-20260610`**: Beacon active. Watch for dispatch or closure result.
+- **Check B sync:** expires 23:50:16Z — trigger sync if next iter is after that.
+- **Iter 1370 accuracy note:** iter 1370 VERIFY-BEFORE-REASSERT on pending approval was premature (the approval was still pending when iter 1370 ran at 21:43Z; it was cleared at 21:51Z). Not a systemic failure — the clear was fast and the end-state claim was correct — but future iters should time-stamp verify assertions more precisely.
+
+**PRIME DIRECTIVE:** 0 new Pulse-initiated interventions this iter (pipeline moving autonomously). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. Iter non-clean (active Forge builds).
+**Tier end-of-iter:** 1 (consecutive_clean=0; active builds).
+
+---
+
 ## Iteration 1370 — 2026-06-10 21:43Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing carries + pipeline moving. Forge actively building PR-1 (fix-classifier-session-lost-001) as of 21:41:29Z. 0 new alerts. 0 open PRs. 9/9 services active.
