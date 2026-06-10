@@ -1,0 +1,37 @@
+[Unit]
+Description=Ourliberty Missions v2 parked-&-aging digest — daily generator (dashboard catch-me-up card)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT gate + logging.
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_parked_aging_digest.sh scheduled
+
+# Stdlib-only producer; a generous margin still bounds a stuck run.
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-parked-aging-digest
+
+# Hardening (matches ourliberty-ceo-digest-daily.service). The generator reads
+# captures.json in the repo and writes the digest artifact under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10
