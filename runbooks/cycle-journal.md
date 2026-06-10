@@ -4,6 +4,105 @@
 
 ---
 
+## Iteration 1281 — 2026-06-10 ~09:00Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ G-rule finding — `inbox_watcher.log` test log contamination (G-rule 3/3; dispatched to Beacon). All mandatory checks nominal. Forge building p2-digest-generator (step 2, ~15 min in). PR #418 (p2-derive-endpoint) OPEN, marker-error retry 1/3 in Forge inbox. All standing [yellow] watches carry forward.
+**Tier state:** 1 (cycle-tier.json: consecutive_clean=0, last_signal_at=2026-06-09T18:16:30Z; G-rule dispatch = tier-reset, stays Tier 1)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1450 lines** (iter 1280 watermark: 08:40:12Z / unreviewed-merge:417 / line 1450). 0 new lines since watermark.
+Triage: 0 alerts. ✅ Nominal. New watermark: unchanged (no new alerts).
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". NOTE: inbox_watcher.log carries test fixture entries (`real-paid-001`, `../../../../etc/pwned`) — root-caused below as G-rule finding; not a log-level alert signal. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: "Go" at 02:32:03 MDT (08:32:03Z) approving dag-preflight-revision-autonomy-001 — tracked in Forge inbox. No new directives since iter 1280. Alert delivery failures at 02:50/02:53 MDT (known Tier-2 probe failures, standing). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: 0 entries (file mtime ~08:46Z, fresh). Healer reports clean. ✅ Nominal (carry forward [yellow] PR #412 standing issue).
+
+**Check 4 — Pending directives:** Forge inbox: 3 tasks (all active/queued, none stale):
+- `marker-error-p2-derive-endpoint-1.json` (08:44Z) — retry 1/3, ~16 min old. Forge completed p2-derive-endpoint build; preflight marker missing. PR #418 open. Not stale.
+- `p2-digest-generator.json` (08:25Z) — **ACTIVE** since 08:44:27Z (inbox_watcher started, wt-forge-p2-digest-generator created). ~15 min in progress.
+- `dag-preflight-revision-autonomy-001.json` (08:32Z) — queued (Forge occupied with p2-digest-generator). Not stale.
+beacon, mirror, pulse inboxes: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (known [yellow]). 8/8 core services active. ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean tree, HEAD=46775c5 (iter 1280 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-10T08:16:15Z (~44 min old at check time, < 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 core services active (beacon-bot, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, chain-event-shipper, dashboard-api). ourliberty-agent-core-health: inactive (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT iter 1280):**
+- PR #418: OPEN, mergeable=UNKNOWN, review=, statusCheckRollup=[] (just opened at 08:44Z, no CI yet). Forge marker-error retry 1/3 in inbox. Not yet at 30-min threshold.
+- PR #412: OPEN, mergeable=UNKNOWN, statusCheckRollup: mirror-review=FAILURE (07:51:48Z). Standing [yellow] unchanged.
+ourliberty-dashboard: 0 open. ✅ Nominal (PR #418 in pipeline; PR #412 standing [yellow]).
+
+**Credential rotation:** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate soak (§5.0):** 7/15. ✅ No action.
+
+**Worktrees (VERIFY-BEFORE-REASSERT iter 1280 watch items):**
+- `wt-forge-p2-derive-endpoint` — still present; Forge completed build (task done=08:44:20Z, cost=$4.45). PR #418 opened. Now in marker-error retry flow. ℹ️ Monitor — watch for PROCEED marker → Mirror dispatch.
+- `wt-forge-p2-digest-generator` — ACTIVE (started 08:44:27Z, ~15 min in). ℹ️ Monitor — watch for PR.
+- `wt-mirror-dag-preflight-missions-v2-phase2` — still present (terminal PASS 08:24Z). Pending heal-wedged reap. ℹ️ Monitor.
+- `wt-mirror-mirror-review-pr412-001` — still present (terminal REVISION 07:51Z). Pending heal-wedged reap. ℹ️ Monitor.
+
+**G-rule finding — inbox_watcher.log test log contamination (NEW, G-rule 3/3):**
+- **Pattern:** `real-paid-001` and `../../../../etc/pwned` task entries appear in production `~/agents/logs/inbox_watcher.log` during Forge build runs. Occurred Jun 6 04:40-04:43Z (×2 each), Jun 8 03:37Z (×1), Jun 10 08:52Z + 08:55Z (×2 each today = during p2-derive-endpoint + p2-digest-generator builds). 106 total occurrences in log.
+- **Root cause:** `scripts/tests/test_inbox_watcher_outbox_write_failure.py` and `scripts/tests/test_path_traversal_sanitizer.py` both redirect `iw.INBOXES_ROOT`, `OUTBOXES_ROOT`, `BLACKBOARD` to temp dirs in setUp, but NOT `iw.LOG_FILE` (line 54: `LOG_FILE = AGENTS_ROOT / "logs" / "inbox_watcher.log"`). When Forge runs the test suite as part of a build, test execution writes to the production log file.
+- **Impact:** Production state unaffected (inbox clean, $0 real API cost — fake_run_claude mock used in tests). Observability degraded: 106 false entries in production log that look like real beacon task executions.
+- **Permanent fix spec (code shape → Forge via Beacon):** In both test files, add `iw.LOG_FILE` to the `self._orig` dict and redirect to `self.root / "logs" / "inbox_watcher.log"` in setUp (create parent dir), restore in tearDown. One-file change, ~4 lines per test class. Low complexity.
+- **Classification:** route-to-beacon + tier-reset.
+- **Dispatch:** inbox-watcher-log-isolation-001 → Beacon inbox (written this iter).
+
+**VERIFY-BEFORE-REASSERT corrections — iter 1280 claims:**
+- Iter 1280 stated wt-forge-p2-digest-generator "NEW ACTIVE (since iter 1279; Forge started p2-digest-generator step 2)." VERIFIED: inbox_watcher.log confirms Forge start task=p2-digest-generator at 08:44:27Z. ✅ Carries forward correctly.
+
+**Verify-before-reassert — iter 1280 standing items:**
+- `health-check-notify-script-missing`: inactive (8/8 active, health.service known inactive). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: forge.log at 02:53:04 MDT shows TIER2_FALLBACK_SKIPPED (auth_401). Pattern continuing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: no change. Carry forward [yellow].
+- `PR #412 no-session-revision`: VERIFIED still OPEN/REVISION/FAILURE. dag-preflight-revision-autonomy-001 queued. Parity fix (Gap A) still pending separate Beacon dispatch. ⚠️ Carry forward.
+- `install-drift-timer-gap verification_pending`: 0/2 clean healer cycles post-PR #411. Next healer run ~18:00Z UTC June 10. OPEN.
+- `sync-push-rebase-fallback-001`: no new occurrence. [blue] standing.
+- `missions-v2-phase2 ACTIVE`: p2-derive-endpoint PR #418 OPENED; p2-digest-generator build ACTIVE; dag-preflight-revision-autonomy-001 queued.
+
+**G-rule tracking:**
+- `heal-pipeline-stall:unrouted-pr fires false positive for recovery-dispatched reviews not in routing-events.jsonl` — **2/3** (unchanged). No new occurrence this iter.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (unchanged). No new occurrence.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — G-rule 3/3 (iter 967); actor-exemption-config spec pending `go: actor-exemption-config`.
+- `inbox_watcher.log test log contamination` — **G-rule 3/3 MET** (Jun 6, Jun 8, Jun 10). Dispatched inbox-watcher-log-isolation-001 to Beacon.
+
+**Standing findings (unchanged unless noted):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 + June 10 00:46Z/01:45Z/01:48Z/02:53Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [yellow] **PR #412 no-session-revision** — Mirror REVISION standing. dag-preflight-revision-autonomy-001 in Forge inbox (systemic fix for REVISION-path autonomy gap); parity fix (Gap A coverage) still needs separate re-dispatch via Beacon.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 69th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #418 — marker-error retry 1/3 in Forge inbox. Watch for PROCEED marker → Mirror dispatch.
+- PR #412 — REVISION, no auto-resume. dag-preflight-revision-autonomy-001 queued; parity fix (Gap A) still pending separate Beacon dispatch.
+- wt-forge-p2-digest-generator — ACTIVE, ~15 min in.
+- wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 — pending heal-wedged reap.
+- install-drift healer: next run ~18:00Z UTC June 10 → 0/2 clean cycles post-PR #411.
+- inbox-watcher-log-isolation-001 — dispatched to Beacon this iter; watch for Forge PR.
+
+**Actions taken:** None (auto-fix allow-list: no eligible findings).
+**Dispatches:** inbox-watcher-log-isolation-001 → Beacon inbox (G-rule systemic fix: redirect iw.LOG_FILE in test setUp).
+**PRIME DIRECTIVE:** 1 new intervention (G-rule detection: test log contamination) + 1 verification_pending (inbox-watcher-log-isolation-001 dispatch awaiting Forge PR). interventions=747, systemic_fixes=16 (verification_pending), ratio≈46.625 (carry; ledger row appended via append_action).
+**Tier end-of-iter:** 1 (G-rule dispatch = non-clean; tier-reset; consecutive_clean=0).
+
+---
+
 ## Iteration 1280 — 2026-06-10 ~09:10Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — PR #418 OPENED ✅ (missions-v2 p2-derive-endpoint, Forge build complete). wt-forge-p2-digest-generator now ACTIVE (step 2 started). 1 Tier-3 alert silenced (unreviewed-merge:417, Larry-direct [blue]). All mandatory checks clean.
