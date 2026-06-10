@@ -666,5 +666,117 @@ class TestReapPidIdentityRecheck(unittest.TestCase):
         self.assertEqual(summary['case2_hard_reaped'], 0)
 
 
+# ---------------------- Forge-PR reap guard ----------------------
+
+class TestForgePrReapGuard(unittest.TestCase):
+    """The guard added for the #412 incident: never destroy (or alert on) a Forge
+    session whose branch has an OPEN PR with no Mirror review dispatched yet."""
+
+    @staticmethod
+    def _recent_iso():
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _old_iso():
+        from datetime import datetime, timezone, timedelta
+        return (datetime.now(timezone.utc)
+                - timedelta(hours=h.GUARD_MAX_PROTECT_HOURS + 1)).isoformat()
+
+    def test_helper_protects_when_open_pr_and_no_review(self):
+        from unittest import mock
+        with mock.patch.object(h, '_open_pr_created_at',
+                               return_value=self._recent_iso()), \
+             mock.patch.object(h, '_review_already_dispatched_for_task',
+                               return_value=False):
+            self.assertTrue(h._forge_branch_has_open_unreviewed_pr(
+                '/home/larry/agent-worktrees/wt-forge-build-x'))
+
+    def test_helper_no_protection_when_no_open_pr(self):
+        from unittest import mock
+        with mock.patch.object(h, '_open_pr_created_at', return_value=None), \
+             mock.patch.object(h, '_review_already_dispatched_for_task',
+                               return_value=False):
+            self.assertFalse(h._forge_branch_has_open_unreviewed_pr(
+                '/home/larry/agent-worktrees/wt-forge-build-x'))
+
+    def test_helper_no_protection_once_review_dispatched(self):
+        from unittest import mock
+        with mock.patch.object(h, '_open_pr_created_at',
+                               return_value=self._recent_iso()), \
+             mock.patch.object(h, '_review_already_dispatched_for_task',
+                               return_value=True):
+            self.assertFalse(h._forge_branch_has_open_unreviewed_pr(
+                '/home/larry/agent-worktrees/wt-forge-build-x'))
+
+    def test_helper_no_protection_when_pr_older_than_cap(self):
+        # Age cap: a long-open PR with no review is no longer protected, so a
+        # wedged session can't hold a fleet slot forever.
+        from unittest import mock
+        with mock.patch.object(h, '_open_pr_created_at',
+                               return_value=self._old_iso()), \
+             mock.patch.object(h, '_review_already_dispatched_for_task',
+                               return_value=False) as m_rev:
+            self.assertFalse(h._forge_branch_has_open_unreviewed_pr(
+                '/home/larry/agent-worktrees/wt-forge-build-x'))
+            m_rev.assert_not_called()  # age cap short-circuits before the review check
+
+    def test_helper_no_protection_for_non_forge_cwd(self):
+        # A mirror worktree (or any non wt-forge- cwd) is never PR-protected; the
+        # gh check is short-circuited so no network call is made.
+        from unittest import mock
+        with mock.patch.object(h, '_open_pr_created_at') as m_pr:
+            self.assertFalse(h._forge_branch_has_open_unreviewed_pr(
+                '/home/larry/agent-worktrees/wt-mirror-build-x'))
+            m_pr.assert_not_called()
+
+    def test_case1_reap_skipped_when_forge_pr_protected(self):
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4242, tier='forge', marker=True, idle=600)
+        with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=True):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(rec.removed, [])
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['forge_pr_protected'], 1)
+
+    def test_hard_reap_skipped_when_forge_pr_protected(self):
+        from unittest import mock
+        rec = _Recorder()
+        state = h.ConfidenceState(mode=h.MODE_ALERT_ONLY, executions=[], pending={})
+        cand = _cand(pid=9200, tier='forge', marker=False, idle=4000)  # hard grace
+        with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=True):
+            summary = _run(rec, [cand], state)
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(summary['case2_hard_reaped'], 0)
+        self.assertEqual(summary['forge_pr_protected'], 1)
+
+    def test_forge_session_reaps_normally_when_not_protected(self):
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4242, tier='forge', marker=True, idle=600)
+        with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [4242])
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(summary['forge_pr_protected'], 0)
+
+    def test_mirror_session_never_pr_protected(self):
+        # The guard is forge-only: a mirror candidate is reaped normally and the
+        # PR-protection helper is never consulted for it.
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=7001, tier='mirror', marker=True, idle=600)
+        with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr') as m_g:
+            summary = _run(rec, [cand], h.ConfidenceState())
+        m_g.assert_not_called()
+        self.assertEqual(rec.killed, [7001])
+        self.assertEqual(summary['case1_reaped'], 1)
+
+
 if __name__ == '__main__':
     unittest.main()

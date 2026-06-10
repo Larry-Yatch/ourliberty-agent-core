@@ -399,5 +399,14 @@
       "plain_language_summary": "A pull request was merged into main with NO evidence of a Mirror REVIEW_PASS -- the Mirror-review merge gate did not hold for it. This is the exact hole that let #303 (merged despite a REVISION verdict) and #324 (merged with no review) slip through. Branch protection should now block this; if this alert fires, protection was bypassed or misconfigured. The subject carries the PR number after the colon.",
       "recommended_action": "Inspect the merge with `gh pr view <N> --repo Larry-Yatch/ourliberty-agent-core`. If it should not have merged, assess the change and revert if needed. Confirm branch protection is intact: `gh api repos/Larry-Yatch/ourliberty-agent-core/branches/main/protection`. This is a defense-in-depth detector; treat a hit as a gate failure worth root-causing."
     }
+  },
+  "heal-undispatched-pr-review": {
+    "undispatched-pr-review": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "never_silence": true,
+      "plain_language_summary": "An open Forge PR has no Mirror review, and the GitHub-truth backstop healer tried to dispatch one but it did not take (the review task is still absent after the dispatch attempt). The happy path here is silent -- the healer normally just dispatches the missed review and logs it; this alert only fires when the dispatch itself keeps failing (e.g. routing denied, missing target_repo), which means a PR will sit unreviewed until a human intervenes. This is the open-PR analogue of the unreviewed-merge detector and the durable fix for the #412 incident (a reaped build session left a clean PR with no review and no local outbox for the outbox-based reconcile to find). The subject carries the PR number after the colon.",
+      "recommended_action": "Inspect why the Mirror review-request write is failing: grep the outbox-notifier log (~/agents/logs/outbox-notifier.log) for a 'review-request dispatch FAILED' / RoutingDenied / 'no target_repo' line referencing the task. Re-dispatch manually by writing a review task to ~/agents/inboxes/mirror/, and `gh pr view <N> --repo Larry-Yatch/ourliberty-agent-core` to confirm the PR state."
+    }
   }
 }
