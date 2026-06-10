@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import unittest
 from datetime import datetime, timezone
@@ -143,9 +144,15 @@ class _DerivedTestBase(unittest.TestCase):
         self._orig_missions = da._missions_json_path
         self._orig_captures = da._captures_json_path
         self._orig_client = da._get_larry_action_supabase_client
+        # Network-safety: stub the live PR-state resolver to {} so the route
+        # (EndpointTest) never reaches GitHub even if a real GITHUB_TOKEN is in
+        # the environment. Tests exercising the PR-state path inject their own
+        # resolver into _handle_missions_derived directly (see OrphanPrStateTest).
+        self._orig_resolver = da._resolve_orphan_pr_states
         da._missions_json_path = lambda: self._missions_path
         da._captures_json_path = lambda: self._captures_path
         da._get_larry_action_supabase_client = lambda: self._stub
+        da._resolve_orphan_pr_states = lambda _urls: {}
         self.addCleanup(self._restore)
 
         self.client = TestClient(da.app)
@@ -154,6 +161,7 @@ class _DerivedTestBase(unittest.TestCase):
         da._missions_json_path = self._orig_missions
         da._captures_json_path = self._orig_captures
         da._get_larry_action_supabase_client = self._orig_client
+        da._resolve_orphan_pr_states = self._orig_resolver
 
     def _restore_env_token(self) -> None:
         if self._orig_env_token is None:
@@ -343,9 +351,10 @@ class EndpointTest(_DerivedTestBase):
                 for m in resp.json()['missions']),
         )
 
-    def test_no_pr_state_read_pr_state_always_none(self) -> None:
-        # Mirror constraint: no live GitHub PR-state reads. Every task's
-        # pr_state must stay None.
+    def test_mission_task_pr_state_always_none(self) -> None:
+        # MISSION-task pr_state stays None (parity-pinned — matches the dashboard
+        # route). The § 3.4 live PR-state read added for orphan terminal
+        # detection does NOT populate mission-task pr_state.
         body = self._derive()
         states = [
             t['pr_state'] for m in body['missions'] for t in m['tasks']
@@ -385,6 +394,271 @@ class DegradationTest(_DerivedTestBase):
         )
         self.assertEqual(out['orphans'], [])
         self.assertEqual(len(out['parked']), 2)
+
+
+# ---------- § 3.4 orphan terminal detection via live PR-state ----------
+
+
+class OrphanPrStateTest(_DerivedTestBase):
+    """The real-world bug: a merged/closed orphan with NO `auto_merge` event
+    under its task_id (the common case for sequence steps) stayed `building`
+    forever, so the lane never collapsed. The injected resolver maps the
+    orphan's pr_url → live GitHub state; no network is touched."""
+
+    def _derive_with_states(self, states: dict) -> dict:
+        return da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=self._stub,
+            repo=None,
+            task_id=None,
+            now=NOW,
+            pr_state_resolver=lambda _urls: states,
+        )
+
+    def test_merged_pr_without_automerge_event_becomes_terminal(self) -> None:
+        # orphan-inreview-now (#505) has a review_pass marker + a pr_url but NO
+        # auto_merge event → event-only derive says in-review (terminal=False).
+        # When GitHub reports the PR MERGED it must flip to shipped/terminal.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/505'
+        o = {x['task_id']: x for x in
+             self._derive_with_states({url: 'MERGED'})['orphans']}
+        self.assertEqual(o['orphan-inreview-now']['state_badge'], 'shipped')
+        self.assertTrue(o['orphan-inreview-now']['terminal'])
+        self.assertFalse(o['orphan-inreview-now']['stalled'])
+
+    def test_closed_pr_is_terminal_with_closed_badge(self) -> None:
+        # orphan-stalled-old (#410) closed-unmerged → terminal, distinct badge.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410'
+        o = {x['task_id']: x for x in
+             self._derive_with_states({url: 'CLOSED'})['orphans']}
+        self.assertEqual(o['orphan-stalled-old']['state_badge'], 'closed')
+        self.assertTrue(o['orphan-stalled-old']['terminal'])
+
+    def test_open_pr_never_terminal(self) -> None:
+        # GitHub reports OPEN → orphan stays visible (in-review here), never hidden.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/505'
+        o = {x['task_id']: x for x in
+             self._derive_with_states({url: 'OPEN'})['orphans']}
+        self.assertFalse(o['orphan-inreview-now']['terminal'])
+        self.assertEqual(o['orphan-inreview-now']['state_badge'], 'in-review')
+
+    def test_empty_resolver_falls_back_to_event_only(self) -> None:
+        # The fail-safe path: no PR state resolved → pre-fix event-only derive.
+        o = {x['task_id']: x for x in self._derive_with_states({})['orphans']}
+        self.assertEqual(o['orphan-inreview-now']['state_badge'], 'in-review')
+        self.assertFalse(o['orphan-inreview-now']['terminal'])
+        # And the shipped-via-auto_merge orphan is still terminal (event path).
+        self.assertTrue(o['orphan-shipped-pr']['terminal'])
+
+    def test_invariant_open_orphan_never_terminal_regardless_of_age(self) -> None:
+        # orphan-stalled-old is 30d+ quiet; OPEN must keep it stalled/visible,
+        # never terminal — no unmerged, un-closed orphan is ever hidden.
+        url = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410'
+        o = {x['task_id']: x for x in
+             self._derive_with_states({url: 'OPEN'})['orphans']}
+        self.assertFalse(o['orphan-stalled-old']['terminal'])
+        self.assertTrue(o['orphan-stalled-old']['stalled'])
+
+    def test_raising_resolver_degrades_not_500s(self) -> None:
+        # Backstop: even if the resolver raises (it shouldn't), the derive must
+        # degrade to event-only, never propagate a 500. orphan-shipped-pr stays
+        # terminal via its auto_merge event; the merged-but-eventless orphan
+        # falls back to in-review (visible).
+        def _boom(_urls):
+            raise RuntimeError('resolver blew up')
+        out = da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=self._stub,
+            repo=None, task_id=None, now=NOW,
+            pr_state_resolver=_boom,
+        )
+        o = {x['task_id']: x for x in out['orphans']}
+        self.assertTrue(o['orphan-shipped-pr']['terminal'])
+        self.assertEqual(o['orphan-inreview-now']['state_badge'], 'in-review')
+
+
+class ResolvePrStatesTest(unittest.TestCase):
+    """Unit tests for the live resolver itself — batched, bounded, fail-safe.
+    `_github_api_request` is the module's monkeypatchable test seam (no network)."""
+
+    def setUp(self) -> None:
+        self._orig_req = da._github_api_request
+        self._orig_tok = da._github_token
+        da._github_token = lambda: 'tok'
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        da._github_api_request = self._orig_req
+        da._github_token = self._orig_tok
+
+    @staticmethod
+    def _resp(body: dict, code: int = 200):
+        class _R:
+            status_code = code
+
+            def json(self_inner):  # noqa: N805
+                return body
+        return _R()
+
+    def test_no_token_returns_empty(self) -> None:
+        da._github_token = lambda: None
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_empty_urls_returns_empty(self) -> None:
+        self.assertEqual(da._resolve_orphan_pr_states([]), {})
+
+    def test_maps_states_one_batched_call_per_repo(self) -> None:
+        calls = []
+
+        def fake(method, url, *, headers=None, json_body=None, timeout=10.0):
+            calls.append(json_body['query'])
+            nums = re.findall(r'pullRequest\(number: (\d+)\)', json_body['query'])
+            return self._resp(
+                {'data': {'repository': {
+                    f'p{n}': {'state': 'MERGED'} for n in nums
+                }}},
+            )
+
+        da._github_api_request = fake
+        urls = [
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/2',
+            'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/9',
+        ]
+        out = da._resolve_orphan_pr_states(urls)
+        self.assertEqual(out[urls[0]], 'MERGED')
+        self.assertEqual(out[urls[2]], 'MERGED')
+        # agent-core (#1,#2) + dashboard (#9) = two repos = two batched calls.
+        self.assertEqual(len(calls), 2)
+
+    def test_request_exception_is_fail_safe(self) -> None:
+        def boom(*_a, **_k):
+            raise RuntimeError('network down')
+        da._github_api_request = boom
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_non_200_is_skipped(self) -> None:
+        da._github_api_request = (
+            lambda *a, **k: self._resp({}, code=502)
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_unparseable_url_is_ignored(self) -> None:
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': {'repository': {}}},
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(['not-a-pr-url']), {},
+        )
+
+    def test_null_data_error_shape_is_fail_safe(self) -> None:
+        # GitHub returns HTTP 200 with {"data": null, "errors": [...]} on a
+        # whole-query failure (bad token, rate-limit). The resolver must return
+        # {} — NOT raise AttributeError on None.get(...) and 500 the route.
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': None, 'errors': [{'type': 'NOT_FOUND'}]},
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_repository_null_is_fail_safe(self) -> None:
+        # {"data": {"repository": null}} (repo gone / no access) → {} cleanly.
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': {'repository': None}},
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_non_dict_body_is_fail_safe(self) -> None:
+        # resp.json() returns a non-dict (e.g. a list) → {} cleanly.
+        da._github_api_request = lambda *a, **k: self._resp([1, 2, 3])
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_partial_null_nodes_resolve_the_rest(self) -> None:
+        # One PR node null (deleted), the other valid → the valid one maps,
+        # the null one is skipped (no crash).
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': {'repository': {'p1': None, 'p2': {'state': 'MERGED'}}}},
+        )
+        urls = [
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/2',
+        ]
+        out = da._resolve_orphan_pr_states(urls)
+        self.assertNotIn(urls[0], out)
+        self.assertEqual(out[urls[1]], 'MERGED')
+
+
+class DeriveOrphanReadabilityUnitTest(unittest.TestCase):
+    """Direct tests of the pure badge/terminal mapping for each pr_state."""
+
+    _NOW = datetime(2026, 6, 10, 12, 0, 0, tzinfo=timezone.utc)
+    _RECENT = '2026-06-10T09:00:00+00:00'
+    _OLD = '2026-04-01T00:00:00+00:00'  # 30d+ quiet
+
+    def _derive(self, pr_state, last_ts=_RECENT, events=None):
+        return da._derive_orphan_readability(
+            {'task_id': 'x', 'last_event_ts': last_ts},
+            events or [],
+            self._NOW,
+            pr_state=pr_state,
+        )
+
+    def test_merged_is_shipped_terminal(self) -> None:
+        out = self._derive('MERGED')
+        self.assertEqual(out['state_badge'], 'shipped')
+        self.assertTrue(out['terminal'])
+
+    def test_closed_is_terminal(self) -> None:
+        out = self._derive('CLOSED')
+        self.assertEqual(out['state_badge'], 'closed')
+        self.assertTrue(out['terminal'])
+
+    def test_open_recent_is_building_not_terminal(self) -> None:
+        out = self._derive('OPEN')
+        self.assertEqual(out['state_badge'], 'building')
+        self.assertFalse(out['terminal'])
+
+    def test_open_stale_is_stalled_visible(self) -> None:
+        out = self._derive('OPEN', last_ts=self._OLD)
+        self.assertEqual(out['state_badge'], 'stalled')
+        self.assertFalse(out['terminal'])
+        self.assertTrue(out['stalled'])
+
+    def test_none_falls_back_to_event_only(self) -> None:
+        # No PR state, no auto_merge event → building (pre-fix behavior).
+        out = self._derive(None)
+        self.assertEqual(out['state_badge'], 'building')
+        self.assertFalse(out['terminal'])
+
+    def test_none_with_automerge_event_is_shipped(self) -> None:
+        out = self._derive(None, events=[{'event_type': 'auto_merge'}])
+        self.assertEqual(out['state_badge'], 'shipped')
+        self.assertTrue(out['terminal'])
 
 
 if __name__ == '__main__':

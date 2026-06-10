@@ -39,9 +39,10 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -2561,10 +2562,16 @@ def _handle_new_mission(
 # are byte-faithful ports — the § 4 parity test deep-equals their output against
 # a committed expected-output JSON that the dashboard side asserts against too.
 #
-# Read-only: no consumer writes through this endpoint, and it makes NO live
-# GitHub PR-state reads (pr_state stays None everywhere, exactly as the current
-# dashboard route passes it). That keeps it cheap, low-latency, and free of any
-# new credential — the 4-artifact credential obligation does NOT trigger.
+# Read-only: no consumer writes through this endpoint. Mission-task pr_state
+# stays None (matching the dashboard route, parity-pinned by § 4). ORPHAN
+# terminal detection additionally does a bounded, fail-safe GitHub PR-state
+# read (_resolve_orphan_pr_states, § 3.4): a merged sequence step rarely
+# carries an `auto_merge` event under its own task_id, so an event-only derive
+# leaves every merged orphan stuck at `building` and the lane never collapses.
+# The read reuses the GITHUB_TOKEN already loaded by the systemd unit (no new
+# credential — the 4-artifact obligation does NOT trigger), is batched one
+# GraphQL call per repo, and degrades to the event-only path (pr_state=None) on
+# any error or missing token — so the board never blocks or 500s on GitHub.
 
 # Phase rank for mission-level aggregation. Higher = more advanced.
 # "deferred" is handled separately (mission-level override).
@@ -2856,29 +2863,143 @@ def _orphan_label_and_location(
     return label, repo, branch
 
 
+# Orphan terminal-state detection (§ 3.4). An orphan's "done-ness" is NOT
+# reliably present in chain_events — a merged sequence step rarely carries an
+# `auto_merge` event under its own task_id — so the event-only derive leaves
+# every merged orphan stuck at `building` and the lane never collapses. The
+# documented fix is a bounded, fail-safe GitHub PR-state read for orphans that
+# carry a pr_url. MERGED → shipped, CLOSED → closed (both terminal/hidden), OPEN
+# → stays visible. Reuses GITHUB_TOKEN (no new credential).
+_PR_URL_RE = re.compile(r'github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)')
+# Defensive upper bound so a pathological orphan set can't fan out into an
+# unbounded GitHub query. _PR_STATE_TOTAL_BUDGET_S caps the WALL TIME across all
+# per-repo calls combined (not per call), so a slow GitHub never stalls the
+# board past the dashboard's own 5s client timeout — it degrades to event-only
+# for the repos it couldn't reach in budget.
+_MAX_PR_STATE_LOOKUPS = 200
+_PR_STATE_TOTAL_BUDGET_S = 4.0
+
+
+def _parse_pr_url(url: Optional[str]) -> Optional[tuple[str, str, int]]:
+    """`https://github.com/<owner>/<repo>/pull/<n>` → (owner, repo, n)."""
+    if not isinstance(url, str):
+        return None
+    m = _PR_URL_RE.search(url)
+    if not m:
+        return None
+    try:
+        return m.group(1), m.group(2), int(m.group(3))
+    except (ValueError, IndexError):
+        return None
+
+
+def _resolve_orphan_pr_states(pr_urls: list[str]) -> dict[str, str]:
+    """Map each PR url → its GitHub state ('OPEN' | 'CLOSED' | 'MERGED').
+
+    Bounded (≤ _MAX_PR_STATE_LOOKUPS), batched (one GraphQL call per repo), and
+    FAIL-SAFE: returns whatever it resolved ({} on a missing token, network /
+    timeout error, non-200, or malformed response) so callers fall back to the
+    event-only derive (pr_state=None) — exactly the pre-fix behavior. NEVER
+    raises. Read-only; reuses the existing GITHUB_TOKEN.
+    """
+    token = _github_token()
+    if not token or not pr_urls:
+        return {}
+    # Dedup + bound; group PR numbers per (owner, repo) for one query each.
+    by_repo: dict[tuple[str, str], dict[int, str]] = {}
+    seen: set[str] = set()
+    total = 0
+    for url in pr_urls:
+        if url in seen:
+            continue
+        seen.add(url)
+        parsed = _parse_pr_url(url)
+        if parsed is None:
+            continue
+        owner, repo, number = parsed
+        by_repo.setdefault((owner, repo), {})[number] = url
+        total += 1
+        if total >= _MAX_PR_STATE_LOOKUPS:
+            break
+    out: dict[str, str] = {}
+    headers = {'Authorization': f'bearer {token}', 'Accept': 'application/json'}
+    # owner/name go through GraphQL variables (never string-interpolated) so a
+    # malformed pr_url can't break or inject the query; only the integer PR
+    # numbers — which _parse_pr_url guarantees are ints — are interpolated.
+    deadline = time.monotonic() + _PR_STATE_TOTAL_BUDGET_S
+    for (owner, repo), num_to_url in by_repo.items():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.1:
+            break  # out of wall-clock budget → degrade to event-only for the rest
+        fields = '\n'.join(
+            f'  p{n}: pullRequest(number: {n}) {{ state }}' for n in num_to_url
+        )
+        query = (
+            'query($owner: String!, $name: String!) {\n'
+            '  repository(owner: $owner, name: $name) {\n'
+            f'{fields}\n  }}\n}}'
+        )
+        try:
+            resp = _github_api_request(
+                'POST', 'https://api.github.com/graphql',
+                headers=headers,
+                json_body={
+                    'query': query,
+                    'variables': {'owner': owner, 'name': repo},
+                },
+                timeout=remaining,
+            )
+            if getattr(resp, 'status_code', None) != 200:
+                continue
+            data = resp.json()
+        except Exception:  # noqa: BLE001 — fail-safe: never break the derive
+            continue
+        # GitHub returns 200 with {"data": null, "errors": [...]} on a
+        # whole-query failure (bad token, rate-limit, malformed query); the
+        # `or {}` keeps a present-but-null `data` from raising here (this line
+        # is past the try, so an AttributeError would escape and 500 the route).
+        repo_node = (
+            (data.get('data') or {}).get('repository')
+            if isinstance(data, dict) else None
+        )
+        if not isinstance(repo_node, dict):
+            continue
+        for n, url in num_to_url.items():
+            node = repo_node.get(f'p{n}')
+            if isinstance(node, dict) and isinstance(node.get('state'), str):
+                out[url] = node['state']
+    return out
+
+
 def _derive_orphan_readability(
     orphan: dict[str, Any],
     events: list[dict[str, Any]],
     now: Optional[datetime] = None,
+    pr_state: Optional[str] = None,
 ) -> dict[str, Any]:
     """Additive Phase-2 orphan fields (§ 3.4). Hiding is driven by a REAL
-    terminal signal (shipped), never by a clock.
+    terminal signal — a merged or explicitly-closed PR — NEVER by a clock.
 
-    `closed` (deliberately-dropped PR) needs a live GitHub PR-state read, which
-    this endpoint does NOT do (no new credential, no latency cost). Per the § 3.4
-    cost-note fallback we collapse ONLY `shipped`; a closed-but-unmerged PR is
-    badged conservatively (stalled when quiet, building/in-review when recent) so
-    it stays VISIBLE. Strictly conservative: nothing incomplete is ever hidden.
+    `pr_state` is the live GitHub state ('MERGED' | 'CLOSED' | 'OPEN') for an
+    orphan carrying a pr_url, or None when unavailable (no token, network error,
+    or no PR). When None we fall back to the event-only derive, which can only
+    reach `shipped` via an `auto_merge` event — the conservative pre-fix path.
+    A quiet-but-OPEN (or PR-less) orphan is `stalled` and stays VISIBLE: nothing
+    in-flight is ever hidden. `closed` (PR closed unmerged) is a deliberate
+    human action, so it is terminal/hidden with its own badge.
     """
     now = now or datetime.now(timezone.utc)
-    # No live PR-state read — pr_state stays None (read-only, cheap).
-    derived_phase = derive_phase_for_task(events, None)
+    derived_phase = derive_phase_for_task(events, pr_state)
     last_dt = _ts_to_dt(orphan.get('last_event_ts'))
     stale_cutoff = now - timedelta(days=_STALE_AFTER_DAYS)
     is_stale = last_dt is not None and last_dt < stale_cutoff
 
     if derived_phase == 'shipped':
         state_badge, terminal, stalled = 'shipped', True, False
+    elif pr_state == 'CLOSED':
+        # PR explicitly closed without merging — deliberately dropped → terminal
+        # (distinct badge). An explicit close is a human action, unlike a stall.
+        state_badge, terminal, stalled = 'closed', True, False
     elif is_stale:
         # Unmerged + quiet past the threshold: overlooked-important bucket.
         state_badge, terminal, stalled = 'stalled', False, True
@@ -2982,11 +3103,19 @@ def _build_derived_response(
     events_by_task_id: dict[str, list[dict[str, Any]]],
     recent_events: list[dict[str, Any]],
     now: Optional[datetime] = None,
+    pr_state_resolver: Optional[
+        Callable[[list[str]], dict[str, str]]
+    ] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
     `missions` + `orphans` (minus the additive orphan-readability keys) match
     the dashboard's MissionListResponse byte-for-byte — that's what § 4 pins.
+
+    `pr_state_resolver` (optional) maps orphan pr_urls → live GitHub states for
+    terminal detection (§ 3.4). None → no PR-state read (event-only derive); the
+    route injects the real, fail-safe resolver, tests inject a stub. Mission-task
+    pr_state always stays None regardless (parity-pinned).
     """
     now = now or datetime.now(timezone.utc)
 
@@ -3026,9 +3155,23 @@ def _build_derived_response(
             events_by_orphan.setdefault(tid, []).append(ev)
 
     orphans = detect_orphans(recent_events, registered_task_ids)
+    # Resolve live PR states for orphans carrying a pr_url so a merged/closed
+    # orphan is detected as terminal even with no auto_merge event under its
+    # task_id (§ 3.4). Fail-safe: a {} result → event-only derive (pre-fix).
+    pr_state_by_url: dict[str, str] = {}
+    if pr_state_resolver is not None:
+        orphan_pr_urls = [o['pr_url'] for o in orphans if o.get('pr_url')]
+        if orphan_pr_urls:
+            # Backstop: the resolver is contracted to never raise, but a derive
+            # must never 500 — if it does raise, degrade to the event-only path.
+            try:
+                pr_state_by_url = pr_state_resolver(orphan_pr_urls) or {}
+            except Exception:  # noqa: BLE001 — fail-safe: never break the derive
+                pr_state_by_url = {}
     for o in orphans:
         o.update(_derive_orphan_readability(
             o, events_by_orphan.get(o['task_id'], []), now,
+            pr_state=pr_state_by_url.get(o.get('pr_url')),
         ))
 
     return {
@@ -3115,9 +3258,16 @@ def _handle_missions_derived(
     repo: Optional[str],
     task_id: Optional[str],
     now: Optional[datetime] = None,
+    pr_state_resolver: Optional[
+        Callable[[list[str]], dict[str, str]]
+    ] = None,
 ) -> dict[str, Any]:
     """Pure handler for GET /api/missions/derived. Reads the registry +
-    captures, fetches chain_events, derives, applies filters."""
+    captures, fetches chain_events, derives, applies filters.
+
+    `pr_state_resolver` defaults to None (no PR-state read) so direct callers
+    and unit tests are network-free; the route passes the real
+    `_resolve_orphan_pr_states`. See `_build_derived_response`."""
     missions_data = _reader_missions(missions_path)
     captures_data = _reader_captures(captures_path)
     entries = missions_data.get('missions') or []
@@ -3145,6 +3295,7 @@ def _handle_missions_derived(
         events_by_task_id=events_by_task_id,
         recent_events=recent_events,
         now=now,
+        pr_state_resolver=pr_state_resolver,
     )
     return _apply_derived_filters(response, repo=repo, task_id=task_id)
 
@@ -4631,8 +4782,10 @@ def get_missions_captures() -> dict[str, Any]:
 # Phase 2 § 3). Source-of-truth phase/aggregate/orphan derivation, ported
 # byte-faithfully from the dashboard's lib/mission-queries.ts (parity-gated,
 # § 4), plus the additive parked[] array + orphan-readability fields. Optional
-# ?repo= / ?task_id= filters (§ 3.2). Read-only; no live GitHub reads; same
-# X-Dashboard-Token gate as /api/system/missions.
+# ?repo= / ?task_id= filters (§ 3.2). Read-only; same X-Dashboard-Token gate as
+# /api/system/missions. Orphan terminal detection does a bounded, fail-safe
+# GitHub PR-state read (_resolve_orphan_pr_states, § 3.4) — reusing the existing
+# GITHUB_TOKEN, degrading to the event-only derive on any error.
 @app.get(
     '/api/missions/derived',
     response_model=MissionsDerivedResponse,
@@ -4648,6 +4801,7 @@ def get_missions_derived(
         supabase_client=_get_larry_action_supabase_client(),
         repo=repo,
         task_id=task_id,
+        pr_state_resolver=_resolve_orphan_pr_states,
     )
 
 
