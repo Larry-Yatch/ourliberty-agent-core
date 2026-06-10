@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration 1339 — 2026-06-10 ~18:03Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 2 — NEW [yellow] orphan directive: Larry "yes unstick it" (11:53 MDT) — Beacon hit permission boundary attempting file deletion (11:55 MDT), task unresolved. [yellow] DM sent (larry-alerts.jsonl line 1383). All other checks nominal. 9/9 services active. 0 open PRs. Sync success (17:16:58Z, 46 min at scan). Notable: install-drift healer fired noon MDT (18:00:06Z) — `units: {}` (no drift), auto-healed stuck `ourliberty-cycle.timer` (standing G-rule 3/3, digest-route only). 1/2 clean post-PR #411 noon fire.
+**Tier state:** 1 (consecutive_clean=0; Check 2 non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T17:42:02.018599+00:00 / outbox-notifier:review-pass` (line 1381, iter 1338)
+- Current total: 1383 lines. 2 new entries since watermark:
+  1. Line 1382 (`2026-06-10T18:00:06Z`) — source=heal-systemd-install-drift, subject=stuck-timer-healed:ourliberty-cycle.timer, route=**digest**. Healer auto-healed `ourliberty-cycle.timer` (daemon-reload+restart; Next fire=unknown). Standing G-rule 3/3; pending `go: cycle-timer checkpoint`. Digest route → no DM, journal note only. Tier-3 equivalent.
+  2. Line 1383 (`2026-06-10T18:02:59Z`) — source=pulse, subject=orphan-directive-unstick-it-20260610T175936Z, route=escalate. Pulse's own [yellow] DM for Check 2 orphan directive. Already processed below.
+- ✅ Nominal (no new actionable alerts; digest-routed timer heal is standing known-pattern).
+- **New watermark: `2026-06-10T18:02:59.018488+00:00 / pulse:orphan-directive-unstick-it-20260610T175936Z` (line 1383)**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- New Larry messages since iter 1338 (~17:47Z scan):
+  - 11:48:01 MDT (17:48Z): Larry — "Where are we with the projects we're working on?" Beacon gave status update at 11:50:54 MDT (truncated in log; covers today's merged PRs + standing items). Larry acknowledged and pivoted.
+  - 11:53:28 MDT (17:53Z): Larry — "yes unstick it" (response to something in Beacon's status, most likely health-check-notify-script-missing dead-letter — G-rule 3/3 iter 1207, Forge brief never picked up).
+  - 11:55:33 MDT (17:55Z): Beacon — "I hit my permission boundary — Beacon can only delete files inside its own working directory (`/home/larry/agent-core/ag..." — task unresolved. No inbox item created. All inboxes empty post-11:55 MDT.
+- **[yellow] ORPHAN DIRECTIVE:** Larry's "yes unstick it" was not completed. `ask-then-do` + tier-reset. [yellow] DM sent via `larry_alerts.append_alert` (line 1383). Message: clarification requested on target; offered Pulse can write fresh Beacon inbox envelope if health-check-notify-script-missing re-dispatch confirmed.
+- Alert idx=0 delivery failure: last failure at 11:38 MDT (before iter 1338 scan at 11:47 MDT). No new delivery failures this iter. G-rule stays at 1/3. No increment.
+- Standing: source=heal-x fixture log-contamination (09:52 MDT TIER_ONE_MARKER / "resets 11:30am" / "TIER 2 distinct" = confirmed test fixtures per memory). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+⚠️ Tier-reset: YES (orphan directive = new non-nominal). [yellow] carry.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` EXISTS (historical suppression keys; no active_stalls). All inboxes empty (beacon, forge, mirror, pulse). 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty. Orphan directive ("yes unstick it") classified in Check 2. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` NOT FOUND (standing per iters 1329+). No unhandled stale daemons. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Recent commits: c985149 (Pulse cycle 20260610T175433Z — iter 1338 wrapper commit), 1360604 (Pulse cycle 20260610T174232Z), 3610d03 (PR #425), 041e46d (PR #426). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=`2026-06-10T17:16:58Z` (~46 min at scan 18:03Z), status=**success**. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** `gh pr list` → `[]`. 0 open PRs. ✅
+- **ourliberty-dashboard:** `gh pr list` → `[]`. 0 open PRs. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** gate-soak-assessment.json: `fired_at: 2026-06-10T16:39:48Z`, `reviews=15`, `first_pass_rate=0.933`. Larry merged PR #426 (bughunt-gate Phase 2) in iter 1338. Soak assessment cycle **COMPLETE** ✅. No action.
+
+**Rotations:** 0 overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1338 watch items:**
+- "install-drift healer — fires ~18:00Z UTC June 10." → **RESOLVED ✅**: fired at 18:00:06Z. `units: {}` (no drift packages). Auto-healed stuck `ourliberty-cycle.timer` (dm_count=1, digest route). Alert line 1382. Standing G-rule 3/3 `go: cycle-timer checkpoint` unchanged. 1/2 clean post-PR #411 noon fires ✅. Watch item CLOSED for this fire.
+- "CCD probe-retry — identity-pinning fix in production. Watch for Larry or Beacon to initiate ccd-s1 re-dispatch." → No evidence of re-dispatch. No new inbox tasks. Larry messages (11:48-11:55 MDT) addressed status generally but not ccd-s1 specifically. **CARRY**.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off." → No evidence of processing in bot log during Larry's 11:48-11:55 MDT session. **CARRY**.
+
+**G-rule tracking:**
+- `ourliberty-cycle.timer stuck` — G-rule 3/3 (standing; threshold met prior to iter 1338); **new occurrence** at 18:00:06Z UTC (auto-healed by install-drift healer). No counter change (already at 3/3). Pending `go: cycle-timer checkpoint`.
+- `completion-DM pending-queue delivery failure` — 1/3 (iter 1337; 1337-1338 window). No new occurrence this iter. Carry.
+- `unreviewed-merge:423+424+426` — G-rule 3/3 threshold met (iter 959); pending `go: actor-exemption-config`. No new merges. Carry.
+- `missions-card-gc:summary not in alert-translations.json` — 1/3 (iter 1333). No new occurrence. Carry.
+- `mirror-dag-pass:chain-context-durability not in alert-translations.json` — 1/3 (iter 1332). Carry.
+- `dispatch-branch-cleanup:gh-unavailable not in alert-translations.json` — 1/3 (iter 1330). Carry.
+- `dispatch-branch-cleanup:summary not in alert-translations.json` — 1/3 (iter 1153). Carry.
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] **NEW**: "yes unstick it" orphan directive — DM sent (larry-alerts.jsonl line 1383). Likely target: health-check-notify-script-missing re-dispatch. Pending Larry clarification.
+- [yellow] CCD probe-retry unblocked (PR #425 in production). Beacon/Larry to initiate ccd-s1 re-dispatch.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; **verified prior iter: no merged PR, no open PR, Forge inbox empty** — dispatch dead-lettered. Re-dispatch via Beacon needed (likely the "unstick it" target).
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [blue] install-drift 1/2 clean noon fires post-PR #411. Watch midnight MDT June 11 for 2/2.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3 + new occurrence (auto-healed at 18:00Z); pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3 (no new occurrence; last at 11:38 MDT pre-iter-1338).
+- [blue] G-rule missions-card-gc:summary 1/3 (iter 1333). Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3 (iter 1332). Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330). Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3 (iter 1153). Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+
+**Watch items for iter 1340:**
+- **"yes unstick it" orphan directive** — DM sent line 1383. Watch for Larry response. If confirmed as health-check-notify-script-missing: Pulse to write fresh Beacon inbox envelope (noting 2/3 dead-letter risk).
+- **install-drift** — midnight MDT June 11 (06:00Z) fire for 2/2 clean post-PR #411.
+- **CCD probe-retry** — watch for Larry or Beacon to initiate ccd-s1 re-dispatch.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:**
+1. Appended [yellow] DM to `larry-alerts.jsonl` (line 1383): `pulse` / `orphan-directive-unstick-it-20260610T175936Z` — route=escalate. Requests clarification on "yes unstick it" target.
+2. Appended PRIME DIRECTIVE intervention row: `orphan-directive:yes-unstick-it-11:53-MDT-beacon-permission-boundary-escalated-yellow` (iter 1339, tier 1, ts 18:03:08Z).
+
+**PRIME DIRECTIVE:** 1 new intervention (Check 2 orphan directive). interventions=756, systemic_fixes=17, ratio≈44.47, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 2 non-nominal).
+
+---
+
 ## Iteration 1338 — 2026-06-10 ~17:47Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Check 0: 2 new alerts, both Tier-3 known patterns (unreviewed-merge:426, outbox-notifier:review-pass) — journal note only. **Key event:** PR #425 (`fix(orchestrator): pin dispatched-worker agent identity deterministically`) MERGED at 17:42Z UTC — Mirror-approved auto-merge. Systemic fix for `inbox_watcher.py:603 identity-nondeterminism` **VERIFIED LANDED**; G-rule 1/3 CLOSED. PR #426 (`feat(bughunt-gate): Phase 2 — self-tuning corpus distillation loop`) merged by Larry at ~17:36Z UTC; bug-hunt gate soak assessment cycle COMPLETE. All other checks nominal. 9/9 services active. Sync: SUCCESS (17:16:58Z, ~31 min at scan, within 2h). 0 open PRs.
