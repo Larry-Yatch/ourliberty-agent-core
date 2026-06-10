@@ -15,6 +15,51 @@
       },
       "last_touched": "2026-06-10T06:01:59.654438+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-orphan-lane-show-desktop-chat-title-fallback-rep-dd23",
+      "title": "Orphan lane: show desktop chat title (fallback repo/branch), not the alphanumeric task_id",
+      "note": "Desktop orphans render desktop-<id> which is unreadable. Capture the Claude Code session title (needs a desktop_session_active re-emit since the title appears after a chat starts; verify the hook exposes it) and render title > repo/branch fallback in OrphansLane instead of the humanized task_id. Phase 2.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/install-drift-just-fired-grace",
+        "captured_at": "2026-06-10T06:35:23.978896+00:00"
+      },
+      "last_touched": "2026-06-10T06:35:23.978896+00:00",
+      "promoted_to": null
+    },
+    {
+      "id": "cap-orphan-lane-show-state-collapse-terminal-orphans-aa37",
+      "title": "Orphan lane: show STATE + collapse terminal orphans (97 noisy, can't tell what's done)",
+      "note": "Lane shows ALL unregistered tasks (terminal + active) with no phase, so 97 items look actionable when most are done. Fix: derive each orphan's phase, badge it (building/in-review/shipped/abandoned), and collapse/hide terminal ones so only actionable orphans show. Pairs with the Phase 2 derive-relocation. Auto-registration + register/dismiss buttons = Phase 3.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/install-drift-just-fired-grace",
+        "captured_at": "2026-06-10T06:35:24.295967+00:00"
+      },
+      "last_touched": "2026-06-10T06:35:24.295967+00:00",
+      "promoted_to": null
+    },
+    {
+      "id": "cap-projects-pm-layer-data-is-stale-separate-system-84ec",
+      "title": "Projects (PM layer) data is stale \u2014 separate system from missions GC",
+      "note": "The Supabase projects table (migrated from Mission Control) is NOT fed by the chain_events spine, so the missions GC healer never touches it. Its staleness needs its own freshness/cleanup mechanism. Track separately from the Missions tab; do not fold into missions GC.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/install-drift-just-fired-grace",
+        "captured_at": "2026-06-10T06:35:24.627125+00:00"
+      },
+      "last_touched": "2026-06-10T06:35:24.627125+00:00",
+      "promoted_to": null
     }
   ]
 }
