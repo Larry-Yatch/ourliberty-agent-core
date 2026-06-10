@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration 1246 — 2026-06-10 03:55Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all mandatory + additive checks nominal; 0 new alerts. Check I fired (Wednesday, sentinel=2026-06-08; previous iters incorrectly skipped Wednesday — §5.1 fires Mon/Wed/Fri/Sun, corrected this iter).
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean to 1)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1403 lines** (UNCHANGED from iter 1245 watermark of 1403). No new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry idx=1402 delivered (unreviewed-merge:405) at 21:39:17-0600 June 9 (03:39:17Z June 10). No new Larry messages or agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json EXISTS but does NOT contain expected `heartbeat`/`active_stalls` keys — file content is a suppress/snooze registry (flat dict of stall_id:expiry_ts pairs; newest entry 2026-06-04). Cannot confirm healer freshness via this substrate. No independent stall evidence in Check 0, Check 1, or Check 2. [blue] watch: substrate format mismatch — prior iters read heartbeat from this path successfully (iter 1245: 03:41:19Z). If next iter also cannot confirm, escalate.
+
+**Check 4 — Pending directives:** beacon=0, forge=0, mirror=0, pulse=0 inbox files. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=33392c6 ("Pulse cycle 20260610T035020Z" — iter 1245 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T03:03:39Z (~52 min ago — within 2h threshold). ✅ Nominal. [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 root code fix outstanding.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8 core ourliberty-*.service units active/running (beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-agent-core-health.service: inactive/dead/Result=success/ExecMainStatus=0 ✅ (healthy oneshot; confirmed again per iter 1245 correction — [yellow] standing is for missing notify_larry.py only). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: **0 open**. ✅ Nominal.
+
+**Check H — Forge activity digest:** 0 open Forge PRs. Recently merged: PR #403 (notifier dedup wedge fix, 06-09T23:08Z), PR #401 (credentials: register OL_DB_RO_URL, 06-09T22:35Z). ✅ Nominal.
+
+**Credential rotation (§ 4.6):** 20 credentials in registry, 0 due within 60 days. ✅ Nominal.
+
+**§5.0 Bug-hunt gate soak:** 2/15 gate reviews since go-live — soaking, no-op.
+
+**§5.1 Check I (Wednesday, sentinel=2026-06-08):** FIRED. Mode=digest. Ledger total $1,041.64 (-35.4% vs prior week). 179 σ-anomalies. Retry overhead $0.00 (0%). High-repeat: `smoke-5a-pf-no-marker` ×3. 2 proposals:
+1. [small] Review high-σ anomaly `medic-operator-scaffold-001` — $6.72 vs $1.68 baseline (24.4σ). **Auto-dispatched to Beacon** (pulse-auto-655be51b08-20260610).
+2. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats; not auto-dispatched (effort=medium). Use `/dispatch 2` to forward.
+DM queued via `larry_alerts.append_alert`. See appended Check I block for full detail.
+
+**Conditional checks (Wednesday June 10 UTC):** Not Sunday → Checks III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: agent-core-health.service = inactive/dead/exit=0/SUCCESS ✅ (re-verified). [yellow] standing for missing notify_larry.py only. Carry forward.
+- `unreviewed-merge streak: 2`: alert count 1403 UNCHANGED. No new alerts. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: No new auth_401 in beacon log. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change/03:03:39Z. Root fix pending. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Check I fired normally this iter. Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): cycle.service active. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): APPROVAL_REQUEST pending. Carry forward.
+
+**Standing findings:**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. (Service itself healthy/exit=0.)
+- [yellow] **unreviewed-merge: streak 2** (PR #404 + PR #405) — DM delivered 03:39:17Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed. Next occurrence on next commit-and-push day.
+- [blue] **Check 3 substrate anomaly** — pipeline-stall healer heartbeat not found in expected state file. Watch next cycle.
+
+**Check I Wednesday-gate correction:** §5.1 fires Mon/Wed/Fri/Sun. Iters 1241–1245 journaled "Checks I skip" on Wednesday — incorrect. Corrected this iter; Check I ran and fired normally. Prior Wednesday sidecar reads were missed opportunities.
+
+**Actions taken:** None (allow-listed auto-fixes).
+**Dispatches:** 1 — Check I auto-dispatch to Beacon (pulse-auto-655be51b08-20260610: review medic-operator-scaffold-001 σ-anomaly, $6.72 vs $1.68 baseline).
+**PRIME DIRECTIVE (script-authoritative):** 0 healer interventions this iter (all mandatory + additive checks nominal). Check I dispatch = optimization action (not a healer intervention). Appending `iter_clean` row. interventions=734, systemic_fixes=15, verification_pending=5, ratio≈48.93 (unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=0 → wrapper increments to 1 (clean iter).
+
+---
+
 ## Iteration 1245 — 2026-06-10 03:47Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Tier 1 — 1 new alert (unreviewed-merge:405, DM auto-delivered 03:39Z; unreviewed-merge streak now 2). CORRECTION this iter: ourliberty-agent-core-health.service is NOT "failed" — it is `inactive (dead) exit=0/SUCCESS` (healthy oneshot). Prior journal entries reporting "failed" were incorrect; carrying forward as [yellow] for missing notify script only.
@@ -74418,3 +74487,15 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 **Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
 
 ---
+
+**Check I (2026-06-08):**
+
+- Ledger total: $1041.64; 179 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- High-repeat tasks: `smoke-5a-pf-no-marker`×3
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: digest — 2 proposal(s):
+  1. [small] Review high-σ anomaly task `medic-operator-scaffold-001` — $6.72 task vs $1.68 baseline (24.4σ above)
+     Rationale: Ledger flagged this task at 24.4σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
+  2. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
+     Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
