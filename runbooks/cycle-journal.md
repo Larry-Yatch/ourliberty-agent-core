@@ -4,6 +4,103 @@
 
 ---
 
+## Iteration 1373 — 2026-06-10 22:12Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline blocked — all Forge build sessions failing with EROFS (tier2 HOME read-only). Beacon has diagnosed root cause and is holding re-dispatch pending Larry's infra decision. 0 open PRs. 9/9 services active. 0 new escalation alerts.
+
+**VERIFY-BEFORE-REASSERT (pipeline-stall):** heal-pipeline-stall ran 21:53:25Z (~19 min ago). "No stalls detected." Heartbeat file MISSING (intermittent: 1369/1370/1372/1373 absent). journalctl authoritative. heal-pipeline-stall-state.json: 43 entries, 30 non-2099 (all historical: May 26 – June 10T15:58Z; none from 22:00Z+ this cycle). ✅ No active stalls per healer.
+**VERIFY-BEFORE-REASSERT (EROFS):** NEW FINDING this iter — see Check 3 below. Not a carry-forward; first diagnosis in iter 1373.
+**VERIFY-BEFORE-REASSERT (pending approval):** beacon-pending-approvals.json MISSING. 0 pending approvals. ✅
+
+**Tier state:** 1 (consecutive_clean=0; EROFS blocking all builds)
+
+**Check 0 — Alert triage:**
+- alert-triage.json: watermark MISSING (standing; G-rule dispatched iter 1251). Per spec: claim trailing 100 lines.
+- larry-alerts.jsonl: **1404 lines** (+1 since iter 1372 watermark). New entry: line 1404 `2026-06-10T22:02:09Z missions-card-gc:summary` — route=digest, Tier-3 known-pattern. ✅ No escalation.
+- **New watermark: line 1404 / missions-card-gc:summary / 2026-06-10T22:02:09Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: MISSING. 0 pending approvals. ✅
+- Last Larry message: 15:52:16 MDT (21:52:16Z) — same as iter 1372, no new messages. No orphan directives. ✅ Nominal.
+- `alert idx=0 delivery to 12345 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall (NEW CRITICAL FINDING):**
+- heal-pipeline-stall ran 21:53:25Z (~19 min ago). "No stalls detected." ✅ (Healer doesn't yet know about EROFS — it checks stall timestamps, not build-session errors.)
+- **EROFS ROOT CAUSE IDENTIFIED:** Beacon `notify-fix-classifier-session-lost-001.1.json` (22:00Z) diagnosed: ALL Forge build sessions are failing because the Claude Code harness cannot create `/home/larry/.claude-larry-personal/.claude/session-env` — the tier2 personal-account HOME dir is mounted read-only. Exit_code=-1 (instant spawn-failure) = harness dies at t=0 before any command runs.
+- **Failures this cycle (VERIFY-BEFORE-REASSERT):**
+  - `fix-test-gate-sandbox-env-injection-001` pass 2: spawn-failure 22:02:14Z (exit_code=-1, "All retries exhausted") ← VERIFIED from outbox archive.
+  - `fix-dashboard-routing-denied-001` build: spawn-failure 22:06:42Z (exit_code=-1, "All retries exhausted") ← VERIFIED from outbox archive.
+  - `build-fix-classifier-session-lost-001`: consumed from inbox at 21:51Z; result at 21:59Z was session_lost (different failure: `--resume` stale session ID) ← VERIFIED from inbox archive + outbox archive.
+- **Beacon response:** notify tasks for all 3 failures completed (22:00Z, 22:03Z, 22:07Z). Beacon holding all re-dispatches. No new Forge tasks queued. Forge inbox: EMPTY. ← VERIFIED.
+- **Beacon recommendation** (`notify-fix-classifier-session-lost-001.1.json`): Fix is one of: (1) make `/home/larry/.claude-larry-personal` mount read-write, OR (2) route Forge build sessions to tier1 HOME (`/home/larry`). Code for `fix-classifier-session-lost-001` is complete on branch `forge/fix-classifier-session-lost-001` — just needs `commit/push/PR` once HOME is writable.
+- ⚠️ tier-reset: YES
+
+**Check 4 — Pending directives:**
+- No new Larry messages. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code ran 21:43:04Z (29 min ago). fresh=75 unparseable=47. State file MISSING (no stale daemons). ✅ Nominal.
+
+**Check A — Source repo:** main, clean (from gitStatus). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=`2026-06-10T21:50:16Z` (~22 min old at 22:12Z), status=no-change. Expires 23:50:16Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** All builds failing with EROFS (see Check 3). Forge inbox empty — Beacon holding re-dispatch. No active builds in-flight.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS (fired iter 1345). Idempotent skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate:** Scripts no-op (no committed audit baseline). ✅
+
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days). ✅
+
+**install-drift:** heartbeat `2026-06-10T18:00:03Z` (~4h12m old). Next fire ~06:00Z June 11. ✅
+
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1372 unchanged.
+- **EROFS spawn-failure**: new pattern. 3 build tasks failed in 2 hours (22:02Z, 22:06Z, 22:06Z). Beacon diagnosed root cause. Spawning G-rule watch: if same EROFS failure occurs post-Larry-fix, count as G-rule 1/3 for permanent fix. For now: infra fix path.
+- heal-pipeline-stall heartbeat file: MISSING again (1369/1370/1372/1373). Pattern: 4/4 of recent iters absent. Sub-threshold watch.
+
+**Actions taken:** 1. Recorded PRIME DIRECTIVE intervention (erofs-blocked-builds:tier2-home-readonly-3-tasks-held). No auto-fixes taken (EROFS is infra, never-auto).
+
+**Escalation:**
+- [yellow] **EROFS: all Forge builds blocked.** `fix-classifier-session-lost-001` code is done on branch but can't commit/push. `fix-test-gate-sandbox-env-injection-001` and `fix-dashboard-routing-denied-001` also blocked. **Action on Larry: fix tier2 HOME mount: `chmod` or `remount` `/home/larry/.claude-larry-personal` as writable, OR re-pin Forge sessions to use tier1 HOME (`/home/larry`). Then re-dispatch: Forge will auto-retry once Beacon un-holds.** Beacon guidance in `agents/outboxes/beacon/.archive/notify-fix-classifier-session-lost-001.1.json`.
+
+**Standing findings (carry):**
+- [yellow] **Wedge-reaper build** — now doubly blocked: EROFS + classifier PR not yet open. Root dependency: fix EROFS first.
+- [yellow] CCD S1 build spawn-failure. Blocked on EROFS + wedge + classifier PR.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] alert-triage.json watermark MISSING (standing; Forge brief pending).
+- [blue] heal-pipeline-stall heartbeat MISSING — 4/4 recent iters (1369/1370/1372/1373). Watch for pattern (not yet 3-consecutive G-rule trigger since 1371 was present).
+
+**PRIME DIRECTIVE:** +1 intervention (erofs-blocked-builds). interventions=763, systemic_fixes=17, ratio≈44.88, trend=flat.
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1372 — 2026-06-10 22:01Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline churning. `fix-classifier-session-lost-001` build FAILED at 21:59:13Z (session_lost, 5/5 retries; WIP preserved on branch). `fix-test-gate-sandbox-env-injection-001` first pass COMPLETE (21:56:17Z, $0.78), second pass active (21:59:19Z). Forge inbox: 3 tasks queued. 0 new alerts. 0 open PRs. 9/9 services active.
