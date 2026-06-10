@@ -460,6 +460,24 @@ class OrphanPrStateTest(_DerivedTestBase):
         self.assertFalse(o['orphan-stalled-old']['terminal'])
         self.assertTrue(o['orphan-stalled-old']['stalled'])
 
+    def test_raising_resolver_degrades_not_500s(self) -> None:
+        # Backstop: even if the resolver raises (it shouldn't), the derive must
+        # degrade to event-only, never propagate a 500. orphan-shipped-pr stays
+        # terminal via its auto_merge event; the merged-but-eventless orphan
+        # falls back to in-review (visible).
+        def _boom(_urls):
+            raise RuntimeError('resolver blew up')
+        out = da._handle_missions_derived(
+            missions_path=self._missions_path,
+            captures_path=self._captures_path,
+            supabase_client=self._stub,
+            repo=None, task_id=None, now=NOW,
+            pr_state_resolver=_boom,
+        )
+        o = {x['task_id']: x for x in out['orphans']}
+        self.assertTrue(o['orphan-shipped-pr']['terminal'])
+        self.assertEqual(o['orphan-inreview-now']['state_badge'], 'in-review')
+
 
 class ResolvePrStatesTest(unittest.TestCase):
     """Unit tests for the live resolver itself — batched, bounded, fail-safe.
@@ -546,6 +564,53 @@ class ResolvePrStatesTest(unittest.TestCase):
         self.assertEqual(
             da._resolve_orphan_pr_states(['not-a-pr-url']), {},
         )
+
+    def test_null_data_error_shape_is_fail_safe(self) -> None:
+        # GitHub returns HTTP 200 with {"data": null, "errors": [...]} on a
+        # whole-query failure (bad token, rate-limit). The resolver must return
+        # {} — NOT raise AttributeError on None.get(...) and 500 the route.
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': None, 'errors': [{'type': 'NOT_FOUND'}]},
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_repository_null_is_fail_safe(self) -> None:
+        # {"data": {"repository": null}} (repo gone / no access) → {} cleanly.
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': {'repository': None}},
+        )
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_non_dict_body_is_fail_safe(self) -> None:
+        # resp.json() returns a non-dict (e.g. a list) → {} cleanly.
+        da._github_api_request = lambda *a, **k: self._resp([1, 2, 3])
+        self.assertEqual(
+            da._resolve_orphan_pr_states(
+                ['https://github.com/o/r/pull/1'],
+            ), {},
+        )
+
+    def test_partial_null_nodes_resolve_the_rest(self) -> None:
+        # One PR node null (deleted), the other valid → the valid one maps,
+        # the null one is skipped (no crash).
+        da._github_api_request = lambda *a, **k: self._resp(
+            {'data': {'repository': {'p1': None, 'p2': {'state': 'MERGED'}}}},
+        )
+        urls = [
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1',
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/2',
+        ]
+        out = da._resolve_orphan_pr_states(urls)
+        self.assertNotIn(urls[0], out)
+        self.assertEqual(out[urls[1]], 'MERGED')
 
 
 class DeriveOrphanReadabilityUnitTest(unittest.TestCase):

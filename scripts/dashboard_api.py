@@ -39,6 +39,7 @@ import secrets
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
@@ -2861,10 +2862,12 @@ def _orphan_label_and_location(
 # → stays visible. Reuses GITHUB_TOKEN (no new credential).
 _PR_URL_RE = re.compile(r'github\.com/([^/\s]+)/([^/\s]+)/pull/(\d+)')
 # Defensive upper bound so a pathological orphan set can't fan out into an
-# unbounded GitHub query, and a tight timeout so a slow GitHub never stalls the
-# board past the dashboard's own 5s budget (it degrades to event-only instead).
+# unbounded GitHub query. _PR_STATE_TOTAL_BUDGET_S caps the WALL TIME across all
+# per-repo calls combined (not per call), so a slow GitHub never stalls the
+# board past the dashboard's own 5s client timeout — it degrades to event-only
+# for the repos it couldn't reach in budget.
 _MAX_PR_STATE_LOOKUPS = 200
-_PR_STATE_TIMEOUT_S = 4.0
+_PR_STATE_TOTAL_BUDGET_S = 4.0
 
 
 def _parse_pr_url(url: Optional[str]) -> Optional[tuple[str, str, int]]:
@@ -2910,27 +2913,43 @@ def _resolve_orphan_pr_states(pr_urls: list[str]) -> dict[str, str]:
             break
     out: dict[str, str] = {}
     headers = {'Authorization': f'bearer {token}', 'Accept': 'application/json'}
+    # owner/name go through GraphQL variables (never string-interpolated) so a
+    # malformed pr_url can't break or inject the query; only the integer PR
+    # numbers — which _parse_pr_url guarantees are ints — are interpolated.
+    deadline = time.monotonic() + _PR_STATE_TOTAL_BUDGET_S
     for (owner, repo), num_to_url in by_repo.items():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0.1:
+            break  # out of wall-clock budget → degrade to event-only for the rest
         fields = '\n'.join(
             f'  p{n}: pullRequest(number: {n}) {{ state }}' for n in num_to_url
         )
         query = (
-            f'query {{ repository(owner: "{owner}", name: "{repo}") {{\n'
-            f'{fields}\n}} }}'
+            'query($owner: String!, $name: String!) {\n'
+            '  repository(owner: $owner, name: $name) {\n'
+            f'{fields}\n  }}\n}}'
         )
         try:
             resp = _github_api_request(
                 'POST', 'https://api.github.com/graphql',
-                headers=headers, json_body={'query': query},
-                timeout=_PR_STATE_TIMEOUT_S,
+                headers=headers,
+                json_body={
+                    'query': query,
+                    'variables': {'owner': owner, 'name': repo},
+                },
+                timeout=remaining,
             )
             if getattr(resp, 'status_code', None) != 200:
                 continue
             data = resp.json()
         except Exception:  # noqa: BLE001 — fail-safe: never break the derive
             continue
+        # GitHub returns 200 with {"data": null, "errors": [...]} on a
+        # whole-query failure (bad token, rate-limit, malformed query); the
+        # `or {}` keeps a present-but-null `data` from raising here (this line
+        # is past the try, so an AttributeError would escape and 500 the route).
         repo_node = (
-            data.get('data', {}).get('repository')
+            (data.get('data') or {}).get('repository')
             if isinstance(data, dict) else None
         )
         if not isinstance(repo_node, dict):
@@ -3133,7 +3152,12 @@ def _build_derived_response(
     if pr_state_resolver is not None:
         orphan_pr_urls = [o['pr_url'] for o in orphans if o.get('pr_url')]
         if orphan_pr_urls:
-            pr_state_by_url = pr_state_resolver(orphan_pr_urls) or {}
+            # Backstop: the resolver is contracted to never raise, but a derive
+            # must never 500 — if it does raise, degrade to the event-only path.
+            try:
+                pr_state_by_url = pr_state_resolver(orphan_pr_urls) or {}
+            except Exception:  # noqa: BLE001 — fail-safe: never break the derive
+                pr_state_by_url = {}
     for o in orphans:
         o.update(_derive_orphan_readability(
             o, events_by_orphan.get(o['task_id'], []), now,
