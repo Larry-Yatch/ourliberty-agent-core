@@ -4,6 +4,114 @@
 
 ---
 
+## Iteration 1349 — 2026-06-10 19:25Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing: Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1 — **UPDATED: Larry confirmed auth_401 is a fixture fault (13:11 MDT); Beacon actively diagnosing with Larry (13:15–13:17 MDT, "necessary but not sufficient").** 1 new alert (unreviewed-merge:431, expected, DM delivered). 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; fixture auth_401 + standing spawn-failures)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:57:24.490251+00:00 / claude_tier1_failed_tier2_unavailable:auth_401 / line 1396` (iter 1348)
+- Current total: 1397 lines. **1 new entry** since watermark:
+  - Line 1397: `ts=19:10:27Z source=heal-unreviewed-merge-detector severity=critical subject=unreviewed-merge:431` — PR #431 merged without Mirror review (actor=Larry-Yatch). `never_silence: true` → Tier-4. DM delivered (alert idx=1396 at 13:15:08 MDT per beacon_telegram_bot.log). This was predicted in iter 1348 as imminent (detector lag). Pulse claims; no new action.
+- **New watermark: `2026-06-10T19:10:27Z / unreviewed-merge:431 / line 1397`**
+- tier-reset: YES (Tier-4 alert)
+
+**VERIFY-BEFORE-REASSERT — auth_401 standing (iter 1348):**
+- **UPDATED**: Larry at 13:11 MDT: "This is a fixture fault again: ⚠ agent-runner-forge [claude_tier1_failed_tier2_unavailable:auth_401] Task fix-wedged-re..." Beacon responded at 13:15 MDT recommending test mock sanitization. Larry echoed at 13:16 MDT; Beacon replied at 13:17 MDT: "Honest answer: partly — it's necessary but not sufficient. It will not 'finally fix this' by itself."
+- Bot log confirms fixture strings at 12:39 MDT (18:39 UTC): `stdout="You've hit your limit · TIER_ONE_MARKER"`, `stdout="You've hit your limit · resets 11:30am"`, `TIER2_FALLBACK_FAILED stdout='auth_401: provider not enabled (TIER 2 distinct)'` — these are the known mock/fixture outputs (per MEMORY calibration note). These appeared before the Forge auth_401 event at 18:57 UTC.
+- `heal-resume-paused-on-tier1.json`: `{"tasks": {}}` — healer has no resume record for this task.
+- In-flight state file persists (`~/agents/state/in-flight/fix-wedged-reaper-spares-active-build-worktree.json` shows `paused_on_tier1`).
+- **Revised assessment**: auth_401 is fixture-caused (test mock contamination in agent_runner, not real credential failure). Prior instruction "run auth_orchestrator.py" is NOT the correct fix. Larry+Beacon are actively diagnosing; Beacon is the right path. Watch for dispatch from that conversation. Do NOT re-DM Larry on this — he's engaged.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Larry→Beacon conversation in progress (13:11→13:17 MDT): fixture-fault characterization + mock-sanitization diagnosis + Beacon "necessary but not sufficient" nuance. Most recent bot log entry: 13:17:27 MDT.
+- No new pending approvals from Larry toward Pulse. beacon-pending-approvals.json: MISSING (0 pending). ✅
+- Standing: auth_401 fixture contamination log entries — G-rule 3/3 dispatched iter 1281; Forge brief pending. The 12:39 MDT entries this cycle confirm recurrence.
+- ⚠️ tier-reset: YES (standing fixture auth log + active Larry+Beacon exchange re: mock contamination).
+
+**Check 3 — Pipeline stall:**
+- `heal-pipeline-stall-state.json`: heartbeat=NONE, stalls=0. Standing (iters 1329+).
+- Forge inbox: EMPTY. In-flight: `fix-wedged-reaper-spares-active-build-worktree.json` paused_on_tier1 (fixture-caused, as updated above). `heal-resume-paused-on-tier1.json`: `{"tasks": {}}` — healer has no resume record.
+- CCD S1 (`ccd-s1-envelope-builder.5.json`) in archive (spawn-failure). `fix-headless-approval-dedup-spawn-failure-wedge.1.json` in archive (spawn-failure). Re-dispatch chain still blocked.
+- ⚠️ Non-nominal; tier-reset: YES (standing).
+
+**Check 4 — Pending directives:**
+- Larry→Beacon exchange at 13:11–13:17 MDT processed by Beacon. ✅ Not orphaned.
+- beacon-pending-approvals.json: MISSING (0 pending). ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (only cooldowns file; standing pattern). 9/9 services active. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. Most recent commit: `cd4304d Pulse cycle 20260610T191418Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~34 min at scan), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅ (confirmed via `gh pr list`)
+- **ourliberty-dashboard:** 0 open PRs. ✅
+- unreviewed-merge:431 DM confirmed delivered (iter 1347's watch resolved).
+
+**Check H — Forge activity:** 0 open Forge PRs. 1 task in in-flight state (paused, fixture-caused). No new Forge activity since 18:57Z. ✅
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** Carry iter 1348. No new audit_due / distill_detector alerts. ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1348 watch items:**
+- **Auth_401 resolution** — UPDATED: fixture-caused, not real auth failure. Larry+Beacon actively diagnosing. Prior "run auth_orchestrator.py" instruction is not the correct fix. **Status: under active diagnosis by Larry+Beacon. Watch for dispatch.**
+- **unreviewed-merge:431 alert** — VERIFIED: alert at line 1397, DM delivered 13:15:08 MDT. ✅ CLOSED.
+- **CCD S1 + headless-dedup** — Both in archive (spawn-failure). Still doubly blocked (fixture auth + wedge fix). CARRY.
+- **install-drift** — 06:00Z UTC June 11. No new alerts. CARRY.
+- **alert-translation-no-mirror-dispatch-001** — No change. CARRY.
+
+**G-rule tracking:**
+- `auth_401 fixture contamination causing task paused_on_tier1`: The 12:39 MDT bot log entries this cycle confirm fixture strings recurred AND caused a REAL task to hit paused_on_tier1. The G-rule 3/3 (log-contamination, iter 1281) dispatched to Beacon; Forge brief still MISSING. The FUNCTIONAL IMPACT (task paused by mock) escalates urgency — note this in the standing finding.
+- All others: carry from iter 1348 (no new occurrences this iter).
+
+**Standing findings:**
+- [yellow] Forge task paused_on_tier1: `fix-wedged-reaper-spares-active-build-worktree`. **REVISED**: fixture-caused (test mock contamination in agent_runner, not real auth). Larry+Beacon diagnosing (13:11–13:17 MDT). Beacon: "necessary but not sufficient." Watch for dispatch from conversation. Do NOT "run auth_orchestrator.py" — that's not the fix.
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Blocked on fixture auth + wedge fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge` build: `.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING; FUNCTIONAL IMPACT confirmed this cycle (task paused by mock output). Escalated urgency.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] unreviewed-merge:429, :430, :431 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2` to send to Beacon.
+
+**Watch items for iter 1350:**
+- **Larry+Beacon mock-sanitization conversation** — watch for dispatch from Beacon or new Larry message. If Beacon dispatches a mock-sanitization task to Forge, verify it reaches Forge inbox.
+- **CCD S1 + headless-dedup** — no action until fixture auth + wedge fix resolved.
+- **install-drift** — 06:00Z June 11.
+- **Forge brief for log-contamination G-rule** — still MISSING (dispatched iter 1281); track if Beacon produces it post the mock-sanitization conversation.
+
+**Actions taken:** None (no new auto-fix conditions; all findings are standing, fixture-related, or pending Larry+Beacon conversation).
+
+**PRIME DIRECTIVE:** +1 intervention (unreviewed-merge:431 claimed via Check 0 triage). 0 new systemic fixes. interventions=761, systemic_fixes=17, ratio≈44.76, trend=flat. iter_non-clean (fixture auth_401 + standing spawn-failures).
+**Tier end-of-iter:** 1 (consecutive_clean=0; fixture auth_401 + standing spawn-failures).
+
+---
+
 ## Iteration 1348 — 2026-06-10 19:08Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing: Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1 (auth_401, 18:57:24Z). PR #431 VERIFIED MERGED (aa1376b `feat(pulse): Check XI — catalog accuracy meter`; 0 open PRs confirmed). unreviewed-merge:431 alert NOT YET in alerts file (1396 lines unchanged; expected imminently from detector lag). CCD S1 and headless-dedup spawn-failures standing (doubly blocked: auth_401 + wedge fix). 9/9 services active.
