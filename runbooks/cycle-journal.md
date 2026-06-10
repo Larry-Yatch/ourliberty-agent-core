@@ -4,6 +4,62 @@
 
 ---
 
+## Iteration 1264 — 2026-06-10 ~06:30Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks clean; 0 new alerts; Forge build in progress (harden-test-prod-write-isolation-001, ~9 min old); 0 open PRs.
+**Tier state:** 1 (consecutive_clean=1→2; last_signal_at=2026-06-09T18:16:30Z; clean iter)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1419 lines** (UNCHANGED — same watermark as iter 1263: 06:12:27Z / pulse-cycle:sync-blocked:captures-json-dirty). No new alerts since watermark. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot last activity 00:15:00 MDT (06:15Z UTC) — Larry said "go" dispatching `harden-test-prod-write-isolation-001` to Forge. No new Larry directives since. Standing Tier 2 auth failure (last TIER2_FALLBACK at 23:32Z June 9). ✅ Nominal (standing item only).
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):** heal-pipeline-stall-state.json modified 06:20Z (< 60 min, healer fresh). File has 34 entries: 13 with 2099-suppression, 21 with past timestamps (May 26–June 4) — all historical artifacts from OAuth outage + June 4 stalls; healer ran at 06:20Z and generated no new stall alerts. NOTE: iter 1263's Check 3 claimed "All 34 state keys have 2099" — current file shows only 13 with 2099, not 34. Prior journal entry was inaccurate on that count; the nominal conclusion stands (healer fresh, 0 new alerts). No heartbeat key (known [blue] format mismatch). ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: `build-harden-test-prod-write-isolation-001.json` (~9 min old — Larry-approved 06:15Z, under 1-hour stale threshold; active build). Beacon: empty. Mirror: empty. Pulse: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=847cc9b ("Pulse cycle 20260610T062013Z"). Sync=no-change at 06:16Z. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T06:16:12Z. ✅ Nominal (< 2h). APPROVAL_REQUEST `sync-push-rebase-fallback-001` standing. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core ourliberty-*.service units active/running: beacon-bot ✅, chain-event-shipper ✅, dashboard-api ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. ourliberty-agent-core-health.service: **failed** (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. assess_gate: 6/15 — soaking, no-op. ✅
+
+**Verify-before-reassert — iter 1263 standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service = **failed** (confirmed Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon log 23:32Z TIER2_FALLBACK_FAILED confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: watermark unchanged at 1419. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: Forge inbox empty (only harden task). Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change 06:16Z; underlying root fix still pending. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: watermark unchanged. [blue] pending `go: actor-exemption-config`.
+- `pulse-auto-9c915b7081-20260610` in Beacon inbox: Beacon inbox now shows empty — task processed. [blue] watch.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready; pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 66th+ occurrence; self-recovering; root code fix pending.
+
+**Watch item:** Forge build `harden-test-prod-write-isolation-001` — Larry-approved 06:15Z; Forge inbox task ~9 min old. Normal build time. Watch for PR opening next cycle.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 1264` → row appended (06:30:52Z).
+**Dispatches:** None.
+**PRIME DIRECTIVE:** iter_clean (no new interventions). interventions=738, systemic_fixes=16, ratio=46.125, trend=flat (script-authoritative, unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=1→2 (wrapper will increment on commit).
+
+---
+
 ## Iteration 1263 — 2026-06-10 ~06:18Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — both iter-1262 findings resolved; all checks clean; 0 new alerts; 0 open PRs.
