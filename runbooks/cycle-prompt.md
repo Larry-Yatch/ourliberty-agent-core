@@ -494,21 +494,39 @@ This check is additive — it fires every cycle and adds at most one line to the
 
 These checks fire only on specific weekdays, on top of the always-run mandatory + additive checks above. They do NOT gate tier de-escalation (a quiet conditional check is just quiet) — they're parallel observation surfaces with their own DM cadence.
 
-#### 5.0 Bug-hunt gate soak — one-shot assessment (TEMPORARY; remove after Phase-2 decision)
+#### 5.0 Bug-hunt gate Phase-2 — distill detector + audit-cadence signal (self-gating one-shots)
 
-Every cycle, run:
+(The soak one-shot `assess_gate.py` lived here until 2026-06-10; it fired, Larry chose
+Phase-2, so it and its §5.0 block were retired per its own spec. Phase-2 is below.)
+
+Phase-2 (shipped: the distill→backtest→propose→approve loop) teaches the bug-hunt corpus
+from full-codebase audit findings. Two self-gating one-shots keep it from being missed.
+Every cycle, run both:
 
 ```
-python3 ~/agent-core/scripts/assess_gate.py
+python3 ~/agent-core/scripts/distill_detector.py
+python3 ~/agent-core/review/distill/audit_cadence_signal.py
 ```
 
-It is **self-gating**: it no-ops (prints a one-line soak status, exits 0) until the Mirror
-bug-hunt gate (shipped PR #398) has reviewed N=15 PRs since go-live, then fires **exactly
-one** Telegram DM to Larry with the soak assessment + next step, writes a sentinel
-(`~/agents/state/gate-soak-assessment.json`), and no-ops forever after. It never raises and
-emits no heartbeat (so the staleness watcher does not track it — no cadence entry needed).
-Journal nothing unless it prints `FIRED`. This is a temporary checkpoint: once Larry decides
-keep / dial-back / Phase-2, delete this subsection and the script. Spec: `review/gate-soak-assessment.md`.
+Both follow the §5.0 contract exactly — **self-gating, fail-open (never raise), no
+heartbeat, journal nothing unless they print `FIRED`**:
+
+- **`distill_detector.py`** no-ops until a NEW full-codebase audit (`AUDIT_main_<date>.md`,
+  excluding the seed `AUDIT_main_20260605.md` and any non-dated `AUDIT_main_*` doc) lands
+  that hasn't been distilled. Then it fires **one** DM telling Larry to run the distiller
+  on his desktop (it's local-`claude -p` dev work, NOT Beacon/droplet auth), and records a
+  per-audit nag (`~/agents/state/distill-detector-nags.json`) so it never re-nags that
+  audit. Stays active as long as audits land manually.
+- **`audit_cadence_signal.py`** is the durable capture for the ONE deferred decision —
+  schedule recurring audits vs keep on-demand. It no-ops until Phase-2 has distilled its
+  first **post-seed** audit (≥15 findings), then fires **exactly once**: a DM carrying the
+  convergence reading (novel-class share per audit) + a data-driven cadence recommendation
+  + a Missions Parked-lane card (`emit_capture.sh`, the durable backstop), writes a sentinel
+  (`~/agents/state/audit-cadence-signal.json`), and no-ops forever after. After Larry makes
+  the cadence call, delete this one and its line here.
+
+Spec: memory `mirror-bughunt-gate-project`; the approve leg is the Beacon
+`approve distill-update-<date>` handler.
 
 #### 5.1 Check I — Optimization mode (Mon/Wed/Fri/Sun)
 
