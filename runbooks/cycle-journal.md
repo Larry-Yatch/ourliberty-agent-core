@@ -4,6 +4,89 @@
 
 ---
 
+## Iteration 1331 — 2026-06-10 ~16:39Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 core services active. Mirror inbox: dag-preflight-chain-context-durability (just dispatched 10:38:48 MDT). Bug-hunt gate: FIRED (15 reviews, fpr=93.3%, sentinel written).
+**Tier state:** 1 (consecutive_clean=0; Check 2 standing non-nominal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T16:24:18.233528+00:00 / dispatch-branch-cleanup:gh-unavailable` (line 1371, iter 1330)
+- Total lines: 1371. 0 new entries since watermark.
+- ✅ Nominal. No tier-reset.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Bot log since iter 1330 (~16:35Z):
+- 10:36:26 MDT (16:36Z): Larry ← "Now that the 422 spec is merged can you kick off the Dag build?"
+- 10:38:35 MDT: Beacon issued APPROVAL_REQUEST for `dag-preflight-chain-context-durability`; Larry approved at 10:38:48 MDT. Task dispatched to Mirror inbox.
+- No agent-distress keywords in bot log. Larry directive addressed < 2 min (not orphan).
+- Standing: source=heal-x fixture log-contamination (09:51–09:52 MDT entries). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+⚠️ Tier-reset: YES (standing non-nominal). [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json EXISTS (suppression entries + historical artifacts; no active stalls). 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:** Larry directive at 16:36Z ("kick off DAG build") addressed by Beacon + dispatched to Mirror inbox at 16:38Z (< 2 min). No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json NOT FOUND. No stale daemons reported. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Standing SYNC-PUSH-REBASE-FALLBACK-001 (74th+; self-recovering; parked). ✅ Nominal within standing pattern.
+
+**Check B — Sync health:** last_sync=`2026-06-10T16:16:50Z` (~22 min at scan). status=error (SYNC-PUSH-REBASE-FALLBACK-001; self-recovering). Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing (health-check-notify-script-missing G-rule 3/3 dispatched iter 1207). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs (carry from iter 1330; 0 new PR alerts in Check 0). ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Forge:** 0 open Forge PRs. Mirror has dag-preflight-chain-context-durability in inbox; Forge tasks pending Mirror DAG output. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** `assess_gate.py` **FIRED** — 15 Mirror reviews reached; first_pass_rate=93.3%, bughunt_findings=1. DM queued to Larry; sentinel written at `~/agents/state/gate-soak-assessment.json` (fired_at=2026-06-10T16:39:48Z). Gate will no-op forever after. Action on Larry: acknowledge soak assessment DM and decide keep/dial-back/Phase-2.
+
+**Rotations:** None overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1330 watch items:**
+- "install-drift healer — fires ~18:00Z UTC June 10" → heartbeat=`2026-06-10T06:00:10.016818+00:00` (unchanged; ~1.3h until expected 18:00Z UTC fire). 0/2 clean healer cycles post-PR #411. **CARRY**.
+- "`alert-translation-no-mirror-dispatch-001` — pending Larry sign-off" → No evidence of processing. **CARRY**.
+- "dispatch-branch-cleanup:gh-unavailable G-rule 1/3" → No new occurrences this iter. **CARRY**.
+
+**G-rule tracking:**
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+- `dispatch-branch-cleanup:gh-unavailable not in alert-translations.json` — 1/3 (iter 1330). Carry.
+- `dispatch-branch-cleanup:summary not in alert-translations.json` — 1/3 (iter 1153). Carry.
+
+**Standing findings:**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10 (~1.3h at scan).
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330).
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 74th+; self-recovering; parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+
+**Watch items for iter 1332:**
+- **dag-preflight-chain-context-durability** — Mirror inbox task dispatched 10:38:48 MDT. Watch for Mirror DAG preflight output + Forge dispatch sequence.
+- **Bug-hunt gate soak DM** — queued to Larry; watch for acknowledgment/decision (keep/dial-back/Phase-2).
+- **install-drift healer** — fires ~18:00Z UTC June 10 (~1.3h at scan). Watch heartbeat advance past 06:00:10Z; expect 1/2 clean cycles post-PR #411.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (Check 2 = standing G-rule 3/3 already recorded iter 1281; assess_gate.py FIRED = self-contained per spec §5.0, no Pulse remediation; Mirror DAG dispatch = Larry-initiated pipeline action, no Pulse intervention). interventions≈755, systemic_fixes=16, ratio≈47.2, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 2 standing non-nominal).
+
+---
+
 ## Iteration 1330 — 2026-06-10 ~16:35Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 0: dispatch-branch-cleanup:gh-unavailable (novel Tier-4; zero-impact; journal-note + G-rule 1/3). Check 2: fixture log-contamination (standing; G-rule 3/3 dispatched iter 1281, Forge brief pending). All other checks nominal. 0 open PRs. 9/9 core services active.
