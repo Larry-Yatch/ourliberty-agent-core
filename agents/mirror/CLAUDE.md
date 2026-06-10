@@ -354,6 +354,21 @@ Beacon dispatches you a preflight DAG review BEFORE she emits the kickoff APPROV
 
 For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks against the sequence file. They are mechanical — no judgment, no vibe. If your verdict diverges from the checks, you're doing it wrong.
 
+**Check 0 — spec_doc reachability (sync-lag guard).** Before checks 1–4, you MUST confirm the sequence's `spec_doc` is actually readable from this checkout. A spec that was just merged to `origin/main` is invisible here until `ourliberty-sync.timer` advances HEAD (incident 2026-06-10: a kickoff failed preflight with "spec never authored" when the spec was in fact merged as PR #415 — the droplet checkout simply lagged origin/main by one commit). NEVER report a missing `spec_doc` as "never authored" without first ruling out sync-lag. Run the script-backed classifier and branch on its exit code:
+
+    ```bash
+    python3 /home/larry/agent-core/scripts/build_sequence_validator.py check-spec-doc <seq-id>
+    # exit 0 = present (or indeterminate) → proceed to checks 1–4
+    # exit 3 = BEHIND_ORIGIN → the spec EXISTS on origin/main; this checkout is behind
+    # exit 1 = NOT_AUTHORED → the spec is genuinely absent on origin/main
+    ```
+
+    - **exit 3 (behind origin):** do NOT run checks 1–4 and do NOT tell anyone to author the spec. Flag REVISION with the classifier's stdout/stderr message verbatim — it says to run `systemctl start ourliberty-sync.service` and re-dispatch once HEAD advances. The spec already exists; re-authoring would create a duplicate/conflict.
+    - **exit 1 (not authored):** flag REVISION with: *"Sequence `<seq-id>` spec_doc `<spec_doc>` is absent from the working copy AND origin/main; author + merge it before re-dispatching the DAG preflight."*
+    - **exit 0:** the spec is present (or origin/main doesn't resolve, e.g. an ad-hoc local run) — proceed to checks 1–4 normally.
+
+    **Enforcement:** `scripts/build_sequence_validator.py check-spec-doc` (function `check_spec_doc_presence`, exit codes 0/1/3); the parallel deterministic guard on the automated kickoff path lives in `outbox_notifier._handle_build_sequence_advancer_kickoff` (`spec-behind-origin` / `spec-not-authored` sentinels). Both are covered by unit tests in `scripts/tests/test_build_sequence_validator.py` and `scripts/tests/test_outbox_notifier_sequence_handlers.py`.
+
 1. **No cycles in the DAG.** Import the validator and call `validate_dag` directly:
 
     ```python
@@ -376,7 +391,7 @@ For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks
 
     Static analysis suffices — you read the spec, not the code. If the spec is too vague to derive file lists, flag REVISION: *"Step `A`'s dispatch_text cites § X.Y but that section does not list the files this step will touch; cannot verify parallelism safety. Amend the spec to enumerate the file list."*
 
-4. **All referenced spec sections exist.** For each `steps[i].dispatch_text`, extract every `<spec_doc> § X.Y` citation. For each citation, `Read` the spec_doc and grep for the section anchor (e.g., `^### X.Y` or `^## X.Y` or the bolded `**X.Y**` form). If any section is missing, flag REVISION: *"Step `A`'s dispatch_text references `<spec_doc> § X.Y` but that section does not exist in the spec. Either fix the citation or add the section."*
+4. **All referenced spec sections exist.** (Check 0 has already confirmed the `spec_doc` file itself is readable here — so a missing *section* below is a real citation/spec gap, not sync-lag.) For each `steps[i].dispatch_text`, extract every `<spec_doc> § X.Y` citation. For each citation, `Read` the spec_doc and grep for the section anchor (e.g., `^### X.Y` or `^## X.Y` or the bolded `**X.Y**` form). If any section is missing, flag REVISION: *"Step `A`'s dispatch_text references `<spec_doc> § X.Y` but that section does not exist in the spec. Either fix the citation or add the section."*
 
 ### Output shape (NOT the REVIEW_PASS / REVIEW_REVISION marker)
 

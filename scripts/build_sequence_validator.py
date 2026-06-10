@@ -36,13 +36,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional, Tuple
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 DEFAULT_BLACKBOARD_DIR = AGENTS_ROOT / 'blackboard' / 'build-sequences'
+
+# The agent-core repo root, derived from this file's location
+# (scripts/build_sequence_validator.py → parents[1]). Used as the default
+# anchor for resolving a sequence's repo-relative `spec_doc` and for the
+# `git -C <root>` calls in check_spec_doc_presence — deterministic on both
+# the authoring Mac and the droplet, unlike cwd.
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Per spec § 5.1: sequence-level status enum.
 VALID_SEQUENCE_STATUS = frozenset({
@@ -453,7 +461,227 @@ def validate_no_concurrent_active(
     return True
 
 
+# -------------------- spec_doc presence guard --------------------
+#
+# Incident 2026-06-10: a build-sequence kickoff failed DAG-preflight with
+# the conclusion "the spec was never authored / referenced sections
+# missing." That diagnosis was WRONG — the spec had been authored and
+# merged to `origin/main` (PR #415, 9dbc2ae). The real cause: the droplet's
+# `~/agent-core` working copy lagged `origin/main` by one commit, so the
+# spec file was not yet in the checkout that Mirror's preflight and Forge
+# read. `ourliberty-sync.timer` later fast-forwarded HEAD and the file
+# appeared. A freshly-merged spec lives on `origin/main` but is invisible
+# to Beacon/Mirror/Forge until sync advances HEAD — and the symptom
+# masquerades as "spec never authored", sending people to re-author a spec
+# that already exists (duplicate/conflict risk).
+#
+# This guard distinguishes the two cases deterministically: a spec_doc
+# missing locally but present on origin/main is a SYNC-LAG problem, not a
+# missing-spec problem.
+
+# spec_doc presence statuses.
+SPEC_DOC_PRESENT = 'present'            # in the working copy — all good
+SPEC_DOC_BEHIND_ORIGIN = 'behind_origin'  # missing locally, present on origin/main → run sync
+SPEC_DOC_NOT_AUTHORED = 'not_authored'    # absent both locally and on origin/main → author it
+SPEC_DOC_INDETERMINATE = 'indeterminate'  # missing locally and origin/main doesn't resolve here
+
+
+@dataclass
+class SpecDocPresence:
+    """Result of check_spec_doc_presence. Truthy iff the spec is present.
+
+    `status` is one of the SPEC_DOC_* constants. `message` is the
+    operator-facing, actionable string — emit it verbatim instead of the
+    misleading "spec never authored". `behind_by` is the HEAD..origin/main
+    commit count when known (status == behind_origin), else None."""
+    status: str
+    spec_doc: str
+    message: str
+    behind_by: Optional[int] = None
+
+    def __bool__(self) -> bool:
+        return self.status == SPEC_DOC_PRESENT
+
+
+# A git runner takes argv (without the leading `git`) and returns
+# (returncode, stdout-stripped). Injectable so tests stay hermetic.
+GitRunner = Callable[[list[str]], Tuple[int, str]]
+
+
+def _default_git_runner(repo_root: Path) -> GitRunner:
+    """Build a `git -C <repo_root> ...` runner. Any OS/subprocess failure
+    (git absent, not a repo, timeout) is folded into a non-zero rc so
+    callers treat it as "could not determine" rather than crashing."""
+    def run(argv: list[str]) -> Tuple[int, str]:
+        try:
+            proc = subprocess.run(
+                ['git', '-C', str(repo_root), *argv],
+                capture_output=True, text=True, timeout=15,
+            )
+            return proc.returncode, (proc.stdout or '').strip()
+        except (OSError, subprocess.SubprocessError):
+            return 1, ''
+    return run
+
+
+def check_spec_doc_presence(
+    spec_doc: Any,
+    repo_root: Optional[Path] = None,
+    *,
+    git: Optional[GitRunner] = None,
+    local_exists: Optional[Callable[[], bool]] = None,
+) -> SpecDocPresence:
+    """Classify whether a sequence's `spec_doc` is usable from this checkout.
+
+    Resolution order:
+      1. Present in the working copy → SPEC_DOC_PRESENT (the common,
+         authoring-time-on-Mac case; no git needed).
+      2. Missing locally, but `git cat-file -e origin/main:<spec_doc>`
+         succeeds → SPEC_DOC_BEHIND_ORIGIN. The spec exists on main; this
+         checkout just hasn't synced. Message tells the operator to run
+         `ourliberty-sync.service`, NOT to re-author.
+      3. Missing locally AND absent on origin/main → SPEC_DOC_NOT_AUTHORED
+         (the genuine "author + merge it first" case).
+      4. Missing locally but `origin/main` doesn't resolve (not a synced
+         git checkout, e.g. a test fixture or a detached export) →
+         SPEC_DOC_INDETERMINATE. We can't tell behind-origin from
+         never-authored, so we don't claim either; callers should not hard-
+         fail on this branch.
+
+    `repo_root` defaults to REPO_ROOT (agent-core root). `git` and
+    `local_exists` are injectable for hermetic tests."""
+    if not isinstance(spec_doc, str) or not spec_doc.strip():
+        return SpecDocPresence(
+            status=SPEC_DOC_INDETERMINATE,
+            spec_doc=str(spec_doc),
+            message=(
+                'spec_doc is empty or not a string; cannot check presence. '
+                'Fix the sequence file\'s `spec_doc` field.'
+            ),
+        )
+    spec_doc = spec_doc.strip()
+    root = Path(repo_root) if repo_root is not None else REPO_ROOT
+    if local_exists is None:
+        def local_exists() -> bool:  # type: ignore[misc]
+            return (root / spec_doc).is_file()
+
+    if local_exists():
+        return SpecDocPresence(
+            status=SPEC_DOC_PRESENT,
+            spec_doc=spec_doc,
+            message=f'spec_doc `{spec_doc}` is present in the working copy.',
+        )
+
+    run = git if git is not None else _default_git_runner(root)
+
+    # origin/main must resolve to distinguish behind-origin from
+    # never-authored. If it doesn't, stay honest: indeterminate.
+    rc, _ = run(['rev-parse', '--verify', '--quiet', 'origin/main'])
+    if rc != 0:
+        return SpecDocPresence(
+            status=SPEC_DOC_INDETERMINATE,
+            spec_doc=spec_doc,
+            message=(
+                f'spec_doc `{spec_doc}` is missing from the working copy and '
+                f'`origin/main` does not resolve here (not a synced git '
+                f'checkout). Cannot distinguish a sync-lag from a never-'
+                f'authored spec — verify on `origin/main` manually before '
+                f're-authoring.'
+            ),
+        )
+
+    rc, _ = run(['cat-file', '-e', f'origin/main:{spec_doc}'])
+    if rc == 0:
+        # Present on origin/main, missing locally → this checkout is behind.
+        behind: Optional[int] = None
+        crc, cout = run(['rev-list', '--count', 'HEAD..origin/main'])
+        if crc == 0 and cout.isdigit():
+            behind = int(cout)
+        # Truthy check, not `is not None`: a 0 count is anomalous here (the
+        # file is on origin/main yet absent locally while HEAD is NOT behind
+        # — e.g. an uncommitted local deletion), so don't print the self-
+        # contradictory "behind by 0 commit(s)". Fall back to generic wording.
+        by = f'{behind} commit(s)' if behind else 'one or more commits'
+        return SpecDocPresence(
+            status=SPEC_DOC_BEHIND_ORIGIN,
+            spec_doc=spec_doc,
+            behind_by=behind,
+            message=(
+                f'working copy is behind origin/main by {by}; spec_doc '
+                f'`{spec_doc}` EXISTS on origin/main but is not yet in this '
+                f'checkout. Run sync (`systemctl start '
+                f'ourliberty-sync.service`) before kickoff, then re-dispatch. '
+                f'This is a sync-lag, NOT a missing spec — do not re-author it.'
+            ),
+        )
+
+    return SpecDocPresence(
+        status=SPEC_DOC_NOT_AUTHORED,
+        spec_doc=spec_doc,
+        message=(
+            f'spec_doc `{spec_doc}` not found in the working copy or on '
+            f'origin/main — author + merge it first, then re-dispatch the '
+            f'kickoff.'
+        ),
+    )
+
+
 # -------------------- CLI --------------------
+
+
+def _read_seq_json(path: Path) -> Tuple[Optional[Any], int]:
+    """Read + JSON-parse a sequence file for the CLI, writing a diagnostic
+    to stderr on failure. Returns `(parsed, 0)` on success or `(None, 1)`
+    on a missing/unreadable/invalid file. Shared by the `validate`,
+    `check-spec-doc`, and bare-path CLI forms so their error wording can't
+    drift apart."""
+    if not path.is_file():
+        sys.stderr.write(f'ERROR: not a file: {path}\n')
+        return None, 1
+    try:
+        return json.loads(path.read_text()), 0
+    except json.JSONDecodeError as e:
+        sys.stderr.write(f'ERROR: {path}: invalid JSON: {e}\n')
+        return None, 1
+    except OSError as e:
+        sys.stderr.write(f'ERROR: {path}: read failed: {e}\n')
+        return None, 1
+
+
+def _cli_check_spec_doc(seq_id_or_path: str) -> int:
+    """CLI for `check-spec-doc <seq-id|path>`.
+
+    Resolves the sequence file (a bare token expands to the canonical
+    blackboard path; anything containing a path separator or `.json` is
+    treated as a path), reads its `spec_doc`, and classifies presence.
+
+    Exit codes (distinct so callers can branch without parsing stdout):
+      0  present OR indeterminate (don't block — authoring-time-on-Mac and
+         not-a-synced-checkout both land here and shouldn't fail kickoff)
+      1  not_authored — genuinely missing; author + merge first
+      3  behind_origin — spec exists on main; run sync, don't re-author
+    """
+    token = seq_id_or_path
+    if token.endswith('.json') or '/' in token or os.sep in token:
+        path = Path(token)
+    else:
+        path = DEFAULT_BLACKBOARD_DIR / f'{token}.json'
+    seq, rc = _read_seq_json(path)
+    if seq is None:
+        return rc
+    spec_doc = seq.get('spec_doc') if isinstance(seq, dict) else None
+    presence = check_spec_doc_presence(spec_doc)
+    if presence.status == SPEC_DOC_PRESENT:
+        sys.stdout.write(f'OK: {presence.message}\n')
+        return 0
+    if presence.status == SPEC_DOC_INDETERMINATE:
+        sys.stdout.write(f'INDETERMINATE: {presence.message}\n')
+        return 0
+    if presence.status == SPEC_DOC_BEHIND_ORIGIN:
+        sys.stderr.write(f'BEHIND_ORIGIN: {presence.message}\n')
+        return 3
+    sys.stderr.write(f'NOT_AUTHORED: {presence.message}\n')
+    return 1
 
 
 def _cli(argv: list[str]) -> int:
@@ -473,8 +701,10 @@ def _cli(argv: list[str]) -> int:
         nargs='+',
         help=(
             'Either `validate <seq-id>` (expands to '
-            '~/agents/blackboard/build-sequences/<seq-id>.json) OR a path to '
-            'a sequence file (JSON). Exits 0 if valid, 1 otherwise.'
+            '~/agents/blackboard/build-sequences/<seq-id>.json), '
+            '`check-spec-doc <seq-id|path>` (classify the sequence\'s '
+            'spec_doc as present / behind-origin / not-authored), OR a path '
+            'to a sequence file (JSON). Exits 0 if valid, 1 otherwise.'
         ),
     )
     parsed = parser.parse_args(argv)
@@ -483,27 +713,22 @@ def _cli(argv: list[str]) -> int:
     if len(raw_args) == 2 and raw_args[0] == 'validate':
         seq_id = raw_args[1]
         path = DEFAULT_BLACKBOARD_DIR / f'{seq_id}.json'
+    elif len(raw_args) == 2 and raw_args[0] == 'check-spec-doc':
+        return _cli_check_spec_doc(raw_args[1])
     elif len(raw_args) == 1:
         path = Path(raw_args[0])
     else:
         sys.stderr.write(
             'ERROR: usage:\n'
             '  build_sequence_validator.py validate <seq-id>\n'
+            '  build_sequence_validator.py check-spec-doc <seq-id|path>\n'
             '  build_sequence_validator.py <path-to-sequence-file.json>\n'
         )
         return 2
 
-    if not path.is_file():
-        sys.stderr.write(f'ERROR: not a file: {path}\n')
-        return 1
-    try:
-        seq = json.loads(path.read_text())
-    except json.JSONDecodeError as e:
-        sys.stderr.write(f'ERROR: {path}: invalid JSON: {e}\n')
-        return 1
-    except OSError as e:
-        sys.stderr.write(f'ERROR: {path}: read failed: {e}\n')
-        return 1
+    seq, rc = _read_seq_json(path)
+    if seq is None:
+        return rc
     result = validate_dag(seq)
     if result.valid:
         label = result.seq_id or path.name

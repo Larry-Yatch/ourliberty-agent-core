@@ -40,6 +40,15 @@ import larry_alerts as la                   # noqa: E402
 import outbox_notifier as on                # noqa: E402
 import safe_write_inbox as swi              # noqa: E402
 
+# Resolve the validator module the SAME way the kickoff handler does at
+# call time, so patching `check_spec_doc_presence` on it is actually seen
+# by the handler (the handler may bind `scripts.build_sequence_validator`
+# or top-level `build_sequence_validator` depending on sys.path).
+try:
+    from scripts import build_sequence_validator as bsv_handler_mod  # noqa: E402
+except ImportError:
+    bsv_handler_mod = bsv
+
 
 def _make_step(step_id, deps=None, status='pending', pr_url=None,
                dispatched_at=None, merged_at=None):
@@ -612,6 +621,90 @@ class KickoffFailureModes(_KickoffHandlerHarness):
         # One DM fired.
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1)
+
+    def test_spec_doc_behind_origin_defers_kickoff_with_sync_message(self):
+        """Incident 2026-06-10: spec_doc merged to origin/main but missing
+        from this checkout. The kickoff MUST NOT transition pending→active
+        and MUST report 'run sync' — NOT 'spec never authored'. The
+        spec-doc classifier is patched to simulate the behind-origin state
+        (it can't be reproduced live: origin/main == the working copy)."""
+        seq = _make_sequence(seq_id='pulse-upgrade-001', status='pending')
+        self._write_sequence(seq)
+        fake = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_BEHIND_ORIGIN,
+            spec_doc='agents/beacon/specs/missions-v2-phase2.md',
+            message=('working copy is behind origin/main by 1 commit(s); run '
+                     'sync (`systemctl start ourliberty-sync.service`); do not '
+                     're-author it.'),
+            behind_by=1,
+        )
+        body = self._make_envelope()
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence', return_value=fake,
+        ):
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
+        self.assertIsNotNone(result)
+        self.assertIn('spec-behind-origin', result)
+        # Sequence stays pending — the spec isn't readable here yet.
+        self.assertEqual(self._read_sequence('pulse-upgrade-001')['status'],
+                         'pending')
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        msg = alerts[0]['message'].lower()
+        self.assertIn('ourliberty-sync.service', msg)
+        self.assertIn('do not re-author', msg)
+        self.assertNotIn('never authored', msg)
+
+    def test_behind_origin_on_active_sequence_still_dedups(self):
+        """Regression: the spec_doc guard must sit AFTER the idempotency
+        no-op. A re-dispatched kickoff on an already-active sequence whose
+        spec is behind-origin must dedup silently (`already-active`), NOT
+        trip the spec guard (`spec-behind-origin`)."""
+        seq = _make_sequence(seq_id='pulse-upgrade-001', status='active')
+        self._write_sequence(seq)
+        fake = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_BEHIND_ORIGIN,
+            spec_doc='agents/beacon/specs/x.md',
+            message='behind origin; run sync',
+            behind_by=1,
+        )
+        body = self._make_envelope()
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence', return_value=fake,
+        ) as patched:
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
+        self.assertIn('already-active', result)
+        self.assertNotIn('spec-behind-origin', result)
+        # The guard never ran — dedup short-circuited before it.
+        patched.assert_not_called()
+        # Dedup audit entry appended; status unchanged.
+        on_disk = self._read_sequence('pulse-upgrade-001')
+        self.assertEqual(on_disk['status'], 'active')
+        self.assertEqual(on_disk['audit_log'][-1]['event'],
+                         'kickoff-duplicate-suppressed')
+
+    def test_spec_doc_not_authored_fails_kickoff_with_genuine_message(self):
+        """The genuine missing-spec case (absent locally AND on origin/main)
+        still reports the real 'author + merge it first' error. Driven by
+        the real classifier against a spec_doc that exists nowhere."""
+        seq = _make_sequence(seq_id='pulse-upgrade-001', status='pending')
+        seq['spec_doc'] = 'agents/beacon/specs/__never_authored_spec__.md'
+        self._write_sequence(seq)
+        body = self._make_envelope()
+        result = on._handle_build_sequence_advancer_kickoff(
+            body, body['result'],
+        )
+        self.assertIsNotNone(result)
+        self.assertIn('spec-not-authored', result)
+        self.assertEqual(self._read_sequence('pulse-upgrade-001')['status'],
+                         'pending')
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('author', alerts[0]['message'].lower())
 
     def test_prompt_without_kickoff_verb_warns_and_archives(self):
         """target_agent=build_sequence_advancer but prompt isn't
