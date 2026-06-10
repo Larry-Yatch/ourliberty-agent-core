@@ -4,6 +4,118 @@
 
 ---
 
+## Iteration 1375 — 2026-06-10 22:22Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline active — all 4 Beacon rekick tasks COMPLETE (22:18-22:21Z). 4 Forge tasks queued (fix-classifier-session-lost-002, fix-test-gate-sandbox-env-injection-002, fix-dashboard-routing-denied-002, fix-systemd-tier2-home-readwrite-001; all 22:18-22:21Z, not yet consumed). PR #434 ✅ MERGED 22:18:33Z — smoke-5a-pf-no-marker suppressed from Check I fixture allowlist. 0 open PRs. 9/10 services active (graph-refresh: inactive oneshot, expected). 1 new alert (unreviewed-merge:434, Tier-3 known pattern).
+
+**VERIFY-BEFORE-REASSERT (EROFS-bypass from iter 1373/1374):** RESOLVED ✅. Beacon rekick sequence completed all 4 tasks (22:18-22:21Z); 4 Forge tasks in inbox. Pipeline recovering.
+**VERIFY-BEFORE-REASSERT (classifier build active from iter 1374):** fix-classifier-session-lost-002.json in Forge inbox (22:18Z). No in-flight Forge build yet (tasks just arrived). Pickup imminent.
+**VERIFY-BEFORE-REASSERT (pending approval):** beacon-pending-approvals.json MISSING → 0 pending approvals. ✅
+
+**Tier state:** 1 (consecutive_clean=0; 4 Forge tasks queued)
+
+**Check 0 — Alert triage:**
+- alert-triage.json: watermark MISSING (standing; G-rule dispatched iter 1251). Per spec: claim trailing 100 lines.
+- larry-alerts.jsonl: **1405 lines** (+1 since iter 1374 watermark, line 1404). New entry: line 1405 `2026-06-10T22:20:16Z heal-unreviewed-merge-detector:unreviewed-merge:434` — route=escalate. PR #434 "fix(pulse): suppress smoke-5a-pf-no-marker fixture from Check I retry-repeat signal" Larry-direct 22:18:33Z. Known standing pattern (actor-exemption-config pending `go: actor-exemption-config`). DM delivered to Larry by outbox-notifier at 22:23:22Z (beacon_telegram_bot.log confirmed). ✅ No additional Pulse escalation.
+- **New watermark: line 1405 / unreviewed-merge:434 / 2026-06-10T22:20:16Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: MISSING → 0 pending approvals. ✅
+- Last Larry message: 15:52:16 MDT (21:52:16Z) — unchanged since iter 1372. No new messages. No orphan directives. ✅ Nominal.
+- `alert idx=0 delivery to 12345 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall-state.json: mtime=16:25 MDT (~22:25Z), FRESH (< 5 min). stalls=0. ✅ Healer ran on schedule (~30-min cadence); no active stalls.
+- **Heartbeat calibration note (G-rule 3/3):** file was "stale > 10 min" in iters 1369/1370/1372/1373/1374 (5/7 iters). This iter: FRESH (healer ran ~22:22-22:25Z). Pattern is a threshold-calibration issue: Check 3's 10-min freshness threshold is too tight for the ~30-min healer cadence. G-rule 3/3 → [blue] defer dispatch to Beacon until Forge queue clears.
+- **Pipeline (iter 1374 watch items — VERIFIED ALL COMPLETE):**
+  - rekick-pr1-classifier-20260610 (Beacon): COMPLETE ✅ 22:18:04Z → fix-classifier-session-lost-002.json in Forge inbox.
+  - rekick-pr2-testgate-20260610 (Beacon): COMPLETE ✅ 22:18:59Z ($0.25, 50s) → fix-test-gate-sandbox-env-injection-002.json in Forge inbox.
+  - rekick-pr4-routing-20260610 (Beacon): COMPLETE ✅ 22:19:54Z ($0.25, 55s) → fix-dashboard-routing-denied-002.json in Forge inbox.
+  - dispatch-pr5-systemd-tier2-home-20260610 (Beacon): COMPLETE ✅ 22:20:59Z ($0.27, 65s) → fix-systemd-tier2-home-readwrite-001.json in Forge inbox.
+- Forge inbox: 4 tasks fresh (22:18-22:21Z). No in-flight build yet (pickup imminent).
+- ⚠️ tier-reset: YES (active tasks queued)
+
+**Check 4 — Pending directives:**
+- No new Larry messages since iter 1372. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING (no stale daemons). ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: `agents/beacon/captures.json` modified (staged). Pre-existing from session start; wrapper auto-commits captures.json at cycle close. `never-auto` per spec but recurring/known pattern. Carry.
+
+**Check B — Sync health:** last_sync=`2026-06-10T21:50:16Z` (~32 min old at 22:22Z), status=no-change. Expires 23:50:16Z. ✅ Nominal. (**WATCH:** trigger sync if next iter after 23:50Z.)
+
+**Check C — Agent liveness:** 9/10 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). graph-refresh: inactive (completed oneshot, last run 22:15:42Z). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 0 open PRs (confirmed). ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- 4 tasks queued (22:18-22:21Z, fresh, pickup imminent):
+  - fix-classifier-session-lost-002.json — classifier session-lost fix (re-dispatch from rekick-pr1)
+  - fix-test-gate-sandbox-env-injection-002.json — test gate sandbox fix (re-dispatch from rekick-pr2)
+  - fix-dashboard-routing-denied-002.json — dashboard routing fix (re-dispatch from rekick-pr4)
+  - fix-systemd-tier2-home-readwrite-001.json — permanent EROFS fix: add TIER2_HOME to ReadWritePaths (from dispatch-pr5)
+- Wedge-reaper: blocked pending classifier PR. CCD S1 + headless-dedup: blocked pending classifier PR.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS (fired iter 1345). Idempotent skip. ✅
+- **PR #434 CLOSURE:** smoke-5a-pf-no-marker fixture now suppressed from Check I retry-repeat signal (branch fix/pulse-check-i-smoke-fixture-allowlist, Larry-direct, 22:18:33Z). Standing [blue] finding smoke-5a-pf-no-marker **CLOSED ✅**.
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate:** All three scripts: no-op (no committed audit baseline). ✅
+
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days). ✅
+
+**install-drift:** heartbeat `2026-06-10T18:00:03Z` (~4h22m old at 22:22Z). Next fire ~06:00Z June 11. ✅
+
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- **heal-pipeline-stall heartbeat threshold 3/3:** 5/7 recent iters showing "stale > 10 min" is threshold-calibration mismatch (healer runs ~30-min; threshold = 10-min). Fix: update cycle-prompt.md § 3.3 freshness threshold to 35 min. Defer dispatch to Beacon until Forge queue clears.
+- **smoke-5a-pf-no-marker Check I false-positive: CLOSED ✅** PR #434 merged 22:18:33Z.
+- All other G-rule statuses: carry from iter 1374 unchanged.
+
+**Actions taken:** None. Pipeline recovering autonomously via Beacon rekick sequence (Larry-initiated).
+
+**Standing findings (carry with updates):**
+- [yellow] **Wedge-reaper build** — blocked pending fix-classifier-session-lost-002 PR (task in Forge inbox, pickup imminent). **Action on Larry: watch for PR open + Mirror review, then approve inbox-watcher restart.**
+- [yellow] CCD S1 build spawn-failure. Blocked on classifier PR.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] EROFS permanent fix: fix-systemd-tier2-home-readwrite-001.json in Forge inbox (PR-5 pending build).
+- [blue] unreviewed-merge:434 — DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch to Beacon deferred (Forge queue busy).
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251; Forge brief pending).
+- [blue] heal-pipeline-stall heartbeat — PRESENT this iter (file mtime 16:25 MDT, fresh). Streak of 5/7 missing was threshold-calibration artifact; not a healer bug.
+
+**Watch items for iter 1376:**
+- Forge picks up 4 tasks: expect fix-classifier-session-lost-002 build to start within minutes (opus-4-8, 30-90 min build).
+- Check B sync expires 23:50:16Z — trigger sync on next iter if after that time.
+
+**PRIME DIRECTIVE:** 0 new Pulse-initiated interventions (pipeline recovering via Beacon rekick sequence, Larry-initiated). interventions=763, systemic_fixes=17, ratio≈44.88, trend=flat. Iter non-clean (active Forge tasks queued).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1373 — 2026-06-10 22:12Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline blocked — all Forge build sessions failing with EROFS (tier2 HOME read-only). Beacon has diagnosed root cause and is holding re-dispatch pending Larry's infra decision. 0 open PRs. 9/9 services active. 0 new escalation alerts.
