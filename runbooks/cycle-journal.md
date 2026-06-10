@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration 1259 — 2026-06-10 ~06:00Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks clean; 0 new alerts; Missions-v2 Phase 1 pipeline complete.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1413 lines** (UNCHANGED — same as iter 1258 watermark at 2026-06-10T05:10:51Z / outbox-notifier:review-pass:PR407). No new alerts since watermark. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry ~05:32Z (Tier 2 auth failures at 05:29Z and 05:32Z — known [yellow] standing pattern). No new Larry directives in the last 4h. No agent distress beyond the known Tier 2 auth issue. ✅ Nominal (standing item only).
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json present, stalls=[]. Heartbeat key absent (known format mismatch [blue], noted prior cycles). No active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon=0, forge=0, pulse=0. mirror=1 (review-step-parked-lane.json — stale task for dashboard PR #41, which MERGED at 05:41:04Z after Mirror was dispatched the review at 05:15Z). heal-abandoned-inbox-tasks.timer active; stale task will be cleaned up. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=16abbed ("Pulse cycle 20260610T053849Z"). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, "Auto-commit push failed; rolled back", commit=ddd96f8, last_sync=2026-06-10T05:33:15Z. This is occurrence 65 of sync-push-rebase-fallback-001. Self-recovered (16abbed is current origin HEAD per wrapper commits). APPROVAL_REQUEST `sync-push-rebase-fallback-001` open. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core ourliberty-*.service units active (beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-cycle.service active (current interactive cycle). All timers active and waiting. ourliberty-agent-core-health.service: **failed** (known [yellow] — notify_larry.py missing). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open (PR #41 confirmed MERGED at 05:41:04Z). ✅ Nominal.
+
+**Periodic/conditional checks (Tuesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation (§ 4.6):** No items within 60-day window. ✅ Nominal.
+
+**Check H — Forge digest:** 4 Forge PRs merged today — Missions-v2 Phase 1 complete:
+- agent-core PR #406 "feat(missions-v2): Phase 1 captures core — durable capture ingest + reader" — 04:59:58Z
+- agent-core PR #407 "config(credentials): register DESKTOP_INGEST_TOKEN in rotation schedule + add rotation runbook" — 05:10:49Z
+- agent-core PR #408 "feat: heal_missions_card_gc.py — durable-capture GC healer" — 05:34:09Z (Mirror REVIEW_PASS auto-merge)
+- dashboard PR #41 "feat: Missions Parked lane renders parked captures (read-only)" — 05:41:04Z
+✅ Pipeline complete. 0 open Forge PRs.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service = **failed** (confirmed Check C). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon log confirms TIER2_FALLBACK_USED at 05:29Z — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Tuesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001` PARKED: No new action visible. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: No new action visible. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: Confirmed 65th occurrence at 05:33:15Z. [blue] standing.
+- `bug-hunt gate`: 5/15 (PR #408 advanced count per MEMORY iter 1258). Carry forward.
+- `unreviewed-merge`: Alert watermark unchanged (no new unreviewed-merge alerts since PR #408 Mirror-reviewed). Dashboard PR #41 merged at 05:41Z; heal-unreviewed-merge-detector.timer active and will catch if unreviewed. [blue] watch.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready (iter 1252); awaiting Larry "go" to Beacon on Telegram.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 65th occurrence (05:33:15Z); self-recovered; root code fix pending.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 0 new alerts; standing items verified). MEMORY (iter 1258 script-authoritative): interventions=736, systemic_fixes=16, ratio=46.0, trend=flat. No change this iter.
+**Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on wrapper commit).
+
+---
+
 ## Iteration 1258 — 2026-06-10 05:36Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all mandatory + additive checks nominal. **PR #408 MERGED ✅** "feat: heal_missions_card_gc.py — durable-capture GC healer" (05:34:09Z, commit 0ee8d747, Mirror REVIEW_PASS auto-merge). Missions-v2 Phase 1 step 1b GC healer shipped. Dashboard PR #41 (step-parked-lane) under Mirror review. Bug-hunt gate advanced to 5/15.
