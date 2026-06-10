@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration 1292 — 2026-06-10 ~10:47Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Forge p2-digest-generator session still alive (PID 995053, 2h03m at ~10:47Z UTC — past 2h mark). dag-preflight-revision-autonomy-001.json still in Forge inbox (2h window expired 10:32Z, now 15+ min past; inbox-watcher pending dead-letter). PRs #418 and #420 reverted to UNKNOWN/UNKNOWN (were CLEAN/MERGEABLE at iter 1291; likely PID 995053 pushed new commits to PR #420 branch or GitHub recompute reset). PR #412 APPROVAL_REQUEST standing. 1 new Tier-3 alert this iter.
+**Tier state:** 1 (consecutive_clean=0; PID 995053 overlong + pipeline blocked = non-clean)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T10:39:09Z / pipeline-stall:no-mirror-dispatch:PR#412 / iter 1291. Scanned larry-alerts.jsonl from watermark:
+- **10:41:24Z**: medic notification (intent=medic-diagnosis) for `pipeline-stall:no-mirror-dispatch:PR#412` — attempt 4. Same PR#412 APPROVAL_REQUEST pattern (revision re-dispatch blocked, chain stalled pending Larry sign-off). Delivered as beacon idx=1327-1328 at 10:42:21Z UTC. **Tier-3 known-pattern** (PR#412 APPROVAL_REQUEST is the registered resolution path). Silenced. ✅
+
+New watermark: **2026-06-10T10:41:24Z / medic-diagnosis:pipeline-stall:no-mirror-dispatch:PR#412 / iter 1292**.
+Triage: 1 new alert — Tier-3 silenced. ✅ No tier-reset from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1291 carried findings:
+- "PID 995053 alive, ~117 min, 2h mark ~10:44Z UTC" → **CONFIRMED PAST 2h MARK**: `ps -p 995053` elapsed=02:03:20 at ~10:47Z. Session at ~2h03m, past the 2h mark. Ask-then-do standing; no 4th DM (Larry has kill path: `kill -9 995053 && rm ~/agents/state/in-flight/p2-digest-generator.json`; DM'd ×3 at 09:57Z, 10:05Z, 10:18Z; no new information beyond "now past 2h mark").
+- "dag-preflight-revision-autonomy-001.json EXPIRED, inbox-watcher to dead-letter" → **CONFIRMED NOT YET DEAD-LETTERED**: file still in `~/agents/inboxes/forge/`; `.archive/` has no dag-preflight entry. Inbox-watcher automatic; no Pulse action.
+- "PRs #418/#420 RESOLVED to CLEAN/MERGEABLE" → **REVERTED TO UNKNOWN/UNKNOWN**: `gh pr view 418` and `gh pr view 420` both return UNKNOWN/OPEN. Most likely PID 995053 pushed additional commits to PR #420 branch (session still running), resetting GitHub merge-state computation; PR #418 may be a GitHub cache artifact. Per calibration: defer, no action.
+- "fix-beacon-mediated-review-routing-evidence-001 UNROUTED (2/3)" → **TASK NOT FOUND**: `find ~/agents/inboxes ~/agents/outboxes -name "*fix-beacon-mediated*"` → no results. Task absent from all known inboxes/outboxes. G-rule carry may be stale. Carrying at 2/3 with a watch flag; will retire if absent next iter.
+- "install-drift healer verification OPEN (0/2)" → **CARRY FORWARD**: next healer run ~18:00Z UTC. No change.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot delivery: idx=1328 at 10:42:21Z UTC (medic-diagnosis, Check 0 this iter). No new `<- 7998341473` inbound messages from Larry since 08:32Z UTC "Go." ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: PRESENT (cooldown dict, no active stalls). Root stall: Forge p2-digest-generator session PID 995053 (2h03m in-flight). ✅ Nominal (known standing).
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):** Forge inbox: 3 tasks, all confirmed.
+- `p2-digest-generator.json` — **in-flight** (PID 995053 alive, 2h03m). in-flight/p2-digest-generator.json present (started=08:44:27Z).
+- `dag-preflight-revision-autonomy-001.json` — 2h window expired 10:32Z; NOT yet dead-lettered (inbox-watcher automatic). 15+ min past window.
+- `marker-error-p2-derive-endpoint-1.json` — queued behind in-flight session.
+Beacon/Mirror/Pulse inboxes: empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. All 8/8 core services active. ✅ Core nominal.
+
+**Check A — Source repo:** Session gitStatus (conversation start): branch=main, clean tree, HEAD=428722d ("Pulse cycle 20260610T104658Z" — iter 1291 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-10T10:16:15Z (31 min ago — within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 standing [blue]. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 core services active. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #418: UNKNOWN/UNKNOWN** — reverted from iter 1291 CLEAN/MERGEABLE. Defer per calibration. marker-error retry queued; pipeline completes after PID 995053 wraps.
+- **PR #420: UNKNOWN/UNKNOWN** — reverted from iter 1291 CLEAN/MERGEABLE. Likely PID 995053 pushed new commits to p2-digest-generator branch. Defer per calibration.
+- **PR #412: UNKNOWN/OPEN** — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Standing [yellow].
+- ourliberty-dashboard: 0 open. ✅
+
+**Credential rotation:** token-rotation-schedule.json: no upcoming or overdue rotations in 60-day window. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate:** 7/15 (carried, no change). ✅
+
+**Cycle tier:** cycle-tier.json: tier=1, consecutive_clean=0, last_signal_at=2026-06-09T18:16:30Z. ✅ Consistent.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch + unrouted-pr for PRs in marker-error retry` — **1/3** (no new occurrence). Carry.
+- `fix-beacon-mediated-review-routing-evidence-001 UNROUTED` — **2/3** (task absent from all inboxes/outboxes — possibly stale carry; watch 1 more iter, retire if still absent). Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (unchanged). Carry.
+
+**Standing findings (unchanged):**
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500. Standing.
+- [yellow] APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED.
+- [yellow] APPROVAL_REQUEST preflight-reminder-enforcement-001 routing failure.
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- [yellow] **Forge p2-digest-generator session overlong (PID 995053, 2h03m past 2h mark, ~10:47Z UTC)** — Larry DM'd × 3 (09:57Z, 10:05Z, 10:18Z). Ask-then-do standing. No 4th DM (no new information beyond "past 2h mark"; Larry has kill path).
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+
+**Watch items for next iter (1293):**
+- **PID 995053 — terminated?** Past 2h mark. On termination: dag-preflight dead-letter resolves; marker-error retry fires; Mirror dispatches for PRs #418/#420 (once merge state recomputes).
+- **dag-preflight dead-lettered?** Still in inbox 15+ min past 2h window; inbox-watcher automatic.
+- **PRs #418/#420 UNKNOWN** — monitor for resolution after PID 995053 terminates.
+- **PR #412 APPROVAL_REQUEST** — Larry sign-off pending.
+- **install-drift healer: ~18:00Z UTC June 10** — 0/2 → expect 1/2 clean cycle post-PR #411 merge.
+- **fix-beacon-mediated-review-routing-evidence-001** — task absent from all inboxes; G-rule carry suspect. Retire at next absent confirmation.
+
+**Actions taken:** None. 1 Tier-3 alert silenced (no tier-reset). PRs #418/#420 deferred (UNKNOWN/UNKNOWN per calibration). PID 995053 ask-then-do standing; no 4th DM. dag-preflight inbox-watcher automatic. No always-fix conditions met.
+**PRIME DIRECTIVE:** 0 new interventions (Tier-3 silence is not an intervention). 0 new systemic_fixes. interventions≈749, systemic_fixes≈17, ratio≈44.1 (unchanged). iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; PID 995053 overlong + pipeline blocked = non-clean).
+
+---
+
 ## Iteration 1291 — 2026-06-10 ~10:41Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Forge p2-digest-generator session still alive (PID 995053, 1h57m at 10:41Z, 2h mark = 10:44:27Z UTC — imminent). PRs #418 and #420 RESOLVED to CLEAN/MERGEABLE (were UNKNOWN/UNKNOWN 123+ and 103+ min; GitHub finally resolved the recompute). PR #412: MERGEABLE/UNSTABLE (APPROVAL_REQUEST standing). dag-preflight-revision-autonomy-001 still in live Forge inbox (inbox-watcher has not yet dead-lettered; 2h window expired 10:32Z UTC — 9+ min ago; inbox-watcher will handle automatically on next scan). 1 new Tier-3 alert this iter.
