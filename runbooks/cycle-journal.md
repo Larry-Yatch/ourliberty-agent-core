@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 1233 — 2026-06-10 02:13Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 1 new alert (sync-blocked known-pattern, route=digest, already suppressed by routing layer); standing items verified unchanged.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1402 lines** (was 1401 at iter 1232 watermark). New line 1402: `{source: "sync.service", ts: "2026-06-10T02:03:27Z", severity: "warning", subject: "sync-blocked:auto-commit-push-failed", route: "digest"}`. beacon_telegram_bot.log confirms: `alert idx=1401 route=digest; skipping DM` at 20:08:29-0600. New occurrence of standing sync-push-rebase-fallback-001 — already routed as digest/suppressed. Tier 3 known-pattern. ✅ Nominal (journal note only; no tier-reset per § 3.0 Tier 3 carve-out).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry: alert idx=1401 route=digest at 20:08:29-0600 June 9 (02:08:29Z June 10) — the sync.service alert noted in Check 0. No new Larry messages or agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json present; active_stalls=[]. ✅ Nominal.
+
+**Check 4 — Agent inboxes:** beacon=0, forge=0, mirror=0, pulse=0. All empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=f63eaff ("Pulse cycle 20260610T015811Z" — iter 1232 wrapper commit). Repo on main+clean. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=**error**, last_sync=2026-06-10T02:03:27Z (fresh, ~10 min old at scan; within 2h threshold). Status changed from `no-change` to `error` vs iter 1232 — new occurrence of standing sync-push-rebase-fallback-001. Alert message: "pushed failed; rolled back to f63eaffb (clean tree restored). Self-heals on the next sync tick." Root cause APPROVAL_REQUEST standing. ✅ (known [blue]; already escalated; no new action)
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** systemctl: 9 active ourliberty-*.service units (8 core: beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot + cycle.service for current run). 0 failed. ourliberty-agent-core-health.timer active/waiting (one-shot timer confirmed). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§ 5.0):** assess_gate.py → "2/15 gate reviews since go-live; soaking, no-op." ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§ 4.6):** token-rotation-schedule.json — no items in 60-day window. ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.timer active/waiting; .service absent from active list (one-shot confirmed). Issue still standing. Carry forward [yellow].
+- `unreviewed-merge streak: 1` (PR #404): New alert (line 1402) is sync.service, NOT unreviewed-merge. Alert count at 1402, unreviewed-merge streak unchanged at 1. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: beacon_telegram_bot.log last non-sync alert remains 18:12:28 MDT June 9 (00:12:28Z). Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Not re-tested (Wednesday — Monday-only check). Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: New occurrence at 02:03:27Z; sync rolled back to clean state, self-heals on next tick. Root cause standing. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. No new occurrence. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): cycle.timer active/waiting normally. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap; Forge inbox empty. Carry forward.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: streak 1** (PR #404, 23:55:10Z) — DM delivered 23:57Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — new occurrence 02:03:27Z (push failed, rolled back to f63eaffb clean; self-heals on next tick). Root cause unfixed. Standing.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 1 new alert Tier-3 known-pattern suppressed; standing items verified). interventions=733 (script-authoritative), systemic_fixes=15, verification_pending=5, ratio≈48.87 (unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
+
+---
+
 ## Iteration 1232 — 2026-06-10 01:57Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks nominal; 0 new alerts since iter 1231 watermark; standing items verified unchanged.
