@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 1364 — 2026-06-10 21:01Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing carries. Same pipeline block as iters 1352–1363. 0 new alerts. 0 open PRs. 9/9 services active.
+**Discipline 1 note:** Initial Check 2 queried `~/agents/blackboard/beacon-pending-approvals.json` (wrong path — got FILE MISSING). VERIFY-BEFORE-REASSERT: correct path is `~/agents/state/beacon-pending-approvals.json` — confirmed present with `fix-tier1-classifier-envelope-not-content-scan` still pending. heal-stale-approvals (ran at 21:00:15Z) corroborates: `pending_approval=1 kept_live=1 cleared=0`. Approval is live and unactioned.
+**Tier state:** 1 (consecutive_clean=0; standing pipeline block + pending approval)
+
+**Check 0 — Alert triage:**
+- Prior watermark: `2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402` (iter 1363)
+- Current total: **1402 lines** — 0 new entries. ✅ Nominal.
+- alert-triage.json: 0 open alerts. ✅ Nominal.
+- **New watermark: unchanged (2026-06-10T20:00:01Z / unreviewed-merge:433 / line 1402)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- beacon-bot last activity: 14:01:07 MDT (20:01:07Z) = idx=1401 (unreviewed-merge:433). No new activity since iter 1363.
+- beacon-pending-approvals.json: VERIFIED at `~/agents/state/beacon-pending-approvals.json`. **1 pending: `fix-tier1-classifier-envelope-not-content-scan` (created_at=2026-06-10T19:30:19Z, ~1h31m at 21:01Z)**. heal-stale-approvals corroborates: pending=1, kept_live=1, cleared=0.
+- No new Larry messages (last: 13:27:01 MDT / 19:27:01Z). Unchanged since iter 1363.
+- ⚠️ tier-reset: YES (unresolved pending approval, standing)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- heal-pipeline-stall.heartbeat: `2026-06-10T20:50:14Z` (11 min old at 21:01Z) — healer running. ✅
+- heal-pipeline-stall-state.json: 0 entries. ✅ Clean (consistent with iter 1363 closure).
+- All agent inboxes (beacon, forge, mirror, pulse, build_sequence_advancer): EMPTY. 0 open PRs.
+- Wedge-reaper fix: still unbuilt. CCD S1 + headless-dedup: blocked on wedge fix + classifier fix. Unchanged.
+- ⚠️ tier-reset: YES (standing pipeline block)
+
+**Check 4 — Pending directives:**
+- Last Larry message: 13:27:01 MDT (19:27:01Z). No new messages since iter 1363. Standing APPROVAL_REQUESTs carry. ✅ Nominal.
+
+**Check 5 — Stale daemon (VERIFY-BEFORE-REASSERT):**
+- heal-stale-daemon-code.heartbeat: `2026-06-10T20:42:46Z` (19 min old at 21:01Z) — healer running. ✅
+- heal-stale-daemon-code-state.json: MISSING (clean run: no stale daemons detected). ✅
+- journalctl: no warnings. 9/9 services active. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T20:50:16Z` (~11 min at 21:01Z), status=no-change. Within 2h threshold (expires 22:50:16Z). ✅ Nominal. (**WATCH:** next iter after 22:50Z should trigger sync.)
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). beacon-bot last activity 20:01:07Z (~1h idle) — consistent with no new inbound. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- All inboxes empty. No active Forge tasks. Pipeline quiescent. Wedge-reaper build archived; no new dispatch.
+- silence-missions-card-gc-summary-alert-001: standing drop (carry iter 1360). No new action this iter.
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency; sentinel check-i-2026-06-10.json exists). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+- audit_cadence_signal.py: no post-seed decision-grade distill artifacts yet; no-op. ✅
+
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days). ✅
+
+**install-drift:** heal-systemd-install-drift.heartbeat: `2026-06-10T18:00:03Z` (~3h old at 21:01Z). WATCH: 06:00Z June 11 (~9h from now). ✅
+
+**ourliberty-cycle.timer:** `Trigger: n/a` — stuck. Known G-rule standing. Carry.
+
+**G-rule tracking:**
+- All G-rule statuses: carry from iter 1363 unchanged. No new occurrences verified this iter.
+
+**Actions taken:** None (no auto-fix thresholds crossed; all findings are standing carries).
+
+**Standing findings:**
+- [yellow] **Wedge-reaper build dispatch DROPPED** (carry iter 1352) — **Action on Larry: say "go: redispatch wedge-reaper build" to Beacon in Telegram.**
+- [yellow] `fix-tier1-classifier-envelope-not-content-scan` — APPROVAL_REQUEST pending Larry (~1h31m since 19:30Z DM). **Action on Larry: say "go: fix-tier1-classifier-envelope-not-content-scan" in Telegram.**
+- [yellow] CCD S1 build spawn-failure. Blocked on wedge fix + classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] unreviewed-merge:433 — DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 dispatch DROPPED — re-dispatch when wedge-reaper path cleared.
+- [blue] install-drift — watch 06:00Z June 11 (~9h from now).
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+- [blue] catalog-accuracy-drift 1/3 (PR #433 root cause fixed; watching for re-occurrence).
+
+**Watch items for iter 1365:**
+- **Wedge-reaper build**: Watch for Larry's "go: redispatch wedge-reaper build" in Telegram.
+- **fix-tier1-classifier-envelope-not-content-scan**: Watch for Larry's "go" response (~1h31m pending as of this iter).
+- **silence-missions-card-gc-summary-alert-001**: Re-dispatch when wedge path clear.
+- **install-drift**: watch 06:00Z June 11.
+- **Check B sync**: last_sync=20:50:16Z — 2h expires 22:50Z; trigger sync if next iter is after that.
+- **beacon-pending-approvals.json path**: correct path is `~/agents/state/beacon-pending-approvals.json` (not blackboard/).
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (all standing carries; no new dispatches). interventions=762, systemic_fixes=17, ratio≈44.82, trend=flat. iter non-clean (standing pipeline block + pending approval).
+**Tier end-of-iter:** 1 (consecutive_clean=0; standing issues).
+
+---
+
 ## Iteration 1363 — 2026-06-10 20:56Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing carries. Same pipeline block as iters 1352–1362. 0 new alerts. 0 open PRs. 9/9 services active. **Discipline 1 note: iter 1362 showed 43 entries (30 non-2099) in heal-pipeline-stall-state.json — VERIFY-BEFORE-REASSERT shows 0 entries now; healer ran at 20:50:14Z and produced a clean state after resolving/expiring the historical May 26–June 10 artifacts. No active stalls in state file. Pipeline-level block (wedge-reaper structural) is unchanged and does NOT write to stall-state.**
