@@ -4,6 +4,95 @@
 
 ---
 
+## Iteration 1302 — 2026-06-10 ~12:18Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Active — p2-dashboard-cutover marker-error retry 1/3 in Forge inbox; p2-orphan-readability build in-flight. 4 × heal-stale-daemon-code auto-restarts (post-PR #421 merge, expected, all services recovered). PR #412 APPROVAL_REQUEST standing. 9/9 core services active.
+**Tier state:** 1 (consecutive_clean=0; PR #412 stall; p2-dashboard-cutover marker-error pending retry)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T11:47:26.724528+00:00 / medic-diagnosis:pipeline-stall:no-mirror-dispatch:PR#412 / iter 1299. Scanned larry-alerts.jsonl:
+- **Count:** 1344 lines (+5 since iter 1301 watermark 1339). 5 new alerts since 11:47:26Z:
+  1. **12:10:20Z** `heal-stale-daemon-code` — auto-restarted `ourliberty-dashboard-api.service` (PR #418 script mtime; route=digest). Expected post-merge auto-restart. Tier 3.
+  2. **12:10:24Z** `heal-stale-daemon-code` — auto-restarted `ourliberty-outbox-notifier.service` (PR #421 script mtime; route=digest). Tier 3.
+  3. **12:10:28Z** `heal-stale-daemon-code` — auto-restarted `ourliberty-beacon-bot.service` (PR #421; route=digest). Tier 3.
+  4. **12:10:32Z** `heal-stale-daemon-code` — auto-restarted `ourliberty-inbox-watcher.service` (PR #421; route=digest). Tier 3.
+  5. **12:15:22Z** `heal-pipeline-stall` — PR #412 unrouted-pr alert (route=escalate). DELIVERED to Larry at 12:15:28Z by Beacon bot. Standing [yellow] pattern; APPROVAL_REQUEST path is the active gate. No new Pulse action.
+- Alerts 1-4: all auto-remediated (heal-stale-daemon-code already did the restart; all 4 services confirmed active post-restart). Route=digest → Beacon bot skipped DM (expected by design). Memory rule: suppress expected-by-design + auto-remediated noise. Tier 3 treatment.
+- Alert 5: heal-pipeline-stall PR#412 unrouted — recurring standing pattern. Delivered by Beacon bot. Standing [yellow] APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` is the active gate.
+
+Watermark: **2026-06-10T12:15:22.508891+00:00 / heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#412 / iter 1302**.
+Triage: 5 new alerts (4 × heal-stale-daemon-code Tier-3 silence; 1 × heal-pipeline-stall delivered by Beacon bot). ⚠️ tier-reset (new signals this iter).
+
+VERIFY-BEFORE-REASSERT of iter 1301 watch items:
+- "Forge p2-dashboard-cutover — in Forge inbox (~16 min at check). Expect PR open ~12:30–12:50Z" → **UPDATED**: Forge ran preflight (12:12-12:14Z, $0.34). Result: wrote work to WIP commit but OMITTED PROCEED marker → marker-error (retry 1/3). `marker-error-p2-dashboard-cutover-1.json` now in Forge inbox. Dashboard PR not yet opened. Carry as watch.
+- "Forge p2-orphan-readability — queued" → **ADVANCED**: Forge ran p2-orphan-readability preflight (12:14:38-12:17:08Z, $0.59). Result: PROCEED marker emitted ✅. `build-p2-orphan-readability.json` dispatched to Forge inbox. Forge in-flight at 12:17:15Z. ✅ Advancing.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN, statusCheckRollup mirror-review=FAILURE. APPROVAL_REQUEST standing. ⚠️ [yellow]
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY FORWARD**: ~12:18Z UTC. Not yet 18:00Z.
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — Beacon consumed; monitoring Beacon spec → Forge brief" → **CARRY**: No Forge brief yet. Monitoring.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last inbound from Larry: "Go" at 08:32Z UTC (unchanged). Beacon bot log: no new inbound messages from Larry since iter 1301. heal-pipeline-stall PR#412 alert delivered at 12:15:28Z (standing pattern, no new directive from Larry). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall: FRESH at 12:15:19Z (healer healthy). Findings: FORGE_NO_PR_SKIP for completed tasks (PRs exist); NO_SESSION_REVISION_SKIP for mirror-review-pr412-001 (superseded_session — correct). Pipeline state:
+- **p2-dashboard-cutover**: Forge preflight ran (12:12-12:14Z); WIP work done but missed PROCEED marker → marker-error retry 1/3 in Forge inbox. Self-healing (3 retries before dead-letter). PR not yet opened.
+- **p2-orphan-readability**: preflight PROCEED ✅ at 12:17:08Z → `build-p2-orphan-readability.json` in Forge inbox; Forge building at 12:17:15Z.
+- **PR #412**: standing stall managed via APPROVAL_REQUEST. Medic attempt 5 at 11:47Z.
+- Pipeline advancing. ✅ Nominal.
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):**
+- Forge: `build-p2-orphan-readability.json` (<5 min old; in-flight) + `marker-error-p2-dashboard-cutover-1.json` (<10 min old; retry 1/3). Both within thresholds.
+- Beacon: EMPTY ✅
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+- ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code ran at 12:10:20-32Z — 4 services auto-restarted (dashboard-api, outbox-notifier, beacon-bot, inbox-watcher). All confirmed active post-restart via `systemctl is-active`. All 9/9 core services active (beacon-bot, chain-event-shipper, cycle.timer, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus (start): branch=main, clean tree, HEAD=b57f3b2 ("Pulse cycle 20260610T121240Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T11:16:17Z (~62 min at check — within 2h threshold). status=no-change. SYNC-PUSH-REBASE-FALLBACK-001 [blue] standing (self-recovering). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 core services active (confirmed systemctl is-active). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #412: OPEN/UNKNOWN** — mirror-review=FAILURE. APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+- **ourliberty-dashboard: 0 open PRs** — p2-dashboard-cutover marker-error retry in progress; p2-orphan-readability build in-flight. ✅
+- **ourliberty-agent-core: 1 open (PR #412)** — unchanged. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead PRs` — **3/3 DISPATCHED** (iter 1298). Beacon consumed ✅. No Forge brief yet. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (no new occurrence). Carry.
+
+**Standing findings (unchanged):**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Mirror REVISION on file; revision chain dead (no forge_build_session_id). Medic attempt 5 at 11:47Z.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419; #418/#421 no alert fired) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1303):**
+- **p2-dashboard-cutover marker-error retry** — retry 1/3 in Forge inbox. Expect Forge to pick up and emit valid PROCEED marker, then build → PR in ourliberty-dashboard.
+- **build-p2-orphan-readability** — Forge in-flight at 12:17:15Z. Expect PR in ourliberty-dashboard.
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean cycle post-PR #411.
+- **PR #412** — APPROVAL_REQUEST standing. Larry sign-off pending.
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — monitoring for Beacon spec → Forge brief.
+- **Sync health** — last_sync 11:16Z; 2h threshold expires ~13:16Z; should auto-trigger before then.
+
+**Actions taken:** None. 4 heal-stale-daemon-code auto-restarts handled by healer (not Pulse). Pipeline self-advancing on all tracks.
+**PRIME DIRECTIVE:** 0 new interventions. 0 new systemic_fixes. interventions=750, systemic_fixes=16, verification_pending=7, ratio=46.875. iter_non-clean (PR #412 stall; p2-dashboard-cutover marker-error pending retry).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1301 — 2026-06-10 ~12:11Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing. Beacon consumed notify-p2-digest-generator ✅ → p2-dashboard-cutover + p2-orphan-readability dispatched to Forge inbox (~11:55Z; p2-dashboard-cutover targets ourliberty-dashboard, ~25 min in-flight, within build window). PR #412 APPROVAL_REQUEST standing. 9/9 core services active.
