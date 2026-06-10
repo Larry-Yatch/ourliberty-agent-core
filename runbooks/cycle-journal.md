@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration 1295 — 2026-06-10 ~11:28Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Pipeline flowing. PID 995053 (Forge p2-digest-generator) reaped at ~10:59Z by heal-wedged-review-sessions. dag-preflight-revision-autonomy-001 in-flight (PID 1033066, started 11:08:24Z, ~20 min elapsed). PRs #418/#420 CLEAN/MERGEABLE; build tasks queued in Forge inbox. PR #412 APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` standing (revision chain dead, Mirror REVISION on file).
+**Tier state:** 1 (consecutive_clean=0; PR #412 standing stall)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T11:11:56Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / iter 1294. Scanned larry-alerts.jsonl from watermark:
+- **Count:** 1336 lines (UNCHANGED from iter 1294 watermark). No new alerts since 11:11:56Z. ✅ Nominal.
+
+Watermark: **unchanged** (2026-06-10T11:11:56Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / iter 1294).
+Triage: 0 new alerts. ✅ No tier-reset from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1294 carried findings:
+- "PID 995053 DEAD (reaped by heal-wedged-review-sessions at ~10:59Z)" → **CONFIRMED**: `ps -p 995053` → PID_DEAD. Reap alert at 10:59:28Z (route=closure). ✅
+- "dag-preflight build task arrived Forge inbox 11:06Z; pipeline advancing" → **CONFIRMED IN-FLIGHT**: `ls ~/agents/state/in-flight/` shows dag-preflight-revision-autonomy-001.json (PID 1033066, started=2026-06-10T11:08:24Z, elapsed=18:30 at check time). ✅
+- "PRs #418/#420 CLEAN/MERGEABLE; build tasks queued" → **CONFIRMED**: `gh pr view 418` → CLEAN/MERGEABLE; `gh pr view 420` → CLEAN/MERGEABLE. ✅ Self-healing.
+- "PR #412 UNSTABLE/MERGEABLE, APPROVAL_REQUEST pending" → **CONFIRMED**: `gh pr view 412` → UNSTABLE/MERGEABLE, reviewDecision="". APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` standing. ✅ [yellow]
+- "install-drift-timer-gap verification OPEN (0/2), next healer ~18:00Z UTC June 10" → **CARRY FORWARD**: 11:28Z UTC, not yet at 18:00Z window. No change.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last inbound from Larry: "Go" at 08:32Z UTC. Last beacon bot delivery: 11:16:07Z MDT (delivery failures noted — standing known issue). No new untracked Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: cooldown dict only, no active stalls. dag-preflight in-flight (PID 1033066, ~20 min). PRs #418/#420 self-healing. PR #412 known standing stall. ✅ Nominal (PR #412 stall managed via APPROVAL_REQUEST path).
+
+**Check 4 — Pending directives:** Forge inbox: 3 build tasks — `build-dag-preflight-revision-autonomy-001.json` (in-flight, PID 1033066), `build-p2-derive-endpoint.json` (11:06Z, queued), `build-p2-digest-generator.json` (11:08Z, queued). Standing backlog 5 tasks (tune-unregistered-approval, watchdog tasks) no longer present in Forge inbox (processed/archived post-reap). Beacon/Mirror/Pulse inboxes: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** All 9/9 core services active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check A — Source repo:** Sync.json: branch=main, commit=812b2c8, last_sync=11:16:17Z. Session gitStatus (start): branch=main, clean, HEAD=9fc9e77. Wrapper commits since then. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T11:16:17Z (~12 min, within 2h threshold). status=no-change. SYNC-PUSH-REBASE-FALLBACK-001 [blue] standing. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 core services active. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #412: UNSTABLE/MERGEABLE** — Mirror REVISION 01:51Z; revision chain dead (no_session_revision_skip); APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. ⚠️ [yellow]
+- **PR #418: CLEAN/MERGEABLE** — build-p2-derive-endpoint.json queued in Forge inbox (11:06Z). Self-healing. ✅
+- **PR #420: CLEAN/MERGEABLE** — build-p2-digest-generator.json queued in Forge inbox (11:08Z). Self-healing. ✅
+- ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch + unrouted-pr for PRs in marker-error retry` — **2/3** (per iter 1294 advance). Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence; 10:59:28Z was `wedged-review-reaped` subject, different pattern — not counting toward this G-rule). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (unchanged). Carry.
+
+**Standing findings (unchanged):**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Mirror REVISION on file; Forge revision chain dead.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak 3 (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1296):**
+- **dag-preflight PID 1033066** — currently ~20 min (started 11:08:24Z). On completion: build-p2-derive-endpoint picks up; Mirror dispatches for PR #418 once pipeline advances.
+- **PR #418/#420** — self-healing expected as Forge works through build queue post-reap.
+- **PR #412 APPROVAL_REQUEST** — Larry sign-off pending.
+- **install-drift healer** — ~18:00Z UTC June 10. 0/2 → expect 1/2 clean cycle.
+
+**Actions taken:** None. 0 new alerts. All standing findings unchanged.
+**PRIME DIRECTIVE:** 0 new interventions. 0 new systemic_fixes. interventions=749, systemic_fixes=16, verification_pending=7, ratio=46.8. iter_non-clean (PR #412 standing stall).
+**Tier end-of-iter:** 1 (consecutive_clean=0; PR #412 stall ongoing).
+
+---
+
 ## Iteration 1293 — 2026-06-10 ~11:05Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Forge p2-digest-generator session still alive (PID 995053, ~2h12m elapsed). dag-preflight-revision-autonomy-001 still NOT dead-lettered (2h28m+ past 2h window; inbox-watcher pending). PRs #418/#420/#412 all UNKNOWN/UNKNOWN. 2 new Tier-3 alerts (PR#418 stall repeat). G-rule fix-beacon-mediated-review-routing-evidence-001 RETIRED (task confirmed absent from all inboxes/outboxes; stale carry).
