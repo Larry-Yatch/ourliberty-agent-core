@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 1242 — 2026-06-10 03:06Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 0 new alerts since iter 1241 watermark (1402 lines unchanged); standing items verified against current state; notable: sync service self-recovered (see Check B).
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1402 lines** (UNCHANGED — same watermark as iter 1241). No new alerts since last claimed line 1402 (sync-blocked:auto-commit-push-failed at 02:03:27Z). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry alert idx=1401 route=digest at 20:08:29-0600 June 9 (02:08:29Z June 10) — UNCHANGED from iter 1241. No new Larry messages or agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-10T02:53:59Z (~12min old at 03:06Z scan). Timer fires every ~16 min (NEXT at 03:09:47Z — confirmed via `systemctl list-timers`). Heartbeat age is within expected inter-fire window. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon=0, forge=0, mirror=0, pulse=0 inbox files. All empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=b1b17fc ("Pulse cycle 20260610T030316Z" — iter 1241 wrapper commit). Sync ran at 03:03:39Z confirming "No changes detected (HEAD=b1b17fc)" — local = origin/main. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=**no-change**, last_sync=2026-06-10T03:03:39Z. ourliberty-sync.service: **inactive (dead), exit=0/SUCCESS** — NOT failed. Changed from iters 1233–1241 which showed status=error/last_sync=02:03:27Z. The 02:03:27Z push-failure self-resolved: sync timer fired at 03:03:39Z, found no new commits to push, ran cleanly. Root cause of APPROVAL_REQUEST sync-push-rebase-fallback-001 is still unfixed (code fix pending); next occurrence will be on the next PR merge day when the wrapper produces commits the timer tries to push. [blue] standing item remains. ✅ (self-recovered, [blue] root cause outstanding)
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** systemctl: 8 core ourliberty-*.service units active (beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot) + cycle.service for current run. ourliberty-agent-core-health.service: **failed** (known [yellow] standing). ourliberty-sync.service: **inactive/dead** (exit=0 — successfully exited, not failed). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§ 5.0):** Not re-run (Wednesday; not a gate-review day). ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§ 4.6):** token-rotation-schedule.json — 0 tokens in 60-day window. ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service confirmed in failed state (from Check C). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry forward [yellow].
+- `unreviewed-merge streak: 1` (PR #404): Alert count 1402 UNCHANGED. No new unreviewed-merge alerts. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: last failure verified in alert stream at 2026-06-08T19:02:51Z. No new failure since then. Standing state unchanged. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json now shows status=no-change (last_sync=03:03:39Z); sync.service exit=0. Acute error from 02:03:27Z self-resolved. Root code fix still pending. [blue] standing.
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. No new occurrence. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): cycle.service active normally. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap; Forge inbox empty. Carry forward.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: streak 1** (PR #404, 23:55:10Z) — DM delivered 23:57Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; acute error self-resolved at 03:03:39Z this iter (sync ran clean, no-change). Next occurrence on next commit-and-push day.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 0 new alerts; standing items verified). interventions=733 (script-authoritative), systemic_fixes=15, verification_pending=5, ratio≈48.87 (unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
+
+---
+
 ## Iteration 1241 — 2026-06-10 03:01Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks nominal; 0 new alerts since iter 1240 watermark (1402 lines unchanged); standing items verified unchanged.
