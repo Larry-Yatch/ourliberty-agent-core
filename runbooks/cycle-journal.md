@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration 1275 — 2026-06-10 ~08:16Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — no new findings. All standing watches carry forward unchanged.
+**Tier state:** 1 (consecutive_clean=2; all checks nominal this iter → +2 toward de-escalation threshold of 3)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1444 lines** (iter 1274 watermark: 07:59:02Z / wedged-worktree:wt-mirror-dag-preflight-missions-v2-phase1-captures / line 1443). 1 new line since watermark:
+- Line 1444 (08:02:24Z): `medic:medic-diagnosis` about `pipeline-stall:unrouted-pr:PR#412` — diagnose-only, delivered at 02:06:27Z MDT. Root-cause conclusion: routing gap already closed before alert fired; Mirror reviewed PR #412 at 07:51Z. Medic's claim "revision auto-dispatched to Forge" is INCORRECT per current state (Forge inbox currently empty) — Medic was describing D3.5 5b behavior that the outbox-notifier skipped (confirmed in iter 1273: no forge_build_session_id → no auto-resume). Alert is Tier 3 known-pattern (medic-diagnosis on already-escalated standing topic). [blue]
+New watermark: 08:02:24Z / medic-diagnosis:pipeline-stall:unrouted-pr:PR#412 / line 1444 / iter 1275.
+Triage: 1 alert, 0 Tier-1, 0 Tier-2, 1 Tier-3 silenced. ✅ Nominal. No tier-reset from Check 0.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot delivery 02:06:27Z MDT (medic-diagnosis idx=1443). TIER2_FALLBACK failures at 01:45/01:48 MDT — standing auth_401 pattern. No new Larry directives requiring Pulse action. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json empty (no active stall entries). No new stall. PR #412 REVIEW_REVISION is standing/fully-escalated (iter 1273). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (beacon, forge, mirror, pulse confirmed). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing). All 8/8 services active. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=bfbfe79 ("Pulse cycle 20260610T080732Z" — iter 1274 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=error, last_sync=2026-06-10T07:48:54Z (~28 min old, < 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 standing (69th+ occurrence; self-recovering). [blue] standing.
+
+**Check C — Agent liveness:** 8/8 core services active (beacon-bot, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, chain-event-shipper, dashboard-api). ourliberty-agent-core-health: inactive (known [yellow]). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 UNKNOWN/UNKNOWN/0-reviews — `gh pr list` returns UNKNOWN (consistent with failed check from Mirror REVIEW_REVISION posted 07:51:48Z). ourliberty-dashboard: 0 open. Standing item; no new escalation needed. ✅ Nominal (carry forward).
+
+**Credential rotation (4.6):** Carry forward from iter 1274 — 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate soak (§5.0):** 7/15 (confirmed `assess_gate.py` this iter). ✅ No action.
+
+**Worktrees (VERIFY-BEFORE-REASSERT iter 1274 watch items):**
+- `wt-mirror-dag-preflight-missions-v2-phase1-captures` — **ABSENT ✅ CONFIRMED CLOSED** (reaped in iter 1274; still absent this iter).
+- `wt-mirror-dag-preflight-missions-v2-phase2` — Present. Terminal marker (REVISION). heal-wedged should reap on next run. ℹ️ Monitor.
+- `wt-mirror-mirror-review-pr412-001` — Present. Terminal marker (Mirror completed review 07:51Z). heal-wedged should reap on next run. ℹ️ Monitor.
+
+**Verify-before-reassert — iter 1274 standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health inactive confirmed (Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: TIER2_FALLBACK_FAILED at 01:45/01:48 MDT confirms still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: inboxes empty. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: no new occurrence this iter. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: no new unreviewed-merge alerts. G-rule 3/3 standing. [blue] standing.
+- `install-drift-timer-gap verification_pending (iter 1262)`: healer next run 18:00Z UTC; 0 of 2 required clean cycles post-PR #411 merge. OPEN.
+- `missions-v2-phase2 DAG-preflight REVISION`: no new action; spec amendment pending Beacon dispatch (Larry direction needed). ⚠️ Standing.
+- `PR #412 no-session-revision`: Mirror REVIEW_REVISION, Forge re-dispatch needed via Beacon. ⚠️ Standing.
+
+**G-rule tracking:**
+- `heal-pipeline-stall:unrouted-pr fires false positive for recovery-dispatched reviews not in routing-events.jsonl` — 1/3 (iter 1274). No new occurrence this iter.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z + 01:45/01:48Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [yellow] **PR #412 no-session-revision** — Mirror REVIEW_REVISION returned. Re-dispatch Forge via Beacon with fresh task_id to apply parity-coverage finding.
+- [yellow] **missions-v2-phase2 DAG-preflight REVISION** — `p2-resurface-and-digest-card` file-enumeration gap. Spec amendment pending Beacon dispatch (Larry direction).
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 69th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #412 — REVIEW_REVISION, no auto-resume. **Action on Larry/Beacon:** re-dispatch Forge via Beacon with fresh task_id to apply Mirror's parity-coverage finding.
+- missions-v2-phase2 — blocked on spec amendment + DAG-preflight re-dispatch.
+- wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 — pending heal-wedged reap.
+- install-drift healer: next run 18:00Z UTC → 0 of 2 clean cycles needed.
+
+**Actions taken:** None (no new findings requiring auto-fix).
+**Dispatches:** None (all standing items already escalated; no G-rule threshold crossed this iter).
+**PRIME DIRECTIVE:** 0 new interventions this iter. interventions=746, systemic_fixes=16, ratio=46.625, trend=flat (script-authoritative, iter 1275 nominal).
+**Tier end-of-iter:** 1, consecutive_clean=2 (all checks nominal → +1 from iter 1274's 1; de-escalation threshold is 3).
+
+---
+
 ## Iteration 1274 — 2026-06-10 ~08:07Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — no new findings. `wt-mirror-dag-preflight-missions-v2-phase1-captures` REAPED ✅ (iter 1273 watch item closed). Standing watches carry forward.
