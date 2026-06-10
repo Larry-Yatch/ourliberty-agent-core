@@ -4,6 +4,90 @@
 
 ---
 
+## Iteration 1290 — 2026-06-10 ~10:33Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Forge p2-digest-generator session STILL alive (PID 995053, ~109 min, started 08:44:27Z). dag-preflight-revision-autonomy-001 2h window **EXPIRED** ~10:32Z UTC — file still in Forge inbox, inbox-watcher handling dead-letter automatically. PRs #420/#418/#412 still UNKNOWN/UNKNOWN (95–115+ min; approaching 120-min recompute stall investigation threshold). 0 new alerts.
+**Tier state:** 1 (consecutive_clean=0; overlong Forge session + UNKNOWN PRs = non-clean)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Watermark from iter 1289: 10:19:04Z / dag-preflight-final-15min:p2-digest-generator / iter 1289. Scanned larry-alerts.jsonl tail: **0 new alerts since watermark**. ✅ Nominal.
+New watermark: **10:19:04Z / dag-preflight-final-15min:p2-digest-generator / iter 1289** (UNCHANGED — no new entries).
+Triage: 0 new alerts. ✅ No tier-resets from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1289 carried findings:
+- "PID 995053 alive, ~103 min" → **CONFIRMED**: `ps -p 995053` shows elapsed=01:49:29, cmd=claude. ~109 min at 10:33Z UTC. Still alive.
+- "dag-preflight 2h window expires 10:32Z UTC — IMMINENT" → **NOW EXPIRED**: ~10:32Z passed. File (`dag-preflight-revision-autonomy-001.json`) still in `~/agents/inboxes/forge/` (inbox-watcher hasn't scanned yet). Inbox-watcher will dead-letter on next cycle. No Pulse action needed; no 4th DM (unchanged info).
+- "PRs #420/#418/#412 UNKNOWN/UNKNOWN" → **CONFIRMED PERSISTENT**: `gh pr view` on all 3 still returns UNKNOWN/UNKNOWN. PR #418 now ~115+ min UNKNOWN; approaching 120-min investigation threshold per calibration. PR #420 now ~95 min. Defer per calibration.
+- "Forge inbox: 3 tasks unchanged" → **CONFIRMED**: dag-preflight-revision-autonomy-001.json + marker-error-p2-derive-endpoint-1.json + p2-digest-generator.json. in-flight/p2-digest-generator.json present (mtime 02:44 MDT = 08:44Z UTC, consistent).
+- "fix-beacon-mediated-review-routing-evidence-001 UNROUTED (2/3)" → **CARRY FORWARD**: Forge inbox unchanged. 2/3.
+- "install-drift healer verification OPEN (0/2)" → **CARRY FORWARD**: next healer run ~18:00Z UTC. No change.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last bot delivery: idx=1326 at 10:22:10Z (iter 1289 dag-preflight-final-15min DM). No new deliveries. No new `<- 7998341473` inbound messages from Larry. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json ABSENT. Known pattern (healer cleans state between cycles; healer active per prior delivery log). Root stall: Forge p2-digest-generator session (PID 995053, 109 min in-flight). ✅ Nominal (known standing).
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):** Forge inbox: 3 tasks, unchanged.
+- `p2-digest-generator.json` — **in-flight** (PID 995053 confirmed alive, 109 min). in-flight/p2-digest-generator.json present (started=08:44:27.290379Z).
+- `dag-preflight-revision-autonomy-001.json` — 2h window **EXPIRED** at 10:32Z UTC. Still in inbox; inbox-watcher will dead-letter automatically. No Pulse action.
+- `marker-error-p2-derive-endpoint-1.json` — queued behind in-flight session.
+Beacon/Mirror/Pulse inboxes: empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. Heartbeat ABSENT. Known [yellow] standing (no new restarts observed; all 8 core services active). ✅ Core nominal.
+
+**Check A — Source repo:** Session gitStatus (start of conversation): branch=main, clean tree, HEAD=2be491d ("Pulse cycle 20260610T103305Z"). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=10:16:15Z (17 min ago — within 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 standing [blue]. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 core services active (ourliberty-beacon-bot, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, chain-event-shipper, dashboard-api — all `active`). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #420: UNKNOWN/UNKNOWN** (95+ min — PR opened 08:58Z). No reviewDecision. Mirror dispatch blocked downstream of Forge session. Defer per calibration.
+- **PR #418: UNKNOWN/UNKNOWN** (115+ min). marker-error retry 1/3 queued. Defer. **Watch: per calibration rule, if still UNKNOWN at 120+ min → investigate GitHub API recompute stall (next iter).**
+- **PR #412: UNKNOWN/UNKNOWN** (hours). Standing [yellow] APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- ourliberty-dashboard: 0 open. ✅
+
+**Credential rotation:** Not Wednesday rotation day. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate:** 7/15 (carried, no change). ✅
+
+**Cycle tier:** cycle-tier.json confirms tier=1, consecutive_clean=0, last_signal_at=2026-06-09T18:16:30Z. ✅ Consistent.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch + unrouted-pr for PRs in marker-error retry` — **1/3** (no new occurrence). Carry.
+- `fix-beacon-mediated-review-routing-evidence-001 UNROUTED` — **2/3** (Forge inbox unchanged). Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (unchanged). No new occurrence.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (unchanged).
+
+**Standing findings (unchanged):**
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500. Standing.
+- [yellow] APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED.
+- [yellow] APPROVAL_REQUEST preflight-reminder-enforcement-001 routing failure.
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- [yellow] **Forge p2-digest-generator session overlong (PID 995053, ~109 min)** — Larry DM'd × 3 (09:57Z, 10:05Z, 10:18Z). Ask-then-do standing. No 4th DM.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+
+**Watch items for next iter (1291):**
+- **dag-preflight-revision-autonomy-001 dead-lettered?** — window expired 10:32Z; verify file moved to inbox `.archive/` in iter 1291.
+- **PID 995053** — approaching 2h mark (~10:44Z UTC); did it terminate? Pipeline unblocks on termination.
+- **PR #418 UNKNOWN at 120+ min** — at ~10:44Z UTC, PR #418 will cross 120-min threshold. If still UNKNOWN, investigate GitHub API recompute stall per calibration rule.
+- **PRs #420/#412** — same UNKNOWN watch; resolve expected post-session-termination.
+- **install-drift healer: ~18:00Z UTC June 10** — 0/2 → expect 1/2 clean cycle post-PR #411 merge.
+- `fix-beacon-mediated-review-routing-evidence-001` UNROUTED — 2/3 watch.
+
+**Actions taken:** None. 0 new alerts. No always-fix conditions met (PRs UNKNOWN = defer per calibration; Forge session = ask-then-do standing; dag-preflight dead-letter = inbox-watcher automatic). Larry DM'd × 3 (no change); no 4th DM warranted.
+**PRIME DIRECTIVE:** 0 new interventions. 0 new systemic_fixes. interventions≈749, systemic_fixes≈17, ratio≈44.1 (unchanged). iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; overlong Forge session + persistent UNKNOWN PRs = non-clean).
+
+---
+
 ## Iteration 1289 — 2026-06-10 ~10:29Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Forge p2-digest-generator session STILL alive (PID 995053, ~103 min, started 08:44:27Z). dag-preflight-revision-autonomy-001 2h window expires 10:32Z UTC — **IMMINENT dead-letter (~3 min as of iter start)**. Larry DM'd × 3 (09:57Z, 10:05Z, 10:18Z); no 4th DM (no new info; inbox-watcher handles dead-letter automatically). PRs #420/#418/#412 still UNKNOWN/UNKNOWN (GitHub recomputing, now 90+ min). 0 new incoming alerts this iter.
