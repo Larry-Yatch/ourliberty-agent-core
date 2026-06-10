@@ -75,6 +75,21 @@
       },
       "last_touched": "2026-06-10T07:05:19.863345+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-register-desktop-ingest-token-in-the-credential-edbb",
+      "title": "Register DESKTOP_INGEST_TOKEN in the credential registry (closes a NOW alert)",
+      "note": "Phase 0 added DESKTOP_INGEST_TOKEN to ~/credentials/.env.larry but not to the credential registry the system tracks, so it fires a recurring credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN NOW alert. Add it to the registry (config/ on the droplet) so the alert clears. Loose end from our own Phase 0 wiring.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/captures-json-single-committer",
+        "captured_at": "2026-06-10T07:12:40.075206+00:00"
+      },
+      "last_touched": "2026-06-10T07:12:40.075206+00:00",
+      "promoted_to": null
     }
   ]
 }
