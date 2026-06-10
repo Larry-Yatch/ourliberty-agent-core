@@ -34,11 +34,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from ._runtime_script_test_support import (
+    copy_larry_alerts_cli,
+    install_timeout_shim,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _RUN_CYCLE = _REPO_ROOT / 'scripts' / 'run_cycle.sh'
-_LARRY_ALERTS = _REPO_ROOT / 'scripts' / 'larry_alerts.py'
 _LIB_PUSH = _REPO_ROOT / 'scripts' / '_lib_push_with_rebase.sh'
+# run_cycle.sh sources _lib_pulse_runtime.sh for PULSE_RUNTIME_PATHS (the
+# auto-commit path set, shared with sync_agent_core.sh); the fake scripts dir
+# must carry it or the script dies at the `source` line under `set -e`.
+_LIB_PULSE = _REPO_ROOT / 'scripts' / '_lib_pulse_runtime.sh'
 
 
 _CLAUDE_STUB = '''#!/usr/bin/env bash
@@ -73,8 +80,10 @@ class _RunCycleTestBase(unittest.TestCase):
         (runbooks_dir / 'cycle-journal.md').write_text('')
         (runbooks_dir / 'cycle-actions.jsonl').write_text('')
         # Copy real production scripts under test + their deps.
-        for src in (_RUN_CYCLE, _LARRY_ALERTS, _LIB_PUSH):
+        for src in (_RUN_CYCLE, _LIB_PUSH, _LIB_PULSE):
             shutil.copy2(src, self.scripts_dir / src.name)
+        # larry_alerts.py + its sibling-module deps (single source of truth).
+        copy_larry_alerts_cli(self.scripts_dir)
         os.chmod(self.scripts_dir / 'run_cycle.sh', 0o755)
         # Set up a bare origin + clone for the auto-restore path (git pull
         # --ff-only needs an upstream).
@@ -97,6 +106,10 @@ class _RunCycleTestBase(unittest.TestCase):
         self.stub_bin.mkdir()
         (self.stub_bin / 'claude').write_text(_CLAUDE_STUB)
         os.chmod(self.stub_bin / 'claude', 0o755)
+        # run_cycle.sh wraps its alert CLI calls in `timeout 10 …`; shim it on
+        # PATH (here, the same stub-bin as the claude stub) so the alert-asserting
+        # subtests run where GNU `timeout` is absent (macOS).
+        install_timeout_shim(self.stub_bin)
 
     def tearDown(self):
         self._tmp.cleanup()

@@ -1,20 +1,33 @@
 #!/usr/bin/env bash
 # _lib_pulse_runtime.sh — shared facts about the Pulse-owned runtime allowlist.
 #
-# Sourced by run_cycle.sh (auto-commits these after a successful cycle) and
-# sync_agent_core.sh (auto-commits + pushes them when they are the only dirt,
-# so an interactive /cycle no longer blocks the next sync — see the 2026-05-28
-# iter-98 incident, brief docs/sync-resilience-and-alert-translation-brief.md).
+# Sourced by run_cycle.sh (auto-commits the Pulse runtime files after a
+# successful cycle) and sync_agent_core.sh (auto-commits + pushes the Pulse
+# runtime files when they are the only dirt, so an interactive /cycle no longer
+# blocks the next sync — see the 2026-05-28 iter-98 incident, brief
+# docs/sync-resilience-and-alert-translation-brief.md).
+#
+# Two machine-owned runtime classes, handled DIFFERENTLY by sync:
+#   - PULSE_RUNTIME_PATHS    — files Pulse rewrites every cycle. Sync may
+#                              auto-commit + push these (iter-98 resilience).
+#   - SYNC_EXTRA_RUNTIME_PATHS — captures.json, whose SOLE committer is
+#                              heal_missions_card_gc.py. Sync must NOT commit it;
+#                              it only TOLERATES the dirt and proceeds to the
+#                              ff-pull (the GC healer persists it on its own
+#                              tick). Two committers racing on origin/main, plus
+#                              sync's hard-reset rollback, opened a data-loss
+#                              window (#409 follow-up) — see sync_agent_core.sh.
 #
 # Single source of truth for:
-#   - PULSE_RUNTIME_PATHS  — the four paths/prefixes Pulse rewrites every cycle.
-#   - SYNC_AUTOCOMMIT_PATHS — the broader set sync (only) may auto-commit+push:
-#     Pulse runtime + other machine-owned, atomically-written runtime files
-#     that other automation commits on its own cadence.
-#   - all_modified_in_pulse_runtime_allowlist — true if every tracked file
-#     modified vs HEAD is inside PULSE_RUNTIME_PATHS.
-#   - all_modified_in_sync_autocommit_allowlist — same, against
-#     SYNC_AUTOCOMMIT_PATHS.
+#   - PULSE_RUNTIME_PATHS / SYNC_EXTRA_RUNTIME_PATHS / SYNC_AUTOCOMMIT_PATHS.
+#   - all_modified_in_pulse_runtime_allowlist — every modified file is Pulse.
+#   - all_modified_in_sync_autocommit_allowlist — every modified file is in the
+#     union (the outer "all dirt is machine-owned" guard).
+#   - any_modified_in_pulse_runtime_allowlist — at least one modified file is
+#     Pulse (does sync have anything to auto-commit?).
+#   - all_modified_in_sync_extra_allowlist — every modified file is a
+#     healer-owned extra (captures.json); the set sync tolerates without
+#     committing.
 
 PULSE_RUNTIME_PATHS=(
     "runbooks/cycle-journal.md"
@@ -23,22 +36,35 @@ PULSE_RUNTIME_PATHS=(
     "agents/pulse/memory/"
 )
 
-# Machine-owned runtime files that are NOT Pulse-owned but are still safe for
-# sync to auto-commit+push when they are the only dirt, instead of refusing and
-# paging Larry. Criteria for adding a path here:
+# Machine-owned runtime files that have their OWN designated committer, so sync
+# must TOLERATE (not commit) their dirt rather than refusing and paging Larry.
+# Criteria for adding a path here:
 #   1. The file is written exclusively by automation (never hand-edited).
 #   2. Writes are atomic (tmp+rename), so a snapshot is never torn.
-#   3. Some other automation already commits it on its own cadence — sync only
-#      needs to absorb the race window between write and that committer's tick.
+#   3. Some other automation is its SOLE committer on its own cadence — sync only
+#      needs to absorb the race window between write and that committer's tick,
+#      WITHOUT becoming a second committer.
 # captures.json (2026-06-10): written by the missions ingest endpoint
 # (dashboard_api.py) and committed every ~10min by heal_missions_card_gc.py.
 # The hourly sync tick can land in that gap and refuse-and-page on a purely
-# machine-owned file — exactly the Pulse iter-98 class, different file.
+# machine-owned file — the Pulse iter-98 class, different file.
+#
+# IMPORTANT (#409 follow-up): sync does NOT auto-commit these. #409 originally
+# made sync a second committer of captures.json; that created a dual-committer
+# race on origin/main and, on a failing push, sync's `git reset --hard` reverted
+# captures.json on disk and lost ingests written during the push window. Sync now
+# leaves these files entirely to their owner: it neither commits nor resets them,
+# only tolerates the dirt and proceeds to the ff-pull. The ff-pull is safe
+# because the sole committer (the GC healer) commits to THIS working tree first,
+# so its captures.json commits are already in local HEAD before origin advances —
+# an incoming ff-pull never carries a captures.json change (and git fast-forwards
+# cleanly past commits that don't touch a dirty file).
 SYNC_EXTRA_RUNTIME_PATHS=(
     "agents/beacon/captures.json"
 )
 
-# The full set sync may auto-commit: Pulse runtime + sync-only extras.
+# The full machine-owned set: Pulse runtime (sync auto-commits) + healer-owned
+# extras (sync tolerates). Used as the outer "all dirt is machine-owned" guard.
 SYNC_AUTOCOMMIT_PATHS=(
     "${PULSE_RUNTIME_PATHS[@]}"
     "${SYNC_EXTRA_RUNTIME_PATHS[@]}"
@@ -99,7 +125,36 @@ all_modified_in_pulse_runtime_allowlist() {
 
 # all_modified_in_sync_autocommit_allowlist <repo_dir>
 #   Returns 0 iff every tracked file that differs from HEAD is inside
-#   SYNC_AUTOCOMMIT_PATHS (Pulse runtime + sync-only machine-owned extras).
+#   SYNC_AUTOCOMMIT_PATHS (Pulse runtime + healer-owned extras). The outer
+#   "all dirt is machine-owned" guard for sync's runtime handling.
 all_modified_in_sync_autocommit_allowlist() {
     _all_modified_in "$1" "${SYNC_AUTOCOMMIT_PATHS[@]}"
+}
+
+# all_modified_in_sync_extra_allowlist <repo_dir>
+#   Returns 0 iff every tracked file that differs from HEAD is inside
+#   SYNC_EXTRA_RUNTIME_PATHS (captures.json). True when the ONLY remaining dirt
+#   is healer-owned — the set sync tolerates and proceeds past without
+#   committing. Returns 1 on a clean tree (callers gate on dirt themselves).
+all_modified_in_sync_extra_allowlist() {
+    _all_modified_in "$1" "${SYNC_EXTRA_RUNTIME_PATHS[@]}"
+}
+
+# any_modified_in_pulse_runtime_allowlist <repo_dir>
+#   Returns 0 if AT LEAST ONE tracked file that differs from HEAD is inside
+#   PULSE_RUNTIME_PATHS (i.e. sync has Pulse runtime dirt to auto-commit).
+#   Returns 1 on a clean tree or when no modified file is Pulse-owned.
+any_modified_in_pulse_runtime_allowlist() {
+    local repo_dir="$1"
+    local files
+    files=$(git -C "$repo_dir" diff --name-only HEAD 2>/dev/null)
+    if [ -z "$files" ]; then
+        return 1
+    fi
+    local path
+    while IFS= read -r path; do
+        [ -z "$path" ] && continue
+        _pulse_runtime_path_allowed "$path" && return 0
+    done <<< "$files"
+    return 1
 }
