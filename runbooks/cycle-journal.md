@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1262 — 2026-06-10 ~06:13Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Two new post-PR#408 findings — dirty tree blocks sync + GC timer not installed.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z; tier-reset this iter due to new findings)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1419 lines** (was 1413 at iter 1261 watermark; 4 new alerts at lines 1414–1417, +2 from this iter's own escalation alerts = 1419). Net new before this iter's escalations: 4 alerts.
+- Line 1414 `install-healed:ourliberty-heal-missions-card-gc.service` (route=digest, source=heal-systemd-install-drift, 06:00:11Z) — service auto-installed by install-drift healer. ✅ Informational, no action.
+- Line 1415 `install-drift:ourliberty-heal-missions-card-gc.timer` (route=escalate, 06:00:13Z) — **REAL FINDING**: timer shipped in PR #408 but NOT installed under /etc/systemd/system/. Install-drift healer auto-installed the service but not the sibling timer. G-rule `install-drift healer doesn't auto-install sibling timers` now at **3/3** → dispatched to Beacon. `ask-then-do` + `tier-reset`.
+- Line 1416 `summary` (route=digest, source=missions-card-gc, 06:00:18Z) — GC healer ran: retired 2 stale session cards ['desktop-744bcd2d', 'desktop-de0a1d89'], commit=nothing. ✅ Informational.
+- Line 1417 `sync-blocked:uncommitted-changes` (route=escalate, source=sync.service, 06:03:59Z) — **REAL FINDING**: sync refused to pull; agents/beacon/captures.json modified but not committed. `never-auto` + `tier-reset`.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):** Beacon bot log last entries 23:30–23:32Z MDT (05:30–05:32Z UTC) — TIER2_FALLBACK sequence (auth_401 + rate_limit; standing known pattern). No new Larry directives. ✅ Nominal (standing Tier 2 auth issue).
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json present — cooldown tracker visible, no active stall entries (all keys have suppressed-until timestamps or past timestamps). Heartbeat key absent (known [blue] format mismatch). ✅ Nominal.
+
+**Check 4 — Pending directives:** All inboxes empty (beacon, forge, mirror, pulse) at check time. ✅ Nominal. (Note: Beacon pulse-auto-9c915b7081-20260610 dispatched this iter — inbox populated AFTER this check.)
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, **DIRTY** (`M agents/beacon/captures.json`), HEAD=3d54742 ("Pulse cycle 20260610T055812Z"). ⚠️ NEW: dirty tree. Previously iters 1259–1261 all showed clean tree. Confirmed by sync.service alert at 06:03:59Z. `never-auto` (TOOLS.md: dirty tree → alert Larry).
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, message="Uncommitted changes in working tree", commit=3d547423 (= current HEAD), last_sync=2026-06-10T06:03:59Z. Sync blocked — this is a DIFFERENT error than the recurring `sync-push-rebase-fallback-001` pattern (that was "Auto-commit push failed"). Root cause: agents/beacon/captures.json is modified but not committed. Sync service refuses to pull. APPROVAL_REQUEST `sync-push-rebase-fallback-001` still open (the prior root code fix is still pending, but today's error is the dirty-tree variety, not the push-rebase race). [yellow] new finding alongside the standing [blue].
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core ourliberty-*.service units active: beacon-bot ✅, chain-event-shipper ✅, dashboard-api ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. ourliberty-agent-core-health.service: **failed** (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation (§4.6):** No new credential alerts since watermark. ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: known [yellow] — not re-queried (8/8 active confirmed, failed unit known). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon bot 05:30–05:32Z TIER2_FALLBACK confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: larry-alerts watermark advanced (1413 → 1417 before this iter's additions). Pending Larry Telegram "go". Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: All inboxes empty at Check 4. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: UNCHANGED — sync.json error this iter is "Uncommitted changes" (different cause), not the push-rebase race. The standing push-rebase fallback root fix is still pending. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: No new unreviewed-merge alerts. [blue] pending `go: actor-exemption-config`.
+
+**NEW FINDINGS this iter:**
+- [yellow] **install-drift:ourliberty-heal-missions-card-gc.timer** — G-rule 3/3. Install-drift healer doesn't auto-install sibling timers. Dispatched: Beacon inbox `pulse-auto-9c915b7081-20260610.json` (spec: extend healer to auto-install sibling .timer units when .service is auto-installed). Immediate action on Larry: `sudo cp ~/agent-core/systemd/ourliberty-heal-missions-card-gc.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now ourliberty-heal-missions-card-gc.timer`.
+- [yellow] **agents/beacon/captures.json dirty — sync blocked** — GC healer (heal_missions_card_gc.py) ran at 06:00Z and reported `commit=nothing` after retiring 2 stale session cards, yet the working tree is dirty. Likely cause: Missions-v2 ingest system writing to captures.json without committing, or GC healer retirement not triggering commit. Sync service is blocked until captures.json is committed or discarded. Action on Larry: commit or reset `agents/beacon/captures.json`. New G-rule 1/3.
+
+**Standing findings (updated):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready; pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 66th+ occurrence (push-rebase race); self-recovering; root code fix pending.
+
+**Actions taken:**
+- `larry_alerts.append_alert` — `install-drift-timer:ourliberty-heal-missions-card-gc` (route=escalate) [yellow] DM
+- `larry_alerts.append_alert` — `sync-blocked:captures-json-dirty` (route=escalate) [yellow] DM
+- Beacon inbox dispatch: `pulse-auto-9c915b7081-20260610.json` (G-rule 3/3: install-drift timer gap spec)
+- `cycle_prime_ledger.py append --kind intervention` × 2 (sync-blocked:captures-json-dirty, install-drift-timer:ourliberty-heal-missions-card-gc)
+- `cycle_prime_ledger.py append --kind verification_pending` × 1 (install-drift-timer-gap-fix:beacon-pulse-auto-9c915b7081-20260610)
+
+**PRIME DIRECTIVE:** 2 new interventions. interventions=738, systemic_fixes=16, verification_pending=6, ratio=46.125, trend=flat.
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: 2 new findings). last_signal_at will update on wrapper commit.
+
+---
+
 ## Iteration 1261 — 2026-06-10 ~05:57Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks clean; 0 new alerts; 0 open PRs; all inboxes empty; 8/8 core services active.
