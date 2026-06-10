@@ -4,6 +4,29 @@
 
 ---
 
+## Dead-letter: inbox-watcher-log-isolation-001 — 2026-06-10 ~09:15Z UTC (interactive)
+
+**Event:** Beacon dead-letter notify received for dispatch `inbox-watcher-log-isolation-001` (G-rule 3/3: inbox_watcher.log test log contamination, iter 1281).
+
+**Rejection reason:** `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug` (recorded in `.invalid/inbox-watcher-log-isolation-001.json.reason`). Two envelope defects:
+1. `"source": "pulse"` — not in `ALLOWED_SOURCES`; must be `"pulse-auto-dispatch"`.
+2. No `prompt` field — envelope used `description` instead, which the validator ignores.
+
+**Root cause:** Pulse's iter 1281 dispatch authored the envelope by hand and used the wrong field names. The `dispatch_validator.py` schema requires `prompt` (≥ 100 chars) and `source` in the allowed enum.
+
+**Fix applied:** Wrote corrected envelope to `~/agents/inboxes/beacon/inbox-watcher-log-isolation-001.json` with:
+- `source`: `"pulse-auto-dispatch"`
+- `prompt`: full task text (1,752 chars — well above the 100-char floor)
+- `dead_letter_retry` metadata documenting the original rejection
+
+**Validation:** `dispatch_validator.validate_task(corrected_envelope)` → `valid=True reason=ok`.
+
+**Actions taken:** Re-dispatched inbox-watcher-log-isolation-001 → Beacon inbox (corrected). No other changes.
+
+**Self-improvement note:** Future hand-authored Pulse dispatches to Beacon must include `prompt` (not `description`) and `source: pulse-auto-dispatch`. The `pulse_check_i.py` script handles this correctly via its envelope builder — manual dispatch is the error-prone path.
+
+---
+
 ## Iteration 1281 — 2026-06-10 ~09:00Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ G-rule finding — `inbox_watcher.log` test log contamination (G-rule 3/3; dispatched to Beacon). All mandatory checks nominal. Forge building p2-digest-generator (step 2, ~15 min in). PR #418 (p2-derive-endpoint) OPEN, marker-error retry 1/3 in Forge inbox. All standing [yellow] watches carry forward.
@@ -76947,3 +76970,77 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
 - [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
 - [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; self-recovering.
 - [blue] **captures.json dirty** — by-design per PR #413; next wrapper commit cleans.
+
+---
+
+## Iteration 1285 — 2026-06-10 09:08Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Stall — PR #412 Mirror REVISION unaddressed; Forge re-dispatch blocked by missing session ID; dispatching to Beacon to create Forge revision task.
+**Tier state:** 1 (consecutive_clean=0; tier-reset — pipeline-stall finding)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1453 lines** (was 1432 at iter 1270). New alerts since iter 1270 watermark:
+- `wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-001` (06:59:39Z): Tier-3 healer-normal. ✅
+- `pipeline-stall:retry-exhausted:harden-test-prod-write-isolation-001` (07:08:35Z): Addressed iter 1270. ✅
+- 6× `auto-restarted:*` (07:09Z): Tier-3 known pattern. ✅
+- `missions-card-gc:summary` (07:10:31Z): Tier-3 GC. ✅
+- `pipeline-stall:harden-test-prod-write-isolation-001` (07:11:40Z): Superseded by iter 1270 dispatch. ✅
+- `unreviewed-merge:413` (07:15:24Z): [yellow] standing. ⚠️
+- `medic-diagnosis:PR#412` (08:32:26Z): **Key finding** — Mirror DID review PR #412 at 01:51:48Z and issued REVISION (sha=d9faa0b2ee60, failure status posted to GitHub). Forge re-dispatch was skipped: forge_build_session_id missing from routing context (outbox-notifier SIGTERM at 01:09:20Z). Medic escalated diagnose-only (PR2 Stage 1 act-branch limits). ⚠️
+- `unreviewed-merge:417` (08:40:12Z): PR #417 merged by Larry-Yatch without Mirror review. [yellow] streak. ⚠️
+- `unreviewed-merge:419` (08:55:16Z): PR #419 merged by Larry-Yatch without Mirror review. [yellow] streak. ⚠️
+- `pipeline-stall:unrouted-pr:PR#412` (09:02:17Z): Healer still firing; root is Forge re-dispatch blocked (not absence of Mirror review — Mirror DID review per medic). ⚠️
+- `g-rule-dispatched:inbox-watcher-log-isolation-001` (09:03:02Z): Prior-iter G-rule dispatch logged. ✅
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry 08:56:17Z — `unreviewed-merge:419` DM delivered. No new Larry directives. Tier 2 auth_401 fallback at 02:52Z and 02:54Z today (known [yellow] standing). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** PR #412 (forge/harden-test-prod-write-isolation-001): OPEN, UNSTABLE, MERGEABLE, reviewDecision="". Mirror REVISION posted at 01:51:48Z June 10. Forge re-dispatch blocked (session ID missing from routing envelope when outbox-notifier restarted mid-sequence). heal-pipeline-stall still firing at 09:02:17Z. **Action: dispatched `cycle-finding-pr412-forge-revision-20260610T090500Z.json` → Beacon inbox** to create Forge revision task. ⚠️ Tier-reset.
+
+**Check 4 — Pending directives:** beacon: 2 files (inbox-watcher-log-isolation-001 + new PR412 dispatch). forge: 3 tasks — `dag-preflight-revision-autonomy-001.json` (08:32Z, ~36 min), `p2-digest-generator.json` (08:25Z, ~43 min), `marker-error-p2-derive-endpoint-1.json` (08:44Z, ~24 min) — all within 1h stale threshold. mirror: empty. pulse: dead-letter notify (expected). ✅ Nominal (no stale tasks).
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT. ourliberty-medic-dispatcher.service: activating/start (~5 min old at journal write; within 10m timeout — Medic running normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree. sync.json: status=no-change, commit=fd36d183, last_sync=2026-06-10T08:16:15Z. Wrapper cycles committing normally (recent commit: "Pulse cycle 20260610T090316Z"). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T08:16:15Z (~52 min before journal write, within 2h threshold). ✅ Nominal. Root fix (sync-push-rebase-fallback-001) [blue] outstanding.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8 core ourliberty-*.service units active. ourliberty-agent-core-health.service: **failed** (known [yellow]). ourliberty-medic-dispatcher.service: activating/start (in-progress normal). ✅ Core nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core:
+- PR #412 (OPEN/UNSTABLE): stall addressed via Beacon dispatch. ⚠️
+- PR #418 `feat(missions-v2): GET /api/missions/derived droplet endpoint` (OPEN, mergeStateStatus=UNKNOWN — GitHub cache lag, opened 08:44Z). Monitoring.
+- PR #420 `feat(missions): parked-&-aging digest generator (Phase 2 §6)` (OPEN, UNKNOWN — opened 08:58Z). Monitoring.
+ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§ 4.6):** Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73d, outside 60d window). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service confirmed **failed** (Check C). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry [yellow].
+- `unreviewed-merge streak` (PRs #413, #417, #419): Confirmed via larry-alerts.jsonl. Streak now 3 consecutive. DMs delivered (beacon log 08:56Z). Pending `go: actor-exemption-config`. Carry [yellow].
+- `Tier 2 weekly probe (auth_401)`: Confirmed in beacon log 02:52Z and 02:54Z today. [yellow] outstanding.
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. [yellow] carry.
+- `sync-push-rebase-fallback-001`: sync.json no-change/08:16Z. [blue] carry.
+- `install-drift-timer-gap verification_pending`: PR #411 merged 06:41:49Z June 10. 0/2 clean healer cycles post-merge; next healer run ~18:00Z UTC (~9h). Cannot verify yet. Open.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: alert-triage.json durable state gap still present; below 3/3 threshold. Carry.
+
+**Actions taken:**
+- Dispatched `cycle-finding-pr412-forge-revision-20260610T090500Z.json` → Beacon inbox (create Forge revision task for PR #412 addressing Mirror REVISION notes).
+- Appended PRIME DIRECTIVE row: `pipeline-stall-route-to-beacon:pr412-forge-revision-blocked` (tier=1, kind=intervention, iter=1285).
+
+**Dispatches:** 1 — `cycle-finding-pr412-forge-revision-20260610T090500Z.json` to Beacon.
+
+**PRIME DIRECTIVE (script-authoritative):** interventions=748, systemic_fixes=16, verification_pending=7, ratio=46.75, trend=flat. (+5 interventions since iter 1270.)
+
+**Standing findings:**
+- [yellow] **PR #412 stall** — Mirror REVISION at 01:51:48Z; Forge re-dispatch blocked (session ID missing in routing context). Beacon dispatch sent this iter.
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 3** (PRs #413, #417, #419) — DMs delivered. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [yellow] **install-drift-timer-gap verification OPEN** — 0/2 clean healer cycles post-PR #411; next ~18:00Z UTC June 10.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; self-recovering.
