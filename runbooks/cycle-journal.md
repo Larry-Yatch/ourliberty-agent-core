@@ -4,6 +4,86 @@
 
 ---
 
+## Iteration 1269 — 2026-06-10 ~07:12Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Two new signals — pipeline stall (PR #412 Mirror not dispatched; Forge retry-exhausted) + heal-stale-daemon-code auto-restarted 6 services at 07:09Z (new code now live; all services healthy post-restart).
+**Tier state:** 1 (consecutive_clean=0; tier-reset: new pipeline stall signal)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl started at **1421 lines** (iter 1268 watermark: 06:45:35Z / unreviewed-merge:411). During cycle run, 10 new alerts arrived (lines 1422–1431):
+- `pipeline-stall:retry-exhausted:harden-test-prod-write-isolation-001` (07:08:35Z, severity=warning) — heal-pipeline-stall confirmed retry budget exhausted. ⚠️ `ask-then-do` + `tier-reset`.
+- `auto-restarted:ourliberty-beacon-bot` (07:09:08Z) — script mtime newer by 398.5 min; new code now live.
+- `auto-restarted:ourliberty-forge-bot` (07:09:12Z) — script mtime newer by 2085.6 min; new code now live.
+- `auto-restarted:ourliberty-inbox-watcher` (07:09:15Z) — script mtime newer by 2085.5 min; new code now live.
+- `auto-restarted:ourliberty-mirror-bot` (07:09:19Z) — script mtime newer by 2085.4 min; new code now live.
+- `auto-restarted:ourliberty-outbox-notifier` (07:09:23Z) — script mtime newer by 398.4 min; new code now live.
+- `auto-restarted:ourliberty-pulse-bot` (07:09:27Z) — script mtime newer by 2085.4 min; new code now live.
+- `summary` (07:10:31Z) — missions-card-gc: retired 2 stale session cards. Routine. Tier 3.
+- `diagnose-only: pipeline-stall:retry-exhausted:harden-test-prod-write-isolation-001` (07:10:57Z) — stall healer diagnostic echo. Informational.
+- `pipeline-stall:harden-test-prod-write-isolation-001` (07:11:40Z) — Pulse-generated alert (this iter).
+Auto-restarted alerts: Tier 3 known-pattern (heal-stale-daemon-code working as designed; services all confirmed running post-restart; no Larry action needed). Pipeline stall: `ask-then-do` + `tier-reset` (see Check 3). New watermark: 07:11:40Z / pipeline-stall:harden-test-prod-write-isolation-001 / iter 1269.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot: last entry 00:46:34 MDT (TIER2_FALLBACK auth_401 + rate_limit; standing known pattern). No new Larry directives in last 4h. ✅ Nominal.
+
+**Check 3 — Pipeline stall (new finding):** heal-pipeline-stall-state.json: no entry for `harden-test-prod-write-isolation-001`. Forge outbox archive: `.json` (06:18Z, preflight#1) + `.1.json` (06:21Z, preflight#2) + `.2.json` (07:02:02Z, build phase exit_code=-1 "All retries exhausted"). PR #412 opened 06:50:38Z (MERGEABLE/0-reviews) but NO successful build result in Forge outbox — Mirror was never dispatched. Forge build session wrote terminal marker at ~06:50:43Z, worktree reaped (idle) at 06:59:39Z. Pipeline exhausted retries at 07:02Z with no worktree remaining. Mirror inbox empty; no June 10 Mirror archive entries. ⚠️ **Pipeline stall: Forge build succeeded (PR #412 open) but outbox completion signal was never written → Mirror not dispatched.** `ask-then-do` + `tier-reset`. Alert sent (07:11:40Z). Suggested action: dispatch Mirror review for PR #412 — reply `go: mirror-review 412` to Beacon.
+
+**Check 4 — Pending directives:** All inboxes empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing). NOTE: heal-stale-daemon-code DID run at ~07:09Z (evidenced by 6 auto-restarted alerts) despite absent state file — healer is functional but state file path may be wrong or omitted. Services running with latest code. ✅ Nominal (healer operational).
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=2b1d00f ("Pulse cycle 20260610T070258Z" — iter 1268 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, "Auto-commit push failed; rolled back", last_sync=2026-06-10T06:47:24Z (~25 min old, < 2h). SYNC-PUSH-REBASE-FALLBACK-001 standing. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT — post-restart):** All 8 core services active after heal-stale-daemon-code restart at ~07:09Z: beacon-bot ✅ (since 07:09:05Z), forge-bot ✅ (07:09:09Z), inbox-watcher ✅ (07:09:12Z), mirror-bot ✅ (07:09:16Z), outbox-notifier ✅ (07:09:21Z), pulse-bot ✅ (07:09:24Z), chain-event-shipper ✅ (not restarted, still 18:07 Jun 9), dashboard-api ✅ (not restarted, 23:08 Jun 9). ourliberty-agent-core-health.service: inactive (known [yellow]). Additional observation: Mirror worktree `wt-mirror-dag-preflight-missions-v2-phase1-captures` has PIDs 970369/970391 running, last mtime Jun 9 21:58 MDT (~3h old) — not reaped by heal-wedged-review-sessions (possibly no terminal marker). [blue] monitor. ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 "test(isolation): AGENTS_ROOT sandbox + write tripwire" — MERGEABLE, 0 reviews, no auto-merge, ~21 min old (under 30-min threshold). Pipeline stall flagged in Check 3. ourliberty-dashboard: 0 open. ✅ Nominal by timing.
+
+**Check H — Forge activity:** PR #412 opened 06:50:38Z (Forge build). Forge `.2.json` "All retries exhausted" at 07:02:02Z (stall confirmed). No Forge merges this iter. 1 open PR.
+
+**Credential rotation (4.6):** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Verify-before-reassert — iter 1268 standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health inactive (confirmed Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon bot 00:46 MDT TIER2_FALLBACK confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: no resolution. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json 06:47:24Z; no new occurrence. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: watermark at unreviewed-merge:411 — no new occurrence this iter. [blue] standing.
+- `PR #412 harden-test-prod-write-isolation-001`: ⚠️ **PIPELINE STALL confirmed** — Forge build complete, Mirror never dispatched, retry-exhausted at 07:02Z. Alert sent 07:11:40Z.
+- `install-drift-timer-gap verification_pending (iter 1262)`: next healer run 18:00Z UTC; 0 of 2 required clean cycles. OPEN.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — Beacon spec ready; pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; no new occurrence this iter; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 68th+ occurrence; self-recovering; root code fix pending.
+
+**New finding:**
+- [yellow] **PR #412 pipeline stall** — Forge build succeeded (PR opened 06:50:38Z) but completion signal never written to outbox → Mirror not dispatched. Forge retry-exhausted at 07:02:02Z. Alert sent 07:11:40Z. Action on Larry: reply `go: mirror-review 412` to Beacon.
+
+**Watch items:**
+- PR #412 pipeline stall — needs Mirror dispatch. Larry action pending.
+- All 6 auto-restarted services: fresh starts at 07:09Z. Monitor for startup issues next cycle.
+- Mirror worktree `wt-mirror-dag-preflight-missions-v2-phase1-captures` (PIDs 970369/970391, ~3h old, not reaped). Monitor — if still present next cycle, escalate as wedged.
+- install-drift healer next run: 18:00Z UTC. At that point: check for clean run → 1 of 2 post-merge cycles satisfied.
+- heal-stale-daemon-code-state.json: healer is functional (ran at 07:09Z) but state file absent — worth checking if path is misconfigured. [blue] monitor.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1269 --template pipeline-stall --detail PR-412-mirror-not-dispatched` → row appended (07:10:19Z). `larry_alerts.append_alert pipeline-stall:harden-test-prod-write-isolation-001` → line 1431 (07:11:40Z).
+**Dispatches:** None (pipeline stall requires Larry action to re-dispatch Mirror).
+**PRIME DIRECTIVE:** 1 new intervention (pipeline-stall:PR-412-mirror-not-dispatched). interventions=742, systemic_fixes=16, ratio=46.375, trend=flat (script-authoritative).
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: pipeline stall new signal).
+
+---
+
 ## Iteration 1268 — 2026-06-10 ~07:01Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — 0 new alerts; Forge build `harden-test-prod-write-isolation-001` complete (PR #412 opened 06:50:38Z, CLEAN/MERGEABLE); install-drift verification_pending open (0/2 clean healer runs post-PR #411 merge); all services nominal.
