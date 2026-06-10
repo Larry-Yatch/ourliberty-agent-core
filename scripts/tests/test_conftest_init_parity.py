@@ -77,6 +77,16 @@ MIRRORED_AUTOUSE_FIXTURES: dict[str, dict[str, str]] = {
         "env_var": "OURLIBERTY_DISABLE_LIVE_EMIT",
         "purpose": "block live Supabase chain_events writes during tests",
     },
+    "_production_write_runtime_tripwire": {
+        "env_var": "OURLIBERTY_TEST_RUN_SENTINEL",
+        "purpose": (
+            "runtime backstop: stamp a run sentinel into production log() "
+            "writes so a write that escapes the sandbox to the real ~/agents "
+            "tree is caught. The __init__ mirror sets the env var; the active "
+            "session-end scan is the pytest fixture's teardown (the unittest "
+            "bootstrap has no session-finish hook)."
+        ),
+    },
 }
 
 
