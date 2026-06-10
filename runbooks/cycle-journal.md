@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration 1255 — 2026-06-10 05:17Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all mandatory + additive checks nominal. **PR #407 MERGED ✅** "config(credentials): register DESKTOP_INGEST_TOKEN in rotation schedule + add rotation runbook" (05:10:49Z, Mirror REVIEW_PASS auto-merge). Closes `credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN` standing item. Auto-restarted:dashboard-api at 05:08:20Z (Tier 3 / by-design — stale-daemon healer picked up PR #406 code; service confirmed active). Missions-v2 pipeline continues: step-parked-lane (PID 613533) active; build-step-gc-healer in inbox awaiting session dispatch.
+**Tier state:** 1 (consecutive_clean=0; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper increments consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1413 lines** (+2 from iter 1254 watermark ts=04:49:03Z / line 1411).
+- Line 1412 (ts=05:08:23Z): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-dashboard-api.service, route=digest. Script mtime=05:02:20Z (PR #406 code) > active-since=23:59:51Z June 9 (delta 302.5 min). Beacon bot delivered at 23:09:10 MDT as route=digest (DM skipped per policy). Dashboard-api confirmed active at 23:08:20 MDT. → **Tier 3 by-design** (auto-restarted:* with route=digest per iter 1049 calibration). No tier-reset.
+- Line 1413 (ts=05:10:51Z): source=outbox-notifier, kind=notification, intent=review-pass, PR #407 Mirror REVIEW_PASS + auto-merged. Informational delivery — action (auto-merge) already completed. → **Tier 3 informational** (pipeline completion signal; no dispatch needed). No tier-reset.
+- Advance watermark to ts=2026-06-10T05:10:51Z / line 1413. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log last real entries at 23:09:19 MDT (standing TIER2_FALLBACK fixture pattern confirmed; route=digest at 23:09:10 MDT for auto-restarted:dashboard-api). No new Larry directives since iter 1254 (last real directive 22:58Z "go" for credential registration → PR #407 now merged; 23:00Z "deeper look" directive → Beacon replied 23:04Z analytically, no Forge dispatch yet). ✅ Nominal. [blue] Beacon's "deeper look" fixture-leak analysis pending follow-up — watching for Forge dispatch.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-10T05:02:19Z (~15 min old at scan time — borderline, ran independent checks per spec). heal-pipeline-stall-state.json: 0 active stalls, 34 entries (all snoozed to 2099). Independent check: PID 613533 (step-parked-lane) confirmed active in process list. build-step-gc-healer.json in inbox; no active claude process for it visible; < 10 min since PID 611680 was last confirmed (iter 1254); < 2h for stall trigger. ✅ Nominal per spec; [blue] watch build-step-gc-healer for PR in next cycle.
+
+**Check 4 — Pending directives:** Forge inbox: build-step-gc-healer.json (missions-v2 Phase 1 step 1b build phase; preflight archived 23:01 MDT = 05:01Z) + step-parked-lane.json (missions-v2 Phase 1 step 2; active, PID 613533). All other inboxes empty. No orphaned Larry directives — 22:58Z "go" → PR #407 merged ✅; 23:00Z "deeper look" → Beacon replied; pending Forge dispatch if actionable. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (oneshot healer completed normally — it restarted dashboard-api and exited). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=05f3c7f ("Pulse cycle 20260610T051122Z" — iter 1254 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-10T05:09:59Z (< 2h, fresh). 65th+ occurrence of sync-push-rebase-fallback-001. Self-recovering. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** All 9 core ourliberty-*.service units active/running per systemctl: beacon-bot ✅, chain-event-shipper ✅, cycle.service ✅ (this iter), dashboard-api ✅ (restarted 23:08:20 MDT, confirmed active), forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. All timers active/waiting. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** **PR #407 MERGED ✅** (05:10:49Z, Mirror-reviewed auto-merge). 0 open PRs in ourliberty-agent-core. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§5.0):** 2/15 — soaking, no-op. ✅
+
+**Check I (§5.1, Wednesday June 10):** Sentinel check-i-2026-06-10.json present (fired iter 1246). Idempotent skip. ✅
+
+**Credential rotation (§4.6):** DESKTOP_INGEST_TOKEN NOW REGISTERED (PR #407 merged). Rotation schedule: 21 credentials (was 20). 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Forge/pipeline digest:** **PR #407 MERGED ✅** "config(credentials): register DESKTOP_INGEST_TOKEN in rotation schedule + add rotation runbook" (Mirror REVIEW_PASS auto-merge 05:10:49Z) — closes credential-drift standing item. Active: step-parked-lane.json (PID 613533, missions-v2 Phase 1 step 2). Pending dispatch: build-step-gc-healer.json (Phase 1 step 1b; preflight PROCEED at 05:01Z; awaiting Forge session start). Pipeline healthy.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001`: Forge inbox = build-step-gc-healer + step-parked-lane (no preflight-reminder). larry-alerts.jsonl at 1413. Still pending. Carry forward [yellow].
+- `health-check-notify-script-missing`: heal-stale-daemon-code-state.json ABSENT (normal). notify_larry.py still missing. Carry forward [yellow].
+- `unreviewed-merge streak 2` (PR #404 + #405): lines 1412-1413 = auto-restarted:dashboard-api (digest) + review-pass:PR407 (Mirror-reviewed = no streak extension). Streak stays at 2. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: beacon log 23:09:19 MDT TIER2_FALLBACK confirmed. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN`: **CLOSED ✅** — PR #407 merged 05:10:49Z; DESKTOP_INGEST_TOKEN now registered in rotation schedule.
+- `sync-push-rebase-fallback-001`: New occurrence 05:09:59Z (65th+). [blue] standing.
+- `alert-triage-watermark-001 APPROVAL_REQUEST parked`: unchanged. Carry forward [yellow].
+- `pulse-auto-dispatch task_id mismatch → APPROVAL_REQUEST silently dropped` G-rule (iter 1247, 1/3): No new occurrence. Carry forward 1/3.
+- `orphan bg process PID 1834248`: Not re-checked; still expected running. [blue] carry forward.
+
+**Standing findings:**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 2** (PR #404 + #405) — pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001** — Beacon spec ready; notifier dropped (task_id mismatch). Pending Larry action (paste block from `/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json` into Telegram or approve via dashboard).
+- [yellow] **alert-triage-watermark-001 APPROVAL_REQUEST parked** — Beacon spec `alert-triage-durable-watermark-001` ready; pending Larry Telegram "go" to Beacon for Forge dispatch.
+- ~~[yellow] **credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN**~~ — **CLOSED ✅ PR #407 merged 05:10:49Z.**
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 65th+ occurrence; root cause unfixed; self-recovering.
+- [blue] **Orphan bg process PID 1834248** — 12d+ polling loop. Harmless; clean up when convenient.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 1255` → iter_clean row appended (05:17:48Z).
+**Dispatches:** None.
+**PRIME DIRECTIVE:** iter_clean (no new interventions). interventions=736, systemic_fixes=16, ratio=46.0, trend=flat (script-authoritative).
+**Tier end-of-iter:** 1, consecutive_clean=0 → wrapper increments (clean iter).
+
+---
+
 ## Iteration 1254 — 2026-06-10 05:09Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all mandatory + additive checks nominal. PR #406 MERGED ✅ (missions-v2 Phase 1 step 1a; Mirror-reviewed, auto-merged). Pipeline active: 2 concurrent Forge builds (step-gc-healer + step-parked-lane) + PR #407 under Mirror review (DESKTOP_INGEST_TOKEN credential registration, actively resolving standing drift item). Larry fixture-leak discussion at 22:55–23:04 MDT: Beacon replied with structural analysis; no orphaned directives.
