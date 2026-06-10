@@ -141,23 +141,45 @@ def _apply_tier_auth(env_dict, tier_name, default_token):
 RATE_LIMIT_RE = re.compile(
     r'(hit your limit|5-hour|resets \d+)', re.IGNORECASE,
 )
+# A lost/unrecoverable --resume session: the Claude CLI can't find the
+# session ID we passed to --resume. The ONLY recovery is a fresh
+# re-dispatch (the heal_resume_paused_on_tier1 auto-heal path) — never the
+# auth runbook, never an auth_401 alert. Checked BEFORE auth_401 so the
+# UUID-embedded-digits case ('...session ID: 32401737-...') resolves here
+# instead of tripping the bare-401 auth matcher.
+SESSION_LOST_RE = re.compile(
+    r'No conversation found with session ID', re.IGNORECASE,
+)
+# auth_401 matches the two literal auth-failure strings verbatim plus a
+# numeric 401 status code. The numeric branch is UUID-safe: 401 must be a
+# standalone token (not preceded/followed by another alphanumeric or a
+# hyphen), so it can NOT match the '401' embedded in a UUID/hex run like
+# '32401737-...'. The common 'HTTP 401 Unauthorized' shape still matches
+# because the code is whitespace-bounded.
 AUTH_401_RE = re.compile(
-    r'(401|Invalid authentication credentials|Failed to authenticate)',
+    r'(?:Invalid authentication credentials'
+    r'|Failed to authenticate'
+    r'|(?<![0-9A-Za-z-])401(?![0-9A-Za-z-]))',
     re.IGNORECASE,
 )
 
 
 def classify_tier1_failure(stdout, stderr):
-    """Return 'rate_limit', 'auth_401', or None.
+    """Return 'rate_limit', 'session_lost', 'auth_401', or None.
 
     Detection runs against the combined stdout+stderr (the Claude CLI emits
     rate-limit AND auth-401 messages on stdout — that's the 2026-05-26 gap).
-    Rate-limit takes precedence when both regexes match; the recovery is the
-    same either way (Tier 2 retry).
+    Precedence: rate_limit (top, unchanged) → session_lost → auth_401.
+    session_lost is checked before auth_401 because a lost-session message
+    carries a UUID whose digits can contain '401'; classifying it as auth
+    would fire the wrong recovery (auth runbook / auth_401 alert) when the
+    real fix is a fresh re-dispatch.
     """
     combined = (stdout or '') + '\n' + (stderr or '')
     if RATE_LIMIT_RE.search(combined):
         return 'rate_limit'
+    if SESSION_LOST_RE.search(combined):
+        return 'session_lost'
     if AUTH_401_RE.search(combined):
         return 'auth_401'
     return None
@@ -331,12 +353,20 @@ def _mark_paused_on_tier1(task_stem, failure_type, agent_id=None, tier=None):
         pass
 
 
-def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id):
-    """DM Larry that Tier 1 failed and Tier 2 was unavailable / also failed
-    OR the session was a --resume that can't fall back. Uses larry_alerts
-    with the existing 'warning' severity; subject buckets on intent +
-    failure_type so different failure types get distinct cooldown windows.
+def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id,
+                          tier='tier1'):
+    """DM Larry that the primary tier failed and Tier 2 was unavailable /
+    also failed OR the session was a --resume that can't fall back. Uses
+    larry_alerts with the existing 'warning' severity; subject buckets on
+    intent + failure_type so different failure types get distinct cooldown
+    windows.
+
+    `tier` is the ACTUAL failing tier (e.g. 'tier1'/'tier2') threaded from
+    the call site — under rotation the primary subprocess can run on either
+    tier, so the alert names the real account instead of a hardcoded
+    'Tier 1' literal.
     """
+    tier_label = (tier or 'tier1').replace('tier', 'Tier ')
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import larry_alerts as la  # noqa: E402
@@ -371,9 +401,9 @@ def _dm_tier2_unavailable(failure_type, task_stem, agent_id, session_id):
             source=f'agent-runner-{agent_id}',
             severity='warning',
             message=(
-                f'Task `{task_label}` ({agent_id}) hit Tier 1 {failure_type} '
-                f'and Tier 2 fallback was unavailable, failed, or skipped.'
-                f'{resume_note}'
+                f'Task `{task_label}` ({agent_id}) hit {tier_label} '
+                f'{failure_type} and Tier 2 fallback was unavailable, '
+                f'failed, or skipped.{resume_note}'
             ),
             subject=f'claude_tier1_failed_tier2_unavailable:{failure_type}',
             suggested_action=recovery,
@@ -1182,13 +1212,40 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 )
                             except Exception:
                                 pass
-                        # Resume-discipline rule: --resume session IDs are
-                        # NOT portable between accounts. A Tier 2 retry on a
-                        # resume task would fail with 'session not found'
-                        # AND would orphan the original session's context.
-                        # DM Larry + mark paused; the next retry would hit
-                        # the same wall, so exit the loop terminally.
                         if session_id:
+                            # session_lost: the --resume target session is
+                            # gone, so there is nothing to fall back TO and
+                            # nothing to re-auth. Recovery is a FRESH
+                            # re-dispatch — mark paused so
+                            # heal_resume_paused_on_tier1 re-dispatches the
+                            # task with session_id stripped. No cooldown was
+                            # set for session_lost above, so the healer's
+                            # cooldown gate is already clear and it re-runs on
+                            # its next tick. Deliberately NO auth_401 DM /
+                            # runbook here — that recovery is wrong for a lost
+                            # session.
+                            if failure_type == 'session_lost':
+                                log(agent_id,
+                                    'TIER_FAILURE_SESSION_LOST '
+                                    'reason=resume_target_gone '
+                                    'action=fresh_redispatch_heal',
+                                    'WARN')
+                                _mark_paused_on_tier1(
+                                    task_stem, failure_type,
+                                    agent_id=agent_id,
+                                    tier=active_tier_name,
+                                )
+                                return (False,
+                                        'Tier 1 session_lost on --resume '
+                                        'session (resume target gone); marked '
+                                        'for fresh re-dispatch heal.',
+                                        None)
+                            # Resume-discipline rule: --resume session IDs are
+                            # NOT portable between accounts. A Tier 2 retry on
+                            # a resume task would fail with 'session not found'
+                            # AND would orphan the original session's context.
+                            # DM Larry + mark paused; the next retry would hit
+                            # the same wall, so exit the loop terminally.
                             log(agent_id,
                                 'TIER2_FALLBACK_SKIPPED reason=' + failure_type +
                                 ' cause=resume_session_account_bound',
@@ -1200,6 +1257,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                             )
                             _dm_tier2_unavailable(
                                 failure_type, task_stem, agent_id, session_id,
+                                tier=active_tier_name,
                             )
                             return (False,
                                     'Tier 1 ' + failure_type +
@@ -1215,6 +1273,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 'WARN')
                             _dm_tier2_unavailable(
                                 failure_type, task_stem, agent_id, None,
+                                tier=active_tier_name,
                             )
                             # Fall through to existing retry behavior — a
                             # transient rate-limit might clear on its own,
@@ -1276,6 +1335,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                         str(t2.returncode), 'WARN')
                                     _dm_tier2_unavailable(
                                         failure_type, task_stem, agent_id, None,
+                                        tier=other_tier_name,
                                     )
                                     # Step C: record the Tier 2 failure as a
                                     # distinct ledger event so Check VIII's
@@ -1343,6 +1403,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                     str(t2_exc), 'WARN')
                                 _dm_tier2_unavailable(
                                     failure_type, task_stem, agent_id, None,
+                                    tier=other_tier_name,
                                 )
 
                 if tm.check_for_rate_limit(output):
