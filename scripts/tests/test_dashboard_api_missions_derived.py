@@ -661,5 +661,97 @@ class DeriveOrphanReadabilityUnitTest(unittest.TestCase):
         self.assertTrue(out['terminal'])
 
 
+class GithubTokenTest(unittest.TestCase):
+    """`_github_token` env-first, then `gh auth token` fallback (the dashboard-api
+    host has gh authed but no token env var)."""
+
+    def setUp(self) -> None:
+        self._orig_env = {
+            k: os.environ.get(k) for k in ('GITHUB_TOKEN', 'GH_TOKEN')
+        }
+        for k in ('GITHUB_TOKEN', 'GH_TOKEN'):
+            os.environ.pop(k, None)
+        self._orig_run = da.subprocess.run
+        self._orig_cache = da._GH_CLI_TOKEN_CACHE
+        da._GH_CLI_TOKEN_CACHE = da._UNSET
+        self.addCleanup(self._restore)
+
+    def _restore(self) -> None:
+        for k, v in self._orig_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        da.subprocess.run = self._orig_run
+        da._GH_CLI_TOKEN_CACHE = self._orig_cache
+
+    @staticmethod
+    def _proc(stdout: str, returncode: int = 0):
+        class _P:
+            pass
+        p = _P()
+        p.stdout = stdout
+        p.returncode = returncode
+        return p
+
+    def test_env_token_wins_and_skips_gh(self) -> None:
+        os.environ['GITHUB_TOKEN'] = 'env-tok'
+
+        def _boom(*_a, **_k):
+            raise AssertionError('gh should not be called when env token exists')
+        da.subprocess.run = _boom
+        self.assertEqual(da._github_token(), 'env-tok')
+
+    def test_gh_fallback_when_env_absent(self) -> None:
+        calls = []
+
+        def fake(cmd, **_k):
+            calls.append(cmd)
+            return self._proc('gh-cli-tok\n')
+        da.subprocess.run = fake
+        self.assertEqual(da._github_token(), 'gh-cli-tok')
+        self.assertEqual(calls[0], ['gh', 'auth', 'token'])
+
+    def test_gh_token_cached_no_second_subprocess(self) -> None:
+        calls = []
+
+        def fake(cmd, **_k):
+            calls.append(cmd)
+            return self._proc('gh-cli-tok')
+        da.subprocess.run = fake
+        self.assertEqual(da._github_token(), 'gh-cli-tok')
+        self.assertEqual(da._github_token(), 'gh-cli-tok')
+        self.assertEqual(len(calls), 1)  # cached after first success
+
+    def test_gh_nonzero_returns_none(self) -> None:
+        da.subprocess.run = lambda *a, **k: self._proc('', returncode=1)
+        self.assertIsNone(da._github_token())
+
+    def test_gh_zero_but_empty_stdout_returns_none_not_cached(self) -> None:
+        # returncode 0 with empty/whitespace stdout must NOT poison the cache.
+        calls = []
+
+        def fake(*_a, **_k):
+            calls.append(1)
+            return self._proc('  \n', returncode=0)
+        da.subprocess.run = fake
+        self.assertIsNone(da._github_token())
+        self.assertIs(da._GH_CLI_TOKEN_CACHE, da._UNSET)  # not cached
+        self.assertIsNone(da._github_token())
+        self.assertEqual(len(calls), 2)  # retried, not cached
+
+    def test_gh_missing_returns_none_and_not_cached(self) -> None:
+        calls = []
+
+        def fake(*_a, **_k):
+            calls.append(1)
+            raise FileNotFoundError('gh not installed')
+        da.subprocess.run = fake
+        self.assertIsNone(da._github_token())
+        # A failure is NOT cached — a later call retries (transient hiccup).
+        self.assertIsNone(da._github_token())
+        self.assertEqual(len(calls), 2)
+
+
 if __name__ == '__main__':
     unittest.main()
