@@ -1,0 +1,13 @@
+[Unit]
+Description=~10-min GC tick for the Missions board (retire stale session cards, age parked captures, commit captures.json)
+
+[Timer]
+# Spec § 6: timer healer, ~10 min cadence. Small boot offset so it doesn't
+# contend with the other git-touching healers that fire on round boundaries.
+OnBootSec=7min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-missions-card-gc.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
