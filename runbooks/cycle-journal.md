@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration 1273 — 2026-06-10 ~07:57Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Two active signals — (1) PR #412 now in Mirror REVIEW_REVISION with no auto-resume path (no-session-revision stall); (2) missions-v2-phase2 DAG-preflight REVISION standing from iter 1272 (spec amendment pending Larry → Beacon).
+**Tier state:** 1 (consecutive_clean=0; tier-reset: no-session-revision new alert)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1439 lines** (iter 1272 effective watermark: 07:39:44Z / mirror-dag-revision:missions-v2-phase2 / line 1438). 1 new line since watermark:
+- Line 1439 (07:51:48Z): `outbox-notifier:no-session-revision:mirror-review-pr412-001` — **NEW**. Mirror returned REVIEW_REVISION on PR #412; outbox-notifier skipped auto-resume dispatch (no `forge_build_session_id` in recovery-dispatched task); broadcast alert queued for manual re-dispatch. Route=escalate. ⚠️ tier-reset.
+New watermark: 07:51:48Z / no-session-revision:mirror-review-pr412-001 / line 1439 / iter 1273.
+
+**VERIFY-BEFORE-REASSERT — iter 1272 claim "PR #412 stall RESOLVING (Mirror review in progress)":** Re-verified. Mirror completed review at 07:51:42Z → **REVIEW_REVISION** (1 finding, medium severity, high confidence). The stall was resolving in iter 1272; it has now transitioned to a new stall shape: revision loop with no auto-resume path. Claim updated: stall was RESOLVING in iter 1272; THIS iter it has become a no-session-revision stall.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot: last real entry 01:48:07 MDT (07:48:07Z) — TIER2_FALLBACK_FAILED (rate_limit + auth_401, standing). Larry's last message: 01:36:06 MDT (07:36:06Z) "go" — already handled (triggered DAG-preflight + mirror-review-pr412-001 dispatch, both completed). No new Larry directives since 07:36Z. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: `pr_no_mirror_dispatch:harden-test-prod-write-isolation-001` suppressed (07:25:25Z — prior stall superseded by Mirror's REVIEW_REVISION). Mirror inbox empty; Forge inbox empty (auto-resume dispatch was skipped by outbox-notifier per log 01:51:48Z). PR #412 is in REVIEW_REVISION state with no active worker. ⚠️ New stall shape: no-session-revision. `ask-then-do` + `tier-reset`.
+
+**Check 4 — Pending directives:** Beacon inbox empty (notification processed at 07:51:53-52:28Z). Forge inbox empty. Mirror inbox empty. Pulse inbox empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (standing). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=1765e19 ("Pulse cycle 20260610T074853Z" — iter 1272 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, "Auto-commit push failed; rolled back", last_sync=2026-06-10T07:48:54Z (~9 min old, < 2h threshold). SYNC-PUSH-REBASE-FALLBACK-001 standing. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8/8 core services active. ourliberty-agent-core-health: inactive (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 OPEN/UNKNOWN-mergeable, state=failure (mirror-review check posted by outbox-notifier at 07:51:48Z), 0 reviews pending (REVIEW_REVISION outcome). ourliberty-dashboard: 0 open. ⚠️ PR #412 needs revision.
+
+**Check H — Forge activity:** 0 newly merged PRs this iter. PR #412 remains open (revision state). 0 Forge-opened PRs active.
+
+**Credential rotation (4.6):** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate soak (§5.0):** `assess_gate.py` → "7/15 gate reviews since go-live; soaking, no-op." ✅ No action.
+
+**Verify-before-reassert — iter 1272 standing items:**
+- `health-check-notify-script-missing`: agent-core-health inactive (confirmed Check C). Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: Beacon bot 01:48 MDT TIER2_FALLBACK_FAILED confirmed — still failing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: all inboxes empty. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json 07:48:54Z error; no new occurrence. [blue] standing.
+- `unreviewed-merge actor-exemption-config`: no new unreviewed-merge alerts this iter. G-rule 3/3 standing. [blue] standing.
+- `install-drift-timer-gap verification_pending (iter 1262)`: healer next run 18:00Z UTC; 0 of 2 required clean cycles post-PR #411 merge. OPEN.
+- `wt-mirror-dag-preflight-missions-v2-phase1-captures`: **ESCALATE** — iter 1272 watch item said "escalate if still present next cycle." Still present, mtime 03:58Z Jun 10 (~4h old), no PIDs, not reaped by heal-wedged-review-sessions. [yellow].
+- `wt-mirror-dag-preflight-missions-v2-phase2`: present, mtime 07:36Z, no PIDs, terminal marker present. heal-wedged should reap on next run. ℹ️ Monitor.
+- `wt-mirror-mirror-review-pr412-001`: present, mtime 07:41Z, Mirror completed 07:51Z, no PIDs. heal-wedged should reap on next run. ℹ️ Monitor.
+- `missions-v2-phase2 spec amendment`: Beacon has not been dispatched for amendment (Beacon inbox empty, no new spec commits). Blocked on Larry direction. ⚠️ Standing.
+
+**New finding:**
+- [yellow] **PR #412 no-session-revision stall** — Mirror returned REVIEW_REVISION at 07:51:42Z (1 finding, medium/high: `test_conftest_init_parity.py` L71-L197 — Gap A's import-time `OURLIBERTY_AGENTS_ROOT`/`WORKTREES_ROOT` redirect has no parity coverage; if the redirect regresses nothing fails and writes silently leak to `~/agents`). Fix: extend parity test to assert both conftest.py and __init__.py set `OURLIBERTY_AGENTS_ROOT` at import time + add live-in-process check mirroring the existing `OURLIBERTY_LOG_DIR` liveness check. **Auto-resume skipped** (recovery-dispatched task had no `forge_build_session_id`; outbox-notifier log 01:51:48Z confirms skip). Beacon processed the notify at 07:51:53Z but its prompt stated "auto-dispatched" — this is FALSE per notifier log. Forge inbox is EMPTY. **Action required: re-dispatch Forge via Beacon with a fresh task_id to apply Mirror's findings (outbox-notifier suggested_action: "Re-dispatch via Beacon with a fresh task_id to thread a new forge_build_session_id").**
+
+- [yellow] **wt-mirror-dag-preflight-missions-v2-phase1-captures** — worktree ~4h old (mtime 03:58Z Jun 10), no PIDs, not reaped by heal-wedged-review-sessions. Per iter 1272 watch item: escalate. heal-wedged-review-sessions may be missing the terminal marker or the idle-grace threshold has not been reached. **Action: Larry may want to manually reap via `rm -rf ~/agent-worktrees/wt-mirror-dag-preflight-missions-v2-phase1-captures` + `git worktree prune -C ~/agent-core`** — or wait for heal-wedged's next run.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z + June 10 00:46Z + 07:48Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — artifact=/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json. Pending Larry action.
+- [yellow] **missions-v2-phase2 DAG-preflight REVISION** (iter 1272) — `p2-resurface-and-digest-card` file-enumeration gap. Spec amendment pending Beacon dispatch (requires Larry direction).
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 68th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #412 — REVIEW_REVISION, no auto-resume path. **Larry action: re-dispatch Forge via Beacon** to apply Mirror's parity-coverage finding.
+- missions-v2-phase2 — spec amendment blocked; DAG-preflight re-dispatch can proceed after amendment.
+- wt-mirror-dag-preflight-missions-v2-phase1-captures — ~4h, no PIDs; escalated this iter.
+- wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 — pending heal-wedged reap.
+- install-drift healer: next run 18:00Z UTC → 1 of 2 clean cycles needed.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind intervention --iter 1273 --template no-session-revision --detail PR-412-mirror-REVIEW_REVISION-no-forge-session-id` → row appended (07:57:26Z). No auto-fixes applied (revision dispatch requires Beacon re-dispatch decision; worktree reap is optional/Larry-delegated).
+**Dispatches:** None (outbox-notifier already escalated no-session-revision to larry-alerts.jsonl route=escalate line 1439 at 07:51:48Z; Beacon bot will deliver on next sweep).
+**PRIME DIRECTIVE:** 1 new intervention (no-session-revision:PR-412-mirror-REVIEW_REVISION). interventions=746, systemic_fixes=16, ratio=46.625, trend=flat (script-authoritative, iter 1273).
+**Tier end-of-iter:** 1, consecutive_clean=0 (tier-reset: no-session-revision new finding).
+
+---
+
 ## Iteration 1272 — 2026-06-10 ~07:38Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ missions-v2-phase2 DAG-preflight REVISION (Mirror found parallel-step file-enumeration gap in `p2-resurface-and-digest-card`; Larry DM'd 07:41Z). PR #412 Mirror review now IN PROGRESS (worktree created 07:41Z — multi-iter stall resolving).
