@@ -136,16 +136,18 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
-# Pulse-runtime auto-commit (sync resilience). Closes the 2026-05-28 iter-98
-# incident class: an interactive Pulse /cycle leaves runbooks/cycle-journal.md,
-# runbooks/cycle-actions.jsonl, agents/pulse/MEMORY.md, or agents/pulse/memory/*
-# uncommitted, and sync refuses to pull for hours until Larry intervenes.
+# Machine-owned runtime auto-commit (sync resilience). Closes the 2026-05-28
+# iter-98 incident class and its 2026-06-10 captures.json sibling: automation
+# leaves a machine-owned runtime file uncommitted (an interactive Pulse /cycle's
+# cycle-journal/cycle-actions/MEMORY, or agents/beacon/captures.json between the
+# missions ingest write and the heal_missions_card_gc commit), and sync refuses
+# to pull for hours/until the other committer's next tick.
 #
 # Posture change (bounded): sync, which has historically been pull-only,
 # gains the ability to push EXACTLY ONE commit to origin/main, and only when
-# every modified file is inside the hardcoded Pulse runtime allowlist in
-# scripts/_lib_pulse_runtime.sh. Any non-allowlist dirt falls through to the
-# existing refuse-and-alert path unchanged.
+# every modified file is inside the hardcoded auto-commit allowlist
+# (SYNC_AUTOCOMMIT_PATHS) in scripts/_lib_pulse_runtime.sh. Any non-allowlist
+# dirt falls through to the existing refuse-and-alert path unchanged.
 #
 # Failure mode: if the push fails (non-FF, network, auth), the local commit is
 # hard-reset to its pre-auto-commit HEAD so we never leave a local-only commit
@@ -157,30 +159,30 @@ source "${SCRIPTS_DIR}/_lib_pulse_runtime.sh"
 # shellcheck source=_lib_push_with_rebase.sh
 source "${SCRIPTS_DIR}/_lib_push_with_rebase.sh"
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    if all_modified_in_pulse_runtime_allowlist "$REPO_DIR"; then
+    if all_modified_in_sync_autocommit_allowlist "$REPO_DIR"; then
         AUTO_PRE_HEAD="$(git rev-parse HEAD)"
-        log "Pulse runtime allowlist dirty (no other modifications) — auto-commit + push"
-        git add -- "${PULSE_RUNTIME_PATHS[@]}" 2>/dev/null || true
+        log "Machine-owned runtime allowlist dirty (no other modifications) — auto-commit + push"
+        git add -- "${SYNC_AUTOCOMMIT_PATHS[@]}" 2>/dev/null || true
 
         TS=$(date -u +%Y%m%dT%H%M%SZ)
-        if git commit -q -m "pulse: auto-commit runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only Pulse-owned runtime files dirty (see scripts/_lib_pulse_runtime.sh allowlist). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
-            log "Auto-committed Pulse runtime files; pushing to origin/main"
+        if git commit -q -m "runtime: auto-commit machine-owned runtime files (sync resilience) ${TS}" -m "Auto-committed by sync_agent_core.sh: working tree had only machine-owned runtime files dirty (see SYNC_AUTOCOMMIT_PATHS in scripts/_lib_pulse_runtime.sh). Sync would otherwise refuse to pull from origin/main." 2>/dev/null; then
+            log "Auto-committed machine-owned runtime files; pushing to origin/main"
             # Reuse run_cycle.sh's rebase fallback: a bare push loses the race
             # when an interactive PR merge advances origin/main mid-cycle. Rebase
             # onto origin and retry instead of rolling back + alerting on every
             # routine non-FF (SYNC-PUSH-REBASE-FALLBACK-001).
             if push_with_rebase origin main /dev/stdout; then
-                log "Pushed Pulse runtime auto-commit to origin/main (rebase fallback available)"
+                log "Pushed machine-owned runtime auto-commit to origin/main (rebase fallback available)"
             else
-                log "ERROR: push of Pulse runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD}"
+                log "ERROR: push of machine-owned runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD}"
                 git rebase --abort 2>/dev/null || true
                 git reset --hard "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
                 write_status "error" "Auto-commit push failed; rolled back"
-                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
+                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed machine-owned runtime files but the push to origin/main failed; rolled back to ${AUTO_PRE_HEAD}. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
                 # Routine self-healing transient: the rollback restored a clean,
                 # pushable tree and sync retries the push on the next tick — no
                 # action required, so route to the digest, not a DM (fix-first).
-                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8} (clean tree restored). Self-heals on the next sync tick; no action needed." "digest"
+                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed machine-owned runtime files but push to origin/main failed; rolled back to ${AUTO_PRE_HEAD:0:8} (clean tree restored). Self-heals on the next sync tick; no action needed." "digest"
                 exit 1
             fi
         else
