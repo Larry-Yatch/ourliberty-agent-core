@@ -1,4 +1,20 @@
 {
   "schema_version": 1,
-  "captures": []
+  "captures": [
+    {
+      "id": "cap-bidirectional-missions-board-agents-read-it-to-s-bebd",
+      "title": "Bidirectional Missions board \u2014 agents read it to self-prioritize",
+      "note": "Today the board is a read-only operator view; the fleet gets work from inbox + sequence DAG, not the board. Raised 2026-06-10; net-new capability (also relevant to the sibling project). Possible future phase: make the registry a prioritized backlog the fleet queries before pulling from its inbox.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "feat/telegram-approve-clears-dashboard-pending",
+        "captured_at": "2026-06-10T06:01:59.654438+00:00"
+      },
+      "last_touched": "2026-06-10T06:01:59.654438+00:00",
+      "promoted_to": null
+    }
+  ]
 }
