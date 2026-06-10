@@ -727,6 +727,19 @@ class GithubTokenTest(unittest.TestCase):
         da.subprocess.run = lambda *a, **k: self._proc('', returncode=1)
         self.assertIsNone(da._github_token())
 
+    def test_gh_zero_but_empty_stdout_returns_none_not_cached(self) -> None:
+        # returncode 0 with empty/whitespace stdout must NOT poison the cache.
+        calls = []
+
+        def fake(*_a, **_k):
+            calls.append(1)
+            return self._proc('  \n', returncode=0)
+        da.subprocess.run = fake
+        self.assertIsNone(da._github_token())
+        self.assertIs(da._GH_CLI_TOKEN_CACHE, da._UNSET)  # not cached
+        self.assertIsNone(da._github_token())
+        self.assertEqual(len(calls), 2)  # retried, not cached
+
     def test_gh_missing_returns_none_and_not_cached(self) -> None:
         calls = []
 
