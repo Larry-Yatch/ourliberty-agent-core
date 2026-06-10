@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 1308 — 2026-06-10 ~13:00Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Pipeline advancing. Forge building p2-resurface-and-digest-card (~14 min into build at scan). PR #412 standing stall (APPROVAL_REQUEST pending Larry sign-off). 9/9 core services active.
+**Tier state:** 1 (consecutive_clean=0; PR #412 standing stall)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** Prior watermark: 2026-06-10T12:49:26.289872Z / medic-diagnosis:PR#412-attempt6 / iter 1307. Scanned larry-alerts.jsonl:
+- **Count:** 1347 lines (UNCHANGED from iter 1307). 0 new alerts since 12:49:26Z watermark. ✅ Nominal.
+- Watermark: **UNCHANGED** (2026-06-10T12:49:26.289872Z / medic-diagnosis:PR#412-attempt6 / iter 1307).
+- Triage: 0 new alerts. ✅ No tier-reset from Check 0.
+
+VERIFY-BEFORE-REASSERT of iter 1307 watch items:
+- "p2-resurface-and-digest-card — Forge building (dispatched ~12:45Z UTC). Expect PR ~13:20–13:40Z UTC." → **ACTIVE**: p2-resurface-and-digest-card.json in Forge inbox (mtime 12:45Z UTC, ~14 min old at 13:00Z). Within threshold. Carry — expect PR ~13:20–13:40Z UTC.
+- "install-drift healer ~18:00Z UTC June 10" → **CARRY**: 13:00Z UTC, not yet 18:00Z.
+- "PR #412 APPROVAL_REQUEST pending Larry sign-off" → **CONFIRMED**: PR #412 OPEN/UNKNOWN/no-reviewDecision. ⚠️ [yellow]
+- "G-rule pipeline-stall-no-mirror-dispatch-misdiag — Forge brief still absent." → **CARRY**: Forge inbox contains only p2-resurface-and-digest-card.json. G-rule Forge brief still missing.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry 06:53:04 local (12:53:04Z UTC) — medic-diagnosis idx=1346 delivered. ~7 min log silence at 13:00Z (idle polling, no Larry inbound). Beacon bot restart 06:22:47 local (12:22:47Z UTC), running stable. No new inbound from Larry. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: 2026-06-10T12:46:55Z (~13 min at scan — fresh). Standing: PR #412 unrouted-pr stall in healer cooldown (last alert 12:47:02Z). 0 active stalls. Pipeline advancing: p2-resurface-and-digest-card in Forge inbox. ✅ Nominal.
+
+**Check 4 — Pending directives (VERIFY-BEFORE-REASSERT):**
+- Forge: 1 task (p2-resurface-and-digest-card.json, mtime 12:45Z UTC, ~14 min old — active build within threshold) ✅
+- Beacon: EMPTY ✅
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+- ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json: ABSENT (no recent restarts). All 9/9 services active (beacon-bot, chain-event-shipper, cycle.timer, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=3234f82 "Pulse cycle 20260610T125830Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T12:16:19Z (~44 min at scan — within 2h threshold). status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 core services active (systemctl is-active all confirmed). beacon_telegram_bot.log active (12:53Z last entry). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-dashboard: 0 open PRs.** ✅ Next: p2-resurface-and-digest-card building in Forge.
+- **PR #412 (ourliberty-agent-core): OPEN/UNKNOWN** — `forge/harden-test-prod-write-isolation-001`, no reviewDecision. Standing stall: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Medic attempt 6 delivered at 12:53Z UTC (attempt 5 was 12:20Z, medic delivered). ⚠️ [yellow]
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** 0 credentials overdue, 0 within-60d window. ✅ Nominal.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall fires no-mirror-dispatch for revision-dead/approval-gated PRs` — **3/3 DISPATCHED** (iter 1298). Beacon consumed ✅. No Forge brief in Forge inbox (only p2-resurface-and-digest-card). Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (no new occurrence this iter). Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — **3/3**; pending `go: actor-exemption-config`. No new occurrence. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (no new occurrence). Carry.
+
+**Standing findings (unchanged from iter 1307):**
+- [yellow] PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. Medic attempt 6 delivered 12:53Z.
+- [yellow] health-check-notify-script-missing — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] Tier 2 weekly probe failed (auth_401) — recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap verification OPEN — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [yellow] unreviewed-merge streak (PRs #413, #417, #419) — pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 70th+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+
+**Watch items for next iter (1309):**
+- **p2-resurface-and-digest-card** — Forge building (~14 min at scan, dispatched 12:45Z UTC). Expect PR ~13:20–13:40Z UTC.
+- **install-drift healer** — ~18:00Z UTC June 10. Expect 1/2 clean cycle post-PR #411.
+- **PR #412** — APPROVAL_REQUEST standing. Larry informed via medic attempt 6 (12:53Z). Recommended: `dispatch forge revision pr=...412` (Larry's call).
+- **G-rule pipeline-stall-no-mirror-dispatch-misdiag** — Forge brief still absent. Monitor.
+
+**Actions taken:** None. Pipeline self-advancing.
+**PRIME DIRECTIVE:** 0 new interventions this iter (0 new alerts, all checks nominal, PR #412 known-standing). 0 new systemic_fixes. interventions=750, systemic_fixes=16, verification_pending=7, ratio=46.875. iter_non-clean (PR #412 standing stall, Check E).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1307 — 2026-06-10 ~12:54Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline advancing. Forge building p2-resurface-and-digest-card (~9 min into build at scan). PR #412 standing stall (medic attempt 6 delivered to Larry at 12:53Z UTC). 9/9 core services active.
