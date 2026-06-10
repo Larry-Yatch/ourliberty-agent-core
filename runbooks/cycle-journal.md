@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 1340 — 2026-06-10 ~18:08Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Check 0: 1 new alert (missions-card-gc:summary, Tier-3 digest, G-rule now 2/3). **Key events:** Orphan directive "yes unstick it" RESOLVED ✅ (Larry cleared ccd-s1 dead-letter files manually at 12:04 MDT — not via Beacon). PR #427 MERGED ✅ (fix(missions): `_github_token` falls back to gh CLI auth when env token absent — closes [yellow] Check IX GITHUB_TOKEN standing item). 2 new Forge preflight tasks (both ~3 min old): `ccd-s1-envelope-builder` (chain-context-durability S1 re-dispatched after dead-letter clear) + `fix-headless-approval-dedup-spawn-failure-wedge` (notifier dedup hotfix for the headless-approval path that caused the S1 wedge). `unreviewed-merge:427` expected from healer (Larry-direct; standing G-rule 3/3). All other checks nominal. 9/9 services. 0 open PRs. Sync SUCCESS (17:16:58Z, ~51 min at scan).
+**Tier state:** 1 (consecutive_clean=0; Check 2 standing non-nominal — fixture contamination)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:02:59.018488+00:00 / pulse:orphan-directive-unstick-it-20260610T175936Z` (line 1383, iter 1339)
+- Current total: 1384 lines. 1 new entry since watermark:
+  1. Line 1384 (`2026-06-10T18:08:16Z`) — source=missions-card-gc, subject=summary, route=**digest**. Retired 2 stale session cards; commit=committed. Standing G-rule 1/3 (iter 1333) → now **2/3**. Route=digest → Tier-3 silence, no DM. No tier-reset.
+- ✅ Nominal.
+- **New watermark: `2026-06-10T18:08:16.374814+00:00 / missions-card-gc:summary` (line 1384)**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- New events since iter 1339 (~18:03Z scan):
+  - 12:04:00 MDT (18:04Z): Larry — "Artifact cleared. Both dead-letter files are gone from /home/larry/agents/inboxes/forge/.archive/ — ccd-s1-envelope-buil[der]". Larry manually cleared the dead-letter preventing ccd-s1-envelope-builder re-dispatch. **ORPHAN DIRECTIVE "yes unstick it" RESOLVED ✅.**
+  - 12:05:45 MDT (18:05:45Z): `fix-headless-approval-dedup-spawn-failure-wedge` dispatched to Forge inbox — Beacon-authored hotfix, Larry-approved.
+  - 12:08:01 MDT (18:08Z): PR #427 "fix(missions): _github_token falls back to gh CLI auth when env token absent" merged by Larry-Yatch (no Mirror review). `unreviewed-merge:427` alert expected from healer; standing G-rule 3/3 (actor=larry-direct-merge; pending `go: actor-exemption-config`). No Pulse action.
+  - alert idx=1382 delivered (orphan-directive DM from iter 1339) at 12:06:15 MDT. ✅
+  - TIER2_FALLBACK entries (auth_401 + rate_limit) — standing known pattern. No new action.
+- Standing: source=heal-x fixture log-contamination (09:52 MDT). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+⚠️ Tier-reset: YES (standing non-nominal fixtures). [yellow] carry. Note: orphan directive resolved → [yellow] standing item removed.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` EXISTS (historical suppression keys; no active_stalls). Forge inbox has 2 fresh preflight tasks (~3 min). 0 open PRs. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- Forge inbox: `ccd-s1-envelope-builder.json` (phase=preflight, dispatched ~18:05Z, ~3 min at scan) + `fix-headless-approval-dedup-spawn-failure-wedge.json` (phase=preflight, dispatched 18:05:45Z). Both within 2h threshold. Active tasks, not stale.
+- Beacon/Mirror/Pulse inboxes: empty.
+- Orphan directive: RESOLVED ✅ (Larry cleared at 12:04 MDT).
+✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` NOT FOUND (standing per iters 1329+). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Recent commits include 5eb6872 (Pulse cycle 20260610T180641Z — iter 1339 wrapper commit). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=`2026-06-10T17:16:58Z` (~51 min at scan), status=**success**. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** PR #427 MERGED ✅ at 18:08:01Z (Larry-Yatch direct). No remaining open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** `gate-soak-assessment.json`: fired_at 16:39:48Z, reviews=15, first_pass_rate=0.933. Larry merged PR #426 (bughunt-gate Phase 2) in iter 1338. Soak assessment cycle COMPLETE ✅. No action.
+
+**Rotations:** 0 overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1339 watch items:**
+- "yes unstick it" orphan directive — **RESOLVED ✅**: Larry cleared ccd-s1 dead-letter files at 12:04 MDT. `ccd-s1-envelope-builder` now in Forge preflight. Watch item CLOSED.
+- install-drift midnight MDT June 11 (06:00Z UTC) → NOT YET (~12h away). `heal-systemd-install-drift.json` state file NOT FOUND (possibly cleaned after the 18:00Z heal run). Per iter 1339: 18:00Z run was 1/2 clean (no drift packages; stuck timer auto-healed). **CARRY** — watch for 06:00Z June 11 fire for 2/2 clean post-PR #411.
+- CCD probe-retry — **UNBLOCKED ✅**: `ccd-s1-envelope-builder` in Forge preflight (re-dispatched after dead-letter clear + identity-pinning fix in production). **CARRY** — watch for Forge PR.
+- `alert-translation-no-mirror-dispatch-001` — no evidence of processing. **CARRY**.
+
+**G-rule tracking:**
+- `missions-card-gc:summary not in alert-translations.json` — **2/3** (iter 1333=1/3; iter 1340=2/3). At 3/3: dispatch Beacon to add `source:missions-card-gc / subject:summary` as Tier-3/FYI in config/alert-translations.json.
+- `completion-DM pending-queue delivery failure` — 1/3 (iter 1337). No new occurrence this iter. Carry.
+- `unreviewed-merge:423+424+426+427` — G-rule 3/3 threshold met (iter 959); pending `go: actor-exemption-config`. PR #427 adds another known-pattern occurrence; no new Pulse action. Carry.
+- `mirror-dag-pass:chain-context-durability not in alert-translations.json` — 1/3 (iter 1332). Carry.
+- `dispatch-branch-cleanup:gh-unavailable not in alert-translations.json` — 1/3 (iter 1330). Carry.
+- `dispatch-branch-cleanup:summary not in alert-translations.json` — 1/3 (iter 1153). Carry.
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — 3/3 dispatched iter 1298; Forge brief pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- ~~[yellow] "yes unstick it" orphan directive~~ — **CLOSED ✅** (Larry resolved at 12:04 MDT).
+- ~~[yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500~~ — **CLOSED ✅** (PR #427 mergedAt 18:08:01Z — `_github_token` now falls back to gh CLI auth).
+- [yellow] CCD probe-retry unblocked (PR #425 in production). `ccd-s1-envelope-builder` in Forge preflight; watch for PR.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; dispatch dead-lettered. Re-dispatch via Beacon pending ("yes unstick it" was the catalyst; Beacon hit permission boundary on the artifact clear; artifacts now cleared by Larry; re-dispatch path open but not yet taken this iter — Larry confirmed intent at 12:04 MDT but did not re-issue Beacon dispatch).
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [blue] install-drift 1/2 clean post-PR #411. Watch 06:00Z June 11 for 2/2.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3 + new occurrence (auto-healed 18:00Z); pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary now **2/3**. At 3/3: dispatch to Beacon.
+- [blue] G-rule completion-DM delivery failure 1/3 (iter 1337). Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3 (iter 1332). Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330). Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3 (iter 1153). Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+
+**Watch items for iter 1341:**
+- **CCD pipeline** — `ccd-s1-envelope-builder` in Forge preflight (~3 min at scan). Watch for Forge proceed + build + PR (deadline ~20:05Z UTC). Also watch `fix-headless-approval-dedup-spawn-failure-wedge` Forge preflight result.
+- **install-drift** — 06:00Z UTC June 11 fire for 2/2 clean post-PR #411.
+- **health-check-notify-script-missing re-dispatch** — Larry confirmed intent ("yes unstick it") at 12:04 MDT; artifacts cleared. Re-dispatch path open. Watch for Larry or Beacon to issue re-dispatch.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+- **`unreviewed-merge:427`** — alert expected from healer (not yet in larry-alerts.jsonl at scan time). Will appear; standing G-rule 3/3 no new action.
+
+**Actions taken:** None (all findings nominal or Tier-3 silenced).
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. 0 new systemic fixes. interventions=756, systemic_fixes=17, ratio≈44.47, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 2 standing non-nominal — fixture contamination).
+
+---
+
 ## Iteration 1339 — 2026-06-10 ~18:03Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Check 2 — NEW [yellow] orphan directive: Larry "yes unstick it" (11:53 MDT) — Beacon hit permission boundary attempting file deletion (11:55 MDT), task unresolved. [yellow] DM sent (larry-alerts.jsonl line 1383). All other checks nominal. 9/9 services active. 0 open PRs. Sync success (17:16:58Z, 46 min at scan). Notable: install-drift healer fired noon MDT (18:00:06Z) — `units: {}` (no drift), auto-healed stuck `ourliberty-cycle.timer` (standing G-rule 3/3, digest-route only). 1/2 clean post-PR #411 noon fire.
