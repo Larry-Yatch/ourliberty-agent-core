@@ -156,5 +156,6 @@ confident reinvention is worth a narrative note.
 - Exact thresholds in the gating table — calibrate to hold the ~89% catch-rate on the
   ground-truth set without blowing up false positives on recent clean PRs. **The
   false-positive rate on clean PRs is not yet measured; watch the first live reviews.**
-- Whether the full 8-lens fan-out runs on every review or only first-review (revision
-  re-reviews could run a lighter targeted pass — revisions are scoped edits).
+- Whether the full bug-hunt fan-out (the eight A–H lenses; Lens I is advisory and can be
+  skipped on re-reviews) runs on every review or only first-review (revision re-reviews could
+  run a lighter targeted pass — revisions are scoped edits).
