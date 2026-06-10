@@ -55,6 +55,16 @@ action. Never self-heals; never auto-dispatches. Five concrete checks:
      pushes) that skip the notifier's auto-dispatch entirely; the chain
      can't pick them up without a manual Beacon dispatch.
 
+  9. **Sequence stuck pending after unresolved DAG REVISION** — a build
+     sequence in `status: pending` whose newest
+     `dag-preflight-revision-routed` audit entry is older than
+     ``STALLED_PENDING_SEQUENCE_MIN`` (30 min) with no newer
+     `dag-preflight-pass-kickoff` (PR-S4 follow-up). The notifier routes
+     Mirror's DAG-preflight REVISION to Beacon for autonomous amend +
+     re-dispatch; this backstop fires the one Larry-actionable alert when
+     that self-heal fails to land and the sequence never activates.
+     (Check 8 is the tier2-fallback scan, defined below.)
+
 Every alert: ONE Telegram DM via `larry_alerts.append_alert` (cooldown
 1h per unique stall key). Each alert states: what stalled, how long,
 recommended action, the specific log grep to run for details.
@@ -65,7 +75,7 @@ never merges PRs, never re-dispatches anything. Same posture as Joe's
 
 Scan window
 -----------
-All seven Checks gate their stall-trigger event timestamp against
+All Checks gate their stall-trigger event timestamp against
 ``SCAN_WINDOW_SECONDS`` (default 86400s = 24h). Events older than the
 window are skipped silently — they represent historical record, not a
 current stall. This retires already-resolved incidents instead of
@@ -133,6 +143,12 @@ FORGE_OUTBOX_ARCHIVE = AGENTS_ROOT / 'outboxes' / 'forge' / '.archive'
 # Mirror PR #107 review (2026-05-26) caught this — original Check 1 silently
 # no-op'd because it grepped the wrong file.
 INBOX_WATCHER_LOG = AGENTS_ROOT / 'logs' / 'inbox_watcher.log'
+# Check 9 (stalled-pending-sequence backstop, PR-S4 follow-up). Build
+# sequences live one JSON file per sequence here. The notifier's DAG-
+# preflight REVISION self-heal records a `dag-preflight-revision-routed`
+# audit entry; a PASS records `dag-preflight-pass-kickoff`. Check 9 reads
+# these to detect a sequence stuck in `pending` after an unresolved REVISION.
+BUILD_SEQUENCES_DIR = AGENTS_ROOT / 'blackboard' / 'build-sequences'
 
 # Repos with active dispatch chains. Mirrors heal_pr_auto_merge.REPOS.
 REPOS = [
@@ -153,6 +169,7 @@ RETRY_EXHAUST_TASK_SCAN = 12         # journal lines to scan around an exhaustio
 LOG_LOOKBACK_HOURS = 24              # Read at most this far back into outbox-notifier.log
 JOURNAL_LOOKBACK_HOURS = 1           # Read at most this far back for retry-exhausted lines
 ALERT_DEDUP_HOURS = 1                # Same stall key not re-DMed within this window
+STALLED_PENDING_SEQUENCE_MIN = 30    # 30 min — sequence pending after unresolved DAG REVISION
 
 # Bounded scan window for stall-trigger events. Events whose anchor
 # timestamp is older than this are treated as historical record, not
@@ -1417,6 +1434,106 @@ def check_revision_dispatched_with_no_session(notifier_lines: list[str],
     return alerts
 
 
+# ---------- Check 9: Sequence stuck pending after unresolved DAG REVISION ----------
+def check_stalled_pending_sequence(state: dict) -> list[dict]:
+    """Scan build-sequences for any sequence stuck in `status: pending`
+    with an UNRESOLVED Mirror DAG-preflight REVISION older than the
+    threshold (PR-S4 follow-up, 2026-06-10).
+
+    Background: the notifier's REVISION self-heal routes a
+    `dag-preflight-revision` notify to Beacon, who is expected to amend the
+    sequence's DAG + re-dispatch the preflight; on Mirror's PASS the notifier
+    flips the sequence `pending` → `active` (recording a
+    `dag-preflight-pass-kickoff` audit entry). If that resume fails or
+    bounces, the sequence sits `pending` forever with no human in the loop —
+    exactly the silent stall this backstop catches. This IS Larry-actionable:
+    work he kicked off is stuck and the auto-heal didn't land.
+
+    Durable signal: the `dag-preflight-revision-routed` audit entry the
+    notifier writes when it routes the REVISION (log-retention-independent).
+    A sequence is STALLED iff:
+      * status == 'pending', AND
+      * its newest `dag-preflight-revision-routed` audit entry is older than
+        STALLED_PENDING_SEQUENCE_MIN, AND
+      * no `dag-preflight-pass-kickoff` entry is newer than that REVISION
+        (Mirror hasn't PASSed the amended sequence yet).
+
+    Scan window: the REVISION ts must be within SCAN_WINDOW_SECONDS — a
+    long-abandoned pending sequence is historical record, not a live stall.
+
+    Dedup: keyed on `stalled_pending_sequence:<seq_id>:<revision_ts>` so a
+    fresh REVISION round (new ts) re-arms, while the same unresolved REVISION
+    fires once per ALERT_DEDUP_HOURS via the shared cooldown.
+    """
+    alerts: list[dict] = []
+    if not BUILD_SEQUENCES_DIR.is_dir():
+        return alerts
+    now = datetime.now(timezone.utc)
+    for seq_path in sorted(BUILD_SEQUENCES_DIR.glob('*.json')):
+        try:
+            seq = json.loads(seq_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(
+                f'check_stalled_pending_sequence: skip {seq_path.name} '
+                f'({type(e).__name__}: {e})', 'WARN',
+            )
+            continue
+        if not isinstance(seq, dict) or seq.get('status') != 'pending':
+            continue
+        audit = seq.get('audit_log')
+        if not isinstance(audit, list):
+            continue
+        latest_rev_ts: Optional[datetime] = None
+        latest_pass_ts: Optional[datetime] = None
+        for entry in audit:
+            if not isinstance(entry, dict):
+                continue
+            ts_raw = entry.get('ts')
+            ts = _parse_ts(ts_raw) if isinstance(ts_raw, str) else None
+            if ts is None:
+                continue
+            event = entry.get('event')
+            if event == 'dag-preflight-revision-routed':
+                if latest_rev_ts is None or ts > latest_rev_ts:
+                    latest_rev_ts = ts
+            elif event == 'dag-preflight-pass-kickoff':
+                if latest_pass_ts is None or ts > latest_pass_ts:
+                    latest_pass_ts = ts
+        if latest_rev_ts is None:
+            continue  # no REVISION routed → not this stall shape
+        # Resolved: a PASS-kickoff at/after the REVISION means Mirror
+        # re-reviewed the amended sequence + the notifier activated it.
+        if latest_pass_ts is not None and latest_pass_ts >= latest_rev_ts:
+            continue
+        if not _within_scan_window(latest_rev_ts, now):
+            continue  # historical abandoned pending sequence, not a stall
+        elapsed_min = int((now - latest_rev_ts).total_seconds() / 60)
+        if elapsed_min < STALLED_PENDING_SEQUENCE_MIN:
+            continue  # give Beacon's resume time to land
+        seq_id = seq.get('seq_id') or seq_path.stem
+        key = f'stalled_pending_sequence:{seq_id}:{latest_rev_ts.isoformat()}'
+        alerts.append({
+            'key': key,
+            'message': (
+                f'Build sequence `{seq_id}` is stuck in `status: pending` '
+                f'{elapsed_min} min after a Mirror DAG-preflight REVISION was '
+                f'routed to Beacon for auto-amend ({seq_path}). The self-heal '
+                f'(Beacon amends the DAG + re-dispatches the preflight, then '
+                f'Mirror PASS activates it) did not land — the sequence never '
+                f'activated. Work you kicked off is stalled.'
+            ),
+            'subject': f'stalled-pending-sequence:{seq_id}',
+            'suggested_action': (
+                f'Inspect the sequence: `cat {seq_path}`. Read Mirror\'s '
+                f'finding: `grep "MIRROR_DAG_PREFLIGHT seq={seq_id} '
+                f'verdict=REVISION" ~/agents/logs/outbox-notifier.log`. Then '
+                f'amend the DAG + re-dispatch the preflight via Beacon, or '
+                f'cancel the sequence if it is no longer needed.'
+            ),
+        })
+    return alerts
+
+
 # ---------- Check 7: Open PRs with no review-request dispatch logged ----------
 
 def _read_recent_routing_events(hours: int) -> list[dict]:
@@ -1834,6 +1951,11 @@ def run() -> int:
         all_alerts += check_tier2_fallback_failures(state)
     except Exception as e:
         log(f'check_tier2_fallback_failures failed: {type(e).__name__}: {e}',
+            'ERROR')
+    try:
+        all_alerts += check_stalled_pending_sequence(state)
+    except Exception as e:
+        log(f'check_stalled_pending_sequence failed: {type(e).__name__}: {e}',
             'ERROR')
 
     if not all_alerts:

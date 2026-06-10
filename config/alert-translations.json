@@ -81,6 +81,12 @@
       "tier": "FYI",
       "plain_language_summary": "A preflight/clarify task pointer was consumed but its archived outbox shows no PR (exit_code != 0 / error / auth_401), so the healer INFERRED a PR-create failure and routed it to this distinct lower-urgency subject (own cooldown) rather than the URGENT forge-no-pr build-gap alarm. In practice this is almost always a FALSE ALARM on a source=larry task: the source=larry outbox path does not populate `pr_url` after the PR is actually created, so a clarify pointer whose sibling build already shipped looks like a loss. The translation layer cannot tell a false alarm from a genuine source=forge infra crash because it keys only on (healer-source, subject), so this is conservatively classified FYI with a verify-first action.",
       "recommended_action": "Verify before acting: check whether the sibling build PR for this task family already merged (gh pr list --search <task-family>, or the Missions tab). If it shipped, this is the known source=larry pr_url-unset artifact -- no action. ONLY if there is genuinely no sibling PR AND the archived outbox (~/agents/outboxes/forge/.archive/<task>.json) shows a real infra/auth crash before PR-create is a re-dispatch warranted. Root-cause fix is healer-side (populate pr_url on the source=larry outbox path, or extend _preflight_family_shipped correlation); this translation is a stopgap. Runbook: runbooks/heal-pipeline-stall.md."
+    },
+    "stalled-pending-sequence": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A build-sequence is still `pending` with an unresolved Mirror DAG-preflight REVISION older than 30 min. Mirror sent a REVISION back through the Beacon notify path, but Beacon never amended-and-re-dispatched (mechanical DAG fix) nor escalated it to you (scope/spec problem). The sequence is wedged — no step has kicked off.",
+      "recommended_action": "Open the named sequence at ~/agents/blackboard/build-sequences/<seq-id>.json and read its audit_log: the `dag-preflight-revision-routed` entry shows when Mirror's REVISION arrived. Check Beacon's inbox/session for the `notify-dag-revision-<seq-id>` task — if Beacon stalled mid-handle, resume it; if the verdict is a scope/spec problem it should have escalated, so decide the binary yourself and either amend the sequence (add the missing depends_on edge) and re-dispatch DAG-preflight, or REJECT the sequence. Runbook: runbooks/heal-pipeline-stall.md."
     }
   },
   "heal-systemd-install-drift": {

@@ -746,6 +746,23 @@ INTENT_ACTION_BLOCKS = {
         'with adjusted scope) or push back to the requester. Bounded by '
         'max_replans on the envelope.'
     ),
+    # PR-S4 follow-up — Mirror DAG-preflight REVISION routed to Beacon for
+    # autonomous self-heal (symmetric with the PASS auto-activate path). The
+    # raw verdict is an agent-to-agent routing signal, NOT a Larry decision.
+    'dag-preflight-revision': (
+        'Mirror returned REVISION on the DAG-preflight for build sequence '
+        '`{seq_id}` (sequence file: `{seq_path}`). This is an agent-to-agent '
+        'routing signal, NOT a Larry decision — handle it yourself per your '
+        'CLAUDE.md § "How you handle a Mirror DAG-preflight REVISION". Read '
+        "Mirror's verdict below. If it is a MECHANICAL DAG fix (the common "
+        'Check-3 parallel-file-overlap case → add a `depends_on` edge '
+        'serializing the flagged step behind the steps it might collide '
+        'with), amend the sequence file (atomic write + audit_log entry) and '
+        're-dispatch the DAG-preflight (marker.py, --phase routing-signal) '
+        'WITHOUT pinging Larry. If it is a SCOPE/SPEC problem you cannot '
+        'mechanically resolve, escalate to Larry as a one-line binary (never '
+        'the raw checks), per your escalation discipline.'
+    ),
 }
 
 # D3.5 5a-followup: per-intent DM templates for chain-completion DMs to Larry.
@@ -2699,6 +2716,66 @@ def _parse_dag_preflight_verdict(result_text: str) -> Optional[str]:
     return m.group(1).upper()
 
 
+def _append_dag_revision_audit(
+    seq_path: Path, seq_id: str, mirror_task_id: str,
+) -> None:
+    """Append a `dag-preflight-revision-routed` entry to the sequence's
+    audit_log (best-effort, atomic write).
+
+    Gives the heal_pipeline_stall stalled-pending-sequence backstop a
+    durable signal of an UNRESOLVED REVISION that does not depend on log
+    retention. Parallels the PASS path's `dag-preflight-pass-kickoff`
+    entry. Does NOT change `status` — the sequence stays `pending` until
+    Beacon amends + re-dispatches and Mirror PASSes (which the existing
+    PASS branch records as `dag-preflight-pass-kickoff`, resolving the
+    stall signal). Idempotent on `mirror_task_id` so a re-processed Mirror
+    outbox doesn't double-record the same REVISION round.
+    """
+    try:
+        seq = json.loads(seq_path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION; could not '
+            f'read sequence file to append audit entry ({type(e).__name__}: '
+            f'{e}); Beacon notify already routed',
+            'WARN',
+        )
+        return
+    if not isinstance(seq.get('audit_log'), list):
+        seq['audit_log'] = []
+    already = any(
+        isinstance(e, dict)
+        and e.get('event') == 'dag-preflight-revision-routed'
+        and e.get('mirror_task_id') == mirror_task_id
+        for e in seq['audit_log']
+    )
+    if already:
+        return
+    seq['audit_log'].append({
+        'ts': datetime.now(timezone.utc).isoformat(),
+        'event': 'dag-preflight-revision-routed',
+        'actor': 'outbox-notifier',
+        'mirror_task_id': mirror_task_id,
+    })
+    tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
+    try:
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(seq, f, indent=2)
+            f.write('\n')
+        os.replace(tmp_path, seq_path)
+    except OSError as e:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        log(
+            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION; could not '
+            f'write audit entry to sequence file ({e}); Beacon notify '
+            f'already routed',
+            'WARN',
+        )
+
+
 def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
     """PR-S4 rectification (H1) — handle Mirror's DAG-preflight session result.
 
@@ -2715,10 +2792,14 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
         advancer tick dispatches the first step. No Larry approval gate
         here: Larry already implicitly approved by chatting Beacon to
         author the sequence; the DAG-preflight gate IS the approval.
-      * REVISION — DM Larry with the verdict + the human-readable
-        review body (which carries Mirror's reasons) + the sequence
-        file path. Larry reads the reasons, amends the sequence file,
-        and re-dispatches the review.
+      * REVISION — route an inter-agent `dag-preflight-revision` notify
+        to Beacon's inbox (reusing the code-review notify-writer), so the
+        bot resumes Beacon and she amends the sequence file + re-dispatches
+        the DAG-preflight autonomously — symmetric with the PASS self-heal.
+        Record the routing as a `dag-preflight-revision-routed` audit_log
+        entry (the stalled-sequence healer's durable signal). NO Larry DM
+        on the happy path (the raw verdict is agent-to-agent, not a Larry
+        decision); only a notify-write FAILURE DMs Larry (protocol broke).
       * malformed (no PASS/REVISION verdict parsed) — DM Larry with a
         `mirror-dag-malformed-result:<seq-id>` alert so the failure is
         loud, not silent.
@@ -2771,22 +2852,92 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
         body_snippet = result_text.strip()
         if len(body_snippet) > 1500:
             body_snippet = body_snippet[:1500] + '\n…(truncated)'
-        msg = (
-            f'Mirror DAG-preflight REVISION for sequence `{seq_id}`. '
-            f'Amend the sequence file at `{seq_path}` (or the spec it '
-            f'references) per Mirror\'s findings below, then '
-            f're-dispatch the review.\n\n--- Mirror\'s verdict ---\n'
-            f'{body_snippet}'
+        # Self-heal symmetric with the PASS auto-activate path: route an
+        # inter-agent notify to Beacon's inbox, reusing the SAME
+        # safe_write_inbox + build_notify_prompt helpers the code-review
+        # result path uses to reach Beacon (Shapes 6-9). The inbox_watcher
+        # dispatches Beacon on arrival; she amends the sequence file +
+        # re-dispatches the DAG-preflight autonomously. Mirror's raw verdict
+        # is an agent-to-agent message, NOT a Larry decision — so per the
+        # actionable-only discipline we do NOT DM Larry here. Larry only
+        # hears about a REVISION via (a) Beacon escalating a genuine
+        # scope/spec call as a one-line binary, or (b) the heal_pipeline_
+        # stall stalled-pending-sequence backstop.
+        notify_source = 'mirror-result'
+        notify_prompt = build_notify_prompt(
+            intent='dag-preflight-revision',
+            sender='mirror',
+            task_id=task_id,
+            success=True,
+            output=body_snippet,
+            intent_kwargs={'seq_id': seq_id, 'seq_path': str(seq_path)},
         )
-        larry_alerts.append_alert(
-            source='outbox-notifier',
-            severity='warning',
-            message=msg,
-            subject=f'mirror-dag-revision:{seq_id}',
-        )
+        notify_task = {
+            'task_id': f'notify-dag-revision-{seq_id}',
+            'prompt': notify_prompt,
+            'source': notify_source,
+            'intent': 'dag-preflight-revision',
+            'seq_id': seq_id,
+            'seq_path': str(seq_path),
+            '_notify_depth': _current_notify_depth(data) + 1,
+        }
+        # Deterministic filename keyed on seq_id: re-processing the same
+        # Mirror outbox overwrites the pending notify (atomic same-path
+        # write) rather than writing a duplicate. Mirrors the code-review
+        # notify dedup, which keys its filename on the outbox stem.
+        notify_filename = f'notify-dag-revision-{seq_id}.json'
+        try:
+            dest = safe_write_inbox.safe_write_inbox(
+                target_agent='beacon',
+                task_dict=notify_task,
+                source_agent=notify_source,
+                filename=notify_filename,
+            )
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
+                f'task={task_id}; routed dag-preflight-revision notify to '
+                f'beacon (file={dest.name})',
+            )
+        except (
+            safe_write_inbox.DispatchRejected,
+            safe_write_inbox.RoutingDenied,
+        ) as e:
+            # The autonomous path broke — Beacon won't self-heal this round.
+            # That IS Larry-actionable (protocol failure), so DM him rather
+            # than drop the REVISION silently. The stalled-sequence backstop
+            # is the second line of defense.
+            larry_alerts.append_alert(
+                source='outbox-notifier',
+                severity='warning',
+                message=(
+                    f'Mirror DAG-preflight REVISION for sequence `{seq_id}` '
+                    f'could not be routed to Beacon ({type(e).__name__}: '
+                    f'{e}). Amend `{seq_path}` per Mirror\'s findings below '
+                    f'and re-dispatch the review manually.\n\n'
+                    f'--- Mirror\'s verdict ---\n{body_snippet}'
+                ),
+                subject=f'mirror-dag-revision-route-failed:{seq_id}',
+            )
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
+                f'task={task_id}; FAILED to route notify to beacon: '
+                f'{type(e).__name__}: {e}; DMed Larry',
+                'WARN',
+            )
+            return f'mirror-dag-preflight:revision-route-failed:{seq_id}'
+
+        # Record the routing in the sequence's audit_log so the stalled-
+        # pending-sequence healer has a durable, log-retention-independent
+        # signal of an UNRESOLVED REVISION (parallels the PASS path's
+        # `dag-preflight-pass-kickoff` entry). Does NOT change `status`.
+        _append_dag_revision_audit(seq_path, seq_id, task_id)
+
+        # Actionable-only: the raw Mirror verdict is now an inter-agent
+        # message, not a Larry DM. Log-only — no append_alert.
         log(
             f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
-            f'task={task_id}; DMed Larry',
+            f'task={task_id}; Larry DM suppressed (routed to Beacon for '
+            f'autonomous amend)',
         )
         return f'mirror-dag-preflight:revision:{seq_id}'
 

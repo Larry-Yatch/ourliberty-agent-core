@@ -3,8 +3,10 @@
 
 Covers:
   - H1: `_handle_mirror_dag_preflight_result` — PASS triggers pending →
-    active kickoff path, REVISION DMs Larry with verdict, malformed
-    fires `mirror-dag-malformed-result` alert.
+    active kickoff path, REVISION self-heals by routing a
+    `dag-preflight-revision` notify to Beacon (no Larry DM; records a
+    `dag-preflight-revision-routed` audit entry), malformed fires
+    `mirror-dag-malformed-result` alert.
   - H3: source=`orchestrator` envelopes reach the kickoff +
     headless-approval handlers (the advancer dispatches Beacon with
     source='orchestrator'; before H3 the handlers source-locked to
@@ -159,6 +161,15 @@ class _DagHandlerHarness(unittest.TestCase):
             if line.strip()
         ]
 
+    def _beacon_inbox_files(self):
+        inbox = swi.INBOXES_ROOT / 'beacon'
+        if not inbox.is_dir():
+            return []
+        return sorted(p for p in inbox.glob('*.json'))
+
+    def _read_beacon_notifies(self):
+        return [json.loads(p.read_text()) for p in self._beacon_inbox_files()]
+
 
 # ============================================================================
 # H1: Mirror DAG preflight result handler
@@ -221,31 +232,82 @@ class MirrorDagPreflightPass(_DagHandlerHarness):
 
 class MirrorDagPreflightRevision(_DagHandlerHarness):
 
-    def test_revision_dms_larry_no_status_change(self):
-        seq = _make_sequence(seq_id='dag-rev-seq', status='pending')
-        self._write_sequence(seq)
-        envelope = {
+    def _revision_envelope(self, seq_id='dag-rev-seq'):
+        return {
             'agent': 'mirror',
             'source': 'beacon',
-            'task_id': 'review-sequence-dag-dag-rev-seq',
-            'prompt': 'review-sequence-dag dag-rev-seq',
+            'task_id': f'review-sequence-dag-{seq_id}',
+            'prompt': f'review-sequence-dag {seq_id}',
             'result': (
                 'DAG preflight found issues:\n'
-                '- Step `s2` cites `spec § 3.7` but that section does not '
-                'exist.\n\n'
+                '- Check 3: steps `s1` and `s2` both write `foo.py` with no '
+                'depends_on edge — serialize s2 behind s1.\n\n'
                 'result: REVISION\n\n'
-                'DAG preflight REVISION for sequence `dag-rev-seq`.'
+                f'DAG preflight REVISION for sequence `{seq_id}`.'
             ),
         }
-        result = on._handle_mirror_dag_preflight_result(envelope)
-        self.assertIsNotNone(result)
+
+    def test_revision_routes_beacon_notify_no_larry_dm(self):
+        seq = _make_sequence(seq_id='dag-rev-seq', status='pending')
+        self._write_sequence(seq)
+        result = on._handle_mirror_dag_preflight_result(
+            self._revision_envelope('dag-rev-seq'),
+        )
+        self.assertEqual(result, 'mirror-dag-preflight:revision:dag-rev-seq')
+
+        # Status unchanged — REVISION does NOT activate the sequence.
         on_disk = self._read_sequence('dag-rev-seq')
-        # Status unchanged.
         self.assertEqual(on_disk['status'], 'pending')
-        # Alert fired.
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1)
-        self.assertIn('REVISION', alerts[0].get('message', ''))
+
+        # Self-heal: a dag-preflight-revision notify landed in Beacon's inbox.
+        notifies = self._read_beacon_notifies()
+        self.assertEqual(len(notifies), 1)
+        notify = notifies[0]
+        self.assertEqual(notify['intent'], 'dag-preflight-revision')
+        self.assertEqual(notify['seq_id'], 'dag-rev-seq')
+        self.assertEqual(notify['source'], 'mirror-result')
+        self.assertIn('dag-rev-seq', notify['seq_path'])
+        # Mirror's verdict body rides the notify prompt.
+        self.assertIn('Check 3', notify['prompt'])
+        # Deterministic filename keyed on seq_id.
+        self.assertEqual(
+            self._beacon_inbox_files()[0].name,
+            'notify-dag-revision-dag-rev-seq.json',
+        )
+
+        # Actionable-only: NO warning-severity Larry DM on the happy path.
+        self.assertEqual(self._read_alerts(), [])
+
+        # Durable stall signal recorded for the heal backstop.
+        rev_entries = [
+            e for e in on_disk['audit_log']
+            if e.get('event') == 'dag-preflight-revision-routed'
+        ]
+        self.assertEqual(len(rev_entries), 1)
+        self.assertEqual(rev_entries[0]['actor'], 'outbox-notifier')
+        self.assertEqual(
+            rev_entries[0]['mirror_task_id'],
+            'review-sequence-dag-dag-rev-seq',
+        )
+
+    def test_revision_reprocess_is_idempotent(self):
+        seq = _make_sequence(seq_id='dag-rev-seq', status='pending')
+        self._write_sequence(seq)
+        env = self._revision_envelope('dag-rev-seq')
+        on._handle_mirror_dag_preflight_result(env)
+        on._handle_mirror_dag_preflight_result(env)  # replay same outbox
+
+        # Deterministic filename → single notify (overwrite, not duplicate).
+        self.assertEqual(len(self._beacon_inbox_files()), 1)
+        # Idempotent on mirror_task_id → single audit entry.
+        on_disk = self._read_sequence('dag-rev-seq')
+        rev_entries = [
+            e for e in on_disk['audit_log']
+            if e.get('event') == 'dag-preflight-revision-routed'
+        ]
+        self.assertEqual(len(rev_entries), 1)
+        # Still no Larry DM.
+        self.assertEqual(self._read_alerts(), [])
 
 
 class MirrorDagPreflightMalformed(_DagHandlerHarness):
