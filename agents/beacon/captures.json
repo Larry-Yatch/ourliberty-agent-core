@@ -90,6 +90,21 @@
       },
       "last_touched": "2026-06-10T07:12:40.075206+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-decide-full-codebase-audit-cadence-abac",
+      "title": "Decide full-codebase-audit cadence",
+      "note": "Phase-2 convergence avg novel-share 40% over 1 audit(s). SCHEDULE recurring audits \u2014 the corpus is still learning new bug classes, so regular audits keep teaching the gate. See memory mirror-bughunt-gate-project.",
+      "state": "parked",
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "fix/unittest-prod-write-tripwire",
+        "captured_at": "2026-06-10T17:23:23.467572+00:00"
+      },
+      "last_touched": "2026-06-10T17:23:23.467572+00:00",
+      "promoted_to": null
     }
   ]
 }
