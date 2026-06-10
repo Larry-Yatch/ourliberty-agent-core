@@ -147,6 +147,16 @@
       "severity_default": "MEDIUM",
       "example_finding_ids": [23, 28, 38, 44, 52, 59, 61],
       "blocking": false
+    },
+    {
+      "class_id": "reinvents-cataloged-shelf-component",
+      "name": "PR builds a new capability that already exists as a catalogued shelf component (reinvention instead of reuse)",
+      "description": "A diff adds a new reusable part (module / substantial function / healer / check / endpoint / agent) whose capability is already provided by a component on the ourliberty-graph shelf, and the diff does not import, call, or extend that existing part — so the factory reimplements instead of reusing, or creates an undeclared near-variant. FORWARD-LOOKING reuse/quality class (Mission A connect-on-build), NOT one of the 64 escaped correctness bugs from the source audit; ADVISORY ONLY — never blocks a merge.",
+      "detection_signature": "Diff introduces a NEW reusable part (new file under scripts/ or app/, a new top-level def/class, a new pulse_check_*/heal_*/endpoint/agent) AND a librarian query (python3 /home/larry/ourliberty-graph/pipeline/librarian.py \"<capability phrase>\") returns a high-scoring component describing the same capability whose location/symbols are absent from the diff's imports/references. Near-variants (same job, different implementation) also match. SKIP edits to an existing part and trivial helpers. Fail-safe: if the librarian/checkout is absent, skip the lens — never block.",
+      "review_lens": "reuse-reinvention",
+      "severity_default": "LOW",
+      "example_finding_ids": [],
+      "blocking": false
     }
   ],
   "coverage": {
@@ -158,6 +168,7 @@
     "A single upstream root — dispatch_validator only type-checking task_id (non-empty str, no charset/length) — propagates into at least three distinct downstream bug classes: path traversal (10/11/39), substring/truncation identifier collisions (12/26/53), and worktree contamination. Fixing the boundary validator (reject separators, enforce a length floor, canonicalize) would retire many instances at once.",
     "Crash-atomicity and concurrency are systematically under-handled on a memory-constrained VM whose documented failure mode is OOM/SIGKILL: non-atomic writes to sentinel/state files, lock-free read-modify-write across daemons, cursors advanced before durable commit, multi-step mutations with no transaction. Atomic tmp+rename is used inconsistently and does not serialize read->mutate->write, so its presence is not evidence of safety.",
     "Many findings are environment- or timing-gated (PID reuse, DST window, >200-row batch, microsecond collisions, multi-tenant /tmp) and correctly latent rather than refuted; the code shape is always present and unguarded. A notable fraction explicitly contradict their own docstring/comment, making 'review the code against its own stated contract' a high-yield, low-false-positive lens.",
-    "SAFETY-FIRST posture (2026-06-08): unsynchronized-shared-state-rmw flipped to blocking=true (was advisory) per Larry's gate posture. Advisory remain: insufficient-uniqueness-key-collision (LOW), implementation-diverges-from-stated-contract (MEDIUM, cosmetic-leaning)."
+    "SAFETY-FIRST posture (2026-06-08): unsynchronized-shared-state-rmw flipped to blocking=true (was advisory) per Larry's gate posture. Advisory remain: insufficient-uniqueness-key-collision (LOW), implementation-diverges-from-stated-contract (MEDIUM, cosmetic-leaning).",
+    "REUSE class (2026-06-10): reinvents-cataloged-shelf-component is the first FORWARD-LOOKING class — it is not one of the 64 escaped bugs (coverage.all_64_covered still describes the audit corpus). It powers Lens I (reuse/reinvention), which queries the ourliberty-graph shelf librarian and is ADVISORY ONLY (blocking=false, narrative note, never a REVISION/ESCALATE/HALT). It is the Mission-A 'connect-before-build' nudge wired into the gate Mirror already runs; graduate toward a real gate only once the accuracy meter (Pulse Check XI) earns it (PLAN §5-#3 / §9-Q4)."
   ]
 }

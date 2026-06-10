@@ -84,6 +84,33 @@ Off-by-one, wrong early-return / drop path, inverted condition, mishandled tri-s
 The modified directories' CLAUDE.md guidance — but only rules that actually apply to
 review (not authoring-time hints). Lowest priority; do not invent rules.
 
+### Lens I — reuse / reinvention  *(ADVISORY — never blocks; Mission-A connect-on-build)*
+Unlike A–H (escaped-bug lenses), this one is a forward-looking *reuse* nudge: does this diff build a
+**new capability that already exists on the component shelf**, reimplementing a catalogued part
+instead of reusing it? **Scope: only diffs that ADD a part** — a new module/file, a new substantial
+top-level function/class, a new `pulse_check_*`/`heal_*`/endpoint/agent. Skip edits to an existing
+part and trivial helpers. For such an addition:
+1. Name, in plain words, the capability the diff adds (from the PR title/description + the new
+   files/symbols).
+2. **Query the shelf librarian** — run it by ABSOLUTE path (like the corpus), it lives in the
+   sibling ourliberty-graph repo, not your worktree:
+   `python3 /home/larry/ourliberty-graph/pipeline/librarian.py "<capability phrase>"`
+   It prints ranked candidates: `[score] <id> [profile] reuse=<mode>` + capability statement +
+   `location:`.
+3. If a high-scoring candidate describes the **same** capability the diff is building **and** the
+   diff does not import/reference/extend that part, surface a reuse note: name the shelf part, its
+   `location` and `reuse_mode`, and what to reuse/extend instead of reinventing. A near-variant
+   (same job, different implementation) is also worth a note — it seeds the portfolio layer.
+
+**Fail-safe — this lens can never block or fail the review.** If the librarian or the
+ourliberty-graph checkout is absent or errors, write one line ("reuse-check skipped: librarian
+unavailable") and move on. The shelf is young and the matcher is v1 token-overlap, so Lens I is
+**advisory only**: findings are sub-blocking narrative notes (see Wiring), never `REVIEW_REVISION`
+/ `REVIEW_ESCALATE` / `REVIEW_EMERGENCY_HALT`. It surfaces a reuse opportunity; Forge/Larry decide.
+(This is Mission A's connect-before-build behavior applied at the gate Mirror already runs —
+PLAN §5-#3 / §9-Q4. Graduate it toward a real gate only once Pulse Check XI's accuracy meter earns
+the trust.)
+
 ## Confidence + severity gating
 
 For each candidate, a separate verifier scores confidence 0–100 (try to construct a
@@ -96,9 +123,12 @@ class:
 | automation-honesty, integration-seam, control-flow | 60 | 80 |
 | identifier-matching, state-persistence | 60 | 75 |
 | CLAUDE.md adherence, style | 80 | (never blocks alone) |
+| reuse-reinvention (advisory) | 70 | (never blocks) |
 
 A finding marked `blocking: true` in the corpus inherits the lower (blocking)
-threshold for its class.
+threshold for its class. Lens I (reuse-reinvention) is `blocking: false` and a
+high surface threshold by design — the v1 librarian is brittle, so only a
+confident reinvention is worth a narrative note.
 
 ## Wiring into Mirror's verdict
 
@@ -114,6 +144,10 @@ threshold for its class.
 - Sub-blocking findings → noted in the review narrative above the marker (where
   Beacon reads them), not gated on. (Do not open a separate PR comment — Mirror's
   flow is marker-based.)
+- **Lens I (reuse/reinvention) never blocks** — its notes always go in the
+  narrative above the marker, regardless of confidence, and never enter
+  `findings[]`. It is an advisory connect-on-build nudge, not a correctness gate;
+  a reuse note must not, on its own, turn a `REVIEW_PASS` into a revision.
 - This runs **in addition to** the `test_regression_check.py` gate and the spec/AC
   checklist. Order: spec/AC → bug-hunt → test-regression gate. All three must pass
   for `REVIEW_PASS`.
@@ -122,5 +156,6 @@ threshold for its class.
 - Exact thresholds in the gating table — calibrate to hold the ~89% catch-rate on the
   ground-truth set without blowing up false positives on recent clean PRs. **The
   false-positive rate on clean PRs is not yet measured; watch the first live reviews.**
-- Whether the full 8-lens fan-out runs on every review or only first-review (revision
-  re-reviews could run a lighter targeted pass — revisions are scoped edits).
+- Whether the full bug-hunt fan-out (the eight A–H lenses; Lens I is advisory and can be
+  skipped on re-reviews) runs on every review or only first-review (revision re-reviews could
+  run a lighter targeted pass — revisions are scoped edits).
