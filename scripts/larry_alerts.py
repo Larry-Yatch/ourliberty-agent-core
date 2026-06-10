@@ -32,12 +32,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+import atomic_io
 import file_lock
 
 AGENTS_ROOT = Path.home() / 'agents'
 ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
 COOLDOWN_ROOT = AGENTS_ROOT / 'state' / 'alert-cooldown'
 OFFSET_FILE = AGENTS_ROOT / 'state' / 'beacon-alerts-offset.txt'
+# The two line-index consumer cursors that resolve_alert must keep consistent
+# when it removes lines (mirrors larry_alerts_retention's offset bookkeeping):
+# beacon (OFFSET_FILE above) + medic. Both are ABSOLUTE last-delivered+1 counts.
+MEDIC_OFFSET_FILE = AGENTS_ROOT / 'state' / 'medic-alerts-offset.txt'
 
 # PR-E2 (#16): larry_alerts_retention rewrites this file (read snapshot →
 # os.replace with survivors). An append that lands between the snapshot and the
@@ -344,6 +349,171 @@ def append_alert(
         return False
     _mark_cooldown(severity, key)
     return True
+
+
+# ---------- alert retraction (resolve a stale escalate after out-of-band fix) ----------
+
+
+def _line_matches_resolution(rec: dict, key: str) -> bool:
+    """True iff `rec` is a pending escalate alert whose `source:subject` == key.
+
+    Only `route == 'escalate'` lines are retractable — a closure/digest
+    self-healed line for the same key is harmless and must be left in place. A
+    legacy line with no `route` rendered as escalate (DEFAULT_ROUTE), so a
+    missing route counts as escalate too. Notification / approval-request
+    records (which carry a `kind` and no severity) never match: they are 1:1
+    with a task and are not the infra-noise this retracts."""
+    if not isinstance(rec, dict):
+        return False
+    if rec.get('kind') in ('notification', 'approval_request'):
+        return False
+    if rec.get('route', DEFAULT_ROUTE) != 'escalate':
+        return False
+    source = rec.get('source')
+    if not isinstance(source, str):
+        return False
+    subject = rec.get('subject')
+    rec_key = f'{source}:{subject}' if subject else source
+    return rec_key == key
+
+
+def _read_line_offset(path: Path) -> int:
+    """Read an absolute line-index offset (next-to-deliver). 0 if missing /
+    unreadable — mirrors read_offset but for an arbitrary consumer file."""
+    try:
+        return int(path.read_text().strip() or '0')
+    except (FileNotFoundError, OSError, ValueError):
+        return 0
+
+
+def resolve_alert(
+    key: str,
+    consumer_offset_files: Optional[list] = None,
+    alerts_file: Optional[Path] = None,
+) -> int:
+    """Retract pending `escalate` alert line(s) matching `key` from the queue.
+
+    The append-only queue has no retraction primitive, so when a drift resolves
+    out-of-band the original 🔴 escalate line stays in larry-alerts.jsonl
+    forever (a producer's reconciliation GC prunes only its own dedup state,
+    never the emitted alert). `resolve_alert` removes the stale line(s) AND
+    keeps the line-index consumer cursors consistent.
+
+    `key` is the `source:subject` cooldown key (or bare `source`). Returns the
+    number of lines removed (0 = no-op, including the no-match and error cases).
+
+    Cursor bookkeeping (load-bearing): beacon + medic offsets are ABSOLUTE line
+    counts (next line to deliver). Removing a line at original index i shifts
+    every later line down by one, so each cursor decrements by the count of
+    removed lines whose original index was < that cursor — otherwise the next
+    real alert is silently skipped (the cursor would point one line too far).
+    A removed line at index >= a cursor was still undelivered, so that cursor is
+    untouched: the retraction merely guarantees it is never delivered.
+
+    The whole read → backup → cursor-decrement → rewrite runs under the SAME
+    sidecar flock every appender (`_locked_append`) and the retention rewrite
+    take, so it can never race an append or a retention pass — a concurrent
+    append lands strictly after the rewrite. Cursors are decremented BEFORE the
+    file rewrite so a crash between the two leaves them pointing into the intact
+    file (re-deliver, never skip — see _resolve_alert_locked). A full backup of
+    the pre-rewrite file is written first (recoverable, mirroring retention's
+    archive-before-rewrite).
+
+    Never raises — returns 0 on any error so callers can fire-and-forget.
+    """
+    af = alerts_file if alerts_file is not None else ALERTS_FILE
+    if consumer_offset_files is None:
+        consumer_offset_files = [OFFSET_FILE, MEDIC_OFFSET_FILE]
+    try:
+        if not af.exists():
+            return 0
+        lock_path = file_lock.sidecar_lock_path(af)
+        try:
+            with file_lock.exclusive_lock(
+                lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC,
+            ):
+                return _resolve_alert_locked(key, af, consumer_offset_files)
+        except file_lock.LockTimeout:
+            # A wedged lock holder must not strand the retraction forever, but
+            # rewriting the file unlocked could race a concurrent append. The
+            # safe degrade is a no-op: the stale line survives to the next call,
+            # strictly better than risking a lost append.
+            return 0
+    except OSError:
+        return 0
+
+
+def _resolve_alert_locked(
+    key: str, af: Path, consumer_offset_files: list,
+) -> int:
+    """The locked body of resolve_alert (see its docstring). MUST run under the
+    alerts-file sidecar flock."""
+    with open(af, encoding='utf-8') as f:
+        lines = f.readlines()
+
+    removed_indices: list = []
+    survivors: list = []
+    for idx, raw in enumerate(lines):
+        stripped = raw.strip()
+        matched = False
+        if stripped:
+            try:
+                rec = json.loads(stripped)
+            except json.JSONDecodeError:
+                rec = None
+            if rec is not None and _line_matches_resolution(rec, key):
+                matched = True
+        if matched:
+            removed_indices.append(idx)
+        else:
+            survivors.append(raw)
+
+    if not removed_indices:
+        return 0
+
+    # Backup the pre-rewrite file first (recoverable) — same backup-before-
+    # rewrite shape as retention's archive step.
+    backup_path = af.parent / (af.name + '.resolve.bak')
+    try:
+        atomic_io.atomic_write_text(backup_path, ''.join(lines))
+    except OSError:
+        # A failed backup must not block the retraction (fire-and-forget);
+        # proceed with rewrite.
+        pass
+
+    # Crash-safe ORDERING (decrement cursors BEFORE the file rewrite): the
+    # cursor decrements and the file rewrite are separate disk ops, so a crash
+    # between them must not strand a consumer. Decrementing FIRST means any
+    # crash-intermediate state leaves the cursors pointing into the STILL-INTACT
+    # (un-rewritten) file, so a consumer re-reads — at worst re-delivering an
+    # already-delivered line (a duplicate DM, including possibly the stale alert
+    # we are retracting), which is the safe at-least-once direction. The reverse
+    # order would leave cursors stale-HIGH against a shortened file and silently
+    # SKIP the next real alert — the exact failure this primitive exists to
+    # prevent. (retention needs a journal for the same rewrite+decrement because
+    # it is a bulk idempotent op; this targeted single rewrite gets crash-safety
+    # for free from fail-safe ordering.) A smaller offset is always skip-safe.
+    #
+    # This shares the same unlocked-consumer race profile as retention: beacon /
+    # medic read + advance their offset without this flock, so a removal that
+    # shifts a line a consumer is mid-delivering can still race. In practice the
+    # retracted line is an already-DELIVERED stale alert (drift resolved
+    # out-of-band well after the DM), so it sits far below both cursors and the
+    # decrement is the common, benign case.
+    for off_path in consumer_offset_files:
+        cur = _read_line_offset(off_path)
+        before = sum(1 for i in removed_indices if i < cur)
+        if before:
+            atomic_io.atomic_write_text(off_path, str(max(0, cur - before)))
+
+    # Rewrite the live file with the survivors LAST. The atomic_io rename swaps
+    # the inode, which the third consumer (chain_event_shipper, a BYTE cursor)
+    # detects as a rotation and re-reads from 0; its deterministic event_id +
+    # ignore_duplicates upsert absorbs the re-read, so — unlike beacon/medic — it
+    # needs no explicit cursor adjustment here.
+    atomic_io.atomic_write_text(af, ''.join(survivors))
+
+    return len(removed_indices)
 
 
 # ---------- significance gate + route classification (fix-first routing) ----------
