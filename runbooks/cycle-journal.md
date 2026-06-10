@@ -4,6 +4,117 @@
 
 ---
 
+## Iteration 1377 — 2026-06-10 22:40Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Pipeline active — 2 PRs OPEN (#435 in Mirror review, #436 freshly opened at 22:38Z). 2 Forge builds still queued. 2 marker-error retries in Forge inbox. 9/10 services active. 0 new larry-alerts.
+
+**VERIFY-BEFORE-REASSERT (iter 1376 watch items):**
+- PR #435 (fix-classifier-session-lost-002): OPEN, MERGEABLE, Mirror inbox has review-fix-classifier-session-lost-002.json. ✅ Review in progress.
+- 3 Forge tasks queued from iter 1376 — PARTIAL: fix-test-gate-sandbox-env-injection-002 consumed → PR #436 opened 22:38Z ✅. fix-dashboard-routing-denied-002 and fix-systemd-tier2-home-readwrite-001 still queued.
+- marker-error-fix-classifier-session-lost-002-1.json: still in Forge inbox (16 min old). Pickup pending. ✅
+- Check B sync: still valid (expires 23:50:16Z, ~70 min remaining at scan). ✅
+- beacon_telegram_bot.log `heal-x` fixture batch (iter 1376 [blue] "monitor next iter"): RECURRED at 16:37Z and 16:40Z MDT (22:37-22:40Z UTC). G-rule `test-fixture-batch-in-bot-log` now **2/3** (iter 1376=1/3, iter 1377=2/3). Dispatch to Beacon at 3/3.
+
+**Tier state:** 1 (consecutive_clean=0; active PRs + Forge queue)
+
+**Check 0 — Alert triage:**
+- alert-triage.json: watermark MISSING (standing; G-rule dispatched iter 1251). Per spec: claim trailing 100 lines.
+- larry-alerts.jsonl: **1405 lines** (UNCHANGED from iter 1376 watermark at line 1405). No new alerts since 22:20:16Z. ✅ Nominal.
+- **Watermark: line 1405 / unreviewed-merge:434 / 2026-06-10T22:20:16Z (carry)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: MISSING → 0 pending approvals. ✅
+- Last Larry message: 15:52:16 MDT (21:52:16Z) — unchanged since iter 1372. No new messages. No orphan directives. ✅ Nominal.
+- Bot log 16:37Z + 16:40Z MDT: `heal-x` fixture batches recurring. Same pattern as iter 1376 22:34Z. TIER_ONE_MARKER + "resets 11:30am" at 16:39Z — confirmed fixture per MEMORY `feedback_fixture_leak_sentinels_not_tier_outage`. No real delivery failure. G-rule 2/3 (above).
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T22:42:39Z (FRESH — healer just fired). ✅
+- Active stalls (post-20:00Z today): 0. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages since iter 1372. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean at session start (gitStatus). Wrapper committed iter 1376 journal as commit a9b6f78 "Pulse cycle 20260610T223916Z". ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-10T21:50:16Z (~50 min old at scan), status=no-change. Expires 23:50:16Z (~70 min remaining). ✅ Nominal. (**WATCH:** trigger sync next iter if after 23:50Z.)
+
+**Check C — Agent liveness:** 9/10 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). graph-refresh: inactive (completed oneshot). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 2 open PRs.
+  - PR #435 "fix(agent_runner): session_lost class + UUID-safe auth_401 classifier" — OPEN/MERGEABLE, 22:24Z (~16 min at scan). Mirror review-fix-classifier-session-lost-002.json in Mirror inbox. Below 30-min auto-merge threshold. ✅
+  - PR #436 "fix(test-gate): inject sandbox env so #412/#428 engage under discover" — OPEN/MERGEABLE, 22:38Z (~2 min at scan). Fresh. Mirror review not yet dispatched (expected — just opened). ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- PR #436 opened 22:38Z ✅ — fix-test-gate-sandbox-env-injection-002 build complete.
+- Forge inbox (4 items):
+  - fix-dashboard-routing-denied-002.json: queued (22:19Z, ~21 min) — pickup pending
+  - fix-systemd-tier2-home-readwrite-001.json: queued (22:21Z, ~19 min) — pickup pending
+  - marker-error-fix-classifier-session-lost-002-1.json: retry 1/3 (22:24Z, ~16 min) — Forge to re-emit PROCEED for PR #435
+  - marker-error-fix-test-gate-sandbox-env-injection-002-1.json: NEW retry 1/3 (22:38Z, ~2 min) — Forge to re-emit PROCEED for PR #436
+- Beacon inbox: empty. ✅
+- Mirror inbox: review-fix-classifier-session-lost-002.json (PR #435). ✅ Review in progress.
+- Wedge-reaper: blocked pending PR #435 merge. CCD S1 + headless-dedup: same block path.
+
+**Check I (Wednesday 2026-06-10):** Sentinel check-i-2026-06-10.json EXISTS. Idempotent skip. ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**§5.0 Bug-hunt gate:** No committed audit baseline. Scripts no-op. ✅
+**Credential rotations:** 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73 days). ✅
+**install-drift:** heartbeat 2026-06-10T18:00:03Z (~4h40m old). Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** `active running` — known G-rule standing. Carry.
+
+**G-rule tracking:**
+- **test-fixture-batch-in-bot-log: 2/3** (iter 1376=1/3, iter 1377=2/3). At 3/3 dispatch to Beacon: route=digest log-contamination fix (ensure test fixtures don't reach bot's alert processing path in production).
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred — Forge queue still busy (2 queued + 2 PRs in review). Carry.
+- All other G-rule statuses: carry from iter 1376 unchanged.
+
+**Actions taken:** None. Pipeline proceeding autonomously.
+
+**Standing findings (carry with updates):**
+- [yellow] **Wedge-reaper build** — blocked pending PR #435 Mirror PASS + auto-merge.
+- [yellow] CCD S1 + headless-dedup spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] EROFS permanent fix: fix-systemd-tier2-home-readwrite-001.json queued in Forge inbox.
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `test-fixture-batch-in-bot-log` — **2/3** (iter 1377). Dispatch at 3/3.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251; Forge brief pending).
+
+**Watch items for iter 1378:**
+- PR #435: expect Mirror PASS + auto-merge. Now ~16 min into review; watch for verdict.
+- PR #436: expect Mirror review dispatch from outbox-notifier shortly after PR open.
+- Forge picks up fix-dashboard-routing-denied-002 and fix-systemd-tier2-home-readwrite-001 (queued ~20 min). Expect new PRs.
+- marker-error retries for PRs #435 and #436: Forge re-emits PROCEED; pipeline continues.
+- Check B sync: watch expires 23:50:16Z — trigger if next iter is after that time.
+- G-rule `test-fixture-batch-in-bot-log`: if recurs next iter → 3/3, dispatch to Beacon.
+
+**PRIME DIRECTIVE:** 0 new Pulse-initiated interventions. interventions=763, systemic_fixes=17, ratio≈44.88, trend=flat. Iter non-clean (active Forge tasks + 2 PRs in pipeline).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1376 — 2026-06-10 22:34Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Pipeline active — PR #435 OPEN (fix-classifier-session-lost-002, 22:24:17Z, Mirror review dispatched 22:35:16Z). 3 Forge tasks still queued (fix-test-gate-sandbox-env-injection-002, fix-dashboard-routing-denied-002, fix-systemd-tier2-home-readwrite-001). marker-error retry 1/3 in Forge inbox for fix-classifier-session-lost-002. 9/10 services active. 0 new larry-alerts.
