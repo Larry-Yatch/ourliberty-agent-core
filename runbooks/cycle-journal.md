@@ -81534,3 +81534,107 @@ VERIFY-BEFORE-REASSERT:
 **Actions taken:** DM queued — `pulse-pr412-guidance-20260610T151037Z` (Check 2 escalation: Larry directives orphaned; PR #412 action path sent).
 **PRIME DIRECTIVE:** +1 intervention (Check 2: Larry directive orphaned; DM sent). interventions≈754, systemic_fixes=16, ratio≈46.81, trend=flat.
 **Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
+## Iteration 1335 — 2026-06-10 17:12Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles 1321-1334 ran between iter 1320 (15:12Z) and now, updating MEMORY.md only (no cycle-journal.md entries). Prior automated watermark per MEMORY: 17:03:16Z / ccd-s1-identity-nondeterminism / iter 1334 (line 1375). PRIME DIRECTIVE per MEMORY iter 1334: interventions≈756.
+
+**Health:** ✅ Nominal with active items — Major positive: PR #412 MERGED 16:06:58Z ✅ (closes longest-standing stall). CCD DAG paused at ccd-s1 pending APPROVAL_REQUEST (delivered to Larry 17:09:36Z); bughunt-gate-soak awaiting Larry Phase 2 decision. All services nominal.
+**Tier state:** 1 (consecutive_clean=0; CCD DAG paused + PR #424 new open PR)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1378 lines** (iter 1334 automated watermark at 1375 / 17:03:16Z; +3 new since). New alerts since iter 1334 watermark:
+
+*Tier 3 (known-pattern / closure — log-only, no action):*
+- `heal-wedged-review-sessions: wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-pr412-revision` (15:41Z, route=closure) — PR #412 revision worktree reaped. ✅
+- `missions-card-gc: summary` (15:46Z, 16:47Z, route=digest) — nominal GC. ✅
+- `outbox-notifier notification` (15:54Z) — ✅
+- `heal-pipeline-stall: pipeline-stall:mirror-pass-unmerged:PR#412` (15:58Z, route=escalate) — **FALSE POSITIVE** per known healer bug (check_pr_no_mirror_dispatch, iter 1286 root cause). PR #412 MERGED 16:06Z — verified MERGED. Tier 3. ✅
+- `heal-pipeline-stall: pipeline-stall:retry-exhausted:harden-test-prod-write-isolation-pr412-revision` (15:58Z) — same false positive root. Tier 3. ✅
+- `medic: medic-fp412-unmerged-20260610T155822` (16:03Z, kind=approval_request) — medic correctly diagnosed PR #412 as false-positive-unmerged. Tier 3 (medic served its purpose). ✅
+- `medic notification` (16:03Z) — ✅
+- `pulse: pr412-merged-pulse-allowlist` (16:11Z, route=closure) — PR #412 merged, Pulse logged to allowlist. ✅
+- `sync.service: sync-blocked:auto-commit-push-failed` (16:16Z, route=digest) — known sync-push-rebase-fallback-001. Per MEMORY: gitStatus HEAD > sync.json commit → wrapper push succeeded independently. Tier 3. ✅
+- `dispatch-branch-cleanup: gh-unavailable` (16:24Z, route=escalate) — Delivered to Larry at 10:29Z MDT. gh CLI now operational (PR queries succeeded this iter). Transient. Self-resolved. ✅
+- `outbox-notifier: mirror-dag-pass:chain-context-durability` (16:40Z, route=escalate) — Mirror passed CCD DAG preflight. Positive news. Tier 3 (nominal). ✅
+
+*Already-handled prior-session dispatches (confirming status):*
+- `pulse: bughunt-gate-soak` (16:39Z, route=escalate) — delivered to Larry 10:44Z MDT. Awaiting Larry's Phase 2 decision (desktop dev work). No new Pulse action.
+- `pulse: ccd-s1-identity-nondeterminism` (17:03Z, route=escalate) — delivered to Larry 11:04Z MDT. Acknowledged.
+- `pulse: ccd-s1-identity-resolution-20260610` (17:05Z, kind=approval_request) — **APPROVAL_REQUEST delivered to Larry at 17:09:36Z UTC.** Pending Larry sign-off (approve or reject via Beacon). No new dispatch needed this iter.
+
+New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-20260610 / iter 1335 (line ~1376).**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: "go" at 16:38:48Z UTC approving `dag-preflight-chain-context-durability`. ✅ Tracked — Mirror dispatched → Mirror PASS 16:40Z → CCD s1 dispatched (currently paused). No orphaned directives. APPROVAL_REQUEST `ccd-s1-identity-resolution-20260610` pending response; not orphaned. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: active_stalls=0 (healer confirmed clean). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:** All inboxes empty: beacon, forge, mirror, pulse. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed; same as iter 1319). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=`a53f25e` "Pulse cycle 20260610T170652Z". sync.json commit=`286f13da` (older) — per MEMORY: gitStatus HEAD > sync.json.commit → wrapper push succeeded independently; sync service hasn't re-fired yet. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** sync.json status=error "Auto-commit push failed; rolled back", last_sync=16:16:50Z (~56 min at scan, within 2h threshold). Known sync-push-rebase-fallback-001; self-recovering. ✅ Nominal. [blue] carry.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 9/9 active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #412 MERGED ✅** at 16:06:58Z UTC — "test(isolation): import-time AGENTS_ROOT sandbox + runtime production-write tripwire." MAJOR CLOSURE: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` RESOLVED. PR #423 also MERGED (feat(dashboard-api): report live active tier in /api/system/rotation).
+- **PR #424 OPEN** — "fix(missions): orphan terminal detection via bounded GitHub PR-state read." Created 17:06:47Z UTC by Larry-Yatch. MERGEABLE, reviewDecision="", no status checks. Mirror routing not yet dispatched (inbox empty, no worktree for PR #424). Age ~6 min — within normal outbox-notifier routing lag. Monitoring; no action. 🔵
+- ourliberty-dashboard: 0 open. ✅
+
+**Check H — Forge activity:** Active worktrees: `wt-forge-ccd-s1-envelope-builder` (CCD s1 paused), `wt-mirror-dag-preflight-chain-context-durability` (completed, stale — cleanup timer handles), `wt-mirror-harden-test-prod-write-isolation-001` (PR #412 merged, stale — cleanup timer handles). 0 Forge PRs > 72h old. ✅ Nominal.
+
+**Periodic/conditional (Wednesday 2026-06-10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§4.6):** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~73d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `PR #412 APPROVAL_REQUEST harden-test-prod-write-isolation-rev-001`: **CLOSED ✅** — PR #412 MERGED 16:06:58Z UTC.
+- `CCD DAG ccd-s1-envelope-builder paused`: CONFIRMED — build-sequences/chain-context-durability.json status=paused, step=ccd-s1-envelope-builder (dispatched). Worktree present. APPROVAL_REQUEST `ccd-s1-identity-resolution-20260610` delivered 17:09:36Z. Carry [yellow].
+- `bughunt-gate-soak`: Delivered 16:44Z MDT. Awaiting Larry desktop dev decision. Carry [yellow].
+- `health-check-notify-script-missing`: 9/9 core services active; ourliberty-agent-core-health.service not in core list (known failed [yellow]). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry. Carry [yellow].
+- `unreviewed-merge: ongoing`: Wednesday — not re-tested. Carry [yellow].
+- `Tier 2 weekly probe (auth_401)`: Beacon bot log shows auth_401 errors at 15:50Z + 15:52Z UTC today. Still active. Carry [yellow]. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not tested. Carry [yellow].
+- `install-drift-timer-gap verification OPEN`: Heartbeat = 2026-06-10T06:00:10Z (unchanged since midnight). Expected fire ~18:00Z UTC June 10 (~48 min from now). 0/2 clean healer cycles post-PR #411. Verification OPEN. Carry.
+- `G-rule heal-pipeline-stall:no-mirror-dispatch+unrouted-pr 2/3`: New false-positive alerts for PR #412 today (15:58Z, 2 alerts). G-rule count ADVANCES to **3/3 ← threshold reached.** APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` already pending Larry for the doc-only fix. Carry to dispatch resolution.
+- `G-rule wedged-review-silent-wt:* 2/3`: No new occurrences this iter. Carry.
+- `G-rule hand-authored-envelope-dead-letter 2/3`: No new occurrences. Carry.
+- `APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001`: Still pending Larry. Now G-rule is 3/3 — escalate noting threshold reached.
+- `sync-push-rebase-fallback-001`: Self-recovering per MEMORY. Carry [blue].
+- `APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001`: Carry [blue] — pending Larry.
+- `ourliberty-cycle.timer G-rule 3/3`: Carry [blue] — pending `go: cycle-timer checkpoint`.
+- `unreviewed-merge actor-exemption-config G-rule 3/3`: Carry [blue] — pending `go: actor-exemption-config`.
+
+**Actions taken:** None.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (all active dispatches from prior sessions; no new actions taken). Script-authoritative per MEMORY iter 1334: interventions≈756, systemic_fixes=16, ratio≈47.25, trend=flat.
+
+**Standing findings:**
+- [yellow] **CCD DAG ccd-s1-envelope-builder PAUSED** — APPROVAL_REQUEST `ccd-s1-identity-resolution-20260610` pending Larry (approve=probe-retry+fix-in-parallel; reject=fix-first). Delivered 17:09:36Z UTC.
+- [yellow] **bughunt-gate-soak** — 15 PRs reviewed (first-pass-PASS 93%). Phase 2 decision needed: "proceed with Phase 2" or "dial back thresholds." Action: Larry on desktop Claude Code in agent-core.
+- [yellow] **alert-translation-no-mirror-dispatch-001** — G-rule now 3/3 (threshold reached). Doc-only APPROVAL_REQUEST pending Larry. Low-risk; stops #412-class healer noise.
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: ongoing** — DMs delivered. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 + June 10 15:50Z UTC. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [yellow] **install-drift-timer-gap verification OPEN** — 0/2 clean healer cycles post-PR #411; next healer ~18:00Z UTC June 10.
+- [blue] **PR #424** — "fix(missions): orphan terminal detection" (Larry-authored, 17:06:47Z). Awaiting Mirror routing. Monitoring.
+- [blue] **APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001`** — pending Larry sign-off.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **sync-push-rebase-fallback-001** — 70th+ occurrence; self-recovering.
+
+**Watch items for next iter (1336):**
+- **install-drift healer** — expected fire ~18:00Z UTC June 10. Heartbeat must advance past 06:00:10Z to confirm 1/2 clean cycle.
+- **PR #424** — expect Mirror routing by next iter; if inbox still empty after 30+ min, investigate.
+- **APPROVAL_REQUEST `ccd-s1-identity-resolution-20260610`** — watch for Larry's approve/reject response to Beacon.
+- **CCD s1 worktree `wt-forge-ccd-s1-envelope-builder`** — should remain paused until APPROVAL_REQUEST resolved.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0).
