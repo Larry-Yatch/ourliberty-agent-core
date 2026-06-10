@@ -32,7 +32,10 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.claude /home/larry/.local /home/larry/.cache
+# .claude-larry-personal (TIER2_HOME) must be writable: 2026-06-10 EROFS
+# incident — tier2 dispatch transcripts silently failed to persist, so every
+# tier2 build-phase --resume died with 'No conversation found'.
+ReadWritePaths=/home/larry/agents /home/larry/credentials /home/larry/.claude /home/larry/.claude-larry-personal /home/larry/.local /home/larry/.cache
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
