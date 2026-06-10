@@ -222,6 +222,12 @@ ROTATION_VALID_MODES: frozenset[str] = frozenset({'auto', 'off'})
 # pin tier1.
 ROTATION_VALID_TIERS: frozenset[str] = frozenset({'tier1', 'tier2'})
 ROTATION_DEFAULT_PINNED_TIER = 'tier1'
+# Live tier the load-gated scheduler is CURRENTLY running on, read from the
+# state file rotate_active_tier maintains via the active_tier helpers (mirrors
+# active_tier.STATE_REL). Surfaced as current_tier so the dashboard can show
+# which tier Auto is actually on — pinned_tier is null in Auto, where the load
+# gate (not the operator) owns the tier.
+ROTATION_ACTIVE_TIER_STATE_REL = Path('blackboard') / 'active-tier.json'
 
 # Approvals-queue-rework N1 (L8): the agent-reviewed "clean up" button.
 # POST /api/larry/cleanup-review runs the SAME triage as
@@ -571,9 +577,12 @@ class RotationModeResponse(BaseModel):
     # 'off' when the runtime override file is present OR the config default is
     # disabled; 'auto' only when neither forces it off. pinned_tier is the tier
     # the operator pinned while 'off' (tier1|tier2); it is null in 'auto' mode,
-    # where the load-gated scheduler owns the tier.
+    # where the load-gated scheduler owns the tier. current_tier is the tier the
+    # scheduler is actually running on right now (live state), surfaced in every
+    # mode so the UI can show which tier Auto landed on.
     mode: str
     pinned_tier: Optional[str]
+    current_tier: Optional[str]
     override_active: bool
     config_enabled: bool
     as_of: str
@@ -590,6 +599,7 @@ class RotationModeRequest(BaseModel):
 class RotationModeUpdateResponse(BaseModel):
     mode: str
     pinned_tier: Optional[str]
+    current_tier: Optional[str]
     override_active: bool
     config_enabled: bool
     action_event_id: str
@@ -4026,6 +4036,23 @@ def _read_rotation_pinned_tier(agents_root: Path) -> str:
     return tier if tier in ROTATION_VALID_TIERS else ROTATION_DEFAULT_PINNED_TIER
 
 
+def _read_rotation_active_tier(agents_root: Path) -> str:
+    """The tier the scheduler is CURRENTLY running on, from the live state
+    file rotate_active_tier maintains (blackboard/active-tier.json). Mirrors
+    ``active_tier.read``'s fallback contract: a missing/unreadable/malformed
+    file, a non-dict payload, or an unknown ``tier`` all collapse to tier1, so
+    the dashboard never wedges on a parse error."""
+    path = agents_root / ROTATION_ACTIVE_TIER_STATE_REL
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return ROTATION_DEFAULT_PINNED_TIER
+    if not isinstance(data, dict):
+        return ROTATION_DEFAULT_PINNED_TIER
+    tier = data.get('tier')
+    return tier if tier in ROTATION_VALID_TIERS else ROTATION_DEFAULT_PINNED_TIER
+
+
 def _reader_rotation_mode(
     agents_root: Path, models_path: Path, now: Optional[datetime] = None,
 ) -> dict[str, Any]:
@@ -4036,7 +4063,10 @@ def _reader_rotation_mode(
     signals are surfaced so the UI can show *why* it's off. ``pinned_tier`` is
     the tier the scheduler will hold while off (file contents when the override
     is present; tier1 when off purely because config is disabled), and ``None``
-    in auto mode where the load gate owns the tier."""
+    in auto mode where the load gate owns the tier. ``current_tier`` is the tier
+    the scheduler is actually running on right now (live state file) — surfaced
+    in every mode so the UI can show which tier Auto landed on; in Off it
+    converges to ``pinned_tier`` within a tick."""
     override_active = (agents_root / ROTATION_OVERRIDE_FILE_NAME).exists()
     config_enabled = _read_rotation_config_enabled(models_path)
     mode = 'auto' if (config_enabled and not override_active) else 'off'
@@ -4051,6 +4081,7 @@ def _reader_rotation_mode(
     return {
         'mode': mode,
         'pinned_tier': pinned_tier,
+        'current_tier': _read_rotation_active_tier(agents_root),
         'override_active': override_active,
         'config_enabled': config_enabled,
         'as_of': _now_utc_iso(now),
