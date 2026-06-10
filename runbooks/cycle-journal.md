@@ -4,6 +4,18 @@
 
 ---
 
+## Inter-iteration note — 2026-06-10 ~07:22Z UTC
+
+**Source:** Beacon result-notification (`cycle-finding-pr412-mirror-review-20260610T072228Z`)
+
+**Finding closed:** [yellow] PR #412 pipeline stall (iter 1269) — **RESOLVED.** Beacon verified ground truth: PR #412 OPEN/MERGEABLE, 0 reviews, diff is test-only (4 files under `scripts/tests/`). No Mirror review task existed in inbox, archive, or in-flight. Beacon confirmed the missed hop was infra only (Forge worktree reaped at 06:59Z before build-outbox 'PR opened' hop could fire review-request; PR itself opened cleanly at 06:50Z).
+
+**Action taken by Beacon:** Dispatched Mirror review recovery task `mirror-review-pr412-001` with APPROVAL_REQUEST marker. Trust policy should auto-dispatch to Mirror; closing DM expected when Mirror returns PASS/REVISION/ESCALATE.
+
+**No further Pulse action required.** PR #412 pipeline stall is no longer a standing open finding — it is now a pending Mirror review. Next cycle: verify Mirror review has landed and PR has merged (or note revision if Mirror returned REVIEW_REVISION).
+
+---
+
 ## Iteration 1269 — 2026-06-10 ~07:12Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Two new signals — pipeline stall (PR #412 Mirror not dispatched; Forge retry-exhausted) + heal-stale-daemon-code auto-restarted 6 services at 07:09Z (new code now live; all services healthy post-restart).
@@ -75969,3 +75981,65 @@ Beacon confirmed: root cause matches iter 83 diagnosis exactly. `append_journal(
      Rationale: Ledger flagged this task at 24.4σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
   2. [medium] Template / fast-path repeating shape `smoke-5a-pf-no-marker` — 3 repeats observed this week; templating would collapse most retry cycles
      Rationale: Outbox archives show this task_id retried 3 times on agent `forge`. Recurring shapes are the prime candidate for the teach-to-fish discipline — propose a templated dispatch or an upstream fix to Beacon.
+
+---
+
+## Iteration 1270 — 2026-06-10 07:22Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Stall — PR #412 open/CLEAN/MERGEABLE; Mirror review never dispatched; Beacon holding
+**Tier state:** 1 (consecutive_clean=0; tier-reset — pipeline-stall finding; last_signal_at=2026-06-10T07:23Z)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1432 lines** (watermark was ~1427 at 2026-06-10T06:45:35Z / unreviewed-merge:411 / iter 1267). New alerts triaged:
+- `wedged-review-reaped:wt-forge-harden-test-prod-write-isolation-001` (06:59:39Z, route=closure, source=heal-wedged-review-sessions): Forge worktree reaped ~9 min after PR #412 opened. Tier-3 (healer working as designed). ✅
+- `pipeline-stall:retry-exhausted:harden-test-prod-write-isolation-001` (07:08:35Z, route=escalate, source=heal-pipeline-stall): **STALL** — Forge retries exhausted after worktree reap. PR #412 is OPEN/CLEAN/MERGEABLE but Mirror review never dispatched. Medic (07:10:57Z): worktree missing at retry time, 4 failures, task dropped. Beacon was notified (07:02:56Z, "build failed, all retries exhausted") and held. **Key fact: PR #412 IS open** (branch `forge/harden-test-prod-write-isolation-001`) — the build succeeded before the worktree was reaped. **Action: dispatched `cycle-finding-pr412-mirror-review-20260610T072228Z.json` → Beacon inbox** (asking Beacon to route Mirror review for PR #412; no Forge re-run needed). ⚠️ Tier-reset.
+- 6× `auto-restarted:*` (07:09Z, route=digest): Tier-3 known pattern (code deploy restart post-PR #413 merge). ✅
+- `missions-card-gc:summary` (07:10:31Z, route=digest): Tier-3 GC summary. ✅
+- `pipeline-stall:harden-test-prod-write-isolation-001` (07:11:40Z, route=escalate, source=pulse-cycle): Prior automated cycle (~iter 1269) already escalated this to Larry. My Beacon dispatch supersedes. ✅ Acknowledged.
+- `unreviewed-merge:413` (07:15:24Z, route=escalate): PR #413 "fix(sync): make GC healer sole committer of captures.json (#409 follow-up)" merged by Larry-Yatch at 07:13:17Z without Mirror review. DM delivered by outbox notifier. [yellow] streak continues.
+
+**Check 1 — Log noise:** `journalctl --priority warning --since 06:45:00` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives since last watermark. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `retry_exhausted:harden-test-prod-write-isolation-001` at 07:08:35Z confirmed; addressed via Beacon dispatch. ✅ Addressed.
+
+**Check 4 — Pending directives:** All inboxes empty at scan. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot; 6 services auto-restarted and confirmed active). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** `M agents/beacon/captures.json` (dirty tree). By-design per PR #413 ("GC healer sole committer"); transient until next wrapper commit. sync.json no-change/07:16Z (pull sync unaffected by uncommitted local changes). [blue] — not a working-copy discipline violation. ✅ Nominal (by-design).
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-10T07:16:13Z. ✅ Nominal. Root fix (sync-push-rebase-fallback-001) [blue] outstanding.
+
+**Check C — Agent liveness:** 8 core ourliberty-*.service units active. ourliberty-agent-core-health.service: **failed** (known [yellow]). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: PR #412 OPEN/CLEAN/MERGEABLE, no reviewDecision (the stall; addressed). ourliberty-dashboard: 0 open. ⚠️ (stall addressed).
+
+**Periodic/conditional (Wednesday 2026-06-10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Verify-before-reassert on carried-forward standings:**
+- `install-drift-timer-gap verification_pending`: PR #411 merged 06:41:49Z; next healer run ~18:00Z UTC (12h cadence). 0/2 clean healer cycles post-merge. OPEN — cannot verify yet.
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service confirmed **failed** (Check C). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. [yellow] confirmed.
+- `Tier 2 weekly probe failed (auth_401)`: Not re-tested (Wednesday). [yellow] carry forward.
+- `Check IX GITHUB_TOKEN missing`: Not re-tested (Wednesday). [yellow] carry forward.
+- `sync-push-rebase-fallback-001`: sync.json no-change/07:16:13Z. [blue] carry forward.
+
+**Actions taken:**
+- Dispatched `cycle-finding-pr412-mirror-review-20260610T072228Z.json` → Beacon inbox.
+- Appended PRIME DIRECTIVE row: `pipeline-stall-route-to-beacon:pr412-mirror-review-never-dispatched` (tier=1, kind=intervention, iter=1270).
+
+**Dispatches:** 1 — `cycle-finding-pr412-mirror-review-20260610T072228Z.json` to Beacon.
+
+**PRIME DIRECTIVE (script-authoritative, this iter):** interventions=743, systemic_fixes=16, verification_pending=6, ratio=46.4375, trend=flat. (+1 intervention this iter.)
+
+**Standing findings:**
+- [yellow] **PR #412 stall** — Beacon dispatch sent; Beacon will DM Larry if it has concerns about the PR.
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: PR #413** (07:13:17Z Larry-direct) — streak continues; `go: actor-exemption-config` pending.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [yellow] **install-drift-timer-gap verification OPEN** — 0/2 clean healer cycles post-PR #411; next healer run ~18:00Z UTC June 10.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; self-recovering.
+- [blue] **captures.json dirty** — by-design per PR #413; next wrapper commit cleans.
