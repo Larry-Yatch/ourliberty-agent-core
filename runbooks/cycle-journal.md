@@ -4,6 +4,84 @@
 
 ---
 
+## Inter-cycle note — 2026-06-10 ~04:41Z UTC (Beacon result notification)
+
+**Source:** Beacon result for `cycle-finding-alert-triage-last-claimed-ts-20260610T043631Z` (dispatched iter 1251).
+
+**Beacon diagnosis (verified against ground truth):** `scripts/alert_triage_state.py` (687 lines) contains zero references to `last_claimed_ts`, `last_claimed_line`, or `watermark` — no watermark logic exists anywhere in the module. `triage_alert()` (L525–598) classifies + persists per-alert rows but never writes a scan position. `~/agents/state/alert-triage.json` is a flat dict keyed by `alert_id` with no top-level watermark slot. Check 0 is prompt-driven (run_cycle.sh has no triage wiring by design), so the absent wiring is the bug — not a shell script gap. Beacon confirmed the iter-757 deprecation applies: watermark must be **timestamp-based** (`last_claimed_ts` authoritative); line count may be stored as advisory-only and must never be the discriminator (retention healer can shrink the file).
+
+**Spec produced:** Forge task `alert-triage-durable-watermark-001` (phase=preflight). Design: separate sidecar `~/agents/state/alert-triage-watermark.json` for `get_watermark()`/`set_watermark()` + CLI subcommand `set-watermark --ts <iso8601>` — zero blast radius on existing flat-dict consumers. Companion update to `runbooks/cycle-prompt.md` §3.0 prose so Check 0 calls the new helper each scan pass.
+
+**APPROVAL_REQUEST status:** Parked. Beacon's marker is inert from this Pulse-triggered path (headless session; marker cannot reach Forge without originating from Telegram). Larry must paste the APPROVAL_REQUEST block in Telegram or send "go" there to dispatch. Spec is ready; effort=small; no financial guard.
+
+**No new work generated.** This note closes the iter 1251 G-rule dispatch loop. Pending: Larry's Telegram "go" to ship the Forge build.
+
+---
+
+## Iteration 1252 — 2026-06-10 04:46Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all mandatory + additive checks nominal. NEW: PR #406 "feat(missions-v2): Phase 1 captures core" opened by Forge at 04:36:45Z (MERGEABLE, 6 min old, under 30-min auto-merge threshold). G-rule fix chain progressing: Beacon produced `alert-triage-durable-watermark-001` spec — **APPROVAL_REQUEST parked** (headless path; Larry action required).
+**Tier state:** 1 (consecutive_clean=0 → wrapper increments to 1; clean iter — tier stays at 1)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1409 lines** (UNCHANGED from iter 1251 watermark of 1409 / ts=2026-06-10T04:22:51Z). No new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last real entries at 22:31-22:34 MDT (04:31-04:34Z June 10): standing TIER2_FALLBACK_SKIPPED / TIER2_FALLBACK_FAILED sequence (auth_401 + "resets 11:30am" rate-limit + "tier2 stderr distinct token" — confirmed fixture per standing classification). No new Larry directives. No real agent distress. ✅ Nominal per standing classification.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat = 2026-06-09T22:29:53-0600 (04:29:53Z; **~12.6 min old at scan time, >10 min threshold** — ran independent checks per spec). heal-pipeline-stall-state.json = snooze/suppress registry (34 entries, all snoozed to 2099). Independent check: Forge build PID 578076 completed PR #406 at 04:36:45Z (~36 min build); session still running post-PR wrap-up. No stall evidence from Checks 0/1/2. ✅ Nominal per independent check. [blue] healer heartbeat slightly stale (>10 min); independent check confirms no stalls.
+
+**Check 4 — Pending directives:** Forge inbox = step-captures-core.json (04:01Z; **Forge build COMPLETE** — PR #406 opened 04:36:45Z; PID 578076 still running post-PR wrap-up, inbox-watcher will archive on exit). `notify-cycle-finding-alert-triage-last-claimed-ts-20260610T043631Z.json` appeared at 04:41Z and was processed by inbox-watcher (now in .archive) — this was Beacon's notification back through the pipeline; see inter-cycle note above. beacon=0, mirror=0, pulse=0. No orphaned Larry directives (last Larry Telegram: 2026-05-28, fully tracked). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (oneshot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=e28284c ("Pulse cycle 20260610T044107Z" — iter 1251 wrapper commit). Sync push-failed at 04:35:23Z (64th+ occurrence of sync-push-rebase-fallback-001). ✅ Nominal per standing classification.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=error, message="Auto-commit push failed; rolled back", last_sync=2026-06-10T04:35:23Z (< 2h ago, fresh). 64th+ occurrence of sync-push-rebase-fallback-001. Self-recovering. [blue] standing.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** All 9 core ourliberty-*.service units active/running: beacon-bot ✅, chain-event-shipper ✅, cycle.service ✅ (this iter), dashboard-api ✅, forge-bot ✅, inbox-watcher ✅, mirror-bot ✅, outbox-notifier ✅, pulse-bot ✅. All timers active/waiting. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: **1 open — PR #406** "feat(missions-v2): Phase 1 captures core — durable capture ingest + reader" (created 04:36:45Z, **MERGEABLE**, reviewDecision="", head=forge/step-captures-core). Auto-merge not yet enabled — 6 min old, under 30-min always-fix threshold. Mirror review dispatch pending (Forge PID 578076 still running; inbox-watcher will dispatch on session exit). ourliberty-dashboard: 0 open. ✅ Nominal (age < threshold; normal review pipeline).
+
+**Bug-hunt gate (§5.0):** 2/15 gate reviews since go-live — soaking, no-op. ✅
+
+**Check I (§5.1, Wednesday June 10):** check-i-2026-06-10.json sentinel present (fired iter 1246). Idempotent skip. ✅
+
+**Credential rotation (§4.6):** 20 credentials, 0 overdue, 0 upcoming within 60d. DESKTOP_INGEST_TOKEN not yet in rotation schedule (action on Larry). ✅ Nominal.
+
+**Forge/pipeline digest:** step-captures-core.json in Forge inbox (missions-v2 Phase 1 step 1a); **Forge build COMPLETE** — PR #406 "feat(missions-v2): Phase 1 captures core — durable capture ingest + reader" opened 04:36:45Z (MERGEABLE, head=forge/step-captures-core, 0 CI checks). PID 578076 still running post-PR wrap-up. Mirror review dispatch will fire on session exit. G-rule alert-triage watermark fix: Beacon spec `alert-triage-durable-watermark-001` produced (inter-cycle note); APPROVAL_REQUEST parked — Larry action required to dispatch Forge build.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001`: Forge inbox = step-captures-core.json only (no preflight-reminder task). No resolution events in new-alert window (0 new alerts). Carry forward [yellow].
+- `health-check-notify-script-missing`: heal-stale-daemon-code-state.json ABSENT (oneshot normal); no PR resolving notify_larry.py visible. Carry forward [yellow].
+- `unreviewed-merge streak 2` (PR #404 + #405): larry-alerts.jsonl at 1409 (unchanged). No new unreviewed-merge alerts. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: beacon log 22:31-22:34 MDT shows standing TIER2_FALLBACK_FAILED. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN`: No resolution event. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: New occurrence 04:35:23Z (64th+). [blue] standing.
+- `pulse-auto-dispatch task_id mismatch → APPROVAL_REQUEST silently dropped` G-rule (iter 1247, 1/3): No new occurrence. Carry forward 1/3.
+- `alert-triage.json last_claimed_ts=None` G-rule: DISPATCHED iter 1251 → closed. Beacon spec produced (inter-cycle note). APPROVAL_REQUEST parked (new [yellow] standing item below).
+
+**Standing findings:**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 2** (PR #404 + #405) — pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001** — Beacon spec ready; notifier dropped (task_id mismatch). Pending Larry action (paste APPROVAL_REQUEST block from `/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json` into Beacon-bot, or approve via dashboard).
+- [yellow] **credential-drift:MISSING_REGISTRY_ENTRY:DESKTOP_INGEST_TOKEN** — in `.env.larry` but not in rotation schedule. DM delivered (beacon-bot idx=1407). Action on Larry: add entry to `config/token-rotation-schedule.json` per `shared/credentials-discipline.md`.
+- [yellow] **NEW: G-rule fix alert-triage-watermark APPROVAL_REQUEST parked** — Beacon spec `alert-triage-durable-watermark-001` ready (effort=small); Forge build gated on Larry Telegram "go" (headless path blocks auto-dispatch). Action on Larry: send "go" in Telegram to Beacon or paste the APPROVAL_REQUEST block.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 64th+ occurrence; root cause unfixed; self-recovering.
+
+**Actions taken:** `cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 1252` → iter_clean row appended (04:46:42Z). DM filed via `larry_alerts.append_alert` (subject=approval-request:parked:alert-triage-durable-watermark-001, route=escalate, ts=04:49:03Z).
+**Post-scan-watermark alert (Check 0 next iter):** larry-alerts.jsonl line 1410 (ts=2026-06-10T04:46:30Z): source=heal-wedged-review-sessions, subject=wedged-review-reaped:wt-forge-step-captures-core. Appeared after Check 0 scan watermark (04:42Z); new watermark for next iter = 2026-06-10T04:46:30Z / line 1410. Next iter Check 0 will triage. Likely Tier-3 (healer working as designed) but verify.
+**Dispatches:** 1 DM (approval-request:parked:alert-triage-durable-watermark-001).
+**PRIME DIRECTIVE:** iter_clean (no new interventions). interventions=736, systemic_fixes=16, ratio=46.0, trend=flat (script-authoritative).
+**Tier end-of-iter:** 1, consecutive_clean=0 → wrapper increments to 1 (clean iter).
+
+---
+
 ## Iteration 1251 — 2026-06-10 04:37Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ G-rule 3/3 THRESHOLD MET — `alert-triage.json last_claimed_ts=None` (5th consecutive cycle confirmed); dispatched Beacon fix spec. All mandatory + additive checks otherwise nominal. Forge actively building step-captures-core (PID 578076, ~35 min in-progress).
