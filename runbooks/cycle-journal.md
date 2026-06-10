@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration 1348 — 2026-06-10 19:08Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Standing: Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1 (auth_401, 18:57:24Z). PR #431 VERIFIED MERGED (aa1376b `feat(pulse): Check XI — catalog accuracy meter`; 0 open PRs confirmed). unreviewed-merge:431 alert NOT YET in alerts file (1396 lines unchanged; expected imminently from detector lag). CCD S1 and headless-dedup spawn-failures standing (doubly blocked: auth_401 + wedge fix). 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; auth_401 block + spawn-failures standing)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:57:24.490251+00:00 / claude_tier1_failed_tier2_unavailable:auth_401 / line 1396` (iter 1347)
+- Current total: 1396 lines. **0 new entries** since watermark. ✅ Nominal.
+- Note: PR #431 merged ~19:01–19:07Z (between iter 1346 and 1347 commits). `heal-unreviewed-merge-detector` alert for PR #431 not yet in file at scan (19:08:29Z); expect on next detector cycle.
+- **Watermark unchanged: `2026-06-10T18:57:24.490251+00:00 / line 1396`**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Beacon bot log last entry: `12:59:29 MDT` (18:59:29Z) — auth_401 delivery confirmation. No new Larry messages since 12:53:23 MDT. ✅
+- beacon-pending-approvals.json: MISSING (0 pending). ✅
+- Standing: auth_401 fixture contamination. G-rule 3/3 dispatched iter 1281; Forge brief pending.
+- ⚠️ tier-reset: YES (standing fixture contamination + active auth block).
+
+**Check 3 — Pipeline stall:**
+- `heal-pipeline-stall-state.json`: heartbeat=MISSING, stalls=0. Standing (iters 1329+).
+- Forge inbox: EMPTY. In-flight: `fix-wedged-reaper-spares-active-build-worktree.json` VERIFIED paused_on_tier1 (`{failure_type: auth_401, at: 18:57:24Z, agent_id: forge, tier: tier2}`).
+- CCD S1 (`build-ccd-s1-envelope-builder.json`) in archive (spawn-failure). VERIFIED.
+- `build-fix-headless-approval-dedup-spawn-failure-wedge.json` in archive (spawn-failure). VERIFIED.
+- Re-dispatch chain blocked: auth_401 resolution required first.
+- ⚠️ Non-nominal; tier-reset: YES.
+
+**Check 4 — Pending directives:**
+- No new Larry messages. beacon-pending-approvals.json MISSING (0 pending). ✅
+- Forge in-flight: 1 task paused_on_tier1 (not in inbox, not actionable by Pulse). ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code.heartbeat`: last heartbeat `2026-06-10T18:42:08Z` (~26 min ago). 9/9 services active. ✅ Nominal.
+
+**Check A — Source repo:** gitStatus (session start): main, clean. Most recent commit `930c676 Pulse cycle 20260610T190738Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~17 min at scan), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅). `ourliberty-agent-core-health.service` failed = standing known. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **VERIFY iter 1347 watch — PR #431:** VERIFIED MERGED. `aa1376b feat(pulse): Check XI` present in gitStatus commit history (between iter 1346 commit `18e2a4f` and iter 1347 commit `930c676`). `gh pr list` returns `[]`. ✅ Resolved.
+- unreviewed-merge:431 not yet in alerts file; detector lag expected. **Watch.**
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:** 0 open Forge PRs. 1 task paused_on_tier1 (as expected given auth block). No new Forge activity. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** No new audit_due / distill_detector alerts. Carry iter 1347. ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window. Carry iter 1347. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1347 watch items:**
+- **Auth_401 resolution** — STILL ACTIVE. Beacon bot log: no new activity since 12:59:29 MDT. In-flight state file confirms `paused_on_tier1`. **Action on Larry: run `scripts/auth_orchestrator.py` from chat, or follow `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`.** CARRY.
+- **PR #431 merge + unreviewed-merge:431** — PR VERIFIED MERGED (aa1376b). Alert not yet in file (detector lag). **UPDATED: merge confirmed. Watch for alert.**
+- **CCD S1 + headless-dedup re-dispatch** — Both VERIFIED in archive (spawn-failure). Doubly blocked. CARRY.
+- **install-drift** — 06:00Z UTC June 11. No new alerts. CARRY.
+- **alert-translation-no-mirror-dispatch-001** — No change. CARRY.
+
+**G-rule tracking:**
+- All carry from iter 1347 (no new occurrences this iter).
+
+**Standing findings:**
+- [yellow] Forge task paused_on_tier1 (auth_401): `fix-wedged-reaper-spares-active-build-worktree`. **Action on Larry: run `scripts/auth_orchestrator.py` from chat.** Runbook: `docs/runbooks/restore-larry-personal-claude-oauth-tier2.md`. DM delivered 12:59:29 MDT.
+- [yellow] CCD S1 build: `build-ccd-s1-envelope-builder.json` spawn-failure. Doubly blocked (auth_401 + wedge fix).
+- [yellow] `build-fix-headless-approval-dedup-spawn-failure-wedge.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Compounded with Forge Tier 1 auth.
+- [blue] unreviewed-merge:431 expected imminently (PR #431 Larry-direct merge).
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] unreviewed-merge:429 and :430 — standing. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281; Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2` to send to Beacon.
+
+**Watch items for iter 1349:**
+- **Auth_401 resolution** — Action on Larry (unchanged); once re-authed, Forge resumes and spawn-failure chain unblocks.
+- **unreviewed-merge:431 alert** — verify fires in alerts file; check DM delivery via Beacon bot log.
+- **CCD S1 + headless-dedup** — no action until auth resolved.
+- **install-drift** — 06:00Z June 11.
+
+**Actions taken:** None (no new auto-fix conditions; all findings standing or pending).
+
+**PRIME DIRECTIVE:** 0 new interventions this iter (0 new alerts to triage). 0 new systemic fixes. interventions=760, systemic_fixes=17, ratio≈44.71, trend=flat. iter_non-clean (auth block + spawn-failures standing).
+**Tier end-of-iter:** 1 (consecutive_clean=0; auth_401 block + standing spawn-failures).
+
+---
+
 ## Iteration 1347 — 2026-06-10 19:10Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Forge task `fix-wedged-reaper-spares-active-build-worktree` paused_on_tier1 (auth_401 at 18:57:24Z). Root-cause fix for spawn-failures is blocked until Larry re-auths Tier 1. Alert already DM'd by outbox-notifier (alert idx=1395, delivered 12:59:29 MDT). PR #431 "feat(pulse): Check XI — catalog accuracy meter" OPEN (Larry-direct, 18:58:29Z, MERGEABLE, age ~12 min at scan — below 30-min threshold). 9/9 services active.
