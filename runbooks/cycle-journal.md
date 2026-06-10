@@ -4,6 +4,145 @@
 
 ---
 
+## Iteration 1282 — 2026-06-10 ~09:20Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ G-rule finding — `heal-pipeline-stall:unrouted-pr` false-positive (G-rule 3/3; dispatched to Beacon). PR #420 OPENED ✅ (p2-digest-generator, Forge build complete). PR #419 MERGED ✅ (fix(approvals) Larry-direct). Beacon completed PR #412 revision dispatch + emitted APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off. SYNC-PUSH-REBASE-FALLBACK-001 70th+ at 09:16Z (known [blue], self-recovered). All mandatory checks nominal.
+**Tier state:** 1 (cycle-tier.json: consecutive_clean=0; G-rule dispatch = tier-reset, stays Tier 1)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):** larry-alerts.jsonl = **1455 lines** (iter 1281 watermark: 08:40:12Z / unreviewed-merge:417 / line 1450). 5 new lines since watermark:
+- Line 1451 (08:55:16Z): `unreviewed-merge:419` — PR #419 (fix(approvals): recover the real APPROVAL_REQUEST marker from Beacon's outbox archive) merged by Larry-Yatch without Mirror review. Consistent with G-rule 3/3 actor-exemption-config pattern. **Tier 3 known-pattern [blue]**. No DM, no tier-reset. ✅
+- Line 1452 (09:02:17Z): `pipeline-stall:unrouted-pr:PR#412` — heal-pipeline-stall reports PR #412 has no routing-events.jsonl entry. This is the 3rd occurrence of the false-positive pattern (G-rule 1/3=iter 1274, 2/3=iter 1278, 3/3=this alert). Medic confirmed: Mirror DID review PR #412 (REVISION at 07:51Z via notify-mirror-review-pr412-001 in beacon/.archive); routing-events.jsonl just lacks the entry. **G-rule 3/3 threshold met → route-to-beacon + tier-reset**. Dispatch written (see Actions).
+- Line 1453 (09:03:02Z): `pulse:g-rule-dispatched:inbox-watcher-log-isolation-001` — our own iter 1281 dispatch notification, route=digest. **Tier 3 known-pattern**. No action.
+- Line 1454 (09:05:41Z): `medic:medic-diagnosis:pipeline-stall:unrouted-pr:PR#412` — medic diagnosed the PR #412 stall (Forge revision not dispatched after Mirror REVISION). Delivered to Larry (beacon_telegram_bot.log idx=1453). Now resolved via Beacon completing cycle-finding-pr412-forge-revision-r1 (APPROVAL_REQUEST created). **Informational**. No action.
+- Line 1455 (09:16:16Z): `sync-blocked:auto-commit-push-failed` — source=sync.service, route=digest. SYNC-PUSH-REBASE-FALLBACK-001 70th+ occurrence; self-recovering (rolled back Pulse paths to ee60231b). **Tier 3 known-pattern [blue]**. No DM, no tier-reset. ✅
+
+New watermark: **09:16:16Z / sync-blocked:auto-commit-push-failed / line 1455 / iter 1282**.
+Triage: 5 alerts — 1 Tier-1 G-rule dispatched (pipeline-stall:unrouted-pr), 4 Tier-3 silenced. ✅ (1 tier-reset from G-rule)
+
+**Check 1 — Log noise:** `journalctl --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No `<- 7998341473` messages in bot logs (last checked beacon_telegram_bot.log tail). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: 37 entries, 0 active stalls (all 2099-suppressed or historical), state file mtime 09:02:17Z (fresh, < 10 min). ✅ Nominal.
+
+**Check 4 — Pending directives:** No orphaned Larry directives detected in Telegram logs (24h window). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (known [yellow]). 8/8 core services active. ✅ Core nominal.
+
+**Check A — Source repo:** gitStatus (session-start snapshot): branch=main, clean tree, HEAD=ee60231 ("Pulse cycle 20260610T091031Z" — iter 1281 wrapper commit). sync.service attempted push at 09:16Z but push failed (SYNC-PUSH-REBASE-FALLBACK-001, rolled back; local tree remains clean and on main). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=error at 09:16:16Z, message="Auto-commit push failed; rolled back", commit=ee60231. SYNC-PUSH-REBASE-FALLBACK-001 70th+ occurrence; self-recovering; APPROVAL_REQUEST open [blue]. Known standing pattern — no new action. ✅ Nominal (known [blue]).
+
+**Check C — Agent liveness:** 8/8 core services active (beacon-bot, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, chain-event-shipper, dashboard-api). ourliberty-agent-core-health: inactive (known [yellow]). ✅ Core nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT iter 1281):**
+- **PR #419: MERGED ✅ 08:53:35Z** (by Larry-Yatch) — `fix(approvals): recover the real APPROVAL_REQUEST marker from Beacon's outbox archive`. Known [blue] unreviewed-merge pattern. CLOSED as watch item.
+- **PR #420: NEW OPENED ✅** — `feat(missions): parked-&-aging digest generator (Phase 2 §6)` (p2-digest-generator build complete). CLEAN/MERGEABLE, no review decision, no CI checks yet. Just opened. Not at 30-min threshold. Needs Mirror review per policy. ℹ️ Watch.
+- PR #418: OPEN, UNKNOWN/UNKNOWN, marker-error retry 1/3 still in Forge inbox. In pipeline.
+- PR #412: OPEN, UNSTABLE (mirror-review=FAILURE). Forge revision dispatch now resolved via APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` (Beacon created; pending Larry sign-off). ⚠️ Carry forward standing [yellow].
+- ourliberty-dashboard: 0 open. ✅
+
+**Credential rotation:** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate soak (§5.0):** 7/15 (carried from iter 1281). ✅ No action.
+
+**Worktrees (VERIFY-BEFORE-REASSERT iter 1281 watch items):**
+- `wt-forge-p2-derive-endpoint` — still present; PR #418 OPEN/UNKNOWN, marker-error retry 1/3 in Forge inbox. ℹ️ Monitor.
+- `wt-forge-p2-digest-generator` — still present; PR #420 OPENED ✅. Forge session may still be wrapping up result notification. ℹ️ Monitor.
+- `wt-mirror-dag-preflight-missions-v2-phase2` — still present (terminal PASS 08:24Z). Pending heal-wedged reap. ℹ️ Monitor.
+- `wt-mirror-mirror-review-pr412-001` — still present (terminal REVISION 07:51Z). Pending heal-wedged reap. ℹ️ Monitor.
+
+**VERIFY-BEFORE-REASSERT corrections — iter 1281 claims:**
+- Iter 1281 stated wt-forge-p2-digest-generator "ACTIVE, ~15 min in". CORRECTED: Forge completed build; PR #420 opened. Worktree still present (session wrap-up likely in progress).
+- Iter 1281 standing item "PR #412 Gap A parity fix still needs separate Beacon dispatch." CORRECTED: RESOLVED ✅ — Beacon completed cycle-finding-pr412-forge-revision-r1 at 09:13Z and emitted APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001`.
+
+**Verify-before-reassert — iter 1281 standing items:**
+- `health-check-notify-script-missing`: 8/8 active, health.service known inactive. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: pattern continuing. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — not re-tested. Carry forward [yellow].
+- `APPROVAL_REQUEST alert-triage-durable-watermark-001 PARKED`: no change. Carry forward [yellow].
+- `APPROVAL_REQUEST preflight-reminder-enforcement-001` routing failure: no change. Carry forward [yellow].
+- `PR #412 no-session-revision`: **NEW APPROVAL_REQUEST** `harden-test-prod-write-isolation-rev-001` created by Beacon (09:13Z). Pending Larry sign-off. ⚠️ Carry forward (pending approval).
+- `install-drift-timer-gap verification_pending`: next healer run ~18:00Z UTC June 10. OPEN.
+- `sync-push-rebase-fallback-001`: 70th+ occurrence at 09:16:16Z. [blue] standing.
+- `missions-v2-phase2 ACTIVE`: PR #420 (p2-digest-generator) OPENED ✅; PR #418 (p2-derive-endpoint) in marker-error retry; dag-preflight-revision-autonomy-001 queued in Forge inbox.
+
+**G-rule tracking:**
+- `heal-pipeline-stall:unrouted-pr fires false positive for recovery-dispatched reviews not in routing-events.jsonl` — **G-rule 3/3 MET** (iter 1274=1/3, iter 1278=2/3, alert 09:02:17Z June 10=3/3). Dispatched cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z → Beacon inbox this iter.
+- `wedged-review-silent-wt:* not in alert-translations.json` — **2/3** (unchanged). No new occurrence this iter.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — G-rule 3/3 (iter 967); actor-exemption-config spec pending `go: actor-exemption-config`. PR #419 is latest streak entry.
+- `hand-authored Pulse dispatch envelope dead-letter` — **2/3** (inbox-watcher-log-isolation-001 + pr412-forge-revision). At 3/3: dispatch to Beacon for envelope helper spec.
+
+**Standing findings (unchanged unless noted):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 + June 10 recurring. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [yellow] **APPROVAL_REQUEST alert-triage-durable-watermark-001** PARKED — pending Larry "go" to Beacon.
+- [yellow] **APPROVAL_REQUEST preflight-reminder-enforcement-001** routing failure — pending Larry action.
+- [yellow] **PR #412 no-session-revision** — NEW: APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` in queue pending Larry sign-off. Once approved: Forge preflight → build on existing branch → PR #412 updates → Mirror re-review.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — 70th+ occurrence; self-recovering; root code fix pending.
+
+**Watch items:**
+- PR #418 — marker-error retry 1/3 in Forge inbox. Watch for PROCEED marker → Mirror dispatch.
+- PR #420 — OPEN, CLEAN/MERGEABLE, no Mirror review yet. Watch for Mirror dispatch (via Forge outbox-notifier route). Check 30-min auto-merge threshold next cycle.
+- PR #412 — APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` pending Larry sign-off.
+- wt-forge-p2-derive-endpoint + wt-forge-p2-digest-generator + wt-mirror-dag-preflight-missions-v2-phase2 + wt-mirror-mirror-review-pr412-001 — pending heal-wedged reap.
+- install-drift healer: next run ~18:00Z UTC June 10 → 0/2 clean cycles post-PR #411.
+- cycle-finding-unrouted-pr-false-positive-grule dispatch → Beacon inbox (written this iter). Watch for Forge PR.
+
+**Actions taken:** Wrote G-rule dispatch to Beacon inbox: `cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z.json` (route: heal-pipeline-stall:unrouted-pr false-positive fix, G-rule 3/3).
+**Dispatches:** cycle-finding-unrouted-pr-false-positive-grule-20260610T092000Z → Beacon inbox.
+**PRIME DIRECTIVE:** 1 new intervention (G-rule detection: unrouted-pr false-positive), 1 new systemic_fix dispatched (G-rule → Beacon); 2 verification confirmations (inbox-watcher-log-isolation-001 Beacon ✅ 09:06Z; cycle-finding-pr412-forge-revision-r1 Beacon ✅ 09:13Z → APPROVAL_REQUEST created). interventions≈748, systemic_fixes≈17, ratio≈43.9.
+**Tier end-of-iter:** 1 (G-rule dispatch = non-clean; tier-reset; consecutive_clean=0).
+
+---
+
+## Result notify: cycle-finding-pr412-forge-revision-20260610T090500Z-r1 — 2026-06-10 ~09:31Z UTC (inter-agent)
+
+**Event:** Beacon result-notification received for task `cycle-finding-pr412-forge-revision-20260610T090500Z-r1` (status=SUCCESS).
+
+**What Beacon did:**
+- Refetched ground truth on PR #412 and Mirror's review; confirmed auto-revision was skipped due to lost session (outbox-notifier SIGTERM mid-sequence), not a Forge problem.
+- Verified no double-dispatch in flight.
+- Authored and emitted APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` — the real marker, scoped to PR #412's existing branch `forge/harden-test-prod-write-isolation-001`.
+
+**What the approval gates:** Forge preflight + extend parity suite to cover OURLIBERTY_AGENTS_ROOT / OURLIBERTY_WORKTREES_ROOT import-time redirect (Mirror's single REVISION finding, severity=medium). Work stays on the existing branch; PR #412 updates in-place. Mirror re-reviews on completion.
+
+**Standing watch item update:** "PR #412 Gap A parity fix still needs separate re-dispatch via Beacon" — **RESOLVED**. APPROVAL_REQUEST now in the approval queue pending Larry's sign-off. Once approved, chain continues: Forge preflight → build → PR #412 update → Mirror re-review.
+
+**No new work required.** Beacon will handle the re-review outcome when it lands.
+
+---
+
+## Dead-letter: cycle-finding-pr412-forge-revision-20260610T090500Z — 2026-06-10 ~09:13Z UTC (interactive)
+
+**Event:** Beacon dead-letter notify received for dispatch `cycle-finding-pr412-forge-revision-20260610T090500Z` (PR #412 Forge revision re-dispatch, authored in a prior session at 09:07Z).
+
+**Rejection reason:** `validator: priority "high" unknown` (recorded in `.invalid/…reason`). Two envelope defects confirmed by re-inspection:
+1. `"priority": "high"` — not in the allowed set (`founder-vision | normal | low | urgent`). The validator short-circuits here.
+2. `"intent": "pipeline-stall-resolution"` — not in `ALLOWED_INTENTS` (would have failed second if priority hadn't failed first).
+
+**Root cause:** Prior dispatch authored the envelope without consulting the MEMORY.md calibration note ("Allowed values: `founder-vision | normal | low | urgent`") or the `dispatch_validator.py` intent enum. Same class of error as the `inbox-watcher-log-isolation-001` dead-letter (iter 1281) — hand-authored envelope bypassed the envelope builder.
+
+**Verify-before-reassert:** PR #412 confirmed OPEN/UNSTABLE/mirror-review=FAILURE/no-reviewDecision as of 09:10Z June 10. No Forge revision task exists in Forge inbox or recent archive for the PR #412 revision (post-07:51Z). Re-dispatch is warranted.
+
+**Fix applied:** Wrote corrected envelope to `~/agents/inboxes/beacon/cycle-finding-pr412-forge-revision-20260610T090500Z-r1.json` with:
+- `"priority": "normal"` (was `"high"`)
+- `"intent"` field removed entirely
+- `"source": "pulse"` (already valid — not the rejection cause)
+- `dead_letter_retry` metadata documenting original rejection
+- `dispatch_validator.validate_task()` → `valid=True reason=ok` confirmed before write
+
+**Actions taken:** Re-dispatched cycle-finding-pr412-forge-revision-20260610T090500Z-r1 → Beacon inbox.
+
+**Self-improvement note:** This is the 2nd consecutive dead-letter from a hand-authored Pulse dispatch envelope (after inbox-watcher-log-isolation-001). Pattern emerging: hand-authored envelopes reliably miss validator constraints that the `pulse_check_i.py` envelope builder handles correctly. Recurrence count: 2. At 3 occurrences this will be a G-rule dispatch to Beacon to spec an envelope helper function for Pulse's ad-hoc dispatches.
+
+---
+
 ## Dead-letter: inbox-watcher-log-isolation-001 — 2026-06-10 ~09:15Z UTC (interactive)
 
 **Event:** Beacon dead-letter notify received for dispatch `inbox-watcher-log-isolation-001` (G-rule 3/3: inbox_watcher.log test log contamination, iter 1281).
