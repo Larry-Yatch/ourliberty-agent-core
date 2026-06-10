@@ -4,6 +4,124 @@
 
 ---
 
+## Iteration 1383 — 2026-06-10 23:25Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ transcript-not-persisted scope confirmed wider (L1419-L1421): Pulse bot cycle sessions now also failing transcript persistence — all 4 agent bots affected by the ReadWritePaths gap. PR #438 is the fix, in Mirror review. 3 open PRs (#437/#438/#439) all in normal review range — none clean+green stale. 9/9 services active.
+
+**VERIFY-BEFORE-REASSERT (iter 1382 watch items):**
+- PR #437 threshold 23:26Z: OPEN, reviewDecision="" — not yet approved. Mirror review dispatched 23:10Z (15 min ago), Mirror restarted 23:13Z (12 min ago). At/past 30-min mark from PR creation, but 30-min always-fix threshold applies only to clean+green PRs (reviewDecision=APPROVED + mergeable). Not clean+green yet → not a stall. ✅ Watch.
+- PR #438 threshold 23:38Z: OPEN, Mirror review in inbox (23:08Z). 13 min to threshold. ✅ Watch.
+- PR #439 threshold 23:41Z: OPEN, no Mirror review dispatch visible in inbox yet. 16 min to threshold. ✅ Watch.
+- Check B sync: last_sync=22:50:16Z, expires 00:50Z (~86 min remaining at scan). ✅ Nominal.
+- ourliberty-agent-core-health.service: expected clean pass at 23:37Z — cannot verify without systemctl status; carry as watch.
+- L1412/L1413 transcript-not-persisted: PR #438 still OPEN. L1419/L1420/L1421 = 3 more instances. SCOPE UPDATE: Pulse bot cycle sessions also affected (L1421). Post-merge action updated below. ✅ Updated.
+- cycle-tier.json `last_signal_at` stale (2026-06-09T18:16:30Z): CONFIRMED STILL STALE — 2nd consecutive observation (iters 1382+1383). G-rule counter: 2/3. Carry; watch for 3rd occurrence.
+
+**NEW since iter 1382:**
+- **L1419 (23:21:25Z):** transcript-not-persisted:tier2 (agent-runner-forge) — Forge built PR #437's build-accounting session; transcript failed EROFS root cause. → Tier 3 incremental (same finding as L1412/L1413, PR #438 fix in review). Journal only.
+- **L1420 (23:21:25Z):** transcript-not-persisted:tier1 (agent-runner-forge) — same session, tier1 path. → Tier 3 incremental. Journal only.
+- **L1421 (23:23:08Z):** transcript-not-persisted:tier1 (agent-runner-pulse) — Pulse bot's own cycle session (the systemd-managed `/cycle` run at ~23:23Z) failed transcript persistence to `/home/larry/.claude/projects/-home-larry-agents-agents-pulse-workspace/s1.jsonl`. **New scope:** `ourliberty-pulse-bot.service` also missing ReadWritePaths for Tier 1 HOME. PR #438 covers "all agent units" — should fix. No new DM (same fix path, Larry already notified at iter 1381). Journal only.
+- **Check I sentinel accuracy correction:** Iters 1381/1382 cited `check-i-2026-06-10.json` as existing. VERIFY: pulse-check-i directory lists `check-i-2026-05-29.json` as most recent — no June 10 file. Skip is correct (Wednesday weekday-gate), but the sentinel reference was stale assertion. Minor journal accuracy issue; no operational impact.
+
+**Tier state:** 1 (consecutive_clean=0; active PRs + ongoing transcript issue)
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1421 lines** (+3 since iter 1382 watermark at 1418). New alerts L1419-L1421: all transcript-not-persisted incremental (2× Forge tier2+tier1, 1× Pulse tier1). All → Tier 3 incremental/known-pattern (PR #438 fix in review, Larry notified). No DMs, no dispatches.
+- **Watermark: line 1421 / agent-runner-pulse:transcript-not-persisted:tier1 / 2026-06-10T23:23:08Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: MISSING → pending=[]. ✅
+- No new Larry messages since 15:52:16 MDT (iter 1372). No orphan directives. ✅ Nominal.
+- `alert idx=0 delivery to 7998341473 failed` — standing known-pattern. Carry.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T23:15:12Z (9 min old at 23:24Z scan, within 30-min cadence). ✅ Nominal.
+- heal-pipeline-stall-state.json: 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅ (gitStatus at session start). Working tree: clean ✅. ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T22:50:16Z (34 min old at 23:24Z scan), status=no-change. Expires 00:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/9 ourliberty-*.service: all `active` (beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle ✅, chain-event-shipper ✅, dashboard-api ✅). ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 3 open PRs.
+  - PR #437 "fix(routing)": OPEN, mergeable=UNKNOWN (GitHub computing), reviewDecision="". 22:56Z (28 min at scan). Mirror review task in inbox (23:10Z). Not clean+green. ✅ Watch.
+  - PR #438 "fix(systemd)": OPEN, mergeable=UNKNOWN, reviewDecision="". 23:08Z (16 min at scan). Mirror review in inbox (23:08Z). Not clean+green. ✅ Watch.
+  - PR #439 "spec: park-the-nudge": OPEN, mergeable=UNKNOWN, reviewDecision="". 23:11Z (13 min at scan). No Mirror review dispatch in inbox. ✅ Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Forge activity:**
+- Forge inbox: **EMPTY** ✅ (all queued tasks from iter 1382 processed/archived).
+- Beacon inbox: EMPTY. ✅
+- Mirror inbox: 2 review tasks (review-fix-dashboard-routing-denied-002.json, review-fix-systemd-tier2-home-readwrite-001.json) — both in active review post-restart at 23:13Z.
+
+**Check I (Wednesday 2026-06-10):** Weekday-gate skip (not Monday). ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue. All credentials due 2027+. ✅ Nominal.
+**install-drift:** Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** Standing G-rule. Carry.
+
+**G-rule tracking:**
+- **cycle-tier.json `last_signal_at` stale: 2/3** — 2nd consecutive observation. Watch for 3rd.
+- **test-fixture-batch-in-bot-log: 3/3 DISPATCHED** (iter 1378). Carry pending Beacon/Forge processing.
+- **auto-restart-failed:ourliberty-outbox-notifier.service: 1/3** — no recurrence. Carry.
+- **wedged-review-silent-wt: 2/3** — no new occurrence. Carry.
+- **heal-pipeline-stall heartbeat threshold 3/3 dispatch:** Deferred. Carry.
+- All other G-rule statuses: carry from iter 1382 unchanged.
+
+**Actions taken:** None.
+
+**Standing findings (carry with updates):**
+- [yellow] **L1412/L1413/L1419/L1420/L1421 transcript-not-persisted**: PR #438 OPEN (Mirror review). SCOPE UPDATE: all 4 agent bots affected (Forge + Pulse confirmed; Beacon + Mirror likely same). After merge: `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-forge-bot.service ourliberty-pulse-bot.service ourliberty-beacon-bot.service ourliberty-mirror-bot.service`.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: Beacon brief ready; Forge dispatch pending Beacon re-emit.
+- [blue] PR #437: Mirror reviewing. At 30-min mark from creation (not clean+green — threshold N/A until approved). Expect PASS soon.
+- [blue] PR #438: Mirror reviewing. Threshold 23:38Z. Post-merge action: daemon-reload + restart ALL bots.
+- [blue] PR #439: Below threshold (23:41Z). Mirror review dispatch pending outbox-notifier.
+- [blue] unreviewed-merge:434 DM'd 22:23Z. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING (standing; G-rule dispatched iter 1251). Carry.
+- [blue] cycle-tier.json `last_signal_at` stale (2026-06-09T18:16Z) — 2nd observation (iters 1382+1383). G-rule counter: 2/3.
+
+**Watch items for iter 1384:**
+- PR #437: Mirror has been reviewing since ~23:13Z restart. Expect PASS + auto-merge by ~23:40Z. If no merge by 23:50Z (54 min since PR creation), escalate.
+- PR #438: Mirror reviewing. Expect PASS + auto-merge by ~23:45Z. After merge: Larry must run `sudo systemctl daemon-reload && sudo systemctl restart ourliberty-forge-bot.service ourliberty-pulse-bot.service ourliberty-beacon-bot.service ourliberty-mirror-bot.service`.
+- PR #439: Expect Mirror review dispatch in inbox. Below threshold until 23:41Z.
+- Check B sync: expires 00:50Z. Trigger sync if not refreshed by ~00:30Z.
+- ourliberty-agent-core-health.service: verify clean pass at 23:37Z run.
+- cycle-tier.json `last_signal_at`: watch for 3rd stale observation → G-rule trigger.
+
+**PRIME DIRECTIVE:** 0 new Pulse interventions this iter (L1419-1421 are incremental to already-tracked L1412/L1413 finding; no new escalation). interventions=765, systemic_fixes=17, ratio≈45.0, trend=flat. Iter non-clean (active PRs + ongoing transcript issue).
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1382 — 2026-06-10 23:18Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Pipeline active — PRs #437/#438/#439 open and MERGEABLE, all below 30-min threshold at scan. 9/9 core services active. heal-stale-daemon-code auto-restarted 4 bots at 23:13Z (code-deploy normal). `ourliberty-agent-core-health.service` FAILED from transient dirty-tree at 23:07Z — tree since committed; health timer fires again 23:37Z, expected clean.
