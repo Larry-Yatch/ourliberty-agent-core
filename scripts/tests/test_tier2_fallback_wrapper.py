@@ -105,6 +105,60 @@ class AgentRunnerClassifyTest(unittest.TestCase):
             self.ar.classify_tier1_failure(mixed, ''), 'rate_limit',
         )
 
+    def test_session_lost_not_auth_401(self):
+        # The 2026-06-10 18:57Z incident: a lost --resume session whose
+        # UUID contains the digits '401'. Must classify session_lost, NOT
+        # auth_401 (the bare-401 matcher used to trip on the UUID).
+        out = 'No conversation found with session ID: 32401737-1d2e-4f3a-...'
+        self.assertEqual(
+            self.ar.classify_tier1_failure(out, ''), 'session_lost',
+        )
+
+    def test_session_lost_case_insensitive(self):
+        out = 'no conversation found with session id: abc'
+        self.assertEqual(
+            self.ar.classify_tier1_failure(out, ''), 'session_lost',
+        )
+
+    def test_session_lost_on_stderr_stream(self):
+        self.assertEqual(
+            self.ar.classify_tier1_failure(
+                '', 'No conversation found with session ID: deadbeef'),
+            'session_lost',
+        )
+
+    def test_uuid_embedded_401_no_auth_context_returns_none(self):
+        # A bare UUID/hex run that happens to contain '401' but carries no
+        # auth context must NOT classify as auth_401.
+        out = 'request id 32401737beef failed during processing'
+        self.assertIsNone(self.ar.classify_tier1_failure(out, ''))
+
+    def test_uuid_with_dashes_embedded_401_returns_none(self):
+        out = 'trace 32401737-1d2e-4f3a-9b8c-aabbccddeeff timed out'
+        self.assertIsNone(self.ar.classify_tier1_failure(out, ''))
+
+    def test_real_http_401_still_auth_401(self):
+        # The UUID-safe regex must keep matching genuine HTTP 401s.
+        self.assertEqual(
+            self.ar.classify_tier1_failure('HTTP 401 Unauthorized', ''),
+            'auth_401',
+        )
+
+    def test_standalone_401_with_punctuation_is_auth_401(self):
+        self.assertEqual(
+            self.ar.classify_tier1_failure('upstream returned 401.', ''),
+            'auth_401',
+        )
+
+    def test_rate_limit_still_top_precedence_over_session_lost(self):
+        # Rate-limit precedence is unchanged even when a session-lost phrase
+        # co-occurs.
+        mixed = ('You have hit your limit. Also: No conversation found '
+                 'with session ID: 32401737-...')
+        self.assertEqual(
+            self.ar.classify_tier1_failure(mixed, ''), 'rate_limit',
+        )
+
 
 class Tier2AvailableTest(unittest.TestCase):
     """tier2_available() is a filesystem probe. Mock TIER2_HOME to a
@@ -196,6 +250,42 @@ class MarkPausedOnTier1Test(unittest.TestCase):
         self.assertEqual(data['pid'], 1234)
         self.assertEqual(data['agent_id'], 'forge')
         self.assertEqual(data['paused_on_tier1']['failure_type'], 'rate_limit')
+
+
+class DmTier2UnavailableTierLabelTest(unittest.TestCase):
+    """_dm_tier2_unavailable must name the ACTUAL failing tier in the alert
+    body rather than a hardcoded 'Tier 1' — under rotation the primary
+    subprocess can run on either tier."""
+
+    def setUp(self):
+        self.ar = importlib.import_module('agent_runner')
+
+    def _capture_alert(self, **kwargs):
+        captured = {}
+
+        def _fake_append_alert(**akw):
+            captured.update(akw)
+            return True
+
+        import larry_alerts as la
+        with mock.patch.object(la, 'append_alert', _fake_append_alert):
+            self.ar._dm_tier2_unavailable(**kwargs)
+        return captured
+
+    def test_names_tier2_when_failing_tier_is_tier2(self):
+        captured = self._capture_alert(
+            failure_type='auth_401', task_stem='t', agent_id='forge',
+            session_id=None, tier='tier2',
+        )
+        self.assertIn('Tier 2', captured.get('message', ''))
+        self.assertNotIn('Tier 1', captured.get('message', ''))
+
+    def test_defaults_to_tier1_label_when_unspecified(self):
+        captured = self._capture_alert(
+            failure_type='auth_401', task_stem='t', agent_id='forge',
+            session_id=None,
+        )
+        self.assertIn('Tier 1', captured.get('message', ''))
 
 
 # ---- beacon_telegram_bot classification + Tier 2 ------------------------
