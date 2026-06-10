@@ -4,6 +4,101 @@
 
 ---
 
+## Iteration 1341 — 2026-06-10 18:17Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal. 5 bots auto-restarted by stale-daemon healer at 18:12Z (PR #425 identity-pinning now live). All 9/9 services active. `ccd-s1-envelope-builder` Forge preflight: retry 1 of 3 (no marker in first attempt). `fix-headless-approval-dedup-spawn-failure-wedge` advanced to build phase. 0 open PRs. Sync no-change 18:08Z. Standing Check 2 non-nominal (fixture contamination, Forge brief still pending).
+**Tier state:** 1 (consecutive_clean=0; Check 2 standing non-nominal — fixture contamination)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T18:08:16.374814+00:00 / missions-card-gc:summary` (line 1384, iter 1340)
+- Current total: 1390 lines. 6 new entries since watermark:
+  1. Line 1385 (`18:10:16Z`) — source=heal-unreviewed-merge-detector, subject=`unreviewed-merge:427`, route=**escalate**. Standing G-rule 3/3 (actor=larry-direct-merge; pending `go: actor-exemption-config`). DM delivered to Larry at 12:11:18 MDT by outbox-notifier. Known standing pattern; no new Pulse action. Tier-3 equivalent.
+  2. Line 1386 (`18:12:04Z`) — source=heal-stale-daemon-code, subject=`auto-restarted:ourliberty-inbox-watcher.service`, route=**digest**. PR #425 commit (3610d03) made inbox_watcher.py newer than service-start. Auto-restarted. Tier-3/by-design.
+  3. Line 1387 (`18:12:08Z`) — source=heal-stale-daemon-code, subject=`auto-restarted:ourliberty-beacon-bot.service`, route=**digest**. Same PR #425 agent_runner.py delta. Tier-3/by-design.
+  4. Line 1388 (`18:12:12Z`) — source=heal-stale-daemon-code, subject=`auto-restarted:ourliberty-forge-bot.service`, route=**digest**. Same. Tier-3/by-design.
+  5. Line 1389 (`18:12:16Z`) — source=heal-stale-daemon-code, subject=`auto-restarted:ourliberty-mirror-bot.service`, route=**digest**. Same. Tier-3/by-design.
+  6. Line 1390 (`18:12:19Z`) — source=heal-stale-daemon-code, subject=`auto-restarted:ourliberty-pulse-bot.service`, route=**digest**. Same. Tier-3/by-design.
+- All 6 are Tier-3 known patterns. No DMs. No tier-reset from Check 0.
+- ✅ Nominal.
+- **New watermark: `2026-06-10T18:12:19.987323+00:00 / heal-stale-daemon-code:auto-restarted:ourliberty-pulse-bot.service` (line 1390)**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- New since iter 1340 scan (~18:08Z): No new Larry messages. Last Larry message: 12:05:44 MDT "go" (triggered `fix-headless-approval-dedup-spawn-failure-wedge` dispatch — tracked). Beacon bot restarted at 12:12:05 MDT post stale-daemon heal (expected).
+- Standing: source=heal-x fixture log-contamination (TIER_ONE_MARKER / "resets 11:30am" / "TIER 2 distinct" in bot log at 11:37-11:40 MDT — confirmed test fixtures per memory). G-rule 3/3 dispatched iter 1281; Forge brief pending.
+⚠️ Tier-reset: YES (standing non-nominal fixtures). [yellow] carry.
+
+**Check 3 — Pipeline stall:** `heal-pipeline-stall-state.json` EXISTS (historical suppression keys; 0 active stalls). Forge inbox: `build-fix-headless-approval-dedup-spawn-failure-wedge.json` (phase=build, dispatched 18:05:45Z, ~11 min at scan; within 2h window) + `marker-error-ccd-s1-envelope-builder-1.json` (retry 1 of 3; Forge preflight produced no PROCEED/CLARIFY/REJECT marker; outbox-notifier sent kickback — Forge bot restarted at 18:12Z, will pick up retry). 0 open PRs on both repos. ✅ Nominal.
+
+**Check 4 — Pending directives:** No new Larry directives since iter 1340. Last directive "go" at 12:05:44 MDT → tracked (hotfix dispatched to Forge). All inboxes: beacon/mirror/pulse empty; forge has 2 items (both within 2h threshold). ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING (standing per iters 1329+; healer ran at 18:12Z and restarted 5 services; state file transient). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean. Most recent commit c55b83a (Pulse cycle 20260610T181320Z — iter 1340 wrapper). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: last_sync=`2026-06-10T18:08:22Z` (~9 min at scan), status=`no-change`, commit=3c140fa. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (all restarted ~18:12Z by stale-daemon healer post-PR #425; all confirmed active): beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. `ourliberty-agent-core-health.service` failed = standing. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** 0 open PRs. ✅
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Bug-hunt gate (§ 5.0):** `gate-soak-assessment.json` fired_at 16:39:48Z, reviews=15. Soak complete. No action. ✅
+
+**Rotations:** 0 overdue. ✅
+
+**VERIFY-BEFORE-REASSERT of iter 1340 watch items:**
+- CCD pipeline — `ccd-s1-envelope-builder` in Forge preflight: preflight ran but produced no marker → marker-error retry 1 of 3 sent back to Forge inbox. Forge bot restarted at 18:12Z and will pick up retry. **CARRY** — watch for Forge to produce PROCEED/CLARIFY/REJECT on retry.
+- `fix-headless-approval-dedup-spawn-failure-wedge` — **advanced to build phase** ✅ (preflight passed). Watch for Forge PR.
+- install-drift midnight MDT June 11 (06:00Z UTC) — NOT YET (~11.75h away). **CARRY**.
+- `alert-translation-no-mirror-dispatch-001` — no evidence of processing. **CARRY**.
+- health-check-notify-script-missing re-dispatch — Larry cleared artifacts at 12:04 MDT; Beacon can re-dispatch. No re-dispatch issued yet. **CARRY**.
+- `unreviewed-merge:427` — appeared line 1385, DM'd Larry at 12:11:18 MDT. ✅ As expected.
+
+**G-rule tracking:**
+- `missions-card-gc:summary not in alert-translations.json` — **2/3** (iter 1333=1/3, iter 1340=2/3). No new occurrence. Carry.
+- `completion-DM pending-queue delivery failure` — 1/3 (iter 1337). No new occurrence. Carry.
+- `unreviewed-merge:427` — G-rule 3/3 threshold met (iter 959); pending `go: actor-exemption-config`. PR #427 adds another occurrence; no new Pulse action. Carry.
+- Others: carry as per iter 1340.
+
+**Standing findings:**
+- [yellow] CCD probe-retry: `ccd-s1-envelope-builder` in Forge retry 1/3. Watch for proceed.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — dead-letter cleared; re-dispatch path open. Pending Beacon re-dispatch.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [blue] install-drift — 1/2 clean post-PR #411. Watch 06:00Z June 11 for 2/2.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3 + occurrence (auto-healed 18:00Z June 10); pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. At 3/3: dispatch Beacon.
+- [blue] G-rule completion-DM delivery failure 1/3 (iter 1337). Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3 (iter 1332). Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3 (iter 1330). Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3 (iter 1153). Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence — G-rule 3/3 dispatched iter 1281, Forge brief pending.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+
+**Watch items for iter 1342:**
+- **CCD pipeline** — `ccd-s1-envelope-builder` marker-error retry 1/3. Forge bot active. Watch for retry result and Forge PR (deadline ~20:05Z UTC on original dispatch).
+- **hotfix build** — `fix-headless-approval-dedup-spawn-failure-wedge` in Forge build phase (~11 min at scan). Watch for Forge PR.
+- **install-drift** — 06:00Z UTC June 11 fire for 2/2 clean post-PR #411.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off.
+
+**Actions taken:** None.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. 0 new systemic fixes. interventions=756, systemic_fixes=17, ratio≈44.47, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0; Check 2 standing non-nominal — fixture contamination).
+
+---
+
 ## Iteration 1340 — 2026-06-10 ~18:08Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Check 0: 1 new alert (missions-card-gc:summary, Tier-3 digest, G-rule now 2/3). **Key events:** Orphan directive "yes unstick it" RESOLVED ✅ (Larry cleared ccd-s1 dead-letter files manually at 12:04 MDT — not via Beacon). PR #427 MERGED ✅ (fix(missions): `_github_token` falls back to gh CLI auth when env token absent — closes [yellow] Check IX GITHUB_TOKEN standing item). 2 new Forge preflight tasks (both ~3 min old): `ccd-s1-envelope-builder` (chain-context-durability S1 re-dispatched after dead-letter clear) + `fix-headless-approval-dedup-spawn-failure-wedge` (notifier dedup hotfix for the headless-approval path that caused the S1 wedge). `unreviewed-merge:427` expected from healer (Larry-direct; standing G-rule 3/3). All other checks nominal. 9/9 services. 0 open PRs. Sync SUCCESS (17:16:58Z, ~51 min at scan).
