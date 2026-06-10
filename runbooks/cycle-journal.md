@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration 1352 — 2026-06-10 19:38Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ NEW: Wedge-reaper build dispatch DROPPED — preflight PROCEED at 19:34Z was archived by outbox-notifier without dispatching a build: `"marker present but no routable target (source=auto-retry, original_source=None)"`. Wedge-reaper fix STUCK; spawn-failure chain (CCD S1 + headless-dedup) remains blocked. Escalation written (larry_alerts). Standing: APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` state uncertain (beacon-pending-approvals.json missing since iter 1351). 0 open PRs. 9/9 services active.
+**Tier state:** 1 (consecutive_clean=0; active pipeline stall + uncertain approval state)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T19:25:16Z / unreviewed-merge:432 / line 1398` (iter 1351)
+- Current total: **1398 lines** — unchanged. 0 new entries since watermark. ✅ Nominal.
+- Watermark unchanged.
+- tier-reset: NO (no new alerts). Note: escalation I just appended (wedge-reaper-build-dispatch-dropped) will appear on next iter's check.
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+- outbox-notifier.log WARN at 13:34:25 MDT: `"marker present but no routable target (source=auto-retry, original_source=None, agent=forge); archiving"` — this is the routing failure for the wedge-reaper resume preflight. Not service noise; captured as Check 3 / Check H finding.
+
+**Check 2 — Telegram sweep (VERIFY-BEFORE-REASSERT):**
+- Beacon bot log last entry: `[13:30:20 MDT]` approval DM sent for `fix-tier1-classifier-envelope-not-content-scan`. **No new messages from Larry since 13:30:20 MDT.**
+- **beacon-pending-approvals.json: MISSING** (was 1 pending at iter 1351, 19:35Z UTC). No Forge task or worktree found for `fix-tier1-classifier-envelope-not-content-scan`. Status unclear — possible file was dropped on Beacon state reset or approval was processed and dispatch failed silently. Per memory discipline, NOT asserting "pending approval" without file confirmation.
+- ⚠️ tier-reset: YES (unresolved approval + routing failure standing)
+
+**Check 3 — Pipeline stall (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall-state.json`: heartbeat=NONE (standing). stalls=0 entries. Nominal.
+- **Forge inbox: EMPTY. In-flight state: EMPTY.**
+- **KEY FINDING**: `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z` preflight completed at `2026-06-10T19:34:21Z` (exit_code=0) with PROCEED. Outbox-notifier processed the marker at 13:34:24–13:34:25 MDT and emitted: `"marker present but no routable target (source=auto-retry, original_source=None, agent=forge); archiving"`. **Build phase was NEVER dispatched.** Root: auto-retry mechanism sets `source=auto-retry, original_source=None`; the notifier routing table requires a non-null source agent to determine where to send the build-completion notification chain — with `original_source=None`, it cannot route and falls back to archive-only. The fix (in-flight-registry guard for heal_wedged_review_sessions) remains unbuilt.
+- `wt-forge-fix-wedged-reaper-spares-active-build-worktree-res` worktree still present (from the preflight); no active build process running in it.
+- CCD S1 (`ccd-s1-envelope-builder.5.json`) in archive (spawn-failure). `fix-headless-approval-dedup-spawn-failure-wedge.1.json` in archive (spawn-failure). Blocked until wedge fix lands + fixture classifier fix.
+- ⚠️ Non-nominal; tier-reset: YES
+
+**Check 4 — Pending directives:**
+- No active Forge tasks in flight. Beacon inbox empty.
+- `fix-tier1-classifier-envelope-not-content-scan`: beacon-pending-approvals.json MISSING; no Forge task. Cannot confirm pending status. Note discrepancy for Larry.
+
+**Check 5 — Stale daemon:**
+- `heal-stale-daemon-code-state.json` MISSING (standing). 9/9 services active. journalctl: no warnings. ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean (most recent commit: 94b6d8a `Pulse cycle 20260610T193502Z`). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: last_sync=`2026-06-10T18:50:42Z` (~48 min at scan), status=success. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active. No journalctl warnings. Forge bot last started 12:12 MDT (post-stale-daemon restart at iter 1341). ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core:** `gh pr list --state open` → `[]`. ✅ Nominal.
+- **ourliberty-dashboard:** `gh pr list --state open` → `[]`. ✅ Nominal.
+
+**Check H — Forge activity:**
+- Forge outbox archive most recent: `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z.json` (19:34Z, PROCEED, cost=$0.87) — preflight complete, build not dispatched (see Check 3).
+- No active Forge PRs, no active build tasks, no in-flight registry entries.
+- ⚠️ Wedge-reaper build stuck at routing gap.
+
+**Check I (Wednesday 2026-06-10):** Already fired iter 1345 (same-day idempotency). Skip. ✅
+
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+
+**§5.0 Bug-hunt gate Phase-2:** No new alerts. Carry. ✅
+
+**Credential rotations:** 0 overdue, 0 within 60-day window. ✅
+
+**G-rule tracking:**
+- **NEW G-rule 1/3: `auto-retry source=auto-retry, original_source=None → outbox-notifier drops build dispatch`** (iter 1352=1/3). Code shape: outbox-notifier routing logic; when `source=auto-retry` and `original_source` is None, the notifier archives instead of dispatching build phase. Fix: preserve original_source in auto-retry envelope, or add explicit routing logic for `source=auto-retry` path. At 3/3: dispatch to Beacon.
+- All others: carry from iter 1351.
+
+**Actions taken:**
+- `larry_alerts.append_alert(source='pulse', severity='warning', subject='wedge-reaper-build-dispatch-dropped', route='escalate')` — [yellow] escalation to Larry about dropped build dispatch. Appended=True.
+
+**Standing findings:**
+- [yellow] **NEW: Wedge-reaper build dispatch DROPPED** — preflight PROCEED at 19:34Z archived without build dispatch. outbox-notifier: `source=auto-retry, original_source=None → no routable target`. **Action on Larry: say "go: redispatch wedge-reaper build" to Beacon in Telegram** — Beacon writes build-phase envelope to Forge inbox for `fix-wedged-reaper-spares-active-build-worktree`.
+- [yellow] `fix-tier1-classifier-envelope-not-content-scan` — beacon-pending-approvals.json MISSING; status unclear. If you did NOT respond "go" to Beacon's DM (sent 13:30 MDT), approval is still pending.
+- [yellow] CCD S1 build: `ccd-s1-envelope-builder.5.json` spawn-failure. Blocked on wedge fix + classifier fix.
+- [yellow] `fix-headless-approval-dedup-spawn-failure-wedge.1.json` spawn-failure. Same block path.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — re-dispatch path open.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination G-rule 3/3 dispatched iter 1281 — Forge brief MISSING.
+- [blue] install-drift — watch 06:00Z June 11.
+- [blue] unreviewed-merge: actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule missions-card-gc:summary 2/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule mirror-dag-pass:chain-context-durability 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:gh-unavailable 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` **1/3** (NEW this iter).
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] heal-pipeline-stall misdiagnosis variants — 3/3 dispatched iter 1298; Forge brief pending.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] hand-authored Pulse dispatch envelope dead-letter 2/3. Carry.
+- [blue] Check I proposal [medium] smoke-5a-pf-no-marker — 4th consecutive. Larry can `/dispatch 2`.
+
+**Watch items for iter 1353:**
+- **Wedge-reaper build**: Watch for Larry's Telegram response to escalation DM. If Larry says "go: redispatch wedge-reaper build" to Beacon, watch for Beacon to write the build-phase envelope to Forge inbox. Build deadline will reset from dispatch time.
+- **`fix-tier1-classifier-envelope-not-content-scan`**: If Larry has NOT responded to Beacon's 13:30 MDT DM, watch for his response. If MISSING file was a Beacon state bug, the approval may silently re-appear on next Beacon sweep.
+- **install-drift** — 06:00Z June 11.
+- **New alert `wedge-reaper-build-dispatch-dropped`** — will appear in Check 0 next iter; should be claimed as Tier-1 or Tier-4 depending on alert-triage state.
+
+**PRIME DIRECTIVE:** +1 intervention (routing failure finding, Check 3). interventions=763, systemic_fixes=17, ratio≈44.88, trend=flat. iter_non-clean (standing: pipeline stall + approval state uncertain).
+**Tier end-of-iter:** 1 (consecutive_clean=0; active pipeline issues).
+
+---
+
 ## Iteration 1351 — 2026-06-10 19:35Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Standing: spawn-failures (CCD S1 + headless-dedup) still blocked. **CLOSED: Forge task `fix-wedged-reaper-spares-active-build-worktree` no longer paused_on_tier1 — RESUMED via auto-retry as `fix-wedged-reaper-spares-active-build-worktree-resume-20260610T193019Z`, now ACTIVE in Forge (preflight, pid=1191674, started 19:30:56Z).** PR #432 MERGED ✅ (Larry-direct, ~19:25Z). NEW: APPROVAL_REQUEST `fix-tier1-classifier-envelope-not-content-scan` pending Larry (DM'd by Beacon at 13:30:20 MDT). 1 new alert (unreviewed-merge:432, expected, DM delivered 13:25:32 MDT). 0 open PRs. 9/9 services active.
