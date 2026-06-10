@@ -1,0 +1,17 @@
+[Unit]
+Description=Missions v2 parked-&-aging digest — daily at 6:15am Larry-local
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/agents/beacon/specs/missions-v2-phase2-resurfacing-and-derive.md
+
+[Timer]
+# 6:15am Larry-local — just after the CEO digest's 6:00am slot so the morning
+# board is fresh when Larry first looks. Larry's timezone is America/Denver
+# (MDT/MST); systemd honors the named zone across DST. Aging itself is the GC
+# healer's persisted flag (5 business days) — this timer only regenerates the
+# read-only card, so the exact minute is not load-bearing.
+OnCalendar=*-*-* 06:15:00 America/Denver
+Persistent=true
+RandomizedDelaySec=120
+Unit=ourliberty-parked-aging-digest.service
+
+[Install]
+WantedBy=timers.target

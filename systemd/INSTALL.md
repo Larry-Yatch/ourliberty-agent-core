@@ -467,3 +467,22 @@ journalctl -u ourliberty-ceo-digest-daily.service -n 50
 ```
 
 The `run_ceo_digest.sh` wrapper handles the concurrency lock (`.ceo-digest-{daily,weekly}.lock`), the `EMERGENCY_HALT` gate, and logging — same pattern as `run_ledger.sh`. Each run push-emits exactly one `ceo_digest` chain_event row.
+
+### Parked-&-aging digest (Missions v2 Phase 2 — dashboard catch-me-up card)
+
+`scripts/parked_aging_digest_generator.py` reads `agents/beacon/captures.json`, selects the `state == "parked"` captures the GC healer already flagged `aging: true` (it does **not** recompute aging — one definition lives in `heal_missions_card_gc.py`, `AGING_BUSINESS_DAYS = 5`), and writes a structured artifact to `~/agents/blackboard/parked-aging-digest.json` (parked count, aging count, the aging items with title + origin repo + calendar age). Stdlib-only, no LLM. The dashboard renders it as a read-only "what's parked & aging?" card (Phase 2 §6; promote/drop/snooze actions are Phase 3). One **daily** timer (06:15 Larry-local) regenerates it; the same wrapper run on demand (`run_parked_aging_digest.sh on-demand`) refreshes it without waiting for the cycle.
+
+```bash
+sudo cp ~/agent-core/systemd/ourliberty-parked-aging-digest.service /etc/systemd/system/
+sudo cp ~/agent-core/systemd/ourliberty-parked-aging-digest.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now ourliberty-parked-aging-digest.timer
+systemctl list-timers 'ourliberty-parked-aging-digest.*'
+
+# Manual smoke (writes/refreshes the artifact now):
+sudo systemctl start ourliberty-parked-aging-digest.service
+journalctl -u ourliberty-parked-aging-digest.service -n 50
+cat ~/agents/blackboard/parked-aging-digest.json
+```
+
+The `run_parked_aging_digest.sh` wrapper handles the concurrency lock (`.parked-aging-digest.lock`), the `EMERGENCY_HALT` gate, and logging — same pattern as `run_ceo_digest.sh`. Each run overwrites the single artifact atomically (no append), so the dashboard always reads the latest.
