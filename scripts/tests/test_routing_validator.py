@@ -88,6 +88,34 @@ class HardTopologyTest(unittest.TestCase):
         self.assertFalse(rv.check_hard_topology('beacon', '')[0])
 
 
+class DashboardRouteTest(unittest.TestCase):
+    """2026-06-10 incident: dashboard Approve/Reject envelopes must route to
+    beacon, and an unlisted source must STILL be denied (no over-broad allow)."""
+
+    def test_dashboard_to_beacon_accepted(self):
+        ok, reason = rv.check_hard_topology('dashboard', 'beacon')
+        self.assertTrue(ok, f'dashboard->beacon should pass, got {reason}')
+        # End-to-end through the combined entry point (no soft-reroute config).
+        final, rerouted, _ = rv.validate_route(
+            'beacon', {'source': 'dashboard', 'prompt': 'approve'},
+        )
+        self.assertEqual(final, 'beacon')
+        self.assertFalse(rerouted)
+
+    def test_dashboard_to_non_beacon_still_denied(self):
+        # The fix is scoped: dashboard may only reach beacon, not arbitrary agents.
+        for target in ('forge', 'mirror', 'pulse'):
+            ok, _ = rv.check_hard_topology('dashboard', target)
+            self.assertFalse(ok, f'dashboard->{target} must remain denied')
+
+    def test_unlisted_source_still_denied(self):
+        # Regression guard against an over-broad allow: a source that is NOT in
+        # FRESH_DISPATCH_ROUTES / SYSTEM_SOURCES / a dialogue leg must be denied.
+        ok, reason = rv.check_hard_topology('made-up-surface', 'beacon')
+        self.assertFalse(ok)
+        self.assertIn('no allowed routes', reason)
+
+
 class SoftRerouteTest(unittest.TestCase):
     """Per-agent IDENTITY.md constraints. Validator fails open when missing."""
 

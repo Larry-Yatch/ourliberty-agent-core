@@ -79,6 +79,16 @@ FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     # so policy / extraction can carve out per-source rules (step 4 wired
     # the Beacon-outbox extraction path keyed on this exact source).
     'pulse-auto-dispatch': {'beacon'},
+    # E4.4 dashboard UI Approve/Reject actions route to Beacon's inbox.
+    # Layer-1 source validation (dispatch_validator.ALLOWED_SOURCES) gained
+    # 'dashboard' on 2026-05-28, but this layer-2 routing table was never
+    # given the matching entry — so every dashboard action envelope passed
+    # source validation, then died here with 'source "dashboard" has no
+    # allowed routes' and was silently dropped to beacon/.invalid while the
+    # API returned 200 (two of Larry's rejections lost this way on
+    # 2026-06-10). The test_dispatch_route_parity regression guard now fails
+    # if a future ALLOWED_SOURCES addition forgets its route the same way.
+    'dashboard': {'beacon'},
 }
 
 # Source suffixes that mark dialogue-leg messages. The notifier writes these
