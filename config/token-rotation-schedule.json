@@ -341,6 +341,23 @@
       "owner_role": "larry",
       "scopes": ["db-read"],
       "notes": "Read-only DB connection URL with an embedded RO-user credential. revocation_only (no scheduled cadence) to match the sibling SUPABASE_URL / SUPABASE_DB_PASSWORD entries — the embedded credential rotates only when the underlying DB read-only user's password is rotated/revoked, at which point this URL must be updated in the same window. Registered retroactively 2026-06-05 to close credential-drift:MISSING_REGISTRY_ENTRY. Original provisioning date is unknown, so created_at and last_rotated_at both use the registration date 2026-06-05 as a best-effort floor (the validator requires last_rotated_at as a real date, and revocation_only has no scheduled rotation anyway). next_rotation_due is null because revocation_only has no scheduled cadence; if Larry wants a scheduled rotation instead, change rotation_type=scheduled + set cadence_days + create the calendar event."
+    },
+    {
+      "name": "DESKTOP_INGEST_TOKEN",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "shared_secret",
+      "purpose": "Dedicated auth token for the desktop session-ingest (write) path. The desktop Claude Code hook POSTs desktop_session_* events with an X-Ingest-Token header that scripts/dashboard_api.py compares (constant-time) to DESKTOP_INGEST_TOKEN in the droplet env (INGEST_TOKEN_ENV). Self-minted shared secret, distinct from DASHBOARD_API_TOKEN — narrow blast radius: a leaked token can only write desktop_session cards as 'desktop-claude' and nothing else. Landed via PR #404 (missions-v2 Phase 0, 2026-06-09).",
+      "rotation_type": "scheduled",
+      "cadence_days": 365,
+      "created_at": "2026-06-09",
+      "last_rotated_at": "2026-06-09",
+      "next_rotation_due": "2027-06-09",
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-desktop-ingest-token.md",
+      "severity_if_lapsed": "medium",
+      "owner_role": "larry",
+      "scopes": ["desktop-ingest"],
+      "notes": "Self-minted shared secret for the desktop ingest (write) path; server compares the X-Ingest-Token header constant-time to this env value (scripts/dashboard_api.py _require_ingest_token). Modeled on DASHBOARD_API_TOKEN (internal-auth secret, scheduled/365). credential_type is shared_secret (not api_token) because the mechanism is a symmetric header-vs-env compare, matching the DASHBOARD_API_TOKEN precedent. Because an external desktop client holds a copy, rotation must update BOTH the droplet .env.larry AND the desktop client in the same window or ingest 401s (see runbook). Never rotated since first install; created_at and last_rotated_at both use 2026-06-09 (the PR #404 land date) as the best-effort install floor — the validator requires last_rotated_at as a real YYYY-MM-DD date, matching the OL_DB_RO_URL precedent. calendar_event_url intentionally null at PR time per the DASHBOARD_API_TOKEN precedent — Beacon creates the annual rotation calendar event post-merge and a follow-up commit pastes the URL here."
     }
   ],
   "known_storage_locations": {
