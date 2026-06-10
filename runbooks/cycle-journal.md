@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration 1321 — 2026-06-10 ~15:35Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Check 2: fixture-pattern entries in beacon_telegram_bot.log at 09:21-09:25 MDT (delivery failure + TIER2_FALLBACK); otherwise nominal. Major positive: PR #412 revision build task received by Forge at ~15:15Z UTC — long-standing APPROVAL_REQUEST stall broken. Forge worktree `wt-forge-harden-test-prod-write-isolation-pr412-revision` active.
+**Tier state:** 1 (consecutive_clean=0; Check 2 non-nominal)
+
+**Continuity note:** Journal shows iter 1318 as most recent entry on disk. MEMORY confirms iters 1319-1320 ran (MEMORY updated at iter 1320, 15:17Z UTC). Likely explanation: sync error at 15:24Z UTC (71st+ SYNC-PUSH-REBASE-FALLBACK-001) rolled back an auto-commit that included the iter 1319-1320 journal updates; local file behind remote. Key events captured in MEMORY: iter 1319 nominal; iter 1320 sent DM `pulse-pr412-guidance-20260610T151037Z` re: PR #412 action path; APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` resolved (Forge received revision task). Proceeding as iter 1321.
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: `2026-06-10T15:00:34.764210+00:00 / medic-diagnosis:pipeline-stall:no-mirror-dispatch:PR#412 / iter 1319` (per MEMORY; UNCHANGED in iter 1320)
+- Current count: 1359 lines. 1 new entry since watermark: `2026-06-10T15:13:11.901005+00:00` (source=pulse, intent=pr412-action-path — Pulse self-notification from iter 1320).
+- Triage: Pulse self-notifications are not healer alerts requiring triage. Nominal.
+- **New watermark: `2026-06-10T15:13:11.901005+00:00 / pr412-action-path:pulse-self-notification / iter 1320`**
+- ✅ Nominal (no tier-reset from Check 0)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entries: 09:21:42 MDT + 09:25:27 MDT — fixture-pattern deliveries (source=heal-x, subjects: fixed-something, still-broken, sig-1) delivered to chat_id=7998341473; 3 more route=digest suppressed. idx=0 delivery failed; TIER2_FALLBACK triggered (auth_401 → rate_limit) — consistent with standing Tier 2 OAuth issue. No Larry inbound messages visible. Fixture entries are a recurrence of the log-contamination pattern; G-rule 3/3 dispatched iter 1281 (Forge brief pending). ⚠️ Tier-reset: YES. [yellow] carry.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall.heartbeat: `2026-06-10T15:12:04.888196+00:00` (~20-25 min at scan — fresh). State file: 18 entries, all 2099-suppressed or past-expired; active_stalls=0. PR #412 healer continues to fire `no-mirror-dispatch` (known misdiagnosis; G-rule 3/3 dispatched); actual gate resolved (Forge has revision task). ✅ Nominal.
+
+**Check 4 — Pending directives:** Forge inbox: `build-harden-test-prod-write-isolation-pr412-revision.json` (created 09:15:49 MDT = 15:15:49Z UTC; ~20 min old at scan; ACTIVE BUILD not stale). Forge worktree `wt-forge-harden-test-prod-write-isolation-pr412-revision` confirmed at 09:12 MDT. Beacon, Mirror, Pulse inboxes: empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code.heartbeat: `2026-06-10T15:11:01.963858+00:00` (~24-30 min at scan — fresh). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus (start): main, clean, HEAD=55a271c "Pulse cycle 20260610T152242Z". git commands blocked by session guard. Sync at 15:24:26Z: error (SYNC-PUSH-REBASE-FALLBACK-001 71st+; "Auto-commit push failed; rolled back"). Self-recovering. ✅ Nominal within tolerance.
+
+**Check B — Sync health:** last_sync=`2026-06-10T15:24:26Z` (fresh, ~10-15 min at scan), status=error (71st+ SYNC-PUSH-REBASE-FALLBACK-001; self-recovering). ✅ Nominal within tolerance.
+
+**Check C — Agent liveness:** 9/9 ourliberty services active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, cycle.service ✅, chain-event-shipper ✅, dashboard-api ✅. APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry sign-off — standing item. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **ourliberty-agent-core: PR #412** — OPEN/UNKNOWN/UNKNOWN, reviewDecision="". **NEW: revision build in progress** — Forge received `build-harden-test-prod-write-isolation-pr412-revision.json` at 15:15Z (preflight PROCEED at 09:15:49 MDT per outbox-notifier log; session=3bb2ecbd-dc9). APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001` RESOLVED (Larry approved; inferred from Forge running preflight). ⚠️ [yellow] watch for PR.
+- **ourliberty-dashboard: 0 open PRs.** ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Rotations:** None overdue or within 60-day window. ✅ Nominal.
+
+**VERIFY-BEFORE-REASSERT of watch items:**
+- "install-drift healer — fires ~18:00Z UTC June 10" → **CARRY**: heartbeat=2026-06-10T06:00:10.016818+00:00 (UNCHANGED; pre-PR#411). Current time ~15:35Z UTC; ~2.4h until 18:00Z fire. 0/2 clean healer cycles. Verification OPEN.
+- "PR #412 APPROVAL_REQUEST `harden-test-prod-write-isolation-rev-001`" → **RESOLVED ✅**: Forge received build task at 15:15:49Z UTC; worktree active. Unblocked.
+- "`alert-translation-no-mirror-dispatch-001`" → **CARRY**: No evidence of processing in outbox-notifier log or Beacon archive. Still pending Larry sign-off.
+
+**G-rule tracking (VERIFY-BEFORE-REASSERT):**
+- `heal-pipeline-stall misdiagnosis variants for APPROVAL_REQUEST-gated PRs` — G-rule 3/3 dispatched iter 1298; Forge brief still pending. Carry.
+- `Check C beacon-bot liveness APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001` — pending Larry sign-off. Carry.
+- `wedged-review-silent-wt:* not in alert-translations.json` — 2/3. Carry.
+- `actor=larry-direct-merge causes unreviewed-merge alert` — 3/3; pending `go: actor-exemption-config`. Carry.
+- `hand-authored Pulse dispatch envelope dead-letter` — 2/3. Carry.
+
+**Standing findings:**
+- [yellow] **Forge build `harden-test-prod-write-isolation-pr412-revision` IN PROGRESS** — watch for PR.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry: say "go: alert-translation-no-mirror-dispatch-001" to Beacon.
+- [yellow] health-check-notify-script-missing — G-rule 3/3 dispatched iter 1207; Forge PR pending.
+- [yellow] Tier 2 weekly probe failed (auth_401) — pending Larry: rotate-claude-setup-tokens.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] install-drift-timer-gap — 0/2 clean healer cycles post-PR #411; next fire ~18:00Z UTC June 10.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] ourliberty-cycle.timer — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] unreviewed-merge actor-exemption-config — G-rule 3/3; pending `go: actor-exemption-config`.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — 71st+ occurrence; self-recovering.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] log-contamination recurrence in beacon_telegram_bot.log (fixture entries at 09:21-09:25 MDT; G-rule 3/3 dispatched iter 1281, Forge brief pending).
+
+**Watch items for next iter (1322):**
+- **Forge build `harden-test-prod-write-isolation-pr412-revision`** — in progress (~20 min at scan). Watch for PR creation and Mirror review dispatch.
+- **install-drift healer** — expected fire ~18:00Z UTC June 10. Watch heartbeat advance past 06:00:10Z. After fire: expect 1/2 clean healer cycles.
+- **`alert-translation-no-mirror-dispatch-001`** — pending Larry sign-off. Watch for approval.
+
+**Actions taken:** None.
+**PRIME DIRECTIVE:** 0 new interventions (Check 2 non-nominal = recurrence of G-rule 3/3 dispatched iter 1281 — no new action; sync error = standing self-recovering pattern). interventions≈754, systemic_fixes=16, ratio≈46.81, trend=flat. iter_non-clean.
+**Tier end-of-iter:** 1 (consecutive_clean=0).
+
+---
+
 ## Iteration 1318 — 2026-06-10 14:54Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal. 0 new alerts. All 9 services active. All inboxes empty. Pipeline healer fresh (active_stalls=0). Standing items carry. install-drift verification still OPEN (~3h until next healer fire at 18:00Z UTC).
