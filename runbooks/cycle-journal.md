@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration 1247 — 2026-06-10 04:10Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Finding — `preflight-reminder-enforcement-001` APPROVAL_REQUEST routing failure (notifier dropped it); all other checks nominal.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; non-clean iter — routing failure; tier resets)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1406 lines** (+3 new alerts since iter 1246 watermark of 1403). All three are Tier-3/informational:
+- Line 1404: `weekly-2026-06-08` (source=ledger, 03:55:05Z) — Ledger weekly report $1041.64 (−35.4% vs prior week). Known weekly pattern. Journal-only. ✅
+- Line 1405: `check-i-2026-06-08` (source=pulse, 03:55:07Z) — Check I summary from iter 1246 (2 proposals, [small] auto-dispatched). G-rule 3/3 (iter 1091) pending engine-fix APPROVAL_REQUEST. Journal-only. ✅
+- Line 1406: `mirror-dag-pass:missions-v2-phase1-captures` (source=outbox-notifier, 03:59:52Z) — Sequence transitioned `pending` → `active`. Tier-3 per PR #264 allowlist. Journal-only. ✅
+Watermark advances to: ts=2026-06-10T03:59:52Z / line 1406.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry: 21:58:36 MDT June 9 (03:58:36Z June 10) — approved dag-preflight-missions-v2-phase1-captures → dispatched to mirror inbox. No new Larry directives. No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json = snooze/suppress registry (34 entries, all snoozed). No active stalls. missions-v2 sequence active: step-captures-core in Forge inbox (dispatched 04:00:06Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon=0 (pulse-auto-655be51b08-20260610 consumed + archived), forge=1 (step-captures-core — active build, nominal), mirror=0, pulse=0. No orphaned Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=e665bf7 ("Pulse cycle 20260610T035902Z" — iter 1246 wrapper). ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=no-change, last_sync=2026-06-10T03:03:39Z (~67 min ago, within 2h threshold). ✅ Nominal. [blue] sync-push-rebase-fallback-001 root fix outstanding.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** 8 core ourliberty-*.service units active (beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ourliberty-agent-core-health.service: inactive/dead/exit=0 ✅ (healthy oneshot; [yellow] standing = notify_larry.py missing). ✅ Core nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§5.0):** 2/15 gate reviews since go-live — soaking, no-op. ✅
+
+**Check I (§5.1, Wednesday June 10):** Firing day. Audit `check-i-2026-06-10.json` already present (iter 1246 wrote it). Script ran: journal skipped (2026-06-08 block present), DM cooldown-suppressed, auto-dispatch deduped (key=655be51b08). ✅ Idempotent.
+
+**Forge digest:** `step-captures-core.json` in Forge inbox (missions-v2 Phase 1 step 1a — captures.json store + capture ingest + emit helper; dispatched 04:00:06Z). 0 open PRs; 0 recently merged. Pipeline healthy.
+
+**Credential rotation (§4.6):** 0 overdue, 0 upcoming within 60d. ✅ Nominal.
+
+**FINDING (ask-then-do) — `preflight-reminder-enforcement-001` APPROVAL_REQUEST routing failure:**
+Beacon successfully diagnosed `medic-operator-scaffold-001` (24.4σ cost anomaly) in 6 min / $1.05 Opus: root cause = Forge received a build-shaped `phase=preflight` prompt without the canonical decide-don't-act reminder and treated preflight as a build instruction (10 files, 41 tests, $6.72 vs $1.68 baseline). Beacon's fix: auto-inject the preflight-reminder into every `phase=preflight` Forge dispatch at `safe_write_inbox` chokepoint + `dispatch_validator` WARN drift-check.
+
+Routing failure: outbox-notifier logged `WARN: beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch (envelope=pulse-auto-655be51b08-20260610, marker='preflight-reminder-enforcement-001'); falling through to default routing`. The "default routing" path did NOT register the APPROVAL_REQUEST: pending-approvals.json = 0 entries, Forge has only `step-captures-core.json`. Spec artifact: `/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json`. Escalation written via `larry_alerts.append_alert` (subject=approval_request:routing-failure:preflight-reminder-enforcement-001, route=escalate).
+
+**G-rule NEW (iter 1247): `pulse-auto-dispatch task_id mismatch → APPROVAL_REQUEST silently dropped` — 1/3.** At 3/3: dispatch to Beacon to spec notifier fix (mismatch on pulse-auto path should add to pending-approvals.json rather than silently falling through).
+
+**Missions-v2 pipeline status (nominal):**
+- Sequence `missions-v2-phase1-captures` ACTIVE (created by Beacon 00:30:00Z; DAG-preflight PASS 03:59:52Z; step-captures-core dispatched 04:00:06Z)
+- Beacon synthesized step marker in 20s ($0.19); outbox-notifier headless-approved + dispatched to Forge 04:01:37Z
+- step-gc-healer + step-parked-lane: status=pending (depend on step-captures-core merging)
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: ourliberty-agent-core-health.service = inactive/dead/exit=0 ✅. APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Carry forward [yellow].
+- `unreviewed-merge streak 2` (PR #404 + #405): alert count 1406, no new unreviewed-merge alerts since 03:35:30Z. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: last auth_401 17:03–17:06 MDT June 9. No new occurrences. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: not re-tested (not Monday). Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json no-change/03:03:39Z. Self-recovered. [blue] outstanding.
+- `alert-triage.json last_claimed_ts=None` G-rule 1/3: 0 claimed rows confirmed. Carry forward.
+
+**Standing findings:**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap.
+- [yellow] **unreviewed-merge: streak 2** (PR #404 + #405) — pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500.
+- [yellow] **APPROVAL_REQUEST routing failure: preflight-reminder-enforcement-001** — Beacon spec ready; notifier dropped (task_id mismatch). Escalated this iter. Artifact: `/home/larry/agents/outboxes/beacon/.archive/pulse-auto-655be51b08-20260610.json`.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — root cause unfixed; self-recovered.
+
+**Actions taken:** `larry_alerts.append_alert` (subject=approval_request:routing-failure:preflight-reminder-enforcement-001, route=escalate). `cycle_prime_ledger.py append` — 1 intervention row.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** +1 intervention (approval-request-routing-failure). interventions=735 (script-authoritative), systemic_fixes=15, ratio=49.0, trend=flat.
+**Tier end-of-iter:** 1, consecutive_clean=0 (non-clean; routing failure finding).
+
+---
+
 ## Iteration 1246 — 2026-06-10 03:55Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all mandatory + additive checks nominal; 0 new alerts. Check I fired (Wednesday, sentinel=2026-06-08; previous iters incorrectly skipped Wednesday — §5.1 fires Mon/Wed/Fri/Sun, corrected this iter).
