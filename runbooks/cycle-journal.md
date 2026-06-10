@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration 1234 — 2026-06-10 02:20Z UTC (interactive, Tier 1)
+
+**Health:** ✅ Nominal — all checks nominal; 0 new alerts since iter 1233 watermark; standing items verified unchanged.
+**Tier state:** 1 (consecutive_clean=0 per cycle-tier.json; last_signal_at=2026-06-09T18:16:30Z; clean iter — wrapper will increment consecutive_clean)
+
+**Check 0 — Alert triage:** larry-alerts.jsonl = **1402 lines** (UNCHANGED — same watermark as iter 1233). No new alerts since last claimed line 1402 (sync-blocked:auto-commit-push-failed at 02:03:27Z, claimed in iter 1233). ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry alert idx=1401 route=digest at 20:08:29-0600 June 9 (02:08:29Z June 10) — UNCHANGED from iter 1233. No new Larry messages or agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json present; active_stalls=[]. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon=0, forge=0, mirror=0, pulse=0. All inboxes empty. No new Larry directives in Telegram last 24h. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer completed normally). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree, HEAD=73e9472 ("Pulse cycle 20260610T021349Z" — iter 1233 wrapper commit). Repo on main+clean. ✅ Nominal.
+
+**Check B — Sync health (VERIFY-BEFORE-REASSERT):** agent-core-sync.json: status=**error**, last_sync=2026-06-10T02:03:27Z (~17min old at scan — FRESH, within 2h threshold). Same occurrence as iter 1233. Message: "Auto-commit push failed; rolled back." Root cause APPROVAL_REQUEST sync-push-rebase-fallback-001 standing. ✅ (known [blue])
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):** systemctl: 9 active ourliberty-*.service units (8 core: beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot + cycle.service for current run). ourliberty-sync.service in **failed** state — manifestation of sync-push-rebase-fallback-001 (one-shot service exited with error at 02:03:27Z; timer will reset+retry). Note: iter 1233 reported "0 failed" — likely the one-shot sync.service was excluded from that count; root cause is the same standing [blue] item. health-check-notify-script-missing: health.timer active/waiting (next trigger ~11min from scan). health.service not in active list (one-shot confirmed). ✅ Core services nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):** ourliberty-agent-core: 0 open. ourliberty-dashboard: 0 open. ✅ Nominal.
+
+**Bug-hunt gate (§ 5.0):** assess_gate.py → "2/15 gate reviews since go-live; soaking, no-op." ✅
+
+**Periodic/conditional checks (Wednesday June 10 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X skip. ✅
+
+**Credential rotation (§ 4.6):** token-rotation-schedule.json — no items in 60-day window (nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, 73d away). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standing items:**
+- `health-check-notify-script-missing`: health.timer active/waiting (trigger ~11min from scan); health.service absent from active list (one-shot confirmed). APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap. Issue still standing. Carry forward [yellow].
+- `unreviewed-merge streak: 1` (PR #404): Alert count 1402 UNCHANGED. No new unreviewed-merge alerts. Carry forward [yellow].
+- `Tier 2 weekly probe failed (auth_401)`: beacon_telegram_bot.log shows auth_401 pattern at 17:06:17-0600 June 9 (23:06Z); last non-sync DM idx=1400 at 18:12:28-0600 June 9 — same known standing state. Carry forward [yellow].
+- `Check IX GITHUB_TOKEN missing`: Wednesday — Monday-only check. Not re-tested. Carry forward [yellow].
+- `sync-push-rebase-fallback-001`: sync.json error/02:03:27Z (FRESH; same occurrence from iter 1233; ourliberty-sync.service now confirmed failed). Root cause standing. Carry forward [blue].
+- `gh pr merge --auto disabled` (1/3): 0 open PRs. No new occurrence. Carry forward.
+- `pulse-check-failed:*` (1/3, iter 1138): Check 1 clean. Gate 2026-06-15. Carry forward.
+- `pulse/check-i-*` (3/3): Engine-fix scope pending Larry. Carry forward.
+- `daemon-reload triggers cycle.timer stuck` G-rule 3/3 (iter 848): cycle.service active normally. Carry forward [blue].
+- `health-check-notify-script-missing` G-rule 3/3 (iter 1207): APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard tap; Forge inbox empty. Carry forward.
+
+**Standing findings (unchanged):**
+- [yellow] **health-check-notify-script-missing** — APPROVAL_REQUEST `notify-larry-phase-d-channel-001` pending Larry dashboard approval tap.
+- [yellow] **unreviewed-merge: streak 1** (PR #404, 23:55:10Z) — DM delivered 23:57Z. Pending `go: actor-exemption-config`.
+- [yellow] **Tier 2 weekly probe failed (auth_401)** — June 8 19:02Z. Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api → POST /api/system/missions/new → 500. Standing.
+- [blue] **ourliberty-cycle.timer** — G-rule 3/3 dispatched (iter 848); pending `go: cycle-timer checkpoint`.
+- [blue] **unreviewed-merge actor-exemption-config** — G-rule 3/3 met; pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST sync-push-rebase-fallback-001** — occurrence 02:03:27Z (push failed, rolled back; self-heals on next tick; ourliberty-sync.service confirmed in failed state this iter). Root cause unfixed. Standing.
+
+**Actions taken:** None.
+**Dispatches:** None.
+**PRIME DIRECTIVE:** 0 new interventions this iter (all checks nominal; 0 new alerts; standing items verified unchanged). interventions=733 (script-authoritative), systemic_fixes=15, verification_pending=5, ratio≈48.87 (unchanged).
+**Tier end-of-iter:** 1, consecutive_clean=0 per cycle-tier.json (wrapper will increment on commit).
+
+---
+
 ## Iteration 1233 — 2026-06-10 02:13Z UTC (interactive, Tier 1)
 
 **Health:** ✅ Nominal — all checks nominal; 1 new alert (sync-blocked known-pattern, route=digest, already suppressed by routing layer); standing items verified unchanged.
