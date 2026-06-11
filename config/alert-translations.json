@@ -215,6 +215,49 @@
       "tier": "SOON",
       "plain_language_summary": "A Beacon chat turn failed mid-session and could not auto-retry on the backup (Tier 2) account, because Claude session IDs are tied to one account. Beacon itself stays running — only that one turn failed. Most often the underlying cause is a brief Anthropic server-side throttle (HTTP 429, 'not your usage limit') that clears on its own, NOT a real quota or auth problem.",
       "recommended_action": "First just send a fresh Beacon message — it starts a new (non-resumed) session and routes normally, which usually confirms recovery on its own. Only if the fresh message ALSO fails, probe `claude -p --output-format json 'say ok'` under each tier HOME (Tier 1: /home/larry; Tier 2: /home/larry/.claude-larry-personal) to tell apart a real auth-401 (re-login needed) from a usage-cap (wait for the rolling-5h window). NOTE: the raw alert's 'wait for the 5h window' advice is often wrong — the classifier currently mislabels transient 429s as auth_401 (fix queued)."
+    },
+    "claude_tier1_failed_tier2_unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "A dispatch failed on its active tier and could not fall back to the other tier (often a resume-bound session). Since #435 a session_lost is auto-recovered by a fresh re-dispatch; this alert now indicates a REAL tier failure — check the quota-events raw_excerpt before acting.",
+      "recommended_action": "Check ~/agents/blackboard/anthropic-quota-events.jsonl (the failing tier's raw_excerpt) before acting: a genuine rate_limit waits out the rolling-5h window on its own; an auth_401 needs re-auth via scripts/auth_orchestrator.py (Tier 1) or Tier 2 provisioning per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. A resume-bound session is marked paused_on_tier1 in the in-flight state file and will NOT auto-recover — re-dispatch once the tier is healthy."
+    }
+  },
+  "agent-runner-forge": {
+    "claude_tier1_failed_tier2_unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "A dispatch failed on its active tier and could not fall back to the other tier (often a resume-bound session). Since #435 a session_lost is auto-recovered by a fresh re-dispatch; this alert now indicates a REAL tier failure — check the quota-events raw_excerpt before acting.",
+      "recommended_action": "Check ~/agents/blackboard/anthropic-quota-events.jsonl (the failing tier's raw_excerpt) before acting: a genuine rate_limit waits out the rolling-5h window on its own; an auth_401 needs re-auth via scripts/auth_orchestrator.py (Tier 1) or Tier 2 provisioning per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. A resume-bound session is marked paused_on_tier1 in the in-flight state file and will NOT auto-recover — re-dispatch once the tier is healthy."
+    }
+  },
+  "agent-runner-mirror": {
+    "claude_tier1_failed_tier2_unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "A dispatch failed on its active tier and could not fall back to the other tier (often a resume-bound session). Since #435 a session_lost is auto-recovered by a fresh re-dispatch; this alert now indicates a REAL tier failure — check the quota-events raw_excerpt before acting.",
+      "recommended_action": "Check ~/agents/blackboard/anthropic-quota-events.jsonl (the failing tier's raw_excerpt) before acting: a genuine rate_limit waits out the rolling-5h window on its own; an auth_401 needs re-auth via scripts/auth_orchestrator.py (Tier 1) or Tier 2 provisioning per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. A resume-bound session is marked paused_on_tier1 in the in-flight state file and will NOT auto-recover — re-dispatch once the tier is healthy."
+    }
+  },
+  "agent-runner-beacon": {
+    "claude_tier1_failed_tier2_unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "A dispatch failed on its active tier and could not fall back to the other tier (often a resume-bound session). Since #435 a session_lost is auto-recovered by a fresh re-dispatch; this alert now indicates a REAL tier failure — check the quota-events raw_excerpt before acting.",
+      "recommended_action": "Check ~/agents/blackboard/anthropic-quota-events.jsonl (the failing tier's raw_excerpt) before acting: a genuine rate_limit waits out the rolling-5h window on its own; an auth_401 needs re-auth via scripts/auth_orchestrator.py (Tier 1) or Tier 2 provisioning per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. A resume-bound session is marked paused_on_tier1 in the in-flight state file and will NOT auto-recover — re-dispatch once the tier is healthy."
+    }
+  },
+  "agent-runner-pulse": {
+    "claude_tier1_failed_tier2_unavailable": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "A dispatch failed on its active tier and could not fall back to the other tier (often a resume-bound session). Since #435 a session_lost is auto-recovered by a fresh re-dispatch; this alert now indicates a REAL tier failure — check the quota-events raw_excerpt before acting.",
+      "recommended_action": "Check ~/agents/blackboard/anthropic-quota-events.jsonl (the failing tier's raw_excerpt) before acting: a genuine rate_limit waits out the rolling-5h window on its own; an auth_401 needs re-auth via scripts/auth_orchestrator.py (Tier 1) or Tier 2 provisioning per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. A resume-bound session is marked paused_on_tier1 in the in-flight state file and will NOT auto-recover — re-dispatch once the tier is healthy."
     }
   },
   "heal-claude-max-burn-rate": {
