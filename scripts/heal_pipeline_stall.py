@@ -319,8 +319,20 @@ def _within_scan_window(ts: Optional[datetime],
 
 
 def _parse_ts(ts_str: str) -> Optional[datetime]:
-    """Parse the timestamp shape outbox_notifier writes. Tolerates space-or-T,
-    optional microseconds, optional tz suffix."""
+    """Parse the timestamp shape outbox_notifier writes to an aware UTC
+    datetime. Tolerates space-or-T, optional microseconds, optional tz suffix.
+
+    A naive value comes from outbox_notifier.log() (datetime.now() — the
+    droplet's LOCAL clock, America/Denver); astimezone() interprets a naive
+    datetime as the system-local zone and converts to UTC, so it lines up with
+    aware (gh '...Z') timestamps and the aware-UTC `now` every Check compares
+    against. heal_pipeline_stall and the notifier run on the SAME host, so the
+    local zone matches the writer's. (Stamping naive as UTC instead — the prior
+    `dt.replace(tzinfo=timezone.utc)` — skewed every event ~6h into the past,
+    so a recent event could look stale: false stall trigger, or clipped scan
+    windows. See heal_pr_auto_merge._to_utc / chain_event_shipper._normalize_iso_ts
+    for the same 6h-skew incident.) An aware value passes through unchanged
+    (same instant, normalized to UTC)."""
     s = ts_str.strip().replace(' ', 'T')
     if s.endswith('Z'):
         s = s[:-1] + '+00:00'
@@ -331,9 +343,7 @@ def _parse_ts(ts_str: str) -> Optional[datetime]:
         dt = datetime.fromisoformat(s)
     except ValueError:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    return dt.astimezone(timezone.utc)
 
 
 def _read_recent_log_lines(log_path: Path, hours: int) -> list[str]:

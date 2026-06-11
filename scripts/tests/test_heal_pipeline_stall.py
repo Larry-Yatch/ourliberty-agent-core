@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -29,9 +30,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 def _ts(minutes_ago: int) -> str:
     """Produce an outbox-notifier-shape log-line timestamp `minutes_ago` minutes
-    before now. Format: `2026-05-26 13:08:39` (human-readable). Used inside the
-    `[<ts>] [notifier] [INFO] ...` line shape that outbox_notifier.py emits."""
-    dt = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+    before now. Format: `2026-05-26 13:08:39` (human-readable, NAIVE host-local).
+
+    outbox_notifier.log() stamps `datetime.now()` — naive host-local time (the
+    droplet runs America/Denver) — so this mirror uses `datetime.now()`, NOT
+    `datetime.now(timezone.utc)`. heal_pipeline_stall._parse_ts interprets a
+    naive stamp as host-local and converts to UTC, so the round-trip is only
+    correct when this fixture and the parser agree on the zone — which is why
+    every test class pins TZ to America/Denver (see _TempAgentsRootMixin).
+    Used inside the `[<ts>] [notifier] [INFO] ...` line shape."""
+    dt = datetime.now() - timedelta(minutes=minutes_ago)
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
@@ -70,6 +78,17 @@ class _TempAgentsRootMixin:
     _SUPABASE_ENV_KEYS = ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
 
     def setUp(self) -> None:
+        # Pin the process TZ to the production droplet's zone. outbox_notifier
+        # writes naive host-local timestamps and _parse_ts interprets naive as
+        # host-local, so the naive `_ts()` fixtures only round-trip when the
+        # test's local zone is fixed — otherwise the suite is non-deterministic
+        # across developer machines (a UTC box and an MDT box parse the same
+        # fixture to instants 6h apart). America/Denver also gives the parser a
+        # real non-zero UTC offset to exercise, so the naive->UTC conversion is
+        # genuinely tested rather than trivially satisfied under TZ=UTC.
+        self._tz_orig = os.environ.get('TZ')
+        os.environ['TZ'] = 'America/Denver'
+        time.tzset()
         self._tmpdir = tempfile.TemporaryDirectory()
         self.agents_root = Path(self._tmpdir.name) / 'agents'
         self.agents_root.mkdir()
@@ -93,6 +112,12 @@ class _TempAgentsRootMixin:
         for k, v in self._supabase_env_snapshot.items():
             if v is not None:
                 os.environ[k] = v
+        # Restore the TZ the test inherited.
+        if self._tz_orig is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = self._tz_orig
+        time.tzset()
 
 
 class TestRegexPatterns(_TempAgentsRootMixin, unittest.TestCase):
@@ -144,6 +169,58 @@ class TestRegexPatterns(_TempAgentsRootMixin, unittest.TestCase):
         m = self.hps._AUTO_MERGE_MERGED_RE.search(line)
         self.assertIsNotNone(m)
         self.assertEqual(m.group('task'), 'chain-discipline-marker-parser-and-regression-check-001')
+
+
+class TestParseTs(_TempAgentsRootMixin, unittest.TestCase):
+    """_parse_ts must read a NAIVE outbox_notifier timestamp as host-local and
+    convert it to UTC, NOT stamp it as UTC. outbox_notifier.log() writes
+    `datetime.now()` (naive, droplet-local America/Denver); reading it as UTC
+    skewed every event ~6h into the past, so a recent event looked stale (false
+    stall trigger) or scan windows clipped events they shouldn't. These cases
+    fail under the prior `dt.replace(tzinfo=timezone.utc)` and pass under
+    `dt.astimezone(timezone.utc)`. Mirrors heal_pr_auto_merge._to_utc /
+    chain_event_shipper._normalize_iso_ts (the same 6h-skew incident).
+
+    _TempAgentsRootMixin pins TZ to America/Denver, so naive stamps resolve at
+    that zone's real offset (MDT -06:00 in summer, MST -07:00 in winter)."""
+
+    def test_naive_summer_stamp_interpreted_as_local_then_utc(self) -> None:
+        # 00:00:23 MDT (-06:00) == 06:00:23 UTC. Under the old code this was
+        # mis-stamped as 00:00:23 UTC — the 6h skew.
+        dt = self.hps._parse_ts('2026-06-11 00:00:23')
+        self.assertIsNotNone(dt)
+        self.assertEqual(dt.utcoffset(), timedelta(0))  # aware, normalized UTC
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_naive_winter_stamp_uses_real_dst_offset(self) -> None:
+        # 00:00:00 MST (-07:00, no DST in January) == 07:00:00 UTC. Proves the
+        # conversion follows the zone's real DST rules, not a frozen offset.
+        dt = self.hps._parse_ts('2026-01-15 00:00:00')
+        self.assertEqual(dt.isoformat(), '2026-01-15T07:00:00+00:00')
+
+    def test_naive_with_t_separator_and_microseconds(self) -> None:
+        dt = self.hps._parse_ts('2026-06-11T00:00:23.500000')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23.500000+00:00')
+
+    def test_aware_z_suffix_passes_through_to_same_instant(self) -> None:
+        # An aware 'Z' timestamp denotes an absolute instant; it must NOT be
+        # shifted by the local zone, only normalized to +00:00.
+        dt = self.hps._parse_ts('2026-06-11T06:00:23Z')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_aware_explicit_offset_normalized_to_utc(self) -> None:
+        # The inbox_watcher / gh shape carries an explicit offset; same instant.
+        dt = self.hps._parse_ts('2026-06-11T00:00:23-06:00')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_compact_offset_normalized(self) -> None:
+        # +HHMM (no colon) is normalized before parsing.
+        dt = self.hps._parse_ts('2026-06-11T00:00:23-0600')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_unparseable_returns_none(self) -> None:
+        self.assertIsNone(self.hps._parse_ts('not-a-timestamp'))
+        self.assertIsNone(self.hps._parse_ts(''))
 
 
 class TestKillSwitch(_TempAgentsRootMixin, unittest.TestCase):
