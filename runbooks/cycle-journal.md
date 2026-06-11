@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration ~1487 — 2026-06-11 16:08Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — Forge PID 1669068 stuck post-merge (ccd-s4) [yellow] RE-ESCALATED; PR #457 status changed UNKNOWN → mirror-review FAILURE [yellow] new finding.
+
+**VERIFY-BEFORE-REASSERT (iter ~1486 watch items):**
+- PID 1669068: **CONFIRMED STILL RUNNING** (`ps -p 1669068`: elapsed 03:04:46, 1.9% CPU/Ssl at 16:05:39Z). Re-escalation threshold 16:05Z **REACHED** (16:05:39Z). Re-escalation DM sent L1275 at 16:08:23Z. [yellow] ESCALATED.
+- PR #457: **CONFIRMED OPEN**, status changed UNKNOWN → mirror-review **FAILURE** (statusCheckRollup context=mirror-review, state=FAILURE, started=08:46:11Z). Age ~7h55m. [yellow] Status update — now FAILURE.
+- Sync: last_sync=2026-06-11T15:52:16Z (~16m at check). ✅ Within 2h (threshold ~17:52Z).
+- F24b: No new dispatch attempts. Still 2/3.
+
+**Check 0 — Alert triage:** Total lines: 1275 (watermark L1273 from iter ~1486; +2 new).
+- L1274: `sentinel` at 16:05:16Z, `route: escalate`, subject `inbox-stall:build-ccd-s4-healer-recover-then-alert.json` — "unpicked for 3.07h". Root cause = PID 1669068 stuck (already escalated). **Tier-3** (known secondary, root cause managed). Context folded into re-escalation DM. Advance to resolved.
+- L1275: Self-appended re-escalation DM (pulse, 16:08:23Z). Actions row.
+Advance watermark L1273→L1275. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last meaningful Larry message: 09:27:17 MDT (15:27:17Z) — "Where are we with the builds?". Re-escalation DM sent this iter (L1275). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (07:00) + `ccd-s5-doctrine-and-handling-shapes.json` (07:50). Unchanged. Normal (blocked on PID 1669068 exit).
+- Beacon: EMPTY ✅ | Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus + sync "no-change" at 15:52:16Z; latest wrapper commit 29e6563 "Pulse cycle 20260611T155853Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T15:52:16Z (~16m at check), status=no-change. 2h threshold ~17:52Z. ✅ Within threshold.
+
+**Check C — Agent liveness:** 9/9 services active. Forge PID 1669068 still running (03:04:46 elapsed at 16:05:39Z). Re-escalation DM sent L1275. [yellow] ESCALATED.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, **mirror-review FAILURE** (changed from UNKNOWN this iter). Created 08:13:19Z (~7h55m ago). No autoMerge. [yellow] Mirror rejected — requires fixes before merge.
+- No other open PRs. ✅
+
+**Check H — Forge digest:**
+- Open: 1 — PR #457 (~7h55m, mirror-review FAILURE). No new merges since PR #464 at 15:14Z. ✅
+
+**§5.0 bug-hunt gate:** no committed audit baseline, no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d. No 60d trigger. ✅
+
+**Actions taken:**
+- Check 0: Triaged L1274 (sentinel inbox-stall build-ccd-s4, Tier-3, root cause PID 1669068 already escalated). Advance watermark L1273→L1275.
+- Check C+E: Re-escalation DM sent (L1275 at 16:08:23Z) — PID 1669068 re-escalation threshold reached + PR #457 FAILURE status update combined in single alert.
+
+**Standing findings:**
+- [yellow] **Forge PID 1669068 stuck post-merge** — ccd-s4 worktree deleted, ccd-s5 blocked. Re-escalation DM sent iter ~1487 at 16:08:23Z (L1275). Awaiting Larry's `kill 1669068`.
+- [yellow] **PR #457 mirror-review FAILURE** — status changed from UNKNOWN this iter. OPEN (~7h55m). Context: mirror-review check started 08:46:11Z, state=FAILURE. Forge cannot address until PID 1669068 is killed.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — stale Forge inbox. Clears when PID 1669068 exits.
+- [blue] `ccd-s5-doctrine-and-handling-shapes.json` — Forge inbox. Pending PID 1669068 exit.
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark L1275. ✅
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`).
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule. (Note: L1274 is a genuine stall, not inflight — G-rule count unchanged.)
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule.
+- [blue] Check III gate discrepancy — carry.
+
+**Watch items for iter ~1488:**
+- PID 1669068: Awaiting Larry's `kill 1669068`. Re-escalation DM sent at 16:08:23Z (L1275). No further re-escalation until Larry responds or threshold ~17:08Z.
+- PR #457: mirror-review FAILURE. Forge cannot address until PID exits. Nudge if >24h by 2026-06-12 08:13Z.
+- Sync: last_sync=15:52:16Z. 2h threshold ~17:52Z — trigger ff+sync when crossed (if repo clean).
+- F24b: Watch for 3rd occurrence if any envelopes dispatched.
+
+**PRIME DIRECTIVE:** +1 intervention this iter (re-escalation DM covering PID 1669068 + PR #457 FAILURE status). Running total: interventions=788, systemic_fixes=21, verification_pending=10, iter_clean=48, ratio≈37.52, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (Forge PID 1669068 stuck + PR #457 FAILURE).
+
+---
+
 ## Iteration ~1486 — 2026-06-11 15:56Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
