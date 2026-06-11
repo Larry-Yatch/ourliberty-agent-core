@@ -5,14 +5,25 @@
 (6 FAIL + 2 ERROR). They are TWO distinct root causes — handle each correctly,
 do NOT blanket-skip/xfail/reorder to hide them. Goal: full discover green.
 
-## Reproduce (env MUST be sourced)
-    cd ~/agent-core/scripts && set -a && . ~/credentials/.env.larry && set +a \
-      && python3 -m unittest discover -s tests -t .
-NOTE: without the env, `beacon_telegram_bot` sys.exits at import (missing
-TELEGRAM_BOT_TOKEN_BEACON) and `test_beacon_tier2_fallback` shows 4 spurious
-errors — that is a test-harness env gap, NOT a real failure. Sourcing the env
-removes them. (Consider hardening those tests to set a dummy token in setUp so
-they don't depend on a live credentials file — optional, low priority.)
+## Reproduce
+
+**NEVER source `~/credentials/.env.larry` (or any live credentials) before
+running tests.** Live `SUPABASE_*` / `TELEGRAM_*` / claude tokens in the test
+process convert every isolation gap from "connection error" into a REAL write,
+page, or paid dispatch (test-isolation audit 2026-06-11, holes H6/H7/H12/M4;
+see docs/test-jail-spec.md). An earlier revision of this brief prescribed
+sourcing the env — that instruction is retracted.
+
+If a test needs `beacon_telegram_bot` to import (it sys.exits without
+TELEGRAM_BOT_TOKEN_BEACON), give it DUMMY values:
+
+    cd ~/agent-core/scripts \
+      && AGENT=beacon TELEGRAM_BOT_TOKEN_BEACON=test-dummy \
+         TELEGRAM_ALLOWED_CHAT_IDS=0 \
+         python3 -m unittest discover -s tests -t .
+
+Tests that genuinely require a live credential are misdesigned — fix the test
+(dummy env in setUp), never the invocation.
 
 ## Bucket A — genuine cross-module isolation/pollution (pass in isolation, fail under discover)
 - `tests.test_deploy_notifier.PathIsolationTest.test_agents_root_inside_tmpdir`
@@ -57,7 +68,8 @@ it as a real safety regression re-opening the 2026-05-29 fixture-replay incident
 class.
 
 ## Acceptance
-- Full `python3 -m unittest discover -s tests -t .` (env sourced) is GREEN.
+- Full `python3 -m unittest discover -s tests -t .` (dummy env only, never live
+  credentials) is GREEN.
 - Bucket A: real isolation fixes; each passes in isolation AND under discover.
 - Bucket B: each test either updated with a one-line reason tying it to the
   specific commit, OR flagged (REJECT/CLARIFY) as a real regression. No silent

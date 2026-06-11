@@ -373,6 +373,16 @@ class RunEndToEndTest(unittest.TestCase):
         # Isolate the self-healed digest read from the live alerts queue.
         stack.enter_context(mock.patch.object(
             larry_alerts, 'ALERTS_FILE', Path('/nonexistent/larry-alerts.jsonl')))
+        # run() calls heartbeat(), which writes the import-frozen
+        # HEARTBEAT_FILE — un-patched, a bare un-sandboxed run freshens the
+        # REAL ceo-digest-generator.heartbeat and masks genuine staleness
+        # from the liveness watchdog. A writable tmp path (not /nonexistent)
+        # on purpose: heartbeat() swallows OSError, so only an observable
+        # write lets tests assert the liveness signal still fires.
+        hb_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        self._hb_file = Path(hb_dir) / 'hb'
+        stack.enter_context(mock.patch.object(
+            cdg, 'HEARTBEAT_FILE', self._hb_file))
 
     def test_voice_path(self):
         client = _FakeClient(events=[{'event_type': 'clarify_response'}])
@@ -386,6 +396,11 @@ class RunEndToEndTest(unittest.TestCase):
                 rc = cdg.run('daily',
                              now_utc=datetime(2026, 6, 2, 13, tzinfo=timezone.utc),
                              client=client)
+                # The liveness heartbeat must actually land — heartbeat()
+                # swallows OSError, so a write regression is otherwise
+                # invisible until the production watchdog pages. (Inside the
+                # stack: the tmp dir holding it is removed on exit.)
+                self.assertTrue(self._hb_file.exists())
             self.assertEqual(rc, 0)
             row = client.upserted[0]['rows'][0]
             self.assertEqual(row['payload']['summary'], 'CEO voice note')

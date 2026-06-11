@@ -127,6 +127,9 @@ class _Base(unittest.TestCase):
         (self.root / 'logs').mkdir(parents=True)
         (self.root / 'blackboard' / 'backups').mkdir(parents=True)
         (self.root / 'state').mkdir(parents=True)
+        # Save/restore, never pop — popping would un-sandbox later tests
+        # whose modules resolve the env at call time (test-jail audit H2/H3).
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         import heal_stale_approvals as mod
         self.mod = importlib.reload(mod)
@@ -134,7 +137,10 @@ class _Base(unittest.TestCase):
 
     def tearDown(self):
         self._tmp.cleanup()
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
 
 
 # -------------------- root resolution --------------------

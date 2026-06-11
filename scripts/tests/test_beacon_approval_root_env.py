@@ -38,6 +38,11 @@ class ApprovalRootEnvTest(unittest.TestCase):
         self.root = Path(self._tmp.name) / 'agents'
         (self.root / 'state').mkdir(parents=True)
         (self.root / 'blackboard').mkdir(parents=True)
+        # Save/restore, never pop: under full discover an ambient sandbox
+        # root (gate env, tests/__init__, or a sibling module's import-time
+        # pin) may be set — popping it would un-sandbox every later test
+        # whose module resolves the env at call time (test-jail audit H2/H3).
+        self._prev_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
 
         # Reload the handler FIRST so its PENDING_APPROVALS_PATH is env-derived,
@@ -53,9 +58,13 @@ class ApprovalRootEnvTest(unittest.TestCase):
         self.unreg = importlib.reload(unreg)
 
     def tearDown(self):
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        if self._prev_root is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._prev_root
         self._tmp.cleanup()
-        # Restore default-env module state for any later test in the run.
+        # Re-freeze module state against the RESTORED env (sandbox if one
+        # was ambient, default otherwise) for any later test in the run.
         import beacon_approval_handler as handler
         import heal_stale_approvals as stale
         import heal_unregistered_approval as unreg

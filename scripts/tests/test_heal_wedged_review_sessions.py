@@ -17,7 +17,9 @@ Coverage (per spec deliverables):
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,20 @@ from pathlib import Path
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
+
+# Import-time sandbox (canonical Gap-A shape, see scripts/tests/conftest.py):
+# the healer's transitive imports freeze AGENTS_ROOT-derived paths at import,
+# so the env must be set BEFORE the import below. Guarded so the #436 gate
+# env / tests/__init__.py (and any outer harness) win. Interim until the
+# per-module bootstrap (docs/test-jail-spec.md Layer A) lands.
+if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
+    _SANDBOX_ROOT = tempfile.mkdtemp(prefix='ol-test-agents-root-')
+    os.makedirs(os.path.join(_SANDBOX_ROOT, 'logs'), exist_ok=True)
+    os.environ['OURLIBERTY_AGENTS_ROOT'] = _SANDBOX_ROOT
+    os.environ.setdefault(
+        'OURLIBERTY_WORKTREES_ROOT', os.path.join(_SANDBOX_ROOT, 'worktrees'))
+    os.environ.setdefault(
+        'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_ROOT, 'logs'))
 
 import heal_wedged_review_sessions as h  # noqa: E402
 
@@ -345,7 +361,7 @@ class TestFalsePositiveDemote(unittest.TestCase):
 
 class TestKillSwitch(unittest.TestCase):
     def test_kill_switch_blocks_main(self, ):
-        import tempfile
+        from unittest import mock
         with tempfile.TemporaryDirectory() as td:
             ks = Path(td) / 'healers.disabled'
             ks.write_text('')
@@ -353,7 +369,11 @@ class TestKillSwitch(unittest.TestCase):
             h.KILL_SWITCH = ks
             try:
                 self.assertTrue(h.kill_switch_active())
-                rc = h.main()
+                # Belt-and-suspenders: LOG_FILE froze into the module-top
+                # sandbox at import, so this mock is the second layer, not
+                # the only barrier — keep both.
+                with mock.patch.object(h, 'log'):
+                    rc = h.main()
                 self.assertEqual(rc, 0)
             finally:
                 h.KILL_SWITCH = orig
