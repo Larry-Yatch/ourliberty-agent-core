@@ -4,6 +4,66 @@
 
 ---
 
+## Dead-letter recovery — 2026-06-11 ~20:40Z UTC (inter-cycle, triggered by outbox-notifier dead-letter notify)
+
+**Trigger:** Outbox notifier delivered dead-letter notify for `cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z.json` — dispatch rejected by `dispatch_validator`.
+
+**Root cause of rejection:** Envelope used `envelope_id` as root field instead of required `task_id`. Validator message: `task_id field missing or empty`. This was the second dispatch failure for this G-rule finding (first at 20:23Z: `source` field was empty; second at 20:36Z: `task_id` missing instead of `envelope_id`).
+
+**Action taken:** Re-dispatched corrected envelope to `~/agents/inboxes/beacon/cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z.json` with fields: `task_id`, `source: pulse`, `dedup_identity: g-rule:wt-cleanup-post-merge-gap:wt-forge-ccd-s5:20260611`. JSON validated ✅. Beacon inbox confirms file present.
+
+**Verify-before-reassert:** Orphaned worktree `/home/larry/agent-worktrees/wt-forge-ccd-s5-doctrine-and-handling-shapes` CONFIRMED STILL PRESENT (git worktree list). PR #465 CONFIRMED MERGED (mergedAt: 2026-06-11T17:28:05Z). G-rule finding remains live — not stale.
+
+**Schema lesson (also recorded in MEMORY.md):** Dispatch envelopes require root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is not a valid root key and silently passes envelope creation but fails validator ingestion.
+
+**Watch for iter ~1523:** Beacon picks up and processes the corrected dispatch. If another dead-letter arrives, escalate schema issue as systemic (F24b G-rule is already 2/3 — this would push JSON-malformation pattern to 3/3 and trigger Forge dispatch for validator schema enforcement tooling).
+
+---
+
+## Iteration ~1521 — 2026-06-11 20:36Z UTC (interactive, Tier 1, consecutive_clean 1→0)
+
+**Trigger:** Larry direct invocation (`/loop → /cycle`).
+
+**Health:** ⚠️ Dispatch-block finding (resolved in-cycle). All 8 services active. PR #474 Mirror retry 1/3 in progress (started 20:31:57Z). G-rule dispatch from iter ~1519 confirmed DISPATCH_BLOCKED — see narrative correction below and Dead-letter recovery entry above.
+
+**VERIFY-BEFORE-REASSERT (iter ~1520 watch items):**
+- **PR #474 Mirror review**: Mirror completed first attempt at 20:31:51Z (session `f1a81df4`, 555s, $0.7882) — no valid marker in output. Outbox-notifier filed `marker-error-test-jail-pr3-gate-hardening-001-1.json` → Mirror retry dispatched 20:31:57Z. Retry in-progress at cycle time. PR MERGEABLE, reviewDecision="" — self-healing. [blue] carry.
+- **wt-ccd-s5**: Still present (~3h old). Healer next run 22:03Z (4h threshold ~21:33Z). On-track. [blue] carry.
+- **Beacon G-rule dispatch consumed**: ❌ NARRATIVE CORRECTION. Iters ~1519 and ~1520 both claimed Beacon consumed the dispatch. Ground truth: `cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json` was DISPATCH_BLOCKED at 20:23:41Z (source="" not in allowed list). File is in `~/agents/inboxes/beacon/.invalid/`. Beacon never processed it.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1304 lines. Watermark: L1303 (unchanged). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise / inbox_watcher scan:** journalctl `ourliberty-*.service --priority warning` → 0 entries last 60 min. Inbox_watcher log surfaced: `validator rejected cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json: source "" not in allowed list` at 20:23:41Z. Finding: G-rule dispatch envelope missing required `source` field. ⚠️ tier-reset.
+
+**Check 2 — Telegram sweep:** Last Larry directive 19:59Z, answered by Beacon 20:00Z. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (20:32:34Z). ✅ Nominal.
+
+**Check 4 — Inboxes:** Forge EMPTY, Beacon EMPTY, Pulse EMPTY, Mirror: `marker-error-test-jail-pr3-gate-hardening-001-1.json` (self-healing retry dispatched). ✅ No stalls.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING. G-rule iter ~1416. [blue] carry. ✅
+
+**Check A:** main, clean. ✅ **Check B:** last_sync ~44 min, no-change. ✅ **Check C:** 8/8 active. ✅ **Check E:** PR #474 open, MERGEABLE, <30 min old. ✅
+
+**Conditional / §5.0:** Thursday — all skips. §5.0 scripts → all no-op. ✅ Credentials → none in 60d window. ✅
+
+**Actions taken:**
+1. Attempted re-dispatch with `source: "pulse"` → rejected again: `task_id field missing or empty`. Dead-letter Pulse session spawned. (See Dead-letter recovery entry above.)
+2. Dead-letter session recovered correctly: re-dispatched with `task_id + source + dedup_identity` → accepted. Beacon started `cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z` at 20:38:06Z (Opus, 1800s timeout).
+3. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean 1→0.
+4. PRIME DIRECTIVE: `append --tier 1 --kind intervention --template dispatch-block-corrected --detail cycle-finding-orphaned-wt-ccd-s5-source-empty` → row written.
+
+**Watch items for iter ~1522:**
+- **PR #474**: Mirror retry result? PASS → auto-merge?
+- **wt-ccd-s5**: Auto-cleaned at 22:03Z?
+- **Beacon processing `cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z`**: spec output expected.
+- **G-rule Pulse-envelope-format (1/3)**: dispatch envelope schema lesson documented (see Dead-letter recovery); watch for recurrence.
+
+**PRIME DIRECTIVE:** 1 intervention (dispatch-block-corrected:wt-ccd-s5). Running total: interventions≈791, systemic_fixes≈23, ratio≈34.
+**Tier end-of-iter:** Tier 1, consecutive_clean 1→0.
+
+---
+
 ## Iteration ~1520 — 2026-06-11 20:29Z UTC (interactive, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).

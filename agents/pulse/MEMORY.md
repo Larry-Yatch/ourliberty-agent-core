@@ -6,6 +6,12 @@
 
 ---
 
+## Dispatch envelope schema (learned 2026-06-11, two failures)
+
+**Rule:** Beacon inbox dispatch envelopes MUST use root field `task_id` (not `envelope_id`). Required fields: `task_id`, `source`, `dedup_identity`, `prompt`, `timeout`. `envelope_id` is silently ignored and fails the validator. Observed two failures: first at 20:23Z (source field empty → DISPATCH_BLOCKED), second at 20:36Z (used `envelope_id` instead of `task_id` → REJECTED). Third attempt (dead-letter recovery) with corrected schema succeeded. F24b G-rule is at 2/3 for JSON dispatch malformation — track for 3/3.
+
+---
+
 ## Status snapshot — updated 2026-06-11 20:22Z UTC (Iter ~1519, interactive)
 
 **Iter ~1519 summary:** Alert watermark: L1303 (20:08Z / missions-card-gc:summary → Tier-3). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions≈790, systemic_fixes≈24 (includes iter 1513 beacon-erofs fix + iter ~1519 wt-cleanup dispatch), ratio≈33. **KEY STATE:** Forge `test-jail-pr3-gate-hardening-001` ACTIVE (PID 1878941, started 20:21Z — new session). 0 open PRs (all 466–473 merged). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` STILL PRESENT (2.5h+); G-rule dispatch sent to Beacon this iter (`cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json`). Beacon EROFS RESOLVED (PR #470, systemic_fix iter 1513). All 9 services active. Sync clean: last_sync=19:52Z. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%).
