@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration 1399 — 2026-06-11 02:56Z UTC (interactive, Tier 2, consecutive_clean 0→1)
+
+**Health:** ✅ All checks nominal. 0 new alerts. 0 open PRs. Forge has fresh build task `pulse-park-and-silence` (9 min old, within threshold). Install-drift timer on schedule 06:00Z June 11. **Tier 2 clean iter 1/3.**
+
+**VERIFY-BEFORE-REASSERT (iter 1398 watch items):**
+- install-drift timer fires 06:00Z June 11: **CONFIRMED** — `ourliberty-heal-systemd-install-drift.timer` NEXT=Thu 2026-06-11 00:00:00 MDT = 06:00:00Z, ~3h 3min left at scan. ✅ On schedule.
+- Beacon install-drift dispatch: Larry action still pending — say "dispatch the install-drift trigger fix" in Beacon chat. No new Telegram interactions observed. Carry.
+- Sync: last_sync=2026-06-11T02:50:33Z (6 min old at scan). ✅ Fresh.
+- Tier 2, consecutive_clean=0: this iter clean → consecutive_clean 0→1. ✅
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: 1447 lines total. No new lines since watermark (line 1447 / agent-runner-pulse:transcript-not-persisted:tier1 / 02:37:12Z). ✅ Nominal.
+- alert-triage.json: last_claimed_line=MISSING (standing watermark-missing pattern, G-rule dispatched iter 1251).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No Larry directives in beacon_telegram_bot.log (last 50 lines). No agent-distress signals. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run ran at 02:57Z → all Forge tasks skipped (FORGE_NO_PR_SKIP: PRs #406/#407/#408/#41/#412/#418/#420/#421/#422/#425/dashboard PRs all exist or preflight-archived). 0 stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING → standing pattern, unchanged. ✅
+
+**Check A — Source repo:** agent-core-sync.json branch=main, status=no-change, last_sync=02:50:33Z. ✅ Nominal.
+
+**Check B — Sync health:** 6 min old at scan. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: 0 open PRs. ✅
+- ourliberty-dashboard: not queried (no signals requiring check). ✅
+
+**Check H — Inboxes:**
+- Forge: `build-pulse-park-and-silence.json` — fresh at 02:47:59Z (9 min old at scan). Dispatched by Beacon (outbox-notifier), `phase=build`, PR title "feat(pulse): park non-auto-dispatched proposals and silence their DM lines (Contract B)". 8 min old; prior `pulse-park-and-silence.json` archived (preflight complete). ✅ Within threshold.
+- Beacon: EMPTY ✅.
+- Mirror: EMPTY ✅.
+- Pulse: EMPTY ✅.
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- §5.0 bug-hunt gate: no-op. ✅
+- Credential rotations: 0 overdue, 0 upcoming within 60d. ✅
+- install-drift timer: NEXT=06:00:00Z June 11, ~3h 3min left. ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted`: 3/3 DISPATCHED (iter 1396).** 0 new occurrences since line 1447 (02:37Z). Total 9. Auto-heals 06:00Z today. Carry.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rules: carry from iter 1398 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier state: consecutive_clean 0→1 at Tier 2 via `scripts/cycle_tier_state.py record --checks-clean true` at 02:58:00Z. ✅
+2. No auto-fix actions executed (all checks nominal).
+3. No dispatches this iter.
+
+**PRIME DIRECTIVE:** 0 rows this iter (all checks nominal). Running total: interventions≈770, systemic_fixes=20, verification_pending=9, ratio≈38.5, trend=stable.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1 (need 2 more clean iters to de-escalate to Tier 3).
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. 9 total occurrences. Beacon spec ready; Larry needs to say **"dispatch the install-drift trigger fix"** in Beacon chat. Auto-heals 06:00Z June 11 regardless.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] build-pulse-park-and-silence (Forge inbox, ~9 min old). Watch for PR open by iter 1400.
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] Beacon spec-ready (install-drift trigger fix): Larry action pending — say "dispatch the install-drift trigger fix" in Beacon chat.
+
+**Watch items for iter 1400:**
+- install-drift timer: fires 06:00Z June 11. If confirmed → transcript-not-persisted G-rule auto-resolved.
+- build-pulse-park-and-silence: watch for Forge PR by ~04:47Z (2h threshold).
+- Sync: next push ~04:50Z.
+- Tier 2 cadence (15-min window). Nominal expected.
+
+---
+
 ## Iteration 1398 — 2026-06-11 02:40Z UTC (interactive, Tier 1→2)
 
 **Health:** ✅ All checks nominal. 3 new alerts (lines 1445–1447), all Tier-3 silenced. park-the-nudge sequence COMPLETE — PR #442 MERGED 02:40:47Z + PR #443 MERGED 02:41:28Z (both Mirror PASS → auto-merge). 0 open PRs. **Tier de-escalation: 3 consecutive clean Tier-1 iters → Tier 2.**
