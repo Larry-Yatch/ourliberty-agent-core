@@ -233,6 +233,7 @@ class RunClaudeInvokesScrub(unittest.TestCase):
 
     def test_scrub_called_before_subprocess(self):
         import agent_runner
+        import larry_alerts
         from unittest import mock
 
         order = []
@@ -303,6 +304,7 @@ class RunClaudeInvokesScrub(unittest.TestCase):
                                return_value=('sonnet', 'sonnet'), create=True), \
              mock.patch.object(agent_runner, 'quarantine_parent_claude_md_poison',
                                return_value=[]), \
+             mock.patch.object(larry_alerts, 'append_alert'), \
              mock.patch.object(agent_runner, 'log', create=True):
             success, output, sid = agent_runner.run_claude(
                 'pulse', 'hello world this is a test prompt', timeout=5)

@@ -29,6 +29,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import agent_runner as ar  # noqa: E402
+import larry_alerts  # noqa: E402
 
 
 def _ok_response(text='ok', session_id='sid-new'):
@@ -59,6 +60,28 @@ class _FakeProc:
 
     def kill(self):
         pass
+
+
+def _pin_log_dir(tc, root):
+    """Route agent_runner.log()'s write-time OURLIBERTY_LOG_DIR resolution
+    into the test's tmp tree so un-mocked log() calls (incl. the #438
+    TRANSCRIPT_NOT_PERSISTED ERROR) can't land in the real ~/agents/logs/.
+    Guards the bare `python3 -m unittest` invocation — the discover gate
+    (#436) pins this process-wide, but direct runs have no other layer.
+    Restore registers via addCleanup, not tearDown: unittest skips tearDown
+    when setUp raises (e.g. the mkdir below), but cleanups still run.
+    """
+    prev = os.environ.get('OURLIBERTY_LOG_DIR')
+
+    def _restore():
+        if prev is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = prev
+
+    tc.addCleanup(_restore)
+    os.environ['OURLIBERTY_LOG_DIR'] = str(root / 'logs')
+    (root / 'logs').mkdir(parents=True, exist_ok=True)
 
 
 class _Guard:
@@ -133,6 +156,10 @@ class ConcurrencyRunningLogTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        # Defense-in-depth: ar.log is mocked in today's tests, but a future
+        # test that drives run_claude without the mock must not write the
+        # real ~/agents/logs/forge.log.
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         if self._prev_root is None:
@@ -162,6 +189,9 @@ class ConcurrencyRunningLogTest(unittest.TestCase):
             mock.patch('agent_runner.subprocess.run',
                        side_effect=lambda cmd, **kw: mock.Mock(
                            returncode=0, stdout=_ok_response(), stderr='')),
+            # #438 transcript check: success with a mock session id would
+            # write a REAL critical alert to the live larry-alerts ledger
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),

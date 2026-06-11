@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -27,6 +28,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import agent_runner as ar  # noqa: E402
 import active_tier  # noqa: E402
+import larry_alerts  # noqa: E402
 
 
 def _ok_response(text='ok', session_id='sid-new'):
@@ -74,6 +76,28 @@ class _NoopGuard:
         return 0
 
 
+def _pin_log_dir(tc, root):
+    """Route agent_runner.log()'s write-time OURLIBERTY_LOG_DIR resolution
+    into the test's tmp tree so un-mocked log() calls (incl. the #438
+    TRANSCRIPT_NOT_PERSISTED ERROR) can't land in the real ~/agents/logs/.
+    Guards the bare `python3 -m unittest` invocation — the discover gate
+    (#436) pins this process-wide, but direct runs have no other layer.
+    Restore registers via addCleanup, not tearDown: unittest skips tearDown
+    when setUp raises (e.g. the mkdir below), but cleanups still run.
+    """
+    prev = os.environ.get('OURLIBERTY_LOG_DIR')
+
+    def _restore():
+        if prev is None:
+            os.environ.pop('OURLIBERTY_LOG_DIR', None)
+        else:
+            os.environ['OURLIBERTY_LOG_DIR'] = prev
+
+    tc.addCleanup(_restore)
+    os.environ['OURLIBERTY_LOG_DIR'] = str(root / 'logs')
+    (root / 'logs').mkdir(parents=True, exist_ok=True)
+
+
 class RunClaudeActiveTierEnvTest(unittest.TestCase):
     """Verify that ``env['HOME']`` follows active-tier state across both
     the primary and fallback subprocess invocations."""
@@ -89,6 +113,7 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
         # Working dir must exist for Popen's cwd= arg
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
@@ -149,6 +174,9 @@ class RunClaudeActiveTierEnvTest(unittest.TestCase):
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             # ledger I/O — no-op so tests don't touch ~/agents
             mock.patch.object(ar, 'append_rate_limit_event'),
+            # #438 transcript check: success with a mock session id would
+            # write a REAL critical alert to the live larry-alerts ledger
+            mock.patch.object(larry_alerts, 'append_alert'),
             # CLAUDE.md poison guard + landmine scrub — irrelevant here
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
@@ -238,6 +266,7 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
@@ -276,6 +305,7 @@ class ResumeNoFallbackRefusalTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -314,6 +344,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
@@ -372,6 +403,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -436,6 +468,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -500,6 +533,7 @@ class AuthCircuitBreakerTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
@@ -535,6 +569,7 @@ class TierFailureLogTaggingTest(unittest.TestCase):
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
         self.workdir = self.root / 'work'
         self.workdir.mkdir(parents=True, exist_ok=True)
+        _pin_log_dir(self, self.root)
 
     def tearDown(self):
         import os
@@ -587,6 +622,7 @@ class TierFailureLogTaggingTest(unittest.TestCase):
             mock.patch.object(ar, '_dm_tier2_unavailable'),
             mock.patch.object(ar, '_mark_paused_on_tier1'),
             mock.patch.object(ar, 'append_rate_limit_event'),
+            mock.patch.object(larry_alerts, 'append_alert'),
             mock.patch.object(ar, 'quarantine_parent_claude_md_poison'),
             mock.patch.object(ar, 'scrub_tmp_identity_landmines'),
             mock.patch('agent_runner.time.sleep'),
