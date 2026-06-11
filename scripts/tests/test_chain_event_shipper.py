@@ -42,8 +42,12 @@ from unittest import mock
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
+_TESTS_DIR = Path(__file__).resolve().parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
 
 import chain_event_shipper as ces  # noqa: E402
+from _fake_supabase import make_fake_supabase  # noqa: E402
 
 
 class _IsolatedAgentsRoot(unittest.TestCase):
@@ -910,35 +914,13 @@ class TestSavePulseCursorAtomic(_IsolatedAgentsRoot):
         self.assertEqual(leftovers, [])
 
 
-class _FakeClientOptions:
-    """Stand-in for supabase-py's ClientOptions capturing the timeout kwarg."""
-
-    def __init__(self, postgrest_client_timeout=None, **kwargs):
-        self.postgrest_client_timeout = postgrest_client_timeout
-        self.extra = kwargs
-
-
-def _make_fake_supabase(capture: dict) -> types.ModuleType:
-    mod = types.ModuleType('supabase')
-
-    def _fake_create_client(url, key, options=None, **kwargs):
-        capture['url'] = url
-        capture['key'] = key
-        capture['options'] = options
-        return object()  # opaque stand-in client; never network-touched
-
-    mod.create_client = _fake_create_client  # type: ignore[attr-defined]
-    mod.ClientOptions = _FakeClientOptions  # type: ignore[attr-defined]
-    return mod
-
-
 class TestBuildClientOptions(unittest.TestCase):
     """build_client_options pins the PostgREST request timeout so a Supabase
     black-hole fails fast instead of blocking each synchronous write for
     supabase-py's multi-tens-of-seconds default."""
 
     def test_returns_options_with_default_timeout(self):
-        with mock.patch.dict(sys.modules, {'supabase': _make_fake_supabase({})}):
+        with mock.patch.dict(sys.modules, {'supabase': make_fake_supabase({})}):
             options = ces.build_client_options()
         self.assertIsNotNone(options)
         self.assertEqual(
@@ -946,7 +928,7 @@ class TestBuildClientOptions(unittest.TestCase):
         self.assertEqual(ces.SUPABASE_TIMEOUT_SEC, 15)
 
     def test_honours_explicit_timeout(self):
-        with mock.patch.dict(sys.modules, {'supabase': _make_fake_supabase({})}):
+        with mock.patch.dict(sys.modules, {'supabase': make_fake_supabase({})}):
             options = ces.build_client_options(timeout_sec=42)
         self.assertEqual(options.postgrest_client_timeout, 42)
 
@@ -960,6 +942,33 @@ class TestBuildClientOptions(unittest.TestCase):
             with mock.patch.dict(sys.modules, {'supabase.lib': None,
                                                'supabase.lib.client_options': None}):
                 self.assertIsNone(ces.build_client_options())
+
+
+class TestBuildClient(unittest.TestCase):
+    """build_client pins the timeout but must degrade to an un-pinned client
+    rather than raise when supabase-py's create_client rejects options=."""
+
+    def test_pins_timeout_when_options_accepted(self):
+        capture: dict[str, Any] = {}
+        with mock.patch.dict(sys.modules, {'supabase': make_fake_supabase(capture)}):
+            from supabase import create_client  # type: ignore
+            client = ces.build_client(create_client, 'https://x.supabase.co', 'k')
+        self.assertIsNotNone(client)
+        self.assertIsNotNone(capture.get('options'))
+        self.assertEqual(
+            capture['options'].postgrest_client_timeout, ces.SUPABASE_TIMEOUT_SEC)
+
+    def test_falls_back_when_create_client_rejects_options(self):
+        # A supabase-py whose create_client signature lacks options=: build_client
+        # must NOT let the TypeError escape (emit_event calls _get_client outside
+        # its try/except), and must still return a usable un-pinned client.
+        capture: dict[str, Any] = {}
+        fake = make_fake_supabase(capture, reject_options=True)
+        with mock.patch.dict(sys.modules, {'supabase': fake}):
+            from supabase import create_client  # type: ignore
+            client = ces.build_client(create_client, 'https://x.supabase.co', 'k')
+        self.assertIsNotNone(client)          # fell back, no raise
+        self.assertIsNone(capture.get('options'))  # bare create_client(url, key)
 
 
 class TestSupabaseSinkPinsTimeout(unittest.TestCase):
@@ -982,7 +991,7 @@ class TestSupabaseSinkPinsTimeout(unittest.TestCase):
 
     def test_ensure_client_passes_postgrest_timeout_option(self):
         capture: dict[str, Any] = {}
-        fake = _make_fake_supabase(capture)
+        fake = make_fake_supabase(capture)
         sink = ces.SupabaseSink()
         with mock.patch.dict(sys.modules, {'supabase': fake}):
             sink._ensure_client()

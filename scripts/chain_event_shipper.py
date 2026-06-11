@@ -930,12 +930,12 @@ def _resolve_client_options_cls():
     try:
         from supabase import ClientOptions  # type: ignore
         return ClientOptions
-    except (ImportError, AttributeError):
+    except ImportError:
         pass
     try:
         from supabase.lib.client_options import ClientOptions  # type: ignore
         return ClientOptions
-    except (ImportError, AttributeError):
+    except ImportError:
         pass
     return None
 
@@ -964,6 +964,31 @@ def build_client_options(timeout_sec: int = SUPABASE_TIMEOUT_SEC) -> Optional[An
         return options_cls(postgrest_client_timeout=timeout_sec)
     except TypeError:
         return None
+
+
+def build_client(create_client, url: str, key: str,
+                 timeout_sec: int = SUPABASE_TIMEOUT_SEC):
+    """Build a supabase client with the PostgREST request timeout pinned.
+
+    ``create_client`` is the caller's already-imported supabase factory — each
+    caller imports it under its own ImportError policy (emit returns None,
+    SupabaseSink raises RuntimeError), so only the build is shared here.
+
+    The timeout comes from ``build_client_options``. If this supabase-py build
+    can't supply ClientOptions, OR its ``create_client`` rejects the ``options=``
+    keyword (signature drift), fall back to an un-pinned client rather than let
+    the failure escape: ``_get_client``'s callers treat a raised exception as a
+    producer crash (``emit_event`` is documented best-effort/never-raises and
+    invokes ``_get_client`` outside its try/except), so a TypeError here would
+    wedge the very loop the timeout exists to protect. See build_client_options.
+    """
+    options = build_client_options(timeout_sec)
+    if options is None:
+        return create_client(url, key)
+    try:
+        return create_client(url, key, options=options)
+    except TypeError:
+        return create_client(url, key)
 
 
 class SupabaseSink:
@@ -996,12 +1021,8 @@ class SupabaseSink:
             ) from exc
         # Pin the PostgREST request timeout (SUPABASE_TIMEOUT_SEC) so a Supabase
         # network black-hole fails fast instead of blocking each drain for
-        # supabase-py's multi-tens-of-seconds default — see build_client_options.
-        options = build_client_options()
-        if options is not None:
-            self._client = create_client(url, key, options=options)
-        else:
-            self._client = create_client(url, key)
+        # supabase-py's multi-tens-of-seconds default — see build_client.
+        self._client = build_client(create_client, url, key)
 
     def insert_rows(self, rows: list[dict[str, Any]]) -> None:
         """INSERT a batch with PK conflict treated as no-op.
