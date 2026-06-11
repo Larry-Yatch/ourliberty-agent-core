@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~1517 — 2026-06-11 20:00Z UTC (interactive, Tier 1, consecutive_clean 1→2)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal — all mandatory + additive checks clean. PR #473 auto-merged at 19:54:05Z (Mirror PASS confirmed). Sync push error from 18:52:40Z self-healed at 19:52:50Z. Forge PID 1860848 active on test-jail-pr3-gate-hardening-001 (started 19:57:39Z). CCD-S5 orphaned worktree still present.
+
+**VERIFY-BEFORE-REASSERT (iter ~1516 watch items):**
+- **PR #473 Mirror PASS + auto-merge**: ✅ RESOLVED. L1303 (19:54:05Z) outbox-notifier review-pass: "Mirror approved PR #473 on task fix-build-background-poll-idiom-001. Auto-merged + branch deleted." Drop from watch.
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: STILL PRESENT. `ls ~/agent-worktrees/` confirms. ~2h29m+ post-PR#465 merge (17:31Z). [yellow] carry.
+- **Sync threshold 20:52:40Z**: ✅ SELF-HEALED. `agent-core-sync.json` last_sync=19:52:50Z, status=no-change. Push error from 18:52:40Z resolved before threshold. Drop threshold watch.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1303 lines (watermark L1302→L1303). 1 new entry:
+- **L1303 (19:54:05Z):** outbox-notifier review-pass PR #473, task=fix-build-background-poll-idiom-001 — "Auto-merged + branch deleted." Tier-3 known pattern (closure/completion). Journal note only; no DM. ✅ Watermark advanced to L1303.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json` MISSING (no pending approvals). No new Larry directives in alert stream. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: `test-jail-pr3-gate-hardening-001.json` — in-flight (PID 1860848, started 19:57:39Z, worktree `wt-forge-test-jail-pr3-gate-hardening-001` present). ✅ Active, not stale.
+- Pulse: EMPTY ✅ | Beacon: EMPTY ✅ | Mirror: EMPTY ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus at conversation start: main, clean. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T19:52:50Z, status=no-change, commit=6b8ad917. Elapsed ~7min from current iter. ✅ Fresh. Push error from 18:52:40Z self-healed. **Drop `sync-push-rebase-fallback-001` standing finding — 1/3 G-rule obsolete (pattern resolved).** `[blue]` G-rule entry removed.
+
+**Check C — Agent liveness:** All 8 systemd services active (beacon-bot, chain-event-shipper, dashboard-api, inbox-watcher, outbox-notifier, forge-bot, mirror-bot, pulse-bot). Forge PID 1860848 alive (test-jail-pr3-gate-hardening-001, started 19:57:39Z). ✅ Nominal.
+
+**Check E — PRs:** `gh pr list --state open` → `[]`. No open PRs. ✅ PR #473 confirmed merged (L1303). **RESOLVED** iter ~1516 watch item.
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅
+
+**Actions taken:**
+1. Alert watermark advanced L1302→L1303 (1 Tier-3 silence). ✅
+2. Ledger: `iter_clean` row appended (iter 1517, tier 1, ts 20:00:41Z). ✅
+3. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean 1→2. ✅
+4. No DMs sent — no [yellow] or [red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [yellow] **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`** — ~2h29m+ post-PR#465 merge (17:31Z). Reaper not catching it. Escalated iter ~1508. Pending Larry.
+- ~~[blue] PR #473~~ — **RESOLVED.** Merged 19:54:05Z. Drop.
+- ~~[blue] sync-push-rebase-fallback-001 — 1/3 G-rule~~ — **RESOLVED.** Push error self-healed 19:52:50Z. Drop.
+- [blue] **Forge: test-jail-pr3-gate-hardening-001** — PID 1860848 active (started 19:57:39Z). Watch for completion + PR open + Mirror review dispatch.
+- [blue] alert-triage watermark L1303.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. Carry.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472) — 18 total. Actor-exemption pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned) — 1/3 G-rule. Carry.
+
+**Watch items for iter ~1518:**
+- **Forge test-jail-pr3-gate-hardening-001 PID 1860848**: PR opened? Marker emitted? (PR-3 is a substantial task — complex gate hardening; allow several hours.)
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: Still present? Larry responded?
+- **Tier de-escalation**: consecutive_clean=2. One more clean iter → Tier 2 promotion (3/3). Watch.
+
+**PRIME DIRECTIVE:** Nominal clean iter. Running total: interventions=794, systemic_fixes=23, verification_pending=10, ratio≈34.5, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 1→2.
+
+---
+
 ## Iteration ~1516 — 2026-06-11 19:50Z UTC (interactive, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/cycle`).
