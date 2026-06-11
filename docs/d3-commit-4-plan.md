@@ -154,7 +154,7 @@ Before `git push` + droplet sync + service restarts:
 - [ ] Trust policy still ships empty rules (default `force_ask`). Don't enable auto-approve carve-outs in the same commit as new behavior.
 - [ ] gh authenticated on droplet (`gh auth status` shows `Larry-Yatch`).
 - [ ] Worktree path `~/agent-repos/ourliberty-agent-core/` exists OR is creatable.
-- [ ] Local test suite passes (`python3 -m unittest discover scripts/tests/`).
+- [ ] Local test suite passes (`python3 -m unittest discover -s scripts/tests`, no credentials sourced — the `_bootstrap` sandbox auto-arms).
 - [ ] Droplet test suite passes after `git reset --hard origin/main`.
 
 ---

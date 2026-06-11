@@ -32,7 +32,7 @@ Read your memory files first, then read these in order before doing anything els
 Verify droplet state:
 - `ssh larry@134.209.44.80 'systemctl list-units "ourliberty-*" --type=service --all --no-pager | head -20 && echo --- && systemctl list-timers "ourliberty-*" --all --no-pager | head -15 && echo --- && git -C ~/agent-core log --oneline -10'` — should see HEAD past `4c79450` (5b-followup-2) + the merge commits for PRs #5 and #6 + any Pulse cycles that ran between sessions.
 - `ssh larry@134.209.44.80 'ls ~/agents/state/in-flight/ && ls ~/agents/inboxes/*/ && tail -3 ~/agents/blackboard/larry-alerts.jsonl && echo offset: $(cat ~/agents/state/beacon-alerts-offset.txt)'` — should be empty in-flight + empty inboxes; queue and offset should match. System quiescent.
-- `ssh larry@134.209.44.80 'cd ~/agent-core && python3 -m unittest discover scripts/tests/ 2>&1 | tail -3'` — should see "Ran 478 tests ... OK" (current baseline; 5c will add ~30 more).
+- `ssh larry@134.209.44.80 'cd ~/agent-core && python3 -m unittest discover -s scripts/tests 2>&1 | tail -3'` — blessed form, no credentials sourced (the `_bootstrap` sandbox auto-arms on import); should see "Ran 478 tests ... OK" (current baseline; 5c will add ~30 more).
 - `ssh larry@134.209.44.80 'python3 ~/agent-core/scripts/watchdog.py 2>&1 | tail -3'` — should see overall=healthy.
 
 Verify origin state:
