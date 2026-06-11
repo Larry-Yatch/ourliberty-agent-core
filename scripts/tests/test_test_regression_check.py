@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
@@ -510,6 +511,29 @@ class OutsideJailTripwireTest(_IsolatedAgentsRoot):
             leaked = fake_agents / 'outboxes' / 'leaked.json'
             leaked.write_text(f'{{"sentinel": "{sentinel}"}}\n')
             with patch.object(trc, 'REAL_AGENTS', fake_agents):
+                with self.assertRaises(trc.AnalysisError):
+                    trc.scan_real_tree_for_sentinel(sentinel)
+
+    def test_old_residue_is_skipped_by_mtime_filter(self):
+        """A pre-existing real-tree file that (synthetically) holds the sentinel
+        but predates the run is SKIPPED when since_mtime is set — it can't be
+        from this run, so reading it is the ~140MB-per-run waste we avoid. With
+        the default since_mtime=0.0 the SAME file is read (proving the skip is
+        the mtime filter, not a missing needle)."""
+        sentinel = 'OL-TEST-RUN-SENTINEL-' + 'feed' * 8
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_agents = Path(tmp) / 'agents'
+            (fake_agents / 'logs').mkdir(parents=True, exist_ok=True)
+            residue = fake_agents / 'logs' / 'old-residue.log'
+            residue.write_text(f'stale {sentinel}\n')
+            old = time.time() - 3600
+            os.utime(residue, (old, old))
+            with patch.object(trc, 'REAL_AGENTS', fake_agents):
+                # since_mtime in the recent past → the hour-old file is skipped.
+                trc.scan_real_tree_for_sentinel(
+                    sentinel, since_mtime=time.time() - 60,
+                )
+                # default (read everything) → the same file IS flagged.
                 with self.assertRaises(trc.AnalysisError):
                     trc.scan_real_tree_for_sentinel(sentinel)
 

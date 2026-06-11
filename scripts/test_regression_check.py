@@ -63,6 +63,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -103,6 +104,12 @@ _DEAD_API_URL_VARS = ('OL_DASHBOARD_API_URL', 'DASHBOARD_API_URL')
 # sentinel (item 4). INCLUDES outboxes/ — H10 verified the #428 runtime tripwire
 # wrongly omits it, and outboxes/ was the 2026-05-13 burn path.
 _TRIPWIRE_SUBDIRS = ('logs', 'inboxes', 'blackboard', 'state', 'outboxes')
+# The tripwire only reads files modified within this margin before the suite
+# started — the run sentinel is a fresh uuid minted at run start, so only files
+# the run could have written can hold it. The margin absorbs filesystem mtime
+# granularity and minor clock skew. Bounds the scan to a handful of fresh files
+# instead of reading the whole ~/agents tree (~14k files / ~140MB) every run.
+_TRIPWIRE_MTIME_MARGIN_S = 5.0
 
 _WALL_UNAVAILABLE_WARNING = (
     'test_regression_check: WARNING — droplet hard wall unavailable: bwrap '
@@ -396,7 +403,7 @@ def remove_worktree(repo_root: Path, dest: Path) -> None:
         pass
 
 
-def scan_real_tree_for_sentinel(sentinel: str) -> None:
+def scan_real_tree_for_sentinel(sentinel: str, since_mtime: float = 0.0) -> None:
     """Outside-jail tripwire (item 4 — H10). Scan the REAL agents tree for any
     file containing THIS run's sentinel and raise AnalysisError (exit 2) on a
     hit — a sentinel-bearing file in the real tree means a test process escaped
@@ -408,9 +415,18 @@ def scan_real_tree_for_sentinel(sentinel: str) -> None:
     paths from ``REAL_AGENTS`` (a module global so meta-tests can monkeypatch
     it to a tmp tree).
 
+    ``since_mtime`` bounds the read to files modified at/after it. The run
+    sentinel is a fresh uuid minted at run start, so a real-tree file written by
+    THIS run necessarily has mtime >= run start; pre-existing residue (which by
+    construction cannot contain this run's sentinel) is skipped without being
+    read. The gate passes ``run-start − _TRIPWIRE_MTIME_MARGIN_S``; the default
+    0.0 reads every file (used by the direct meta-tests). This keeps the scan to
+    the handful of files the run actually touched instead of reading the whole
+    ~/agents tree (~14k files / ~140MB on the droplet) on every gate run.
+
     Fail-open on scan-infra errors (missing dir, permission): a scan that can't
     complete logs a warning and does NOT block; only an actual sentinel hit
-    blocks. Cheap — a handful of dirs, well within the per-SHA budget.
+    blocks.
     """
     needle = sentinel.encode()
     for sub in _TRIPWIRE_SUBDIRS:
@@ -422,6 +438,10 @@ def scan_real_tree_for_sentinel(sentinel: str) -> None:
                 if not path.is_file():
                     continue
                 try:
+                    # Skip pre-existing residue: it can't hold this run's unique
+                    # sentinel, so reading it is pure waste (the ~140MB win).
+                    if path.stat().st_mtime < since_mtime:
+                        continue
                     data = path.read_bytes()
                 except OSError:
                     continue
@@ -474,6 +494,9 @@ def collect_failures_at_sha(
     # /tmp/wt-main- — the cwd-prefix the zombie/wedged-session healers SIGKILL.
     worktree_path = tmp_parent / f'gate-wt-{sha[:12]}'
     add_worktree(repo_root, sha, worktree_path)
+    # Captured just before the suite runs so the outside-jail tripwire only
+    # reads files the run could have written (minus the granularity margin).
+    run_start = time.time()
     try:
         failures = run_tests_in_dir(
             worktree_path, timeout_s, isolated_root, env=env,
@@ -481,7 +504,9 @@ def collect_failures_at_sha(
     finally:
         remove_worktree(repo_root, worktree_path)
 
-    scan_real_tree_for_sentinel(sentinel)
+    scan_real_tree_for_sentinel(
+        sentinel, since_mtime=run_start - _TRIPWIRE_MTIME_MARGIN_S,
+    )
     return failures
 
 
