@@ -619,6 +619,13 @@ _LOG_EVENT_KEYWORDS = {
     'AUTO_MERGE': 'auto_merge',
     'MARKER_ERROR': 'marker_error',
     'COST_BUDGET': 'cost_budget',
+    # SUPERSEDED (forge-queue-in-review-lane): review_request is now
+    # push-emitted by outbox_notifier._emit_review_request_chain_event with
+    # agent='forge' at the dispatch sites. Do NOT add a REVIEW_REQUEST log
+    # line on the producer side when fixing this parser — it would
+    # double-write the event (push ts != log ts, so the event_id PK can't
+    # dedup the pair) and the parsed copy would carry agent='notifier',
+    # which the dashboard's .eq('agent','forge') fetch ignores anyway.
     'REVIEW_REQUEST': 'review_request',
     'BUILD_DISPATCHED': 'build_dispatched',
     'HEALER_FIRE': 'healer_fire',

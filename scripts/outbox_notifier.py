@@ -1590,6 +1590,62 @@ def _emit_mirror_verdict_chain_event(
         )
 
 
+def _emit_review_request_chain_event(
+    task_id: str,
+    pr_url: str,
+    *,
+    revision_count: int,
+    replan_count: int,
+) -> None:
+    """Push a `review_request` chain_event after a Mirror review dispatch.
+
+    forge-queue-in-review-lane: the dashboard's Forge queue derives its
+    "In review" lane from chain_events rows with agent='forge' and
+    event_type='review_request' (dashboard_api._derive_in_review). The
+    shipper defined a REVIEW_REQUEST log-line format for this event but no
+    producer was ever written — and the shipper's log parser can't consume
+    this module's `[ts] [notifier] [LEVEL]` line shape anyway — so the lane
+    sat permanently empty. Push-emit at the dispatch site instead, the same
+    proven pathway as `_emit_mirror_verdict_chain_event`.
+
+    Fires from `_dispatch_mirror_review` (revision_count=0) and
+    `_dispatch_mirror_review_rerun` (revision_count=round N), AFTER the
+    inbox write succeeds — a rejected/duplicate dispatch emits nothing.
+    `agent='forge'` deliberately: the event marks the FORGE build entering
+    review (the dashboard fetch filters on the building agent), even though
+    the writer is this notifier and the reviewer is Mirror.
+
+    Best-effort + ADDITIVE: emit_event logs WARN and returns False on
+    Supabase outage; the review dispatch itself never depends on the row
+    landing. A lost row only means the task skips the in_review lane
+    visually until the verdict lands. The same display-only loss happens if
+    the daemon dies between the inbox write and this emit: re-processing
+    hits the idempotency presence check (which fires before the dispatch
+    try-block) and skips both — accepted, the lane is a view, not state.
+    Same daemon-never-wedge invariant as the sibling emit helpers.
+    """
+    chain_payload = {
+        'agent': 'forge',
+        'task_id': task_id,
+        'revision_count': revision_count,
+        'replan_count': replan_count,
+    }
+    try:
+        chain_event_emit.emit_event(
+            event_type='review_request',
+            agent='forge',
+            task_id=task_id,
+            payload=chain_payload,
+            pr_url=pr_url,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(
+            f'review_request chain_event emit raised unexpectedly for '
+            f'task {task_id!r}: {type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 # Canonical "preflight response carried no marker block at all" error. Defined
 # as a constant (not an inline literal) so the none-found marker-error retry
 # enrichment in `_notify_forge_marker_error` can detect THIS specific failure
@@ -3423,6 +3479,10 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
             f'review-request dispatched mirror <- beacon '
             f'(task={task_id}, file={dest.name}, pr={pr_url})'
         )
+        _emit_review_request_chain_event(
+            task_id, pr_url,
+            revision_count=0, replan_count=replan_count,
+        )
     except (
         safe_write_inbox.DispatchRejected,
         safe_write_inbox.RoutingDenied,
@@ -4131,6 +4191,10 @@ def _dispatch_mirror_review_rerun(
         log(
             f're-review dispatched mirror <- beacon (task={task_id}, '
             f'round={round_num}, file={dest.name})'
+        )
+        _emit_review_request_chain_event(
+            task_id, pr_url,
+            revision_count=round_num, replan_count=replan_count,
         )
     except (
         safe_write_inbox.DispatchRejected,

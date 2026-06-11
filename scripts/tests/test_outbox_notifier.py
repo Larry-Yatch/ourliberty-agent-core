@@ -40,6 +40,7 @@ import safe_write_inbox as swi      # noqa: E402
 # monkeypatches of on.AGENTS_ROOT / on.LOG_FILE / ... still override on top.
 _AGENTS_ROOT_BACKUP = None
 _AGENTS_ROOT_TMPDIR = None
+_LIVE_EMIT_BACKUP = None
 
 # build-mirror-review-status — shared ordered call log. The inert status
 # override (installed in setUpModule) and per-class merge overrides both
@@ -61,10 +62,19 @@ def _inert_mirror_review_status(data, marker_decision):
 
 
 def setUpModule():  # noqa: N802 — unittest hook name
-    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
+    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _LIVE_EMIT_BACKUP
     _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
     _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='outbox-notifier-test-')
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
+    # forge-queue-in-review-lane: review dispatches now push-emit a chain
+    # event via chain_event_emit. Under `unittest discover` (which never
+    # runs tests/__init__.py — the verified #428 gap) nothing else sets the
+    # guard, and a shell with SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY sourced
+    # (any droplet session) would build a LIVE client and upsert fixture
+    # rows into the real chain_events table. Force the kill-switch for the
+    # whole module; tests that exercise emit behavior mock emit_event.
+    _LIVE_EMIT_BACKUP = os.environ.get('OURLIBERTY_DISABLE_LIVE_EMIT')
+    os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
     for sub in ('logs', 'state', 'blackboard', 'inboxes', 'outboxes'):
         Path(_AGENTS_ROOT_TMPDIR, sub).mkdir(exist_ok=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
@@ -80,6 +90,10 @@ def tearDownModule():  # noqa: N802 — unittest hook name
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
     else:
         os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_BACKUP
+    if _LIVE_EMIT_BACKUP is None:
+        os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
+    else:
+        os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = _LIVE_EMIT_BACKUP
     if _AGENTS_ROOT_TMPDIR:
         shutil.rmtree(_AGENTS_ROOT_TMPDIR, ignore_errors=True)
     importlib.reload(swi)  # swi follows OURLIBERTY_AGENTS_ROOT too (prod-write isolation)
@@ -10896,6 +10910,117 @@ class ReconcileMissedMirrorReviewsTest(unittest.TestCase):
         on._reconcile_missed_mirror_reviews()
         self.assertEqual(
             list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
+
+
+class ReviewRequestChainEventTest(unittest.TestCase):
+    """forge-queue-in-review-lane: review dispatches push-emit a
+    `review_request` chain_event (agent='forge') so the dashboard's
+    in_review lane populates. The emit fires ONLY on a successful inbox
+    write — idempotent skips and rejected dispatches emit nothing — and
+    an emit failure never breaks the dispatch itself."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+        self.captured: list[dict] = []
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def _fake_emit(self, **kwargs):
+        self.captured.append(kwargs)
+        return True
+
+    def _data(self):
+        return {
+            'task_id': 'real-rr1',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/real-rr1',
+        }
+
+    PR = 'https://github.com/x/y/pull/9'
+
+    def test_first_dispatch_emits_review_request(self):
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        # The dispatch itself wrote the review task...
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
+        # ...and exactly one review_request event rode along.
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['task_id'], 'real-rr1')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 0)
+        self.assertEqual(ev['payload']['replan_count'], 0)
+
+    def test_rerun_dispatch_emits_with_round_number(self):
+        data = self._data()
+        data['pr_url'] = self.PR
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review_rerun(data, 2, 'fixed the findings')
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 2)
+
+    def test_idempotent_skip_does_not_emit(self):
+        inbox = on.INBOXES_ROOT / 'mirror'
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / 'review-real-rr1.json').write_text('{}')
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_rejected_dispatch_does_not_emit(self):
+        with mock.patch.object(
+            swi, 'safe_write_inbox',
+            side_effect=swi.DispatchRejected('denied by validator'),
+        ), mock.patch.object(on.chain_event_emit, 'emit_event',
+                             self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_emit_failure_does_not_break_dispatch(self):
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            # Must not propagate — daemon-never-wedge.
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
 
 
 if __name__ == '__main__':
