@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration ~1515 — 2026-06-11 19:44Z UTC (interactive, Tier 2→1 reset, dirty-tree:systemd-heal-install-drift-service)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Drift (Check A) — `systemd/ourliberty-heal-systemd-install-drift.service` modified in working tree (session gitStatus at conversation start). All mandatory checks nominal. PR #469 merged at 19:25:47Z ✅. Forge PID 1845670 building fix-build-background-poll-idiom-001 (started 19:44:08Z). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` still present (2h20m+).
+
+**VERIFY-BEFORE-REASSERT (iter ~1514 watch items):**
+- **PR #469 Mirror PASS + merge**: ✅ RESOLVED. Merged at 2026-06-11T19:25:47Z (`gh pr view 469`). Both Forge build (PID 1830242) and Mirror PASS completed successfully. Drop from watch.
+- **Forge build PID 1830242**: ✅ COMPLETED (inferred from PR #469 merge). Process no longer alive; worktree cleaned by reaper.
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: STILL PRESENT (confirmed `ls ~/agent-worktrees/`). ~2h20m post-PR#465 merge (17:28Z). Reaper (PR #457) deployed but hasn't caught this worktree. [yellow] carry.
+- **Sync threshold 20:52:40Z**: NOT CROSSED. Current time ~19:44Z. ~68 min remaining. ✅ Self-healing.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1297 lines (watermark L1296→L1297). 1 new entry:
+- **L1297 (19:25:05Z):** `unreviewed-merge:471` (actor=Larry-Yatch). PR #471 = `fix(alert-translations): add pulse/beacon-erofs EROFS translation entry`. Tier-3 known pattern (actor-exemption). Journal note only; no DM. ✅ Watermark advanced to L1297.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json` MISSING (no pending approvals). No new Larry directives in alert stream beyond L1297 (actor-exemption pattern). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `RETRY_EXHAUSTED_SKIP task=test-jail-pr2-choke-guards-001 reason=superseded_session` (expected — task completed via PR #469 merge) + `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Pulse: EMPTY ✅ | Beacon: EMPTY ✅ | Forge: EMPTY ✅ (Forge in-flight: `fix-build-background-poll-idiom-001`, PID 1845670, started 19:44:08Z — picked up from inbox just before scan) | Mirror: EMPTY ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus at conversation start: main, M `systemd/ourliberty-heal-systemd-install-drift.service`. Working tree dirty. Git commands blocked in this session context — diff unavailable. This file was clean at iter ~1514 start, so modification occurred between 19:24Z and conversation start. ⚠️ [yellow] new finding. `never-auto` — alert Larry. No DM (Larry is active/watching).
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T18:52:40Z (status=error, push failed). Elapsed ~51 min. 2h threshold 20:52:40Z not yet crossed. ✅ Within window. Self-healing.
+
+**Check C — Agent liveness:** inbox_watcher (PID 1829291), outbox_notifier (PID 1829300), beacon_telegram_bot (PID 1843738) alive via pgrep. All 5 systemd services `active`. Forge PID 1845670 active (fix-build-background-poll-idiom-001, 1 min). ✅ Nominal.
+
+**Check E — PRs:** `gh pr list --state open` → `[]`. No open PRs. PR #469 merged. ✅ Nominal.
+
+**§5.0 bug-hunt gate:** Thursday — no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d — no 60d trigger. ✅
+
+**Actions taken:**
+1. Alert watermark advanced L1296→L1297 (1 new Tier-3 silence). ✅
+2. Ledger: `intervention` row appended — `dirty-tree:systemd-heal-install-drift-service` (iter 1515, tier 2, never-auto). ✅
+3. Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 2→1 reset** (consecutive_clean=0, last_signal_at=19:48:26Z). Script treats any non-clean iter as a tier-reset signal; dirty tree finding triggered this.
+4. No DMs sent — dirty tree is [yellow], Larry is active.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [yellow] **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`** — 2h20m+ post-PR#465 merge (17:28Z). Reaper not catching it. Pending Larry response.
+- [yellow] **Dirty working tree** — `systemd/ourliberty-heal-systemd-install-drift.service` modified since iter ~1514 clean. Git diff unavailable (commands blocked this session). Investigate: run `git diff HEAD -- systemd/ourliberty-heal-systemd-install-drift.service` in agent-core dir.
+- ~~[blue] PR #469~~ — **RESOLVED.** Merged 19:25:47Z. Drop.
+- ~~[blue] Forge marker-error retry 2/3~~ — **RESOLVED.** Build completed; PR #469 merged. Drop.
+- [blue] **Forge build: fix-build-background-poll-idiom-001** — PID 1845670 active (started 19:44:08Z). Watch for completion.
+- [blue] alert-triage watermark L1297.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. Carry.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471) — 17 total (+1: PR #471 Larry-Yatch at 19:25Z). Actor-exemption pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned) — 1/3 G-rule. Carry.
+- [blue] Sync push failure 18:52:40Z — self-healing. Threshold 20:52:40Z not yet crossed.
+
+**Watch items for iter ~1516:**
+- **Forge fix-build-background-poll-idiom-001 PID 1845670**: Completed? Marker emitted? PR opened?
+- **Dirty tree `systemd/ourliberty-heal-systemd-install-drift.service`**: Still present? What modified it? Run `git diff HEAD -- systemd/ourliberty-heal-systemd-install-drift.service`.
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: Still present? Larry responded?
+- **Sync threshold 20:52:40Z**: Crossed? Check agent-core-sync.json. If crossed + still error → escalate [yellow].
+
+**PRIME DIRECTIVE:** Non-nominal iter (Check A dirty tree). Intervention recorded. Running total: interventions=794, systemic_fixes=23, verification_pending=10, ratio≈34.5, trend=flat.
+**Tier end-of-iter:** Tier 2→1 reset (consecutive_clean=0; `cycle_tier_state.py record --checks-clean false` triggered Tier 1 on dirty-tree finding).
+
+---
+
+
 ## Iteration ~1514 — 2026-06-11 19:24Z UTC (interactive, Tier 1→2, consecutive_clean 2→3 → de-escalate)
 
 **Trigger:** Larry direct invocation (`/cycle`).
