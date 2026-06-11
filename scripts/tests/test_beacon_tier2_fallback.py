@@ -63,6 +63,13 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
     def setUp(self):
         super().setUp()
         self.bot = importlib.import_module('beacon_telegram_bot')
+        # Step C quota-ledger writes resolve OURLIBERTY_AGENTS_ROOT at CALL
+        # time — class-level patch so no future call_beacon test can write
+        # the real anthropic-quota-events.jsonl; bound so tests can assert
+        # the emission still happens.
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
 
     def test_resume_plus_rate_limit_refuses_tier2(self):
         # Tier 1 returns rate-limit phrasing on stdout, non-zero exit
@@ -75,9 +82,11 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm', dm_mock), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as failure_dm_mock, \
-             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True):
             reply, sess = self.bot.call_beacon('hello', 'sess-abc')
+        # Step C: the tier-1 failure must still land a quota-ledger event —
+        # this is the only test coverage of the bot's emission call sites.
+        self.quota_mock.assert_called()
         # Tier 2 must NOT have been invoked — only one _run_claude_once call
         self.assertEqual(run_mock.call_count, 1,
                          'Tier 2 subprocess must not be invoked on --resume failure')
@@ -97,7 +106,6 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
-             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm') as refuse_dm:
             reply, sess = self.bot.call_beacon('hello', None)
         # Tier 2 WAS attempted (two calls); refuse-on-resume DM did NOT fire
@@ -117,6 +125,10 @@ class BeaconBotT2StdoutReturnedTest(_TempDirBase):
     def setUp(self):
         super().setUp()
         self.bot = importlib.import_module('beacon_telegram_bot')
+        # See BeaconBotRefuseOnResumeTest.setUp — same class-level barrier.
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
 
     def test_tier2_failure_body_echoes_tier2_stdout(self):
         # Tier 1 phrase must actually trip classify_tier1_failure — use the
@@ -132,9 +144,9 @@ class BeaconBotT2StdoutReturnedTest(_TempDirBase):
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
-             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as dm_mock:
             reply, _ = self.bot.call_beacon('hello', None)
+        self.quota_mock.assert_called()
         # The chat reply body must contain Tier 2's stdout, NOT Tier 1's
         self.assertIn('TIER 2 distinct', reply)
         self.assertNotIn('TIER_ONE_MARKER', reply)

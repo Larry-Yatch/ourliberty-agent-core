@@ -359,6 +359,13 @@ class CallBeaconTier2Test(unittest.TestCase):
         os.environ['OURLIBERTY_CREDENTIALS_ENV_FILE'] = (
             '/nonexistent-ourliberty-test/.env.larry')
         self.bot = _BotImporter.load_with_env()
+        # Step C quota-ledger writes resolve OURLIBERTY_AGENTS_ROOT at CALL
+        # time — these call_beacon tests drive real tier-failure paths, so
+        # without this patch every run appends to the real
+        # anthropic-quota-events.jsonl (test-jail audit, the #412 class).
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:
@@ -476,6 +483,10 @@ class CallBeaconTier2SetupTokenTest(unittest.TestCase):
         self._prev_t2 = os.environ.get('CLAUDE_CODE_OAUTH_TOKEN_TIER2')
         os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = self._TIER2_TOKEN
         self.bot = _BotImporter.load_with_env()
+        # See CallBeaconTier2Test.setUp — same quota-ledger barrier.
+        _p = mock.patch.object(self.bot, '_append_bot_quota_event')
+        self.quota_mock = _p.start()
+        self.addCleanup(_p.stop)
 
     def tearDown(self):
         if self._prev_t2 is None:

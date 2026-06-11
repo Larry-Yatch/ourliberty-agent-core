@@ -31,18 +31,44 @@ _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
-# Import-time sandbox: the healer (and its transitive imports, e.g.
-# heal_stale_approvals) resolve AGENTS_ROOT-derived paths — some frozen at
-# import — so un-mocked log()/heartbeat() calls from ANY test class here
-# would append to the real ~/agents tree on the droplet. setdefault so the
-# #436 gate env (and any outer harness) still wins. Interim until the
+# Import-time sandbox (canonical Gap-A shape, see scripts/tests/conftest.py):
+# the healer's transitive imports freeze AGENTS_ROOT-derived paths at import,
+# so the env must be set BEFORE the import below. Guarded so the #436 gate
+# env / tests/__init__.py (and any outer harness) win. Interim until the
 # per-module bootstrap (docs/test-jail-spec.md Layer A) lands.
-os.environ.setdefault(
-    'OURLIBERTY_AGENTS_ROOT',
-    tempfile.mkdtemp(prefix='ol-test-agents-root-'))
+if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
+    _SANDBOX_ROOT = tempfile.mkdtemp(prefix='ol-test-agents-root-')
+    os.makedirs(os.path.join(_SANDBOX_ROOT, 'logs'), exist_ok=True)
+    os.environ['OURLIBERTY_AGENTS_ROOT'] = _SANDBOX_ROOT
+    os.environ.setdefault(
+        'OURLIBERTY_WORKTREES_ROOT', os.path.join(_SANDBOX_ROOT, 'worktrees'))
+    os.environ.setdefault(
+        'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_ROOT, 'logs'))
 
 import heal_unregistered_approval as h  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
+
+
+# Runtime backstop: h resolves agents_root() at CALL time, and an
+# alphabetically-earlier suite's tearDown can pop OURLIBERTY_AGENTS_ROOT
+# before this module's tests RUN (discover imports everything first, then
+# runs) — so the env pin above cannot be the only barrier. Patch the two
+# write funnels for the whole module; tests that assert on them (e.g.
+# PromoteRaceTest) layer their own patches on top.
+_MODULE_WRITE_PATCHES = [
+    mock.patch.object(h, 'log'),
+    mock.patch.object(h, 'heartbeat'),
+]
+
+
+def setUpModule():
+    for _p in _MODULE_WRITE_PATCHES:
+        _p.start()
+
+
+def tearDownModule():
+    for _p in _MODULE_WRITE_PATCHES:
+        _p.stop()
 
 
 NOW = datetime(2026, 6, 3, 12, 0, 0, tzinfo=timezone.utc)

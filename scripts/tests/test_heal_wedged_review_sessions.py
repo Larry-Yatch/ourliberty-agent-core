@@ -28,14 +28,19 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-# Import-time sandbox: h freezes AGENTS_ROOT/LOG_FILE/HEARTBEAT_FILE at
-# import, so un-mocked log()/heartbeat() from ANY test class here would
-# append to the real ~/agents tree on the droplet. setdefault so the #436
-# gate env (and any outer harness) still wins. Interim until the
+# Import-time sandbox (canonical Gap-A shape, see scripts/tests/conftest.py):
+# the healer's transitive imports freeze AGENTS_ROOT-derived paths at import,
+# so the env must be set BEFORE the import below. Guarded so the #436 gate
+# env / tests/__init__.py (and any outer harness) win. Interim until the
 # per-module bootstrap (docs/test-jail-spec.md Layer A) lands.
-os.environ.setdefault(
-    'OURLIBERTY_AGENTS_ROOT',
-    tempfile.mkdtemp(prefix='ol-test-agents-root-'))
+if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
+    _SANDBOX_ROOT = tempfile.mkdtemp(prefix='ol-test-agents-root-')
+    os.makedirs(os.path.join(_SANDBOX_ROOT, 'logs'), exist_ok=True)
+    os.environ['OURLIBERTY_AGENTS_ROOT'] = _SANDBOX_ROOT
+    os.environ.setdefault(
+        'OURLIBERTY_WORKTREES_ROOT', os.path.join(_SANDBOX_ROOT, 'worktrees'))
+    os.environ.setdefault(
+        'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_ROOT, 'logs'))
 
 import heal_wedged_review_sessions as h  # noqa: E402
 
@@ -356,7 +361,6 @@ class TestFalsePositiveDemote(unittest.TestCase):
 
 class TestKillSwitch(unittest.TestCase):
     def test_kill_switch_blocks_main(self, ):
-        import tempfile
         from unittest import mock
         with tempfile.TemporaryDirectory() as td:
             ks = Path(td) / 'healers.disabled'
@@ -365,8 +369,9 @@ class TestKillSwitch(unittest.TestCase):
             h.KILL_SWITCH = ks
             try:
                 self.assertTrue(h.kill_switch_active())
-                # h.log appends to the import-frozen LOG_FILE under the real
-                # ~/agents/logs on the droplet — keep the exit line in memory.
+                # Belt-and-suspenders: LOG_FILE froze into the module-top
+                # sandbox at import, so this mock is the second layer, not
+                # the only barrier — keep both.
                 with mock.patch.object(h, 'log'):
                     rc = h.main()
                 self.assertEqual(rc, 0)
