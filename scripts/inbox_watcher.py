@@ -48,7 +48,11 @@ import safe_write_inbox  # noqa: E402
 import worktree_manager  # noqa: E402
 
 HOME = Path.home()
-AGENTS_ROOT = HOME / "agents"
+# Honor the OURLIBERTY_AGENTS_ROOT sandbox redirect (set by the test bootstrap /
+# conftest) like every sibling module. Without this, the import-time log/state
+# paths resolve under the real ~/agents and a test that triggers a log() write
+# escapes the sandbox into the live tree.
+AGENTS_ROOT = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT", str(HOME / "agents")))
 INBOXES_ROOT = AGENTS_ROOT / "inboxes"
 OUTBOXES_ROOT = AGENTS_ROOT / "outboxes"
 BLACKBOARD = AGENTS_ROOT / "blackboard"

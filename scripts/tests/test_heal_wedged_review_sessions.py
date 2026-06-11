@@ -398,10 +398,14 @@ class TestNoDoubleKill(unittest.TestCase):
         self.assertIsNone(h.agent_tier_for_cwd('/home/larry/agent-core'))
 
     def test_review_worktrees_are_owned(self):
+        # Build the expected cwds from the SAME Path.home() the module derived
+        # WORKTREE_PREFIXES from at import — a jailed/overridden HOME (CI, the
+        # scratch-HOME tripwire) moves that prefix off the '/home/larry' literal.
+        worktrees = h.HOME / 'agent-worktrees'
         self.assertEqual(
-            h.agent_tier_for_cwd('/home/larry/agent-worktrees/wt-mirror-a'), 'mirror')
+            h.agent_tier_for_cwd(str(worktrees / 'wt-mirror-a')), 'mirror')
         self.assertEqual(
-            h.agent_tier_for_cwd('/home/larry/agent-worktrees/wt-forge-b'), 'forge')
+            h.agent_tier_for_cwd(str(worktrees / 'wt-forge-b')), 'forge')
 
 
 # ---------------------- config ----------------------

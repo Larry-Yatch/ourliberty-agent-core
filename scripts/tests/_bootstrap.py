@@ -38,10 +38,16 @@ registering two atexit scans that would double-fire ``os._exit``.
 """
 import atexit
 import os
+import site
 import sys
 import tempfile
 import time
 import uuid
+
+try:
+    import pwd  # POSIX-only; used to find the REAL home regardless of $HOME.
+except ImportError:  # pragma: no cover - non-POSIX
+    pwd = None
 
 # Process guards that survive the dual module identity described above (a
 # module-level bool would not, because top-level `_bootstrap` and
@@ -61,6 +67,68 @@ _ARMED_GUARD = 'OURLIBERTY_TEST_BOOTSTRAP_TRIPWIRE_ARMED'
 # the identity that actually ran engage().
 _RUNTIME_TRIPWIRE_ARMED = False
 _RUNTIME_TRIPWIRE_SENTINEL = None
+
+
+def _real_user_site_dirs():
+    """The per-user site-packages directories of the REAL invoking user,
+    resolved independently of ``$HOME``.
+
+    pip ``--user`` installs (fastapi / uvicorn / httpx for the dashboard tests
+    live here on this droplet) land in ``<home>/.local/lib/pythonX.Y/site-packages``.
+    Python computes that path from ``$HOME`` at interpreter startup, so if the
+    suite is invoked under an overridden/jailed ``$HOME`` — e.g. CI, or the
+    scratch-HOME no-production-write tripwire — the real user-site silently
+    drops off ``sys.path`` and ``import fastapi`` raises ModuleNotFoundError.
+
+    We derive the home from the passwd database (``pwd``), which reflects the
+    actual account and is immune to a ``$HOME`` override, and fall back to
+    ``site.getusersitepackages()`` for the common (un-overridden) case."""
+    dirs = []
+    homes = []
+    if pwd is not None:
+        try:
+            homes.append(pwd.getpwuid(os.getuid()).pw_dir)
+        except (KeyError, OSError):
+            pass
+    ver = f'python{sys.version_info.major}.{sys.version_info.minor}'
+    for home in homes:
+        if home:
+            dirs.append(os.path.join(home, '.local', 'lib', ver, 'site-packages'))
+    try:
+        dirs.append(site.getusersitepackages())
+    except Exception:
+        pass
+    # De-dupe while preserving order.
+    seen = set()
+    out = []
+    for d in dirs:
+        if d and d not in seen:
+            seen.add(d)
+            out.append(d)
+    return out
+
+
+def _preserve_user_site():
+    """Keep the real user-site importable for this process AND for any test
+    subprocess, regardless of a ``$HOME`` override later in the run.
+
+    Prepended (ahead of the system ``dist-packages``) so it matches the normal
+    pip ``--user`` precedence: e.g. the newer ``typing_extensions`` that fastapi
+    /pydantic require lives in user-site and MUST win over the older copy in
+    ``/usr/lib/python3/dist-packages``. Mirrored to the front of ``PYTHONPATH``
+    so subprocess-spawning tests inherit the same ordering. Idempotent."""
+    to_add = [d for d in _real_user_site_dirs()
+              if os.path.isdir(d) and d not in sys.path]
+    # Insert preserving the candidate order at the front of sys.path.
+    for usersite in reversed(to_add):
+        sys.path.insert(0, usersite)
+
+    existing = os.environ.get('PYTHONPATH', '')
+    parts = existing.split(os.pathsep) if existing else []
+    new_parts = [d for d in _real_user_site_dirs()
+                 if os.path.isdir(d) and d not in parts]
+    if new_parts:
+        os.environ['PYTHONPATH'] = os.pathsep.join(new_parts + parts)
 
 
 def _is_this_process(var: str) -> bool:
@@ -148,6 +216,13 @@ def engage() -> None:
     if _is_this_process(_ENGAGE_GUARD):
         return
     os.environ[_ENGAGE_GUARD] = str(os.getpid())
+
+    # Keep pip --user packages importable even if the suite runs under an
+    # overridden/jailed HOME (CI, or the scratch-HOME tripwire). Do this FIRST,
+    # before any test triggers a fastapi import. This does NOT touch HOME — the
+    # sandbox is built on OURLIBERTY_* env redirection (mirrored from conftest;
+    # see test_conftest_init_parity.py), not a HOME swap.
+    _preserve_user_site()
 
     # Production log redirection (Gap: 2026-05-27 live-log leak). Many daemons
     # resolve OURLIBERTY_LOG_DIR at write time; pin it to a tmp dir so an
