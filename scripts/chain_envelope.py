@@ -2,7 +2,8 @@
 """chain_envelope.py — the single sanctioned constructor for dispatch/notify
 envelopes in the Beacon→Forge→Mirror automation chain.
 
-Spec: ``agents/beacon/specs/chain-context-durability.md`` §4 (M1), §5 (S1).
+Spec: ``agents/beacon/specs/chain-context-durability.md`` §4 (M1 + M3),
+§5 (S1 + S3).
 
 Every inter-agent envelope carries *chain context* that lets the next step
 fire automatically: the build session to ``--resume`` (``forge_build_session_id``),
@@ -40,7 +41,11 @@ and ``inbox_watcher.py`` in later steps of the sequence.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+import json
+import os
+import subprocess
+from pathlib import Path
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 
 class _Sentinel:
@@ -89,11 +94,160 @@ def _passes_guard(value: Any, guard: str) -> bool:
     return bool(value)
 
 
+# ---------------------------------------------------------------------------
+# M3 — derivable-context backfill (spec §4 M3, §5 S3).
+#
+# Several dead-ends in the chain fire because a whitelisted field is *missing*,
+# not *unrecoverable*: ``target_repo`` is derivable from the mission registry
+# (the mission that owns the task names its repo); ``pr_url`` is derivable via
+# ``gh`` (the Forge build PR's head branch is the ``forge/<task_id>``
+# convention). The builder backfills these from their source of truth so a
+# handler never concludes it must dead-end on a field that was recoverable all
+# along. Only genuinely unrecoverable context (e.g. a reaped build session)
+# falls through to M2's agent-route.
+#
+# Backfill is OPT-IN per call (``backfill=`` arg, default off). The resolvers
+# do real I/O — a registry read, a ``gh`` shell-out — so the happy path that
+# already carries the field pays nothing; only the recovery/dead-end paths that
+# ask for backfill incur the lookup. Every resolver is fail-safe: it returns
+# ``None`` (→ field stays absent → the genuinely-unrecoverable case) rather
+# than raising, so a missing/malformed registry or a ``gh`` outage can never
+# crash envelope construction.
+# ---------------------------------------------------------------------------
+
+# Subset of CHAIN_CONTEXT_FIELDS that has a source of truth to derive from.
+BACKFILLABLE_FIELDS: frozenset[str] = frozenset({'target_repo', 'pr_url'})
+
+# Env-overridable so tests redirect the registry read to a fixture without
+# touching the real ``agents/beacon/missions.json``. Mirrors dashboard_api's
+# ``_missions_json_path`` convention.
+_MISSIONS_JSON_ENV = 'OURLIBERTY_MISSIONS_JSON'
+# Owner prefix used to expand a short repo name (``ourliberty-agent-core``) into
+# the ``owner/repo`` coordinates ``gh`` expects. Env-overridable for parity with
+# the rest of the chain's gh helpers.
+_GH_OWNER_ENV = 'OURLIBERTY_GH_OWNER'
+_DEFAULT_GH_OWNER = 'Larry-Yatch'
+_GH_TIMEOUT_S = 20
+
+
+def _missions_json_path() -> Path:
+    override = os.environ.get(_MISSIONS_JSON_ENV)
+    if override:
+        return Path(override)
+    return Path(__file__).resolve().parent.parent / 'agents' / 'beacon' / 'missions.json'
+
+
+def backfill_target_repo(task_id: Optional[str]) -> Optional[str]:
+    """Derive ``target_repo`` from the mission registry.
+
+    Returns the ``repo`` of the mission whose ``task_ids`` contains ``task_id``,
+    or ``None`` when unresolvable (no registry, malformed JSON, or no mission
+    owns the task). Never raises — an unreadable registry degrades to "absent",
+    which is exactly the genuinely-unrecoverable case M2 handles.
+    """
+    if not task_id:
+        return None
+    try:
+        data = json.loads(_missions_json_path().read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    missions = data.get('missions') if isinstance(data, dict) else None
+    if not isinstance(missions, list):
+        return None
+    for mission in missions:
+        if not isinstance(mission, dict):
+            continue
+        task_ids = mission.get('task_ids')
+        if isinstance(task_ids, list) and task_id in task_ids:
+            repo = mission.get('repo')
+            if isinstance(repo, str) and repo:
+                return repo
+    return None
+
+
+def _full_repo(target_repo: Optional[str]) -> Optional[str]:
+    """Expand a short repo name to ``owner/repo`` for ``gh``. A value that
+    already carries an owner (``foo/bar``) is returned unchanged."""
+    if not target_repo or not isinstance(target_repo, str):
+        return None
+    if '/' in target_repo:
+        return target_repo
+    owner = os.environ.get(_GH_OWNER_ENV) or _DEFAULT_GH_OWNER
+    return f'{owner}/{target_repo}'
+
+
+def _gh_pr_url_for_branch(repo_full: str, branch: str) -> Optional[str]:
+    """Return the URL of the PR whose head is ``branch`` via ``gh pr list``, or
+    ``None`` on any gh failure. Isolated as a mockable seam so tests exercise
+    the backfill without shelling out."""
+    cmd = [
+        'gh', 'pr', 'list',
+        '--repo', repo_full,
+        '--head', branch,
+        '--state', 'all',
+        '--json', 'url',
+        '--limit', '1',
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=_GH_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        rows = json.loads(proc.stdout or '[]')
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict) and row.get('url'):
+                return row['url']
+    return None
+
+
+def backfill_pr_url(
+    task_id: Optional[str],
+    *,
+    target_repo: Optional[str] = None,
+    branch: Optional[str] = None,
+) -> Optional[str]:
+    """Derive the Forge build PR's ``pr_url`` via ``gh``.
+
+    The PR's head branch is the worktree convention ``forge/<task_id>`` unless
+    ``branch`` is given explicitly. ``gh`` is scoped to the repo, so the lookup
+    needs ``target_repo`` — passed in if the caller already resolved it, else
+    derived from the mission registry. Returns ``None`` when unresolvable (no
+    repo, gh outage, or no matching PR). Never raises.
+    """
+    if not task_id:
+        return None
+    repo_full = _full_repo(target_repo or backfill_target_repo(task_id))
+    if not repo_full:
+        return None
+    head = branch or f'forge/{task_id}'
+    return _gh_pr_url_for_branch(repo_full, head)
+
+
+# field -> resolver(task_id, env) used by the builder's ``backfill=`` path.
+# ``target_repo`` is ordered before ``pr_url`` in CHAIN_CONTEXT_FIELDS, so when
+# both are requested the registry-derived repo is already on ``env`` and the
+# pr_url resolver can scope its gh query to it.
+_BACKFILL_RESOLVERS: dict[str, Callable[[Optional[str], Mapping[str, Any]], Optional[str]]] = {
+    'target_repo': lambda task_id, env: backfill_target_repo(task_id),
+    'pr_url': lambda task_id, env: backfill_pr_url(
+        task_id, target_repo=env.get('target_repo'), branch=env.get('branch'),
+    ),
+}
+
+
 def build_chain_envelope(
     base: Mapping[str, Any],
     source: Optional[Mapping[str, Any]],
     *,
     carry: Mapping[str, Any],
+    backfill: Optional[Iterable[str]] = None,
 ) -> dict[str, Any]:
     """Construct a dispatch/notify envelope with chain context resolved.
 
@@ -114,6 +268,15 @@ def build_chain_envelope(
                            guard (so an explicit ``None``/falsy value drops,
                            matching the historical ``if value:`` /
                            ``if value is not None:`` conditional-copy form).
+        backfill: optional collection of whitelisted field names to derive from
+            their source of truth (M3) when, after ``carry`` resolution, the
+            field is still absent. Must be a subset of ``BACKFILLABLE_FIELDS``
+            (``target_repo`` ← mission registry, ``pr_url`` ← gh). Backfill only
+            fills a *missing* field — a value an explicit/``CARRY`` resolution
+            already produced is never overwritten. Default ``None`` → no
+            backfill (the happy path that already carries the field pays no
+            I/O). Resolvers are fail-safe: an unresolvable field simply stays
+            absent (the genuinely-unrecoverable case that M2 routes).
 
     Returns:
         A fresh ``dict`` — ``base`` plus the resolved context fields.
@@ -150,6 +313,15 @@ def build_chain_envelope(
             f'(missing={sorted(missing)}, unknown={sorted(unknown)})'
         )
 
+    backfill_fields = set(backfill or ())
+    unknown_backfill = backfill_fields - BACKFILLABLE_FIELDS
+    if unknown_backfill:
+        raise ValueError(
+            'build_chain_envelope: backfill must be a subset of '
+            f'{sorted(BACKFILLABLE_FIELDS)} '
+            f'(unknown={sorted(unknown_backfill)})'
+        )
+
     env: dict[str, Any] = dict(base)
     src = source or {}
     for field, guard in CHAIN_CONTEXT_FIELDS.items():
@@ -159,5 +331,18 @@ def build_chain_envelope(
         value = src.get(field) if decision is CARRY else decision
         if _passes_guard(value, guard):
             env[field] = value
+
+    # M3 backfill: for each requested field still ABSENT after carry
+    # resolution, derive it from its source of truth. Iterate the whitelist
+    # (not the request set) so the order is deterministic — target_repo before
+    # pr_url — letting the pr_url resolver see a just-backfilled target_repo.
+    if backfill_fields:
+        task_id = env.get('task_id')
+        for field in CHAIN_CONTEXT_FIELDS:
+            if field not in backfill_fields or field in env:
+                continue
+            value = _BACKFILL_RESOLVERS[field](task_id, env)
+            if _passes_guard(value, CHAIN_CONTEXT_FIELDS[field]):
+                env[field] = value
 
     return env
