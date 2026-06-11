@@ -1795,5 +1795,56 @@ class RemediateMissingInstallClassAwareTest(_IsolatedAgentsRoot):
             self.assertFalse(h._activates_via_enable('x.service'))  # timer-activated
 
 
+class TriggeredEntrypointTest(_IsolatedAgentsRoot):
+    """`main(['--triggered'])` is the post-merge sync hook: it must run EXACTLY
+    one run_once() tick, emit a DISTINCT 'triggered' log line for audit, and
+    pass NO dry_run_override (so every gate — kill-switch / allowlist / env /
+    dedup — still governs remediate-vs-dry-run inside run_once)."""
+
+    def test_triggered_runs_one_tick_and_logs_distinct_line(self):
+        logs: list[str] = []
+        with mock.patch.object(h, 'run_once', return_value={}) as run_once, \
+             mock.patch.object(h, 'log', side_effect=lambda m, *a, **k: logs.append(m)):
+            rc = h.main(['--triggered'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(run_once.call_count, 1)
+        # No dry_run_override forced — gates inside run_once stay authoritative.
+        self.assertNotIn('dry_run_override', run_once.call_args.kwargs)
+        self.assertTrue(
+            any('triggered' in line for line in logs),
+            f'expected a distinct triggered log line, got {logs!r}',
+        )
+
+    def test_once_alias_behaves_like_triggered(self):
+        logs: list[str] = []
+        with mock.patch.object(h, 'run_once', return_value={}) as run_once, \
+             mock.patch.object(h, 'log', side_effect=lambda m, *a, **k: logs.append(m)):
+            rc = h.main(['--once'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(run_once.call_count, 1)
+        self.assertTrue(any('triggered' in line for line in logs))
+
+    def test_no_arg_run_does_not_log_triggered(self):
+        logs: list[str] = []
+        with mock.patch.object(h, 'run_once', return_value={}) as run_once, \
+             mock.patch.object(h, 'log', side_effect=lambda m, *a, **k: logs.append(m)):
+            rc = h.main([])
+        self.assertEqual(rc, 0)
+        self.assertEqual(run_once.call_count, 1)
+        self.assertFalse(any('triggered' in line for line in logs))
+
+    def test_triggered_honors_kill_switch_one_tick(self):
+        # End-to-end through real run_once: kill-switch present -> clean exit,
+        # zero DMs, still exactly one tick. Proves the entrypoint doesn't bypass
+        # the gate.
+        h.KILL_SWITCH.parent.mkdir(parents=True, exist_ok=True)
+        h.KILL_SWITCH.write_text('disabled')
+        self.addCleanup(lambda: h.KILL_SWITCH.unlink(missing_ok=True))
+        with mock.patch.object(h, 'dm_larry', return_value=True) as dm:
+            rc = h.main(['--triggered'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(dm.call_count, 0)
+
+
 if __name__ == '__main__':
     unittest.main()
