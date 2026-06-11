@@ -17,7 +17,9 @@ Coverage (per spec deliverables):
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,15 @@ from pathlib import Path
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
+
+# Import-time sandbox: h freezes AGENTS_ROOT/LOG_FILE/HEARTBEAT_FILE at
+# import, so un-mocked log()/heartbeat() from ANY test class here would
+# append to the real ~/agents tree on the droplet. setdefault so the #436
+# gate env (and any outer harness) still wins. Interim until the
+# per-module bootstrap (docs/test-jail-spec.md Layer A) lands.
+os.environ.setdefault(
+    'OURLIBERTY_AGENTS_ROOT',
+    tempfile.mkdtemp(prefix='ol-test-agents-root-'))
 
 import heal_wedged_review_sessions as h  # noqa: E402
 
@@ -346,6 +357,7 @@ class TestFalsePositiveDemote(unittest.TestCase):
 class TestKillSwitch(unittest.TestCase):
     def test_kill_switch_blocks_main(self, ):
         import tempfile
+        from unittest import mock
         with tempfile.TemporaryDirectory() as td:
             ks = Path(td) / 'healers.disabled'
             ks.write_text('')
@@ -353,7 +365,10 @@ class TestKillSwitch(unittest.TestCase):
             h.KILL_SWITCH = ks
             try:
                 self.assertTrue(h.kill_switch_active())
-                rc = h.main()
+                # h.log appends to the import-frozen LOG_FILE under the real
+                # ~/agents/logs on the droplet — keep the exit line in memory.
+                with mock.patch.object(h, 'log'):
+                    rc = h.main()
                 self.assertEqual(rc, 0)
             finally:
                 h.KILL_SWITCH = orig

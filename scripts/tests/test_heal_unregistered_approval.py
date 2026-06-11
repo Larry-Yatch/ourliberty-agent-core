@@ -19,7 +19,9 @@ Run:
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -28,6 +30,16 @@ from unittest import mock
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
+
+# Import-time sandbox: the healer (and its transitive imports, e.g.
+# heal_stale_approvals) resolve AGENTS_ROOT-derived paths — some frozen at
+# import — so un-mocked log()/heartbeat() calls from ANY test class here
+# would append to the real ~/agents tree on the droplet. setdefault so the
+# #436 gate env (and any outer harness) still wins. Interim until the
+# per-module bootstrap (docs/test-jail-spec.md Layer A) lands.
+os.environ.setdefault(
+    'OURLIBERTY_AGENTS_ROOT',
+    tempfile.mkdtemp(prefix='ol-test-agents-root-'))
 
 import heal_unregistered_approval as h  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
@@ -810,6 +822,7 @@ class PromoteRaceTest(unittest.TestCase):
         with mock.patch.object(h, 'kill_switch',
                                return_value=Path('/nonexistent/kill-switch')), \
              mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'log'), \
              mock.patch.object(h, 'load_heuristics',
                                return_value=DEFAULT_HEURISTICS), \
              mock.patch.object(h, 'read_alerts',

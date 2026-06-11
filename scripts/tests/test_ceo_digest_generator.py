@@ -373,6 +373,14 @@ class RunEndToEndTest(unittest.TestCase):
         # Isolate the self-healed digest read from the live alerts queue.
         stack.enter_context(mock.patch.object(
             larry_alerts, 'ALERTS_FILE', Path('/nonexistent/larry-alerts.jsonl')))
+        # run() calls heartbeat(), which mkdirs + writes the import-frozen
+        # HEARTBEAT_FILE — un-patched, every test run freshens the REAL
+        # /home/larry/agents/blackboard/ceo-digest-generator.heartbeat and
+        # masks genuine staleness from the liveness watchdog. Needs a
+        # writable tmp path (a /nonexistent path would only be swallowed).
+        hb_dir = stack.enter_context(tempfile.TemporaryDirectory())
+        stack.enter_context(mock.patch.object(
+            cdg, 'HEARTBEAT_FILE', Path(hb_dir) / 'hb'))
 
     def test_voice_path(self):
         client = _FakeClient(events=[{'event_type': 'clarify_response'}])

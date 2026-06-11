@@ -38,8 +38,15 @@ class SweepOrphanDirsTest(unittest.TestCase):
         self.base.mkdir()
         self._patch = mock.patch.object(csw, 'WORKTREE_BASE', self.base)
         self._patch.start()
+        # sweep_orphan_dirs logs every keep/removal; csw.LOG_FILE is a
+        # hardcoded /home/larry path no env var can redirect — patch it or
+        # every droplet test run appends to the real worktree-cleanup.log.
+        self._log_patch = mock.patch.object(
+            csw, 'LOG_FILE', Path(self.tmpdir) / 'worktree-cleanup.log')
+        self._log_patch.start()
 
     def tearDown(self):
+        self._log_patch.stop()
         self._patch.stop()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
@@ -132,8 +139,13 @@ class SweepCanonicalStemGuardTest(unittest.TestCase):
             csw, 'MANAGED_WORKTREE_PREFIX', str(self.base / 'wt-')
         )
         self._prefix_patch.start()
+        # The keep/reap flow logs decisions; see SweepOrphanDirsTest.setUp.
+        self._log_patch = mock.patch.object(
+            csw, 'LOG_FILE', Path(self.tmpdir) / 'worktree-cleanup.log')
+        self._log_patch.start()
 
     def tearDown(self):
+        self._log_patch.stop()
         self._prefix_patch.stop()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 

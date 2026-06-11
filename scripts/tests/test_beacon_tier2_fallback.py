@@ -75,6 +75,7 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm', dm_mock), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as failure_dm_mock, \
+             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True):
             reply, sess = self.bot.call_beacon('hello', 'sess-abc')
         # Tier 2 must NOT have been invoked — only one _run_claude_once call
@@ -96,6 +97,7 @@ class BeaconBotRefuseOnResumeTest(_TempDirBase):
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
+             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, '_tier2_refuse_on_resume_dm') as refuse_dm:
             reply, sess = self.bot.call_beacon('hello', None)
         # Tier 2 WAS attempted (two calls); refuse-on-resume DM did NOT fire
@@ -130,6 +132,7 @@ class BeaconBotT2StdoutReturnedTest(_TempDirBase):
         run_mock = mock.Mock(side_effect=[tier1, tier2])
         with mock.patch.object(self.bot, '_run_claude_once', run_mock), \
              mock.patch.object(self.bot, 'tier2_available', return_value=True), \
+             mock.patch.object(self.bot, '_append_bot_quota_event'), \
              mock.patch.object(self.bot, '_tier2_failure_dm') as dm_mock:
             reply, _ = self.bot.call_beacon('hello', None)
         # The chat reply body must contain Tier 2's stdout, NOT Tier 1's
