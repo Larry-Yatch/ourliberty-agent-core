@@ -135,6 +135,7 @@ import larry_alerts  # noqa: E402
 import fixture_patterns  # noqa: E402
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
 from id_match import id_matches  # noqa: E402
+from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -353,17 +354,7 @@ def _parse_ts(ts_str: str) -> Optional[datetime]:
     windows. See heal_pr_auto_merge._to_utc / chain_event_shipper._normalize_iso_ts
     for the same 6h-skew incident.) An aware value passes through unchanged
     (same instant, normalized to UTC)."""
-    s = ts_str.strip().replace(' ', 'T')
-    if s.endswith('Z'):
-        s = s[:-1] + '+00:00'
-    # Normalize +HHMM to +HH:MM if needed
-    if re.search(r'[+-]\d{4}$', s):
-        s = s[:-2] + ':' + s[-2:]
-    try:
-        dt = datetime.fromisoformat(s)
-    except ValueError:
-        return None
-    return dt.astimezone(timezone.utc)
+    return parse_log_ts(ts_str)
 
 
 def _read_recent_log_lines(log_path: Path, hours: int) -> list[str]:

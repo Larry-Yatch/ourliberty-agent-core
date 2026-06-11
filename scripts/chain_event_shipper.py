@@ -67,6 +67,7 @@ from typing import Any, Iterable, Iterator, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import atomic_io  # noqa: E402  (shared durable atomic write, PR-E #366)
 import file_lock  # noqa: E402  (shared advisory flock, PR-E2 #16)
+from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 LOG_FILE = AGENTS_ROOT / 'logs' / 'chain-event-shipper.log'
@@ -702,26 +703,18 @@ def parse_log_line(line: str) -> Optional[ChainEvent]:
 
 
 def _normalize_iso_ts(raw: str) -> str:
-    """Normalize a log-line timestamp to ISO8601 UTC.
+    """Normalize a log-line timestamp to an ISO8601 UTC string.
 
-    Naive timestamps are interpreted as HOST-LOCAL time, not UTC:
-    outbox_notifier.log() stamps `datetime.now()` and the production droplet
-    runs America/Denver, so reading naive as UTC shifted every event 6h into
-    the past — far enough that build_sequence_advancer.chain_event_says_merged
-    (`ts >= dispatched_at`) would discard a freshly-merged step. The shipper
-    always runs on the same host as the notifier, so the system zone is the
-    writer's zone.
+    Delegates the naive-host-local→UTC parse to the shared
+    log_ts.parse_log_ts (see its module docstring for the 6h-skew history that
+    made build_sequence_advancer.chain_event_says_merged drop fresh merges).
+    On unparseable input we fall back to now() so a malformed line still ships
+    with a sane ordering ts rather than vanishing.
     """
-    s = raw.replace(' ', 'T')
-    if s.endswith('Z'):
-        s = s[:-1] + '+00:00'
-    try:
-        dt = datetime.fromisoformat(s)
-    except ValueError:
+    dt = parse_log_ts(raw)
+    if dt is None:
         return datetime.now(timezone.utc).isoformat()
-    if dt.tzinfo is None:
-        dt = dt.astimezone()  # attaches the host-local zone
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.isoformat()
 
 
 # pulse-escalations.json is a snapshot rewritten by Pulse each cycle. We

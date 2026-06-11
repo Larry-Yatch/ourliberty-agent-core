@@ -37,6 +37,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+import sys
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
+
 AGENTS_ROOT = Path('/home/larry/agents')
 LOG_DIR = AGENTS_ROOT / 'logs'
 
@@ -102,24 +109,12 @@ def _parse_ts(line: str) -> Optional[datetime]:
     m = _TS_RE.search(line)
     if not m:
         return None
-    raw = m.group(1).replace(' ', 'T')
-    if raw.endswith('Z'):
-        raw = raw[:-1] + '+00:00'
-    # Normalize +HHMM (no colon) to +HH:MM for py3.9's fromisoformat.
-    if re.search(r'[+-]\d{4}$', raw):
-        raw = raw[:-2] + ':' + raw[-2:]
-    try:
-        dt = datetime.fromisoformat(raw)
-    except ValueError:
-        return None
-    # outbox-notifier.log is naive HOST-LOCAL (datetime.now(); droplet runs
-    # America/Denver) — astimezone() reads a naive value in the system zone.
-    # inbox-watcher.log / heal-pr-auto-merge.log carry an explicit offset
-    # (aware UTC isoformat) — astimezone() preserves their instant. The old
-    # `.replace(tzinfo=utc)` only suited the aware sources and threw the naive
-    # one ~6h into the past; capturing the offset above lets every source
-    # resolve to the correct instant.
-    return dt.astimezone(timezone.utc)
+    # _TS_RE keeps the offset (above) so the three mixed-zone sources stay
+    # distinguishable; parse_log_ts then reads the naive outbox-notifier stamp
+    # as host-local and the aware inbox-watcher / heal-pr-auto-merge stamps by
+    # their own offset — a bare `.replace(tzinfo=utc)` threw the naive one ~6h
+    # into the past.
+    return parse_log_ts(m.group(1))
 
 
 def _iter_lines_in_window(
