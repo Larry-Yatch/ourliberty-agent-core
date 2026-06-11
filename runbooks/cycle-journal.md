@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~1527 — 2026-06-11 21:45Z UTC (interactive, Tier 2, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 9/9 services active. 0 open PRs. 1 new alert (L1307, Tier-3 known-pattern). All mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT (iter ~1526 watch items):**
+- **wt-ccd-s5 GC at 22:03Z?** Worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` PRESENT, mtime 17:31Z UTC. GC threshold 21:31Z UTC now PAST (14 min ago). Healer next run ~22:03Z (~18 min away). Still within 22:10Z watch window. ✅ On track. [blue] carry.
+- **PR #476 (test-jail-pr4):** MERGED ✅. Git log confirms `6a24a21 test(jail): test-jail PR-4 — deliberate-leak acceptance proof + docs sweep + reconciliation runbook (#476)`. Watch item RESOLVED.
+- **Sync error:** `agent-core-sync.json` last_sync=20:52:55Z (~53 min at check time), status=error. 2h escalation threshold 22:52Z (~67 min away). ✅ carry.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001:** `beacon-pending-approvals.json` has 1 pending (`unreg-approval-2dbbe7bb4d4b`, known PR #457 escalation, standing). Routing gap persists. G-rule 1/3. [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1307 lines. Watermark L1306 entering cycle. L1307 = `wedged-review-reaped:wt-forge-test-jail-pr4-acceptance-proof-001` (source=heal-wedged-review-sessions, 21:30:14Z, route=closure). `alert_triage_state.py triage-alert` → **Tier 3** (known-pattern in alert-translations.json). Resolved directly. Watermark advanced 1306→1307. 0 DMs. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json`: 1 pending (`unreg-approval-2dbbe7bb4d4b`, standing PR #457 escalation). No orphaned Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (21:46Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** Larry directives from today: forge-build inquiries (18:19–18:46Z, addressed by Beacon/build completion), pending-approval query (19:39Z, standing item). All have chain artifacts or responses. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry. ✅
+
+**Check A — Source repo:** main, clean (session gitStatus). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T20:52:55Z (~53 min), status=error (auto-commit push failed; rolled back). Within 2h escalation threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime 20:56:30Z, PR #476 already merged). Pipeline healer reports no stalls → self-recovering lifecycle. Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. PR #476 merged since iter ~1526. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open Forge PRs. PR #476 merged since iter ~1526 (`test(jail): test-jail PR-4`). ✅ Nominal. Shipped: #476.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Outside 60-day DM window. ✅ Nominal.
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert --alert-id wedged-review-reaped:wt-forge-test-jail-pr4-acceptance-proof-001` → Tier-3/known-pattern, resolved. Watermark L1306→L1307. ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1. ✅
+3. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] wt-ccd-s5 — GC past threshold (21:31Z), healer ~22:03Z. Watch: if persists past 22:10Z → escalate. [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, **476**) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary 2/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+
+**Watch items for iter ~1528:**
+- **wt-ccd-s5**: GC threshold 21:31Z passed. Healer expected ~22:03Z. If worktree persists past 22:10Z → escalate [yellow].
+- **Sync error**: `agent-core-sync.json` error from 20:52:55Z. Escalation threshold 22:52Z (~67 min from this iter). Monitor.
+- **consecutive_clean=1**: One more clean iter → de-escalate to Tier 3 (30-min cadence).
+- **PR #476 unreviewed-merge alert**: L1307 was wedge-reaper closure; unreviewed-merge:476 alert expected separately. Watch larry-alerts.jsonl for it.
+
+**PRIME DIRECTIVE:** 0 new interventions. Running total: interventions≈793, systemic_fixes≈24, ratio≈33.0, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=1.
+
+---
+
 ## Iteration ~1526 — 2026-06-11 21:26Z UTC (interactive, Tier 1 → 2, consecutive_clean 2→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
