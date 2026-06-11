@@ -4,6 +4,110 @@
 
 ---
 
+## Iteration 1422 — 2026-06-11 08:35Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Health:** ⚠️ Drift (carry + new). PR #459 CONFLICTING (08:24Z, 11min, watching 30-min threshold ~08:55Z). PR #457 MERGEABLE (08:13Z, 22min, Mirror review task queued). PR #455 regression MERGED — forward-fix task in Forge inbox. New Forge task dispatched 08:27Z (background-task output visibility, Larry "go"). 9/9 bots active. Sync still error (07:51Z, within 2h window, next ~08:51Z). **Tier 1, consecutive_clean 0→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1421 watch items):**
+- Sync ~08:51Z: **NOT YET** — last_sync=07:51:16Z (error), at 08:33Z is 42min old. Within 2h threshold. Next sync timer: ~08:51Z. Monitor.
+- PR #455 revision task: **IN FORGE INBOX** as `fix-test-bootstrap-preserve-usersite-001.json` (source=larry, phase=build, 08:15Z). However PR #455 **ALREADY MERGED** at 08:11:56Z — the auto-merge fired the instant PR #454 landed (08:11:45Z → #455 unblocked and merged 11 sec later), racing the revision task dispatch (08:09Z). Regression is live in main. Forward-fix is the correct remediation; task is in queue. ✅ Handling in motion.
+- Forge build tasks (ccd-s1, ccd-s2, fix-reaper): **build-fix-reaper-handoff-guard-checks-liveness-002 PICKED UP** by Forge → PR #457 opened at 08:13:19Z. ccd-s1 and ccd-s2 still in inbox. Pipeline stall: FORGE_NO_PR_SKIP (pr_exists — PRs already open for these tasks). Not stalled.
+- sync-blocked G-rule (1/3): sync hasn't retried yet (still showing 07:51Z). Watch at ~08:51Z.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1489. Watermark already at 1489 (claimed by prior inter-iter cycle). **0 new lines this iter.** ✅ Nominal.
+- (For record: last alert was L1489 at 08:15:43Z — `unreviewed-merge:454`, actor=Larry-Yatch, Tier-3 known pattern. Already claimed. Journal note; no DM; no tier-reset.)
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry directives since iter 1421 (08:15Z): 08:19Z ("Is Forge stuck again?") → Beacon confirmed yes (background-task hang, same pattern), proposed fix. 08:24Z ("yes and tell me how to kill it and uplug it") → Beacon answered. 08:26Z ("I think I just killed it") → Beacon confirmed services healthy. 08:27Z ("go") → Beacon dispatched `fix-build-background-task-output-visibility-001` to Forge inbox. All directives tracked and answered in-window. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. All Forge tasks FORGE_NO_PR_SKIP (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. `heal-stale-daemon-code-cooldowns.json` present. ✅ Nominal.
+
+**Check A — Source repo:** 9/9 ourliberty-*.service active+running at 08:33Z. `ourliberty-agent-core-health.service` FAILED (known — reports sync_freshness error + notify script missing). `ourliberty-sync.service` FAILED (one-shot, timer will fire ~08:51Z). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: status=error, last_sync=2026-06-11T07:51:16Z, message="Auto-commit push failed; rolled back". At check (08:33Z): 42min old. Within 2h threshold. Next sync ~08:51Z. Known recurring pattern (sync-push-rebase-fallback-001). ✅ Standing, no escalation.
+
+**Check C — Agent liveness:** 9/9 bots active+running: beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. ✅ Nominal.
+
+**Check E — PRs:** 2 open PRs (PR #455 MERGED, not listed).
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`, branch `forge/fix-reaper-handoff-guard-checks-liveness-002`) — MERGEABLE, created 08:13:19Z (~22min at check). Mirror review task `review-fix-reaper-handoff-guard-checks-liveness-002.json` in Mirror inbox (dispatched ~08:24Z). Under 30-min threshold. Monitor — at ~08:43Z crosses 30-min mark; if Mirror hasn't reviewed by then, escalate.
+- **PR #459** (`fix(tz): read outbox-notifier naive timestamps as host-local, not UTC`, branch `work/notifier-ts-skew`) — CONFLICTING, created 08:24:59Z (~11min at check). TZ fix for outbox-notifier. Conflict requires branch rebase. Under 30-min threshold; not blocking anything currently. Watch ~08:55Z.
+
+**Check H — Inboxes:**
+- Forge: **4 items**:
+  - `build-ccd-s1-envelope-builder.json` — ~6.1h (pipeline stall: FORGE_NO_PR_SKIP, pr=#446).
+  - `build-ccd-s2-no-session-revision-route.json` — ~6.7h (pipeline stall: FORGE_NO_PR_SKIP).
+  - `fix-build-background-task-output-visibility-001.json` — ~6min (NEW — dispatched at 08:27Z per Larry approval; PrivateTmp/background-task output fix, source=beacon, phase=preflight).
+  - `fix-test-bootstrap-preserve-usersite-001.json` — ~18min (forward-fix for PR #455 regression, source=larry, phase=build).
+- Mirror: **1 item** — `review-fix-reaper-handoff-guard-checks-liveness-002.json` (~9min, for PR #457).
+- Beacon/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ No DM.
+
+**G-rule tracking:**
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED + L1489 unreviewed-merge:454):** L1489 adds PR #454 (actor=Larry-Yatch) to the pattern. G-rule already dispatched (actor-exemption-config spec pending Beacon/Forge). No new action.
+- **`heal-stale-daemon-code:auto-restarted` (4/3, DISPATCHED iter 1416):** 0 new. Beacon consumed dispatch. Monitor for spec.
+- **`sync-blocked:auto-commit-push-failed` (1/3):** sync hasn't retried yet. Check at ~08:51Z.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Carry.
+- All other G-rules: carry from iter 1421 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→0 via `scripts/cycle_tier_state.py record --checks-clean false` at 08:35:57Z. Tier 1. ✅
+2. Alert watermark: already at 1489 (no advance needed this iter).
+3. No auto-fix allow-list actions executed. PR #457 under 30-min threshold; PR #459 CONFLICTING not in allow-list.
+
+**PRIME DIRECTIVE:** 0 new rows this iter. Running total: interventions=778, systemic_fixes=21, verification_pending=9, ratio=37.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] PR #455 regression MERGED (08:11:56Z) — `fix-test-bootstrap-preserve-usersite-001` in Forge inbox. Timing: auto-merge fired 11 sec after #454 landed, racing the revision task. System is handling via forward-fix PR. Monitor Forge pickup.
+- [blue] PR #457 (fix(reaper) handoff guard) — MERGEABLE 08:13Z, Mirror review task in inbox. Watch 30-min threshold ~08:43Z.
+- [blue] PR #459 (fix(tz) notifier timestamps) — CONFLICTING 08:24Z. Needs rebase. Watch 30-min threshold ~08:55Z.
+- [blue] fix-build-background-task-output-visibility-001 — Forge inbox, phase=preflight, 08:27Z. PrivateTmp/background-task hang root cause. Priority throughput fix.
+- [blue] sync-push-rebase-fallback-001 — known, self-heals ~08:51Z. 1/3 G-rule. Watch next sync.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed. `Trigger: n/a`. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] unreviewed-merge (454, 456, 453, 448) — actor=Larry-Yatch, Tier-3 known pattern. G-rule actor-exemption-config 3/3 DISPATCHED. Carry.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry. (Note: `last_claimed_line` IS present in alert-triage.json as of this check.)
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Carry.
+
+**Watch items for iter 1423:**
+- Sync ~08:51Z: verify `status=success` in agent-core-sync.json. If still error → 2h threshold may be breached, escalate [yellow]. Also confirm sync-blocked G-rule count (1/3 → 2/3 if sync fails again).
+- PR #457 at 30-min threshold (~08:43Z): verify Mirror reviewed (if not, escalate). If Mirror PASS and MERGEABLE, enable auto-merge per allow-list.
+- PR #459 CONFLICTING: still under threshold at 08:35Z, but watch ~08:55Z. If still CONFLICTING, note as a stale conflict blocking the TZ fix.
+- `fix-build-background-task-output-visibility-001` (Forge preflight): monitor for Forge pickup + PROCEED/CLARIFY marker. This is the throughput-blocking root-cause fix.
+- `fix-test-bootstrap-preserve-usersite-001` (Forge build): monitor for Forge pickup + new PR. Suite regression (18→31) is live on main.
+
+---
+
 ## Iteration 1421 — 2026-06-11 08:15Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Drift (carry). PR #454 MERGED ✅ (08:11:45Z — unblocked #455). PR #455 revision task from Larry queued in Forge inbox: MUST NOT auto-merge as-is. All 5 mandatory checks nominal. 9/9 bots active. **Tier 1, consecutive_clean 0→0.**
