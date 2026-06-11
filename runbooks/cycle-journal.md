@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration ~1478 — 2026-06-11 15:01Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ✅ Nominal — all mandatory + additive checks clean. PR #457 UNKNOWN carries [yellow]; PR #464 CLEAN/MERGEABLE (age ~17m, not yet 30m threshold). 0 new alerts. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1477 watch items):**
+- `build-ccd-s4-healer-recover-then-alert.json` in Forge inbox: **STILL PRESENT** (mtime Jun 11 07:00). Pipeline stall confirms `pr_exists match=branch pr=#463` (merged 13:46Z) — inbox file is post-merge stale. **G-rule 1/3** (first confirmed instance; prior iters said "status unclear"). [blue] carry updated.
+- `ccd-s5-doctrine-and-handling-shapes.json` in Forge inbox: **STILL PRESENT** (mtime Jun 11 07:50). CCD-S5 PR not yet opened. [blue] carry.
+- PR #457 CI state: **STILL UNKNOWN** — confirmed via `gh pr list`. OPEN, no autoMerge. [yellow] carry.
+- PR #464: `gh pr list` returned UNKNOWN (transient recomputation artifact); `gh pr view` confirms **CLEAN/MERGEABLE**, no CI checks configured. Age ~17m at check time. Not yet 30m threshold. [blue] watch — eligible for auto-merge at ~15:14Z.
+- Approval-gate `unreg-approval-2dbbe7bb4d4b`: cleared iter ~1477 (verified). NOT re-asserting.
+- zombie `fix-test-bootstrap-preserve-usersite-001.json`: **IN_ARCHIVE** — verified. Not active.
+- Check III proposals: `approve threshold-update-2026-06-11` outstanding. [yellow] carry.
+
+**Check 0 — Alert triage:** Total lines: 1267 (unchanged from watermark L1267). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last delivery: idx=1266 (medic-diagnosis) at 14:53Z. No new Larry directives. 429/502 transient at 08:00 MDT — known standing. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for ~19 known tasks; ccd-s4 skipped as pr_exists=PR#463 merged). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (07:00, stale post-#463) + `ccd-s5-doctrine-and-handling-shapes.json` (07:50). Inbox watcher has not self-archived the stale ccd-s4 file. [blue] noted.
+- Beacon: EMPTY ✅ | Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+✅ Nominal.
+
+**Check 5 — Stale daemon:** cycle-tier.json present and valid (tier=1, consecutive_clean=0, last_signal_at=14:58Z). heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=9462dc3 "Pulse cycle 20260611T150003Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T14:52:15Z (~9 min ago), status=no-change. ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9 active services (beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #464** (`refactor(tz): extract shared log_ts.parse_log_ts`) — CLEAN/MERGEABLE (direct view; gh pr list UNKNOWN was transient). Age ~17m. No autoMerge. Not yet 30m — watch for auto-merge at ~15:14Z if automated cycle fires. [blue] carry.
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, UNKNOWN. Age ~6h48m. Direct Larry decision still needed: merge or close. [yellow] carry.
+
+**Check H — Forge digest:**
+- Open: 2 — PR #464 (~17m, CLEAN) and PR #457 (~6h48m, UNKNOWN).
+- Merged in last 4h (since ~11:01Z): 3 PRs — #461 (12:08Z), #462 (12:53Z), #463 (13:46Z). ✅ Nominal.
+
+**§5.0 bug-hunt gate:** no committed audit baseline, no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check III: last ran 14:06Z; next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due ~72d. No 60d trigger. ✅
+
+**G-rule tracking:**
+- **post-merge-stale-inbox-file** (ccd-s4 inbox present after PR #463 merged): **1/3** — first confirmed instance. If present next 2 iters without Forge self-archiving, dispatch to Forge (inbox watcher should archive task files when corresponding PR merges).
+- All other G-rules carry from iter ~1477 unchanged.
+
+**Actions taken:** None — observation-only iter.
+
+**Standing findings:**
+- [yellow] **PR #457 CI UNKNOWN** — OPEN, `mergeStateStatus=UNKNOWN` (~6h48m). Direct Larry decision needed: merge or close.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry pending Beacon/Forge.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. Approval: `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **PR #464** (`refactor(tz)`) — CLEAN/MERGEABLE, ~17m, no autoMerge. Watch for auto-merge at ~15:14Z.
+- [blue] **post-merge-stale-inbox-file** `build-ccd-s4-healer-recover-then-alert.json` — **G-rule 1/3**. Inbox watcher hasn't self-archived after PR #463 merge. Watching.
+- [blue] **CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`** — in Forge inbox. Watch for preflight → PR (docs-only).
+- [blue] **fix-build-background-poll-idiom-001** — not yet dispatched. Watch for Beacon dispatch.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark L1267. ✅
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — Tier-3 known. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24-empty-prompt-envelope-rejected — 1/3 G-rule. Carry.
+- [blue] Check III gate discrepancy — ran 11d after prior run. Noting for awareness.
+
+**Watch items for iter ~1479:**
+- PR #464: Check if automated cycle enabled auto-merge at ~15:14Z (age >30m). If not, enable on next interactive iter that finds it CLEAN and >30m.
+- PR #457: Still OPEN/UNKNOWN. If >24h with no Larry response, consider nudge.
+- `build-ccd-s4-healer-recover-then-alert.json`: Watch for Forge self-archive or inbox-watcher cleanup. If still present next iter, G-rule 2/3.
+- Check B: Sync at ~9m — well within threshold.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Running total: interventions=785, systemic_fixes=21, verification_pending=10, iter_clean=47, ratio≈37.4, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (PR #457 UNKNOWN carry; non-clean iter).
+
+---
+
 ## Iteration ~1477 — 2026-06-11 14:56Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation.
