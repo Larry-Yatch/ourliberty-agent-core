@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~1519 — 2026-06-11 20:22Z UTC (interactive, Tier 1, consecutive_clean=0)
+
+**Health:** ✅ Nominal with standing items. All 9 services active. 0 open PRs. Forge on test-jail-pr3 (PID 1878941, started 20:21Z). One standing orphaned worktree (ccd-s5, 2.5h). EROFS fully resolved (PR #470 fixed, systemic_fix recorded iter 1513). 16 new alerts since watermark — all Tier-3/Tier-4-resolved.
+
+**VERIFY-BEFORE-REASSERT on prior watch items:**
+- **PR #466 open+mergeable**: **RESOLVED** — PR #466 merged ✅ CLOSED.
+- **test-jail-pr2 wedged session (PID 1772672)**: **RESOLVED** — wedged-review-reaped closure at 19:01Z ✅ CLOSED.
+- **beacon-erofs:claude-json-readonly**: **RESOLVED** — PR #470 (`fix: readwrite paths`) merged at ~19:17Z; iter 1513 systemic_fix row recorded; `.claude.json` writable (mtime 19:57Z); Beacon bot responding normally at 20:00Z ✅ CLOSED.
+- **dirty-tree:systemd-heal-install-drift-service** (iter 1515 intervention): **RESOLVED** — session gitStatus main/clean; sync 19:52Z no-change ✅ CLOSED.
+- **Orphaned worktree wt-forge-ccd-s5-doctrine-and-handling-shapes**: **STILL PRESENT** — worktree-cleanup.log at 20:03Z: "Keeping (age: 2.5h)". AUTO_MERGE_WORKTREE_TEARDOWN event fired at 17:28Z but teardown did not execute. [yellow] carry — G-rule escalation threshold crossed (3+ cleanup-scan keeps since 18:35Z). Dispatching to Beacon this iter.
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: idx=1287 (file line 1288). File total: 1304 lines. New alerts: idx=1288–1303 (16 alerts).
+- idx=1288 (18:50Z): `unreviewed-merge:468` — Tier-3, known pattern ✅
+- idx=1289 (18:51Z): `beacon-erofs:claude-json-readonly` — Tier-4 (novel shape). ALREADY RESOLVED: PR #470 systemic fix committed at 19:17Z (iter 1513 ledger row). No DM needed (condition past-state; Beacon functional). Tier-4→resolved ✅
+- idx=1290 (18:52Z): `sync-blocked:auto-commit-push-failed` — Tier-3, sync self-healed (19:52Z clean) ✅
+- idx=1291 (18:56Z): `pipeline-stall:unrouted-pr:PR#466` — Tier-3, PR#466 merged, stall resolved ✅
+- idx=1292 (18:58Z): medic-diagnosis PR#466 — Tier-3, same root cause resolved ✅
+- idx=1293 (19:01Z): `wedged-review-reaped:wt-forge-test-jail-pr2-choke-guards-001` — Tier-3 closure ✅
+- idx=1294–1297 (19:05–19:45Z): `unreviewed-merge:466/470/471/472` — Tier-3 known pattern ✅
+- idx=1298–1301 (19:47–19:48Z): 4 `auto-restarted:*` services — Tier-3 known (heal-stale-daemon-code, post-PR#469) ✅
+- idx=1302 (19:54Z): `review-pass:PR#473` auto-merged — Tier-3 closure ✅
+- idx=1303 (20:08Z): `missions-card-gc:summary` — Tier-3 digest ✅
+- **Watermark updated: 1287 → 1303.** Triage: 16 alerts, 15 Tier-3 + 1 Tier-4-resolved. 0 dispatches. ✅ Nominal.
+
+**Check 1 — Log noise:** `sudo journalctl` blocked (approval required in interactive session). Beacon bot clean (last response 20:00Z). No distress signals in alert stream since 20:08Z. ✅ Nominal (limited scan).
+
+**Check 2 — Telegram sweep:** Last Larry directive: "what do you think?" at 19:59Z — answered by Beacon at 20:00Z ✅. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall --dry-run` → "no stalls detected" ✅. Forge PID 1878941 active (test-jail-pr3, started 20:21Z, ~1 min old). ✅ Nominal.
+
+**Check 4 — Inboxes:**
+- Forge: `test-jail-pr3-gate-hardening-001.json` (active, PID 1878941 alive) ✅
+- Beacon: EMPTY ✅ | Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+- ✅ Nominal.
+
+**Check 5 — Stale daemon:** All 9 services active. heal-stale-daemon-code auto-restarted 4 services at 19:47–48Z post-PR#469 merge — normal operation. ✅ Nominal.
+
+**Check A — Source repo:** gitStatus (session start): main, clean. ✅ Nominal.
+**Check B — Sync health:** last_sync=2026-06-11T19:52:50Z (~30 min ago), status=no-change. ✅ Within 2h threshold.
+**Check C — Agent liveness:** 9/9 active. Beacon bot responding 20:00Z. ✅ Nominal.
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Periodic (Thursday 2026-06-11 UTC):** Check I (not Sunday): skip. Check III (last ran today, 11d since prior, not 14d): skip. Checks VIII, IX, X (not Monday): skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**PRIME DIRECTIVE:** 0 new interventions, 0 new systemic_fixes this iter (all alerts Tier-3/Tier-4-resolved; beacon-erofs systemic_fix already recorded by iter 1513). Running total (script-authoritative from ledger): interventions≈790, systemic_fixes≈23, iter_clean≈62. +1 systemic_fix row to be recorded for Beacon dispatch (orphaned-wt:post-merge-teardown-gap → G-rule dispatch).
+
+**Actions taken:**
+1. Updated alert-triage.json watermark 1287 → 1303 (16 Tier-3/Tier-4-resolved claims).
+2. Dispatched G-rule finding to Beacon inbox: `cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json` — permanent fix proposal: worktree-cleanup.py should remove worktrees whose corresponding PRs have merged, regardless of whether a terminal marker was set (teardown notification ≠ teardown execution).
+
+**Standing findings:**
+- [yellow] **Orphaned wt-forge-ccd-s5-doctrine-and-handling-shapes** — STILL PRESENT at 2.5h+. cleanup-log keeping every hour. G-rule 3/3 dispatched to Beacon this iter (wt-cleanup-post-merge-gap). Watch for Beacon spec + Forge fix.
+- [yellow] **bughunt-gate-soak** — Phase 2 pending Larry. [carry]
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched; Forge PR pending. [carry]
+- [yellow] **Tier 2 weekly probe auth_401** — Action: docs/runbooks/rotate-claude-setup-tokens.md. [carry]
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500. [carry]
+- [blue] **test-jail-pr3-gate-hardening-001** — Forge PID 1878941 active (20:21Z). Watch for PR to open.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry.
+- [blue] **APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001** — pending Larry.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering.
+- [blue] **catalog-accuracy-drift G-rule 1/3** — watch for 2/3.
+- [blue] Various blue G-rules and APPROVAL_REQUESTs carried from prior iters (see iter ~1480 standing list).
+
+**Watch items for next iter (~1520):**
+- Forge test-jail-pr3: expect PR to open within ~30–60 min.
+- Orphaned wt-ccd-s5: Beacon G-rule dispatch consumed → Forge brief expected.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0 — orphaned wt + standing yellows).
+
+---
+
 ## Iteration ~1518 — 2026-06-11 20:12Z UTC (interactive, Tier 1, consecutive_clean 2→0, Check A transient dirty-tree auto-healed)
 
 **Trigger:** Larry direct invocation (`/cycle`).

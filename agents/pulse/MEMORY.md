@@ -6,6 +6,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-11 20:22Z UTC (Iter ~1519, interactive)
+
+**Iter ~1519 summary:** Alert watermark: L1303 (20:08Z / missions-card-gc:summary → Tier-3). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions≈790, systemic_fixes≈24 (includes iter 1513 beacon-erofs fix + iter ~1519 wt-cleanup dispatch), ratio≈33. **KEY STATE:** Forge `test-jail-pr3-gate-hardening-001` ACTIVE (PID 1878941, started 20:21Z — new session). 0 open PRs (all 466–473 merged). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` STILL PRESENT (2.5h+); G-rule dispatch sent to Beacon this iter (`cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json`). Beacon EROFS RESOLVED (PR #470, systemic_fix iter 1513). All 9 services active. Sync clean: last_sync=19:52Z. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%).
+
 ## Status snapshot — updated 2026-06-11 18:07Z UTC (Iter ~1504, interactive)
 
 **Iter ~1504 summary:** Alert watermark: L1284 (17:56:37Z / missions-card-gc:summary → Tier-3 silence; unchanged from iter ~1503). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=789, systemic_fixes=22, iter_clean=59, ratio≈35.86, trend=flat. **KEY STATE:** Forge `test-jail-pr2-choke-guards-001` ACTIVE (~32 min, started 17:34:24Z), PR #466 (`test(jail): stop two tests leaking fixture lines into the real inbox_watcher.log (H3)`) OPEN+MERGEABLE (opened 17:50:30Z), Mirror review not yet dispatched (Forge still running). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` ~38 min post-PR#465 merge (17:28Z); reaper deployed 17:39Z, not yet cleaned — escalate if still present at ~18:28Z. Sync clean: last_sync=17:52:20Z, threshold 19:52:20Z. All 4 services active. All checks nominal. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III threshold proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%).
