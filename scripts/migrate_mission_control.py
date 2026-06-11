@@ -196,15 +196,14 @@ def _connect_supabase(url: Optional[str], key: Optional[str]):
             "On droplet: set -a; source ~/credentials/.env.larry; set +a"
         )
 
+    from supabase_factory import get_supabase_client
     try:
-        from supabase import create_client
+        return get_supabase_client(final_url, final_key)
     except ImportError as exc:
         raise SystemExit(
             "ERROR: supabase-py is not installed. Run:\n"
             "  pip3 install --user --break-system-packages supabase"
         ) from exc
-
-    return create_client(final_url, final_key)
 
 
 # ============================================================

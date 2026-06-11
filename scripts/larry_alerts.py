@@ -34,6 +34,7 @@ from typing import Optional
 
 import atomic_io
 import file_lock
+from test_isolation_guard import refuse_under_test
 
 AGENTS_ROOT = Path.home() / 'agents'
 ALERTS_FILE = AGENTS_ROOT / 'blackboard' / 'larry-alerts.jsonl'
@@ -310,6 +311,7 @@ def append_alert(
             daily CEO digest). An unknown value falls back to 'escalate' so a
             mistake over-notifies rather than silently drops.
     """
+    refuse_under_test('larry-alerts')
     if severity not in VALID_SEVERITIES:
         # Don't raise — surface as a no-op with a stderr hint.
         try:
@@ -421,6 +423,7 @@ def resolve_alert(
 
     Never raises — returns 0 on any error so callers can fire-and-forget.
     """
+    refuse_under_test('larry-alerts')
     af = alerts_file if alerts_file is not None else ALERTS_FILE
     if consumer_offset_files is None:
         consumer_offset_files = [OFFSET_FILE, MEDIC_OFFSET_FILE]
@@ -623,6 +626,7 @@ def append_notification(
     Returns True on successful append, False on failure. Never raises —
     callers fire-and-forget.
     """
+    refuse_under_test('larry-alerts')
     record = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'source': source,
@@ -671,6 +675,7 @@ def append_approval_request(
     Returns True on successful append, False on failure. Never raises —
     callers fire-and-forget.
     """
+    refuse_under_test('larry-alerts')
     record = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'source': source,

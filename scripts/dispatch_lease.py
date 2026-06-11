@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pid_identity  # noqa: E402  # PID-reuse guard before reclaim-kill
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path.home() / 'agents'
 LEASES_DIR = AGENTS_ROOT / 'state' / 'dispatch-leases'
@@ -174,6 +175,7 @@ def try_acquire(identity, holder_pid=None):
                 same_holder = _pid_alive_same_boot(ex_pid, ex_boot) and \
                     pid_identity.still_same_process(ex_pid, existing.get('holder_starttime'))
                 if same_holder:
+                    refuse_under_test('reclaim-kill')
                     _log_op(f'RECLAIM: stale lease for {identity} with live PID {ex_pid} '
                             f'(age={int(age)}s) — SIGTERM then SIGKILL')
                     try:

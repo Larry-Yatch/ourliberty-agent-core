@@ -39,6 +39,7 @@ def get_manager():
 from concurrency_guard import get_guard, MAX_CONCURRENT
 import active_tier
 from atomic_io import atomic_write_json  # noqa: E402  (shared durable atomic write, PR-E #366)
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path.home() / 'agents'
 
@@ -1100,6 +1101,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 # orchestrator's process group. If the orchestrator restarts,
                 # the claude process keeps running. The in-flight registry
                 # on disk lets the new orchestrator adopt the orphan.
+                refuse_under_test('claude-spawn')
                 proc = subprocess.Popen(
                     cmd,
                     stdin=subprocess.PIPE,
@@ -1373,6 +1375,7 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                                 cmd, model, fallback, session_id,
                             )
                             try:
+                                refuse_under_test('claude-spawn')
                                 t2 = subprocess.run(
                                     t2_cmd,
                                     input=prompt,

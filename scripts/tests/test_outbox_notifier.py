@@ -38,6 +38,13 @@ import outbox_notifier as on        # noqa: E402
 import routing_validator as rv      # noqa: E402
 import safe_write_inbox as swi      # noqa: E402
 
+try:
+    from . import _chokepoint_optout
+except ImportError:
+    import _chokepoint_optout
+
+_CHOKEPOINT_SAVED_SENTINEL = None
+
 
 # Redirect OURLIBERTY_AGENTS_ROOT to a fresh tmp dir for the whole module so
 # tests running inside a Forge worktree don't pollute prod /home/larry/agents/
@@ -68,6 +75,11 @@ def _inert_mirror_review_status(data, marker_decision):
 
 def setUpModule():  # noqa: N802 — unittest hook name
     global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _LIVE_EMIT_BACKUP
+    global _CHOKEPOINT_SAVED_SENTINEL
+    # This module drives gh-write / larry-alerts / inbox-write chokepoints
+    # against the rerouted tmpdir tree below; opt out of the Layer B guards so
+    # they pass through to the test's mocks (the #428 real-tree scan still runs).
+    _CHOKEPOINT_SAVED_SENTINEL = _chokepoint_optout.disengage_guards()
     _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
     _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='outbox-notifier-test-')
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
@@ -91,6 +103,7 @@ def setUpModule():  # noqa: N802 — unittest hook name
 
 
 def tearDownModule():  # noqa: N802 — unittest hook name
+    _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
     if _AGENTS_ROOT_BACKUP is None:
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
     else:

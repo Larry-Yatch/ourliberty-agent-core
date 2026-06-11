@@ -400,5 +400,26 @@ class BotLoopRoutingTest(unittest.TestCase):
         self.assertEqual(larry_alerts.read_offset(), 1)
 
 
+try:
+    from . import _chokepoint_optout
+except ImportError:
+    import _chokepoint_optout
+
+_CHOKEPOINT_SAVED_SENTINEL = None
+
+
+def setUpModule():  # noqa: N802 — unittest hook
+    # This module drives a Layer B-guarded chokepoint (larry_alerts / inbox /
+    # gh-write / claude-spawn / concurrency) against already-isolated state, so
+    # the guard would breach before the test's own mocks. Opt out for the module
+    # so the guard is a pass-through; the #428 real-tree leak scanner still runs.
+    global _CHOKEPOINT_SAVED_SENTINEL
+    _CHOKEPOINT_SAVED_SENTINEL = _chokepoint_optout.disengage_guards()
+
+
+def tearDownModule():  # noqa: N802 — unittest hook
+    _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -39,6 +39,7 @@ from telegram_text_utils import strip_leading_slash  # noqa: E402
 # anthropic-quota-events.jsonl, leaving zero events for 2026-05-29's stall
 # storm even though auth_401 dominated the failures here.
 import agent_runner  # noqa: E402
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 # ---------- config ----------
 
@@ -129,6 +130,7 @@ def http_json(url: str, payload: Optional[dict] = None, timeout: int = 35) -> Op
 
 
 def telegram_send(chat_id: int, text: str) -> None:
+    refuse_under_test('telegram-send')
     if not text:
         text = "[empty response]"
     while text:

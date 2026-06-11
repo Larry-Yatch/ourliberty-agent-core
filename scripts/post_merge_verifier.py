@@ -40,6 +40,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 from atomic_io import atomic_write_json  # noqa: E402
+from test_isolation_guard import gh_write  # noqa: E402
 
 AGENTS_ROOT = Path('/home/larry/agents')
 STATE_FILE = AGENTS_ROOT / 'blackboard' / 'post-merge-verifications.json'
@@ -125,7 +126,7 @@ def gh_plain(*args: str) -> str | None:
     silently and a whole class of regression-reopen gaps went undetected.
     """
     try:
-        result = subprocess.run(
+        result = gh_write(
             ['gh', *args],
             capture_output=True, text=True, timeout=GH_TIMEOUT,
             env={**os.environ, 'PATH': '/usr/bin:/usr/local/bin'},

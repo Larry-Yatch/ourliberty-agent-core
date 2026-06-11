@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import dispatch_validator  # noqa: E402
 import routing_validator   # noqa: E402
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -186,6 +187,7 @@ def safe_write_inbox(
         Path to the written file (final_target may differ from target_agent
         if IDENTITY.md soft-reroute fired).
     """
+    refuse_under_test('inbox-write')
     if not isinstance(task_dict, dict):
         raise DispatchRejected('task_dict must be a dict')
     if not target_agent or not isinstance(target_agent, str):

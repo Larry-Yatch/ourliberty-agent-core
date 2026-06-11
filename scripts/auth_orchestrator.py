@@ -22,6 +22,10 @@ Import is side-effect-free: the executable flow lives under main()/__main__, so
 the helpers can be unit-tested without spawning `claude auth login`.
 """
 import os, pty, subprocess, time, select, sys, re, stat, errno, shutil, atexit, json
+from pathlib import Path
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_isolation_guard import refuse_under_test
 
 EMAIL = "agent.beacon.ourliberty@gmail.com"
 URL_FILE = "/tmp/auth-url.txt"
@@ -216,6 +220,7 @@ def main():
     atexit.register(_maybe_restore_credentials, cred_backup, cred_file)
 
     log("spawning claude auth login")
+    refuse_under_test('claude-spawn')
     master, slave = pty.openpty()
     proc = subprocess.Popen(
         ["claude", "auth", "login", "--claudeai", "--email", EMAIL],

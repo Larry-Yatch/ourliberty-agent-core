@@ -513,8 +513,8 @@ def _get_chain_events_for_task(task_id: str,
         # that runs in an environment without Supabase configured.
         return None
     try:
-        from supabase import create_client  # type: ignore
-        client = create_client(url, key)
+        from supabase_factory import get_supabase_client  # type: ignore
+        client = get_supabase_client(url, key)
         since_iso = since_ts.astimezone(timezone.utc).isoformat()
         res = (
             client.table('chain_events')

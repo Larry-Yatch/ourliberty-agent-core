@@ -13,10 +13,15 @@ Safe limit: 6 concurrent claude processes
 
 import os
 import json
+import sys
 import time
 import fcntl
 import tempfile
 from pathlib import Path
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_isolation_guard import refuse_under_test
 
 AGENTS_ROOT = Path.home() / 'agents'
 GUARD_FILE = AGENTS_ROOT / 'config' / '.concurrency-guard.json'
@@ -157,6 +162,7 @@ class ConcurrencyGuard:
 
     def acquire(self, agent_id, task_id=''):
         """Try to acquire a slot. Returns True if acquired, False if at capacity."""
+        refuse_under_test('concurrency-guard')
         lock_file = GUARD_FILE.with_suffix('.lock')
         with open(lock_file, 'w') as lf:
             fcntl.flock(lf, fcntl.LOCK_EX)
@@ -186,6 +192,7 @@ class ConcurrencyGuard:
 
     def release(self, agent_id=''):
         """Release a slot for this process."""
+        refuse_under_test('concurrency-guard')
         lock_file = GUARD_FILE.with_suffix('.lock')
         with open(lock_file, 'w') as lf:
             fcntl.flock(lf, fcntl.LOCK_EX)

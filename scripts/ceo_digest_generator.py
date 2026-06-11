@@ -51,6 +51,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import chain_event_emit as cee  # noqa: E402
 import larry_alerts  # noqa: E402
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 APPROVALS_FILE = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
@@ -502,6 +503,7 @@ def generate_ceo_voice(prompt: str) -> tuple[Optional[str], Optional[float]]:
     parse failure, empty result) returns (None, None) and the caller falls
     through to the raw rendering. Never raises.
     """
+    refuse_under_test('claude-spawn')
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', DIGEST_MODEL,

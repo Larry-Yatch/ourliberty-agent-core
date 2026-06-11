@@ -90,8 +90,8 @@ def _connect_supabase():
             'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — '
             'cannot run audit.'
         )
-    from supabase import create_client  # type: ignore
-    return create_client(url, key)
+    from supabase_factory import get_supabase_client  # type: ignore
+    return get_supabase_client(url, key)
 
 
 def fetch_event_type_counts(client, lookback_days: int = 7) -> dict[str, int]:

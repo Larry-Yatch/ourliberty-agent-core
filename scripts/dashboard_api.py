@@ -3846,10 +3846,10 @@ def _get_larry_action_supabase_client():
     if not url or not key:
         return None
     try:
-        from supabase import create_client  # type: ignore  # noqa: PLC0415
+        from supabase_factory import get_supabase_client  # type: ignore  # noqa: PLC0415
+        return get_supabase_client(url, key)
     except ImportError:
         return None
-    return create_client(url, key)
 
 
 def _atomic_write_envelope(path: Path, payload: dict[str, Any]) -> None:
@@ -4564,6 +4564,11 @@ def _cleanup_review_verify_uncertain(
     if not items:
         return {}
     prompt = _build_cleanup_review_prompt(items)
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from test_isolation_guard import refuse_under_test  # noqa: PLC0415
+    refuse_under_test('claude-spawn')
     try:
         proc = subprocess.run(
             ['claude', '--print', '--model', CLEANUP_REVIEW_VERIFY_MODEL,

@@ -47,6 +47,7 @@ if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
 import chain_event_shipper as ces  # noqa: E402
+import test_isolation_guard  # noqa: E402
 from _fake_supabase import make_fake_supabase  # noqa: E402
 
 
@@ -951,8 +952,9 @@ class TestBuildClient(unittest.TestCase):
     def test_pins_timeout_when_options_accepted(self):
         capture: dict[str, Any] = {}
         with mock.patch.dict(sys.modules, {'supabase': make_fake_supabase(capture)}):
-            from supabase import create_client  # type: ignore
-            client = ces.build_client(create_client, 'https://x.supabase.co', 'k')
+            # Genuine self-test of the guarded chokepoint → allow() the real build.
+            with test_isolation_guard.allow('supabase'):
+                client = ces.build_client('https://x.supabase.co', 'k')
         self.assertIsNotNone(client)
         self.assertIsNotNone(capture.get('options'))
         self.assertEqual(
@@ -965,8 +967,9 @@ class TestBuildClient(unittest.TestCase):
         capture: dict[str, Any] = {}
         fake = make_fake_supabase(capture, reject_options=True)
         with mock.patch.dict(sys.modules, {'supabase': fake}):
-            from supabase import create_client  # type: ignore
-            client = ces.build_client(create_client, 'https://x.supabase.co', 'k')
+            # Genuine self-test of the guarded chokepoint → allow() the real build.
+            with test_isolation_guard.allow('supabase'):
+                client = ces.build_client('https://x.supabase.co', 'k')
         self.assertIsNotNone(client)          # fell back, no raise
         self.assertIsNone(capture.get('options'))  # bare create_client(url, key)
 
@@ -994,7 +997,9 @@ class TestSupabaseSinkPinsTimeout(unittest.TestCase):
         fake = make_fake_supabase(capture)
         sink = ces.SupabaseSink()
         with mock.patch.dict(sys.modules, {'supabase': fake}):
-            sink._ensure_client()
+            # Genuine self-test of the guarded chokepoint → allow() the real build.
+            with test_isolation_guard.allow('supabase'):
+                sink._ensure_client()
         self.assertIsNotNone(sink._client)
         self.assertEqual(capture.get('url'), 'https://example.supabase.co')
         options = capture.get('options')

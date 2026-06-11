@@ -40,9 +40,9 @@ def main() -> int:
         help="Actually clear the matched rows. Without it, dry-run (no writes).")
     args = ap.parse_args()
 
-    from supabase import create_client
-    c = create_client(os.environ["SUPABASE_URL"],
-                      os.environ["SUPABASE_SERVICE_ROLE_KEY"])
+    from supabase_factory import get_supabase_client
+    c = get_supabase_client(os.environ["SUPABASE_URL"],
+                            os.environ["SUPABASE_SERVICE_ROLE_KEY"])
     now = dt.datetime.now(dt.timezone.utc)
 
     rows = c.table("chain_events").select("event_id,event_type,task_id,ts,read_at") \
