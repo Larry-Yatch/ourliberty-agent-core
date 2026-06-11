@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~1526 — 2026-06-11 21:26Z UTC (interactive, Tier 1 → 2, consecutive_clean 2→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 9/9 services active. 1 open PR (#476, freshly opened, not yet reviewed). 0 new alerts. All mandatory checks clean. **Tier de-escalated 1→2** (3 consecutive clean iters).
+
+**VERIFY-BEFORE-REASSERT (iter ~1525 watch items):**
+- **wt-ccd-s5 GC at 22:03Z?** Worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` PRESENT at `/home/larry/agent-worktrees/`, mtime 11:31 MDT (17:31Z UTC). GC threshold 21:31Z UTC, healer next run 22:03Z. 5 min from threshold at check time; on track. ✅ [blue] carry.
+- **test-jail-pr4**: PR #476 opened at 21:19Z UTC. ✅ **Watch item resolved.** New: PR #476 (`forge/test-jail-pr4-acceptance-proof-001`) awaiting Mirror review; mergeable=MERGEABLE. Not yet at 30-min stale threshold.
+- **Sync error**: `agent-core-sync.json` last_sync=20:52:55Z (~33 min at check time), status=error. Within 2h escalation threshold (22:52Z). ✅ carry.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: `beacon-pending-approvals.json` has only `unreg-approval-2dbbe7bb4d4b`. Routing gap persists. G-rule 1/3. [blue] carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1306 lines. Watermark L1306 (fully claimed). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json`: 1 pending (`unreg-approval-2dbbe7bb4d4b`, known PR #457 item, standing). No orphaned Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (21:26Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** No unresolved Larry directives in last 24h. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus: main, clean. Most recent commit `1cf52c1 Pulse cycle 20260611T212239Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T20:52:55Z (~33 min), status=error (`auto-commit push failed; rolled back`). `last_success: null`. Within 2h threshold (escalate at 22:52Z). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (in-flight, PR #476 open). Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 1 open PR — #476 `test(jail): test-jail PR-4 — deliberate-leak acceptance proof + docs sweep + reconciliation runbook` (forge/test-jail-pr4-acceptance-proof-001). mergeable=MERGEABLE, reviewDecision="" (Mirror not yet reviewed). Created 21:19Z (~7 min ago). Not yet at 30-min stale+no-review threshold. ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **tier promoted 1→2** (reset consecutive_clean=0). ✅
+2. No always-allowed-fix actions required.
+3. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] wt-ccd-s5 — GC expected 22:03Z. If persists past 22:10Z → escalate. [carry]
+- [blue] PR #476 (test-jail-pr4) open — awaiting Mirror review. Watch: if clean+green for >30m without auto-merge, enable auto-merge. [new]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3 (no new occurrence). [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary 2/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+
+**Watch items for iter ~1527:**
+- **wt-ccd-s5**: GC expected ~22:03Z. If worktree persists past 22:10Z → escalate.
+- **PR #476**: Mirror review expected. If clean+green for >30m without auto-merge → enable auto-merge per allow-list.
+- **Sync error**: If `agent-core-sync.json` still shows error by 22:52Z (2h from 20:52Z) → escalate to [yellow].
+- **Tier 2 cadence**: Now at Tier 2 (15-min cadence). Next scheduled fire ~21:41Z.
+
+**PRIME DIRECTIVE:** 0 new interventions. Running total: interventions≈793, systemic_fixes≈24, ratio≈33.0, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0 (fresh start post-promotion).
+
+---
+
 ## Iteration ~1525 — 2026-06-11 21:20Z UTC (interactive, Tier 1, consecutive_clean 2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
