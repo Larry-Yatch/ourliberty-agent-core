@@ -4,6 +4,101 @@
 
 ---
 
+## Iteration ~1471 — 2026-06-11 13:59Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ✅ Nominal (pipeline progressing). CCD-S5 dispatched to Forge inbox. PR #457 [yellow] standing (~5h46m). 9/9 services active. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1470 watch items):**
+- Forge post-build cleanup `build-ccd-s4-healer-recover-then-alert.json`: **STILL PRESENT** in Forge inbox. [blue] carry.
+- Beacon `notify-ccd-s4-healer-recover-then-alert.json`: **CONSUMED** — Beacon inbox EMPTY. ✅ Resolved. CCD-S5 dispatch followed (see Check 4).
+- fix-build-background-poll-idiom-001: **NOT YET DISPATCHED** — Forge inbox has CCD-S5 instead. Note: Forge REJECTED predecessor `fix-build-background-task-output-visibility-001` at preflight (alert 12:50Z: env-only framing refuted; Beacon re-scoped to `fix-build-background-poll-idiom-001`). [blue] carry.
+- PR #457 Larry response: **STILL PENDING** — UNKNOWN-mergeable, no reviews. Now ~5h46m standing. [yellow] carry.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: **STILL PENDING** — beacon-pending-approvals.json MISSING. [yellow] carry.
+
+**Check 0 — Alert triage:** Total lines: 1264. Prior watermark: L1264. No new alerts since iter ~1470. ✅ Nominal. Watermark unchanged at L1264.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry inbound: 02:39 MDT (08:39Z UTC, ~5h20m ago). No new directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for 24 known tasks). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (post-build cleanup; known) + **NEW: `ccd-s5-doctrine-and-handling-shapes.json`** (CCD-S5 dispatch from Beacon/outbox-notifier — expected pipeline progression after CCD-S4 merged). ✅ Normal active build state.
+- Beacon: EMPTY ✅ (notify-ccd-s4 envelope consumed)
+- Mirror: EMPTY ✅
+- Pulse: EMPTY ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known. Last auto-restart event: 13:16Z (outbox-notifier; same occurrence carried from prior iters).
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=79290fe "Pulse cycle 20260611T134959Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T13:52:16Z (~5 min ago at check time), status=no-change. ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active/running. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`) — OPEN, UNKNOWN-mergeable (transient), no reviews, no autoMerge. Created 08:13:19Z (~5h46m). DM delivered iter ~1462. [yellow] carry.
+
+**§5.0 bug-hunt gate:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only), Check III (next eligible 2026-06-14). Skip. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). No 60d trigger. ✅
+
+**G-rule tracking:**
+- All G-rules carry from iter ~1470 unchanged. No new occurrences this iter.
+- unreviewed-merge set unchanged: (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — G-rule 3/3 DISPATCHED, Tier-3 known.
+
+**Actions taken:** None — observation-only iter.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional. DM delivered iter ~1462. UNKNOWN-mergeable (transient). Larry's response needed. ~5h46m standing.
+- [yellow] **APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`** — Beacon DM sent (iter 1451). Pending Larry response (APPROVE/REJECT). beacon-pending-approvals.json MISSING.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] **CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`** — NEW in Forge inbox (dispatched this cycle by outbox-notifier). Docs-only PR: agent CLAUDE.md handling shapes + Enforcement lines for `code-review-revision-no-session` + recover-or-route-to-agent rule. Watch for Forge preflight → PR.
+- [blue] **fix-build-background-poll-idiom-001** — not yet dispatched. Forge rejected predecessor env-only spec; Beacon re-scoped. Watch for Beacon dispatch now Forge queue has CCD-S5.
+- [blue] `build-ccd-s4-healer-recover-then-alert.json` — Forge post-build cleanup still present. Watch for clearance.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark MISSING (beacon-pending-approvals.json MISSING — standing).
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter 1416. Count tracked by G-rule.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing (known, post-PR #460 one-shot done).
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463) — Tier-3 known pattern. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24-empty-prompt-envelope-rejected — 1/3 G-rule. Carry.
+
+**Watch items for iter ~1472:**
+- CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`: Watch for Forge preflight → PR (docs-only, expected to be fast).
+- `build-ccd-s4-healer-recover-then-alert.json`: Watch for Forge post-build cleanup clearance.
+- fix-build-background-poll-idiom-001: Watch for Beacon dispatch (Forge queue now has CCD-S5 active).
+- PR #457: Larry response needed (~5h46m+ standing). UNKNOWN-mergeable — recheck.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: Larry response.
+
+**PRIME DIRECTIVE:** No new intervention this iter (observation-only). Running total (iter ~1470 carry): interventions=784, systemic_fixes=21, verification_pending=10, ratio≈37.3, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~1470 — 2026-06-11 13:48Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation.
