@@ -2188,6 +2188,98 @@ def _result_epoch(f: Path, envelope: dict[str, Any]) -> float:
         return 0.0
 
 
+def _prior_dispatch_was_definitive_non_run(task_id: str) -> bool:
+    """Return True only when the MOST RECENT Forge outbox result for this
+    task_id was a DEFINITIVE non-run (worker produced no real work and no PR).
+
+    Headless-approval dedup-wedge fix (2026-06-11), mirroring PR #403's build-
+    phase carve-out (``_prior_build_was_spawn_failure``). The headless-approval-
+    request dispatch keys its dedup on the archived preflight task file
+    ``<task_id>.json``; that file is archived even when the prior attempt was a
+    definitive non-run — e.g. ccd-s1 (2026-06-10), where identity resolved to
+    BEACON instead of FORGE and the worker emitted an IDENTITY_MISMATCH reject
+    with no real work and no PR. The stale artifact then blocked every retry.
+
+    Two definitive-non-run shapes are recognized, BOTH requiring no PR:
+      - spawn-failure: ``exit_code == -1`` + ~0 duration (None or < 2s) + an
+        ``'All retries exhausted'`` signal — the worker never spawned.
+      - identity-mismatch reject: the result/error text carries the
+        ``IDENTITY_MISMATCH`` token — the worker bailed at the identity gate
+        before doing any work (this is the ccd-s1 regression shape).
+
+    SAFETY INVARIANT (same as #403): fires ONLY on a determinable definitive
+    non-run. A genuine REJECT (spec not buildable) has exit 0 and no IDENTITY_
+    MISMATCH token, so it is correctly NOT matched and stays deduped. A
+    completed attempt (any PR) or an in-flight one (no terminal result) returns
+    False so dedup keeps its conservative skip. Any read/parse error → False.
+
+    Unlike the build helper this does NOT filter on ``phase == 'build'`` — the
+    headless wedge is keyed on the preflight task file, so the prior attempt's
+    terminal result is a preflight (or later) result. The MOST RECENT result
+    of any phase wins, so a task that later completed (with a PR) still dedups.
+    """
+    try:
+        archive_dir = OUTBOXES_ROOT / 'forge' / '.archive'
+        if not archive_dir.exists():
+            return False
+        # Result envelopes are keyed `<task_id>.json` / `<task_id>.N.json`.
+        # Anchor the match so a task_id that is a prefix of another (e.g.
+        # 'foo' vs 'foo-v2') can't cross-match.
+        name_re = re.compile(rf'^{re.escape(task_id)}(\.\d+)?\.json$')
+        candidates: list[tuple[float, dict[str, Any]]] = []
+        for f in archive_dir.glob('*.json'):
+            if f.name.startswith('.') or not name_re.match(f.name):
+                continue
+            try:
+                envelope = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(envelope, dict):
+                continue
+            if envelope.get('agent') != 'forge':
+                continue
+            candidates.append((_result_epoch(f, envelope), envelope))
+        if not candidates:
+            return False
+
+        # Most recent result of any phase wins.
+        _, latest = max(candidates, key=lambda item: item[0])
+
+        # A PR (top-level field OR a `PR opened:`/`PR updated:` line in the
+        # result text) means real work ran — never override.
+        if latest.get('pr_url'):
+            return False
+        if _extract_pr_url_from_build_result(latest.get('result', '')):
+            return False
+
+        signals = (
+            str(latest.get('error') or ''),
+            str(latest.get('result') or ''),
+        )
+
+        # Shape 1 — definitive spawn-failure (worker never ran).
+        if latest.get('exit_code') == -1:
+            duration = latest.get('duration_sec')
+            duration_ok = duration is None
+            if duration is not None:
+                try:
+                    duration_ok = float(duration) < 2
+                except (TypeError, ValueError):
+                    duration_ok = False
+            if duration_ok and any(
+                'all retries exhausted' in s.lower() for s in signals
+            ):
+                return True
+
+        # Shape 2 — identity-mismatch reject (worker bailed at identity gate).
+        if any('identity_mismatch' in s.lower() for s in signals):
+            return True
+
+        return False
+    except Exception:
+        return False
+
+
 def _dispatch_build_phase(data: dict[str, Any]) -> None:
     """Write a build-phase task to Forge's inbox after a PROCEED marker.
 
@@ -6489,15 +6581,39 @@ def _handle_beacon_headless_approval_request(
     # if the notifier crashes between dispatch and archive.
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
     filename = safe_write_inbox.canonical_inbox_name(f'{marker_task_id}.json')
+    # A task currently in the LIVE inbox is queued/in-flight — always skip,
+    # never override (don't double-dispatch a running preflight).
+    live = forge_inbox / filename
+    if live.exists():
+        log(
+            f'headless-approval-request already dispatched for task '
+            f'{marker_task_id} (live inbox file present); skipping '
+            f'duplicate write',
+        )
+        return str(live)
+    # A stale `<task_id>.json` in .archive/ or .invalid/ normally means the
+    # task was already dispatched (crash-recovery protection). EXCEPTION
+    # (headless dedup-wedge fix, 2026-06-11, mirroring PR #403): if the prior
+    # attempt was a DEFINITIVE non-run (spawn-failure / identity-mismatch
+    # reject, no PR), the artifact is a phantom that would permanently wedge
+    # the task_id — allow the re-dispatch. The override fires ONLY on a
+    # determinable definitive non-run; in-flight / completed work returns
+    # False and keeps the conservative skip.
     for candidate in (
-        forge_inbox / filename,
         forge_inbox / '.archive' / filename,
         forge_inbox / '.invalid' / filename,
     ):
         if candidate.exists():
+            if _prior_dispatch_was_definitive_non_run(marker_task_id):
+                log(
+                    f'HEADLESS_DEDUP_OVERRIDE task={marker_task_id} — prior '
+                    f'attempt was a definitive non-run (spawn-failure / '
+                    f'identity-reject, no PR); allowing re-dispatch'
+                )
+                break
             log(
                 f'headless-approval-request already dispatched for task '
-                f'{marker_task_id} (file or archive or .invalid present); '
+                f'{marker_task_id} (archive or .invalid present); '
                 f'skipping duplicate write',
             )
             return str(candidate)

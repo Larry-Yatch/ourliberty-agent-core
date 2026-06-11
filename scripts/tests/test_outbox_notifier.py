@@ -9576,6 +9576,203 @@ class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
         forge_tasks = list((on.INBOXES_ROOT / 'forge').glob('*.json'))
         self.assertEqual(forge_tasks, [])
 
+    # ---------------- dedup-wedge override (2026-06-11, mirrors PR #403) ----------------
+    #
+    # A stale archived Forge preflight task `<task_id>.json` must NOT
+    # permanently block re-dispatch when the prior attempt was a DEFINITIVE
+    # non-run (spawn-failure / identity-mismatch reject, no PR). The override
+    # fires ONLY on a determinable non-run; in-flight / completed work keeps
+    # the conservative skip. ccd-s1 (identity-reject) is the regression case.
+
+    def _seed_inbox_archive(self, task_id, where='.archive'):
+        """Plant the stale `<task_id>.json` in Forge's inbox archive/.invalid."""
+        d = on.INBOXES_ROOT / 'forge' / where
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{task_id}.json').write_text('{}')
+
+    def _seed_outbox_result(self, task_id, body, suffix='.1'):
+        """Plant a Forge RESULT envelope in Forge's outbox archive."""
+        d = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        f = d / f'{task_id}{suffix}.json'
+        f.write_text(json.dumps(body))
+        return f
+
+    def _identity_reject_result(self, task_id):
+        # ccd-s1 shape: identity drew BEACON instead of FORGE; the worker
+        # emitted the single IDENTITY_MISMATCH line and stopped — no PR.
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': 0,
+            'result': 'IDENTITY_MISMATCH: expected=forge loaded=beacon',
+            'error': None,
+            'duration_sec': 8.3,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:15:00.000000+00:00',
+        }
+
+    def _spawn_failure_result(self, task_id):
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': -1,
+            'result': 'All retries exhausted',
+            'error': 'All retries exhausted',
+            'duration_sec': None,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:15:00.000000+00:00',
+        }
+
+    def _completed_result(self, task_id):
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'build',
+            'exit_code': 0,
+            'result': (
+                'PR opened: '
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/410'
+                '\n\nImplemented the change.'
+            ),
+            'error': None,
+            'duration_sec': 142.5,
+            'pr_url': None,
+            'completed_at': '2026-06-10T13:00:00.000000+00:00',
+        }
+
+    def _genuine_reject_result(self, task_id):
+        # A legitimate preflight REJECT (spec not buildable): exit 0, no PR,
+        # NO identity-mismatch token. Must stay deduped — re-dispatch would
+        # just re-REJECT.
+        return {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'preflight',
+            'exit_code': 0,
+            'result': (
+                '=== REJECT ===\n{"task_id": "ccd-s1", "reason": "spec '
+                'references a file that does not exist"}\n=== END_REJECT ==='
+            ),
+            'error': None,
+            'duration_sec': 21.0,
+            'pr_url': None,
+            'completed_at': '2026-06-10T12:20:00.000000+00:00',
+        }
+
+    def test_dedup_overridden_on_identity_reject(self):
+        # ccd-s1 regression: prior attempt was an IDENTITY_MISMATCH reject
+        # (no PR, no real work). The stale archived task file must NOT wedge
+        # the retry — the override re-dispatches.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-ccd-s1.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        # A fresh live preflight task was written despite the stale archive.
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_overridden_on_spawn_failure(self):
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._spawn_failure_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-spawnfail.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_override_fires_from_invalid_dir(self):
+        # The wedge artifact can also live in .invalid/ (a validator-rejected
+        # prior dispatch). The override must fire from there too.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id, where='.invalid')
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-invalid.json', body)
+        on.process_outbox(f)
+        self.assertTrue((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_still_skips_when_prior_completed(self):
+        # A prior attempt that opened a PR is real work — re-dispatch must
+        # NOT fire; the dedup keeps its skip.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._completed_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-done.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_still_skips_on_genuine_reject(self):
+        # A legitimate REJECT (exit 0, no PR, no identity-mismatch token) is
+        # NOT a non-run — re-dispatch would just re-REJECT. Must stay deduped.
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        self._seed_outbox_result(task_id, self._genuine_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-reject.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_skips_when_no_terminal_result(self):
+        # Notifier crashed mid-flight: the inbox artifact is archived but NO
+        # terminal result exists. The override must NOT fire (conservative).
+        task_id = 'ccd-s1'
+        self._seed_inbox_archive(task_id)
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-crash.json', body)
+        on.process_outbox(f)
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}.json').exists())
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_dedup_live_inbox_always_skips(self):
+        # A task currently in the LIVE inbox is in-flight; even with a prior
+        # non-run result present, never double-dispatch it.
+        task_id = 'ccd-s1'
+        live_dir = on.INBOXES_ROOT / 'forge'
+        live_dir.mkdir(parents=True, exist_ok=True)
+        (live_dir / f'{task_id}.json').write_text('{"phase": "preflight"}')
+        self._seed_outbox_result(task_id, self._identity_reject_result(task_id))
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-inflight.json', body)
+        on.process_outbox(f)
+        # Exactly the one we planted; no second write, no override.
+        self.assertEqual(len(list(live_dir.glob(f'{task_id}.json'))), 1)
+        self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
+
+    def test_non_run_helper_defensive(self):
+        # Missing archive dir -> False.
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('no-such'))
+        # Corrupt envelope -> False (parse error is conservative).
+        d = on.OUTBOXES_ROOT / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'corrupt.1.json').write_text('{not valid json')
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('corrupt'))
+        # Prefix-collision guard: a result for `<task>-v2` must not match.
+        self._seed_outbox_result(
+            'pfx-v2', self._spawn_failure_result('pfx-v2')
+        )
+        self.assertFalse(on._prior_dispatch_was_definitive_non_run('pfx'))
+        # Positive cases.
+        self._seed_outbox_result('sf', self._spawn_failure_result('sf'))
+        self.assertTrue(on._prior_dispatch_was_definitive_non_run('sf'))
+        self._seed_outbox_result('im', self._identity_reject_result('im'))
+        self.assertTrue(on._prior_dispatch_was_definitive_non_run('im'))
+
 
 class NoSessionRevisionDmTest(unittest.TestCase):
     """Chain-gap #6 (observed 2026-05-20 on PR #59).
