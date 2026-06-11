@@ -4,6 +4,111 @@
 
 ---
 
+## Iteration 1389 — 2026-06-11 00:22Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ transcript-not-persisted regression ONGOING — now also affects agent-runner-pulse (line 1429, 00:15:25Z) in addition to forge (lines 1427–1428 from iter 1388). Same root cause: PR #438 unit-file changes not yet installed to /etc/systemd/system/. Auto-heals 06:00Z. No new DM sent (Larry already informed iter 1388; same root cause). PR #440 MERGED ✅ 00:20:36Z (cycle-tier.json record_iter_result fix deployed). PR #439 spec branch open 70 min; healer already escalated to Larry. 9/9 services active. Inboxes empty. Sync fresh.
+
+**VERIFY-BEFORE-REASSERT (iter 1388 watch items):**
+- PR #440 Mirror review result: **CONFIRMED MERGED 00:20:36Z.** cycle-tier.json `last_signal_at` stale G-rule → RESOLVED. Fix deployed. ✅ CLOSED.
+- transcript-not-persisted new occurrences: **WRONG prediction** — line 1429 (00:15:25Z) shows transcript-not-persisted:tier1 from agent-runner-pulse (not forge). PR #438 install gap also affects pulse-bot unit. G-rule `unknown-task transcript-not-persisted` → 2/3. Root cause unchanged; auto-heal still 06:00Z. Larry already informed iter 1388 — no re-DM.
+- install-drift healer 06:00Z: NOT YET (currently 00:22Z). ✅ Pending.
+- PR #439 72h threshold: still open, 70 min old. Healer fired alert (line 1431) and escalated to Larry via route=escalate. 72h threshold 2026-06-13 ~23:11Z. ✅ Watch.
+
+**Check 0 — Alert triage (4 new alerts: lines 1429–1432, watermark was 1428):**
+- **Line 1429** (00:15:25Z): `transcript-not-persisted:tier1` from agent-runner-pulse, task=unknown-task, path=/home/larry/.claude/projects/-home-larry-agents-agents-pulse-workspace/s1.jsonl. Same root cause as iter 1388 Tier-2 (PR #438 install gap). Larry already DM'd. **Effective Tier-3** (same root cause, already escalated, auto-heal scheduled, re-DM would be noise). Journal note only. G-rule: 2/3.
+- **Line 1430** (00:18:02Z): Pulse's own DM written in iter 1388 (`transcript-not-persisted:post-pr438-unit-install-gap`, source=pulse). **Tier-3** (self-written). Journal note only.
+- **Line 1431** (00:20:05Z): `pipeline-stall:unrouted-pr:PR#439` from heal-pipeline-stall. PR #439 open 68 min, no Mirror review dispatch. Healer escalated to Larry via route=escalate (Beacon 5-min sweep delivers). **Tier-3** (known standing policy: Larry-authored spec PRs have 72h threshold; Larry already informed by healer). Journal note only.
+- **Line 1432** (00:21:56Z): medic notification for PR#439 (same finding as line 1431). **Tier-3** (informational). Journal note only.
+- **Watermark advance: line 1432 / medic:notification / 2026-06-11T00:21:56Z**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: pending=[] (file present, empty). ✅ Nominal.
+- No new Larry directives. ✅
+
+**Check 3 — Pipeline stall:**
+- ourliberty-heal-pipeline-stall.service: ran at 00:20:02Z UTC (2 min before scan), status=0/SUCCESS. ✅ Nominal.
+- Note: healer log shows `FORGE_NO_PR_SKIP task=fix-classifier-session-lost-001` (PREFLIGHT_EXIT, archived) — clean, not a stall.
+
+**Check 4 — Pending directives:**
+- No new Larry messages. ✅
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Standing pattern.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean ✅. HEAD=4ad1a3d "Pulse cycle 20260611T002110Z" (includes PR #440 merge). ✅ Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T23:50:19Z (32 min old at 00:22Z scan), status=success. Expires ~01:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service (current) ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 1 open PR — PR #439 "spec: park-the-nudge": OPEN, mergeable=UNKNOWN, reviewDecision="", createdAt=23:11:57Z (70 min at scan). Spec branch, no automated Mirror review. 72h threshold 2026-06-13 ~23:11Z. Healer escalated to Larry. ✅ Watch.
+- PR #440: MERGED 00:20:36Z ✅ CLOSED.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Inboxes:**
+- All 4 inboxes (forge, beacon, mirror, pulse): EMPTY ✅.
+
+**Check I (Thursday 2026-06-11):** Weekday-gate skip (not Monday). ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). Skip. ✅
+**Credential rotations:** 0 overdue, 0 upcoming within 60d. ✅
+**install-drift:** Waiting for 06:00Z June 11. ✅
+**ourliberty-cycle.timer:** Trigger: n/a — standing G-rule. Carry.
+
+**G-rule tracking:**
+- **cycle-tier.json `last_signal_at` stale → RESOLVED via PR #440 MERGED**: Fix deployed. Verification: cycle-tier.json should show updated `last_updated` after this cycle completes (wrapper calls record_iter_result). Watch iter 1390 for confirmation.
+- **`unknown-task` transcript-not-persisted: 2/3** (iter 1388: forge tier1+tier2; iter 1389: pulse tier1). Root cause = PR #438 install gap. All three alerts share task=unknown-task. At 3/3: dispatch to Beacon to spec agent_runner task_id fallback logging. Watch for 3rd occurrence (may occur at next Forge or Pulse automated cycle before 06:00Z).
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry pending Beacon/Forge.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rule statuses: carry from iter 1388 unchanged.
+
+**Actions taken:**
+- None. All new alerts classified Tier-3 (effective). No re-DM, no new dispatches.
+
+**PRIME DIRECTIVE:** 0 new rows this iter (no corrective dispatches; transcript-not-persisted observation already covered by iter 1388 intervention; PR#439 healer pre-escalated). Running total: interventions=767, systemic_fixes=19, verification_pending=9, ratio≈40.4, trend=stable.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — transcript-not-persisted ongoing; PR #439 unrouted).
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: PR #438 unit files NOT in /etc/systemd/system/. Now confirmed affecting forge AND pulse agents. Auto-heals 06:00Z June 11. DM sent iter 1388. G-rule 2/3.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- ~~[blue] PR #440: OPEN~~ → ✅ MERGED 00:20:36Z. cycle-tier.json fix deployed.
+- [blue] PR #439: OPEN, spec branch, 70 min, no automated Mirror review. 72h threshold 2026-06-13 ~23:11Z. Healer alerted Larry.
+- ~~[blue] cycle-tier.json `last_signal_at` stale → CHAIN ACTIVE~~ → ✅ PR #440 MERGED. RESOLVED. Verify iter 1390.
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11. Will install PR #438 unit changes.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule `unknown-task transcript-not-persisted` — 2/3 (forge + pulse). Watch for 3rd.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] Calibration: Check 3 heartbeat check should use `systemctl status ourliberty-heal-pipeline-stall.service` not ~/agents/state/heal-pipeline-stall.heartbeat.
+
+**Watch items for iter 1390:**
+- install-drift healer: Confirm 06:00Z fire installs PR #438 unit changes (forge-bot + pulse-bot ReadWritePaths).
+- cycle-tier.json: Verify `last_updated` > 2026-06-11T00:22Z after this cycle completes (confirms PR #440 record_iter_result fix working).
+- transcript-not-persisted: If 3rd occurrence before 06:00Z → advance G-rule to 3/3 and dispatch to Beacon.
+- PR #439: watch (no action until 72h threshold 2026-06-13).
+
+---
+
 ## Iteration 1388 — 2026-06-11 00:12Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ transcript-not-persisted regression (lines 1427–1428, 00:10:35Z) — PR #438 unit-file changes in repo but NOT installed to /etc/systemd/system/ (install-drift healer ran at 18:00Z, before PR #438 merged at 23:25Z). Larry's 23:43Z daemon-reload reloaded old unit definitions. Will auto-heal at 06:00Z via install-drift healer. [yellow] DM sent. PR #440 "fix(cycle): record_iter_result wiring" opened by Forge at 00:11:11Z (MERGEABLE, Mirror reviewing). 9/9 services active. Sync fresh.
