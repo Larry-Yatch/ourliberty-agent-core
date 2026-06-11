@@ -1629,6 +1629,15 @@ _QUEUE_TERMINAL_EVENT_TYPES = (
     'cost_budget', 'review_escalate',
 )
 
+# Mirror's review verdicts also close an in_review entry. Mirror — NOT the
+# building agent — emits these rows (same attribution seam as done_today's
+# verdict join), so they arrive via `verdict_rows`, keyed back to the build
+# by task_id. A REVISION closes the current entry; the subsequent re-review
+# dispatch push-emits a fresh review_request which re-opens the lane.
+_QUEUE_VERDICT_EVENT_TYPES = (
+    'review_pass', 'review_revision', 'review_escalate',
+)
+
 
 def _reader_agent_queue_queued(
     agents_root: Path, agent: str, now: Optional[datetime] = None,
@@ -1711,15 +1720,29 @@ def _fetch_chain_events_for_agent(
     return list(getattr(resp, 'data', None) or [])
 
 
-def _derive_in_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _derive_in_review(
+    rows: list[dict[str, Any]],
+    verdict_rows: Optional[list[dict[str, Any]]] = None,
+) -> list[dict[str, Any]]:
     """IN_REVIEW lane: a task whose latest `review_request` has no later
-    terminal event for the same task_id. `since` = that review_request ts."""
+    closing event for the same task_id. `since` = that review_request ts.
+
+    Closing events come from two row sets, mirroring `_derive_done_today`'s
+    attribution split: the agent's own terminal events (`rows`,
+    _QUEUE_TERMINAL_EVENT_TYPES) and Mirror's review verdicts
+    (`verdict_rows`, _QUEUE_VERDICT_EVENT_TYPES) joined by task_id."""
     by_task: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         tid = r.get('task_id')
         if not tid:
             continue
         by_task.setdefault(tid, []).append(r)
+    verdicts_by_task: dict[str, list[dict[str, Any]]] = {}
+    for r in verdict_rows or []:
+        tid = r.get('task_id')
+        if not tid or r.get('event_type') not in _QUEUE_VERDICT_EVENT_TYPES:
+            continue
+        verdicts_by_task.setdefault(tid, []).append(r)
     out: list[dict[str, Any]] = []
     for tid, evs in by_task.items():
         reviews = [e for e in evs if e.get('event_type') == 'review_request']
@@ -1733,15 +1756,17 @@ def _derive_in_review(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 latest_rr, latest_rr_dt = e, dt
         if latest_rr is None:
             continue
-        has_later_terminal = False
-        for e in evs:
-            if e.get('event_type') not in _QUEUE_TERMINAL_EVENT_TYPES:
-                continue
+        closers = [
+            e for e in evs
+            if e.get('event_type') in _QUEUE_TERMINAL_EVENT_TYPES
+        ] + verdicts_by_task.get(tid, [])
+        has_later_closer = False
+        for e in closers:
             dt = _ts_to_dt(e.get('ts'))
             if dt is not None and dt > latest_rr_dt:
-                has_later_terminal = True
+                has_later_closer = True
                 break
-        if has_later_terminal:
+        if has_later_closer:
             continue
         out.append({
             'task_id': tid,
@@ -1982,7 +2007,7 @@ def _reader_agent_queue(
             'building': _reader_agent_queue_building(
                 agents_root, worktrees_root, agent, now=now,
             ),
-            'in_review': _derive_in_review(rows),
+            'in_review': _derive_in_review(rows, verdict_rows),
             'active': [],
             'done_today': _derive_done_today(
                 rows, verdict_rows, agent, now=now,

@@ -316,6 +316,70 @@ class InReviewLaneTest(_Base):
         ids = [x['task_id'] for x in r.json()['in_review']]
         self.assertEqual(ids, ['taskA'])
 
+    def test_mirror_verdict_closes_entry(self):
+        # forge-queue-in-review-lane: Mirror's verdict rides agent='mirror'
+        # rows — the forge fetch never sees it. The verdict join (by
+        # task_id) must close the entry, else every reviewed task sits in
+        # the lane forever (auto_merge & co. never land in forge's rows).
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskC',
+             'event_type': 'review_request', 'pr_url': 'https://pr/C',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskC',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/C',
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        self.assertEqual(r.json()['in_review'], [])
+
+    def test_rerun_review_request_after_verdict_reopens(self):
+        # REVISION closes the first entry; the re-review dispatch emits a
+        # fresh review_request and the task re-enters the lane with the
+        # new `since`.
+        now = datetime.now(timezone.utc)
+        rerun_ts = (now - timedelta(minutes=10)).isoformat()
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskD',
+             'event_type': 'review_request', 'pr_url': 'https://pr/D',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskD',
+             'event_type': 'review_revision', 'pr_url': 'https://pr/D',
+             'ts': (now - timedelta(minutes=20)).isoformat()},
+            {'agent': 'forge', 'task_id': 'taskD',
+             'event_type': 'review_request', 'pr_url': 'https://pr/D',
+             'ts': rerun_ts},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        in_review = r.json()['in_review']
+        self.assertEqual([x['task_id'] for x in in_review], ['taskD'])
+        self.assertEqual(in_review[0]['since'], rerun_ts)
+
+    def test_unrelated_mirror_rows_do_not_close(self):
+        # A verdict for a DIFFERENT task and a non-verdict mirror event for
+        # the SAME task must both leave the entry open.
+        now = datetime.now(timezone.utc)
+        rows = [
+            {'agent': 'forge', 'task_id': 'taskE',
+             'event_type': 'review_request', 'pr_url': 'https://pr/E',
+             'ts': (now - timedelta(minutes=30)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskF',
+             'event_type': 'review_pass', 'pr_url': 'https://pr/F',
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'taskE',
+             'event_type': 'session_done', 'pr_url': None,
+             'ts': (now - timedelta(minutes=5)).isoformat()},
+        ]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH)
+        ids = [x['task_id'] for x in r.json()['in_review']]
+        self.assertEqual(ids, ['taskE'])
+
 
 # ==================== done_today lane ====================
 

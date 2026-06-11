@@ -10898,5 +10898,116 @@ class ReconcileMissedMirrorReviewsTest(unittest.TestCase):
             list((on.INBOXES_ROOT / 'mirror').glob('review-*.json')), [])
 
 
+class ReviewRequestChainEventTest(unittest.TestCase):
+    """forge-queue-in-review-lane: review dispatches push-emit a
+    `review_request` chain_event (agent='forge') so the dashboard's
+    in_review lane populates. The emit fires ONLY on a successful inbox
+    write — idempotent skips and rejected dispatches emit nothing — and
+    an emit failure never breaks the dispatch itself."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT', 'BLACKBOARD',
+            'LOG_FILE', 'DEAD_LETTER_STATE', 'EMERGENCY_HALT_FLAG',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        self._swi_originals = {
+            'AGENTS_ROOT': swi.AGENTS_ROOT,
+            'INBOXES_ROOT': swi.INBOXES_ROOT,
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        on.ensure_dirs()
+        self.captured: list[dict] = []
+
+    def tearDown(self):
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        self._tmp.cleanup()
+
+    def _fake_emit(self, **kwargs):
+        self.captured.append(kwargs)
+        return True
+
+    def _data(self):
+        return {
+            'task_id': 'real-rr1',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/real-rr1',
+        }
+
+    PR = 'https://github.com/x/y/pull/9'
+
+    def test_first_dispatch_emits_review_request(self):
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        # The dispatch itself wrote the review task...
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
+        # ...and exactly one review_request event rode along.
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['task_id'], 'real-rr1')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 0)
+        self.assertEqual(ev['payload']['replan_count'], 0)
+
+    def test_rerun_dispatch_emits_with_round_number(self):
+        data = self._data()
+        data['pr_url'] = self.PR
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review_rerun(data, 2, 'fixed the findings')
+        self.assertEqual(len(self.captured), 1)
+        ev = self.captured[0]
+        self.assertEqual(ev['event_type'], 'review_request')
+        self.assertEqual(ev['agent'], 'forge')
+        self.assertEqual(ev['pr_url'], self.PR)
+        self.assertEqual(ev['payload']['revision_count'], 2)
+
+    def test_idempotent_skip_does_not_emit(self):
+        inbox = on.INBOXES_ROOT / 'mirror'
+        inbox.mkdir(parents=True, exist_ok=True)
+        (inbox / 'review-real-rr1.json').write_text('{}')
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_rejected_dispatch_does_not_emit(self):
+        with mock.patch.object(
+            swi, 'safe_write_inbox',
+            side_effect=swi.DispatchRejected('denied by validator'),
+        ), mock.patch.object(on.chain_event_emit, 'emit_event',
+                             self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(self.captured, [])
+
+    def test_emit_failure_does_not_break_dispatch(self):
+        def _raise(**_):
+            raise RuntimeError('supabase blew up')
+
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _raise):
+            # Must not propagate — daemon-never-wedge.
+            on._dispatch_mirror_review(self._data(), self.PR)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))), 1)
+
+
 if __name__ == '__main__':
     unittest.main()
