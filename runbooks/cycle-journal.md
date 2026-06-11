@@ -4,6 +4,22 @@
 
 ---
 
+## Iter ~1480 dead-letter response — 2026-06-11 15:20Z UTC
+
+**Trigger:** Inter-agent notify — dead-letter for `cycle-finding-post-merge-stale-inbox-file-20260611T151439Z` (dispatched by iter ~1480 cycle).
+
+**Finding:** Envelope was rejected by dispatch_validator: `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug`. Root cause confirmed: iter ~1480's cycle wrote the envelope using a `body` field instead of the required `prompt` field. Validator expects `prompt` ≥ 100 chars; `body` is a non-standard key, yielding a 0-char prompt.
+
+**F24 G-rule update:** This is now 2/3 occurrences. Prior occurrence was iter ~1479 standing-findings (1/3 G-rule noted). Pattern: cycle dispatch code sometimes generates envelopes with `body` instead of `prompt`. Permanent fix candidate if 3/3 reached.
+
+**Verify-before-redispatch:** `build-ccd-s4-healer-recover-then-alert.json` confirmed still present in Forge inbox (mtime 2026-06-11T07:00Z, unchanged). Finding is live; re-dispatch warranted.
+
+**Action:** Re-dispatched corrected envelope `cycle-finding-post-merge-stale-inbox-file-20260611T152000Z.json` to Beacon inbox with `prompt` field (1580 chars). Original `body` content preserved verbatim. Archived dead-letter notify from Pulse inbox.
+
+**post-merge-stale-inbox-file G-rule:** 3/3 — dispatch now successfully re-sent. Status: DISPATCHED (pending Beacon processing).
+
+---
+
 ## Iteration ~1479 — 2026-06-11 15:07Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation.
@@ -96119,3 +96135,103 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 
 **Tier end-of-iter:** 1 (consecutive_clean=0 -- PR #457 stall + direction-ask pending).
 
+
+## Iteration ~1480 — 2026-06-11 15:14Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ⚡ Action — PR #464 auto-merged (>30m, CLEAN). G-rule 3/3 dispatched to Beacon (post-merge-stale-inbox-file). PR #457 UNKNOWN [yellow] carry. 0 new alerts. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1479 watch items):**
+- PR #464: **MERGED** ✅ at 15:14:38Z (age 30m37s, always-fix `enable-pr-auto-merge`). CLOSED.
+- PR #457: **STILL OPEN/UNKNOWN** (gh pr list confirmed). 24h threshold: 2026-06-12 08:13Z. [yellow] carry.
+- `build-ccd-s4-healer-recover-then-alert.json` in Forge inbox: **STILL PRESENT** (confirmed Forge inbox listing). G-rule 3/3 threshold met — dispatch to Beacon EXECUTED this iter. Now tracking Beacon consumption.
+- Check B: ~22m at scan. ✅ Within threshold.
+- Zombie `fix-test-bootstrap-preserve-usersite-001.json`: **IN_ARCHIVE** (confirmed this iter; not in active inbox). Sentinel from 14:44Z was already processed in prior iter. CLOSED.
+
+**Check 0 — Alert triage:** Total lines: 1267 (unchanged; watermark L1267). **0 new alerts.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last delivery: idx=1265 (sentinel inbox-stall) at 14:48Z. No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for ~9 known tasks including ccd-s4 pr_exists=#463). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-ccd-s4-healer-recover-then-alert.json` (07:00, stale post-#463) + `ccd-s5-doctrine-and-handling-shapes.json` (07:50). G-rule dispatch for ccd-s4 stale file executed this iter.
+- Beacon: EMPTY pre-dispatch (1 item written this iter: G-rule dispatch). Mirror: EMPTY | Pulse: EMPTY
+✅ Nominal.
+
+**Check 5 — Stale daemon:** cycle-tier.json present and valid (tier=1, consecutive_clean=0, last_signal_at=14:58Z pre-iter). heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus; HEAD=beba378 "Pulse cycle 20260611T151047Z"). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T14:52:15Z (~22 min ago), status=no-change. ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9 active services (beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #464** (`refactor(tz): extract shared log_ts.parse_log_ts`) — MERGED ✅ 15:14:38Z (always-fix: age 30m37s, CLEAN/MERGEABLE). CLOSED.
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, UNKNOWN. Age ~7h1m. Direct Larry decision needed: merge or close. 24h threshold: 2026-06-12 08:13Z. [yellow] carry.
+
+**Check H — Forge digest:**
+- Open: 1 — PR #457 (~7h1m, UNKNOWN). PR #464 MERGED this iter.
+- No new merges since #464 at 15:14Z. ✅ Nominal.
+
+**§5.0 bug-hunt gate:** no committed audit baseline, no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check III: last ran 14:06Z (iter ~1472); next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due ~72d. No 60d trigger. ✅
+
+**G-rule tracking:**
+- **post-merge-stale-inbox-file** (`build-ccd-s4-healer-recover-then-alert.json`): **3/3 DISPATCHED** — Beacon inbox `cycle-finding-post-merge-stale-inbox-file-20260611T151439Z.json` at 15:14:39Z. Spec: inbox-watcher should archive Forge task files when corresponding PR has merged (same FORGE_NO_PR_SKIP branch-match logic as heal_pipeline_stall.py). Watch: Beacon consumption + Forge brief.
+- All other G-rules carry from iter ~1479 unchanged.
+
+**Actions taken:**
+1. `gh pr merge 464 --squash` → MERGED 15:14:38Z (`refactor(tz): extract shared log_ts.parse_log_ts`). Logged to cycle-actions.jsonl. PRIME DIRECTIVE: `enable-pr-auto-merge:pr-464`.
+2. Wrote `cycle-finding-post-merge-stale-inbox-file-20260611T151439Z.json` to Beacon inbox. PRIME DIRECTIVE: `post-merge-stale-inbox-file:g-rule-dispatch-to-beacon`.
+
+**Standing findings:**
+- [yellow] **PR #457 CI UNKNOWN** — OPEN, mergeStateStatus=UNKNOWN (~7h1m). Direct Larry decision needed: merge or close.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry pending Beacon/Forge.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. Approval: `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **post-merge-stale-inbox-file** — G-rule 3/3 DISPATCHED this iter. Watch Beacon consumption + Forge brief.
+- [blue] **CCD-S5 `ccd-s5-doctrine-and-handling-shapes.json`** — in Forge inbox (~8h14m). Watch for preflight → PR.
+- [blue] **fix-build-background-poll-idiom-001** — not yet dispatched. Watch for Beacon dispatch.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark L1267. ✅
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464) — Tier-3 known. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule auto-restart-failed:* — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule auto-retry source=auto-retry drops build dispatch — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] retry-exhausted-on-shipped-task → 2/3. Carry.
+- [blue] retry_exhausted:post-merge-install-drift-trigger-001 — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] sentinel-inbox-stall-ignores-inflight — 2/3 G-rule.
+- [blue] G-rule actor-exemption-config 3/3 — APPROVAL_REQUEST pending.
+- [blue] G-rule cycle-timer checkpoint 3/3 — pending `go: cycle-timer checkpoint`.
+- [blue] F24-empty-prompt-envelope-rejected — 1/3 G-rule. Carry.
+- [blue] Check III gate discrepancy — ran 11d after prior run. Noting for awareness.
+
+**Watch items for iter ~1481:**
+- PR #457: Still OPEN/UNKNOWN. 24h threshold: 2026-06-12 08:13Z. No nudge yet.
+- `build-ccd-s4-healer-recover-then-alert.json`: G-rule 3/3 dispatched to Beacon. Watch for Beacon consumption + Forge brief.
+- `ccd-s5-doctrine-and-handling-shapes.json`: in Forge inbox (~8h14m). Watch for Forge processing → PR.
+
+**PRIME DIRECTIVE:** 2 new rows this iter (intervention: enable-pr-auto-merge:pr-464; systemic_fix: post-merge-stale-inbox-file:g-rule-dispatch-to-beacon). Running total: interventions=786, systemic_fixes=22, verification_pending=10, ratio≈35.7, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (action taken + PR #457 UNKNOWN non-clean carry).
+
+---
