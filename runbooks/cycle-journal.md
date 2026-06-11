@@ -107,6 +107,14 @@
 - Sync: next push ~03:50Z. Verify SYNC-PUSH-REBASE-FALLBACK-001 doesn't fire.
 - Tier 1 cadence restored. Watch for signal-clear.
 
+**Inter-cycle note — Beacon result (~02:24Z, task=cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z):**
+Beacon completed spec for G-rule 3/3 transcript-not-persisted permanent fix. Summary:
+- Root cause verified: two-latency gap — sync pulls in ≤1h but install-drift healer runs on 12h timer (00:00/12:00 UTC). PR #438 unit files sat on disk up to 12h before the running unit picked them up.
+- Fix: sync-script hook, 1 PR, 2 files — `scripts/heal_systemd_install_drift.py` (add `--triggered` mode) + `scripts/sync_agent_core.sh` (fire healer after Step 7 when pulled commit touches `systemd/*.service|*.timer`). Install lands within one sync cycle (≤1h); 12h timer stays as backstop.
+- Dispatch status: NOT auto-dispatched (Pulse not in `outbox_notifier.py` auto-dispatch source set). Beacon queued a Telegram alert. Larry must say **"dispatch the install-drift trigger fix"** from Beacon chat to emit the real APPROVAL_REQUEST marker.
+- Forge preflight item: verify sync user's sudoers covers `sudo -n cp`, `daemon-reload`, `enable --now` (healer commands); if not, triggered install silently degrades to 12h backstop.
+- Full spec: `memory/beacon/2026-06-11.md`.
+
 ---
 
 ## Iteration 1395 — 2026-06-11 01:50Z UTC (interactive, Tier 2→3)
@@ -88148,3 +88156,89 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 - [blue] **sync-push-rebase-fallback-001** — self-recovering; root fix APPROVAL_REQUEST open.
 
 **Tier end-of-iter:** 1 (consecutive_clean=1 — this iter clean, all findings Tier-3 or nominal).
+
+---
+
+## Iteration 1397 — 2026-06-11 02:30Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles 1393–1396 ran after iter 1392 (00:44Z), updating MEMORY.md only (no journal entries). Last MEMORY snapshot: iter 1396 at 02:22Z. Recent commits: af7f971 "Pulse cycle 20260611T022445Z" (iter 1396 wrapper), ba6c29d "docs(spec): park-the-nudge" (PR #439 merged 01:50Z).
+
+**Health:** ✅ Nominal with standing items — park-the-nudge sequence active (PRs #441/#442/#443, Mirror reviewing all three); transcript-not-persisted install-gap still firing (3 new, root cause auto-heals 06:00Z UTC ~3.5h).
+**Tier state:** 1 (consecutive_clean=0 at start; this iter CLEAN → consecutive_clean=1 at end)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark (MEMORY iter 1396): line 1440 / agent-runner-pulse:transcript-not-persisted / 2026-06-11T02:00:13Z
+- Current count: **1443 lines** (+3 new)
+- New alerts (lines 1441–1443):
+  - agent-runner-forge:transcript-not-persisted:tier2+tier1 (02:20:47Z, CRITICAL): Forge build attempted transcript persist; PR #438 units not installed in /etc/systemd/system/. G-rule 3/3 already dispatched to Beacon (iter 1396). Auto-heals 06:00Z. → **Tier 3** (known-pattern). ✅
+  - agent-runner-pulse:transcript-not-persisted:tier1 (02:22:24Z, CRITICAL): Pulse automated cycle, same root cause. → **Tier 3** (known-pattern). ✅
+- New watermark: **1443 / agent-runner-pulse:transcript-not-persisted:tier1 / 2026-06-11T02:22:24Z**
+- Triage: 0 actions, 0 dispatches, 3 Tier-3 silences. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl priority warning since 90 min → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon-pending-approvals.json MISSING (= empty). No orphaned Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** Healer heartbeat=2026-06-11T02:13:19Z (13 min ago, fresh). heal-pipeline-stall-state.json: 44 entries, 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- beacon: 1 item — cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z.json (Pulse G-rule dispatch iter 1396, ~4 min old; expected lag before Beacon processes). ✅
+- forge: empty. ✅
+- mirror: 3 items — review-fix-wedged-reaper-spares-active-build-worktree-002.json, review-capture-label-contract.json, review-add-tier-fallback-alert-translation-001.json (park-the-nudge sequence reviews for PRs #441/442/443; all opened 02:06–02:16Z, within normal review lag). ✅
+- pulse: empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot healer, no new restarts). ✅ Nominal.
+
+**Check A — Source repo (VERIFY-BEFORE-REASSERT):** Session-start gitStatus: branch=main, clean tree. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-11T01:50:22Z (~40 min ago, within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 systemd services active: beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- ourliberty-agent-core: 3 open PRs, all park-the-nudge sequence (Forge-authored, 02:06–02:16Z, UNKNOWN-mergeable — normal GitHub compute delay; Mirror reviewing all three):
+  - PR #441 forge/fix-wedged-reaper-spares-active-build-worktree-002 (Mirror reviewing)
+  - PR #442 forge/capture-label-contract (Mirror reviewing)
+  - PR #443 forge/add-tier-fallback-alert-translation-001 (Mirror reviewing)
+  - All opened <30 min ago, below auto-merge threshold. ✅ Monitor.
+- ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional (Thursday 2026-06-11 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- transcript-not-persisted install-gap: CONFIRMED still firing (3 new occurrences lines 1441–1443). Root cause: /etc/systemd/system/ units pre-PR-#438. G-rule 3/3 Beacon dispatch IN INBOX. Auto-heals 06:00Z June 11 (~3.5h). No new action this iter.
+- park-the-nudge sequence: CONFIRMED ACTIVE — PRs #441/442/443 open, Mirror reviews dispatched.
+- bughunt-gate-soak: Phase 2 decision pending Larry. [yellow] carry.
+- health-check-notify-script-missing: G-rule 3/3 dispatched iter 1207; Forge PR pending. [yellow] carry.
+- Tier 2 weekly probe (auth_401): Not re-tested (Thursday). [yellow] carry.
+- Check IX GITHUB_TOKEN: Not tested. [yellow] carry.
+- sync-push-rebase-fallback-001: No new occurrence. [blue] carry.
+- G-rule cycle-timer checkpoint 3/3: [blue] carry.
+- G-rule actor-exemption-config 3/3: [blue] carry.
+- APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001: [blue] carry.
+
+**Actions taken:** None.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** 0 new interventions this iter. Script-authoritative per MEMORY iter 1396: interventions=769, systemic_fixes=20, ratio≈38.45, trend=improving.
+
+**Standing findings:**
+- [yellow] **transcript-not-persisted install-gap** — still firing (3 new lines 1441–1443). G-rule 3/3 Beacon dispatch in inbox. Auto-heals 06:00Z June 11 (~3.5h). DM sent iter 1388. No new action.
+- [yellow] **bughunt-gate-soak** — Phase 2 decision pending Larry.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched; Forge PR pending.
+- [yellow] **Tier 2 weekly probe (auth_401)** — Action on Larry: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [blue] **park-the-nudge PRs #441/#442/#443** — Mirror reviewing all three. Watch for verdicts and MERGEABLE threshold.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry sign-off.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending go: cycle-timer checkpoint.
+- [blue] **G-rule actor-exemption-config 3/3** — pending go: actor-exemption-config.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering; root fix APPROVAL_REQUEST open.
+
+**Watch items for next iter (1398):**
+- **park-the-nudge PRs #441/#442/#443** — expect Mirror verdicts; watch for CLEAN+MERGEABLE + 30-min auto-merge threshold.
+- **install-drift healer** — fires 06:00Z UTC June 11 (~3.5h). Installs PR #438 units, daemon-reload, fixes transcript-not-persisted root cause.
+- **Beacon inbox** — cycle-finding-transcript-not-persisted dispatch; expect consumption + Forge brief within 30 min of Beacon's next run.
+
+**Tier end-of-iter:** 1 (consecutive_clean=1 — this iter clean; all findings Tier-3 or nominal).
