@@ -570,9 +570,13 @@ def _enforce_cost_budget(
     instead of a silent stall.
 
     Sentinel log line on cap-fire: ``COST_BUDGET_EXHAUSTED task=<id>
-    current=$X.XX cap=$5.00 dispatch=<label>`` — load-bearing for watchdog
-    scanning. Same pattern as the BEACON_REPLAN_ALERT_WRITE_FAILED sentinel
-    from 5c.
+    current=$X.XX cap=$5.00 dispatch=<label>; ... agent=forge`` —
+    load-bearing for watchdog scanning. Same pattern as the
+    BEACON_REPLAN_ALERT_WRITE_FAILED sentinel from 5c. The trailing
+    `agent=forge` kv is read by chain_event_shipper (ships the sentinel as
+    a `cost_budget` chain event; the dashboard's Forge-queue lanes only
+    fetch agent='forge' rows). The plain per-dispatch ``COST_BUDGET ...
+    (allowed)`` INFO line below is deliberately NOT a chain event.
     """
     at_cap, current, cap = _check_cost_budget(task_id)
     if not at_cap:
@@ -592,7 +596,8 @@ def _enforce_cost_budget(
     log(
         f'COST_BUDGET_EXHAUSTED task={task_id} current=${current:.2f} '
         f'cap=${cap:.2f} dispatch={dispatch_label}; refusing dispatch'
-        + ('' if already_dmed else ' + queueing closing DM'),
+        + ('' if already_dmed else ' + queueing closing DM')
+        + ' agent=forge',
         'WARN',
     )
     if already_dmed:
@@ -1179,6 +1184,10 @@ _last_reconcile_ts = 0.0
 
 
 def log(msg: str, level: str = 'INFO') -> None:
+    # The stamp is NAIVE HOST-LOCAL time (the droplet runs America/Denver,
+    # not UTC). chain_event_shipper._normalize_iso_ts and
+    # heal_pr_auto_merge._to_utc interpret naive timestamps as host-local —
+    # don't switch this to UTC without migrating every log reader at once.
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     line = f'[{ts}] [notifier] [{level}] {msg}\n'
     try:
@@ -4464,12 +4473,20 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
       - already-merged (resume after crash) — `already_merged`
       - malformed PR URL (couldn't parse) — `failed` (no shell-out)
       - gh CLI missing entirely (FileNotFoundError) — `failed`
+
+    Every AUTO_MERGE log line (here and in the process_outbox validation
+    paths) ends with `agent=forge`: chain_event_shipper ships these lines
+    to Supabase chain_events, and the dashboard's Forge-queue lanes only
+    fetch rows with agent='forge' — a line without the kv ships as
+    agent='notifier' and stays invisible there. The kv must stay at the
+    END of the line: heal_pr_auto_merge._AUTO_MERGE_FAILED_RE requires
+    `task= pr= outcome=` to remain adjacent.
     """
     parsed = _parse_pr_url(pr_url)
     if parsed is None:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url!r} outcome=failed '
-            f'reason=malformed-pr-url (no shell-out attempted)',
+            f'reason=malformed-pr-url (no shell-out attempted) agent=forge',
             'WARN',
         )
         return {
@@ -4492,7 +4509,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     except subprocess.TimeoutExpired as e:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
-            f'reason=timeout after {_AUTO_MERGE_TIMEOUT_S}s ({e})',
+            f'reason=timeout after {_AUTO_MERGE_TIMEOUT_S}s ({e}) agent=forge',
             'WARN',
         )
         return {
@@ -4504,7 +4521,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     except FileNotFoundError as e:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
-            f'reason=gh-cli-missing ({e})',
+            f'reason=gh-cli-missing ({e}) agent=forge',
             'WARN',
         )
         return {
@@ -4516,7 +4533,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     except OSError as e:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
-            f'reason=os-error ({type(e).__name__}: {e})',
+            f'reason=os-error ({type(e).__name__}: {e}) agent=forge',
             'WARN',
         )
         return {
@@ -4529,7 +4546,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     if proc.returncode == 0:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=merged '
-            f'(--squash --delete-branch)',
+            f'(--squash --delete-branch) agent=forge',
         )
         return {
             'merge_outcome': 'merged',
@@ -4547,7 +4564,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
         log(
             f'AUTO_MERGE task={task_id} pr={pr_url} outcome=already_merged '
             f'(gh exit={proc.returncode} but state=MERGED — resume from '
-            f'prior crash; treating as success)',
+            f'prior crash; treating as success) agent=forge',
         )
         return {
             'merge_outcome': 'already_merged',
@@ -4560,7 +4577,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
     log(
         f'AUTO_MERGE task={task_id} pr={pr_url} outcome=failed '
         f'(gh exit={proc.returncode}, state={state}, '
-        f'stderr={stderr_text[:300]!r})',
+        f'stderr={stderr_text[:300]!r}) agent=forge',
         'WARN',
     )
     return {
@@ -7719,7 +7736,7 @@ def process_outbox(outbox_file: Path) -> str:
                     f'outcome=failed reason=marker-envelope-pr-url-mismatch '
                     f'marker_pr={pr_url!r} envelope_pr={envelope_pr_url!r} — '
                     f'refusing to merge a PR other than the one Mirror was '
-                    f'dispatched to review',
+                    f'dispatched to review agent=forge',
                     'WARN',
                 )
                 marker_decision['merge_result'] = {
@@ -7757,7 +7774,7 @@ def process_outbox(outbox_file: Path) -> str:
                     log(
                         f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
                         f'outcome=skipped reason=pr-url-shape-invalid '
-                        f'({shape_reason})',
+                        f'({shape_reason}) agent=forge',
                         'WARN',
                     )
                     _archive_outbox(outbox_file)
@@ -7778,7 +7795,7 @@ def process_outbox(outbox_file: Path) -> str:
                     log(
                         f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
                         f'outcome=skipped reason=pr-not-found '
-                        f'({exist_reason})',
+                        f'({exist_reason}) agent=forge',
                         'WARN',
                     )
                     _archive_outbox(outbox_file)
@@ -7787,7 +7804,7 @@ def process_outbox(outbox_file: Path) -> str:
                     log(
                         f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
                         f'outcome=skipped reason=pr-state-{pr_state} '
-                        f'(already terminal)',
+                        f'(already terminal) agent=forge',
                     )
                     _archive_outbox(outbox_file)
                     return 'auto-merge-skipped'
