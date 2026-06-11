@@ -46,9 +46,13 @@ _WRITE_FUNC_NAME = 'safe_write_inbox'
 
 # Modules whose dispatch/notify envelopes must route through the builder.
 # S1 = outbox_notifier only; healers/inbox_watcher are added as later steps
-# migrate them (each addition is the enforcement half of that step).
+# migrate them (each addition is the enforcement half of that step). S4 adds
+# heal_pipeline_stall.py: its M4 recover-then-alert path now routes a
+# no-session / DAG REVISION notify to Beacon, and that envelope is built via
+# build_chain_envelope just like the notifier's.
 SCANNED_MODULES: tuple[str, ...] = (
     'outbox_notifier.py',
+    'heal_pipeline_stall.py',
 )
 
 

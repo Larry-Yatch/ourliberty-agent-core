@@ -9,7 +9,20 @@ been doing manually each session: scan the pipeline state, identify
 stalls, DM Larry with what stalled + recommended action.
 
 Runs every 15 minutes via systemd timer. Silent unless something needs
-action. Never self-heals; never auto-dispatches. Five concrete checks:
+action.
+
+Recover-then-alert (chain-context-durability M4, 2026-06-11). The healer
+is no longer surface-only. For the *recoverable* checks (2, 3, 6, 7, 9) it
+now attempts an automatic recovery — re-dispatch / re-route through the M1
+``build_chain_envelope`` + M2 route-to-owning-agent machinery — BEFORE it
+alerts, and DMs Larry only if that recovery fails (the actionable-only
+doctrine: "an alert fires only if auto-remediation fails"). The recovery
+reuses the same idempotent primitives the notifier and the standalone
+healers use (``_dispatch_mirror_review`` + its presence-check, ``merge_pr``,
+the no-session-revision / DAG-revision Beacon route), so a recovery that has
+already landed is a safe no-op rather than a double-dispatch. The
+*detective-only* checks (4, 5, 8) and Check 1 stay alert-only by design —
+they have no clean recovery primitive. Five concrete checks:
 
   1. **Forge built but no PR opened** — `[forge] done task=X
      success=True` >2h ago AND no PR exists with `forge/X` branch
@@ -69,9 +82,15 @@ Every alert: ONE Telegram DM via `larry_alerts.append_alert` (cooldown
 1h per unique stall key). Each alert states: what stalled, how long,
 recommended action, the specific log grep to run for details.
 
-Never acts on the stall. Surface only. The healer never kills processes,
-never merges PRs, never re-dispatches anything. Same posture as Joe's
-`pipeline_watcher.py` and our `dispatch_sentinel.py`.
+Recovery posture (M4). For recoverable stalls the healer DOES act — it
+re-dispatches a missing Mirror review, retries an unfired auto-merge, or
+re-routes a no-session / DAG REVISION to Beacon, then alerts only if the
+recovery did not land. It never kills processes. Recovery is bounded by the
+same per-key ALERT_DEDUP_HOURS cooldown that gates alerts (one attempt per
+key per window), and a successful recovery stamps that cooldown so the next
+tick does not re-attempt while the merge/review settles asynchronously. The
+detective-only checks (4, 5, 8) and Check 1 stay surface-only — same posture
+as Joe's `pipeline_watcher.py` and our `dispatch_sentinel.py`.
 
 Scan window
 -----------
@@ -97,6 +116,7 @@ Phase E4 followup, 2026-05-26.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -1175,6 +1195,11 @@ def check_pr_no_mirror_dispatch(notifier_lines: list[str], open_prs: list[dict],
                 f'`grep "{task}" ~/agents/logs/outbox-notifier.log | tail -20`. '
                 f'If Forge notify never fired or the build-phase dispatch was suppressed, '
                 f'a manual review dispatch via Beacon is the unstick path.'),
+            # M4: recoverable — re-dispatch the missing Mirror review before alerting.
+            'recovery': functools.partial(
+                _recover_via_mirror_review, task, branch, pr['_repo'],
+                pr.get('title') or '', pr_url,
+            ),
         })
     return alerts
 
@@ -1222,6 +1247,11 @@ def check_mirror_pass_unmerged(notifier_lines: list[str], open_prs: list[dict],
                 f'`grep "AUTO_MERGE.*{task}" ~/agents/logs/outbox-notifier.log`. '
                 f'If outcome=failed, heal_pr_auto_merge.py should retry; if no AUTO_MERGE line at all, '
                 f'manual merge: `gh pr merge {pr["number"]} --repo {pr["_repo"]} --squash --delete-branch`.'),
+            # M4: recoverable — retry the unfired squash-merge before alerting.
+            'recovery': functools.partial(
+                _recover_via_auto_merge, pr['_repo'], pr['number'],
+                pr.get('title') or '',
+            ),
         })
     return alerts
 
@@ -1448,6 +1478,8 @@ def check_revision_dispatched_with_no_session(notifier_lines: list[str],
                 f'Apply the revisions to the PR branch by hand, OR re-dispatch '
                 f'via Beacon: `dispatch forge --task fix-{task}-revisions ...`.'
             ),
+            # M4: recoverable — route to Beacon for fresh-task_id re-dispatch before alerting.
+            'recovery': functools.partial(_recover_no_session_revision, task),
         })
     return alerts
 
@@ -1547,6 +1579,10 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
                 f'verdict=REVISION" ~/agents/logs/outbox-notifier.log`. Then '
                 f'amend the DAG + re-dispatch the preflight via Beacon, or '
                 f'cancel the sequence if it is no longer needed.'
+            ),
+            # M4: recoverable — re-route the DAG REVISION to Beacon before alerting.
+            'recovery': functools.partial(
+                _recover_stalled_sequence, seq_id, str(seq_path),
             ),
         })
     return alerts
@@ -1658,7 +1694,7 @@ def check_unrouted_open_prs(open_prs: list[dict],
                 )
                 continue
         key = f'unrouted_open_pr:{pr["_repo"]}:{pr["number"]}'
-        alerts.append({
+        alert = {
             'key': key,
             'message': (
                 f'PR #{pr["number"]} ({pr["_repo"]}) on branch `{branch}` opened '
@@ -1674,7 +1710,17 @@ def check_unrouted_open_prs(open_prs: list[dict],
                 f'Verify routing fires: '
                 f'`tail -50 ~/agents/logs/routing-events.jsonl | grep "{branch}"`.'
             ),
-        })
+        }
+        # M4: recoverable ONLY when the branch yields a dispatchable task_id —
+        # the review-request idempotency key is task-keyed, so a branch with no
+        # parseable task (e.g. a non-forge/ external branch) has no clean
+        # recovery primitive and stays alert-only.
+        if branch_task:
+            alert['recovery'] = functools.partial(
+                _recover_via_mirror_review, branch_task, branch, pr['_repo'],
+                pr.get('title') or '', pr_html_url,
+            )
+        alerts.append(alert)
     return alerts
 
 
@@ -1892,6 +1938,184 @@ def check_tier2_fallback_failures(state: dict) -> list[dict]:
     return alerts
 
 
+# ---------- Recovery primitives (M4: recover-then-alert) ----------
+#
+# Each returns True iff the recoverable stall was remediated this tick. They
+# reuse the notifier's / the standalone healers' canonical, idempotent
+# dispatch primitives so a recovery that has already landed (or a duplicate
+# re-attempt on the next tick) is a safe no-op rather than a double-dispatch.
+# They are fail-safe: any unexpected exception is logged and surfaces as
+# `False` (recovery failed → the run() loop falls through to the alert),
+# never as a crash that would take the whole healer down.
+
+
+def _recover_via_mirror_review(task: str, branch: str, repo: str,
+                               title: str, pr_url: str) -> bool:
+    """Recover an open PR with no Mirror review dispatched (Checks 2 & 7).
+
+    Writes a review-request to Mirror's inbox via the notifier's canonical
+    `_dispatch_mirror_review`, then verifies it landed via the shared
+    `_review_request_already_dispatched` presence-check. Idempotent: the
+    inner dispatch's own presence-gate skips a duplicate write, and an
+    already-present review counts as success. `repo` may be the full
+    `owner/name`; the notifier wants the short name."""
+    try:
+        import outbox_notifier as notifier
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(mirror-review) import failed for {task}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    data = {
+        'task_id': task,
+        'target_repo': repo.split('/')[-1],
+        'branch': branch,
+        'pr_title': title or '',
+        'dispatched_by': 'heal-pipeline-stall',
+    }
+    try:
+        notifier._dispatch_mirror_review(data, pr_url)
+    except Exception as e:  # noqa: BLE001 — inner call swallows routing/cost denials
+        log(f'recover(mirror-review) dispatch raised for {task}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    try:
+        fname = safe_write_inbox.canonical_inbox_name(f'review-{task}.json')
+        landed = notifier._review_request_already_dispatched(fname)
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(mirror-review) verify failed for {task}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    log(f'recover(mirror-review) task={task} landed={landed}', 'INFO')
+    return landed
+
+
+def _recover_via_auto_merge(repo: str, pr_number: int, title: str) -> bool:
+    """Recover a Mirror-PASS PR that never merged (Check 3) by retrying the
+    squash-merge via `heal_pr_auto_merge.merge_pr`. Returns True on a
+    `merged` or `already_merged` outcome; `failed` (conflict / branch
+    protection / network) falls through to the alert."""
+    try:
+        import heal_pr_auto_merge
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(auto-merge) import failed for {repo}#{pr_number}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    try:
+        outcome, reason = heal_pr_auto_merge.merge_pr(repo, pr_number, title)
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(auto-merge) raised for {repo}#{pr_number}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    log(f'recover(auto-merge) {repo}#{pr_number} outcome={outcome}: {reason}',
+        'INFO')
+    return outcome in ('merged', 'already_merged')
+
+
+def _route_revision_notify_to_beacon(*, task_id: str, intent: str,
+                                     notify_task_id: str, filename: str,
+                                     base_extra: dict, intent_kwargs: dict,
+                                     body: str) -> bool:
+    """Shared M2 route: write an inter-agent notify to Beacon's inbox via the
+    notifier's `build_notify_prompt` + `build_chain_envelope` (M1) +
+    `safe_write_inbox`. Every chain-context field is an explicit DROP — these
+    are agent-to-agent routing signals whose payload is the intent_kwargs, not
+    per-task chain context. Deterministic filename → re-processing overwrites
+    the pending notify (atomic same-path write) rather than duplicating it.
+    Returns True iff the notify was written."""
+    try:
+        import outbox_notifier as notifier
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(beacon-route) import failed for {task_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    try:
+        notify_prompt = notifier.build_notify_prompt(
+            intent=intent, sender='mirror', task_id=task_id,
+            success=True, output=body, intent_kwargs=intent_kwargs,
+        )
+        notify_base = {
+            'task_id': notify_task_id,
+            'prompt': notify_prompt,
+            'source': 'mirror-result',
+            'intent': intent,
+            **base_extra,
+        }
+        notify_task = notifier.build_chain_envelope(
+            notify_base, {},
+            carry={
+                'target_repo': notifier.DROP,
+                'pr_url': notifier.DROP,
+                'forge_build_session_id': notifier.DROP,
+                'reply_chat_id': notifier.DROP,
+                'revision_count': notifier.DROP,
+                'replan_count': notifier.DROP,
+                'max_replans': notifier.DROP,
+            },
+        )
+        dest = safe_write_inbox.safe_write_inbox(
+            target_agent='beacon',
+            task_dict=notify_task,
+            source_agent='mirror-result',
+            filename=filename,
+        )
+        log(f'recover(beacon-route) intent={intent} task={task_id} '
+            f'routed to beacon (file={dest.name})', 'INFO')
+        return True
+    except (safe_write_inbox.DispatchRejected,
+            safe_write_inbox.RoutingDenied) as e:
+        log(f'recover(beacon-route) intent={intent} task={task_id} route '
+            f'denied: {type(e).__name__}: {e}', 'WARN')
+        return False
+    except Exception as e:  # noqa: BLE001
+        log(f'recover(beacon-route) intent={intent} task={task_id} failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+
+
+def _recover_no_session_revision(task: str) -> bool:
+    """Recover a no-Forge-session code-review REVISION (Check 6) by routing a
+    `code-review-revision-no-session` notify to Beacon so she re-dispatches
+    Forge with a fresh task_id (M2). Mirrors
+    `outbox_notifier._route_no_session_revision_to_beacon`."""
+    body = (
+        f'Mirror requested REVISION on task `{task}` but no Forge build '
+        f'session exists to --resume (heal-pipeline-stall backstop). '
+        f'Re-dispatch Forge with a fresh task_id to apply Mirror\'s findings '
+        f'to the existing PR branch.'
+    )
+    return _route_revision_notify_to_beacon(
+        task_id=task,
+        intent='code-review-revision-no-session',
+        notify_task_id=f'notify-no-session-revision-{task}',
+        filename=f'notify-no-session-revision-{task}.json',
+        base_extra={'original_task_id': task},
+        intent_kwargs={'pr_url': '(no pr_url)', 'branch': '(branch unknown)'},
+        body=body,
+    )
+
+
+def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
+    """Recover a sequence stuck pending after an unresolved DAG-preflight
+    REVISION (Check 9) by re-routing the `dag-preflight-revision` notify to
+    Beacon so a fresh Beacon session amends the DAG + re-dispatches the
+    preflight (M2). Mirrors the notifier's
+    `_handle_mirror_dag_preflight_result` REVISION branch."""
+    body = (
+        f'Build sequence `{seq_id}` is still pending after an unresolved '
+        f'DAG-preflight REVISION (heal-pipeline-stall backstop). Amend the '
+        f'DAG in `{seq_path}` per Mirror\'s finding and re-dispatch the '
+        f'preflight via marker.py (--phase routing-signal).'
+    )
+    return _route_revision_notify_to_beacon(
+        task_id=f'review-sequence-dag-{seq_id}',
+        intent='dag-preflight-revision',
+        notify_task_id=f'notify-dag-revision-{seq_id}',
+        filename=f'notify-dag-revision-{seq_id}.json',
+        base_extra={'seq_id': seq_id, 'seq_path': str(seq_path)},
+        intent_kwargs={'seq_id': seq_id, 'seq_path': str(seq_path)},
+        body=body,
+    )
+
+
 # ---------- Main ----------
 
 def _alert_is_fixture(alert: dict) -> bool:
@@ -1982,6 +2206,7 @@ def run() -> int:
         return 0
 
     fired = 0
+    recovered_count = 0
     for alert in all_alerts:
         if _alert_is_fixture(alert):
             log(f'suppressed (fixture task): {alert["key"]}', 'INFO')
@@ -1989,10 +2214,37 @@ def run() -> int:
         if not should_alert(state, alert['key']):
             log(f'suppressed (cooldown): {alert["key"]}', 'INFO')
             continue
+        # M4 recover-then-alert: a recoverable stall attempts auto-remediation
+        # FIRST and alerts only if it does not land. A successful recovery
+        # stamps the same per-key cooldown an alert would — so the next tick
+        # does not re-attempt while the merge/review/route settles async, and
+        # no Larry DM fires. A failed (or absent) recovery falls through to the
+        # single alert below — exactly one per key per window, never a double.
+        recovery = alert.get('recovery')
+        if recovery is not None:
+            try:
+                recovered = bool(recovery())
+            except Exception as e:  # noqa: BLE001 — recovery must never crash the healer
+                log(f'recovery raised for {alert["key"]}: '
+                    f'{type(e).__name__}: {e}', 'WARN')
+                recovered = False
+            if recovered:
+                record_alert(state, alert['key'])
+                recovered_count += 1
+                log(f'recovered (alert suppressed): {alert["key"]}', 'INFO')
+                continue
+            log(f'recovery failed for {alert["key"]}; falling through to alert',
+                'INFO')
+        message = alert['message']
+        if recovery is not None:
+            message += (
+                ' [heal-pipeline-stall attempted auto-recovery and it did not '
+                'land — manual intervention needed.]'
+            )
         ok = larry_alerts.append_alert(
             source='heal-pipeline-stall',
             severity='warning',
-            message=alert['message'],
+            message=message,
             subject=alert['subject'],
             suggested_action=alert['suggested_action'],
         )
@@ -2002,7 +2254,8 @@ def run() -> int:
             log(f'alerted: {alert["key"]}', 'INFO')
         else:
             log(f'larry_alerts append failed for {alert["key"]}', 'WARN')
-    log(f'done: {fired} new alert(s) fired, {len(all_alerts) - fired} suppressed', 'INFO')
+    log(f'done: {fired} new alert(s) fired, {recovered_count} recovered, '
+        f'{len(all_alerts) - fired - recovered_count} suppressed', 'INFO')
     save_state(state)
     return 0
 
