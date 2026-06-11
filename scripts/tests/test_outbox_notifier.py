@@ -8542,6 +8542,277 @@ class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
         self.assertIn(self.SUMMARY, body)
 
 
+class ReviewPassNotifyGitHubTruthTest(unittest.TestCase):
+    """false-success-notify-fix (2026-06-11) — the Mirror REVIEW_PASS
+    inter-agent notify to Beacon must report the GitHub-confirmed merge
+    state, NOT an optimistic "auto-merge fired" claim.
+
+    Incident: Mirror approved PR #455; auto-merge was HELD behind PR #454
+    (overlapping files) so the PR stayed OPEN — but the notify hardcoded
+    "Auto-merge has fired automatically" and Beacon reported a merge that
+    never happened, sending the operator chasing it. Ground truth
+    (`gh pr view 455 --json state`) was state=OPEN, mergedAt=null.
+
+    These run process_outbox end-to-end with the gh shell-outs mocked
+    (`gh pr view --json state` => OPEN; the serializer gates decide held vs
+    merged) and assert the BEACON NOTIFY prompt — not just Larry's DM —
+    reflects reality. The serializer is NOT bypassed; the gate flow is what
+    produces the outcome. No real gh, no writes to ~/agents.
+    """
+
+    PR_URL = PR_URL_FIXTURE  # .../pull/42
+    SUMMARY = 'All 5 ACs met; regression gate clean.'
+    TASK_ID = 'real-rev'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._originals = {}
+        for name in [
+            'AGENTS_ROOT', 'INBOXES_ROOT', 'OUTBOXES_ROOT',
+            'BLACKBOARD', 'LOG_FILE', 'DEAD_LETTER_STATE',
+            'EMERGENCY_HALT_FLAG', 'AUTO_MERGE_QUEUE_FILE',
+        ]:
+            self._originals[name] = getattr(on, name)
+        on.AGENTS_ROOT = self._root
+        on.INBOXES_ROOT = self._root / 'inboxes'
+        on.OUTBOXES_ROOT = self._root / 'outboxes'
+        on.BLACKBOARD = self._root / 'blackboard'
+        on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
+        on.DEAD_LETTER_STATE = self._root / 'state' / 'dead-letter.json'
+        on.EMERGENCY_HALT_FLAG = on.BLACKBOARD / 'EMERGENCY_HALT'
+        on.AUTO_MERGE_QUEUE_FILE = self._root / 'state' / 'auto-merge-queue.json'
+        import larry_alerts as la
+        self._la_originals = {
+            k: getattr(la, k)
+            for k in ('AGENTS_ROOT', 'ALERTS_FILE', 'COOLDOWN_ROOT', 'OFFSET_FILE')
+        }
+        la.AGENTS_ROOT = self._root
+        la.ALERTS_FILE = self._root / 'blackboard' / 'larry-alerts.jsonl'
+        la.COOLDOWN_ROOT = self._root / 'state' / 'alert-cooldown'
+        la.OFFSET_FILE = self._root / 'state' / 'beacon-alerts-offset.txt'
+        self._swi_originals = {
+            k: getattr(swi, k)
+            for k in ('AGENTS_ROOT', 'INBOXES_ROOT', 'ROUTING_EVENTS_LOG')
+        }
+        swi.AGENTS_ROOT = self._root
+        swi.INBOXES_ROOT = self._root / 'inboxes'
+        swi.ROUTING_EVENTS_LOG = self._root / 'logs' / 'routing-events.jsonl'
+        self._rv_root = rv.REPO_ROOT
+        rv.REPO_ROOT = self._root / 'repo'
+        rv.invalidate_cache()
+
+        # Gate flow runs for real; only the gh shell-outs are mocked. NOT
+        # bypassed (would skip the gates that decide held vs merged).
+        self._orig_skip_serializer = on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = False
+        # No FN override → the real existence-state check runs (mocked below
+        # to state=OPEN), exercising the post-fix merge-before-notify path.
+        self._orig_override = on._AUTO_MERGE_FN_OVERRIDE
+        on._AUTO_MERGE_FN_OVERRIDE = None
+        on._reset_auto_merge_queue_state()
+
+        # Configurable gh-mock state (defaults overridden per test).
+        self._pr_state = 'OPEN'        # gh pr view --json state
+        self._overlap_blocker = None   # gate 1 serializer blocker PR#
+        self._mergeable = 'mergeable'  # gate 2 mergeable status
+        self._merge_result = {
+            'merge_outcome': 'merged',
+            'merge_reason': 'squash-merged + branch deleted',
+            'pr_number': 42,
+            'repo_coords': 'Larry-Yatch/ourliberty-agent-core',
+        }
+        self._auto_merge_calls: list[tuple] = []
+
+        def _existence_stub(repo, pr):
+            return self._pr_state, 'mocked gh pr view --json state'
+
+        def _overlap_stub(pr_number, repo_coords, changed_files):
+            return self._overlap_blocker
+
+        def _mergeable_stub(repo, pr):
+            return self._mergeable
+
+        def _changed_files_stub(repo, pr):
+            return ['scripts/foo.py']
+
+        def _auto_merge_stub(pr_url, task_id):
+            self._auto_merge_calls.append((pr_url, task_id))
+            return dict(self._merge_result)
+
+        self._patches = [
+            mock.patch.object(on, '_pr_url_existence_state', _existence_stub),
+            mock.patch.object(on, '_find_overlap_blocker', _overlap_stub),
+            mock.patch.object(on, '_gh_pr_mergeable_status', _mergeable_stub),
+            mock.patch.object(on, '_gh_pr_changed_files', _changed_files_stub),
+            mock.patch.object(on, '_auto_merge_pr', _auto_merge_stub),
+            # Isolate from worktree/sequence side-effects of a successful merge.
+            mock.patch.object(on, '_teardown_worktrees_for_task', lambda **k: None),
+            mock.patch.object(on, '_signal_sequence_step_merged', lambda **k: None),
+        ]
+        for p in self._patches:
+            p.start()
+        on.ensure_dirs()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        for name, value in self._originals.items():
+            setattr(on, name, value)
+        for name, value in self._swi_originals.items():
+            setattr(swi, name, value)
+        import larry_alerts as la
+        for name, value in self._la_originals.items():
+            setattr(la, name, value)
+        on._AUTO_MERGE_FN_OVERRIDE = self._orig_override
+        on._AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST = self._orig_skip_serializer
+        on._reset_auto_merge_queue_state()
+        rv.REPO_ROOT = self._rv_root
+        rv.invalidate_cache()
+        self._tmp.cleanup()
+
+    def _write_pass_outbox(self, changed_files=('scripts/foo.py',)):
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id=self.TASK_ID, summary=self.SUMMARY),
+        )
+        body['changed_files'] = list(changed_files)
+        outbox_dir = on.OUTBOXES_ROOT / 'mirror'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / 'pass.json'
+        f.write_text(json.dumps(body))
+        return f
+
+    def _beacon_notify(self):
+        notifies = list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json'))
+        self.assertEqual(
+            len(notifies), 1, f'expected 1 beacon notify, got {len(notifies)}',
+        )
+        return json.loads(notifies[0].read_text())
+
+    def _review_pass_dm_count(self):
+        import larry_alerts as la
+        if not la.ALERTS_FILE.exists():
+            return 0
+        return sum(
+            1
+            for line in la.ALERTS_FILE.read_text().splitlines() if line.strip()
+            if json.loads(line).get('kind') == 'notification'
+            and json.loads(line).get('intent') == 'review-pass'
+        )
+
+    # ---- THE INCIDENT: held behind a blocker, PR still OPEN ----
+    def test_held_behind_blocker_notify_does_not_claim_merged(self):
+        # PR #455-shape: Mirror PASS, gh pr view => OPEN, auto-merge HELD
+        # behind an overlapping PR (#454). The notify MUST NOT say the merge
+        # fired/merged; it must say queued-behind-#454 + the PR is NOT merged.
+        self._pr_state = 'OPEN'
+        self._overlap_blocker = 454
+        f = self._write_pass_outbox()
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        notify = self._beacon_notify()
+        self.assertEqual(notify['intent'], 'review-pass')
+        prompt = notify['prompt']
+        # The bug: the old template hardcoded "Auto-merge has fired
+        # automatically" regardless of the real outcome.
+        self.assertNotIn('has fired', prompt)
+        self.assertNotIn('Auto-merge fired', prompt)
+        self.assertNotIn('now MERGED', prompt)
+        # Truthful: queued behind #454, NOT merged.
+        self.assertIn('QUEUED behind PR #454', prompt)
+        self.assertIn('NOT merged', prompt)
+        self.assertIn('APPROVED', prompt)
+        # The merge shell-out never fired (gate 1 short-circuited).
+        self.assertEqual(self._auto_merge_calls, [])
+
+    # ---- positive control: a real merge => notify says MERGED ----
+    def test_real_merge_notify_says_merged(self):
+        self._pr_state = 'OPEN'
+        self._overlap_blocker = None
+        self._mergeable = 'mergeable'
+        f = self._write_pass_outbox()
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        prompt = self._beacon_notify()['prompt']
+        self.assertIn('now MERGED', prompt)
+        self.assertNotIn('QUEUED', prompt)
+        self.assertNotIn('NOT merged', prompt)
+        # The merge actually fired exactly once.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+
+    # ---- conflict: notify says blocked, not merged ----
+    def test_conflict_notify_does_not_claim_merged(self):
+        self._pr_state = 'OPEN'
+        self._overlap_blocker = None
+        self._mergeable = 'conflicting'
+        f = self._write_pass_outbox()
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        prompt = self._beacon_notify()['prompt']
+        self.assertNotIn('has fired', prompt)
+        self.assertNotIn('now MERGED', prompt)
+        self.assertIn('BLOCKED', prompt)
+        self.assertIn('NOT merged', prompt)
+        # gate 2 short-circuited before any merge shell-out.
+        self.assertEqual(self._auto_merge_calls, [])
+
+    # ---- already-terminal skip: still OPEN-state mismatch, no false merge ----
+    def test_already_merged_resume_notify_says_merged_and_skips(self):
+        # Resume after crash: gh pr view => MERGED. The merge step skips
+        # (no re-merge), the notify truthfully says already-MERGED, and the
+        # outbox result is 'auto-merge-skipped' (DM suppressed, like before).
+        self._pr_state = 'MERGED'
+        f = self._write_pass_outbox()
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'auto-merge-skipped')
+        prompt = self._beacon_notify()['prompt']
+        self.assertIn('already MERGED', prompt)
+        self.assertNotIn('has fired', prompt)
+        # No re-merge shell-out.
+        self.assertEqual(self._auto_merge_calls, [])
+        # The closing DM is suppressed for a skip (pre-fix behavior): the
+        # truthful notify already went out; no duplicate Larry DM.
+        self.assertEqual(self._review_pass_dm_count(), 0)
+
+    def test_deferred_unknown_notify_does_not_claim_merged(self):
+        # gh mergeable=UNKNOWN on first attempt → merge deferred to the queue
+        # sweep, PR stays OPEN. The notify must say PENDING / NOT merged, never
+        # fired/merged; the closing DM is suppressed until the sweep resolves.
+        self._pr_state = 'OPEN'
+        self._overlap_blocker = None
+        self._mergeable = 'unknown'
+        f = self._write_pass_outbox()
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-marker')
+        prompt = self._beacon_notify()['prompt']
+        self.assertNotIn('has fired', prompt)
+        self.assertNotIn('now MERGED', prompt)
+        self.assertIn('PENDING', prompt)
+        self.assertIn('NOT merged', prompt)
+        # No merge shell-out; deferred outcome suppresses the closing DM.
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(self._review_pass_dm_count(), 0)
+
+    def test_render_merge_status_line_is_github_truth_gated(self):
+        # Unit-level guard on the renderer: only confirmed merges say MERGED;
+        # every held/failed/missing outcome says NOT merged / requested.
+        r = on._render_review_pass_merge_status_line
+        self.assertIn('MERGED', r({'merge_outcome': 'merged'}))
+        self.assertIn('MERGED', r({'merge_outcome': 'already_merged'}))
+        held = r({'merge_outcome': 'held_for_blocker',
+                  'blocker_pr_number': 7, 'overlap_files': 'a.py'})
+        self.assertIn('QUEUED behind PR #7', held)
+        self.assertNotIn('now MERGED', held)
+        for oc in ('held_conflict', 'held_fail_closed', 'deferred_unknown', 'failed'):
+            line = r({'merge_outcome': oc, 'merge_reason': 'x'})
+            self.assertNotIn('now MERGED', line, oc)
+            self.assertNotIn('has fired', line, oc)
+        # Missing/unknown never asserts success.
+        none_line = r(None)
+        self.assertIn('REQUESTED', none_line)
+        self.assertNotIn('now MERGED', none_line)
+
+
 class CostBudgetGateAtDispatchSitesTest(unittest.TestCase):
     """D3.5 5d — verify the cost gate refuses dispatch at each of the
     four dispatch sites when the per-task spend is at-cap."""
