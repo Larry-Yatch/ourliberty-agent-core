@@ -4,6 +4,104 @@
 
 ---
 
+## Iteration ~1520 — 2026-06-11 20:29Z UTC (interactive, Tier 1, consecutive_clean 0→1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. All 8 bot+infra services active. PR #474 open (Mirror review in progress, ~9 min old). 0 new alerts since watermark. agent-core-health.service: ✅ passed at 20:12:35Z (branch: main, clean_tree: ok, sync_freshness: ok) — prior FAILED state fully resolved. Forge test-jail-pr3 completed → PR #474 opened 20:20:42Z.
+
+**VERIFY-BEFORE-REASSERT (iter ~1519 watch items):**
+- **Forge test-jail-pr3 PID 1878941 → PR open**: ✅ RESOLVED. PR #474 `fix(tests): test-jail PR-3 — gate hardening (worktree-always, subtractive env, outside-jail tripwire, hard-wall scaffold)` opened 20:20:42Z. Mirror review task in Mirror inbox. Drop from watch.
+- **Orphaned wt-forge-ccd-s5-doctrine-and-handling-shapes**: STILL PRESENT. Beacon G-rule dispatch (iter ~1519) consumed — Beacon inbox EMPTY. Auto-cleanup expected next healer run after 21:33Z. [blue] carry.
+- **agent-core-health.service FAILED**: ✅ RESOLVED. Ran at 20:12:35Z, all checks passed. Drop from standing findings.
+- **Beacon G-rule dispatch (orphaned-wt-ccd-s5 post-merge-teardown-gap)**: Beacon inbox EMPTY → consumed. Watch for Beacon spec.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1304 lines. Watermark: L1303 (carried from iter ~1519). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry directive: 'what do you think?' at 19:59Z — answered by Beacon at 20:00Z. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: EMPTY ✅ (test-jail-pr3 completed → PR #474 opened)
+- Beacon: EMPTY ✅
+- Mirror: `review-test-jail-pr3-gate-hardening-001.json` — active (PR #474 opened 20:20:42Z, ~9 min). ✅ In progress.
+- Pulse: EMPTY ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus: main, clean (confirmed by health check 20:12:35Z). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T19:52:50Z (~37min), status=no-change. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 bot+infra services active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api). agent-core-health is a oneshot timer — ran + exited successfully 20:12:35Z. ✅ Nominal.
+
+**Check E — PRs:** PR #474 open, MERGEABLE, reviewDecision="", Mirror review in progress, created 20:20:42Z (~9 min). Not stale. ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11):** Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅
+
+**§5.0 Bug-hunt gate:** `audit_due_nudge.py` → no-op (no committed audit baseline). `distill_detector.py` → no-op. `audit_cadence_signal.py` → no-op. ✅
+
+**Credential rotation:** No credentials within 60-day rotation window. ✅ Nominal.
+
+**Worktrees:**
+- `wt-forge-ccd-s5-doctrine-and-handling-shapes`: STILL PRESENT. Beacon consumed G-rule dispatch. Auto-cleanup expected after 21:33Z (healer hourly at :03 → 22:03Z). [blue] carry.
+- `wt-forge-test-jail-pr3-gate-hardening-001`: Active (Forge build worktree). ✅
+- `wt-mirror-test-jail-pr3-gate-hardening-001`: Active (Mirror review worktree for PR #474). ✅
+
+**Actions taken:**
+1. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean 0→1. ✅
+2. Alert watermark: L1303 unchanged (0 new alerts). ✅
+3. No DMs sent — no new [yellow] or [red] findings.
+
+**Standing findings:**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **Orphaned wt-forge-ccd-s5-doctrine-and-handling-shapes** — auto-cleanup expected 22:03Z. G-rule Beacon dispatch consumed. Watch for Beacon spec.
+- [blue] **PR #474** — Mirror review in progress (~9 min). Watch for Mirror PASS + auto-merge.
+- [blue] **Forge: test-jail-pr3-gate-hardening-001** — COMPLETED. PR #474 opened. ~~Drop active watch~~. Now under PR #474 watch.
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. Carry.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 472, 473) — actor-exemption pending `go: actor-exemption-config`. Carry.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned) — 1/3 G-rule. Carry.
+- [blue] bughunt-gate-soak — Phase 2 pending Larry.
+- [blue] health-check-notify-script-missing — G-rule 3/3 dispatched. Forge PR pending.
+- [blue] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry.
+- [blue] G-rule cycle-timer checkpoint 3/3 — pending `go: cycle-timer checkpoint`.
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry.
+
+**Watch items for iter ~1521:**
+- **PR #474**: Mirror review completing? PASS → auto-merge? (Mirror task ~9 min in at cycle close.)
+- **wt-ccd-s5**: Auto-cleaned at 22:03Z? (Healer next run.)
+- **Beacon spec for wt-cleanup-post-merge-gap**: G-rule consumed — Beacon spec expected.
+- **Tier de-escalation**: consecutive_clean=1. Two more clean iters → Tier 2 promotion.
+
+**PRIME DIRECTIVE:** Clean iter — 0 new interventions, 0 new systemic_fixes. Running total: interventions≈790, systemic_fixes≈23+1 (G-rule dispatch from iter ~1519 carried), verification_pending≈10, ratio≈34, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean 0→1.
+
+---
+
 ## Iteration ~1519 — 2026-06-11 20:22Z UTC (interactive, Tier 1, consecutive_clean=0)
 
 **Health:** ✅ Nominal with standing items. All 9 services active. 0 open PRs. Forge on test-jail-pr3 (PID 1878941, started 20:21Z). One standing orphaned worktree (ccd-s5, 2.5h). EROFS fully resolved (PR #470 fixed, systemic_fix recorded iter 1513). 16 new alerts since watermark — all Tier-3/Tier-4-resolved.
