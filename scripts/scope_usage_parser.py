@@ -76,8 +76,16 @@ _MCP_TOOL_TO_SCOPE: tuple[tuple[str, str], ...] = (
     ('calendar', 'calendar'),
 )
 
-# Loose timestamp match for log lines beginning with `[YYYY-MM-DD...]`.
-_TS_RE = re.compile(r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})')
+# Match the `[YYYY-MM-DD...]` prefix, capturing optional microseconds and tz
+# offset too. This parser reads THREE logs with DIFFERENT zones:
+# outbox-notifier.log is naive host-local (space-separated), while
+# inbox-watcher.log and heal-pr-auto-merge.log are aware UTC isoformat
+# (`datetime.now(timezone.utc).isoformat()` — T-separated, `+00:00`). Dropping
+# the offset would make the naive and aware sources indistinguishable and
+# mis-shift one of them ~6h.
+_TS_RE = re.compile(
+    r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)'
+)
 
 # `gh <subcommand>` — matches anywhere in the line, captures the subcommand.
 _GH_INVOCATION_RE = re.compile(r'\bgh\s+(\w+)')
@@ -94,16 +102,23 @@ def _parse_ts(line: str) -> Optional[datetime]:
     m = _TS_RE.search(line)
     if not m:
         return None
+    raw = m.group(1).replace(' ', 'T')
+    if raw.endswith('Z'):
+        raw = raw[:-1] + '+00:00'
+    # Normalize +HHMM (no colon) to +HH:MM for py3.9's fromisoformat.
+    if re.search(r'[+-]\d{4}$', raw):
+        raw = raw[:-2] + ':' + raw[-2:]
     try:
-        dt = datetime.fromisoformat(m.group(1).replace(' ', 'T'))
+        dt = datetime.fromisoformat(raw)
     except ValueError:
         return None
-    # The bracketed ts is naive HOST-LOCAL: outbox_notifier writes it via
-    # datetime.now() (no tz), and the droplet runs America/Denver. Stamping
-    # it as UTC skewed every line ~6h into the past, so recent usage got
-    # clipped by the cutoff window (under-count). astimezone() on a naive
-    # value interprets it in the system zone — the same host that wrote the
-    # log — then normalizes to UTC.
+    # outbox-notifier.log is naive HOST-LOCAL (datetime.now(); droplet runs
+    # America/Denver) — astimezone() reads a naive value in the system zone.
+    # inbox-watcher.log / heal-pr-auto-merge.log carry an explicit offset
+    # (aware UTC isoformat) — astimezone() preserves their instant. The old
+    # `.replace(tzinfo=utc)` only suited the aware sources and threw the naive
+    # one ~6h into the past; capturing the offset above lets every source
+    # resolve to the correct instant.
     return dt.astimezone(timezone.utc)
 
 

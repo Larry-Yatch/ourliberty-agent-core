@@ -70,6 +70,20 @@ class TestParseTs(_DenverTZ):
         dt = sup._parse_ts('[2026-06-11T00:00:23] gh pr list --state open')
         self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
 
+    def test_aware_utc_isoformat_instant_preserved(self):
+        # inbox-watcher.log / heal-pr-auto-merge.log shape: aware UTC isoformat
+        # (datetime.now(timezone.utc).isoformat()) with microseconds + offset.
+        # These must NOT be shifted — they already mean UTC. Reading them as
+        # local would push them +6h the wrong way.
+        dt = sup._parse_ts(
+            '[2026-06-11T06:00:23.123456+00:00] [INFO] AUTO_MERGE task=x'
+        )
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23.123456+00:00')
+
+    def test_aware_z_suffix_instant_preserved(self):
+        dt = sup._parse_ts('[2026-06-11T06:00:23Z] gh pr merge 1')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
     def test_no_timestamp_returns_none(self):
         self.assertIsNone(sup._parse_ts('gh pr merge 42 (no bracket ts)'))
 
