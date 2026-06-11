@@ -68,6 +68,8 @@ import chain_event_emit             # noqa: E402  # E4.4e PR-A: push writer
 from chain_envelope import (        # noqa: E402  # M1: sole envelope constructor
     CARRY,
     DROP,
+    backfill_pr_url,        # M3: pr_url <- gh
+    backfill_target_repo,   # M3: target_repo <- mission registry
     build_chain_envelope,
 )
 import dispatch_validator         # noqa: E402
@@ -3472,13 +3474,27 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     task_id = data.get('task_id') or 'unknown'
     target_repo = data.get('target_repo')
     if not target_repo:
+        # M3 (chain-context-durability §4): a missing target_repo is usually
+        # *recoverable* — the mission registry maps this task_id to its repo.
+        # Backfill from the source of truth BEFORE concluding we must dead-end;
+        # only a task no mission owns falls through to the WARN below.
+        target_repo = backfill_target_repo(task_id)
+        if target_repo:
+            log(
+                f'target_repo backfilled to `{target_repo}` for task {task_id} '
+                f'from the mission registry (M3); proceeding with review dispatch',
+                'INFO',
+            )
+    if not target_repo:
         # Without target_repo, Mirror's worktree gate (now active per 5a's
         # agent-models.json change) rejects the review task as "no canonical
-        # path." Surface the gap to Larry rather than silently dropping.
+        # path." Genuinely unrecoverable (no owning mission) — surface the gap
+        # to Larry rather than silently dropping.
         log(
-            f'PR opened on task {task_id} but no target_repo on envelope; '
-            f'cannot dispatch review (Mirror requires target_repo for '
-            f'worktree gating). Larry must manually re-dispatch.',
+            f'PR opened on task {task_id} but no target_repo on envelope and '
+            f'none derivable from the mission registry; cannot dispatch review '
+            f'(Mirror requires target_repo for worktree gating). Larry must '
+            f'manually re-dispatch.',
             'WARN',
         )
         return
@@ -4224,8 +4240,18 @@ def _dispatch_mirror_review_rerun(
     task_id = data.get('task_id') or 'unknown'
     target_repo = data.get('target_repo')
     if not target_repo:
+        # M3: derive target_repo from the mission registry before dead-ending.
+        target_repo = backfill_target_repo(task_id)
+        if target_repo:
+            log(
+                f'target_repo backfilled to `{target_repo}` for task {task_id} '
+                f'from the mission registry (M3); proceeding with re-review',
+                'INFO',
+            )
+    if not target_repo:
         log(
-            f'Forge revision-{round_num} on task {task_id} has no target_repo; '
+            f'Forge revision-{round_num} on task {task_id} has no target_repo '
+            f'and none derivable from the mission registry; '
             f'cannot dispatch re-review — skipping.',
             'WARN',
         )
@@ -4233,6 +4259,16 @@ def _dispatch_mirror_review_rerun(
 
     branch = data.get('branch')
     pr_url = data.get('pr_url')
+    if not pr_url:
+        # M3: derive the PR URL via gh (head branch = forge/<task_id>) before
+        # the dead-end check below. The repo just resolved scopes the gh query.
+        pr_url = backfill_pr_url(task_id, target_repo=target_repo, branch=branch)
+        if pr_url:
+            log(
+                f'pr_url backfilled to `{pr_url}` for task {task_id} via gh '
+                f'(M3); proceeding with re-review',
+                'INFO',
+            )
     max_revisions = data.get('max_revisions', mrh.DEFAULT_MAX_REVISIONS)
     if not isinstance(max_revisions, int) or max_revisions < 0:
         max_revisions = mrh.DEFAULT_MAX_REVISIONS
@@ -4291,8 +4327,8 @@ def _dispatch_mirror_review_rerun(
     if not pr_url:
         log(
             f'Forge revision-{round_num} on task {task_id} has no pr_url '
-            f'on envelope; cannot dispatch re-review — skipping. Larry '
-            f'should manually re-dispatch.',
+            f'on envelope and none derivable via gh; cannot dispatch '
+            f're-review — skipping. Larry should manually re-dispatch.',
             'WARN',
         )
         return
