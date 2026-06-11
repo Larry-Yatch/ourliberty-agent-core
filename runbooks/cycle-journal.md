@@ -100885,3 +100885,89 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 **Tier end-of-iter:** 1 (consecutive_clean=0 — Forge stall active).
 
 ---
+
+## Iteration ~1531 — 2026-06-11 23:16Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles ~1491–~1530 ran between iter ~1490 (16:32Z) and this session (23:16Z). Key automated actions during that window: inbox-watcher restarted ~19:48Z (heal-stale-daemon-code); PRs #457, #465–#476 all merged (Larry's EROFS/test-jail sprint + chain activity); four services auto-restarted 19:47–19:48Z; Forge PID 1669068 self-reaped. Session-start gitStatus: branch=main, clean (per sync no-change 22:53Z). Tier at start: 1, consecutive_clean=1, last_signal_at=2026-06-11T22:56Z.
+
+**Health:** ✅ Nominal — sprint day cleanup. All blocking items from iter ~1490 resolved. One new [yellow] carry (stale post-merge Forge task).
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Watermark MISSING in alert-triage.json → catchup claimed last 100 lines (L1209–L1308, file total=1308).
+- Escalate-class alerts since iter ~1490 (L1278+): L1279 (sentinel ccd-s5 stall) → SELF-RESOLVED (inbox-watcher restarted 19:48Z, PR #465 delivered). L1281 (retry-exhausted ccd-s4) → RESOLVED. L1285/L1289/L1292/L1295–L1298/L1305: unreviewed-merge PRs #467, #468, #466, #470, #471, #472, #475 (all never_silence:true) → Larry direct merges during EROFS/test-jail sprint; each delivered to Larry by outbox-notifier in real-time. L1287 (orphaned wt-forge-ccd-s5) → RESOLVED. L1288 (sentinel in-flight test-jail-pr2) → RESOLVED (PR #469 merged). L1290 (Beacon [claude exit 1] EROFS) → RESOLVED (PR #470 19:08Z). L1306 (sync-blocked auto-commit-push-failed) → route=digest, self-healed. L1307 (wedged-review-reaped test-jail-pr4) → route=closure, FYI. L1308 (dispatch-branch-cleanup) → route=digest, routine.
+- Pattern note: 7 direct Larry merges with never_silence:true unreviewed-merge alerts (#466–#475) — actor=Larry-Yatch, sprint day, all delivered in real-time. No new dispatch this iter.
+- New watermark: **L1308**. Written to alert-triage.json. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl last 90 min → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message ~20:00Z UTC: approved `fix-build-background-poll-idiom-001` with 'go' → PR #473 merged 19:54Z (docs(forge): codify foreground-run idiom). No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes (VERIFY-BEFORE-REASSERT):**
+- Forge: 1 item — `test-jail-pr4-acceptance-proof-001.json` (14:56Z, ~8.3h). PR #476 MERGED 21:42Z; Forge worktree reaped 21:30Z (terminal marker present); Mirror reviewed 21:30–21:42Z (success, $0.76); task file not auto-archived. **[yellow] post-merge stale** — see Standing Findings.
+- Beacon/Mirror/Pulse: EMPTY. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (healer completed; 4 services restarted 19:47–19:48Z). All 7 services active. ✅ Standing known.
+
+**Check A — Source repo:** main, clean (sync no-change 22:53Z). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=22:53Z (~23 min at scan time), status=no-change. ✅ Within 2h.
+
+**Check C — Agent liveness:** 7/7 active: beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier. ✅ Nominal.
+
+**Check E — PRs:** 0 open. ✅ Nominal.
+
+**Check H — Forge digest:** 0 open. Merged today: PRs #462–#476 (15 PRs — Larry sprint + chain). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** Thursday, all three scripts self-gate. ✅
+
+**Conditional checks:** Thursday — Check I/III/VIII/IX/X skip. ✅
+
+**Credential rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). No 60d trigger. ✅
+
+**Verify-before-reassert on carried standings:**
+- Forge PID 1669068: NOT ALIVE. ✅ CLOSED.
+- PR #457 mirror-review FAILURE: MERGED 17:39Z (fix(reaper): release handoff guard). ✅ CLOSED.
+- CCD s5: PR #465 MERGED 17:28Z (docs(beacon): S5 REVISION handling shape). ✅ CLOSED.
+- fix-reaper-handoff-guard-descope-003: task archived; PR #457 delivered. ✅ CLOSED.
+- fix-build-background-poll-idiom-001 [blue] carry: PR #473 MERGED 19:54Z. ✅ CLOSED.
+- Sync-push-failure: 2 occurrences today (18:52Z, 20:52Z); route=digest, self-healed. 2/3 G-rule. Watch.
+- health-check-notify-script-missing G-rule 3/3: no Forge PR found yet. [yellow] carry.
+
+**Actions taken:**
+1. Updated alert-triage.json watermark: `last_claimed_line` → L1308.
+2. Appended PRIME DIRECTIVE intervention row: `alert-triage-watermark-catchup:claimed-L1209-L1308-all-resolved` (iter 1531, tier 1).
+
+**Dispatches:** 0.
+
+**Standing findings:**
+- [yellow] **test-jail-pr4-acceptance-proof-001.json in Forge inbox** — post-merge stale (~8.3h). PR #476 MERGED 21:42Z; Forge session ended with terminal marker; no active process/worktree. Same post-merge-stale-inbox-file pattern; G-rule dispatched to Beacon in iter ~1480. Monitor: inbox-watcher should self-detect merged PR state and not re-burn Opus.
+- [yellow] **bughunt-gate-soak Phase 2** — pending Larry.
+- [yellow] **Tier 2 weekly probe auth_401** — Action: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST 500.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3 dispatched iter ~1415; no Forge PR yet. Watch.
+- [blue] **Check III threshold proposals** — `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001** — pending Larry.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry.
+- [blue] **sync-push-rebase-fallback-001** — 2/3 G-rule (two auto-commit-push-failed today). Watch for 3/3.
+- [blue] **unreviewed-merge sprint batch** (#466–#476) — Tier-4 per never_silence:true; all delivered in real-time. G-rule 3/3 already dispatched (iter ~1378).
+- [blue] **heal-stale-daemon-code-state.json MISSING** — standing known.
+- [blue] **G-rule dispatch-branch-cleanup:summary** — 3/3 DISPATCHED iter ~1530. Watch Beacon consumption.
+- [blue] **APPROVAL_REQUEST alert-triage-durable-watermark-001** — parked.
+- [blue] **sentinel-inbox-stall-ignores-inflight** — 2/3 G-rule.
+- [blue] **F24-empty-prompt-envelope-rejected** — 1/3 G-rule.
+- [blue] **catalog-accuracy-drift** — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] **alert-triage.json watermark** — REPAIRED this iter (L1308). ✅
+
+**Watch items for next iter (~1532):**
+- **test-jail-pr4-acceptance-proof-001.json** — confirm inbox-watcher does not re-burn Opus on merged-PR task.
+- **health-check-notify-script-missing** — check if Forge PR has appeared.
+- **sync-push-rebase-fallback G-rule** — watch for 3rd occurrence.
+
+**PRIME DIRECTIVE:** 1 intervention this iter (watermark repair). Script-authoritative ratio: interventions=799, systemic_fixes=25, ratio=31.96, trend=flat.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — stale Forge task carry).
+
+---
