@@ -1832,7 +1832,8 @@ class MarkerDisciplineEndToEndTests(unittest.TestCase):
             "--output-dir", str(self.output_dir),
             "--journal", str(self.journal),
             "--halt-flag", str(self.halt_flag),
-            "--no-dm", "--no-journal", "--no-auto-dispatch", "--force",
+            "--no-dm", "--no-journal", "--no-auto-dispatch", "--no-park",
+            "--force",
         ]
 
     def test_e2e_persists_marker_discipline(self):
@@ -1845,6 +1846,186 @@ class MarkerDisciplineEndToEndTests(unittest.TestCase):
         self.assertEqual(md["misses"], 2)  # base-a depth1 + base-b depth1
         self.assertEqual(md["retry_depth_distribution"], {"1": 2, "2": 1, "3": 0})
         self.assertEqual(md["window_end"], WEEK_ENDING)
+
+
+class ParkAndSuppressTests(unittest.TestCase):
+    """Contract B §5.2/§5.3: each non-auto-dispatched proposal is parked once as
+    a durable capture (emit_capture(label='pulse-check-i')); its DM line is then
+    shown once as `[parked]` and omitted from subsequent digests. A proposal
+    whose park fails (no capture_id) is never silently dropped — it keeps its
+    full DM line. Auto-dispatch-eligible proposals are never parked.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.state_path = Path(self.tmp.name) / "parked.json"
+        self.fired_at = datetime(2026, 5, 24, 8, 0, 0, tzinfo=timezone.utc)
+
+    def _eligible_proposal(self) -> dict:
+        # effort=small + $-quantified impact → auto-dispatches, never parked.
+        return {
+            "title": "Review high-σ anomaly task `burned-task-007`",
+            "effort": "small",
+            "impact": "$9.20 task vs $1.10 baseline (3.7σ above)",
+            "rationale": "Ledger flagged this task at 3.7σ above baseline.",
+        }
+
+    def _medium_proposal(self) -> dict:
+        # effort=medium → not eligible → parkable.
+        return {
+            "title": "Investigate retry / clarification cost sources",
+            "effort": "medium",
+            "impact": "~$2.50/wk reclaimable (20.0% of total spend)",
+            "rationale": "Retry overhead is above the 15% threshold.",
+        }
+
+    def _check_i(self, proposals: list[dict], signals: dict | None = None) -> dict:
+        return {
+            "schema_version": "v1",
+            "week_ending": WEEK_ENDING,
+            "fired_at": self.fired_at.isoformat(),
+            "mode": "digest",
+            "has_signal": True,
+            "proposals": [dict(p) for p in proposals],
+            "ledger_headline": {"total_usd": 5.0, "anomaly_count": 1},
+            "engineering_signals": signals or {},
+        }
+
+    def test_parks_each_non_eligible_once_over_n_cycles(self):
+        # Same medium proposal re-pitched across 3 Check I cycles parks exactly
+        # once: the first cycle records a capture_id; later cycles see it in the
+        # state file and skip the emit.
+        p = self._medium_proposal()
+        with mock.patch.object(pci, "emit_capture",
+                               return_value="cap-001") as emit:
+            first = pci.park_proposals([p], self.fired_at, self.state_path)
+            second = pci.park_proposals([p], self.fired_at, self.state_path)
+            third = pci.park_proposals([p], self.fired_at, self.state_path)
+
+        self.assertEqual(emit.call_count, 1, "park must emit exactly once")
+        kwargs = emit.call_args.kwargs
+        self.assertEqual(kwargs["label"], "pulse-check-i")
+        self.assertEqual(kwargs["source"], "agent")
+        self.assertEqual(kwargs["title"], p["title"])
+        self.assertIn(p["impact"], kwargs["note"])
+        self.assertIn(p["rationale"], kwargs["note"])
+
+        key = pci._proposal_dedup_key(p)
+        self.assertEqual(set(first), {key})
+        self.assertEqual(second, {})
+        self.assertEqual(third, {})
+        state = json.loads(self.state_path.read_text())
+        self.assertEqual(state[key]["capture_id"], "cap-001")
+        self.assertEqual(state[key]["parked_at"], self.fired_at.isoformat())
+
+    def test_parked_dropped_from_digest_after_first_cycle(self):
+        # Cycle 1: the freshly parked proposal is annotated [parked] and stays
+        # in the digest (shown once). Cycle 2: same proposal, now in state and
+        # not parked_now → omitted; with no other signal the mode collapses to
+        # no-signal instead of re-pitching.
+        p = self._medium_proposal()
+        with mock.patch.object(pci, "emit_capture", return_value="cap-xyz"):
+            parked_now = pci.park_proposals([p], self.fired_at, self.state_path)
+        parked_state = pci._load_parked_state(self.state_path)
+
+        c1 = self._check_i([p])
+        pci.apply_park_suppression(c1, parked_now, parked_state)
+        self.assertEqual(len(c1["proposals"]), 1)
+        self.assertTrue(c1["proposals"][0]["parked"])
+        self.assertEqual(c1["proposals"][0]["capture_id"], "cap-xyz")
+        self.assertEqual(c1["mode"], "digest")
+        dm = pci.render_dm(c1)
+        self.assertIn("[parked]", dm)
+        self.assertIn("see dashboard Parked lane", dm)
+        self.assertNotIn(p["impact"], dm)
+
+        # Cycle 2: nothing parked this run; prior capture_id earns silence.
+        c2 = self._check_i([p])
+        pci.apply_park_suppression(c2, {}, parked_state)
+        self.assertEqual(c2["proposals"], [])
+        self.assertFalse(c2["has_signal"])
+        self.assertEqual(c2["mode"], "no-signal")
+
+    def test_park_failure_keeps_proposal_in_dm(self):
+        # emit_capture returns None (e.g. token/network failure) → no capture_id
+        # recorded → the proposal is NEVER suppressed; its full DM line stays.
+        p = self._medium_proposal()
+        with mock.patch.object(pci, "emit_capture", return_value=None) as emit:
+            parked_now = pci.park_proposals([p], self.fired_at, self.state_path)
+        self.assertEqual(emit.call_count, 1)
+        self.assertEqual(parked_now, {})
+        self.assertFalse(self.state_path.exists(),
+                         "no state write when nothing parked")
+
+        parked_state = pci._load_parked_state(self.state_path)
+        c = self._check_i([p])
+        pci.apply_park_suppression(c, parked_now, parked_state)
+        self.assertEqual(len(c["proposals"]), 1)
+        self.assertNotIn("parked", c["proposals"][0])
+        dm = pci.render_dm(c)
+        self.assertNotIn("[parked]", dm)
+        self.assertIn(p["impact"], dm)
+
+    def test_park_emit_exception_never_crashes(self):
+        # If emit_capture itself raises, park_proposals swallows it (Check I
+        # must never crash) and treats the proposal as unparked.
+        p = self._medium_proposal()
+        with mock.patch.object(pci, "emit_capture",
+                               side_effect=RuntimeError("boom")):
+            parked_now = pci.park_proposals([p], self.fired_at, self.state_path)
+        self.assertEqual(parked_now, {})
+        self.assertFalse(self.state_path.exists())
+
+        c = self._check_i([p])
+        pci.apply_park_suppression(c, parked_now,
+                                   pci._load_parked_state(self.state_path))
+        self.assertEqual(len(c["proposals"]), 1)
+        self.assertNotIn("parked", c["proposals"][0])
+
+    def test_auto_dispatch_eligible_unaffected(self):
+        # An eligible (small + $) proposal is never parked: emit_capture is not
+        # called for it and it survives suppression with its full DM line.
+        eligible = self._eligible_proposal()
+        with mock.patch.object(pci, "emit_capture",
+                               return_value="cap-should-not-happen") as emit:
+            parked_now = pci.park_proposals(
+                [eligible], self.fired_at, self.state_path,
+            )
+        emit.assert_not_called()
+        self.assertEqual(parked_now, {})
+        self.assertFalse(self.state_path.exists())
+
+        c = self._check_i([eligible])
+        pci.apply_park_suppression(c, parked_now,
+                                   pci._load_parked_state(self.state_path))
+        self.assertEqual(len(c["proposals"]), 1)
+        self.assertNotIn("parked", c["proposals"][0])
+        self.assertEqual(c["mode"], "digest")
+
+    def test_mixed_eligible_and_parked_only_medium_parked(self):
+        # A digest with one eligible + one medium proposal: only the medium one
+        # parks; the eligible one is left for the auto-dispatch path.
+        eligible = self._eligible_proposal()
+        medium = self._medium_proposal()
+        with mock.patch.object(pci, "emit_capture",
+                               return_value="cap-m") as emit:
+            parked_now = pci.park_proposals(
+                [eligible, medium], self.fired_at, self.state_path,
+            )
+        self.assertEqual(emit.call_count, 1)
+        self.assertEqual(emit.call_args.kwargs["title"], medium["title"])
+        self.assertEqual(set(parked_now), {pci._proposal_dedup_key(medium)})
+
+        c = self._check_i([eligible, medium])
+        pci.apply_park_suppression(
+            c, parked_now, pci._load_parked_state(self.state_path),
+        )
+        titles = {p["title"]: p for p in c["proposals"]}
+        self.assertIn(eligible["title"], titles)
+        self.assertIn(medium["title"], titles)
+        self.assertNotIn("parked", titles[eligible["title"]])
+        self.assertTrue(titles[medium["title"]]["parked"])
 
 
 if __name__ == "__main__":

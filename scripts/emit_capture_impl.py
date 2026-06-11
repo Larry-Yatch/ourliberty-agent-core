@@ -56,15 +56,34 @@ def _normalize_repo(name: str) -> str:
     return name.split('.', 1)[0]
 
 
-def main() -> int:
-    title = (os.environ.get('OL_CAPTURE_TITLE') or '').strip()
-    if not title:
-        _err('no title (set OL_CAPTURE_TITLE or pass it as the first arg) — skip')
-        return 2
+def emit_capture(
+    *,
+    title: str,
+    note: str | None = None,
+    source: str = 'agent',
+    label: str | None = None,
+    session_id: str | None = None,
+) -> str | None:
+    """Park a durable capture card via `POST /api/ingest/capture`.
 
-    note = (os.environ.get('OL_CAPTURE_NOTE') or '').strip()
-    source = (os.environ.get('OL_CAPTURE_SOURCE') or _DEFAULT_SOURCE).strip()
-    session_id = (os.environ.get('OL_CAPTURE_SESSION_ID') or '').strip() or None
+    The shared, importable core of the capture gesture: any agent script can
+    call this in-process to land a card in the Missions Parked lane. Derives
+    origin (repo / branch) from the current git context, reads the narrow
+    ingest token, and POSTs. The optional `label` is an allowlisted first-class
+    tag (server-validated against CAPTURE_ALLOWED_LABELS).
+
+    Returns the server-assigned `capture_id` on success, or `None` on ANY
+    failure (missing title/token, network error, unexpected response). NEVER
+    raises — an in-process caller (Pulse Check I) must not crash on a failed
+    park; diagnostics go to stderr via `_err`.
+    """
+    title = (title or '').strip()
+    if not title:
+        _err('no title — skip')
+        return None
+    note = (note or '').strip() or None
+    source = (source or _DEFAULT_SOURCE).strip()
+    session_id = (session_id or '').strip() or None
 
     cwd = os.getcwd()
     repo = None
@@ -82,8 +101,9 @@ def main() -> int:
     }
     body = json.dumps({
         'title': title,
-        'note': note or None,
+        'note': note,
         'origin': origin,
+        'label': label,
     }).encode('utf-8')
 
     api_url = (os.environ.get('OL_DASHBOARD_API_URL')
@@ -94,10 +114,10 @@ def main() -> int:
         token = Path(token_file).read_text(encoding='utf-8').strip()
     except Exception:
         _err(f'no ingest token at {token_file}')
-        return 3
+        return None
     if not token:
         _err('empty ingest token')
-        return 3
+        return None
 
     req = urllib.request.Request(
         f'{api_url}/api/ingest/capture',
@@ -109,15 +129,33 @@ def main() -> int:
             payload = json.loads(resp.read().decode('utf-8') or '{}')
     except Exception as exc:  # noqa: BLE001
         _err(f'POST failed: {exc}')
-        return 4
+        return None
 
     capture_id = payload.get('capture_id') if isinstance(payload, dict) else None
     if not capture_id:
         _err(f'unexpected response: {payload!r}')
-        return 4
-    sys.stdout.write(f'captured {capture_id}\n')
+        return None
     if os.environ.get('OL_HOOK_DEBUG'):
-        _err(f'parked {capture_id} repo={repo} branch={branch}')
+        _err(f'parked {capture_id} repo={repo} branch={branch} label={label}')
+    return capture_id
+
+
+def main() -> int:
+    title = (os.environ.get('OL_CAPTURE_TITLE') or '').strip()
+    if not title:
+        _err('no title (set OL_CAPTURE_TITLE or pass it as the first arg) — skip')
+        return 2
+
+    capture_id = emit_capture(
+        title=title,
+        note=os.environ.get('OL_CAPTURE_NOTE'),
+        source=os.environ.get('OL_CAPTURE_SOURCE') or _DEFAULT_SOURCE,
+        session_id=os.environ.get('OL_CAPTURE_SESSION_ID'),
+    )
+    if not capture_id:
+        # emit_capture already wrote the specific reason to stderr.
+        return 1
+    sys.stdout.write(f'captured {capture_id}\n')
     return 0
 
 

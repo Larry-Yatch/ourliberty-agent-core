@@ -57,6 +57,7 @@ from typing import Any, Optional
 
 import safe_write_inbox  # noqa: E402 — sys.path adjusted above
 from fixture_patterns import is_fixture_task_id  # noqa: E402
+from emit_capture_impl import emit_capture  # noqa: E402 — Contract B §5.1 helper
 
 # --- constants ---
 
@@ -111,6 +112,10 @@ AUTO_DISPATCH_DOLLAR_RE = re.compile(r"\$\d")
 # σ-anomaly that survives a week is genuinely new evidence.
 AUTO_DISPATCH_DEDUP_WINDOW_DAYS = 7
 DEFAULT_DISPATCH_STATE_FILE = HOME / "agents" / "state" / "pulse-check-i-dispatched.json"
+# Contract B (park-the-nudge §5.2) — emitter-side dedup for parked proposals,
+# mirroring DEFAULT_DISPATCH_STATE_FILE. Keys on _proposal_dedup_key; records
+# the returned capture_id so DM suppression is earned by durable capture.
+DEFAULT_PARKED_STATE_FILE = HOME / "agents" / "state" / "pulse-check-i-parked.json"
 
 
 # --- IO helpers ---
@@ -887,6 +892,164 @@ def auto_dispatch_proposals(
     return dispatched_now
 
 
+# --- park non-auto-dispatched proposals (Contract B §5.2 / §5.3) ---
+
+
+def _load_parked_state(path: Path) -> dict[str, dict[str, Any]]:
+    """Read parked-proposal dedup state. Fail-open on any error — a missing or
+    unreadable state file means "nothing parked yet", which is recoverable (we
+    may re-park, never silently suppress). Returns {dedup_key: {capture_id,
+    parked_at}}.
+    """
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[pulse-check-i] WARN: parked state read failed ({e}); "
+              f"treating as empty")
+        return {}
+
+
+def _save_parked_state(path: Path, state: dict[str, dict[str, Any]]) -> None:
+    """Persist parked-proposal dedup state. Best-effort + atomic, mirroring
+    _save_dispatch_state — a failed write logs a WARN but does not propagate
+    (the capture already succeeded; a missed state-write means we may re-park
+    next cycle, which is recoverable and strictly safer than over-suppressing).
+    """
+    try:
+        _atomic_write(path, json.dumps(state, indent=2) + "\n")
+    except OSError as e:
+        print(f"[pulse-check-i] WARN: parked state write failed ({e})")
+
+
+def park_proposals(
+    proposals: list[dict[str, Any]],
+    fired_at: datetime,
+    state_path: Path,
+) -> dict[str, dict[str, Any]]:
+    """Park each non-auto-dispatched proposal as a durable capture card.
+
+    For every proposal that is NOT auto-dispatch-eligible (the judgment /
+    medium-effort ones that re-pitch every cycle), emit a durable capture via
+    `emit_capture(label='pulse-check-i')` unless its dedup key already carries a
+    recorded capture_id in the parked-state file. On success record
+    `{key: {capture_id, parked_at}}`. Best-effort + atomic, mirroring
+    `auto_dispatch_proposals`.
+
+    Returns the mapping of keys parked in THIS run (so the DM layer can show
+    them once as `[parked]`). NEVER raises and NEVER suppresses on failure: a
+    proposal whose park fails records no capture_id, so `apply_park_suppression`
+    keeps it in the digest. (Mirror focus: emit failure can never crash Check I;
+    suppression strictly requires a recorded capture_id.)
+    """
+    if not proposals:
+        return {}
+    state = _load_parked_state(state_path)
+    parked_now: dict[str, dict[str, Any]] = {}
+    for p in proposals:
+        if _is_auto_dispatch_eligible(p):
+            continue  # eligible proposals auto-dispatch — never parked
+        key = _proposal_dedup_key(p)
+        prior = state.get(key)
+        if prior and prior.get("capture_id"):
+            continue  # already parked in a prior cycle — silence earned
+        title = str(p.get("title") or "(untitled proposal)")
+        note = f"{p.get('impact') or ''}\n\n{p.get('rationale') or ''}".strip()
+        try:
+            capture_id = emit_capture(
+                title=title,
+                note=note,
+                source="agent",
+                label="pulse-check-i",
+            )
+        except Exception as e:  # noqa: BLE001 — park must never crash Check I
+            print(f"[pulse-check-i] WARN: park raised for key={key[:10]} "
+                  f"({type(e).__name__}: {e}); leaving proposal in DM")
+            continue
+        if not capture_id:
+            print(f"[pulse-check-i] park failed (no capture_id) key={key[:10]} "
+                  f"title={title!r}; leaving proposal in DM")
+            continue
+        record = {"capture_id": capture_id, "parked_at": fired_at.isoformat()}
+        state[key] = record
+        parked_now[key] = record
+        print(f"[pulse-check-i] parked: key={key[:10]} "
+              f"capture_id={capture_id} title={title!r}")
+    if parked_now:
+        _save_parked_state(state_path, state)
+    return parked_now
+
+
+def apply_park_suppression(
+    check_i: dict[str, Any],
+    parked_now: dict[str, dict[str, Any]],
+    parked_state: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Suppress parked proposals' DM lines (Contract B §5.3), mutating check_i.
+
+    Each non-auto-dispatch proposal is reclassified by its dedup key:
+      - parked in THIS run (key in `parked_now` with a capture_id) → annotated
+        `parked=True` and shown ONCE as `[parked] … — see dashboard Parked lane`.
+      - parked in a PRIOR run (capture_id in `parked_state`, not `parked_now`) →
+        omitted from the digest entirely (silence earned by durable capture).
+      - not parked (park failed → no capture_id) → left untouched, still DM'd in
+        full. Suppression STRICTLY requires a recorded capture_id.
+
+    Auto-dispatch-eligible proposals and the Ledger headline are unaffected.
+    `mode`/`has_signal` are recomputed so an all-parked digest with no fresh
+    signal collapses toward heartbeat/no-signal instead of re-pitching.
+    """
+    parked_now = parked_now or {}
+    parked_state = parked_state or {}
+    if check_i.get("mode") == "skipped":
+        return check_i
+    if not parked_now and not parked_state:
+        return check_i  # nothing ever parked — preserve today's behavior
+
+    proposals = check_i.get("proposals") or []
+    kept: list[dict[str, Any]] = []
+    for p in proposals:
+        if _is_auto_dispatch_eligible(p):
+            kept.append(p)
+            continue
+        key = _proposal_dedup_key(p)
+        now_rec = parked_now.get(key)
+        if now_rec and now_rec.get("capture_id"):
+            annotated = dict(p)
+            annotated["parked"] = True
+            annotated["capture_id"] = now_rec["capture_id"]
+            kept.append(annotated)
+            continue
+        prior = parked_state.get(key)
+        if prior and prior.get("capture_id"):
+            continue  # parked in a prior cycle → omit from this digest
+        kept.append(p)  # not parked (e.g. park failed) → keep it in the DM
+    check_i["proposals"] = kept
+
+    sigs = check_i.get("engineering_signals") or {}
+    real_anoms = sigs.get("sigma_anomalies") or []
+    repeats = sigs.get("high_repeat_tasks") or []
+    overhead_pct = float(sigs.get("retry_overhead_pct", 0.0) or 0.0)
+    md = sigs.get("marker_discipline")
+    md_alert = bool(isinstance(md, dict) and md.get("alert"))
+    has_signal = bool(
+        kept or real_anoms or repeats
+        or overhead_pct >= RETRY_OVERHEAD_PCT_THRESHOLD
+        or md_alert
+    )
+    check_i["has_signal"] = has_signal
+    if kept:
+        check_i["mode"] = "digest"
+    elif has_signal:
+        check_i["mode"] = "heartbeat"
+    else:
+        check_i["mode"] = "no-signal"
+    return check_i
+
+
 # --- manual dispatch (Larry-driven /dispatch <N>) ---
 
 
@@ -1143,9 +1306,14 @@ def render_dm(check_i: dict[str, Any]) -> str:
     lines.append("")
     lines.append(f"Proposed optimizations ({len(check_i['proposals'])}):")
     for i, p in enumerate(check_i["proposals"], 1):
-        lines.append(
-            f"  {i}. [{p['effort']}] {p['title']} — {p['impact']}"
-        )
+        if p.get("parked"):
+            lines.append(
+                f"  {i}. [parked] {p['title']} — see dashboard Parked lane"
+            )
+        else:
+            lines.append(
+                f"  {i}. [{p['effort']}] {p['title']} — {p['impact']}"
+            )
     return "\n".join(lines)
 
 
@@ -1215,10 +1383,16 @@ def render_journal_block(check_i: dict[str, Any]) -> str:
 
     lines.append(f"- Mode: digest — {len(check_i['proposals'])} proposal(s):")
     for i, p in enumerate(check_i["proposals"], 1):
-        lines.append(
-            f"  {i}. [{p['effort']}] {p['title']} — {p['impact']}"
-        )
-        lines.append(f"     Rationale: {p['rationale']}")
+        if p.get("parked"):
+            lines.append(
+                f"  {i}. [parked] {p['title']} — see dashboard Parked lane "
+                f"(capture {p.get('capture_id')})"
+            )
+        else:
+            lines.append(
+                f"  {i}. [{p['effort']}] {p['title']} — {p['impact']}"
+            )
+            lines.append(f"     Rationale: {p['rationale']}")
     return "\n".join(lines)
 
 
@@ -1293,6 +1467,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--dispatch-state-file",
         default=str(DEFAULT_DISPATCH_STATE_FILE),
         help="Dedup state file for auto-dispatch (closed-loop step 5).",
+    )
+    p.add_argument(
+        "--no-park",
+        action="store_true",
+        help="Skip parking non-auto-dispatched proposals (Contract B). "
+             "Test / dry-run.",
+    )
+    p.add_argument(
+        "--parked-state-file",
+        default=str(DEFAULT_PARKED_STATE_FILE),
+        help="Dedup state file for parked proposals (Contract B §5.2).",
     )
     p.add_argument(
         "--dispatch",
@@ -1407,6 +1592,24 @@ def main(argv: Optional[list[str]] = None) -> int:
         marker_discipline=marker_discipline,
     )
 
+    # Contract B (park-the-nudge §5.2/§5.3): park each non-auto-dispatched
+    # proposal as a durable capture, then suppress its DM line once a
+    # capture_id is recorded. Park BEFORE the audit/DM render so a freshly
+    # recorded capture_id is honored this cycle. Wrapped defensively — a park
+    # failure must never crash Check I (the proposal simply stays in the DM).
+    parked_state_path = Path(args.parked_state_file)
+    parked_now: dict[str, dict[str, Any]] = {}
+    if not args.no_park:
+        try:
+            parked_now = park_proposals(
+                check_i.get("proposals") or [], now, parked_state_path,
+            )
+        except Exception as e:  # noqa: BLE001 — park must never crash Check I
+            print(f"[pulse-check-i] WARN: park step crashed "
+                  f"({type(e).__name__}: {e}); continuing")
+    parked_state = _load_parked_state(parked_state_path)
+    apply_park_suppression(check_i, parked_now, parked_state)
+
     # Audit filename uses firing date so the 4 weekly firings each get
     # their own record. Sidecar lookup above still uses week_ending —
     # Ledger remains weekly Monday.
@@ -1467,6 +1670,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                   f"({type(e).__name__}: {e}); continuing")
 
     print(f"[pulse-check-i] mode={check_i['mode']}")
+    print(f"[pulse-check-i] parked: {len(parked_now)}")
     print(f"[pulse-check-i] wrote {out_path}")
     print(f"[pulse-check-i] DM: {dm_result}")
     if not args.no_journal:
