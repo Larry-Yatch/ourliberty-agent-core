@@ -12,9 +12,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-11 20:22Z UTC (Iter ~1519, interactive)
+## Status snapshot — updated 2026-06-11 21:16Z UTC (Iter ~1524, interactive)
 
-**Iter ~1519 summary:** Alert watermark: L1303 (20:08Z / missions-card-gc:summary → Tier-3). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions≈790, systemic_fixes≈24 (includes iter 1513 beacon-erofs fix + iter ~1519 wt-cleanup dispatch), ratio≈33. **KEY STATE:** Forge `test-jail-pr3-gate-hardening-001` ACTIVE (PID 1878941, started 20:21Z — new session). 0 open PRs (all 466–473 merged). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` STILL PRESENT (2.5h+); G-rule dispatch sent to Beacon this iter (`cycle-finding-orphaned-wt-ccd-s5-20260611T202200Z.json`). Beacon EROFS RESOLVED (PR #470, systemic_fix iter 1513). All 9 services active. Sync clean: last_sync=19:52Z. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%).
+**Iter ~1524 summary:** Alert watermark: L1306 (sync-blocked:auto-commit-push-failed / 20:52:55Z). Tier 1, consecutive_clean=1. PRIME DIRECTIVE: interventions≈793, systemic_fixes≈24, ratio≈33.0. **KEY STATE:** Forge `test-jail-pr4-acceptance-proof-001` ACTIVE (worktree mtime 20:56:32Z UTC). 0 open PRs. wt-ccd-s5 GC pending ~22:03Z (mtime 17:31Z UTC, 4h threshold). Sync error from 20:52:55Z self-healing. All 9 services active. **PATH NOTE:** `larry-alerts.jsonl` actual path = `~/agents/blackboard/larry-alerts.jsonl` (NOT `~/agents/state/`). `alert_triage_state.py` has no `claim-window` subcommand; valid cmds: read, triage, classify, triage-alert, dispatched, resolved. Watermark `last_claimed_line` is 1-indexed; `triage_decisions[].alert_idx` is 0-indexed (differ by 1). **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%). G-rule `alert-triage-watermark-loss-on-write` 1/3 (script bug: `triage-alert` drops top-level fields on write; at 3/3 dispatch Forge to fix).
 
 ## Status snapshot — updated 2026-06-11 18:07Z UTC (Iter ~1504, interactive)
 

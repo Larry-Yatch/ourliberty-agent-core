@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration ~1524 — 2026-06-11 21:10Z UTC (interactive, Tier 1, consecutive_clean 1)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 9/9 services active. 0 open PRs. 0 new alerts. Watermark residual from iter ~1523 repaired inline (+1 line advance).
+
+**VERIFY-BEFORE-REASSERT (iter ~1523 watch items):**
+- **wt-ccd-s5 GC at 22:03Z?** Current time 21:10Z. NOT yet past threshold (mtime 17:31Z UTC → 4h = 21:31Z → healer 22:03Z). Still on track. ✅ [blue] carry.
+- **test-jail-pr4-acceptance-proof-001**: Forge worktree active (mtime 20:56:32Z UTC). 14 min elapsed at cycle time; expected PR by 21:26–21:56Z. In window. ✅
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: `beacon-pending-approvals.json` checked — only `unreg-approval-2dbbe7bb4d4b` present. Routing gap PERSISTS. G-rule 1/3. [blue] carry.
+- **alert-triage-watermark-loss-on-write 1/3**: Repair from iter ~1523 held — `triage_decisions` 18 entries intact. However watermark was left at L1305 (covered through alert_idx=1304); sync-blocked (alert_idx=1305, L1306) was in `triage_decisions` but `last_claimed_line` not advanced. Residual of original bug, not a new occurrence. Repaired: L1305→L1306. G-rule remains **1/3**.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl` (blackboard path): 1306 lines. Watermark L1305 entering cycle. L1306 = `sync-blocked:auto-commit-push-failed` (already triaged in iter ~1523, `alert_idx=1305` in `triage_decisions`, Tier-3/silence/resolved). Watermark not advanced in prior cycle due to script bug residual. Repaired: `last_claimed_line` 1305→1306. 0 new alerts requiring triage. ✅
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** 1 pending approval in `beacon-pending-approvals.json`: `unreg-approval-2dbbe7bb4d4b` (known PR #457 escalation from 11:15Z). No orphaned Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (21:11Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** No unresolved Larry directives in last 24h. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] carry. ✅
+
+**Check A — Source repo:** main, clean. Last commit `c1cc921 Pulse cycle 20260611T210951Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T20:52:55Z (~18 min), status=error (same error as iter ~1523: auto-commit push failed, rolled back). Self-heals on next tick. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (in-flight, worktree active mtime 20:56Z). Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. Forge building pr4 (worktree present). ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Actions taken:**
+1. Repaired `alert-triage.json`: advanced `last_claimed_line` from 1305 → 1306 (completing iter ~1523 repair; sync-blocked already in `triage_decisions` as alert_idx=1305). ✅
+2. `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1. ✅
+3. No always-allowed-fix actions required.
+4. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] wt-ccd-s5 — GC expected 22:03Z. [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — **1/3** (no new occurrence; watermark residual repaired). [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary 2/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+
+**Watch items for iter ~1525:**
+- **wt-ccd-s5**: GC expected ~22:03Z. If persists past 22:10Z → escalate.
+- **test-jail-pr4**: Forge expected to open PR by ~21:56Z (60 min from 20:56Z start). If no PR by 22:15Z next cycle → check for stall.
+- **Sync error**: Should self-heal next tick (~21:22–21:52Z). If `agent-core-sync.json` still shows error by next cycle at 22:00Z+ → escalate.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: G-rule 1/3 carry. Watch for recurrence.
+
+**PRIME DIRECTIVE:** 0 new interventions (watermark advance completes prior iter's repair, not a new incident). Running total: interventions≈793, systemic_fixes≈24, ratio≈33.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~1523 — 2026-06-11 21:04Z UTC (interactive, Tier 1, consecutive_clean 0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
