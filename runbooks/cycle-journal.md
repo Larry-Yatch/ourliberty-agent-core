@@ -4,6 +4,111 @@
 
 ---
 
+## Iteration 1404 — 2026-06-11 05:10Z UTC (interactive, Tier 3, consecutive_clean 2→3)
+
+**Health:** ✅ All checks nominal. 3 new alerts (lines 1456–1458): 2 Tier-3 informational (pipeline-stall false positive + medic confirmation), 1 Tier-3 standing pattern (unreviewed-merge:445, same actor-exemption G-rule). 0 open PRs. install-drift timer on schedule 06:00Z (~52min). PR #445 merged by Larry (test-side fix for transcript-not-persisted storm). Forge: 4 tasks — 2 in build phase (no stall), 1 preflight-exit (ccd-s1, cleanup pending), 1 fresh preflight (fix-reaper). **Tier 3, consecutive_clean 2→3 (floor tier — no further de-escalation).**
+
+**VERIFY-BEFORE-REASSERT (iter 1403 watch items):**
+- install-drift timer fires 06:00Z June 11: **CONFIRMED** — NEXT=06:00Z MDT, 52min remaining at scan. ✅ Not yet fired, on schedule.
+- Forge: 3 preflight tasks advanced: fix-headless-002 → phase=build ✅, post-merge-install-drift-001 → phase=build ✅, ccd-s1-envelope-builder → PREFLIGHT_EXIT (healer skipping, stale inbox file) ✅. New task fix-reaper-handoff-guard-checks-liveness added (04:43Z, 24min old at scan). All within threshold.
+- `build-pulse-park-and-silence.json`: **RESOLVED** — not in inbox, PR #444 merged 03:28Z. Medic confirmed false-positive retry-exhausted at 04:58Z. ✅
+- Sync: last_sync=04:50:46Z (16min old at scan). Expires ~05:50Z. ✅ Nominal. Note: PR #445 (merged 05:01Z) not yet pulled — next sync (~05:50Z) will capture it.
+- Tier 3, consecutive_clean=2: this iter clean → consecutive_clean 2→3. ✅
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1458. Watermark was 1455 (iter 1403). 3 new lines.
+- **Line 1456** (04:55:52Z): `heal-pipeline-stall` / `pipeline-stall:retry-exhausted:pulse-park-and-silence` / route=escalate — FALSE POSITIVE confirmed by medic (line 1457). PR #444 shipped at 03:28Z; the retry-exhausted fired because the archive step encountered repeated ENOENT errors after the worktree was cleaned up post-merge. Healer itself already suppressed on cooldown. **Tier-3** — informational, no DM. G-rule 1/3: `heal-pipeline-stall retry-exhausted fires on shipped tasks when worktree cleanup precedes archive step`. Medic recommends: extend `_preflight_family_shipped` check to cover build-phase archive step.
+- **Line 1457** (04:58:50Z): `medic` / `medic-diagnosis` / intent=medic-diagnosis — confirms #444 shipped, no action needed. **Tier-3** — informational.
+- **Line 1458** (05:05:34Z): `heal-unreviewed-merge-detector` / `unreviewed-merge:445` / route=escalate — PR #445 (`fix(tests): stop agent_runner test runs leaking real critical alerts`) merged by Larry-Yatch at 05:01Z without Mirror review. Same recurring pattern as unreviewed-merge:434. Actor-exemption-config G-rule 3/3 already dispatched (iter ~1396); fix pending `go: actor-exemption-config`. **Tier-3** treatment (same known pattern, no new systemic information). No DM. Standing finding update.
+- **Watermark: advance to line 1458 / heal-unreviewed-merge-detector:unreviewed-merge:445 / 2026-06-11T05:05:34Z**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry directives at 04:12–04:48Z (22:12–22:48 MDT): fix-headless-002 dispatch (→ Forge inbox phase=build ✅), ccd-s1 (→ PREFLIGHT_EXIT ✅), fix-reaper-handoff-guard-checks-liveness (→ Forge inbox preflight ✅), post-merge-install-drift-001 (→ Forge inbox phase=build ✅), plan note re: reaper-guard at 22:48 MDT (guidance for in-flight task ✅). All directives tracked. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → `no stalls detected`. All existing inbox tasks either FORGE_NO_PR_SKIP or under threshold. retry-exhausted:pulse-park-and-silence suppressed on cooldown. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING → standing pattern, unchanged. ✅
+
+**Check A — Source repo:** agent-core-sync.json branch=main, status=no-change, last_sync=04:50:46Z. ✅ Nominal. (PR #445 merged 05:01Z; will sync ~05:50Z.)
+
+**Check B — Sync health:** 16min old at scan. Expires ~05:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service ✅. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (ourliberty-agent-core). ✅ Nominal.
+
+**Check H — Inboxes:**
+- Forge: 4 tasks present.
+  - `build-fix-headless-approval-dedup-spawn-failure-wedge-002.json` — phase=build, 04:45Z (~25min). Healer clean. Carry.
+  - `build-post-merge-install-drift-trigger-001.json` — phase=build, 04:42Z (~28min). Healer clean. Carry.
+  - `ccd-s1-envelope-builder.json` — phase=preflight, PREFLIGHT_EXIT (healer skipping, archive exists). Stale inbox file pending cleanup. ✅
+  - `fix-reaper-handoff-guard-checks-liveness.json` — phase=preflight, 04:43Z (~27min). New task. Larry approved at 22:41–22:43 MDT with plan note. ✅
+- Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: `no committed audit baseline; no-op`. ✅
+- distill_detector.py: `no un-distilled audits; no-op`. ✅
+- audit_cadence_signal.py (`review/distill/`, not `scripts/`): `no post-seed decision-grade distill artifacts yet; no-op`. ✅ [Note: correct path is `review/distill/audit_cadence_signal.py`.]
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: 0 overdue, 0 within 60d (nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 = 72d). ✅
+- install-drift timer: NEXT=06:00Z June 11, ~52min left. ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new occurrences (line 1454 remains the last). PR #445 merged (test-side fix: mock `larry_alerts.append_alert` in 4 test files). install-drift fires ~52min (systemd-side fix). Combined resolution expected. Carry.
+- **`heal-stale-daemon-code:auto-restarted` (1/3):** No new occurrence. Carry.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- **`heal-pipeline-stall retry-exhausted on shipped task` (1/3):** NEW. This iter — retry-exhausted:pulse-park-and-silence fired because archive step saw ENOENT after successful build+merge cleaned the worktree. Medic confirmed. Carry.
+- All other G-rules: carry from iter 1403 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier state: consecutive_clean 2→3 at Tier 3 (floor tier) via `scripts/cycle_tier_state.py record --checks-clean true` at 05:12Z. ✅
+2. No auto-fix actions executed (all checks nominal).
+3. No dispatches this iter.
+
+**PRIME DIRECTIVE:** 0 rows this iter (all checks nominal; Check 0 Tier-3 silences do not touch the ledger). Running total: interventions≈770, systemic_fixes=20, verification_pending=9, ratio≈38.5, trend=stable.
+**Tier end-of-iter:** Tier 3, consecutive_clean=3 (floor tier — de-escalation no-op; script stays at 3, next signal resets to Tier 1).
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **15 total occurrences** (lines 1438–1454). PR #445 (test-side fix) merged 05:01Z. Auto-heals 06:00Z (~52min at iter start). Both fixes should resolve together. Larry action still available: say **"dispatch the install-drift trigger fix"** in Beacon chat (or wait for auto-heal at 06:00Z).
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] unreviewed-merge:434 DM'd + :445 same pattern. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] Beacon spec-ready (install-drift trigger fix): Larry action pending — say "dispatch the install-drift trigger fix" in Beacon chat.
+- [blue] heal-stale-daemon-code:auto-restarted G-rule 1/3. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. New. Medic's proposed fix: extend `_preflight_family_shipped` check.
+
+**Watch items for iter 1405:**
+- install-drift timer: fires 06:00Z June 11 (~52min from scan). After firing, verify transcript-not-persisted alerts stop. Combined with PR #445 test-side fix, both vectors should be closed.
+- Forge build tasks: fix-headless-002 and post-merge-install-drift-001 in build phase (~25–28min at scan). Watch for PRs to open.
+- fix-reaper-handoff-guard-checks-liveness: fresh preflight. Should advance to build within next iter.
+- ccd-s1-envelope-builder: PREFLIGHT_EXIT, stale inbox file. Should auto-archive.
+- Sync: ~05:50Z pull will include PR #445.
+- Tier 3 cadence. Nominal expected.
+
+---
+
 ## Iteration 1403 — 2026-06-11 04:31Z UTC (interactive, Tier 3, consecutive_clean 1→2)
 
 **Health:** ✅ All checks nominal. 1 new alert (line 1455: missions-card-gc summary, Tier-3 silence). 0 open PRs. 3 new Forge preflight tasks dispatched (≤19min old, within threshold). install-drift timer on schedule 06:00Z (~1h 28min). build-pulse-park-and-silence still phase=build (advancer running, no stall per healer). **Tier 3 clean iter 2/3.**
