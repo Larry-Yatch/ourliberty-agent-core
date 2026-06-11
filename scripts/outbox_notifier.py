@@ -710,11 +710,23 @@ INTENT_ACTION_BLOCKS = {
     # D3.5 commit 5a — Mirror review marker intents. D3.5 closed with 5d:
     # revision dispatch (5b), replan flow (5c), auto-merge + EMERGENCY_HALT
     # trip + cost-budget gate (5d) are all live.
+    # false-success-notify-fix (2026-06-11): the merge-status line is
+    # GitHub-truth-gated, NOT a hardcoded "auto-merge has fired". The old
+    # template asserted the merge fired the instant Mirror PASSed — but the
+    # merge runs AFTER and can be HELD (queued behind an overlapping PR),
+    # CONFLICTING, or FAILED. PR #455 was held behind #454, yet Beacon was
+    # told "auto-merge fired" and reported a merge that never happened.
+    # `{merge_status_line}` is rendered from the gh-confirmed `merge_outcome`
+    # by `_render_review_pass_merge_status_line` and only says MERGED when
+    # `gh pr merge`/`gh pr view --json state` confirmed it. The auto-merge
+    # now runs BEFORE this notify is built (see process_outbox) so the line
+    # reflects reality. approved != auto-merge-requested != merged.
     'review-pass': (
         'Mirror has APPROVED PR `{pr_url}` on task `{task_id}`. Summary: '
-        '{summary}. Auto-merge has fired automatically (D3.5 5d) — Larry '
-        'sees the actual merge outcome in his closing DM. Journal the '
-        'approval; no further action from you.'
+        '{summary}. {merge_status_line} Journal the approval. Report the '
+        'merge state EXACTLY as stated above — do NOT say the PR is merged '
+        'unless that line says MERGED. Larry sees the authoritative merge '
+        'outcome in his closing DM. No further action from you.'
     ),
     'review-revision': (
         'Mirror has requested REVISION on PR `{pr_url}` for task `{task_id}` '
@@ -883,6 +895,12 @@ DM_TEMPLATES = {
 # fall back to DM_TEMPLATES['review-pass'] on missing/unknown outcome so
 # the render pipeline never crashes mid-merge — degrade to silent-or-vague
 # rather than wedge the daemon.
+#
+# KEEP IN SYNC with `_render_review_pass_merge_status_line` below, which maps
+# the SAME `merge_outcome` values to the one-sentence merge line in the Beacon
+# inter-agent notify (this dict is Larry's phone DM body; that function is the
+# agent journal line). A new outcome must be added in BOTH places or one
+# surface will render the generic fallback while the other is specific.
 _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
     'merged': (
         'Mirror approved PR {pr_url} on task `{task_id}`.\n'
@@ -942,6 +960,72 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
         '&& git rebase origin/main && git push --force-with-lease'
     ),
 }
+
+
+def _render_review_pass_merge_status_line(
+    merge_result: Optional[dict[str, Any]],
+) -> str:
+    """GitHub-truth merge-status sentence for the review-pass inter-agent notify.
+
+    false-success-notify-fix (2026-06-11). The review-pass notify to Beacon
+    is informational, but it MUST NOT claim a merge that hasn't happened.
+    This renders a single sentence from the gh-confirmed `merge_outcome`
+    produced by `_attempt_auto_merge_with_gates` — the same outcome that
+    drives Larry's outcome-aware closing DM (`_REVIEW_PASS_DM_VARIANTS`).
+
+    The word "MERGED" appears ONLY for `merged` / `already_merged`, which the
+    merge path returns ONLY after `gh pr merge` exits 0 or `gh pr view --json
+    state` confirms MERGED. Every held/queued/failed/pending outcome says, in
+    plain words, that the PR is NOT merged — so the receiver can never echo
+    "auto-merge fired" for a PR that is only queued behind a blocker (the
+    PR #455-held-behind-#454 incident). A missing/unknown outcome degrades to
+    "requested; outcome in Larry's DM" — never a success claim.
+
+    Distinguishes the three states the incident conflated:
+      approved        — Mirror PASSed (always true on this path)
+      auto-merge-requested / queued / held — merge attempted, not done
+      merged          — gh confirmed the merge
+    """
+    outcome = merge_result.get('merge_outcome') if isinstance(merge_result, dict) else None
+    if outcome in ('merged', 'already_merged'):
+        return 'Auto-merge fired and the PR is now MERGED (branch deleted).'
+    if outcome in ('held_for_blocker', 'queued_behind_serializer'):
+        blocker = merge_result.get('blocker_pr_number', '?')
+        overlap = merge_result.get('overlap_files', 'overlapping files')
+        return (
+            f'Auto-merge is QUEUED behind PR #{blocker} (overlap on '
+            f'{overlap}) — it will merge automatically once that PR clears. '
+            f'The PR is NOT merged yet.'
+        )
+    if outcome == 'held_conflict':
+        return (
+            'Auto-merge is BLOCKED — the PR conflicts with main and needs a '
+            'manual rebase. The PR is NOT merged.'
+        )
+    if outcome == 'held_fail_closed':
+        return (
+            'Auto-merge is HELD — the merge queue is fail-closed on a corrupt '
+            'state file and an operator must clear it. The PR is NOT merged.'
+        )
+    if outcome == 'deferred_unknown':
+        return (
+            'Auto-merge is PENDING — GitHub is still computing mergeability; '
+            'the queue sweep will retry. The PR is NOT merged yet.'
+        )
+    if outcome == 'failed':
+        reason = merge_result.get('merge_reason', 'see logs') if isinstance(merge_result, dict) else 'see logs'
+        return (
+            f'Auto-merge FAILED ({reason}) — the PR is NOT merged and needs '
+            f'manual attention.'
+        )
+    # No merge_result attached (defensive — the marker-routing path attaches
+    # one before this notify renders) or an unrecognized outcome: never assert
+    # success. State it as requested-and-pending and defer to Larry's DM.
+    return (
+        "Auto-merge has been REQUESTED; its outcome is reported in Larry's "
+        'closing DM. The PR is NOT confirmed merged by this notify.'
+    )
+
 
 # Subset of intents that produce a closing DM to the originating chat. Other
 # intents are mid-chain mechanics that don't warrant Larry's attention.
@@ -2804,6 +2888,12 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         intent_kwargs = {
             'pr_url': pr_url,
             'summary': payload.get('summary', '(no summary)'),
+            # false-success-notify-fix (2026-06-11): default GitHub-truth
+            # merge-status line = "requested/pending". The marker-routing
+            # block in process_outbox runs the auto-merge BEFORE the notify
+            # and overwrites this with the real gh-confirmed outcome line so
+            # the notify never claims a merge that hasn't happened.
+            'merge_status_line': _render_review_pass_merge_status_line(None),
         }
     elif marker_type == 'review_revision':
         # m-5 review fix: budget_exhausted is the stronger termination
@@ -7428,6 +7518,253 @@ def _handle_beacon_clarification_response(
     return str(dest)
 
 
+def _run_review_pass_auto_merge(
+    data: dict[str, Any],
+    marker_decision: dict[str, Any],
+    outbox_file: Path,
+) -> Optional[str]:
+    """Run the auto-merge for a Mirror REVIEW_PASS and record the gh-truth outcome.
+
+    false-success-notify-fix (2026-06-11). Called from process_outbox's
+    marker-routing block BEFORE the back-leg inter-agent notify is built, so
+    the notify reports the ACTUAL merge state (merged / queued-behind-blocker /
+    conflict / failed) instead of an optimistic "auto-merge fired" claim. This
+    extends Larry's original D3.5 5d sign-off ("merge BEFORE the closing DM
+    renders") to the Beacon notify too, so BOTH the agent journal and Larry's
+    DM are GitHub-truth. Incident: PR #455 was held behind #454 yet Beacon was
+    told the merge fired.
+
+    Sets `marker_decision['merge_result']`, `['merge_outcome']`, and the
+    `merge_status_line` in `['intent_kwargs']` (read by the review-pass notify
+    template). Returns:
+      * 'auto-merge-skipped' — degenerate PR (shape-invalid url / 404 /
+        already-terminal). The caller STILL sends the now-truthful notify and
+        archives, but suppresses Larry's closing DM and returns this string
+        verbatim — preserving the pre-fix skip semantics (notify yes, DM no)
+        while replacing the old bogus "auto-merge fired" notify text with an
+        accurate "skipped / not merged" (or "already MERGED") line.
+      * None — a merge was attempted and the outcome recorded; the caller
+        continues to the notify + closing DM as normal.
+
+    Does NOT archive the outbox — the caller owns the single archive at the
+    end of the marker block (so the notify dispatches first; resume-safety
+    unchanged: a crash re-processes the outbox and gets `already_merged`).
+    """
+    payload = marker_decision.get('payload') or {}
+    pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
+
+    def _skip(outcome: str, merge_reason: str, status_line: str) -> str:
+        """Record a non-merge (skipped / already-terminal) review-pass
+        outcome and return the 'auto-merge-skipped' signal. The notify
+        renders `status_line`; the caller suppresses the DM on this signal."""
+        marker_decision['merge_result'] = {
+            'merge_outcome': outcome,
+            'merge_reason': merge_reason,
+            'pr_number': '?',
+            'repo_coords': '?',
+        }
+        marker_decision['merge_outcome'] = outcome
+        marker_decision['intent_kwargs'] = {
+            **(marker_decision.get('intent_kwargs') or {}),
+            'merge_status_line': status_line,
+        }
+        return 'auto-merge-skipped'
+    # nervous-system-audit #15 (2026-06-05): the marker's `pr_url` is
+    # agent-authored and must agree with the PR the chain actually
+    # dispatched Mirror to review — `data['pr_url']`, set on the
+    # review envelope by `_dispatch_mirror_review` and propagated
+    # through the outbox. Without this gate the shape+OPEN validators
+    # below would happily merge ANY structurally-valid OPEN PR the
+    # marker names, even a different one than Mirror reviewed. Same
+    # discipline as the marker-vs-envelope task_id check at
+    # classification time, applied at the irreversible merge boundary.
+    # Both-present-and-differ is the only fail case: a legacy chain
+    # with no envelope pr_url falls through to the existing validators
+    # (graceful degradation), and an absent / unparseable marker
+    # pr_url is handled by the no-pr_url / shape-check branches below.
+    # Compare NORMALIZED (owner/repo, number) coords via _GH_PR_URL_RE
+    # rather than raw strings: the marker pr_url is agent-authored, so
+    # cosmetic variants of the same PR (trailing slash, `/files`,
+    # `?query`, `#frag`) must NOT read as a mismatch and block a
+    # legitimate merge.
+    envelope_pr_url = data.get('pr_url')
+    _marker_m = (
+        _GH_PR_URL_RE.search(pr_url) if isinstance(pr_url, str) else None
+    )
+    _env_m = (
+        _GH_PR_URL_RE.search(envelope_pr_url)
+        if isinstance(envelope_pr_url, str) else None
+    )
+    pr_url_mismatch = (
+        _marker_m is not None
+        and _env_m is not None
+        and (_marker_m.group(1), _marker_m.group(2))
+        != (_env_m.group(1), _env_m.group(2))
+    )
+    if pr_url_mismatch:
+        log(
+            f'AUTO_MERGE task={data.get("task_id", "?")} '
+            f'outcome=failed reason=marker-envelope-pr-url-mismatch '
+            f'marker_pr={pr_url!r} envelope_pr={envelope_pr_url!r} — '
+            f'refusing to merge a PR other than the one Mirror was '
+            f'dispatched to review agent=forge',
+            'WARN',
+        )
+        marker_decision['merge_result'] = {
+            'merge_outcome': 'failed',
+            'merge_reason': (
+                f'marker pr_url ({pr_url}) does not match the '
+                f'dispatched review pr_url ({envelope_pr_url}); '
+                f'auto-merge refused'
+            ),
+            'pr_number': '?',
+            'repo_coords': '?',
+        }
+        marker_decision['merge_outcome'] = 'failed'
+    elif pr_url:
+        # Structural pr_url validator (2026-05-29 —
+        # structural-pr-url-validator). Two layers run BEFORE the
+        # serializer gates / `gh pr merge` shell-out:
+        #   Layer 1 (shape) — regex match against
+        #     `https://github.com/Larry-Yatch/<allowed>/pull/<N>`
+        #     with N>=1. Cheap, deterministic, rejects garbage
+        #     (`pull/0`, wrong-owner spoofs, fixture pointers).
+        #   Layer 2 (existence) — `gh pr view --json state` with
+        #     10s timeout. Confirms the PR is real AND state=OPEN.
+        #     404 / timeout / non-OPEN state → skip without
+        #     shell-out to `gh pr merge`.
+        # Either skip is a SKIP outcome, not a failed outcome:
+        # log a clean line, archive, and continue. No DM to Larry,
+        # no marker-error notify back to Mirror — these are
+        # operating-environment ground-truth violations (the URL
+        # was structurally invalid or pointed at nothing), not
+        # marker-discipline failures.
+        task_id_log = data.get('task_id', '?')
+        shape_repo, shape_pr_number, shape_reason = _pr_url_shape_check(pr_url)
+        if shape_repo is None:
+            log(
+                f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                f'outcome=skipped reason=pr-url-shape-invalid '
+                f'({shape_reason}) agent=forge',
+                'WARN',
+            )
+            return _skip(
+                'skipped_shape_invalid',
+                f'pr url shape invalid: {shape_reason}',
+                'Auto-merge was SKIPPED — the PR URL is not a valid GitHub '
+                'PR reference; the PR is NOT merged.',
+            )
+        # Layer 2 bypass when `_AUTO_MERGE_FN_OVERRIDE` is installed:
+        # the integration-test classes use the override to mock the
+        # merge path end-to-end and pre-date this validator; they
+        # use known-good fixture URLs and don't expect a real
+        # `gh pr view` shell-out. Production never sets the
+        # override, so the existence check always runs.
+        if _AUTO_MERGE_FN_OVERRIDE is not None:
+            pr_state, exist_reason = 'OPEN', 'ok (test-override bypass)'
+        else:
+            pr_state, exist_reason = _pr_url_existence_state(
+                shape_repo, shape_pr_number,
+            )
+        if pr_state is None:
+            log(
+                f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                f'outcome=skipped reason=pr-not-found '
+                f'({exist_reason}) agent=forge',
+                'WARN',
+            )
+            return _skip(
+                'skipped_not_found',
+                f'pr not found / unreachable: {exist_reason}',
+                'Auto-merge was SKIPPED — the PR could not be confirmed on '
+                'GitHub (not found / timeout); the PR is NOT merged.',
+            )
+        if pr_state != 'OPEN':
+            log(
+                f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
+                f'outcome=skipped reason=pr-state-{pr_state} '
+                f'(already terminal) agent=forge',
+            )
+            if pr_state == 'MERGED':
+                # Resume-after-crash: the PR was already merged on a prior
+                # pass. gh confirms state=MERGED, so the notify may truthfully
+                # say MERGED. Still a skip (no re-merge, no duplicate DM).
+                return _skip(
+                    'already_merged',
+                    'PR already merged (resume from prior dispatch)',
+                    'The PR is already MERGED on GitHub (no re-merge needed).',
+                )
+            return _skip(
+                'skipped_terminal',
+                f'pr state={pr_state} (not open)',
+                f'Auto-merge was SKIPPED — the PR is {pr_state}, not open; '
+                f'the PR is NOT merged.',
+            )
+        repo_coords, pr_number = shape_repo, shape_pr_number
+        envelope_changed_files = data.get('changed_files')
+        if not isinstance(envelope_changed_files, list):
+            envelope_changed_files = None
+        try:
+            merge_result = _attempt_auto_merge_with_gates(
+                pr_url=pr_url,
+                repo_coords=repo_coords,
+                pr_number=pr_number,
+                task_id=data.get('task_id') or 'unknown',
+                summary=(payload.get('summary') if isinstance(payload, dict) else '') or '',
+                chat_id=data.get('reply_chat_id'),
+                changed_files=envelope_changed_files,
+            )
+        except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+            log(
+                f'AUTO_MERGE serializer raised on task '
+                f'{data.get("task_id", "?")}: '
+                f'{type(e).__name__}: {e}; rendering failed '
+                f'outcome',
+                'WARN',
+            )
+            merge_result = {
+                'merge_outcome': 'failed',
+                'merge_reason': (
+                    f'serializer raised: {type(e).__name__}: {e}'
+                ),
+                'pr_number': pr_number,
+                'repo_coords': repo_coords,
+            }
+        marker_decision['merge_result'] = merge_result
+        marker_decision['merge_outcome'] = merge_result['merge_outcome']
+        # V6 step-merged signal fires inside
+        # `_attempt_auto_merge_with_gates` so every merge path
+        # (marker-routing here, _queue_release, sweep
+        # UNKNOWN-retry) propagates exactly once.
+    else:
+        # Mirror PASS without a pr_url is malformed; the marker
+        # parser would normally catch this, but defensive — render
+        # a failed-outcome DM so Larry sees the gap.
+        log(
+            f'mirror REVIEW_PASS on task {data.get("task_id", "?")} '
+            f'has no pr_url on payload; cannot auto-merge — DM will '
+            f'reflect this as a failed outcome.',
+            'WARN',
+        )
+        marker_decision['merge_result'] = {
+            'merge_outcome': 'failed',
+            'merge_reason': 'Mirror PASS marker had no pr_url',
+            'pr_number': '?',
+            'repo_coords': '?',
+        }
+        marker_decision['merge_outcome'] = 'failed'
+    # false-success-notify-fix (2026-06-11): render the GitHub-truth merge-
+    # status line for the review-pass notify from the outcome computed above.
+    # Overwrites the "requested/pending" default set at classification time.
+    marker_decision['intent_kwargs'] = {
+        **(marker_decision.get('intent_kwargs') or {}),
+        'merge_status_line': _render_review_pass_merge_status_line(
+            marker_decision.get('merge_result'),
+        ),
+    }
+    return None
+
+
 def process_outbox(outbox_file: Path) -> str:
     """Process one result outbox. Returns one of:
        'notified' | 'notified-marker' | 'archived-no-notify' | 'depth-cap' |
@@ -7802,6 +8139,30 @@ def process_outbox(outbox_file: Path) -> str:
                 _maybe_dm_larry_direct_synth(data, marker_decision)
 
         task_id = data.get('task_id', outbox_file.stem)
+
+        # false-success-notify-fix (2026-06-11): for a Mirror REVIEW_PASS,
+        # attempt the auto-merge BEFORE building the back-leg notify so the
+        # notify reports the gh-confirmed merge state (merged / queued-behind-
+        # blocker / conflict / failed), never an optimistic "auto-merge fired".
+        # Incident: PR #455 was held behind #454, yet Beacon was told the merge
+        # fired and reported a merge that never happened. `_run_review_pass_
+        # auto_merge` attaches `merge_result` + the rendered `merge_status_line`
+        # to marker_decision; the notify template + Larry's closing DM both read
+        # from it. A 'auto-merge-skipped' return (degenerate PR: shape-invalid
+        # url / 404 / already-terminal) preserves the pre-fix skip semantics —
+        # the notify STILL fires (now truthful), but the closing DM is
+        # suppressed and process_outbox returns 'auto-merge-skipped' below. The
+        # proceed/revision dispatch helpers never fire for review_pass, so this
+        # reorder changes nothing for other marker types.
+        review_pass_skip: Optional[str] = None
+        if (
+            marker_decision['marker_type'] == 'review_pass'
+            and agent == 'mirror'
+        ):
+            review_pass_skip = _run_review_pass_auto_merge(
+                data, marker_decision, outbox_file,
+            )
+
         # nervous-system-audit #12 (2026-06-05): the back-leg inter-agent
         # notify is INFORMATIONAL (the upstream agent journals the result).
         # A notify failure must NOT abort the chain's substantive actions —
@@ -8007,183 +8368,11 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             _dispatch_revision_to_forge(data, marker_decision)
 
-        # D3.5 5d — auto-merge on Mirror REVIEW_PASS. Order per Larry's
-        # sign-off: merge fires BEFORE the closing DM renders so the DM
-        # body accurately reflects what happened (merged / already_merged /
-        # failed). `merge_result` is attached to marker_decision so
-        # `_render_dm_message` can pick the outcome-aware DM variant. The
-        # outbox archives last so a daemon crash between merge and archive
-        # leads to re-processing the same outbox; the second call gets
-        # `already_merged` from `_gh_pr_state` and the same success DM body.
-        if (
-            marker_decision['marker_type'] == 'review_pass'
-            and agent == 'mirror'
-        ):
-            payload = marker_decision.get('payload') or {}
-            pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
-            # nervous-system-audit #15 (2026-06-05): the marker's `pr_url` is
-            # agent-authored and must agree with the PR the chain actually
-            # dispatched Mirror to review — `data['pr_url']`, set on the
-            # review envelope by `_dispatch_mirror_review` and propagated
-            # through the outbox. Without this gate the shape+OPEN validators
-            # below would happily merge ANY structurally-valid OPEN PR the
-            # marker names, even a different one than Mirror reviewed. Same
-            # discipline as the marker-vs-envelope task_id check at
-            # classification time, applied at the irreversible merge boundary.
-            # Both-present-and-differ is the only fail case: a legacy chain
-            # with no envelope pr_url falls through to the existing validators
-            # (graceful degradation), and an absent / unparseable marker
-            # pr_url is handled by the no-pr_url / shape-check branches below.
-            # Compare NORMALIZED (owner/repo, number) coords via _GH_PR_URL_RE
-            # rather than raw strings: the marker pr_url is agent-authored, so
-            # cosmetic variants of the same PR (trailing slash, `/files`,
-            # `?query`, `#frag`) must NOT read as a mismatch and block a
-            # legitimate merge.
-            envelope_pr_url = data.get('pr_url')
-            _marker_m = (
-                _GH_PR_URL_RE.search(pr_url) if isinstance(pr_url, str) else None
-            )
-            _env_m = (
-                _GH_PR_URL_RE.search(envelope_pr_url)
-                if isinstance(envelope_pr_url, str) else None
-            )
-            pr_url_mismatch = (
-                _marker_m is not None
-                and _env_m is not None
-                and (_marker_m.group(1), _marker_m.group(2))
-                != (_env_m.group(1), _env_m.group(2))
-            )
-            if pr_url_mismatch:
-                log(
-                    f'AUTO_MERGE task={data.get("task_id", "?")} '
-                    f'outcome=failed reason=marker-envelope-pr-url-mismatch '
-                    f'marker_pr={pr_url!r} envelope_pr={envelope_pr_url!r} — '
-                    f'refusing to merge a PR other than the one Mirror was '
-                    f'dispatched to review agent=forge',
-                    'WARN',
-                )
-                marker_decision['merge_result'] = {
-                    'merge_outcome': 'failed',
-                    'merge_reason': (
-                        f'marker pr_url ({pr_url}) does not match the '
-                        f'dispatched review pr_url ({envelope_pr_url}); '
-                        f'auto-merge refused'
-                    ),
-                    'pr_number': '?',
-                    'repo_coords': '?',
-                }
-                marker_decision['merge_outcome'] = 'failed'
-            elif pr_url:
-                # Structural pr_url validator (2026-05-29 —
-                # structural-pr-url-validator). Two layers run BEFORE the
-                # serializer gates / `gh pr merge` shell-out:
-                #   Layer 1 (shape) — regex match against
-                #     `https://github.com/Larry-Yatch/<allowed>/pull/<N>`
-                #     with N>=1. Cheap, deterministic, rejects garbage
-                #     (`pull/0`, wrong-owner spoofs, fixture pointers).
-                #   Layer 2 (existence) — `gh pr view --json state` with
-                #     10s timeout. Confirms the PR is real AND state=OPEN.
-                #     404 / timeout / non-OPEN state → skip without
-                #     shell-out to `gh pr merge`.
-                # Either skip is a SKIP outcome, not a failed outcome:
-                # log a clean line, archive, and continue. No DM to Larry,
-                # no marker-error notify back to Mirror — these are
-                # operating-environment ground-truth violations (the URL
-                # was structurally invalid or pointed at nothing), not
-                # marker-discipline failures.
-                task_id_log = data.get('task_id', '?')
-                shape_repo, shape_pr_number, shape_reason = _pr_url_shape_check(pr_url)
-                if shape_repo is None:
-                    log(
-                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
-                        f'outcome=skipped reason=pr-url-shape-invalid '
-                        f'({shape_reason}) agent=forge',
-                        'WARN',
-                    )
-                    _archive_outbox(outbox_file)
-                    return 'auto-merge-skipped'
-                # Layer 2 bypass when `_AUTO_MERGE_FN_OVERRIDE` is installed:
-                # the integration-test classes use the override to mock the
-                # merge path end-to-end and pre-date this validator; they
-                # use known-good fixture URLs and don't expect a real
-                # `gh pr view` shell-out. Production never sets the
-                # override, so the existence check always runs.
-                if _AUTO_MERGE_FN_OVERRIDE is not None:
-                    pr_state, exist_reason = 'OPEN', 'ok (test-override bypass)'
-                else:
-                    pr_state, exist_reason = _pr_url_existence_state(
-                        shape_repo, shape_pr_number,
-                    )
-                if pr_state is None:
-                    log(
-                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
-                        f'outcome=skipped reason=pr-not-found '
-                        f'({exist_reason}) agent=forge',
-                        'WARN',
-                    )
-                    _archive_outbox(outbox_file)
-                    return 'auto-merge-skipped'
-                if pr_state != 'OPEN':
-                    log(
-                        f'AUTO_MERGE task={task_id_log} pr={pr_url!r} '
-                        f'outcome=skipped reason=pr-state-{pr_state} '
-                        f'(already terminal) agent=forge',
-                    )
-                    _archive_outbox(outbox_file)
-                    return 'auto-merge-skipped'
-                repo_coords, pr_number = shape_repo, shape_pr_number
-                envelope_changed_files = data.get('changed_files')
-                if not isinstance(envelope_changed_files, list):
-                    envelope_changed_files = None
-                try:
-                    merge_result = _attempt_auto_merge_with_gates(
-                        pr_url=pr_url,
-                        repo_coords=repo_coords,
-                        pr_number=pr_number,
-                        task_id=data.get('task_id') or 'unknown',
-                        summary=(payload.get('summary') if isinstance(payload, dict) else '') or '',
-                        chat_id=data.get('reply_chat_id'),
-                        changed_files=envelope_changed_files,
-                    )
-                except Exception as e:  # noqa: BLE001 — daemon-never-wedge
-                    log(
-                        f'AUTO_MERGE serializer raised on task '
-                        f'{data.get("task_id", "?")}: '
-                        f'{type(e).__name__}: {e}; rendering failed '
-                        f'outcome',
-                        'WARN',
-                    )
-                    merge_result = {
-                        'merge_outcome': 'failed',
-                        'merge_reason': (
-                            f'serializer raised: {type(e).__name__}: {e}'
-                        ),
-                        'pr_number': pr_number,
-                        'repo_coords': repo_coords,
-                    }
-                marker_decision['merge_result'] = merge_result
-                marker_decision['merge_outcome'] = merge_result['merge_outcome']
-                # V6 step-merged signal fires inside
-                # `_attempt_auto_merge_with_gates` so every merge path
-                # (marker-routing here, _queue_release, sweep
-                # UNKNOWN-retry) propagates exactly once.
-            else:
-                # Mirror PASS without a pr_url is malformed; the marker
-                # parser would normally catch this, but defensive — render
-                # a failed-outcome DM so Larry sees the gap.
-                log(
-                    f'mirror REVIEW_PASS on task {data.get("task_id", "?")} '
-                    f'has no pr_url on payload; cannot auto-merge — DM will '
-                    f'reflect this as a failed outcome.',
-                    'WARN',
-                )
-                marker_decision['merge_result'] = {
-                    'merge_outcome': 'failed',
-                    'merge_reason': 'Mirror PASS marker had no pr_url',
-                    'pr_number': '?',
-                    'repo_coords': '?',
-                }
-                marker_decision['merge_outcome'] = 'failed'
+        # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
+        # auto-merge now runs EARLIER — before the back-leg notify — via
+        # `_run_review_pass_auto_merge`, so the notify reports the gh-truth
+        # merge state. By here, marker_decision already carries
+        # merge_result + merge_outcome; the closing DM below reads them.
 
         # D3.5 5a-followup: chain-completion DM to the originating Telegram
         # thread. Fires only for terminal-from-Larry's-perspective intents
@@ -8192,9 +8381,19 @@ def process_outbox(outbox_file: Path) -> str:
         # propagated through the chain. Non-fatal on failure.
         # D3.5 5d: review-pass DM body now reflects the merge_outcome
         # attached above; the render pipeline picks the correct variant.
-        _maybe_dm_larry(data, marker_decision)
+        # false-success-notify-fix (2026-06-11): suppress the closing DM for a
+        # review-pass auto-merge SKIP (degenerate PR), preserving the pre-fix
+        # behavior where skip cases sent no DM (the notify above still fired).
+        if review_pass_skip is None:
+            _maybe_dm_larry(data, marker_decision)
 
         _archive_outbox(outbox_file)
+        # false-success-notify-fix (2026-06-11): a review-pass merge SKIP
+        # returns 'auto-merge-skipped' (its truthful notify already went out
+        # above) — surfaced before the notify-failed telemetry status so the
+        # skip outcome stays the canonical return for these degenerate PRs.
+        if review_pass_skip is not None:
+            return review_pass_skip
         # #12: preserve the 'notify-failed' status for telemetry, but only
         # AFTER the substantive actions (auto-merge, dispatch, DM) and the
         # archive above have run.
