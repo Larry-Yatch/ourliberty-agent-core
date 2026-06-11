@@ -65,6 +65,11 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import beacon_approval_handler as approval  # noqa: E402
 import chain_event_emit             # noqa: E402  # E4.4e PR-A: push writer
+from chain_envelope import (        # noqa: E402  # M1: sole envelope constructor
+    CARRY,
+    DROP,
+    build_chain_envelope,
+)
 import dispatch_validator         # noqa: E402
 import fixture_patterns             # noqa: E402  # outbox-side fixture gate
 import forge_preflight_handler as fph  # noqa: E402
@@ -1847,7 +1852,7 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
     # Retry tracking lives in `marker_error_count`; filename uses
     # `-{new_count}` suffix for uniqueness. Now Forge's marker contract
     # (task_id matches envelope) holds consistently across retries.
-    notify_task: dict[str, Any] = {
+    notify_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': prompt,
         'source': 'outbox-notifier',
@@ -1860,47 +1865,41 @@ def _notify_forge_marker_error(data: dict[str, Any], err_msg: str) -> None:
     # the count (Forge might re-emit a CLARIFY_REQUEST after recovering, and
     # Beacon needs the right budget for the next round).
     if data.get('clarification_count') is not None:
-        notify_task['clarification_count'] = data['clarification_count']
+        notify_base['clarification_count'] = data['clarification_count']
     if data.get('max_clarifications') is not None:
-        notify_task['max_clarifications'] = data['max_clarifications']
+        notify_base['max_clarifications'] = data['max_clarifications']
     if data.get('claude_session_id'):
-        notify_task['session_id'] = data['claude_session_id']
-    # Phase D3 commit 4b: propagate target_repo + branch so the retry task
-    # passes the watcher's worktree gate. Without these, an agent with
-    # `worktree_enabled: true` (Forge) rejects the marker-error retry as
-    # `target_repo: no canonical path` and the malformed-marker recovery
-    # silently dies — same shape as the 4a marker-error black-hole bug.
-    if data.get('target_repo'):
-        notify_task['target_repo'] = data['target_repo']
+        notify_base['session_id'] = data['claude_session_id']
     if data.get('branch'):
-        notify_task['branch'] = data['branch']
-    # D3.5 5b M-2 review fix: propagate revision-phase envelope fields so
-    # a marker-error retry triggered by the revision-preamble strict gate
-    # doesn't lose Forge's revision context. Without these the retry task
-    # arrives with no `phase` (watcher resume gate refuses --resume),
-    # no `forge_build_session_id` (next revision-dispatch can't thread),
-    # no `revision_count` / `max_revisions` (budget eval starts fresh),
-    # no `pr_url` (Forge has nothing to point Mirror at). Without these
-    # the revision-phase marker-error path is a dead end.
+        notify_base['branch'] = data['branch']
     if data.get('phase'):
-        notify_task['phase'] = data['phase']
-    if data.get('forge_build_session_id'):
-        notify_task['forge_build_session_id'] = data['forge_build_session_id']
-    if data.get('revision_count') is not None:
-        notify_task['revision_count'] = data['revision_count']
+        notify_base['phase'] = data['phase']
     if data.get('max_revisions') is not None:
-        notify_task['max_revisions'] = data['max_revisions']
-    if data.get('pr_url'):
-        notify_task['pr_url'] = data['pr_url']
-    # D3.5 5b-followup Bug E (live re-test): propagate reply_chat_id so a
-    # marker-error retry doesn't drop the originating Telegram chat thread.
-    # _notify_mirror_marker_error has this; _notify_forge_marker_error was
-    # missing it — discovered when the 2026-05-13 re-test completed PR #5
-    # successfully but Larry got no closing DM because reply_chat_id went
-    # to None on the first marker-error retry and never recovered through
-    # the chain.
-    if data.get('reply_chat_id') is not None:
-        notify_task['reply_chat_id'] = data['reply_chat_id']
+        notify_base['max_revisions'] = data['max_revisions']
+    # Chain context routed through the sole constructor (M1). Whitelisted
+    # fields propagate from the inbound envelope so the malformed-marker retry
+    # keeps Forge's worktree/session/budget context:
+    #   - target_repo/branch (branch above): worktree gate, else the retry
+    #     rejects as `target_repo: no canonical path` (the 4a black-hole shape).
+    #   - phase/forge_build_session_id/revision_count/pr_url (D3.5 5b M-2): a
+    #     revision-phase marker-error retry without these dead-ends (no
+    #     --resume, no findings thread, fresh budget, nothing to point Mirror at).
+    #   - reply_chat_id (5b-followup Bug E): else the originating Telegram
+    #     thread silently ends with no closing DM.
+    # replan_count/max_replans are not part of the marker-error retry context.
+    notify_task = build_chain_envelope(
+        notify_base,
+        data,
+        carry={
+            'target_repo': CARRY,
+            'forge_build_session_id': CARRY,
+            'revision_count': CARRY,
+            'pr_url': CARRY,
+            'reply_chat_id': CARRY,
+            'replan_count': DROP,
+            'max_replans': DROP,
+        },
+    )
 
     if _is_fixture_emission(task_id):
         log(
@@ -1971,15 +1970,28 @@ def _dead_letter_marker_error_to_dispatcher(
         output=(data.get('result') or '')[:1000],
         intent_kwargs={'reason': reason},
     )
-    notify_task: dict[str, Any] = {
+    notify_base: dict[str, Any] = {
         'task_id': f'dead-letter-marker-{task_id}',
         'prompt': prompt,
         'source': 'outbox-notifier',
         'intent': 'dead-letter',
         '_notify_depth': 1,
     }
-    if data.get('reply_chat_id') is not None:
-        notify_task['reply_chat_id'] = data['reply_chat_id']
+    # Terminal dead-letter: only reply_chat_id rides forward so Beacon's
+    # closing DM reaches the originating Telegram thread (M1).
+    notify_task = build_chain_envelope(
+        notify_base,
+        data,
+        carry={
+            'reply_chat_id': CARRY,
+            'target_repo': DROP,
+            'pr_url': DROP,
+            'forge_build_session_id': DROP,
+            'revision_count': DROP,
+            'replan_count': DROP,
+            'max_replans': DROP,
+        },
+    )
 
     if _is_fixture_emission(task_id):
         log(
@@ -2178,7 +2190,7 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
     ])
     build_prompt = '\n'.join(build_prompt_lines)
 
-    build_task: dict[str, Any] = {
+    build_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': build_prompt,
         'source': 'beacon',
@@ -2186,29 +2198,34 @@ def _dispatch_build_phase(data: dict[str, Any]) -> None:
         'session_id': preflight_session,
         'dispatched_by': 'outbox-notifier',
     }
-    if target_repo:
-        build_task['target_repo'] = target_repo
     if branch:
-        build_task['branch'] = branch
+        build_base['branch'] = branch
     if pr_title:
-        build_task['pr_title'] = pr_title
+        build_base['pr_title'] = pr_title
     if pr_body:
-        build_task['pr_body'] = pr_body
+        build_base['pr_body'] = pr_body
     if max_clar is not None:
-        build_task['max_clarifications'] = max_clar
-    if data.get('reply_chat_id') is not None:
-        build_task['reply_chat_id'] = data['reply_chat_id']
-    # D3.5 5c C-1 review fix: propagate replan_count + max_replans through
-    # the preflight→build hop. Without this, an approval emitted by the 5c
-    # replan path (which set replan_count > 0 on the original Forge task
-    # envelope) would land in Forge's preflight outbox correctly but get
-    # reset to 0 on the build dispatch — breaking the budget enforcement
-    # on the next Mirror REVIEW_ESCALATE leg. Symmetric with how
-    # revision_count rides through _dispatch_revision_to_forge.
-    if data.get('replan_count') is not None:
-        build_task['replan_count'] = data['replan_count']
-    if data.get('max_replans') is not None:
-        build_task['max_replans'] = data['max_replans']
+        build_base['max_clarifications'] = max_clar
+    # Chain context (M1). target_repo (truthy local) gates Forge's worktree.
+    # replan_count + max_replans propagate through the preflight→build hop
+    # (D3.5 5c C-1): without them, a 5c-replan approval (replan_count > 0 on
+    # the original envelope) resets to 0 on the build dispatch, breaking the
+    # budget cap on the next Mirror REVIEW_ESCALATE leg. reply_chat_id keeps
+    # the Telegram thread. pr_url/forge_build_session_id/revision_count are
+    # not yet known at build dispatch (no PR, no review).
+    build_task = build_chain_envelope(
+        build_base,
+        data,
+        carry={
+            'target_repo': target_repo,
+            'reply_chat_id': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+            'pr_url': DROP,
+            'forge_build_session_id': DROP,
+            'revision_count': DROP,
+        },
+    )
 
     # D3.5 5c-followup-2 (audit C-1): key the build-task filename by
     # replan_count when this is a replan iteration. The dedup check below
@@ -2872,7 +2889,7 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
             output=body_snippet,
             intent_kwargs={'seq_id': seq_id, 'seq_path': str(seq_path)},
         )
-        notify_task = {
+        notify_base = {
             'task_id': f'notify-dag-revision-{seq_id}',
             'prompt': notify_prompt,
             'source': notify_source,
@@ -2881,6 +2898,22 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
             'seq_path': str(seq_path),
             '_notify_depth': _current_notify_depth(data) + 1,
         }
+        # A sequence-DAG routing signal carries no per-task chain context — the
+        # seq_id/seq_path above are the payload. Every whitelisted field is an
+        # explicit DROP (M1).
+        notify_task = build_chain_envelope(
+            notify_base,
+            data,
+            carry={
+                'target_repo': DROP,
+                'pr_url': DROP,
+                'forge_build_session_id': DROP,
+                'reply_chat_id': DROP,
+                'revision_count': DROP,
+                'replan_count': DROP,
+                'max_replans': DROP,
+            },
+        )
         # Deterministic filename keyed on seq_id: re-processing the same
         # Mirror outbox overwrites the pending notify (atomic same-path
         # write) rather than writing a duplicate. Mirrors the code-review
@@ -3107,7 +3140,7 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
     # task_id as the ORIGINAL task_id across retries (was wrapped before;
     # broke Mirror's marker contract). Retry tracking via marker_error_count;
     # filename uniqueness via the `-{new_count}` filename suffix.
-    notify_task: dict[str, Any] = {
+    notify_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': prompt,
         'source': 'outbox-notifier',
@@ -3117,40 +3150,35 @@ def _notify_mirror_marker_error(data: dict[str, Any], err_msg: str) -> None:
         'marker_error_count': new_count,
     }
     # Propagate envelope fields the agent needs to keep working on the same
-    # task (session_id for --resume, target_repo + branch for worktree gating).
-    # Same shape as the Forge marker-error path.
+    # task (session_id for --resume, branch for worktree gating). Same shape
+    # as the Forge marker-error path.
     if data.get('claude_session_id'):
-        notify_task['session_id'] = data['claude_session_id']
-    if data.get('target_repo'):
-        notify_task['target_repo'] = data['target_repo']
+        notify_base['session_id'] = data['claude_session_id']
     if data.get('branch'):
-        notify_task['branch'] = data['branch']
-    if data.get('pr_url'):
-        notify_task['pr_url'] = data['pr_url']
-    # Revision counters propagate too — a marker-error round shouldn't
-    # reset the revision budget mid-review.
-    if data.get('revision_count') is not None:
-        notify_task['revision_count'] = data['revision_count']
+        notify_base['branch'] = data['branch']
     if data.get('max_revisions') is not None:
-        notify_task['max_revisions'] = data['max_revisions']
-    # D3.5 5a M-3 review fix: propagate reply_chat_id so a Telegram-initiated
-    # review whose marker errors three-strikes still closes the chat thread
-    # via the eventual dead-letter to Beacon. Without this the user-facing
-    # DM thread silently ends.
-    if data.get('reply_chat_id') is not None:
-        notify_task['reply_chat_id'] = data['reply_chat_id']
-    # D3.5 5b M-7 (second-pass review fix): propagate forge_build_session_id
-    # and phase. Without these, a Mirror marker-error retry that emits a
-    # clean REVIEW_REVISION on the second try would have no
-    # forge_build_session_id on the envelope — `_build_outbox` propagates
-    # only what's on the task — and `_dispatch_revision_to_forge` would
-    # silently skip (no session to --resume). Same shape as the C-1
-    # propagation gap, on Mirror's side. `phase` is also missing — without
-    # it, Mirror's retry task arrives with no phase context.
-    if data.get('forge_build_session_id'):
-        notify_task['forge_build_session_id'] = data['forge_build_session_id']
+        notify_base['max_revisions'] = data['max_revisions']
     if data.get('phase'):
-        notify_task['phase'] = data['phase']
+        notify_base['phase'] = data['phase']
+    # Chain context (M1). target_repo gates worktree; revision_count keeps the
+    # review budget mid-retry; reply_chat_id closes the Telegram thread on
+    # three-strike dead-letter (5a M-3); forge_build_session_id (5b M-7) lets a
+    # retry that emits a clean REVIEW_REVISION still resolve Forge's session in
+    # _dispatch_revision_to_forge. replan_count/max_replans aren't part of the
+    # Mirror marker-error retry context.
+    notify_task = build_chain_envelope(
+        notify_base,
+        data,
+        carry={
+            'target_repo': CARRY,
+            'pr_url': CARRY,
+            'revision_count': CARRY,
+            'reply_chat_id': CARRY,
+            'forge_build_session_id': CARRY,
+            'replan_count': DROP,
+            'max_replans': DROP,
+        },
+    )
 
     if _is_fixture_emission(task_id):
         log(
@@ -3309,21 +3337,16 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     ])
     review_prompt = '\n'.join(review_prompt_lines)
 
-    review_task: dict[str, Any] = {
+    review_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': review_prompt,
         'source': 'beacon',
         'phase': 'review',
-        'pr_url': pr_url,
-        'target_repo': target_repo,
-        'revision_count': 0,
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
     }
     if branch:
-        review_task['branch'] = branch
-    if data.get('reply_chat_id') is not None:
-        review_task['reply_chat_id'] = data['reply_chat_id']
+        review_base['branch'] = branch
     # D3.5 5a M-2 review fix: propagate the same envelope fields
     # _dispatch_build_phase does. Without these, a future Mirror REVIEW_QUESTION
     # round-trip (5b) loses the PR metadata when answering back to Beacon,
@@ -3331,22 +3354,26 @@ def _dispatch_mirror_review(data: dict[str, Any], pr_url: str) -> None:
     # the 4a marker-error black hole.
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
-            review_task[f_name] = data[f_name]
-    # D3.5 5b: thread Forge's build session_id through Mirror's envelope as
-    # `forge_build_session_id` so a downstream REVIEW_REVISION can resume
-    # Forge's session for the revision dispatch. Without this, the revision
-    # task can't --resume the right conversation and Forge starts fresh,
-    # losing all the build context she'd already loaded.
-    if data.get('claude_session_id'):
-        review_task['forge_build_session_id'] = data['claude_session_id']
-    # D3.5 5c C-1 review fix: propagate replan_count + max_replans through
-    # the build→review hop. Without this, Mirror's REVIEW_ESCALATE outbox
-    # would carry replan_count=0 on the second-loop iteration, defeating
-    # the budget cap. Symmetric with the preflight→build propagation.
-    if data.get('replan_count') is not None:
-        review_task['replan_count'] = data['replan_count']
-    if data.get('max_replans') is not None:
-        review_task['max_replans'] = data['max_replans']
+            review_base[f_name] = data[f_name]
+    # Chain context (M1). pr_url/target_repo are the PR under review; first
+    # review starts the revision budget at 0. forge_build_session_id threads
+    # Forge's build session (D3.5 5b) so a downstream REVIEW_REVISION can
+    # --resume her for the revision dispatch instead of starting fresh.
+    # replan_count + max_replans ride the build→review hop (5c C-1), else
+    # Mirror's REVIEW_ESCALATE outbox carries replan_count=0 and defeats the cap.
+    review_task = build_chain_envelope(
+        review_base,
+        data,
+        carry={
+            'pr_url': pr_url,
+            'target_repo': target_repo,
+            'revision_count': 0,
+            'forge_build_session_id': data.get('claude_session_id'),
+            'reply_chat_id': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+        },
+    )
 
     # D3.5 5c-followup-2 (audit C-2): key the review-task filename by
     # replan_count when this is a replan iteration's first review. Same
@@ -3821,21 +3848,12 @@ def _dispatch_revision_to_forge(
     ])
     revision_prompt = '\n'.join(revision_prompt_lines)
 
-    revision_task: dict[str, Any] = {
+    revision_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': revision_prompt,
         'source': 'beacon',          # logical dispatcher (Beacon's spec authorized this)
         'phase': 'revision',
         'session_id': forge_session,  # --resume Forge's build session
-        # C-1 review fix (D3.5 5b): also propagate forge_build_session_id
-        # on the revision-task envelope itself. _build_outbox propagates
-        # this onward to Forge's revision outbox, so round-2's
-        # _dispatch_mirror_review_rerun → next REVIEW_REVISION →
-        # _dispatch_revision_to_forge can still resolve the build session.
-        # Without this, the loop stalls silently at round 2.
-        'forge_build_session_id': forge_session,
-        'target_repo': target_repo,
-        'revision_count': next_count,
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
         # D3.5 5b M-8 (second-pass review fix): thread Mirror's findings
@@ -3851,29 +3869,33 @@ def _dispatch_revision_to_forge(
         'previous_findings': findings if isinstance(findings, list) else [],
     }
     if branch:
-        revision_task['branch'] = branch
-    if pr_url:
-        revision_task['pr_url'] = pr_url
-    if data.get('reply_chat_id') is not None:
-        revision_task['reply_chat_id'] = data['reply_chat_id']
+        revision_base['branch'] = branch
     # Propagate the same envelope fields _dispatch_build_phase does so a
     # future REVIEW_QUESTION (deferred) round-trip would preserve PR
     # metadata. Same shape as 5a M-2 review fix.
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
-            revision_task[f_name] = data[f_name]
-    # D3.5 5c C-X1 (second-pass review fix): propagate replan_count +
-    # max_replans through the revision-loop dispatches too. Without this,
-    # a task that goes through ANY revision round before re-escalating has
-    # replan_count reset to 0 on the resulting REVIEW_ESCALATE notify —
-    # silently defeating the max_replans cap. The first C-1 fix covered
-    # preflight→build and build→review; this completes coverage of the
-    # remaining two dispatch sites (_dispatch_revision_to_forge here +
-    # _dispatch_mirror_review_rerun below).
-    if data.get('replan_count') is not None:
-        revision_task['replan_count'] = data['replan_count']
-    if data.get('max_replans') is not None:
-        revision_task['max_replans'] = data['max_replans']
+            revision_base[f_name] = data[f_name]
+    # Chain context (M1). forge_build_session_id (C-1 5b) is set explicitly on
+    # the revision envelope so round-2's _dispatch_revision_to_forge can still
+    # resolve the build session — without it the loop stalls silently at round
+    # 2. target_repo/pr_url point at the PR; revision_count is this round's
+    # number. replan_count + max_replans ride the revision dispatches (5c C-X1)
+    # so a task that revises before re-escalating doesn't reset replan_count=0
+    # and defeat the cap.
+    revision_task = build_chain_envelope(
+        revision_base,
+        data,
+        carry={
+            'forge_build_session_id': forge_session,
+            'target_repo': target_repo,
+            'revision_count': next_count,
+            'pr_url': pr_url,
+            'reply_chat_id': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+        },
+    )
 
     # Idempotency check: revision-task filename is keyed on round number so
     # multiple revision rounds for the same task_id don't collide. Re-process
@@ -4028,40 +4050,40 @@ def _dispatch_mirror_review_rerun(
         )
         return
 
-    review_task: dict[str, Any] = {
+    review_base: dict[str, Any] = {
         'task_id': task_id,
         'prompt': review_prompt,
         'source': 'beacon',
         'phase': 'review',
-        'pr_url': pr_url,
-        'target_repo': target_repo,
-        'revision_count': round_num,
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
     }
     if branch:
-        review_task['branch'] = branch
-    if data.get('reply_chat_id') is not None:
-        review_task['reply_chat_id'] = data['reply_chat_id']
-    # forge_build_session_id propagates forward unchanged so the NEXT
-    # revision (if Mirror flags more findings) can resume Forge's session.
-    if data.get('forge_build_session_id'):
-        review_task['forge_build_session_id'] = data['forge_build_session_id']
+        review_base['branch'] = branch
     # M-8 second-pass fix: also propagate previous_findings forward so the
     # NEXT round's REVIEW_REVISION (if any) carries findings through.
     if isinstance(data.get('previous_findings'), list):
-        review_task['previous_findings'] = data['previous_findings']
+        review_base['previous_findings'] = data['previous_findings']
     for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
         if data.get(f_name) is not None:
-            review_task[f_name] = data[f_name]
-    # D3.5 5c C-X1 (second-pass review fix): also propagate replan_count +
-    # max_replans through the re-review dispatch. Closes the second seam in
-    # the revision-loop replan-budget propagation chain (the partner fix is
-    # in _dispatch_revision_to_forge above).
-    if data.get('replan_count') is not None:
-        review_task['replan_count'] = data['replan_count']
-    if data.get('max_replans') is not None:
-        review_task['max_replans'] = data['max_replans']
+            review_base[f_name] = data[f_name]
+    # forge_build_session_id propagates forward unchanged (CARRY) so the NEXT
+    # revision (if Mirror flags more findings) can resume Forge's session.
+    # D3.5 5c C-X1: replan_count + max_replans also propagate through the
+    # re-review dispatch (CARRY), closing the second seam in the revision-loop
+    # replan-budget chain (partner fix in _dispatch_revision_to_forge above).
+    review_task = build_chain_envelope(
+        review_base, data,
+        carry={
+            'pr_url': pr_url,
+            'target_repo': target_repo,
+            'revision_count': round_num,
+            'forge_build_session_id': CARRY,
+            'reply_chat_id': CARRY,
+            'replan_count': CARRY,
+            'max_replans': CARRY,
+        },
+    )
 
     # Idempotency: keyed on round number so re-process on notifier crash
     # doesn't double-dispatch a re-review.
@@ -6363,7 +6385,7 @@ def _handle_beacon_headless_approval_request(
     # written filename on `payload["task_id"]`.
     marker_task_id = payload.get('task_id') or task_id
 
-    forge_task: dict[str, Any] = {
+    forge_base: dict[str, Any] = {
         'task_id': marker_task_id,
         'prompt': payload.get('prompt') or '',
         'source': 'beacon',
@@ -6374,21 +6396,29 @@ def _handle_beacon_headless_approval_request(
     # Propagate envelope/marker fields the way chat-mode does — marker
     # values win when both are present (Beacon's marker is the spec).
     target_repo = payload.get('target_repo') or data.get('target_repo')
-    if target_repo:
-        forge_task['target_repo'] = target_repo
     pr_title = payload.get('pr_title') or data.get('pr_title')
     if pr_title:
-        forge_task['pr_title'] = pr_title
+        forge_base['pr_title'] = pr_title
     max_clar = payload.get('max_clarifications')
     if max_clar is None:
         max_clar = data.get('max_clarifications')
     if isinstance(max_clar, int) and max_clar >= 0:
-        forge_task['max_clarifications'] = max_clar
+        forge_base['max_clarifications'] = max_clar
     for field in ('task_type', 'summary', 'changed_files'):
         if payload.get(field) is not None:
-            forge_task[field] = payload[field]
-    if data.get('reply_chat_id') is not None:
-        forge_task['reply_chat_id'] = data['reply_chat_id']
+            forge_base[field] = payload[field]
+    forge_task = build_chain_envelope(
+        forge_base, data,
+        carry={
+            'target_repo': target_repo,
+            'reply_chat_id': CARRY,
+            'forge_build_session_id': DROP,
+            'replan_count': DROP,
+            'max_replans': DROP,
+            'revision_count': DROP,
+            'pr_url': DROP,
+        },
+    )
 
     # Idempotency — same shape as _dispatch_mirror_review and
     # _dispatch_build_phase. Guards against re-processing the same outbox
@@ -6976,7 +7006,7 @@ def _handle_beacon_clarification_response(
         intent_kwargs={'remaining': remaining},
     )
 
-    forge_task: dict[str, Any] = {
+    forge_base: dict[str, Any] = {
         'task_id': original_task_id,
         'prompt': prompt,
         'source': 'beacon-clarification',
@@ -6988,23 +7018,33 @@ def _handle_beacon_clarification_response(
         # exists to stop.
         '_notify_depth': 1,
     }
-    if data.get('reply_chat_id') is not None:
-        forge_task['reply_chat_id'] = data['reply_chat_id']
     # Propagate clarification budget so Forge knows how many CLARIFY_REQUESTs
     # remain. Beacon's response is one round; count is what the envelope
     # already carries (incremented by the marker handler when Forge first
     # emitted CLARIFY_REQUEST, propagated through Beacon's round-trip).
     if data.get('clarification_count') is not None:
-        forge_task['clarification_count'] = data['clarification_count']
+        forge_base['clarification_count'] = data['clarification_count']
     if data.get('max_clarifications') is not None:
-        forge_task['max_clarifications'] = data['max_clarifications']
-    # Propagate target_repo/branch/pr_title/pr_body so Forge's worktree
-    # gate accepts the continuation envelope. Same shape as the default
-    # routing path which propagates these via the
-    # `4b post-test-2 fix` block.
-    for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body', 'pr_url'):
+        forge_base['max_clarifications'] = data['max_clarifications']
+    # Propagate branch/pr_title/pr_body so Forge's worktree gate accepts the
+    # continuation envelope. target_repo/pr_url are whitelisted context and
+    # carry through below. Same shape as the default routing path which
+    # propagates these via the `4b post-test-2 fix` block.
+    for f_name in ('branch', 'pr_title', 'pr_body'):
         if data.get(f_name):
-            forge_task[f_name] = data[f_name]
+            forge_base[f_name] = data[f_name]
+    forge_task = build_chain_envelope(
+        forge_base, data,
+        carry={
+            'target_repo': CARRY,
+            'pr_url': CARRY,
+            'reply_chat_id': CARRY,
+            'forge_build_session_id': DROP,
+            'replan_count': DROP,
+            'max_replans': DROP,
+            'revision_count': DROP,
+        },
+    )
 
     # Filename — `resume-<task>-r<count>.json`. The clarification_count
     # discriminator makes the filename unique per round, so multi-round
@@ -7459,7 +7499,7 @@ def process_outbox(outbox_file: Path) -> str:
             error=data.get('error') or '',
             intent_kwargs=marker_decision['intent_kwargs'],
         )
-        notify_task: dict[str, Any] = {
+        notify_base: dict[str, Any] = {
             'task_id': f'notify-{task_id}',
             'prompt': prompt,
             'source': marker_decision['notify_source'],
@@ -7467,10 +7507,8 @@ def process_outbox(outbox_file: Path) -> str:
             # Depth still tracked for telemetry; budget supersedes the cap.
             '_notify_depth': _current_notify_depth(data) + 1,
         }
-        if data.get('reply_chat_id') is not None:
-            notify_task['reply_chat_id'] = data['reply_chat_id']
         if data.get('claude_session_id'):
-            notify_task['session_id'] = data['claude_session_id']
+            notify_base['session_id'] = data['claude_session_id']
         # task-25 (2026-05-20) — Forge's session is also stashed under a
         # distinct field that survives Beacon's round-trip via
         # inbox_watcher._build_outbox propagation. The `session_id` field
@@ -7484,38 +7522,42 @@ def process_outbox(outbox_file: Path) -> str:
         # need this hop since her revision cascade uses
         # `forge_build_session_id` instead.
         if agent == 'forge' and data.get('claude_session_id'):
-            notify_task['forge_session_id'] = data['claude_session_id']
+            notify_base['forge_session_id'] = data['claude_session_id']
         # Propagate clarification budget so the next leg has the counter.
         if marker_decision['next_clarification_count'] is not None:
-            notify_task['clarification_count'] = marker_decision['next_clarification_count']
+            notify_base['clarification_count'] = marker_decision['next_clarification_count']
         if data.get('max_clarifications') is not None:
-            notify_task['max_clarifications'] = data['max_clarifications']
-        # Phase D3 commit 4b post-test-2 fix: propagate target_repo + branch
-        # + pr_title/pr_body forward across the full clarification cascade
-        # (forge→beacon question, then beacon→forge answer, then forge
-        # re-preflight). Without these on the notify task, _build_outbox
-        # on Beacon's side has nothing to propagate, the answer leg arrives
-        # at Forge with target_repo=None, and the watcher's worktree gate
-        # refuses with "no canonical path". Same shape as the marker-error
-        # black hole the 4b review caught — different code path.
-        for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body',
-                       'pr_url'):
+            notify_base['max_clarifications'] = data['max_clarifications']
+        # Phase D3 commit 4b post-test-2 fix: propagate branch + pr_title/pr_body
+        # forward across the full clarification cascade (forge→beacon question,
+        # then beacon→forge answer, then forge re-preflight). target_repo/pr_url
+        # are whitelisted context and carry through the builder below. Without
+        # these on the notify task, _build_outbox on Beacon's side has nothing
+        # to propagate, the answer leg arrives at Forge with target_repo=None,
+        # and the watcher's worktree gate refuses with "no canonical path".
+        for f_name in ('branch', 'pr_title', 'pr_body'):
             if data.get(f_name):
-                notify_task[f_name] = data[f_name]
+                notify_base[f_name] = data[f_name]
         # D3.5 5c — when the marker decision is review-escalate (any of three
         # sub-flavors: direct REVIEW_ESCALATE, auto-promoted from low-
         # confidence REVISION, or budget-exhausted REVISION), surface the
         # replan budget + Mirror's reason on the notify task so Beacon's
         # CLAUDE.md decision tree has the data it needs without re-reading
-        # her inbox archive. `mirror_escalate_reason` rides forward through
-        # _build_outbox propagation so the notifier can apply the level-3
-        # discipline gate when Beacon emits her replan APPROVAL_REQUEST.
+        # her inbox archive. replan_count/max_replans are whitelisted context
+        # resolved through the builder (DROP unless this is an escalate);
+        # `mirror_escalate_reason` is non-whitelisted narrative set after the
+        # build, riding forward through _build_outbox propagation so the
+        # notifier can apply the level-3 discipline gate when Beacon emits her
+        # replan APPROVAL_REQUEST.
+        escalate_replan_count: Any = DROP
+        escalate_max_replans: Any = DROP
+        escalate_reason = ''
         if marker_decision['intent'] == 'review-escalate':
-            notify_task['replan_count'] = data.get('replan_count', 0) or 0
+            escalate_replan_count = data.get('replan_count', 0) or 0
             max_replans = data.get('max_replans')
             if not isinstance(max_replans, int) or max_replans < 0:
                 max_replans = _load_max_replans_from_config()
-            notify_task['max_replans'] = max_replans
+            escalate_max_replans = max_replans
             reason = marker_decision.get('intent_kwargs', {}).get('reason', '')
             # C-2 review fix: when the underlying marker was REVIEW_REVISION
             # (auto_promoted or budget_exhausted), the `reason` text built by
@@ -7540,8 +7582,21 @@ def process_outbox(outbox_file: Path) -> str:
                     reason = (
                         f'{reason} Findings: ' + ' | '.join(finding_descs)
                     )
-            if reason:
-                notify_task['mirror_escalate_reason'] = reason
+            escalate_reason = reason
+        notify_task = build_chain_envelope(
+            notify_base, data,
+            carry={
+                'reply_chat_id': CARRY,
+                'target_repo': CARRY,
+                'pr_url': CARRY,
+                'replan_count': escalate_replan_count,
+                'max_replans': escalate_max_replans,
+                'revision_count': DROP,
+                'forge_build_session_id': DROP,
+            },
+        )
+        if escalate_reason:
+            notify_task['mirror_escalate_reason'] = escalate_reason
 
         # task-19 (2026-05-19) — gate ONLY the back-leg inter-agent notify
         # on `not larry_direct`. The dispatch helpers below
@@ -7879,32 +7934,43 @@ def process_outbox(outbox_file: Path) -> str:
     # dispatch_validator's `timeout` check is range-bounded
     # [MIN_TIMEOUT, MAX_TIMEOUT] when present, no-op when absent. Upstream's
     # `timeout: 0` ("no timeout") would fail our validator's 60s floor.
-    notify_task = {
+    notify_base = {
         'task_id': f'notify-{task_id}',
         'prompt': prompt,
         'source': notify_source,
         'intent': intent,
         '_notify_depth': next_depth,
     }
-    if data.get('reply_chat_id') is not None:
-        notify_task['reply_chat_id'] = data['reply_chat_id']
     # Propagate session_id so clarification-response delivery can resume
     # the original Forge session (commit 4b wires the watcher to honor it).
     if data.get('claude_session_id'):
-        notify_task['session_id'] = data['claude_session_id']
+        notify_base['session_id'] = data['claude_session_id']
     # Carry clarification budget across the cascade so it reaches Forge with
     # the correct count on the resume leg.
     if data.get('clarification_count') is not None:
-        notify_task['clarification_count'] = data['clarification_count']
+        notify_base['clarification_count'] = data['clarification_count']
     if data.get('max_clarifications') is not None:
-        notify_task['max_clarifications'] = data['max_clarifications']
-    # Phase D3 commit 4b post-test-2 fix: propagate target_repo + branch +
-    # pr_title/pr_body so the clarification-answer leg back to Forge passes
-    # the worktree gate. See the matching block in the marker-decision path
-    # above for the full explanation.
-    for f_name in ('target_repo', 'branch', 'pr_title', 'pr_body'):
+        notify_base['max_clarifications'] = data['max_clarifications']
+    # Phase D3 commit 4b post-test-2 fix: propagate branch + pr_title/pr_body
+    # so the clarification-answer leg back to Forge passes the worktree gate.
+    # target_repo is whitelisted context and carries through the builder below.
+    # See the matching block in the marker-decision path above for the full
+    # explanation.
+    for f_name in ('branch', 'pr_title', 'pr_body'):
         if data.get(f_name):
-            notify_task[f_name] = data[f_name]
+            notify_base[f_name] = data[f_name]
+    notify_task = build_chain_envelope(
+        notify_base, data,
+        carry={
+            'target_repo': CARRY,
+            'reply_chat_id': CARRY,
+            'forge_build_session_id': DROP,
+            'replan_count': DROP,
+            'max_replans': DROP,
+            'revision_count': DROP,
+            'pr_url': DROP,
+        },
+    )
 
     notify_filename = f'notify-{outbox_file.stem}.json'
     try:
@@ -8062,15 +8128,25 @@ def scan_dead_letters() -> int:
                 output=f'Original prompt (first 500 chars):\n{original_prompt_excerpt}',
                 intent_kwargs={'reason': dl_reason},
             )
-            notify_task: dict[str, Any] = {
+            notify_base: dict[str, Any] = {
                 'task_id': f'dead-letter-{invalid_file.stem}',
                 'prompt': dl_prompt,
                 'source': f'{agent}-result',
                 'intent': 'dead-letter',
                 '_notify_depth': 1,  # this IS a depth-1 message; further loops cap
             }
-            if task_data.get('reply_chat_id') is not None:
-                notify_task['reply_chat_id'] = task_data['reply_chat_id']
+            notify_task = build_chain_envelope(
+                notify_base, task_data,
+                carry={
+                    'reply_chat_id': CARRY,
+                    'forge_build_session_id': DROP,
+                    'replan_count': DROP,
+                    'max_replans': DROP,
+                    'revision_count': DROP,
+                    'target_repo': DROP,
+                    'pr_url': DROP,
+                },
+            )
 
             notify_filename = f'notify-dead-letter-{invalid_file.stem}.json'
             try:
