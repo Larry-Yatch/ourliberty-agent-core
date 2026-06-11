@@ -4,6 +4,116 @@
 
 ---
 
+## Iteration ~1522 — 2026-06-11 20:50Z UTC (interactive, Tier 1, consecutive_clean 0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 9/9 services active. 0 open PRs. 0 new alerts. One non-empty Pulse inbox item (Beacon result-notify, routing gap, low-priority — covered by inter-cycle entries below).
+
+**VERIFY-BEFORE-REASSERT (iter ~1521 watch items):**
+- **PR #474** (`test-jail-pr3-gate-hardening-001`): ✅ RESOLVED — Mirror PASS 14:39:27Z MDT, auto-merged + worktrees torn down 14:39:32Z MDT (20:39:32Z UTC). Confirmed via `gh pr view 474`. DROP.
+- **wt-forge-ccd-s5-doctrine-and-handling-shapes**: CONFIRMED STILL PRESENT (`/home/larry/agent-worktrees/`). Mtime 17:31Z UTC; 4h threshold 21:31Z; next GC healer 22:03Z. Self-resolving. [blue] carry.
+- **Beacon spec for wt-cleanup-post-merge-gap**: DONE — Beacon processed dispatch, confirmed root cause, designed `branch_has_merged_pr()` probe fix, emitted APPROVAL_REQUEST `worktree-cleanup-merged-pr-reap-001`. Routing gap persists (G-rule 1/3, per inter-cycle entries below). Low-priority carry.
+- **G-rule Pulse-envelope-format (1/3)**: Schema lesson documented in Dead-letter recovery entry. 1/3 carry.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1304 lines. Watermark: L1303 (all lines claimed per prior iters). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json` MISSING — no pending approvals. No unresolved Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (20:44Z). ✅ Nominal.
+
+**Check 4 — Inboxes:**
+- Forge: EMPTY ✅ | Beacon: EMPTY ✅ | Mirror: EMPTY ✅
+- Pulse: `notify-beacon-reregister-worktree-cleanup-approval-20260611T204500Z.json` — Beacon re-emission (PROCESSED this iter; archive blocked by session path restriction, left for inbox_watcher). ⚠️ Non-empty → tier-reset.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] carry. ✅
+
+**Check A — Source repo:** gitStatus: main, clean. Last commit `e7d5acd Pulse cycle 20260611T204101Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T19:52:50Z (~57 min), status=no-change. ✅ Within 2h threshold.
+
+**Check C — Agent liveness:** 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III: next eligible 2026-06-25. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean false` → consecutive_clean remains 0 (Pulse inbox non-empty). ✅
+2. `cycle_prime_ledger.py append --tier 1 --kind intervention --template approval-registration-gap --detail worktree-cleanup-merged-pr-reap-001` → row written. ✅
+3. No always-allowed-fix actions executed.
+4. No DMs sent — no new [yellow]/[red] findings beyond standing items.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] wt-forge-ccd-s5 — auto-cleanup 22:03Z. [blue] carry.
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — **1/3**. Two consecutive Beacon sub-task sessions emitted valid APPROVAL_REQUEST markers; neither extracted by outbox_notifier. At 2/3: DM Larry. At 3/3: dispatch to Forge/Beacon for outbox_notifier fix.
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — standing. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary 2/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+
+**Watch items for iter ~1523:**
+- **wt-ccd-s5**: Auto-cleaned at ~22:03Z? Expected YES (4h mtime threshold 21:31Z + healer 22:03Z). If persists past 22:10Z → escalate.
+- **APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001**: routing gap G-rule 1/3. Watch for recurrence (2/3 threshold for DM).
+
+**PRIME DIRECTIVE:** 1 intervention (approval-registration-gap:worktree-cleanup-merged-pr-reap-001). Running total: interventions≈792, systemic_fixes≈24, ratio≈33.2, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+## Beacon result notification — 2026-06-11 ~20:46Z UTC (inter-cycle, result from beacon-reregister-worktree-cleanup-approval-20260611T204500Z)
+
+**Trigger:** Beacon completed `beacon-reregister-worktree-cleanup-approval-20260611T204500Z` (exit_code=0). Outbox-notifier delivered result to Pulse as depth=1 beacon-result.
+
+**Beacon output summary:** Re-emitted APPROVAL_REQUEST marker for `worktree-cleanup-merged-pr-reap-001` verbatim in reply text, including full Forge prompt for `fix(gc): reap merged-PR worktrees independent of terminal marker`.
+
+**Verify-before-reassert:**
+- `beacon-pending-approvals.json` checked: `worktree-cleanup-merged-pr-reap-001` is NOT present. Only pending item is `unreg-approval-2dbbe7bb4d4b` (PR #457 escalation, unrelated). Routing gap PERSISTS after 2nd re-emission attempt.
+- Forge inbox: EMPTY. Marker did not auto-route to Forge.
+- Orphaned `wt-forge-ccd-s5-doctrine-and-handling-shapes`: STILL PRESENT. Mtime: 2026-06-11T17:31Z UTC. 4h MAX_AGE_SECONDS threshold fires at 21:31Z UTC. GC timer next run: ~22:03Z UTC. **SELF-RESOLVES at 22:03Z without intervention.** [blue] no action.
+
+**Routing gap pattern (new G-rule 1/3):** Two consecutive Beacon sessions (`cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z` + `beacon-reregister-worktree-cleanup-approval-20260611T204500Z`) both emitted valid `APPROVAL_REQUEST` markers in their reply text; both were processed by outbox_notifier (result moved to `.archive`, pulse-notify delivered) but neither landed in `beacon-pending-approvals.json`. Hypothesized gap: outbox_notifier approval_request extractor does not run when the task result is delivered as a depth=1 pulse-notify (direction-ask result path vs. standard Beacon spec-writing path). G-rule `approval_request_not_extracted_from_depth1_beacon_result`: **1/3**. At 3/3: dispatch Beacon to investigate and fix outbox_notifier extraction path.
+
+**Action taken:** None. Worktree incident resolves naturally at 22:03Z. Systemic fix `worktree-cleanup-merged-pr-reap-001` is still valuable for future cases (closes the 4h gap for post-merge worktrees). Approval registration will carry forward; if GC run at 22:03Z cleans the worktree, urgency drops to low-priority.
+
+**Watch for next cycle:** GC run at ~22:03Z reaps `wt-forge-ccd-s5` ✅ → worktree incident CLOSED. If worktree persists past 22:10Z, escalate. Systemic fix approval: carry at low-priority; re-attempt registration via `heal_unregistered_approval.py` if Larry wants the fix shipped.
+
+---
+
+## Beacon result notification — 2026-06-11 ~20:44Z UTC (inter-cycle, result from cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z)
+
+**Trigger:** Beacon completed task `cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z` (exit_code=0, completed 20:40:26Z). Outbox-notifier delivered result to Pulse as depth=1 beacon-result.
+
+**Beacon output summary:**
+- Confirmed PR #465 (`forge/ccd-s5-doctrine-and-handling-shapes`) merged 17:28Z ✅
+- Confirmed `wt-forge-ccd-s5-doctrine-and-handling-shapes` still present on disk ✅
+- Root cause confirmed: `sweep_canonical()` gates purely on 4h mtime with no PR merge awareness.
+- Designed fix: add `branch_has_merged_pr()` probe in `sweep_canonical()` after in-flight-stem guard; `MERGED_GRACE_SECONDS = 1800`; gh-probe failure falls back to mtime (fail-safe).
+- Produced APPROVAL_REQUEST marker for `worktree-cleanup-merged-pr-reap-001` (target: Forge, task_type: feature-development, files: `scripts/cleanup_stale_worktrees.py` + new test module).
+
+**Routing gap detected:** APPROVAL_REQUEST was in Beacon's session result, but outbox-notifier processed this as a depth=1 pulse-notify and did NOT extract the approval_request into the routing queue. `~/agents/state/beacon-pending-approvals.json` does not contain `worktree-cleanup-merged-pr-reap-001`. Forge inbox empty.
+
+**Action taken:** Dispatched direction-ask to Beacon inbox (`beacon-reregister-worktree-cleanup-approval-20260611T204500Z.json`) asking Beacon to re-emit the APPROVAL_REQUEST marker in its reply text so the outbox-notifier session log scanner picks it up and registers it in `beacon-pending-approvals.json`.
+
+**Verify-before-reassert (carried items):**
+- Orphaned `wt-forge-ccd-s5-doctrine-and-handling-shapes`: STILL PRESENT (confirmed this notification). Will be cleaned by the fix once shipped, or manually on Larry request.
+- PR #474 (`test-jail-pr3-gate-hardening-001`): Confirmed MERGED at 14:39:32 local (20:39Z UTC) per outbox-notifier log. Worktrees teardown logged. CLOSED.
+
+**Watch for next cycle:** Beacon re-registers approval → Larry sees it in Approvals tab → dispatch to Forge preflight.
+
+---
+
 ## Dead-letter recovery — 2026-06-11 ~20:40Z UTC (inter-cycle, triggered by outbox-notifier dead-letter notify)
 
 **Trigger:** Outbox notifier delivered dead-letter notify for `cycle-finding-orphaned-wt-ccd-s5-20260611T203300Z.json` — dispatch rejected by `dispatch_validator`.
