@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import logging
 import sys
+import types
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 from unittest.mock import MagicMock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
@@ -282,6 +284,83 @@ class TestClearApprovalRequest(unittest.TestCase):
             if original_key is not None:
                 cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = original_key
             cee.reset_client_for_testing()
+
+
+class _FakeClientOptions:
+    """Stand-in for supabase-py's ClientOptions capturing the timeout kwarg."""
+
+    def __init__(self, postgrest_client_timeout=None, **kwargs):
+        self.postgrest_client_timeout = postgrest_client_timeout
+        self.extra = kwargs
+
+
+def _make_fake_supabase(capture: dict[str, Any]) -> types.ModuleType:
+    """Build a fake ``supabase`` module recording create_client's args.
+
+    Resolves both lookups _get_client makes: ``from supabase import
+    create_client`` and (via ces.build_client_options) ``from supabase import
+    ClientOptions``.
+    """
+    mod = types.ModuleType('supabase')
+
+    def _fake_create_client(url, key, options=None, **kwargs):
+        capture['url'] = url
+        capture['key'] = key
+        capture['options'] = options
+        capture['extra_kwargs'] = kwargs
+        return object()  # opaque stand-in client; never network-touched
+
+    mod.create_client = _fake_create_client  # type: ignore[attr-defined]
+    mod.ClientOptions = _FakeClientOptions  # type: ignore[attr-defined]
+    return mod
+
+
+@unittest.skipIf(
+    'pytest' in sys.modules,
+    'conftest autouse fixture neutralizes _get_client under pytest; run via '
+    'unittest (python3 -m unittest scripts.tests.test_chain_event_emit)',
+)
+class TestGetClientPinsTimeout(unittest.TestCase):
+    """_get_client must pin the PostgREST timeout so a Supabase black-hole
+    fails fast instead of blocking the single-threaded notifier loop."""
+
+    _GUARD_KEYS = (
+        'OURLIBERTY_DISABLE_LIVE_EMIT', 'PYTEST_CURRENT_TEST',
+        'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
+    )
+
+    def setUp(self):
+        cee.reset_client_for_testing()
+        self._saved = {k: cee.os.environ.get(k) for k in self._GUARD_KEYS}
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                cee.os.environ.pop(k, None)
+            else:
+                cee.os.environ[k] = v
+        cee.reset_client_for_testing()
+
+    def test_get_client_passes_postgrest_timeout_option(self):
+        capture: dict[str, Any] = {}
+        fake = _make_fake_supabase(capture)
+        with mock.patch.dict(sys.modules, {'supabase': fake}):
+            # Lift the test-isolation guards so _get_client actually builds a
+            # client (the fake create_client makes that safe — no network).
+            cee.os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
+            cee.os.environ.pop('PYTEST_CURRENT_TEST', None)
+            cee.os.environ['SUPABASE_URL'] = 'https://example.supabase.co'
+            cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'svc-role-key'
+            client = cee._get_client()
+        self.assertIsNotNone(client)
+        self.assertEqual(capture.get('url'), 'https://example.supabase.co')
+        # The whole point: an options object carrying the shipper's timeout.
+        options = capture.get('options')
+        self.assertIsNotNone(
+            options, 'create_client called without options= — timeout not pinned')
+        self.assertEqual(
+            options.postgrest_client_timeout, ces.SUPABASE_TIMEOUT_SEC)
+        self.assertEqual(ces.SUPABASE_TIMEOUT_SEC, 15)
 
 
 if __name__ == '__main__':

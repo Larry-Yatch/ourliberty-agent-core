@@ -27,8 +27,11 @@ import os
 import shutil
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from typing import Any
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -781,6 +784,91 @@ class TestSavePulseCursorAtomic(_IsolatedAgentsRoot):
         leftovers = [p.name for p in state_dir.iterdir()
                      if p != ces.PULSE_CURSOR_FILE]
         self.assertEqual(leftovers, [])
+
+
+class _FakeClientOptions:
+    """Stand-in for supabase-py's ClientOptions capturing the timeout kwarg."""
+
+    def __init__(self, postgrest_client_timeout=None, **kwargs):
+        self.postgrest_client_timeout = postgrest_client_timeout
+        self.extra = kwargs
+
+
+def _make_fake_supabase(capture: dict) -> types.ModuleType:
+    mod = types.ModuleType('supabase')
+
+    def _fake_create_client(url, key, options=None, **kwargs):
+        capture['url'] = url
+        capture['key'] = key
+        capture['options'] = options
+        return object()  # opaque stand-in client; never network-touched
+
+    mod.create_client = _fake_create_client  # type: ignore[attr-defined]
+    mod.ClientOptions = _FakeClientOptions  # type: ignore[attr-defined]
+    return mod
+
+
+class TestBuildClientOptions(unittest.TestCase):
+    """build_client_options pins the PostgREST request timeout so a Supabase
+    black-hole fails fast instead of blocking each synchronous write for
+    supabase-py's multi-tens-of-seconds default."""
+
+    def test_returns_options_with_default_timeout(self):
+        with mock.patch.dict(sys.modules, {'supabase': _make_fake_supabase({})}):
+            options = ces.build_client_options()
+        self.assertIsNotNone(options)
+        self.assertEqual(
+            options.postgrest_client_timeout, ces.SUPABASE_TIMEOUT_SEC)
+        self.assertEqual(ces.SUPABASE_TIMEOUT_SEC, 15)
+
+    def test_honours_explicit_timeout(self):
+        with mock.patch.dict(sys.modules, {'supabase': _make_fake_supabase({})}):
+            options = ces.build_client_options(timeout_sec=42)
+        self.assertEqual(options.postgrest_client_timeout, 42)
+
+    def test_returns_none_when_client_options_absent(self):
+        # supabase present but no ClientOptions attribute (layout drift / very
+        # old build) → degrade to an un-pinned client rather than crash.
+        mod = types.ModuleType('supabase')
+        mod.create_client = lambda *a, **k: object()  # type: ignore[attr-defined]
+        with mock.patch.dict(sys.modules, {'supabase': mod}):
+            # Also block the supabase.lib.client_options fallback path.
+            with mock.patch.dict(sys.modules, {'supabase.lib': None,
+                                               'supabase.lib.client_options': None}):
+                self.assertIsNone(ces.build_client_options())
+
+
+class TestSupabaseSinkPinsTimeout(unittest.TestCase):
+    """SupabaseSink._ensure_client must build the client with the timeout
+    option — the shipper's drain loop is synchronous too."""
+
+    _KEYS = ('SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY')
+
+    def setUp(self):
+        self._saved = {k: os.environ.get(k) for k in self._KEYS}
+        os.environ['SUPABASE_URL'] = 'https://example.supabase.co'
+        os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'svc-role-key'
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def test_ensure_client_passes_postgrest_timeout_option(self):
+        capture: dict[str, Any] = {}
+        fake = _make_fake_supabase(capture)
+        sink = ces.SupabaseSink()
+        with mock.patch.dict(sys.modules, {'supabase': fake}):
+            sink._ensure_client()
+        self.assertIsNotNone(sink._client)
+        self.assertEqual(capture.get('url'), 'https://example.supabase.co')
+        options = capture.get('options')
+        self.assertIsNotNone(
+            options, 'create_client called without options= — timeout not pinned')
+        self.assertEqual(
+            options.postgrest_client_timeout, ces.SUPABASE_TIMEOUT_SEC)
 
 
 if __name__ == '__main__':
