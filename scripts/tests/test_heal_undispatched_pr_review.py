@@ -13,6 +13,11 @@ Covers the pure, dependency-free core:
 
 from __future__ import annotations
 
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone

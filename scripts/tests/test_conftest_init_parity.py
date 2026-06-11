@@ -52,6 +52,11 @@ Run:
 """
 from __future__ import annotations
 
+try:  # engage the test sandbox before any production import reads env/paths
+    from . import _bootstrap  # noqa: F401
+except ImportError:  # discover loads this module top-level (no package parent)
+    import _bootstrap  # noqa: F401
+
 import ast
 import os
 import shutil
@@ -66,6 +71,11 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 _CONFTEST = _TESTS_DIR / "conftest.py"
 _INIT = _TESTS_DIR / "__init__.py"
+# The canonical sandbox setup now lives in _bootstrap.py; __init__.py delegates
+# to it (so both the discover and dotted/pytest loaders share one source of
+# truth). The mirror assertions below therefore ground against _BOOTSTRAP, and
+# a dedicated test proves __init__ actually imports it.
+_BOOTSTRAP = _TESTS_DIR / "_bootstrap.py"
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +230,41 @@ def _module_level_env_setters(path: Path) -> set[str]:
     return found
 
 
+def _all_env_setters(path: Path) -> set[str]:
+    """Env-var names the file sets on ``os.environ`` ANYWHERE — including inside
+    a function body. _bootstrap.py performs its redirects inside ``engage()``,
+    which it calls unconditionally at module import, so a module-level-only scan
+    (``_module_level_env_setters``) would miss them. This is still an AST check,
+    not a substring scan: a comment mentioning the var does not count."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for tgt in node.targets:
+                name = _environ_subscript_key(tgt)
+                if name is not None:
+                    found.add(name)
+        elif isinstance(node, ast.Call):
+            name = _environ_setdefault_key(node)
+            if name is not None:
+                found.add(name)
+    return found
+
+
+def _calls_engage_at_import(path: Path) -> bool:
+    """True if ``path`` calls ``engage()`` at module top level (not inside a
+    function). _bootstrap.py's redirects live inside ``engage()``; this proves
+    they actually run at import, which is what makes _all_env_setters' relaxed
+    scan a sound stand-in for an import-time guarantee."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in tree.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            func = node.value.func
+            if isinstance(func, ast.Name) and func.id == "engage":
+                return True
+    return False
+
+
 class ConftestInitParityTest(unittest.TestCase):
     """Fails loudly if a conftest autouse protection has no __init__.py mirror."""
 
@@ -258,17 +303,40 @@ class ConftestInitParityTest(unittest.TestCase):
                     f"the registry maps to fixture {fixture!r}.",
                 )
 
-    def test_init_mirrors_each_env_var(self):
-        """__init__.py (the unittest bootstrap) must set every mirrored env var."""
-        body = _INIT.read_text()
+    def test_bootstrap_mirrors_each_env_var(self):
+        """_bootstrap.py (the canonical unittest bootstrap) must set every
+        mirrored env var. This is where the setup now lives; __init__.py
+        delegates to it (see test_init_delegates_to_bootstrap)."""
+        body = _BOOTSTRAP.read_text()
         for fixture, meta in MIRRORED_AUTOUSE_FIXTURES.items():
             with self.subTest(fixture=fixture):
                 self.assertIn(
                     meta["env_var"], body,
-                    f"scripts/tests/__init__.py does not set {meta['env_var']!r}, "
+                    f"scripts/tests/_bootstrap.py does not set {meta['env_var']!r}, "
                     f"the unittest mirror of conftest fixture {fixture!r}. The "
                     "gate would run without this protection.",
                 )
+
+    def test_init_delegates_to_bootstrap(self):
+        """__init__.py must DELEGATE to _bootstrap (import it) rather than carry
+        its own copy of the setup — the single-source-of-truth invariant. If a
+        future edit re-inlines the setup into __init__, the two bootstraps can
+        drift again; this catches that."""
+        body = _INIT.read_text()
+        tree = ast.parse(body, filename=str(_INIT))
+        imports_bootstrap = any(
+            (isinstance(n, ast.ImportFrom)
+             and any(a.name == "_bootstrap" for a in n.names))
+            or (isinstance(n, ast.Import)
+                and any(a.name == "_bootstrap" for a in n.names))
+            for n in ast.walk(tree)
+        )
+        self.assertTrue(
+            imports_bootstrap,
+            "scripts/tests/__init__.py no longer imports _bootstrap; the dotted/"
+            "pytest loader path would run without the canonical sandbox setup "
+            "(or a re-inlined copy could drift from _bootstrap).",
+        )
 
     def test_mirror_env_vars_are_live_in_process(self):
         """Importing scripts.tests must leave every mirror env var set — proves
@@ -294,11 +362,19 @@ class ConftestInitParityTest(unittest.TestCase):
         """Gap A's OURLIBERTY_*_ROOT redirect is the spec's PRIMARY mechanism,
         but it is import-time/module-level, not an autouse fixture — so the
         MIRRORED_AUTOUSE_FIXTURES checks above never touch it. Assert (via AST,
-        not substring) that BOTH conftest.py and __init__.py actually SET each
-        registered var at import time. Removing the redirect from either file
-        fails here even if the explanatory comment is left behind."""
+        not substring) that BOTH conftest.py and _bootstrap.py actually SET each
+        registered var at import time. conftest sets them at module top;
+        _bootstrap sets them inside ``engage()``, which it calls unconditionally
+        at import (asserted separately below). Removing the redirect from either
+        file fails here even if the explanatory comment is left behind."""
         conftest_setters = _module_level_env_setters(_CONFTEST)
-        init_setters = _module_level_env_setters(_INIT)
+        bootstrap_setters = _all_env_setters(_BOOTSTRAP)
+        self.assertTrue(
+            _calls_engage_at_import(_BOOTSTRAP),
+            "scripts/tests/_bootstrap.py no longer calls engage() at module "
+            "level, so its env redirects (set inside engage) do not run at "
+            "import — the Gap A sandbox would never arm for the discover gate.",
+        )
         for env_var in MIRRORED_IMPORT_TIME_REDIRECTS:
             with self.subTest(env_var=env_var, file="conftest.py"):
                 self.assertIn(
@@ -309,14 +385,14 @@ class ConftestInitParityTest(unittest.TestCase):
                     "AGENTS_ROOT constant can leak inbox/blackboard/state writes "
                     "to the real ~/agents tree.",
                 )
-            with self.subTest(env_var=env_var, file="__init__.py"):
+            with self.subTest(env_var=env_var, file="_bootstrap.py"):
                 self.assertIn(
-                    env_var, init_setters,
-                    f"scripts/tests/__init__.py no longer sets {env_var!r} at "
-                    "import time. The Gap A redirect is gone for the unittest "
-                    "gate (python3 -m unittest) — the exact path the regression "
-                    "gate uses — so a frozen AGENTS_ROOT can leak writes to the "
-                    "real ~/agents tree with nothing failing.",
+                    env_var, bootstrap_setters,
+                    f"scripts/tests/_bootstrap.py no longer sets {env_var!r}. The "
+                    "Gap A redirect is gone for the discover gate (python3 -m "
+                    "unittest discover) — the exact path the regression gate uses "
+                    "— so a frozen AGENTS_ROOT can leak writes to the real "
+                    "~/agents tree with nothing failing.",
                 )
 
     def test_agents_root_redirect_is_live_and_sandboxed(self):
