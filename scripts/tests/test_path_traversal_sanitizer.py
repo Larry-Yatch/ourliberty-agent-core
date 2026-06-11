@@ -138,12 +138,20 @@ class InboxWatcherOutboxContainmentTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        # LOG_FILE is in the set: iw computes it at IMPORT from AGENTS_ROOT
+        # (test-jail H3). Under a full `discover` run the gate's env can pin
+        # OURLIBERTY_AGENTS_ROOT at the REAL ~/agents before the per-file
+        # bootstrap fires, so LOG_FILE stays frozen to the live log and the
+        # process_task log() below ('start task=../../../../etc/pwned …') would
+        # append the hostile-fixture line to it. Redirect the log sink too.
         self._orig = {k: getattr(iw, k) for k in
-                      ("INBOXES_ROOT", "OUTBOXES_ROOT", "BLACKBOARD", "COSTS_FILE")}
+                      ("INBOXES_ROOT", "OUTBOXES_ROOT", "BLACKBOARD",
+                       "COSTS_FILE", "LOG_FILE")}
         iw.INBOXES_ROOT = self.root / "inboxes"
         iw.OUTBOXES_ROOT = self.root / "outboxes"
         iw.BLACKBOARD = self.root / "blackboard"
         iw.COSTS_FILE = iw.BLACKBOARD / "costs.jsonl"
+        iw.LOG_FILE = self.root / "logs" / "inbox_watcher.log"
         (iw.INBOXES_ROOT / self.AGENT / ".archive").mkdir(parents=True, exist_ok=True)
         (iw.OUTBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
 

@@ -40,11 +40,20 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
             'OUTBOXES_ROOT': iw.OUTBOXES_ROOT,
             'BLACKBOARD': iw.BLACKBOARD,
             'COSTS_FILE': iw.COSTS_FILE,
+            # iw.LOG_FILE is computed at IMPORT from AGENTS_ROOT (test-jail H3).
+            # Under a full `discover` run the gate's env can pin
+            # OURLIBERTY_AGENTS_ROOT at the REAL ~/agents before the per-file
+            # bootstrap fires, so LOG_FILE stays frozen to the live log and
+            # every process_task log() below ('outbox write failed for
+            # real-paid-001 …', 'simulated ENOSPC') would append to it.
+            # Redirect the log sink too so this test cannot leak into prod.
+            'LOG_FILE': iw.LOG_FILE,
         }
         iw.INBOXES_ROOT = self.root / 'inboxes'
         iw.OUTBOXES_ROOT = self.root / 'outboxes'
         iw.BLACKBOARD = self.root / 'blackboard'
         iw.COSTS_FILE = iw.BLACKBOARD / 'costs.jsonl'
+        iw.LOG_FILE = self.root / 'logs' / 'inbox_watcher.log'
         (iw.INBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
         (iw.INBOXES_ROOT / self.AGENT / '.archive').mkdir(parents=True, exist_ok=True)
         (iw.OUTBOXES_ROOT / self.AGENT).mkdir(parents=True, exist_ok=True)
