@@ -913,16 +913,14 @@ class TestForgeBuildSequenceSpare(unittest.TestCase):
     def test_spare_reason_queued_dispatch_not_released_on_age_alone(self):
         # ANTI-CCD-S1 (-002): a genuinely queued dispatch whose build file is OLD
         # (idle well past the former GUARD_MAX_PROTECT_HOURS age cap) but is a
-        # still-LIVE handoff — NOT owned by this session, worktree intact, PR not
-        # merged/closed — must STILL be spared. Releasing on age alone re-creates
-        # the ccd-s1 active-build reap (a build merely waiting for a busy slot).
+        # still-LIVE handoff — worktree intact, PR not merged/closed — must STILL
+        # be spared. Releasing on age alone re-creates the ccd-s1 active-build reap
+        # (a build merely waiting for a busy slot).
         from unittest import mock
         idle = h.GUARD_MAX_PROTECT_HOURS * 3600 + 100
         cand = _cand(tier='forge', name='ccd-s1', marker=True, idle=idle)
         with mock.patch.object(h, '_forge_inbox_has_queued_build',
                                return_value=True), \
-             mock.patch.object(h, '_candidate_owns_build_dispatch',
-                               return_value=False), \
              mock.patch.object(h, '_forge_branch_pr_merged_or_closed',
                                return_value=False), \
              mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
@@ -1009,7 +1007,7 @@ class TestBuildHandoffGraceConfig(unittest.TestCase):
 class TestForgeTaskIdDeletedSuffix(unittest.TestCase):
     """The kernel appends ' (deleted)' to /proc/<pid>/cwd for a wedged worker
     whose worktree was torn down; the task_id extractor must strip it so
-    ownership / inbox lookups still resolve the real task_id."""
+    inbox / PR-state lookups still resolve the real task_id."""
 
     def test_strips_deleted_suffix(self):
         self.assertEqual(
@@ -1029,88 +1027,29 @@ class TestForgeTaskIdDeletedSuffix(unittest.TestCase):
             '/home/larry/agent-worktrees/wt-forge-x'))
 
 
-class TestCandidateOwnsBuildDispatch(unittest.TestCase):
-    """The PRIMARY wedge discriminator: the in-flight registry records THIS
-    candidate process as the consumer of a build dispatch → the inbox build file
-    is its own already-consumed leftover, not a pending handoff."""
-
-    def _write(self, in_flight_dir, stem, *, pid, agent_id='forge'):
-        (in_flight_dir / f'{stem}.json').write_text(json.dumps({
-            'task_stem': stem, 'agent_id': agent_id, 'pid': pid,
-            'started_at': NOW.isoformat(),
-        }))
-
-    def test_owns_when_build_entry_has_this_pid(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            self._write(d, 'build-pulse-park-and-silence', pid=1472172)
-            cand = _cand(pid=1472172, tier='forge', name='pulse-park-and-silence')
-            self.assertTrue(h._candidate_owns_build_dispatch(cand, in_flight_dir=d))
-
-    def test_owns_when_replan_build_entry_has_this_pid(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            self._write(d, 'build-ccd-s1-replan2', pid=4242)
-            cand = _cand(pid=4242, tier='forge', name='ccd-s1')
-            self.assertTrue(h._candidate_owns_build_dispatch(cand, in_flight_dir=d))
-
-    def test_not_owned_when_only_preflight_entry(self):
-        # A lingering preflight session is registered under the BARE <task_id>
-        # stem (no 'build-' prefix) — that is NOT build-file ownership, so a
-        # genuine handoff (build not yet spawned) is correctly seen as un-owned.
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            self._write(d, 'ccd-s1', pid=4242)  # preflight stem
-            cand = _cand(pid=4242, tier='forge', name='ccd-s1')
-            self.assertFalse(h._candidate_owns_build_dispatch(cand, in_flight_dir=d))
-
-    def test_not_owned_when_build_entry_has_other_pid(self):
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            self._write(d, 'build-ccd-s1', pid=9999)  # a different process
-            cand = _cand(pid=4242, tier='forge', name='ccd-s1')
-            self.assertFalse(h._candidate_owns_build_dispatch(cand, in_flight_dir=d))
-
-    def test_not_owned_when_registry_absent(self):
-        cand = _cand(pid=4242, tier='forge', name='ccd-s1')
-        self.assertFalse(h._candidate_owns_build_dispatch(
-            cand, in_flight_dir=Path('/nonexistent/in-flight')))
-
-
 class TestForgeHandoffIsLive(unittest.TestCase):
-    """Liveness gate: a queued build file is a LIVE handoff only when NONE of the
-    wedge signals (ownership / worktree-deleted / merged-or-closed PR) hold."""
+    """Liveness gate: a queued build file is a LIVE handoff only when NEITHER
+    decisive wedge signal (worktree-deleted / merged-or-closed PR) holds."""
 
     def test_live_when_no_wedge_signal(self):
         from unittest import mock
         cand = _cand(pid=4242, tier='forge', name='ccd-s1', idle=5632)
-        with mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
-             mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=False):
+        with mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=False):
             self.assertTrue(h._forge_handoff_is_live(cand, 'ccd-s1'))
 
-    def test_not_live_when_candidate_owns_file(self):
-        # PRIMARY signal short-circuits BEFORE the gh call (cheapest-first).
-        from unittest import mock
-        cand = _cand(pid=4242, tier='forge', name='ccd-s1', idle=5632)
-        with mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=True), \
-             mock.patch.object(h, '_forge_branch_pr_merged_or_closed') as m_pr:
-            self.assertFalse(h._forge_handoff_is_live(cand, 'ccd-s1'))
-            m_pr.assert_not_called()
-
     def test_not_live_when_worktree_deleted(self):
+        # Local deleted-cwd signal short-circuits BEFORE the gh call.
         from unittest import mock
         cand = _cand(pid=4242, tier='forge', idle=5632,
                      cwd='/home/larry/agent-worktrees/wt-forge-ccd-s1 (deleted)')
-        with mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
-             mock.patch.object(h, '_forge_branch_pr_merged_or_closed') as m_pr:
+        with mock.patch.object(h, '_forge_branch_pr_merged_or_closed') as m_pr:
             self.assertFalse(h._forge_handoff_is_live(cand, 'ccd-s1'))
             m_pr.assert_not_called()  # local deleted-cwd signal beats the gh call
 
     def test_not_live_when_pr_merged_or_closed(self):
         from unittest import mock
         cand = _cand(pid=4242, tier='forge', name='ccd-s1', idle=5632)
-        with mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
-             mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=True):
+        with mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=True):
             self.assertFalse(h._forge_handoff_is_live(cand, 'ccd-s1'))
 
 
@@ -1145,51 +1084,15 @@ class TestForgeBranchPrMergedOrClosed(unittest.TestCase):
 
 class TestForgeWedgeDeadlockRegression(unittest.TestCase):
     """The headline -002 regression: the pulse-park-and-silence deadlock. A Forge
-    worker SPARED by its OWN leftover build-dispatch file (it is the in-flight
-    owner/consumer, and/or its worktree was deleted, and/or its PR merged) must
-    now be REAPED — while a genuinely-live handoff stays spared (#441)."""
+    worker SPARED by a leftover build-dispatch file whose worktree was deleted
+    and/or whose PR is merged/closed must now be REAPED — while a genuinely-live
+    handoff stays spared (#441)."""
 
     def _forge_cand(self, **kw):
         kw.setdefault('tier', 'forge')
         kw.setdefault('marker', True)   # post-PROCEED / post-build marker present
         kw.setdefault('idle', 6000)     # well past the 600s handoff grace floor
         return _cand(**kw)
-
-    def test_wedged_owner_of_own_build_file_is_reaped(self):
-        # THE BUG: queued build file present, but the candidate IS the in-flight
-        # consumer of it (its own consumed leftover) → wedge → reaped.
-        from unittest import mock
-        rec = _Recorder()
-        cand = self._forge_cand(pid=1472172, name='pulse-park-and-silence')
-        with mock.patch.object(h, '_forge_inbox_has_queued_build', return_value=True), \
-             mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=True), \
-             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
-                               return_value=False):
-            summary = _run(rec, [cand], h.ConfidenceState())
-        self.assertEqual(rec.killed, [1472172])
-        self.assertEqual(summary['case1_reaped'], 1)
-        self.assertEqual(summary['forge_spared'], 0)
-
-    def test_wedged_owner_reaped_end_to_end_via_real_registry(self):
-        # Same bug, exercised through the REAL in-flight registry read (no mock of
-        # the ownership helper) — a build-<task>.json registry entry carrying this
-        # candidate's pid proves ownership.
-        from unittest import mock
-        rec = _Recorder()
-        cand = self._forge_cand(pid=1472172, name='pulse-park-and-silence')
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            (d / 'build-pulse-park-and-silence.json').write_text(json.dumps({
-                'task_stem': 'build-pulse-park-and-silence',
-                'agent_id': 'forge', 'pid': 1472172,
-            }))
-            with mock.patch.object(h, 'IN_FLIGHT_DIR', d), \
-                 mock.patch.object(h, '_forge_inbox_has_queued_build', return_value=True), \
-                 mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
-                                   return_value=False):
-                summary = _run(rec, [cand], h.ConfidenceState())
-        self.assertEqual(rec.killed, [1472172])
-        self.assertEqual(summary['case1_reaped'], 1)
 
     def test_wedged_with_deleted_worktree_is_reaped(self):
         # DECISIVE release: the worktree was torn down (cwd '(deleted)'), proving
@@ -1200,7 +1103,6 @@ class TestForgeWedgeDeadlockRegression(unittest.TestCase):
             pid=4300,
             cwd='/home/larry/agent-worktrees/wt-forge-pulse-park-and-silence (deleted)')
         with mock.patch.object(h, '_forge_inbox_has_queued_build', return_value=True), \
-             mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
              mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=False), \
              mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
                                return_value=False):
@@ -1216,7 +1118,6 @@ class TestForgeWedgeDeadlockRegression(unittest.TestCase):
         rec = _Recorder()
         cand = self._forge_cand(pid=4301, name='pulse-park-and-silence')
         with mock.patch.object(h, '_forge_inbox_has_queued_build', return_value=True), \
-             mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
              mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=True), \
              mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
                                return_value=False):
@@ -1227,13 +1128,12 @@ class TestForgeWedgeDeadlockRegression(unittest.TestCase):
 
     def test_genuine_live_handoff_still_spared_441(self):
         # #441 MUST still hold: a build file awaiting a not-yet-spawned consumer —
-        # NOT owned by this session, worktree intact, PR not merged/closed — is
-        # STILL spared (the active-build protection we must not regress).
+        # worktree intact, PR not merged/closed — is STILL spared (the
+        # active-build protection we must not regress).
         from unittest import mock
         rec = _Recorder()
         cand = self._forge_cand(pid=4302, name='ccd-s1')
         with mock.patch.object(h, '_forge_inbox_has_queued_build', return_value=True), \
-             mock.patch.object(h, '_candidate_owns_build_dispatch', return_value=False), \
              mock.patch.object(h, '_forge_branch_pr_merged_or_closed', return_value=False), \
              mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
                                return_value=False):

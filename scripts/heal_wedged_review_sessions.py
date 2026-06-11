@@ -128,15 +128,6 @@ HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-wedged-review-sessions.heart
 STATE_FILE = AGENTS_ROOT / 'state' / 'review-reaper-confidence.json'
 CLAUDE_PROJECTS_DIR = HOME / '.claude' / 'projects'
 CONFIG_FILE = _SCRIPTS_DIR.parent / 'config' / 'review-reaper-rules.json'
-# In-flight worker registry written by agent_runner._register_in_flight: one
-# `<task_stem>.json` per running dispatch recording {task_stem, agent_id, pid}.
-# A build-phase dispatch (`build-<task_id>.json`) registers under that stem with
-# the spawned `claude` pid; a wedged build worker never reaches
-# _unregister_in_flight, so the entry persists with pid == the wedged claude pid.
-# We read it to tell whether a candidate session OWNS (already consumed) the
-# build file in its inbox vs. a file awaiting a not-yet-spawned consumer. Mirrors
-# inbox_watcher.IN_FLIGHT_DIR / agent_runner.IN_FLIGHT_DIR.
-IN_FLIGHT_DIR = AGENTS_ROOT / 'state' / 'in-flight'
 
 # Review-tier worktrees this healer owns.
 WORKTREE_PREFIXES = (
@@ -837,7 +828,7 @@ def _forge_task_id_for_cwd(cwd: str) -> Optional[str]:
     """The task_id embedded in a Forge worktree cwd (`wt-forge-<task_id>`), or
     None for a non-Forge / non-conventional cwd. A trailing ` (deleted)` (the
     kernel's marker for a torn-down worktree still held open by a wedged process)
-    is stripped first, so ownership / inbox lookups resolve the real task_id even
+    is stripped first, so inbox / PR-state lookups resolve the real task_id even
     for a dead session."""
     name = Path(cwd).name
     if name.endswith(_DELETED_CWD_SUFFIX):
@@ -857,59 +848,14 @@ def _cwd_worktree_deleted(cwd: str) -> bool:
     return cwd.endswith(_DELETED_CWD_SUFFIX)
 
 
-def _read_in_flight_entry(path: Path) -> Optional[dict[str, Any]]:
-    """Parse one in-flight registry file; None on any IO/JSON error or non-dict."""
-    try:
-        data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def _candidate_owns_build_dispatch(
-    cand: Candidate, in_flight_dir: Optional[Path] = None,
-) -> bool:
-    """True iff the in-flight registry records THIS candidate process as the
-    consumer of a build-phase dispatch — the PRIMARY wedge discriminator.
-
-    The build phase is filed as `build-<task_id>.json` (or a
-    `build-<task_id>-replanN.json` replan iteration) and the runner registers it
-    in-flight under that filename stem with the spawned `claude` pid
-    (agent_runner._register_in_flight). A wedged build worker never reaches
-    _unregister_in_flight, so the entry persists with `pid == cand.pid`. When we
-    find such an entry the inbox build file is this session's OWN already-consumed
-    leftover — a WEDGE — not a next-phase handoff awaiting a different,
-    not-yet-spawned consumer. (A true handoff's file has NO matching in-flight
-    `build-*` entry for this pid: the build process hasn't been spawned, or this
-    session is the lingering preflight registered under the bare `<task_id>`
-    stem, which this glob deliberately excludes.)
-
-    Matched on pid (one running process owns exactly one task) + agent_id, so it
-    is robust to task_id canonicalization. Read-only; any IO/parse error on an
-    individual entry is skipped, and an absent registry yields False
-    (conservative: no ownership proof → fall back to the other signals)."""
-    in_flight_dir = in_flight_dir if in_flight_dir is not None else IN_FLIGHT_DIR
-    try:
-        entries = list(in_flight_dir.glob('build-*.json'))
-    except OSError:
-        return False
-    for path in entries:
-        entry = _read_in_flight_entry(path)
-        if entry is None:
-            continue
-        if entry.get('pid') == cand.pid and entry.get('agent_id') == 'forge':
-            return True
-    return False
-
-
 def _forge_branch_pr_merged_or_closed(task_id: str) -> bool:
     """True iff the task's branch (`forge/<task_id>`) has a MERGED or CLOSED PR —
     a DECISIVE release: a merged PR means the build's deliverable already landed,
     a closed PR means it was abandoned; either way a leftover build file is no
     longer a live handoff. Read-only gh; returns False on ANY gh failure
     (fail-SAFE toward KEEPING the spare — a transient gh miss must never flip a
-    genuine handoff into a reap; the ownership + worktree-deleted signals remain
-    the local proof of a wedge)."""
+    genuine handoff into a reap; the worktree-deleted signal remains the local
+    proof of a wedge)."""
     branch = f'forge/{task_id}'
     try:
         out = subprocess.run(
@@ -941,30 +887,33 @@ def _forge_branch_pr_merged_or_closed(task_id: str) -> bool:
 
 def _forge_handoff_is_live(cand: Candidate, task_id: str) -> bool:
     """Distinguish a GENUINE preflight→build handoff (keep sparing) from a wedged
-    session sitting on its OWN already-consumed build file (release the guard).
+    session whose queued build file is a stale leftover (release the guard).
 
     A queued `build-<task_id>.json` in Forge's inbox alone is NOT proof of a live
     handoff — the 2026-06-11 pulse-park-and-silence deadlock: the build had
     finished + merged and the worktree was torn down, yet the leftover inbox file
     made the guard spare the wedged worker for ~1h40m (self-sustaining: the file
     isn't archived because the wedged owner never cleanly exits, and the worker
-    isn't reaped because the file is present). The handoff is live ONLY when NONE
-    of these wedge signals hold, checked cheapest-first:
+    isn't reaped because the file is present). The handoff is live ONLY when
+    NEITHER of these decisive wedge signals holds, checked cheapest-first:
 
-      (1) PRIMARY — ownership: the in-flight registry records THIS candidate as
-          the build dispatch's consumer. A true handoff's file awaits a DIFFERENT,
-          not-yet-spawned consumer; if the candidate already consumed it, the file
-          is its own leftover.
-      (2) DECISIVE — the worktree is deleted (cwd is a `(deleted)` path): the
-          session is dead.
-      (2) DECISIVE — the branch's PR is already merged/closed: the build's work
-          already landed (or was abandoned).
+      DECISIVE — the worktree is deleted (cwd is a `(deleted)` path): the session
+          is dead, so the queued file is a leftover, not a pending handoff.
+      DECISIVE — the branch's PR is already merged/closed: the build's work
+          already landed (or was abandoned), so the queued file is stale.
 
     Age is deliberately NOT a signal here: a genuinely queued dispatch can sit
     past any window while the Forge slot is busy, so releasing on age alone would
-    re-create the ccd-s1 active-build reap that #441 fixed."""
-    if _candidate_owns_build_dispatch(cand):
-        return False
+    re-create the ccd-s1 active-build reap that #441 fixed.
+
+    (A third signal — in-flight-registry OWNERSHIP — was removed in the descope
+    of PR #457: it globbed the registry for `build-*.json`, but the runner files
+    every in-flight worker under the BARE `<task_stem>.json`
+    (agent_runner._register_in_flight), so the glob never matched and ownership
+    was always False. Re-deriving ownership from the bare stem would reintroduce
+    the #441 active-build reap, since preflight and build register under the same
+    stem with no phase signal to tell a wedged build worker from a live one — that
+    needs a registry phase-signal change tracked as a separate follow-up.)"""
     if _cwd_worktree_deleted(cand.cwd):
         return False
     if _forge_branch_pr_merged_or_closed(task_id):
@@ -1057,9 +1006,8 @@ def _forge_spare_reason(cand: Candidate, cfg: dict[str, Any]) -> Optional[str]:
           handoff is still LIVE (`_forge_handoff_is_live`) — the build is about to
           `--resume` into this worktree; removing it strands the sequence (the
           ccd-s1 incident). The liveness check is what closes the
-          pulse-park-and-silence deadlock (-002): a leftover build file the
-          candidate has ALREADY consumed (it owns the in-flight entry), or whose
-          worktree is deleted / whose PR is merged-or-closed, is a WEDGE, not a
+          pulse-park-and-silence deadlock (-002): a leftover build file whose
+          worktree is deleted, or whose PR is merged-or-closed, is a WEDGE, not a
           live handoff — so the guard releases and the normal reap proceeds.
           Deliberately NOT bounded by age: a genuinely queued dispatch can sit
           past any window while the slot is busy, and age-alone release would
@@ -1079,13 +1027,12 @@ def _forge_spare_reason(cand: Candidate, cfg: dict[str, Any]) -> Optional[str]:
     if task_id and _forge_inbox_has_queued_build(task_id):
         if _forge_handoff_is_live(cand, task_id):
             return (f'queued next-phase build dispatch present in Forge inbox for '
-                    f'task {task_id}, handoff still live (file not consumed by '
-                    f'this session, worktree intact, PR not merged/closed) — '
-                    f'preflight→build handoff in flight')
+                    f'task {task_id}, handoff still live (worktree intact, '
+                    f'PR not merged/closed) — preflight→build handoff in flight')
         log(f'build-handoff guard RELEASED for task {task_id} '
-            f'({Path(cand.cwd).name}): queued build file is this wedged session\'s '
-            f'OWN consumed leftover (ownership / worktree-deleted / merged-or-'
-            f'closed PR) — not a live handoff, allowing normal reap', 'INFO')
+            f'({Path(cand.cwd).name}): queued build file is a stale leftover '
+            f'(worktree-deleted or merged/closed PR) — not a live handoff, '
+            f'allowing normal reap', 'INFO')
     if _forge_branch_has_open_unreviewed_pr(cand.cwd):
         return ('branch has an OPEN PR with no Mirror review dispatched yet — '
                 'reaping would orphan the review (#412 guard)')
