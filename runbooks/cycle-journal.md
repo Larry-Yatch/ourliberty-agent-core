@@ -4,6 +4,33 @@
 
 ---
 
+## Iteration 1450 — 2026-06-11 12:14Z UTC (result-notification, Tier 1)
+
+**Trigger:** Inter-agent result notification from Beacon — task `g-rule-wedged-review-wt-dispatch-20260611`, status=SUCCESS.
+
+**G-rule `wedged-review-silent-wt` — Beacon investigation result:**
+
+Beacon investigated the proposed Option A fix (add `sys.exit(0)` after terminal-marker write in build-loop/session wrapper) and found it **architecturally invalid**:
+- No Python build-loop/session wrapper writes Forge's terminal marker — the marker is text the *model* emits.
+- `agent_runner.py` spawns one `claude -p` subprocess and blocks in `while proc.poll() is None`; it already exits cleanly the instant `claude` exits.
+- The lingering process IS the live detached `claude` subprocess. It doesn't exit after the model's final turn because **model-spawned background Bash/monitor processes** (e.g. a self-matching `until ! kill -0 $(...)` loop) keep the CLI alive. Python wrapper can't bolt `sys.exit(0)` onto anything — it's blocked waiting on the wedged child.
+
+**PR #461 / no work lost:** The reaped session was `wt-forge-*-001` (a redundant predecessor). PR #461 was task `-002` and merged at 12:08:38Z normally via the standard chain (briefly `AUTO_MERGE_HELD` on blocker #457). The healer reaped the dead `-001` cleanly. Pattern is a real recurring annoyance (held fleet slot + closure alert per instance) but no active fire.
+
+**G-rule `wedged-review-silent-wt` status:** 3/3 DISPATCHED (iter 1448) → BEACON COMPLETE → Option A invalid; genuine root-cause fix deferred to direction-ask.
+
+**APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611` — pending Larry:**
+Binary direction-ask from Beacon:
+- **APPROVE** = Beacon specs + dispatches a Forge T0 PR for in-process terminal-marker reap in `agent_runner` (detect terminal marker + short idle, SIGTERM the finished `claude` so outbox writes through normal path; healer stays as cross-process net). Hot-path change to the shared 4-agent spawner — real blast radius; Mirror-gated. Beacon's lean: APPROVE.
+- **REJECT** = hold; accept the existing wedged-review healer as designed mitigation; revisit only if the wedge starts losing outboxes or orphaning PRs.
+
+Beacon notes this to Beacon's inbox for the normal approval chain. beacon-pending-approvals.json is MISSING (standing issue) — cannot verify trust-policy state. No new larry_alerts DM yet at L1259 (unchanged). Watching for Beacon's DM delivery.
+
+**Actions:** None. Result notification only.
+**PRIME DIRECTIVE:** No new ledger row (result notification, not a new intervention).
+
+---
+
 ## Iteration 1449 — 2026-06-11 12:09Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Drift (resolving). PR #461 **MERGED** 12:08:38Z — D3.5 auto-merge had not fired at 32min; manually enabled, landed immediately. PR #457 [yellow] still standing. Forge PID 1635236 in-flight (resume-fix-build-background-task-output-visibility-001-r1). Beacon PID 1637007 in-flight (g-rule-wedged-review-wt dispatch). All 9/9 services active. Tier 1, consecutive_clean 0→0.
@@ -93893,3 +93920,119 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 - **fix-test-bootstrap-preserve-usersite-001** — queued since 02:15Z; watch for build start.
 
 **Tier end-of-iter:** 1 (consecutive_clean=0 — non-clean: Beacon auth failure + Forge ccd-s2 stall).
+
+## Iteration ~1460 — 2026-06-11 12:30Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles ~1437–~1459 ran after iter 1436 (10:34Z), updating MEMORY.md only. Key resolutions since iter 1436: ccd-s2 worktree reaped (10:50Z) ✅; fix-test-bootstrap-preserve-usersite-001 retry-exhausted but superseded by PR #461 ✅; PR #461 (fix(test-bootstrap): preserve user-site across jailed HOME) MERGED 12:08:38Z ✅; PR #460 (feat(outbox-notifier): route no-session code-review REVISION to Beacon M2) MERGED ✅. Session-start gitStatus: branch=main, clean, HEAD=1ddcca4 "Pulse cycle 20260611T121244Z". Tier at start: 1, consecutive_clean=0.
+
+**Health:** ⚠️ Attention — PR #457 (fix(reaper): release handoff guard) Mirror escalation standing ~3h44min (since 08:46Z); Beacon APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611` unregistered in beacon-pending-approvals.json (direction-ask routed to Beacon inbox this iter). Positives: PR #461 merged ✅; all 15 new alerts Tier-3 ✅; 8/8 services active ✅; Check 1 clean ✅; no new pipeline stalls ✅.
+
+**Tier state:** 1 (consecutive_clean=0; PR #457 standing non-clean)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: MISSING from alert-triage.json; MEMORY iter 1436 was L1244. Claiming L1245–L1259 (15 new lines).
+- L1245 (10:50Z): heal-wedged-review-sessions reaped wt-forge-ccd-s2 (terminal marker, idle 7339s). → **Tier 3** ✅
+- L1246 (11:09Z): pulse iter 1441 — PR #457 escalation DM (already delivered). → **Tier 3** ✅
+- L1247–L1249 (11:16Z): heal-stale-daemon-code auto-restarts (outbox-notifier, beacon-bot, inbox-watcher) post-PR-#460 merge. → **Tier 3** ✅
+- L1250 (11:21Z): sentinel inbox-stall fix-test-bootstrap-preserve-usersite-001. → **Tier 3** stale (medic L1251: timing artifact, task already running; watcher restarted 11:17Z).
+- L1251–L1252 (11:26Z): medic diagnoses + test-ping-verify. → **Tier 3** ✅
+- L1253–L1254 (11:31Z): sentinel inbox-stall fix-build-background-task-output-visibility-001 + build-ccd-s1-envelope-builder. → **Tier 3** (medic L1255–L1256: normal queue drain, fix-test-bootstrap-001 in progress).
+- L1255–L1256 (11:35Z): medic diagnoses. → **Tier 3** ✅
+- L1257 (11:47Z): heal-wedged-review-sessions reaped fix-test-bootstrap-preserve-usersite-001 (pid 1612678, idle 691s > grace 300s). → **Tier 3** ✅
+- L1258 (11:55Z): heal-pipeline-stall retry-exhausted fix-test-bootstrap-preserve-usersite-001. → **Tier 3** SUPERSEDED — PR #461 (fix-test-bootstrap-preserve-usersite-002) MERGED 12:08:38Z per gitStatus (db037fe). ✅
+- L1259 (11:59Z): medic diagnosis for L1258 — confirms PR #461 open (Mirror reviewing); now MERGED. → **Tier 3** ✅
+- New watermark: **L1260** (next unclaimed starts here). Triage: 0 new dispatches, 15 Tier-3 silences. ✅ Nominal.
+
+**Check 1 — Log noise:** journalctl warning since 90min → no entries. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Beacon bot log: auth 401 events at 02:47Z and 04:52Z MDT — standing Tier 2 weekly probe (known pattern; action Larry). Beacon bot restarted 11:16Z UTC (heal-stale-daemon-code post-PR #460). Alerts delivering normally post-restart (L1246–L1259 all delivered or skipped per route=digest).
+- Note: "resets 11:30am" / "TIER_ONE_MARKER" / "tier2 distinct" in bot log are leaked test fixtures (per memory discipline), not a real auth outage.
+- No new orphaned Larry directives since last interactive iter (08:27Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall-state.json: healer_ts=None, active_stalls=[]. ✅
+- PR #457: still open (UNKNOWN-mergeable, GitHub compute). Mirror escalation 08:46Z standing ~3h44min. _candidate_owns_build_dispatch non-functional (confirmed). NOT auto-merge eligible. [yellow] carry — DM already sent iter 1441 (11:09Z).
+- ccd-s2: RESOLVED — reaped L1245 ✅
+- fix-test-bootstrap-preserve-usersite: RESOLVED via PR #461 ✅
+- Check 3: ✅ Nominal (no new stalls).
+
+**Check 4 — Pending directives / Inboxes (VERIFY-BEFORE-REASSERT):**
+- beacon: 1 item added THIS ITER — pulse-wedged-forge-exit-fix-direction-ask-20260611T123000Z.json (Pulse direction-ask routing the APPROVAL_REQUEST). Expected to be picked up by Beacon next run. ✅
+- forge: 2 items — `resume-fix-build-background-task-output-visibility-001-r1.json` (queued, retry 1) + `ccd-s3-derivable-context-backfill.json` (CCD Stage 3, IN-FLIGHT per in-flight registry). ✅
+- mirror: empty. ✅
+- pulse: 0 items (notify-g-rule-wedged-review-wt-dispatch-20260611.json read + archived this iter). ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot completed post-PR #460; new code live across all services since 11:16Z). ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: main, clean, HEAD=1ddcca4 ("Pulse cycle 20260611T121244Z"). ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=2026-06-11T11:51:44Z (~38min ago, within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):**
+- systemctl: 8/8 active — beacon-bot, forge-bot, mirror-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer. ✅ Nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #457** (fix(reaper): release handoff guard on ownership/merged/worktree-deleted): OPEN, UNKNOWN-mergeable, 08:13Z (~4h). reviewDecision="". Mirror escalation 08:46Z (~3h44min standing). Key issue: `_candidate_owns_build_dispatch` non-functional in production (globs build-*.json but in-flight registry uses bare <task_id>.json). NOT auto-merge eligible. DM already sent iter 1441 (11:09:48Z alert L1246). Larry decision pending: revise spec (new APPROVAL_REQUEST to Beacon) or push back. [yellow] carry.
+- **PR #461** (fix(test-bootstrap): preserve user-site across jailed HOME): MERGED ✅ — db037fe in HEAD. CLOSED.
+- ourliberty-dashboard: no open PRs (not checked; carry nominal). ✅
+
+**Pulse inbox — material finding (VERIFY-BEFORE-REASSERT):**
+- Read and archived: `notify-g-rule-wedged-review-wt-dispatch-20260611.json` (from Beacon, result of g-rule-wedged-review-wt-dispatch-20260611).
+- Beacon finding: Option A (sys.exit(0) after terminal-marker write) architecturally **invalid** — no Python wrapper writes the terminal marker; marker is model-emitted text. The lingering process IS the live `claude -p` subprocess that agent_runner blocks on. Root cause: model-spawned background processes (e.g. self-matching pgrep loops) keep the CLI alive.
+- Beacon finding: PR #461 MERGED at 12:08:38Z ✅; -001 worktree was a redundant predecessor — no work lost today.
+- Beacon APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: APPROVE=spec+dispatch Forge agent_runner in-process terminal-marker reap (hot-path change to shared 4-agent spawner, Mirror-gated); REJECT=leave to wedged-review healer. Beacon lean: APPROVE.
+- beacon-pending-approvals.json: MISSING (approval not yet formally registered).
+- **Action taken:** Routed direction-ask to Beacon inbox (pulse-wedged-forge-exit-fix-direction-ask-20260611T123000Z.json). Appended [yellow] escalation to larry-alerts.jsonl (L1260) for Telegram delivery. Beacon will DM Larry with the formal APPROVAL_REQUEST gate.
+
+**Periodic/conditional (Thursday 2026-06-11 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- **PR #457 _candidate_owns_build_dispatch non-functional**: CONFIRMED still open, non-functional (no fix merged). [yellow] carry.
+- **fix-test-bootstrap-preserve-usersite-001 retry-exhausted**: RESOLVED — PR #461 merged (db037fe). ✅ CLOSED.
+- **bughunt-gate-soak**: Phase 2 decision pending Larry. [yellow] carry.
+- **health-check-notify-script-missing G-rule 3/3**: Forge PR pending; no new PR visible this iter. [yellow] carry.
+- **Tier 2 weekly probe (auth_401)**: CONFIRMED — auth 401 still occurring in beacon_telegram_bot.log (02:47Z, 04:52Z MDT). Action Larry: `docs/runbooks/rotate-claude-setup-tokens.md`. [yellow] carry.
+- **Check IX GITHUB_TOKEN**: Not tested (Thursday). [yellow] carry.
+- **APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001**: Not verified; carry. [blue]
+- **G-rule cycle-timer checkpoint 3/3**: No new go signal. [blue] carry.
+- **G-rule actor-exemption-config 3/3**: New occurrences at L1488/L1489/L1252/L1253 — pattern holds. No new dispatch (APPROVAL_REQUEST already queued). [blue] carry.
+- **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001**: [blue] carry.
+- **sync-push-rebase-fallback-001**: No new occurrence. [blue] carry.
+- **catalog-accuracy-drift G-rule 1/3**: 1 occurrence at iter 1436. [blue] carry — watch for 2/3.
+- **ccd-s1-envelope-builder PAUSED**: CONFIRMED — still in forge inbox awaiting APPROVAL_REQUEST ccd-s1-identity-resolution. [blue] carry.
+- **ccd-s3-derivable-context-backfill**: NEW positive finding — in forge inbox AND in-flight (ccd-s3 build session active). CCD DAG progressing. ✅
+
+**Actions taken:** Archived pulse inbox notification. Routed APPROVAL_REQUEST direction-ask to Beacon inbox. Appended L1260 escalation to larry-alerts.jsonl. Updated alert-triage.json watermark → L1260. Recorded tier-reset to cycle-tier.json.
+
+**Dispatches:** 1 — pulse-wedged-forge-exit-fix-direction-ask-20260611T123000Z.json → beacon inbox (route APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611` for formal registration).
+
+**PRIME DIRECTIVE:** +1 intervention (Beacon APPROVAL_REQUEST unregistered — spent attention routing). Script-authoritative: interventions≈781+, systemic_fixes=21, ratio ≈37.1, trend=flat.
+
+**Standing findings:**
+- [yellow] **PR #457 Mirror escalation standing ~3h44min** — `_candidate_owns_build_dispatch` non-functional. Larry decision: revise spec (APPROVAL_REQUEST to Beacon) or push back. DM sent 11:09Z (iter 1441). No new DM this iter.
+- [yellow] **Beacon APPROVAL_REQUEST wedged-forge-exit-fix-direction-20260611** — direction-ask routed to Beacon inbox. Beacon will DM Larry with binary gate. Not in beacon-pending-approvals.json yet.
+- [yellow] **bughunt-gate-soak** — Phase 2 decision pending Larry.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3; Forge PR pending.
+- [yellow] **Tier 2 weekly probe (auth_401)** — Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [blue] **ccd-s3 in-flight** — CCD Stage 3 (derivable-context-backfill) active. ✅ positive.
+- [blue] **resume-fix-build-background-task-output-visibility-001-r1** — queued in forge inbox.
+- [blue] **ccd-s1-envelope-builder PAUSED** — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry sign-off.
+- [blue] **catalog-accuracy-drift G-rule 1/3** — 5/34 shelf cards drifted; watch for 2/3.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering.
+
+**Watch items for next iter (~1461):**
+- **Beacon inbox** — expect pickup of direction-ask and formal APPROVAL_REQUEST DM to Larry for wedged-forge-exit-fix-direction-20260611.
+- **PR #457** — if still open and no Larry decision by next interactive iter, escalate [red].
+- **ccd-s3** — watch for PR from active in-flight build.
+- **resume-fix-build-background-task-output-visibility-001-r1** — expect Forge pickup after ccd-s3.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0 — PR #457 standing, APPROVAL_REQUEST unregistered).
+
+---
