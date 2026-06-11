@@ -110,8 +110,8 @@ def _connect_supabase():
             'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — '
             'cannot run retention.'
         )
-    from supabase import create_client  # type: ignore
-    return create_client(url, key)
+    from supabase_factory import get_supabase_client  # type: ignore
+    return get_supabase_client(url, key)
 
 
 def load_retention_config(

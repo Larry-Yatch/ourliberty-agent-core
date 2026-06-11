@@ -66,6 +66,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from test_isolation_guard import refuse_under_test  # noqa: E402
+
 _MODELS_CONFIG_PATH = _SCRIPTS_DIR.parent / 'config' / 'agent-models.json'
 
 AGENTS_ROOT = Path('/home/larry/agents')
@@ -511,6 +513,7 @@ def delete_remote(repo: Path, branches: list[str]) -> int:
     """``git push origin --delete`` in chunks; retry a failed chunk per-ref so a
     single already-deleted ref doesn't fail the batch. Returns the count
     successfully deleted."""
+    refuse_under_test('git-push-delete')
     deleted = 0
     for i in range(0, len(branches), DELETE_CHUNK):
         chunk = branches[i:i + DELETE_CHUNK]

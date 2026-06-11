@@ -21,6 +21,10 @@ the file HANDLING is hardened. Import is side-effect-free (executable flow under
 main()/__main__). See auth_orchestrator.py for the Tier 1 twin.
 """
 import os, pty, subprocess, time, select, sys, re, stat, errno, atexit
+from pathlib import Path
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_isolation_guard import refuse_under_test
 
 URL_FILE = "/tmp/auth-url-tier2.txt"
 CODE_FILE = "/tmp/auth-code-tier2.txt"
@@ -140,6 +144,7 @@ def main():
     log(f"target_dir={target_dir} ready")
 
     log("spawning claude auth login (no --email pre-fill)")
+    refuse_under_test('claude-spawn')
     master, slave = pty.openpty()
     proc = subprocess.Popen(
         ["claude", "auth", "login", "--claudeai"],

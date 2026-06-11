@@ -25,6 +25,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_isolation_guard import refuse_under_test
+
 AGENTS_ROOT = Path.home() / 'agents'
 BLACKBOARD = AGENTS_ROOT / 'blackboard'
 HALT_FILE = BLACKBOARD / 'EMERGENCY_HALT'
@@ -45,6 +49,7 @@ def log(message, level='INFO'):
 
 def halt():
     """Activate emergency halt."""
+    refuse_under_test('kill-switch')
     BLACKBOARD.mkdir(parents=True, exist_ok=True)
     halt_data = {
         'activated_at': datetime.now(timezone.utc).isoformat(),

@@ -61,6 +61,7 @@ import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push write
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
 from telegram_text_utils import strip_leading_slash  # noqa: E402
+from test_isolation_guard import refuse_under_test  # noqa: E402
 
 # ---------- config ----------
 
@@ -363,6 +364,7 @@ def http_json(url: str, payload: Optional[dict] = None, timeout: int = 35) -> Op
 
 def telegram_send(chat_id: int, text: str) -> None:
     """Send a message, splitting if it exceeds Telegram's 4096-char limit."""
+    refuse_under_test('telegram-send')
     if not text:
         text = "[empty response]"
     while text:
@@ -401,6 +403,7 @@ def _run_claude_once(
         env["HOME"] = home_override
     if oauth_token:
         env["CLAUDE_CODE_OAUTH_TOKEN"] = oauth_token
+    refuse_under_test('claude-spawn')
     try:
         return subprocess.run(
             cmd,
@@ -918,6 +921,7 @@ def _send_alert_dm(chat_id: int, text: str) -> bool:
     Per-line ack on the alert queue depends on this returning truthfully —
     advancing the offset on a half-failed send loses the alert (M2 fix).
     """
+    refuse_under_test('telegram-send')
     if not text:
         return True
     chunks: list[str] = []

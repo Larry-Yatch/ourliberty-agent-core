@@ -71,6 +71,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 from atomic_io import atomic_write_json  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
+from test_isolation_guard import gh_write  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
@@ -246,7 +247,7 @@ def list_open_prs(repo: str) -> list[dict]:
 def add_stalled_label(repo: str, pr_number: int) -> bool:
     env = {**os.environ, 'PATH': '/usr/bin:/usr/local/bin:/snap/bin'}
     try:
-        result = subprocess.run(
+        result = gh_write(
             ['gh', 'pr', 'edit', str(pr_number), '--repo', repo,
              '--add-label', STALLED_LABEL],
             capture_output=True, text=True, timeout=GH_TIMEOUT_S, env=env,
@@ -446,7 +447,7 @@ def merge_pr(repo: str, pr_number: int, title: str) -> tuple[str, str]:
     outbox_notifier._auto_merge_pr."""
     env = {**os.environ, 'PATH': '/usr/bin:/usr/local/bin:/snap/bin'}
     try:
-        result = subprocess.run(
+        result = gh_write(
             ['gh', 'pr', 'merge', str(pr_number),
              '--repo', repo, '--squash', '--delete-branch'],
             capture_output=True, text=True, timeout=GH_TIMEOUT_S, env=env,

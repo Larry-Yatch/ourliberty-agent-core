@@ -44,8 +44,24 @@ os.environ['OURLIBERTY_AGENTS_ROOT'] = _TMP_AGENTS_ROOT.name
 
 import deploy_notifier as dn  # noqa: E402
 
+try:
+    from . import _chokepoint_optout
+except ImportError:
+    import _chokepoint_optout
+
+_CHOKEPOINT_SAVED_SENTINEL = None
+
+
+def setUpModule():  # noqa: N802 — unittest API
+    # This module drives a Layer B-guarded chokepoint against the tmpdir tree
+    # above; opt out so the guard passes through to the test's mocks (the #428
+    # real-tree leak scanner still runs).
+    global _CHOKEPOINT_SAVED_SENTINEL
+    _CHOKEPOINT_SAVED_SENTINEL = _chokepoint_optout.disengage_guards()
+
 
 def tearDownModule():  # noqa: N802 — unittest API
+    _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
     _TMP_AGENTS_ROOT.cleanup()
 
 

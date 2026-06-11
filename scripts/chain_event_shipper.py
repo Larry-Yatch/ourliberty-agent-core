@@ -959,13 +959,16 @@ def build_client_options(timeout_sec: int = SUPABASE_TIMEOUT_SEC) -> Optional[An
         return None
 
 
-def build_client(create_client, url: str, key: str,
+def build_client(url: str, key: str,
                  timeout_sec: int = SUPABASE_TIMEOUT_SEC):
     """Build a supabase client with the PostgREST request timeout pinned.
 
-    ``create_client`` is the caller's already-imported supabase factory — each
-    caller imports it under its own ImportError policy (emit returns None,
-    SupabaseSink raises RuntimeError), so only the build is shared here.
+    The actual client is built through ``supabase_factory.get_supabase_client``
+    — the ONE guarded chokepoint (test-jail Layer B, H7), so an un-mocked build
+    from a test process raises ``TestIsolationBreach`` instead of connecting to
+    the live project. ``get_supabase_client`` raises ``ImportError`` if
+    supabase-py is absent; callers keep their own ImportError policy (emit
+    returns None, SupabaseSink raises RuntimeError).
 
     The timeout comes from ``build_client_options``. If this supabase-py build
     can't supply ClientOptions, OR its ``create_client`` rejects the ``options=``
@@ -975,13 +978,14 @@ def build_client(create_client, url: str, key: str,
     invokes ``_get_client`` outside its try/except), so a TypeError here would
     wedge the very loop the timeout exists to protect. See build_client_options.
     """
+    from supabase_factory import get_supabase_client  # type: ignore
     options = build_client_options(timeout_sec)
     if options is None:
-        return create_client(url, key)
+        return get_supabase_client(url, key)
     try:
-        return create_client(url, key, options=options)
+        return get_supabase_client(url, key, options=options)
     except TypeError:
-        return create_client(url, key)
+        return get_supabase_client(url, key)
 
 
 class SupabaseSink:
@@ -1005,17 +1009,18 @@ class SupabaseSink:
                 'SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing — '
                 'cannot connect to Supabase.'
             )
+        # Pin the PostgREST request timeout (SUPABASE_TIMEOUT_SEC) so a Supabase
+        # network black-hole fails fast instead of blocking each drain for
+        # supabase-py's multi-tens-of-seconds default — see build_client. The
+        # client is built through the guarded supabase_factory chokepoint, which
+        # raises ImportError when supabase-py is absent.
         try:
-            from supabase import create_client  # type: ignore
+            self._client = build_client(url, key)
         except ImportError as exc:
             raise RuntimeError(
                 'supabase-py is not installed. '
                 'pip3 install --user --break-system-packages supabase'
             ) from exc
-        # Pin the PostgREST request timeout (SUPABASE_TIMEOUT_SEC) so a Supabase
-        # network black-hole fails fast instead of blocking each drain for
-        # supabase-py's multi-tens-of-seconds default — see build_client.
-        self._client = build_client(create_client, url, key)
 
     def insert_rows(self, rows: list[dict[str, Any]]) -> None:
         """INSERT a batch with PK conflict treated as no-op.

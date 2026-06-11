@@ -37,10 +37,10 @@ _COMPONENT_SEP = ("-", "_")
 
 
 def _client():
-    from supabase import create_client
+    from supabase_factory import get_supabase_client
     url = os.environ["SUPABASE_URL"]
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-    return create_client(url, key)
+    return get_supabase_client(url, key)
 
 
 def _is_mock(tid):

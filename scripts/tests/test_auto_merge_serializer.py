@@ -45,12 +45,22 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 
+try:
+    from . import _chokepoint_optout
+except ImportError:
+    import _chokepoint_optout
+
 _AGENTS_ROOT_BACKUP = None
 _AGENTS_ROOT_TMPDIR = None
+_CHOKEPOINT_SAVED_SENTINEL = None
 
 
 def setUpModule():  # noqa: N802 — unittest hook
-    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR
+    global _AGENTS_ROOT_BACKUP, _AGENTS_ROOT_TMPDIR, _CHOKEPOINT_SAVED_SENTINEL
+    # Auto-merge drives gh-write (gh pr merge) through outbox_notifier against
+    # the rerouted tmpdir tree; opt out of the Layer B guards so they pass
+    # through to the test's mocks (the #428 real-tree scan still runs).
+    _CHOKEPOINT_SAVED_SENTINEL = _chokepoint_optout.disengage_guards()
     _AGENTS_ROOT_BACKUP = os.environ.get('OURLIBERTY_AGENTS_ROOT')
     _AGENTS_ROOT_TMPDIR = tempfile.mkdtemp(prefix='auto-merge-serializer-test-')
     os.environ['OURLIBERTY_AGENTS_ROOT'] = _AGENTS_ROOT_TMPDIR
@@ -61,6 +71,7 @@ def setUpModule():  # noqa: N802 — unittest hook
 
 
 def tearDownModule():  # noqa: N802
+    _chokepoint_optout.reengage_guards(_CHOKEPOINT_SAVED_SENTINEL)
     if _AGENTS_ROOT_BACKUP is None:
         os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
     else:

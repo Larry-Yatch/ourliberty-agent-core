@@ -46,8 +46,8 @@ def _client():
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
         sys.exit("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not in environment")
-    from supabase import create_client
-    return create_client(url, key)
+    from supabase_factory import get_supabase_client
+    return get_supabase_client(url, key)
 
 
 def _is_test(row):

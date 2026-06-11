@@ -43,7 +43,7 @@ concurrent use.
 
 ## Why not use the shipper's `SupabaseSink` class directly
 
-`SupabaseSink` is a thin wrapper around `create_client(...).table(...)`.
+`SupabaseSink` is a thin wrapper around the guarded supabase client's `.table(...)`.
 Reusing it from this module would require sharing a process-scope sink
 instance with the shipper daemon, which doesn't exist in the bot/notifier
 processes. Cheaper to instantiate the client lazily here, same way the
@@ -96,18 +96,19 @@ def _get_client():
     key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
     if not url or not key:
         return None
-    try:
-        from supabase import create_client  # type: ignore
-    except ImportError:
-        return None
     # Pin the PostgREST request timeout (shipper's SUPABASE_TIMEOUT_SEC) so a
     # Supabase network black-hole fails fast. Without it, every push-emit site
     # in outbox_notifier blocks this synchronous upsert for supabase-py's
     # multi-tens-of-seconds default — and because those emits run inside the
     # single-threaded notifier's process_outbox loop, one stall serializes ALL
     # agents' notifications behind it. ces.build_client falls back to an
-    # un-pinned client (never raises into emit_event) on supabase-py drift.
-    _CLIENT = ces.build_client(create_client, url, key)
+    # un-pinned client (never raises into emit_event) on supabase-py drift, and
+    # builds through the guarded supabase_factory chokepoint — which raises
+    # ImportError when supabase-py is absent (degrade to None, no live emit).
+    try:
+        _CLIENT = ces.build_client(url, key)
+    except ImportError:
+        return None
     return _CLIENT
 
 

@@ -36,6 +36,7 @@ if str(_TESTS_DIR) not in sys.path:
 
 import chain_event_emit as cee  # noqa: E402
 import chain_event_shipper as ces  # noqa: E402
+import test_isolation_guard  # noqa: E402
 from _fake_supabase import make_fake_supabase  # noqa: E402
 
 
@@ -323,15 +324,18 @@ class TestGetClientPinsTimeout(unittest.TestCase):
     def _build_client(self, fake) -> Any:
         """Lift the test-isolation guards and build a client against `fake`.
 
-        The fake create_client makes this safe (no network). tearDown restores
-        the guards even if an assertion fails mid-block.
+        The fake create_client makes this safe (no network). This is a genuine
+        self-test of the guarded Supabase chokepoint, so the real build is wrapped
+        in ``test_isolation_guard.allow('supabase')`` (the sanctioned escape
+        hatch). tearDown restores the guards even if an assertion fails mid-block.
         """
         with mock.patch.dict(sys.modules, {'supabase': fake}):
             cee.os.environ.pop('OURLIBERTY_DISABLE_LIVE_EMIT', None)
             cee.os.environ.pop('PYTEST_CURRENT_TEST', None)
             cee.os.environ['SUPABASE_URL'] = 'https://example.supabase.co'
             cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'svc-role-key'
-            return cee._get_client()
+            with test_isolation_guard.allow('supabase'):
+                return cee._get_client()
 
     def test_get_client_passes_postgrest_timeout_option(self):
         capture: dict[str, Any] = {}

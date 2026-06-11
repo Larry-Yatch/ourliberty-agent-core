@@ -35,6 +35,26 @@ import agent_runner as ar  # noqa: E402
 import active_tier  # noqa: E402
 import larry_alerts  # noqa: E402
 
+try:
+    from . import _chokepoint_optout
+except ImportError:
+    import _chokepoint_optout
+
+_SAVED_SENTINEL = None
+
+
+def setUpModule():  # noqa: N802 — unittest hook name
+    # This module mocks subprocess.Popen/run to inspect the env it WOULD spawn
+    # with; the Layer B claude-spawn guard sits just before that mocked call and
+    # would breach first. Opt out for the module so the guard is a pass-through
+    # to the mock (the #428 real-tree scanner still runs).
+    global _SAVED_SENTINEL
+    _SAVED_SENTINEL = _chokepoint_optout.disengage_guards()
+
+
+def tearDownModule():  # noqa: N802 — unittest hook name
+    _chokepoint_optout.reengage_guards(_SAVED_SENTINEL)
+
 
 def _ok_response(text='ok', session_id='sid-new'):
     return json.dumps({'result': text, 'session_id': session_id})

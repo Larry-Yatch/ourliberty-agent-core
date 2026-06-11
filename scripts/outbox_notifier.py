@@ -81,6 +81,7 @@ import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
 import trust_policy                 # noqa: E402
 import worktree_manager             # noqa: E402  # auto-merge worktree teardown
+from test_isolation_guard import gh_write  # noqa: E402
 
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
@@ -4685,7 +4686,7 @@ def _post_mirror_review_commit_status(
         return None
 
     try:
-        proc = subprocess.run(
+        proc = gh_write(
             ['gh', 'api', f'repos/{repo_coords}/statuses/{head_sha}',
              '-f', f'state={state}',
              '-f', f'context={_MIRROR_REVIEW_STATUS_CONTEXT}',
@@ -4775,7 +4776,7 @@ def _auto_merge_pr(pr_url: str, task_id: str) -> dict[str, Any]:
         }
     repo_coords, pr_number = parsed
     try:
-        proc = subprocess.run(
+        proc = gh_write(
             ['gh', 'pr', 'merge', str(pr_number),
              '--repo', repo_coords,
              '--squash',
