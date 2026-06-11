@@ -4,6 +4,111 @@
 
 ---
 
+## Iteration 1396 — 2026-06-11 02:22Z UTC (interactive, Tier 3→1)
+
+**Health:** ⚠️ Signal. 6 new alerts (lines 1435–1440): G-rule 3/3 transcript-not-persisted triggered (forge tier2+tier1 + pulse tier1), Beacon dispatch queued. unreviewed-merge:439 (Tier-4, notifier already DM'd). park-the-nudge sequence now ACTIVE — PRs #441/#442/#443 opened. Install-drift on schedule at 06:00Z (3h 38m). **Tier 3→1 reset** (non-Tier-3 Check 0 findings).
+
+**VERIFY-BEFORE-REASSERT (iter 1395 watch items):**
+- install-drift healer 06:00Z June 11: **CONFIRMED** — `ourliberty-heal-systemd-install-drift.timer` NEXT=Thu 2026-06-11 00:00:00 MDT = 06:00:00 UTC, 3h 41min left at scan. ✅ On schedule.
+- transcript-not-persisted 3rd occurrence before 06:00Z: **CONFIRMED** — lines 1438-1440 (forge tier2, forge tier1, pulse tier1), 01:58–02:00Z. G-rule 2/3 → 3/3. ✅ Triggered; dispatch queued.
+- PR #439 OPEN: **MERGED** — unreviewed-merge:439 alert fired at 01:50Z (line 1435); route=escalate; notifier DM'd Larry. ✅ Resolved.
+- Sync: last_sync=2026-06-11T01:50:22Z (28 min old at 02:18Z scan), expires ~03:50Z. ✅ Nominal.
+
+**Check 0 — Alert triage (lines 1435–1440, 6 new):**
+- **Line 1435** (01:50:08Z): `heal-unreviewed-merge-detector` / `unreviewed-merge:439` / route=escalate. PR #439 spec merged by Larry-Yatch, no Mirror review. Standing pattern (G-rule 3/3 DISPATCHED iter 959, `go: actor-exemption-config` pending). outbox-notifier already DM'd via route=escalate. **Tier-4** — journal note only, no Pulse DM, tier-reset. ✅
+- **Line 1436** (01:53:58Z): `outbox-notifier` / `mirror-dag-pass:park-the-nudge` / route=escalate. Mirror DAG-preflight PASS for `park-the-nudge` sequence; transitioned `pending` → `active`; first build step dispatched ≤5 min. **Tier-3** known-pattern (mirror-dag-pass:* in alert-translations.json per PR #264 iter 668). Silence + journal note. No tier-reset. ✅
+- **Line 1437** (01:54:20Z): `missions-card-gc` / `summary` / route=digest. **Tier-3** known-pattern (`silence-missions-card-gc-summary-alert-001`). Silence. No tier-reset. ✅
+- **Lines 1438–1440** (01:58–02:00Z): `agent-runner-forge` tier2 + `agent-runner-forge` tier1 + `agent-runner-pulse` tier1 — all `transcript-not-persisted` / route=escalate / CRITICAL. Root cause: PR #438 unit install gap (forge-bot + pulse-bot ReadWritePaths not yet installed; install-drift auto-heals 06:00Z June 11). G-rule 2/3 → **3/3 TRIGGERED**. Beacon dispatch written. **Tier-2** (actionable CRITICAL); tier-reset. ✅
+- **Watermark: advance to line 1440 / agent-runner-pulse:transcript-not-persisted / 2026-06-11T02:00:13Z**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon-pending-approvals.json MISSING (= []). No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall ran at 02:13:23Z (5 min before scan), status=0/SUCCESS. 0 new alerts fired, 1 suppressed (cooldown: tier2-fallback beacon-bot rate_limit). 0 active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives:** None detected. beacon-pending-approvals empty. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING → standing pattern, unchanged. ✅
+
+**Check A — Source repo:** last_sync=2026-06-11T01:50:22Z, branch=main, status=no-change, HEAD=5717f2c. ✅ Nominal.
+
+**Check B — Sync health:** 28 min old at 02:18Z scan (threshold 2h), expires ~03:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service (current) ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #439 "spec: park-the-nudge":** MERGED ✅ (unreviewed-merge alert at 01:50Z; removed from watch). Closed.
+- **PR #440 "fix(cycle): invoke record_iter_result":** MERGED ✅ at 00:20:36Z June 11 (confirmed via gh pr view). Closed.
+- **PR #441 "fix(reaper): spare worktrees of builds still in flight":** OPEN, MERGEABLE, reviewDecision="", createdAt=02:06Z (12 min at scan). Mirror review task `review-fix-wedged-reaper-spares-active-build-worktree-002.json` in Mirror inbox. Watch (30-min threshold at 02:36Z).
+- **PR #442 "feat(capture): add allowlisted first-class label to capture ingest":** OPEN, UNKNOWN mergeable (github computing), createdAt=02:13Z (5 min at scan). Forge revision build `build-capture-label-contract.json` in Forge inbox (marker-error recovery). Watch.
+- **PR #443 "chore(alerts): translation entry for claude_tier1_failed_tier2_unavailable":** OPEN, MERGEABLE, reviewDecision="", createdAt=02:16Z (2 min at scan). Mirror review task `review-add-tier-fallback-alert-translation-001.json` in Mirror inbox. Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Inboxes:**
+- Forge: `build-capture-label-contract.json` (PR #442 revision). Active in-flight, not stale. ✅
+- Beacon: `notify-fix-wedged-reaper-spares-active-build-worktree-002.json` (PR #441 notify) + `cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z.json` (G-rule 3/3 dispatch, written this iter). ✅
+- Mirror: `review-add-tier-fallback-alert-translation-001.json` (PR #443) + `review-fix-wedged-reaper-spares-active-build-worktree-002.json` (PR #441). Both fresh. ✅
+- Pulse: empty. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip (not Mon/Wed/Fri/Sun). ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: 0 overdue, 0 upcoming within 60d. ✅
+- install-drift timer: confirmed NEXT=06:00:00 UTC June 11, 3h 41min left at scan. ✅
+
+**G-rule tracking:**
+- **`unknown-task transcript-not-persisted`: 2/3 → 3/3 DISPATCHED** — 3 new occurrences (lines 1438-1440, 01:58–02:00Z: forge tier2 + forge tier1 + pulse tier1). Root cause = PR #438 unit install gap. Auto-heals 06:00Z June 11. Beacon dispatch written: `cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z.json`. Permanent fix: add post-merge triggered path to install-drift healer for unit-file-change PRs.
+- **park-the-nudge sequence ACTIVE** — Mirror DAG-preflight PASS (line 1436, 01:53Z). PRs #441/#442/#443 opened 02:06–02:16Z. Pipeline healthy.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry pending Beacon/Forge.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rules: carry from iter 1395 unchanged.
+
+**Actions taken:**
+1. Wrote Beacon dispatch envelope: `~/agents/inboxes/beacon/cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z.json` (G-rule 3/3 transcript-not-persisted, post-merge unit reload permanent fix spec request).
+2. Recorded PRIME DIRECTIVE ledger rows: 2 interventions + 1 systemic_fix (via `scripts/cycle_prime_ledger.py append`).
+3. Tier-reset to Tier 1 (via `scripts/cycle_tier_state.py record --checks-clean false`).
+
+**PRIME DIRECTIVE:** +2 interventions, +1 systemic_fix this iter. Running total: interventions=769, systemic_fixes=20, verification_pending=9, ratio≈38.45, trend=improving (+1 systemic_fix).
+**Tier end-of-iter:** 3→1 reset (transcript-not-persisted Tier-2 + unreviewed-merge:439 Tier-4; consecutive_clean reset to 0). `cycle_tier_state.py record --checks-clean false` → tier reset 3→1 confirmed 02:22:30Z.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: PR #438 unit install gap. **G-rule 3/3 DISPATCHED this iter.** Auto-heals 06:00Z June 11 (install-drift). Beacon dispatch: `cycle-finding-transcript-not-persisted-post-merge-unit-reload-20260611T021843Z.json`.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] unreviewed-merge:439 DM'd by notifier (Tier-4, 01:50Z; actor-exemption-config G-rule 3/3 DISPATCHED iter 959, pending `go: actor-exemption-config`).
+- [blue] PR #441: OPEN, MERGEABLE, ~12 min, Mirror reviewing. Watch (30-min threshold 02:36Z).
+- [blue] PR #442: OPEN, UNKNOWN mergeable, ~5 min, Forge revision build in flight. Watch.
+- [blue] PR #443: OPEN, MERGEABLE, ~2 min, Mirror reviewing. Watch.
+- [blue] park-the-nudge sequence ACTIVE (DAG-preflight PASS 01:53Z; 3 PRs opened 02:06–02:16Z).
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+
+**Watch items for iter 1397:**
+- install-drift healer: confirm fires 06:00Z June 11 and installs PR #438 unit changes (forge-bot + pulse-bot ReadWritePaths). If confirmed → transcript-not-persisted G-rule closed; alert-translations.json PR #439 (park-the-nudge) unreviewed-merge alert no longer watch.
+- PR #441: 30-min threshold at 02:36Z. If clean+green + Mirror PASS → auto-merge eligible.
+- PR #442: Watch for Forge revision build result + PR update (UNKNOWN mergeable may resolve).
+- PR #443: Mirror review in flight. Watch for PASS → auto-merge.
+- park-the-nudge sequence: All 3 PRs in progress. Watch for first merge.
+- Sync: next push ~03:50Z. Verify SYNC-PUSH-REBASE-FALLBACK-001 doesn't fire.
+- Tier 1 cadence restored. Watch for signal-clear.
+
+---
+
 ## Iteration 1395 — 2026-06-11 01:50Z UTC (interactive, Tier 2→3)
 
 **Health:** ✅ All checks nominal. No new actionable alerts. 9/9 services active. Install-drift timer confirmed for 06:00Z June 11 (~4h 10min away at scan). Transcript-not-persisted G-rule 2/3 (no new occurrence). PR #439 within 72h threshold. **Tier de-escalation: 3 consecutive clean Tier-2 iters → Tier 3.**
