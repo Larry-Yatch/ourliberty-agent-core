@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration 1401 — 2026-06-11 03:34Z UTC (interactive, Tier 2→3 de-escalation, consecutive_clean 2→3)
+
+**Health:** ✅ All checks nominal. 4 new alerts (lines 1451–1454): 3 Tier-3 silences + 1 digest-class auto-restart (all suppressed). PR #444 MERGED 03:28:18Z. Install-drift timer on schedule (06:00Z). **Tier de-escalation: 3 consecutive clean Tier-2 iters → Tier 3.**
+
+**VERIFY-BEFORE-REASSERT (iter 1400 watch items):**
+- install-drift timer fires 06:00Z June 11: **CONFIRMED** — `ourliberty-heal-systemd-install-drift.timer` Next=Thu 2026-06-11 00:00:00 MDT = 06:00:00Z, ~2h 28min remaining at scan. ✅ Not yet fired, on schedule.
+- PR #444 "feat(pulse): park non-auto-dispatched proposals and silence their DM lines": **MERGED 03:28:18Z** ✅ Mirror PASS → auto-merge completed. 0 open PRs.
+- Sync: last_sync=02:50:33Z (40 min old at scan). ✅ Fresh (expires ~04:50Z).
+- Tier 2, consecutive_clean=2: this iter clean → consecutive_clean 2→3 → **tier promoted 2→3**. ✅
+
+**Check 0 — Alert triage (lines 1451–1454, 4 new):**
+- **Line 1451** (03:14:23Z): `heal-stale-daemon-code` / `auto-restarted:ourliberty-dashboard-api.service` / route=digest. Stale-daemon healer auto-restarted dashboard-api (script mtime 516 min newer than active-since; new code: commit a193969 feat(capture) from PR #442). Triage system: Tier 4 (no registry template). Overriding: route=digest, service confirmed active+running, auto-remediated expected behavior — per Larry's feedback suppress expected-by-design + auto-remediated noise. Treating as informational. G-rule candidate (1/3): add `auto-restarted:*` (source=heal-stale-daemon-code, route=digest) to Tier-3 known-pattern allowlist. ✅ No DM.
+- **Line 1452** (03:23:02Z): `agent-runner-forge` / `transcript-not-persisted:tier2` / route=escalate. 13th occurrence. Same PR #438 unit install gap. **Tier-3** — silence. ✅
+- **Line 1453** (03:23:02Z): `agent-runner-forge` / `transcript-not-persisted:tier1` / route=escalate. 14th occurrence. **Tier-3** — silence. ✅
+- **Line 1454** (03:24:33Z): `agent-runner-pulse` / `transcript-not-persisted:tier1` / route=escalate. 15th occurrence. **Tier-3** — silence. ✅
+- **Watermark: advance to line 1454 / agent-runner-pulse:transcript-not-persisted:tier1 / 2026-06-11T03:24:33Z**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives in bot logs. beacon-pending-approvals.json MISSING/EMPTY. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal_pipeline_stall.py --dry-run → `no stalls detected`. All Forge tasks FORGE_NO_PR_SKIP (existing PRs / preflight-archived). ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING → standing pattern, unchanged. Note: healer IS firing (line 1451 confirms restart occurred) — state file path disconnect is the pre-existing gap. ✅
+
+**Check A — Source repo:** Branch main, clean tree (gitStatus context confirmed). agent-core-sync.json branch=main, status=no-change, last_sync=02:50:33Z. ✅ Nominal.
+
+**Check B — Sync health:** 40 min old at scan. Expires ~04:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅ (freshly restarted at 03:14Z), cycle.service ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- ourliberty-agent-core: 0 open PRs (PR #444 MERGED 03:28:18Z). ✅
+- ourliberty-dashboard: not queried (no signals requiring check). ✅
+
+**Check H — Inboxes:**
+- Forge: `build-pulse-park-and-silence.json` — phase=build, stale (PR #444 merged 03:28Z). No stall detected. Lifecycle auto-advance expected. ✅
+- Beacon: EMPTY ✅. Mirror: EMPTY ✅. Pulse: EMPTY ✅.
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- §5.0 bug-hunt gate: no-op. ✅
+- Credential rotations: 0 overdue, 0 upcoming within 60d. ✅
+- install-drift timer: NEXT=06:00:00Z June 11, ~2h 28min left. ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted`: 3/3 DISPATCHED (iter 1396).** 3 new occurrences (lines 1452–1454, now 15 total). Auto-heals 06:00Z today (~2h 28min). Carry.
+- **`heal-stale-daemon-code:auto-restarted` (NEW, 1/3):** Line 1451. route=digest, auto-remediated. G-rule candidate for Tier-3 allowlist. Need 2 more occurrences to dispatch.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rules: carry from iter 1400 unchanged.
+
+**Actions taken:**
+1. Recorded cycle tier state: consecutive_clean 2→3 at Tier 2 via `scripts/cycle_tier_state.py record --checks-clean true` at 03:34:05Z → **tier promoted 2→3, consecutive_clean reset to 0**. ✅
+2. No auto-fix actions executed (all checks nominal).
+3. No dispatches this iter.
+
+**PRIME DIRECTIVE:** 0 rows this iter (all Tier-3 silences + digest-class informational + nominal checks). Running total: interventions≈770, systemic_fixes=20, verification_pending=9, ratio≈38.5, trend=stable.
+**Tier end-of-iter:** **Tier 3** (promoted from Tier 2), consecutive_clean=0 (need 3 clean iters to remain at Tier 3).
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **15 total occurrences** (lines 1438–1454). Auto-heals 06:00Z June 11 (~2h 28min). Larry action pending: say **"dispatch the install-drift trigger fix"** in Beacon chat (or wait for auto-heal at 06:00Z).
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] Beacon spec-ready (install-drift trigger fix): Larry action pending — say "dispatch the install-drift trigger fix" in Beacon chat.
+- [blue] heal-stale-daemon-code:auto-restarted G-rule 1/3. Carry.
+
+**Watch items for iter 1402:**
+- install-drift timer: fires 06:00Z June 11 (~2h 26min from journal write). If confirmed → transcript-not-persisted G-rule auto-resolved; PR #438 unit changes installed.
+- Forge inbox: `build-pulse-park-and-silence.json` stale phase=build. Should auto-archive after PR #444 merged. Watch.
+- Sync: expires ~04:50Z; refresh expected before iter 1402 (Tier 3 = 30-min cadence, next fire ~04:04Z).
+- Tier 3 cadence (30-min window).
+
+---
+
 ## Iteration 1400 — 2026-06-11 03:11Z UTC (interactive, Tier 2, consecutive_clean 1→2)
 
 **Health:** ✅ All checks nominal. 3 new alerts (lines 1448–1450), all Tier-3 silenced. PR #444 "feat(pulse): park non-auto-dispatched proposals and silence their DM lines (Contract B)" OPEN (03:07:11Z, 4 min at scan, MERGEABLE). Install-drift timer on schedule 06:00Z June 11 (~2h 48min). **Tier 2 clean iter 2/3.**
