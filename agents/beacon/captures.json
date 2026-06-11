@@ -214,6 +214,22 @@
       },
       "last_touched": "2026-06-11T07:17:28.294112+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-investigate-retry-clarification-cost-sources-d121",
+      "title": "Investigate retry / clarification cost sources",
+      "note": "~$3.00/wk reclaimable (22.0% of total spend is retries/clarifications)\n\nRetry overhead is above the 15% threshold. Audit the outbox-notifier log for the dominant retry shapes (revision, clarification, cycle-fix) and tighten the upstream preflight / spec template that caused them.",
+      "state": "parked",
+      "label": "pulse-check-i",
+      "origin": {
+        "source": "agent",
+        "session_id": null,
+        "repo": "inbox-watcher-log-jail",
+        "branch": "fix/inbox-watcher-log-sink-jail",
+        "captured_at": "2026-06-11T17:47:05.211097+00:00"
+      },
+      "last_touched": "2026-06-11T17:47:05.211097+00:00",
+      "promoted_to": null
     }
   ]
 }
