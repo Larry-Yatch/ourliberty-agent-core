@@ -4,6 +4,97 @@
 
 ---
 
+## Iteration ~1506 — 2026-06-11 18:19Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Non-nominal — Check 0: new `unreviewed-merge:467` alert (PR #467 merged by Larry without Mirror review, 18:14:29Z). Worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` still present, 51 min post-PR#465 merge; escalation threshold 18:28Z (9 min remaining at scan time). Forge `test-jail-pr2-choke-guards-001` still in progress (~45 min), PR #466 open.
+
+**VERIFY-BEFORE-REASSERT (iter ~1505 watch items):**
+- Forge `test-jail-pr2-choke-guards-001`: **STILL IN PROGRESS** ✅ — inbox task present (phase=preflight), inbox_watcher last entry 17:40:07Z (no `done` logged). PR #466 OPEN, UNKNOWN mergeable (GitHub computing). ~45 min elapsed. Normal cadence for complex multi-test jail task. Carry.
+- Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`: **STILL PRESENT** — confirmed `ls ~/agent-worktrees/`. PR #465 merged 17:28Z; ~51 min elapsed at scan time (~18:19Z). Escalation threshold 18:28Z (~9 min remaining at scan). Reaper PR #457 deployed 17:39Z; 40 min since deploy; not yet cleaned. Approaching escalation threshold.
+- Sync: last_sync=17:52:20Z (~26 min elapsed). Threshold 19:52:20Z. ✅ Good.
+
+**Check 0 — Alert triage:** larry-alerts.jsonl: 1286 lines (watermark L1284→L1286). 2 new entries:
+- **L1285 (18:15:16Z):** `heal-unreviewed-merge-detector` — `unreviewed-merge:467`. PR #467 (`fix(notifier): GitHub-truth-gate the review-pass auto-merge notify`) merged at 18:14:29Z by actor=Larry-Yatch (non-bot), no REVIEW_PASS evidence. Confirmed via `gh pr view 467`: state=MERGED, mergedAt=18:14:29Z, mergedBy=Larry-Yatch. severity=critical, route=escalate. **Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`)** — same classification as the 12 unreviewed merges in the standing list. Adding PR #467 to standing list (now 13 total). No new dispatch. `tier-reset`.
+- **L1286 (18:17:42Z):** `heal-stale-daemon-code` — auto-restarted `ourliberty-outbox-notifier.service` (script mtime newer than active-since by 150.3 min; commit 74634dd `fix(notifier): GitHub-truth-gate the review-pass auto-merge notify (#467)` deployed mtime=18:17:34Z vs service active-since=15:47:15Z). severity=warning, route=digest. Known pattern (G-rule dispatched iter ~1416). New occurrence. Journal note only; no new dispatch.
+New watermark: L1286. → Non-nominal (Tier-4 alert).
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last Larry message 17:34Z (zombie stand-down; addressed in prior iters). No new unaddressed directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (multiple FORGE_NO_PR_SKIP on already-matched tasks — expected). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: `test-jail-pr2-choke-guards-001.json` ACTIVE (started 17:34:24Z, ~45 min, PR #466 open). ✅ In progress.
+- Mirror: EMPTY ✅ | Beacon: EMPTY ✅ | Pulse: EMPTY ✅
+- All Larry directives in last 24h have matching chain artifacts. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. Healer auto-restarted outbox-notifier at 18:17:42Z per L1286 (healer ran; state file still not produced — standing defect). [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus: on main, clean, aligned with origin/main (head=df2ca8b `Pulse cycle 20260611T181733Z`). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T17:52:20Z (~26 min elapsed), status=no-change. 2h threshold 19:52:20Z. ✅ Good.
+
+**Check C — Agent liveness:** All 5 services active (inbox-watcher, beacon-bot, forge-bot, mirror-bot, outbox-notifier). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #466** (`test(jail): stop two tests leaking fixture lines into the real inbox_watcher.log (H3)`) — OPEN, UNKNOWN mergeable, reviewDecision="" — opened 17:50:30Z (~29 min at scan time). Approaching 30-min threshold. Forge task still active; Mirror review not dispatched. Not yet eligible for auto-merge. [blue] watch.
+- **PR #467** — MERGED 18:14:29Z (actor=Larry-Yatch, no Mirror review). Added to unreviewed-merge standing list.
+
+**Check H — Forge digest:** 1 open PR (#466, Mirror review pending Forge completion). `test-jail-pr2-choke-guards-001` IN PROGRESS (~45 min). Normal cadence.
+
+**§5.0 bug-hunt gate:** Thursday — no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d — no 60d trigger. ✅
+
+**Actions taken:** None. Chain advancing; no intervention warranted.
+
+**Standing findings (carried and updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **PR #466** — OPEN, UNKNOWN mergeable (~29 min), Forge task still running, Mirror review dispatch pending. Watch.
+- [blue] Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` — 51 min post-PR#465 merge. **Escalation threshold 18:28Z — CRITICAL WATCH next iter.**
+- [blue] alert-triage watermark L1286 (updated +2).
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. New occurrence this iter (L1286). Carry.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, **467**) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`). +1 this iter.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] **inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned)** — 1/3 G-rule (no new instances this iter). Carry.
+
+**Watch items for iter ~1507:**
+- **CRITICAL**: Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` — **ESCALATE** if still present at or past 18:28Z (60 min post-PR#465 merge). Only ~9 min remained at scan time; next iter should fire the escalation.
+- Forge `test-jail-pr2-choke-guards-001`: Watch for inbox_watcher `done` + Mirror review dispatch for PR #466.
+- PR #466: Once Forge completes + Mirror dispatched + Mirror PASS + 30-min clean+green + auto-merge not enabled → enable auto-merge.
+- Sync: 2h threshold 19:52:20Z. Auto-trigger if crossed and repo clean.
+
+**PRIME DIRECTIVE:** Non-nominal iter (Check 0 Tier-4 unreviewed-merge:467 + tier-reset). No new Pulse interventions. iter_clean stays 60. Running total: interventions=789, systemic_fixes=22, verification_pending=10, iter_clean=60, ratio≈35.86, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (non-nominal iter; active Forge build; PR #466 open).
+
+---
+
 ## Iteration ~1505 — 2026-06-11 18:14Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
