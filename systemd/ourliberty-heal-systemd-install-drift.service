@@ -18,7 +18,7 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # then add:
 #   Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true"
 # then `sudo systemctl restart ourliberty-heal-systemd-install-drift.timer`.
-Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=false"
+Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_systemd_install_drift.py
 TimeoutStartSec=60
 Nice=10
