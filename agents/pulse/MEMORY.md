@@ -6,6 +6,10 @@
 
 ---
 
+## Status snapshot — updated 2026-06-11 18:07Z UTC (Iter ~1504, interactive)
+
+**Iter ~1504 summary:** Alert watermark: L1284 (17:56:37Z / missions-card-gc:summary → Tier-3 silence; unchanged from iter ~1503). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=789, systemic_fixes=22, iter_clean=59, ratio≈35.86, trend=flat. **KEY STATE:** Forge `test-jail-pr2-choke-guards-001` ACTIVE (~32 min, started 17:34:24Z), PR #466 (`test(jail): stop two tests leaking fixture lines into the real inbox_watcher.log (H3)`) OPEN+MERGEABLE (opened 17:50:30Z), Mirror review not yet dispatched (Forge still running). Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes` ~38 min post-PR#465 merge (17:28Z); reaper deployed 17:39Z, not yet cleaned — escalate if still present at ~18:28Z. Sync clean: last_sync=17:52:20Z, threshold 19:52:20Z. All 4 services active. All checks nominal. **STANDING:** Tier-2 weekly probe auth_401 (pending Larry: rotate-claude-setup-tokens.md), Check III threshold proposals pending `approve threshold-update-2026-06-11` (2 high-attention: beacon Δ92%, forge Δ64%).
+
 ## Status snapshot — updated 2026-06-11 17:10Z UTC (Iter ~1496, interactive)
 
 **Iter ~1496 summary:** Alert watermark: L1281 (17:07:55Z / pipeline-stall:retry-exhausted:ccd-s4-healer-recover-then-alert → Tier-3 silence). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=789, systemic_fixes=22, iter_clean=53, ratio≈35.86, trend=flat. **KEY STATE:** CCD DAG — s1 ✅ s2 ✅ s3 ✅ s4 PR #463 MERGED ✅ s5 PR #465 OPEN/MERGEABLE (docs(beacon): S5 — opened 17:08:50Z). **INBOX-WATCHER STALL CLEARED ✅** — Larry restarted service; all 3 queued tasks processed. **fix-reaper-handoff-guard-descope-003 ACTIVE** (started 17:09:08Z, ~1h window). PR #457 (`fix(reaper)`) OPEN/FAILURE ~9h — 24h threshold 2026-06-12 08:13Z; resolution path: descope-003 ACTIVE. PR #465 Mirror review pending (outbox-notifier processing). **STANDING:** health-check-notify-script-missing, Tier-2-probe auth_401 (rotate-claude-setup-tokens.md), APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001, Check III proposals pending `approve threshold-update-2026-06-11`.
