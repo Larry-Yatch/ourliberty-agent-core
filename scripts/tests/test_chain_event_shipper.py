@@ -27,6 +27,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -200,8 +201,124 @@ class TestParseJournalRecord(unittest.TestCase):
 
 
 class TestParseLogLine(unittest.TestCase):
+    """The production lines below are copied from the droplet's
+    ~/agents/logs/outbox-notifier.log (2026-06-11): naive HOST-LOCAL
+    timestamp, a `[notifier]` tag before the level, free-text parentheticals
+    after the kv pairs. The original fixtures used an imaginary
+    `[ts] [LEVEL] KEYWORD` shape, which is how the parser shipped zero
+    events from this source for its entire life.
 
-    def test_marker_emit(self):
+    Naive timestamps are interpreted as host-local, so TZ is pinned to the
+    droplet's zone (America/Denver) for deterministic expectations.
+    """
+
+    def setUp(self):
+        self._tz_orig = os.environ.get('TZ')
+        os.environ['TZ'] = 'America/Denver'
+        time.tzset()
+
+    def tearDown(self):
+        if self._tz_orig is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = self._tz_orig
+        time.tzset()
+
+    def test_production_auto_merge_merged_line(self):
+        line = (
+            '[2026-06-11 00:00:23] [notifier] [INFO] AUTO_MERGE '
+            'task=post-merge-install-drift-trigger-001 '
+            'pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/447 '
+            'outcome=merged (--squash --delete-branch) agent=forge\n'
+        )
+        ev = ces.parse_log_line(line)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev.event_type, 'auto_merge')
+        self.assertEqual(ev.agent, 'forge')
+        self.assertEqual(ev.task_id, 'post-merge-install-drift-trigger-001')
+        self.assertEqual(
+            ev.pr_url,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/447',
+        )
+        self.assertEqual(ev.payload.get('outcome'), 'merged')
+        # 00:00:23 MDT (-06:00) == 06:00:23 UTC. Reading naive as UTC put
+        # events 6h in the past — enough that the advancer's
+        # `ts >= dispatched_at` gate dropped every merge.
+        self.assertEqual(ev.ts, '2026-06-11T06:00:23+00:00')
+
+    def test_pre_deploy_line_without_agent_kv_defaults_notifier(self):
+        line = (
+            '[2026-06-11 00:00:23] [notifier] [INFO] AUTO_MERGE task=abc '
+            'pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1 '
+            'outcome=merged (--squash --delete-branch)\n'
+        )
+        ev = ces.parse_log_line(line)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev.agent, 'notifier')
+
+    def test_auto_merge_failed_with_quoted_pr_and_warn_level(self):
+        line = (
+            "[2026-06-10 22:13:40] [notifier] [WARN] AUTO_MERGE task=abc-001 "
+            "pr='https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42' "
+            "outcome=failed reason=malformed-pr-url (no shell-out attempted) "
+            "agent=forge\n"
+        )
+        ev = ces.parse_log_line(line)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev.event_type, 'auto_merge')
+        self.assertEqual(ev.payload.get('outcome'), 'failed')
+        self.assertEqual(
+            ev.pr_url,
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42',
+        )
+
+    def test_auto_merge_lookalikes_rejected(self):
+        # Production lines sharing the AUTO_MERGE prefix that are NOT merge
+        # outcomes. A bare startswith keyword match shipped these as bogus
+        # auto_merge events.
+        for rest in (
+            'AUTO_MERGE_WORKTREE_TEARDOWN task=t agent=forge path=/x repo=/y',
+            'AUTO_MERGE_HELD task=t pr=https://example/pr/1 blocker=#42',
+            'AUTO_MERGE_QUEUE_RELEASED pr=https://example/pr/1',
+            'AUTO_MERGE_DEFERRED_UNKNOWN task=t pr=https://example/pr/1',
+            'AUTO_MERGE_SKIPPED_CONFLICTING task=t pr=https://example/pr/1',
+        ):
+            line = f'[2026-06-11 00:00:23] [notifier] [INFO] {rest}\n'
+            self.assertIsNone(ces.parse_log_line(line), rest)
+
+    def test_cost_budget_allowed_trajectory_line_rejected(self):
+        # Fired on EVERY healthy dispatch. Shipping it as a cost_budget row
+        # would mark every healthy task failed in the dashboard Done lane
+        # (cost_budget is in _DONE_FAILURE_EVENT_TYPES).
+        line = (
+            '[2026-06-10 17:12:01] [notifier] [INFO] COST_BUDGET task=abc '
+            'current=$1.40 cap=$5.00 dispatch=mirror-review (allowed)\n'
+        )
+        self.assertIsNone(ces.parse_log_line(line))
+
+    def test_cost_budget_dm_write_failed_rejected(self):
+        line = (
+            '[2026-06-10 17:12:01] [notifier] [WARN] COST_BUDGET_DM_WRITE_FAILED '
+            'task=abc (disk full?); cap-fire DM did not queue\n'
+        )
+        self.assertIsNone(ces.parse_log_line(line))
+
+    def test_cost_budget_exhausted_ships_as_cost_budget(self):
+        line = (
+            '[2026-06-10 17:12:01] [notifier] [WARN] COST_BUDGET_EXHAUSTED '
+            'task=abc current=$5.12 cap=$5.00 dispatch=mirror-review; '
+            'refusing dispatch + queueing closing DM agent=forge\n'
+        )
+        ev = ces.parse_log_line(line)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev.event_type, 'cost_budget')
+        self.assertEqual(ev.agent, 'forge')
+        self.assertEqual(ev.task_id, 'abc')
+        self.assertEqual(ev.cost_usd, 5.12)
+
+    def test_legacy_tagless_shape_still_parses(self):
+        # The pre-fix documented shape (no [notifier] tag, aware UTC ts).
+        # Drain-test fixtures and any future non-notifier writer use it.
         line = (
             '[2026-05-25T19:42:13+00:00] [INFO] MARKER_EMIT '
             'agent=forge task=abc-001 verdict=PROCEED\n'
@@ -211,33 +328,35 @@ class TestParseLogLine(unittest.TestCase):
         self.assertEqual(ev.event_type, 'marker_emit')
         self.assertEqual(ev.agent, 'forge')
         self.assertEqual(ev.task_id, 'abc-001')
+        self.assertEqual(ev.ts, '2026-05-25T19:42:13+00:00')
 
-    def test_auto_merge_with_pr_url(self):
+    def test_aware_timestamp_not_shifted(self):
         line = (
-            "[2026-05-25T19:42:13Z] [INFO] AUTO_MERGE task=abc-001 "
-            "pr='https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42' "
-            "outcome=merged\n"
+            '[2026-05-25T19:42:13Z] [notifier] [INFO] AUTO_MERGE task=t '
+            'pr=https://example/pr/1 outcome=merged agent=forge\n'
         )
         ev = ces.parse_log_line(line)
         self.assertIsNotNone(ev)
-        self.assertEqual(ev.event_type, 'auto_merge')
-        self.assertEqual(
-            ev.pr_url,
-            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42',
-        )
+        self.assertEqual(ev.ts, '2026-05-25T19:42:13+00:00')
 
-    def test_cost_budget_extracts_cost(self):
-        line = (
-            '[2026-05-25T19:42:13Z] [INFO] COST_BUDGET '
-            'task=abc agent=forge cost_usd=1.23 limit_usd=5\n'
-        )
-        ev = ces.parse_log_line(line)
-        self.assertIsNotNone(ev)
-        self.assertEqual(ev.cost_usd, 1.23)
-        self.assertEqual(ev.payload.get('limit_usd'), '5')
+    def test_same_second_distinct_outcomes_get_distinct_event_ids(self):
+        # Log timestamps have 1-second resolution. Without the id_extra
+        # disambiguator, a failed merge + a retry succeeding in the same
+        # second hash to the same event_id and ON CONFLICT DO NOTHING drops
+        # the merged row — the advancer's gate then never sees the merge.
+        base = '[2026-06-11 00:00:23] [notifier] [INFO] AUTO_MERGE task=t1 '
+        failed = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=failed reason=x agent=forge\n')
+        merged = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=merged agent=forge\n')
+        self.assertNotEqual(failed.event_id, merged.event_id)
+        # Re-reading the identical line (cursor rewind) still dedups.
+        replay = ces.parse_log_line(
+            base + 'pr=https://example/pr/1 outcome=merged agent=forge\n')
+        self.assertEqual(merged.event_id, replay.event_id)
 
     def test_non_event_line_returns_none(self):
-        line = '[2026-05-25T19:42:13Z] [INFO] random log without keyword\n'
+        line = '[2026-06-11 00:00:23] [notifier] [INFO] random log no keyword\n'
         self.assertIsNone(ces.parse_log_line(line))
 
     def test_malformed_line_returns_none(self):
