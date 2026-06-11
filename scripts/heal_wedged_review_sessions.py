@@ -147,6 +147,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
     'silent_grace_seconds': 900,         # 15 min — Case 2 no-marker idle floor (alert)
     'hard_silent_grace_seconds': 3600,   # 60 min — Case 2 deterministic auto-reap backstop
     'streak_to_promote': 3,              # consecutive true positives → auto-reap
+    # Per-task build-handoff grace, keyed to the build-sequence advancer's
+    # cadence (ourliberty-build-sequence-advancer.timer / outbox dispatch runs
+    # on a 300s OnCalendar=*:0/5). A Forge session that has emitted a terminal
+    # marker (e.g. PROCEED) sits idle in the preflight→build handoff window while
+    # the advancer dispatches its next phase; this is ADDED on top of
+    # marker_grace_seconds so a marker-present Forge session isn't reaped before
+    # the advancer has had a full cycle to dispatch — closing the false-positive
+    # reaping that stranded ccd-s1 (2026-06-10).
+    'build_handoff_grace_seconds': 300,
 }
 
 # Sentinel the hard backstop is pushed to when config is mistuned (hard <=
@@ -243,7 +252,8 @@ def load_config(path: Path = CONFIG_FILE) -> dict[str, Any]:
     if isinstance(data.get('enabled'), bool):
         cfg['enabled'] = data['enabled']
     for key in ('marker_grace_seconds', 'silent_grace_seconds',
-                'hard_silent_grace_seconds', 'streak_to_promote'):
+                'hard_silent_grace_seconds', 'streak_to_promote',
+                'build_handoff_grace_seconds'):
         raw = data.get(key)
         if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
             cfg[key] = int(raw)
@@ -809,16 +819,63 @@ def _review_already_dispatched_for_task(task_id: str) -> bool:
         return False
 
 
+def _forge_task_id_for_cwd(cwd: str) -> Optional[str]:
+    """The task_id embedded in a Forge worktree cwd (`wt-forge-<task_id>`), or
+    None for a non-Forge / non-conventional cwd."""
+    name = Path(cwd).name
+    if not name.startswith(FORGE_WORKTREE_NAME_PREFIX):
+        return None
+    task_id = name[len(FORGE_WORKTREE_NAME_PREFIX):]
+    return task_id or None
+
+
+def _forge_inbox_has_queued_build(task_id: str) -> bool:
+    """True iff a next-phase BUILD dispatch for `task_id` is QUEUED in Forge's
+    LIVE inbox — the preflight→build handoff window. Reaping a session in this
+    state removes the worktree the queued build is about to `--resume` into,
+    stranding the whole build sequence (the 2026-06-10 ccd-s1 incident).
+
+    We deliberately consult only the LIVE inbox (`~/agents/inboxes/forge/`), not
+    `.archive/`/`.invalid/`: a live file means the build is queued and not yet
+    consumed (the strongest 'spare me' signal); an archived file means the build
+    was already dispatched-and-consumed, so the session is no longer in the
+    handoff window. The filename is derived through the SAME
+    `canonical_inbox_name` the outbox notifier writes with
+    (`_dispatch_build_phase`), so a task_id carrying a path-structural byte can't
+    make the lookup miss. Replan iterations (`build-<task_id>-replanN.json`) are
+    covered too. Read-only; lazy-imports safe_write_inbox so the supabase-free
+    test path is unaffected. Any import/IO failure returns False (the handoff
+    grace window remains the baseline cushion, so a transient miss here never
+    strands a fresh handoff)."""
+    try:
+        import safe_write_inbox
+    except Exception as e:  # noqa: BLE001
+        log(f'could not import safe_write_inbox for queued-build check: '
+            f'{type(e).__name__}: {e}; treating task {task_id} as un-queued', 'WARN')
+        return False
+    try:
+        forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
+        base = safe_write_inbox.canonical_inbox_name(f'build-{task_id}.json')
+        if (forge_inbox / base).exists():
+            return True
+        replan_prefix = safe_write_inbox.canonical_inbox_name(f'build-{task_id}-replan')
+        for p in forge_inbox.glob('build-*-replan*.json'):
+            if p.name.startswith(replan_prefix):
+                return True
+    except OSError as e:
+        log(f'queued-build check IO error for task {task_id}: '
+            f'{type(e).__name__}: {e}; treating as un-queued', 'WARN')
+        return False
+    return False
+
+
 def _forge_branch_has_open_unreviewed_pr(cwd: str) -> bool:
     """True iff this Forge worktree's branch has an OPEN PR for which no Mirror
     review has been dispatched yet — the state in which reaping would orphan the
     PR. Once a review IS dispatched the deliverable is captured and this returns
     False (the session is safe to reap). Non-Forge / non-conventional cwds return
     False (no protection)."""
-    name = Path(cwd).name  # e.g. wt-forge-<task-id>
-    if not name.startswith(FORGE_WORKTREE_NAME_PREFIX):
-        return False
-    task_id = name[len(FORGE_WORKTREE_NAME_PREFIX):]
+    task_id = _forge_task_id_for_cwd(cwd)
     if not task_id:
         return False
     branch = f'forge/{task_id}'
@@ -836,6 +893,48 @@ def _forge_branch_has_open_unreviewed_pr(cwd: str) -> bool:
     if _review_already_dispatched_for_task(task_id):
         return False  # review already in flight → safe to reap
     return True
+
+
+def _forge_spare_reason(cand: Candidate, cfg: dict[str, Any]) -> Optional[str]:
+    """The reason this Forge session must be SPARED from reaping because its build
+    sequence is still legitimately in flight, or None if no spare-condition holds.
+
+    A session is reaped ONLY when it fails ALL of these AND is idle past
+    threshold. The conditions, checked cheapest-first so the gh call is the last
+    resort:
+
+      (c) build-handoff grace window — the session is idle no longer than
+          marker_grace + build_handoff_grace (the build-sequence advancer's
+          cadence). Until a full advancer cycle has elapsed past the normal
+          marker grace, the advancer hasn't had its chance to dispatch the next
+          phase, so a freshly-marker'd session in the preflight→build handoff
+          must not be reaped. Pure idle math — protects the window even if the
+          probes below can't run.
+      (a) a next-phase BUILD dispatch is QUEUED in Forge's live inbox — the build
+          is about to `--resume` into this worktree; removing it strands the
+          sequence (the ccd-s1 incident). Bounded by GUARD_MAX_PROTECT_HOURS so a
+          dispatch that is never consumed (the dispatcher itself wedged) can't
+          protect the slot forever.
+      (b) the branch has an OPEN PR with no Mirror review dispatched yet — reaping
+          would orphan the PR/review (the #412 guard).
+
+    Caller invokes this only for tier 'forge'. All reads are local files /
+    GitHub-truth — no model call."""
+    grace_floor = cfg['marker_grace_seconds'] + cfg['build_handoff_grace_seconds']
+    if cand.idle_secs <= grace_floor:
+        return (f'within build-handoff grace window (idle {int(cand.idle_secs)}s '
+                f'<= marker_grace {cfg["marker_grace_seconds"]}s + advancer cadence '
+                f'{cfg["build_handoff_grace_seconds"]}s) — advancer has not yet had '
+                f'a full cycle to dispatch the next phase')
+    if cand.idle_secs <= GUARD_MAX_PROTECT_HOURS * 3600:
+        task_id = _forge_task_id_for_cwd(cand.cwd)
+        if task_id and _forge_inbox_has_queued_build(task_id):
+            return (f'queued next-phase build dispatch present in Forge inbox for '
+                    f'task {task_id} — preflight→build handoff in flight')
+    if _forge_branch_has_open_unreviewed_pr(cand.cwd):
+        return ('branch has an OPEN PR with no Mirror review dispatched yet — '
+                'reaping would orphan the review (#412 guard)')
+    return None
 
 
 # ==================== notify seams ====================
@@ -1080,7 +1179,7 @@ def run_cycle(
     summary: dict[str, Any] = {
         'scanned': len(candidates), 'case1_reaped': 0, 'case2_alerted': 0,
         'case2_auto_reaped': 0, 'case2_hard_reaped': 0, 'case2_demoted_at_gate': 0,
-        'true_positives': 0, 'false_positives': 0, 'forge_pr_protected': 0,
+        'true_positives': 0, 'false_positives': 0, 'forge_spared': 0,
         'mode_before': state.mode,
     }
 
@@ -1111,24 +1210,23 @@ def run_cycle(
             continue  # no activity log → cannot assess
         verdict = classify(
             marker_present=cand.marker_present, idle_secs=cand.idle_secs, cfg=cfg)
-        # Forge-PR reap guard: never destroy (or alert on) a Forge session whose
-        # branch has an OPEN PR with no Mirror review yet — reaping it before the
-        # review is dispatched is the #412 orphaned-review incident. We hold off
-        # only until a review exists (then this returns False and the session is
-        # reaped normally next cycle); heal_undispatched_pr_review dispatches that
-        # review independently, so the wait is bounded and self-resolving. Only
-        # incurred when a reap/alert would actually fire, so the gh cost is ~never
-        # paid in steady state.
-        if (verdict in (REAP_CASE1, REAP_CASE2_HARD, SILENT_CASE2)
-                and cand.tier == 'forge'
-                and _forge_branch_has_open_unreviewed_pr(cand.cwd)):
-            log(f'reap/alert skipped for {cand.session_id} '
-                f'({Path(cand.cwd).name}): Forge branch has an OPEN PR with no '
-                f'Mirror review yet — not destroying until the review is '
-                f'dispatched (heal_undispatched_pr_review will dispatch it; '
-                f'reap resumes once a review exists)', 'INFO')
-            summary['forge_pr_protected'] += 1
-            continue
+        # Forge build-sequence spare guard: never destroy (or alert on) a Forge
+        # session whose build is still legitimately in flight — a queued
+        # next-phase build dispatch (preflight→build handoff), an open PR awaiting
+        # its Mirror review (#412), or a session still inside the advancer-cadence
+        # handoff grace window. Reaping any of these strands the build sequence
+        # (the 2026-06-10 ccd-s1 false-positive). The guard self-resolves: each
+        # condition clears as the sequence advances (dispatch consumed, review
+        # dispatched, grace elapsed), and all are bounded so a genuinely-wedged
+        # session is still reaped. Only incurred when a reap/alert would actually
+        # fire, so the gh cost is ~never paid in steady state.
+        if verdict in (REAP_CASE1, REAP_CASE2_HARD, SILENT_CASE2) and cand.tier == 'forge':
+            spare_reason = _forge_spare_reason(cand, cfg)
+            if spare_reason:
+                log(f'reap/alert skipped for {cand.session_id} '
+                    f'({Path(cand.cwd).name}): {spare_reason}', 'INFO')
+                summary['forge_spared'] += 1
+                continue
         if verdict == REAP_CASE1:
             if reap(cand, case='case1',
                     reason=(f'terminal marker present, idle {int(cand.idle_secs)}s '

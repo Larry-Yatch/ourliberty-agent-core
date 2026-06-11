@@ -36,6 +36,7 @@ CFG = {
     'silent_grace_seconds': 900,
     'hard_silent_grace_seconds': 3600,
     'streak_to_promote': 3,
+    'build_handoff_grace_seconds': 300,
 }
 
 
@@ -731,16 +732,21 @@ class TestForgePrReapGuard(unittest.TestCase):
             m_pr.assert_not_called()
 
     def test_case1_reap_skipped_when_forge_pr_protected(self):
+        # idle past the build-handoff grace floor (marker_grace 300 + handoff 300
+        # = 600) so the open-PR condition (b) — not the grace window — is what
+        # spares the session; the queued-build probe is forced off to isolate (b).
         from unittest import mock
         rec = _Recorder()
-        cand = _cand(pid=4242, tier='forge', marker=True, idle=600)
+        cand = _cand(pid=4242, tier='forge', marker=True, idle=700)
         with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
-                               return_value=True):
+                               return_value=True), \
+             mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=False):
             summary = _run(rec, [cand], h.ConfidenceState())
         self.assertEqual(rec.killed, [])
         self.assertEqual(rec.removed, [])
         self.assertEqual(summary['case1_reaped'], 0)
-        self.assertEqual(summary['forge_pr_protected'], 1)
+        self.assertEqual(summary['forge_spared'], 1)
 
     def test_hard_reap_skipped_when_forge_pr_protected(self):
         from unittest import mock
@@ -748,34 +754,225 @@ class TestForgePrReapGuard(unittest.TestCase):
         state = h.ConfidenceState(mode=h.MODE_ALERT_ONLY, executions=[], pending={})
         cand = _cand(pid=9200, tier='forge', marker=False, idle=4000)  # hard grace
         with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
-                               return_value=True):
+                               return_value=True), \
+             mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=False):
             summary = _run(rec, [cand], state)
         self.assertEqual(rec.killed, [])
         self.assertEqual(summary['case2_hard_reaped'], 0)
-        self.assertEqual(summary['forge_pr_protected'], 1)
+        self.assertEqual(summary['forge_spared'], 1)
 
     def test_forge_session_reaps_normally_when_not_protected(self):
+        # idle past the grace floor (600) with NO queued build and NO open PR →
+        # all spare-conditions fail → reaped.
         from unittest import mock
         rec = _Recorder()
-        cand = _cand(pid=4242, tier='forge', marker=True, idle=600)
+        cand = _cand(pid=4242, tier='forge', marker=True, idle=700)
         with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_inbox_has_queued_build',
                                return_value=False):
             summary = _run(rec, [cand], h.ConfidenceState())
         self.assertEqual(rec.killed, [4242])
         self.assertEqual(summary['case1_reaped'], 1)
-        self.assertEqual(summary['forge_pr_protected'], 0)
+        self.assertEqual(summary['forge_spared'], 0)
 
-    def test_mirror_session_never_pr_protected(self):
+    def test_mirror_session_never_spared(self):
         # The guard is forge-only: a mirror candidate is reaped normally and the
-        # PR-protection helper is never consulted for it.
+        # spare helper is never consulted for it.
         from unittest import mock
         rec = _Recorder()
         cand = _cand(pid=7001, tier='mirror', marker=True, idle=600)
-        with mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr') as m_g:
+        with mock.patch.object(h, '_forge_spare_reason') as m_g:
             summary = _run(rec, [cand], h.ConfidenceState())
         m_g.assert_not_called()
         self.assertEqual(rec.killed, [7001])
         self.assertEqual(summary['case1_reaped'], 1)
+
+
+# ---------------------- build-sequence spare conditions ----------------------
+
+class TestForgeBuildSequenceSpare(unittest.TestCase):
+    """The fix for the 2026-06-10 ccd-s1 incident: the reaper must SPARE a Forge
+    worktree whose build is still legitimately in flight, and still reap a
+    genuinely-wedged one. Four spare-conditions, per the spec:
+      (1) a queued next-phase build dispatch  → spared
+      (2) an open PR awaiting Mirror review    → spared
+      (3) within the advancer-cadence grace    → spared
+      (4) none of the above + idle past grace  → still reaped
+    """
+
+    def test_session_with_queued_next_phase_dispatch_is_spared(self):
+        # (1) preflight→build handoff: a queued build-<task>.json in Forge's inbox
+        # means the build is about to --resume into this worktree. Idle is past
+        # the grace floor so only condition (a) can spare it; PR check forced off.
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4300, tier='forge', name='ccd-s1', marker=True, idle=5632)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=True), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(rec.removed, [])
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['forge_spared'], 1)
+
+    def test_session_with_open_pr_awaiting_review_is_spared(self):
+        # (2) open PR, no review dispatched yet. Idle past the grace floor and no
+        # queued build, so condition (b) is what spares it.
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4301, tier='forge', name='pr-x', marker=True, idle=5632)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=True):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['forge_spared'], 1)
+
+    def test_session_within_advancer_grace_window_is_spared(self):
+        # (3) idle past marker_grace (300 → verdict is REAP_CASE1) but within the
+        # handoff grace floor (300 + 300 = 600). The advancer hasn't had a full
+        # cycle yet, so the session is spared without consulting any external seam.
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4302, tier='forge', name='handoff', marker=True, idle=450)
+        # Grace is pure idle math and must short-circuit BEFORE the queue/PR
+        # probes — assert those are never consulted.
+        with mock.patch.object(h, '_forge_inbox_has_queued_build') as m_q, \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr') as m_pr:
+            summary = _run(rec, [cand], h.ConfidenceState())
+        m_q.assert_not_called()
+        m_pr.assert_not_called()
+        self.assertEqual(rec.killed, [])
+        self.assertEqual(summary['case1_reaped'], 0)
+        self.assertEqual(summary['forge_spared'], 1)
+
+    def test_genuinely_wedged_session_is_still_reaped(self):
+        # (4) terminal marker, idle far past the grace floor, NO queued dispatch,
+        # NO open PR → fails all spare-conditions → reaped (the truly-wedged case
+        # the healer still exists to handle).
+        from unittest import mock
+        rec = _Recorder()
+        cand = _cand(pid=4303, tier='forge', name='wedged', marker=True, idle=5632)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            summary = _run(rec, [cand], h.ConfidenceState())
+        self.assertEqual(rec.killed, [4303])
+        self.assertEqual(rec.removed, [cand.cwd])
+        self.assertEqual(summary['case1_reaped'], 1)
+        self.assertEqual(summary['forge_spared'], 0)
+
+    # -------- _forge_spare_reason precedence / bounds --------
+
+    def test_spare_reason_grace_takes_precedence(self):
+        cand = _cand(tier='forge', marker=True, idle=400)  # <= 600 grace floor
+        reason = h._forge_spare_reason(cand, CFG)
+        self.assertIsNotNone(reason)
+        self.assertIn('grace', reason)
+
+    def test_spare_reason_none_when_all_conditions_fail(self):
+        from unittest import mock
+        cand = _cand(tier='forge', marker=True, idle=5632)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=False), \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            self.assertIsNone(h._forge_spare_reason(cand, CFG))
+
+    def test_spare_reason_queued_dispatch_bounded_by_max_protect(self):
+        # Past GUARD_MAX_PROTECT_HOURS the queued-dispatch probe is skipped (a
+        # never-consumed dispatch can't hold the slot forever); with no open PR
+        # the session is no longer spared.
+        from unittest import mock
+        idle = h.GUARD_MAX_PROTECT_HOURS * 3600 + 100
+        cand = _cand(tier='forge', marker=True, idle=idle)
+        with mock.patch.object(h, '_forge_inbox_has_queued_build',
+                               return_value=True) as m_q, \
+             mock.patch.object(h, '_forge_branch_has_open_unreviewed_pr',
+                               return_value=False):
+            self.assertIsNone(h._forge_spare_reason(cand, CFG))
+            m_q.assert_not_called()  # bound short-circuits before the probe
+
+
+class TestForgeInboxQueuedBuild(unittest.TestCase):
+    """Direct tests for the queued-build probe against a temp INBOXES_ROOT."""
+
+    def _with_inbox(self, fn):
+        import tempfile
+        import safe_write_inbox
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as td:
+            forge_inbox = Path(td) / 'forge'
+            forge_inbox.mkdir(parents=True)
+            with mock.patch.object(safe_write_inbox, 'INBOXES_ROOT', Path(td)):
+                return fn(forge_inbox)
+
+    def test_live_build_file_present_is_queued(self):
+        def check(forge_inbox):
+            (forge_inbox / 'build-ccd-s1.json').write_text('{}')
+            self.assertTrue(h._forge_inbox_has_queued_build('ccd-s1'))
+        self._with_inbox(check)
+
+    def test_replan_build_file_present_is_queued(self):
+        def check(forge_inbox):
+            (forge_inbox / 'build-ccd-s1-replan2.json').write_text('{}')
+            self.assertTrue(h._forge_inbox_has_queued_build('ccd-s1'))
+        self._with_inbox(check)
+
+    def test_no_build_file_is_not_queued(self):
+        def check(forge_inbox):
+            self.assertFalse(h._forge_inbox_has_queued_build('ccd-s1'))
+        self._with_inbox(check)
+
+    def test_archived_build_does_not_count_as_queued(self):
+        # An archived (already-consumed) build is NOT the handoff window — only a
+        # LIVE inbox file means a dispatch is queued-and-pending.
+        def check(forge_inbox):
+            archive = forge_inbox / '.archive'
+            archive.mkdir()
+            (archive / 'build-ccd-s1.json').write_text('{}')
+            self.assertFalse(h._forge_inbox_has_queued_build('ccd-s1'))
+        self._with_inbox(check)
+
+
+class TestForgeTaskIdForCwd(unittest.TestCase):
+    def test_extracts_task_id(self):
+        self.assertEqual(
+            h._forge_task_id_for_cwd('/home/larry/agent-worktrees/wt-forge-ccd-s1'),
+            'ccd-s1')
+
+    def test_non_forge_cwd_is_none(self):
+        self.assertIsNone(
+            h._forge_task_id_for_cwd('/home/larry/agent-worktrees/wt-mirror-x'))
+
+
+class TestBuildHandoffGraceConfig(unittest.TestCase):
+    def test_default_present(self):
+        cfg = h.load_config(Path('/nonexistent/review-reaper-rules.json'))
+        self.assertEqual(cfg['build_handoff_grace_seconds'], 300)
+
+    def test_valid_override(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({'build_handoff_grace_seconds': 120}))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['build_handoff_grace_seconds'], 120)
+
+    def test_negative_falls_back(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'c.json'
+            p.write_text(json.dumps({'build_handoff_grace_seconds': -1}))
+            cfg = h.load_config(p)
+            self.assertEqual(cfg['build_handoff_grace_seconds'], 300)
 
 
 if __name__ == '__main__':
