@@ -3061,6 +3061,7 @@ def _parked_from_captures(captures: list[dict[str, Any]]) -> list[dict[str, Any]
         out.append({
             'capture_id': cap.get('id'),
             'title': cap.get('title'),
+            'label': cap.get('label'),
             'repo': origin.get('repo'),
             'area': origin.get('area'),
             'aging': cap.get('aging') is True,
@@ -3524,6 +3525,16 @@ CAPTURE_DEFAULT_SOURCE = 'desktop-chat'
 # 'desktop-chat'; the others are admitted now so future Telegram/agent capture
 # sources (spec § 9) need no schema change, only an emitter.
 CAPTURE_ALLOWED_SOURCES = ('desktop-chat', 'telegram', 'agent')
+# Frozen allowlist of capture labels, beside CAPTURE_ALLOWED_SOURCES (spec
+# park-the-nudge § 4). An optional first-class `label` tags a capture's
+# provenance — e.g. a recurring Pulse Check I proposal parked in the Missions
+# lane. Same threat model as the source pin: a leaked ingest token may only
+# write KNOWN labels. V1 member: 'pulse-check-i'; a new label is one tuple
+# entry, no schema change.
+CAPTURE_ALLOWED_LABELS = ('pulse-check-i',)
+# captures.json registry schema. v2 adds the optional first-class `label`
+# field on each capture record; v1 records read back as label-absent (→ None).
+CAPTURES_SCHEMA_VERSION = 2
 # A capture is tiny (title + a sentence of note + origin). Cap it so a leaked
 # ingest token can't bloat captures.json with a multi-MB row. Spec § 4: 413.
 MAX_CAPTURE_PAYLOAD_BYTES = 4096
@@ -3543,6 +3554,7 @@ class CaptureIngestRequest(BaseModel):
     title: str
     note: Optional[str] = None
     origin: dict[str, Any] = Field(default_factory=dict)
+    label: Optional[str] = None
 
 
 class CaptureIngestResponse(BaseModel):
@@ -3572,10 +3584,11 @@ def _read_captures_registry(captures_path: Path) -> dict[str, Any]:
     captures}). Missing file → a fresh empty registry. Malformed JSON →
     HTTPException(500), so the write path never appends onto a corrupt file."""
     if not captures_path.exists():
-        return {'schema_version': 1, 'captures': []}
+        return {'schema_version': CAPTURES_SCHEMA_VERSION, 'captures': []}
     try:
         raw = captures_path.read_text()
-        data = json.loads(raw) if raw.strip() else {'schema_version': 1, 'captures': []}
+        data = (json.loads(raw) if raw.strip()
+                else {'schema_version': CAPTURES_SCHEMA_VERSION, 'captures': []})
     except (OSError, json.JSONDecodeError) as e:
         first_line = str(e).splitlines()[0] if str(e) else type(e).__name__
         raise HTTPException(
@@ -3592,7 +3605,7 @@ def _read_captures_registry(captures_path: Path) -> dict[str, Any]:
         )
     if not isinstance(data.get('captures'), list):
         data['captures'] = []
-    data.setdefault('schema_version', 1)
+    data.setdefault('schema_version', CAPTURES_SCHEMA_VERSION)
     return data
 
 
@@ -3656,6 +3669,7 @@ def _handle_capture_ingest(
     title: Any,
     note: Any,
     origin: Any,
+    label: Any = None,
     captures_path: Path,
     now: Optional[datetime] = None,
     window_sec: int = CAPTURE_IDEMPOTENCY_WINDOW_SEC,
@@ -3691,9 +3705,18 @@ def _handle_capture_ingest(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'invalid origin.source={source!r}',
         )
+    # `label` is optional and allowlisted (spec § 4): None is back-compat
+    # (desktop/telegram captures carry none); a non-None value must be known so
+    # a leaked ingest token can only write a recognized label.
+    if label is not None and label not in CAPTURE_ALLOWED_LABELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'invalid label={label!r}',
+        )
     try:
         body_bytes = len(json.dumps(
-            {'title': title, 'note': note, 'origin': origin}).encode('utf-8'))
+            {'title': title, 'note': note, 'origin': origin, 'label': label},
+        ).encode('utf-8'))
     except (TypeError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -3722,6 +3745,7 @@ def _handle_capture_ingest(
             'title': title,
             'note': note or '',
             'state': 'parked',
+            'label': label,
             'origin': {
                 'source': source,
                 'session_id': session_id,
@@ -3732,6 +3756,9 @@ def _handle_capture_ingest(
             'last_touched': ts_iso,
             'promoted_to': None,
         })
+        # Stamp the current schema on every write so a pre-existing v1 file is
+        # upgraded in place the first time a capture is appended.
+        registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         _atomic_write_captures(captures_path, registry)
     return {'ok': True, 'capture_id': capture_id}
 
@@ -4918,6 +4945,7 @@ def post_capture_ingest(body: CaptureIngestRequest) -> dict[str, Any]:
         title=body.title,
         note=body.note,
         origin=body.origin,
+        label=body.label,
         captures_path=_captures_json_path(),
     )
 

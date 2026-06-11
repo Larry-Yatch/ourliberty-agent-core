@@ -50,6 +50,7 @@
     {
       "capture_id": "cap-aging-one",
       "title": "Aging idea",
+      "label": null,
       "repo": "ourliberty-agent-core",
       "area": null,
       "aging": true,
@@ -58,6 +59,7 @@
     {
       "capture_id": "cap-fresh-two",
       "title": "Fresh idea",
+      "label": null,
       "repo": "ourliberty-dashboard",
       "area": null,
       "aging": false,
