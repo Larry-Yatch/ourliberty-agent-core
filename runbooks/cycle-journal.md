@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration 1436 — 2026-06-11 10:34Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Health:** ⚠️ Drift (carry). PR #457 Mirror escalation standing (~1h43min since 08:50Z; flag window ~11:20Z, ~46min away). ccd-s2 active (PID 1533425, elapsed=2h6min — crossed 2h at ~10:27Z, deadline ~12:27Z). All 6 mandatory checks + additive checks nominal. 9/9 bots active. Forge inbox 4 items (concurrency constrained). Sync fresh. **Tier 1, consecutive_clean 0→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1435 watch items):**
+- PR #457 Larry decision: **STILL PENDING** — `gh pr list` confirms 1 open PR (number=457, mergeable=UNKNOWN, autoMergeRequest=null). Last beacon log 04:21:22-0600 (=10:21:22Z) was catalog-accuracy-drift digest delivery. No Larry directives detected. At 10:34Z: ~2h21min since creation (08:13Z), ~1h43min since Mirror escalation (08:50Z). Flag window ~11:20Z (~46min remaining). [yellow] carry.
+- ccd-s2 (PID 1533425, 08:27:44Z): **STILL ACTIVE** — `ps -p 1533425` confirmed: elapsed=02:06:18, 2.0% CPU. **Crossed 2h at ~10:27Z** (~6min ago). Deadline: ~12:27Z (~1h53min from check). Pipeline stall: `no stalls detected` — FORGE_NO_PR_SKIP reason=preflight_exit. Normal.
+- `fix-test-bootstrap-preserve-usersite-001` (08:15Z): **STILL IN INBOX** — ~2h19min at check. inbox-watcher concurrency constrained. Monitor.
+- `fix-build-background-task-output-visibility-001` (08:27Z): **STILL IN INBOX** — ~2h7min at check. Concurrency constrained. Monitor.
+- Sync next expected ~11:51Z: **ON TRACK** — last_sync=09:51:26Z, ~42min old at check. Well within 2h. ✅
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1244 (unchanged from iter 1435). No new alerts since catalog-accuracy-drift (10:19:17Z). **0 new lines.** ✅ Nominal.
+- alert-triage.json `last_claimed_line` MISSING — standing. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log: last entry 04:21:22-0600 (=10:21:22Z, catalog-accuracy-drift digest, no Larry directive). Entries at 02:50:34-0600 (=08:50:34Z): idx=1491/1492 auto-restarted digest (known pattern), idx=1493 review-escalate delivered (Mirror PR #457 escalation — confirmed). No new Larry directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. All FORGE_NO_PR_SKIP (pr_exists or preflight_exit). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING — standing. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing. ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean. ✅ Nominal.
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-11T09:51:26Z. At check: ~42min old. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active. ✅ Nominal.
+
+**Check E — PRs:** 1 open PR.
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`, branch `forge/fix-reaper-handoff-guard-checks-liveness-002`) — mergeable=UNKNOWN, autoMergeRequest=null. Created 08:13:19Z (~2h21min at check). Mirror escalation delivered 08:50:34Z (~1h43min standing). NOT auto-merge eligible. Flag window ~11:20Z (~46min). [yellow] standing.
+
+**Check H — Inboxes:**
+- Forge: **4 items** (unchanged):
+  - `build-ccd-s1-envelope-builder.json` — FORGE_NO_PR_SKIP (pr=#446). Standing.
+  - `build-ccd-s2-no-session-revision-route.json` — inbox-watcher active session (PID 1533425, **crossed 2h** at ~10:27Z). Deadline: ~12:27Z.
+  - `fix-build-background-task-output-visibility-001.json` — 08:27Z (~2h7min). Concurrency constrained.
+  - `fix-test-bootstrap-preserve-usersite-001.json` — 08:15Z (~2h19min). Concurrency constrained.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:** audit_due_nudge.py / distill_detector.py: no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: all outside 60d window. ✅ No DM.
+
+**G-rule tracking:**
+- catalog-accuracy-drift: **1/3** (from iter 1435). No new occurrence this iter. Monitor.
+- All other G-rules carry from iter 1435 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→0 via `scripts/cycle_tier_state.py record --checks-clean false` at 10:34:46Z (PR #457 escalation standing). Tier 1. ✅
+2. Alert watermark: 0 new alerts. Anchor: catalog-accuracy-drift 10:19:17Z, file=1244 lines. Hold.
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter. Running total (script-authoritative): interventions=780, systemic_fixes=21, verification_pending=9, ratio=37.14, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional in production. Larry's decision needed. Escalation delivered 08:50Z (~1h43min standing at check). Flag window: ~11:20Z (~46min from check).
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] ccd-s2-no-session-revision-route — Forge active session (PID 1533425, **crossed 2h** ~10:27Z). Deadline: ~12:27Z. In progress.
+- [blue] fix-build-background-task-output-visibility-001 — Forge inbox, 08:27Z (~2h7min). Concurrency constrained.
+- [blue] fix-test-bootstrap-preserve-usersite-001 — Forge inbox, 08:15Z (~2h19min). Concurrency constrained.
+- [blue] build-ccd-s1-envelope-builder.json — FORGE_NO_PR_SKIP (pr=#446). Standing.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. route=digest. **1/3 G-rule.** Monitor.
+- [blue] alert-triage watermark discrepancy — alert-triage.json MISSING. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule. Carry.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459) — actor=Larry-Yatch, Tier-3 known pattern. G-rule actor-exemption-config 3/3 DISPATCHED. Carry.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy). Carry.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Carry.
+
+**Watch items for iter 1437:**
+- PR #457: ~1h43min standing. **Flag window ~11:20Z (~46min from check).** If no Larry direction by 11:20Z, fire [yellow] DM.
+- ccd-s2 (PID 1533425): **crossed 2h** at ~10:27Z. Deadline ~12:27Z (~1h53min). Monitor for PR open.
+- `fix-test-bootstrap-preserve-usersite-001` (08:15Z): ~2h19min. Concurrency constrained; picks up after ccd-s2.
+- `fix-build-background-task-output-visibility-001` (08:27Z): ~2h7min. Concurrency constrained.
+- Sync: next expected ~11:51Z.
+- catalog-accuracy-drift: G-rule 1/3. Watch for recurrence.
+
+---
+
 ## Iteration 1435 — 2026-06-11 10:29Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Drift (carry). PR #457 Mirror escalation standing (~1h39min since 08:50Z delivery; flag window ~11:20Z, ~51min away). ccd-s2 active (PID 1533425, **crossed 2h** at ~10:27Z, deadline 12:27Z). All 6 mandatory checks + additive checks nominal. 9/9 bots running (beacon/forge/mirror via Python launchers — systemctl launcher-inactive per known iter-1309 pattern). 1 new alert (catalog-accuracy-drift, route=digest, 1st occurrence). **Tier 1, consecutive_clean 0→0.**

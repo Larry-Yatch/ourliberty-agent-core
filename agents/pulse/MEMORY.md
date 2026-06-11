@@ -6,9 +6,9 @@
 
 ---
 
-## Status snapshot — updated 2026-06-11 10:13Z UTC (Iter 1433, interactive)
+## Status snapshot — updated 2026-06-11 10:34Z UTC (Iter 1436, interactive)
 
-**Iter 1433 summary:** Alert watermark: 1243 lines, sentinel 09:30:16Z (hold). Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=780, systemic_fixes=21, ratio=37.14, trend=flat. **KEY STATE:** PR #457 (`fix(reaper): handoff guard`) open, Mirror escalation delivered 08:50Z (~1h23min standing). `_candidate_owns_build_dispatch` non-functional in production. Larry's decision pending. PR NOT auto-merge eligible. Flag window: ~11:20Z. ccd-s2 build session (PID 1533425, 08:27:44Z, ~1h44min — approaching 2h flag ~10:27Z, deadline ~12:27Z). `fix-test-bootstrap-preserve-usersite-001` + `fix-build-background-task-output-visibility-001` in Forge inbox, both crossed 1h, inbox-watcher concurrency constrained. 9/9 bots active. Sync 09:51:26Z no-change. **Standins carry:** health-check-notify-script-missing, Tier-2-probe auth_401 (action Larry: rotate-claude-setup-tokens.md), APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001. build-ccd-s1-envelope-builder in Forge inbox, FORGE_NO_PR_SKIP (pr=#446).
+**Iter 1436 summary:** Alert watermark: 1244 lines, catalog-accuracy-drift 10:19:17Z. Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=780, systemic_fixes=21, ratio=37.14, trend=flat. **KEY STATE:** PR #457 (`fix(reaper): handoff guard`) open, Mirror escalation delivered 08:50Z (~1h43min standing). `_candidate_owns_build_dispatch` non-functional in production. Larry's decision pending. NOT auto-merge eligible. Flag window: ~11:20Z (~46min from 10:34Z). ccd-s2 build session (PID 1533425, **crossed 2h** at ~10:27Z, deadline ~12:27Z). `fix-test-bootstrap-preserve-usersite-001` (08:15Z, ~2h19min) + `fix-build-background-task-output-visibility-001` (08:27Z, ~2h7min) in Forge inbox, concurrency constrained. 9/9 bots active. Sync 09:51:26Z no-change. **Standins carry:** health-check-notify-script-missing, Tier-2-probe auth_401 (action Larry: rotate-claude-setup-tokens.md), APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001. build-ccd-s1-envelope-builder in Forge inbox, FORGE_NO_PR_SKIP (pr=#446). catalog-accuracy-drift G-rule 1/3 (5/34 shelf cards drifted in ourliberty-graph, route=digest).
 
 ## Status snapshot — updated 2026-06-11 07:29Z UTC (Iter 1417)
 
