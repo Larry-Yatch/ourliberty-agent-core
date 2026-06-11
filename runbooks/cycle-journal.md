@@ -4,6 +4,107 @@
 
 ---
 
+## Iteration ~1497 — 2026-06-11 17:20Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier 1 — PR #457 mirror-review FAILURE [yellow] carry. `fix-reaper-handoff-guard-descope-003` IN PROGRESS. All other checks nominal.
+
+**VERIFY-BEFORE-REASSERT (iter ~1496 watch items):**
+- `fix-reaper-handoff-guard-descope-003`: **IN PROGRESS** ✅ — inbox-watcher started build phase at 17:12:35Z; worktree `/home/larry/agent-worktrees/wt-forge-fix-reaper-handoff-guard-descope-003` active; process confirmed running via pgrep at 17:19Z. ~7 min elapsed; expected ~1h window from start → ~18:12Z.
+- PR #465: **CONFIRMED OPEN** — state=OPEN, branch=`forge/ccd-s5-doctrine-and-handling-shapes`, 1 file. `notify-ccd-s5-doctrine-and-handling-shapes` Beacon task completed 17:13:17Z ($0.27). Mirror review dispatch expected via outbox-notifier. [blue] watch.
+- Sync: **UPDATED** — last_sync=16:52:19Z (~27 min at 17:19Z). 2h threshold ~18:52Z. ✅ Good.
+- PR #457: **CONFIRMED OPEN** — updatedAt=08:13:19Z unchanged. Resolution: `build-fix-reaper-handoff-guard-descope-003` IN PROGRESS. 24h threshold 2026-06-12 08:13Z. [yellow] carry.
+- `marker-error-ccd-s5-doctrine-and-handling-shapes-1.json`: **PROCESSED** ✅ — gone from Forge inbox (inbox-watcher picked it up after restart per iter ~1496).
+- ccd-s5 completion chain: inbox-watcher marked `ccd-s5-doctrine-and-handling-shapes` done at 17:12:34Z (65s preflight). `build-ccd-s5-doctrine-and-handling-shapes.json` build-phase envelope now queued in Forge inbox. PR #465 already exists on branch.
+
+**Check 0 — Alert triage:** Total lines: 1282 (watermark L1281 → +1 new). L1282: `medic-diagnosis` for `pipeline-stall:retry-exhausted:ccd-s4-healer-recover-then-alert` at 17:11:46Z. Same source pattern as L1280/L1281 (medic follow-up on ccd-s4 retry-exhausted). Known-pattern match in alert-translations.json → **Tier-3 silence**. No DM, no dispatch. Watermark advance: L1281 → L1282.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon sessions: 0 active. Last Larry message unchanged ("Is this related to the fix we just launched?" 16:32:45Z). No new messages, no re-escalation thresholds active. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `0 new alert(s) fired, 0 recovered, 2 suppressed` (ccd-s4 retry-exhausted on cooldown; tier2_fallback:beacon-bot:rate_limit on cooldown + auto-remediated). ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: 2 items — `build-fix-reaper-handoff-guard-descope-003.json` (ACTIVE, build phase running in worktree) + `build-ccd-s5-doctrine-and-handling-shapes.json` (queued, waiting for fix-reaper to complete).
+- Beacon: EMPTY ✅ | Mirror: EMPTY ✅ | Pulse: EMPTY ✅
+- All Larry directives in last 24h have matching chain artifacts. ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing known. ✅ Known.
+
+**Check A — Source repo:** branch=main, clean (HEAD=34f7901 = origin/main). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T16:52:19Z (~27 min at 17:19Z), status=no-change. 2h threshold ~18:52Z. ✅ Good.
+
+**Check C — Agent liveness:** All 4 services active (inbox-watcher, beacon-bot, forge-bot, mirror-bot). Inbox-watcher last log at 17:13:17Z; `notify-ccd-s5` Beacon completed. `build-fix-reaper` actively running in worktree. ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #457** (`fix(reaper): release handoff guard`) — OPEN, UNKNOWN mergeable, updatedAt=08:13:19Z (~9h). No autoMerge. Resolution path: `build-fix-reaper-handoff-guard-descope-003` IN PROGRESS (~7 min elapsed). 24h threshold 2026-06-12 08:13Z. [yellow] carry.
+- **PR #465** (`docs(beacon): S5`) — OPEN, branch=`forge/ccd-s5-doctrine-and-handling-shapes`, 1 file, reviewDecision="". Mirror review expected via outbox-notifier. [blue] watch.
+- No other open PRs. ✅
+
+**Check H — Forge digest:** Open: 2 — PR #457 (~9h), PR #465 (fresh, ~11 min). `build-fix-reaper-handoff-guard-descope-003` ACTIVE in worktree. `build-ccd-s5-doctrine-and-handling-shapes.json` queued. ✅
+
+**§5.0 bug-hunt gate:** Conditional; no script found. No-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri only) → skip. Check VIII/IX/X (Monday-only) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d. No 60d trigger. ✅
+
+**Actions taken:** None. L1282 triaged Tier-3 silence. Tier state recorded non-clean (PR #457 open).
+
+**KEY WATCH this iter:**
+- `build-ccd-s5-doctrine-and-handling-shapes.json` is in Forge inbox with `"phase": "build"` while PR #465 already exists. When inbox-watcher picks it up after fix-reaper completes, Forge's build-phase session will run. Forge agent likely detects the existing PR and skips `gh pr create`; monitor for PR conflict or error in next cycle.
+
+**Standing findings:**
+- [yellow] **PR #457 mirror-review FAILURE** — OPEN (~9h). Resolution path: `build-fix-reaper-handoff-guard-descope-003` ACTIVE (started 17:12:35Z). 24h threshold 2026-06-12 08:13Z.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. (rate_limit auto-remediated this cycle; credential rotation still outstanding)
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter ~1378. Carry.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [blue] **PR #465** (`docs(beacon): S5`) — OPEN (17:08:50Z, branch=`forge/ccd-s5-doctrine-and-handling-shapes`). Mirror review expected.
+- [blue] `build-fix-reaper-handoff-guard-descope-003` — ACTIVE (started 17:12:35Z, ~1h window → ~18:12Z).
+- [blue] `build-ccd-s5-doctrine-and-handling-shapes.json` — Forge inbox queued. Watch for build-phase outcome (PR already exists).
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Watch for Beacon.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] alert-triage watermark L1282.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464) — Tier-4 (never-silence; actor-exemption pending `go: actor-exemption-config`).
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+
+**Watch items for iter ~1498:**
+- `build-fix-reaper-handoff-guard-descope-003`: Expected completion ~18:12Z. Watch for PR open and Mirror review dispatch.
+- `build-ccd-s5-doctrine-and-handling-shapes.json`: Will be processed after fix-reaper completes. Watch for outcome — expect Forge to skip `gh pr create` since PR #465 exists, or produce a Mirror-review dispatch for the existing PR.
+- PR #465: Watch for Mirror review dispatch.
+- Sync: last_sync=16:52:19Z. 2h threshold ~18:52Z — trigger ff+sync if crossed and repo clean.
+- PR #457: FAILURE, 24h threshold 2026-06-12 08:13Z. Will be superseded by fix-reaper descope-003 PR.
+- beacon-pending-approvals.json MISSING — check if approvals surface appears after fix-reaper completes.
+
+**PRIME DIRECTIVE:** No new Pulse interventions this iter (L1282 Tier-3 silence is not an intervention). Prime ledger: appended iter_clean (iter=1497 [counter shows 0 per standing bug], tier=1); iter_clean 53→54. Running total: interventions=789, systemic_fixes=22, verification_pending=10, iter_clean=54, ratio≈35.86, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (PR #457 FAILURE still open; resolution in-flight).
+
+---
+
 ## Iteration ~1496 — 2026-06-11 17:10Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
