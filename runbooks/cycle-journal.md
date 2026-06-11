@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~1533 — 2026-06-11 23:33Z UTC (interactive, /cycle, Tier 1→1, consecutive_clean 1→0)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ⚠️ Tier-reset. 4/4 bots alive. 0 open PRs. 1 new alert (L1309, Tier-4). G-rule follow-up from iter ~1532 was INVALID (F24 empty-prompt). **Tier 1, consecutive_clean 1→0** (tier-reset from Check 0 Tier-4).
+
+**VERIFY-BEFORE-REASSERT (iter ~1532 watch items):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: Still in preflight (mtime 20:56:30Z, now ~2h37min old, PR #476 merged). Pipeline healer: no stalls (23:30Z). ✅ carry.
+- **system-health log_growth warning**: Still warning (seconds_since_write=1671, queued_inboxes=1). Tied to Forge test-jail-pr4 preflight. ✅ carry.
+- **dispatch-branch-cleanup G-rule follow-up (`g-rule-dispatch-branch-cleanup-followup-001.json`)**: Found in Beacon `.invalid/` — rejected for "prompt too short (0 chars, min 100) — likely F24 empty-prompt bug." The envelope contained only `{"task_id": "..."}` with no payload. G-rule Pulse-envelope-format 1/3 → **2/3**. The original G-rule from iter ~1530 was consumed by Beacon ✅ (in Beacon `.archive/`). No re-dispatch needed this cycle — the original Beacon APPROVAL_REQUEST is in the approval chain.
+- **Automated-cycle journal-gap**: No new automated cycle since iter ~1532 observation. Gap pattern not yet confirmed recurring. ✅ carry.
+- **Tier 1 → Tier 2 de-escalation**: Was consecutive_clean=1; L1309 Tier-4 this iter resets to 0. Need 3 clean iters to reach Tier 2.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1309 lines. Watermark entering L1308. L1309 = `dispatch-branch-cleanup:summary` (23:27:06Z, "pruned 3 local + 2 remote stale branches", route=digest). `alert_triage_state.py` → **Tier-4** (novel — no registry template, no translation match in `alert-translations.json` which is empty). Known-in-progress fix: original G-rule was consumed by Beacon (iter ~1530); Beacon APPROVAL_REQUEST `alert-translations-dispatch-branch-cleanup-summary-001` was auto-approved (beacon-pending-approvals.json FILE_NOT_FOUND); Forge task status unconfirmed but no open Forge PR. Beacon bot outbox_notifier correctly routing as `digest; skipping DM`. No new DM sent. Watermark 1308→1309. **Tier-reset triggered.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: Last Larry messages at 13:44–14:00 MDT (~9h ago): `go`, `status`, `is the pending approval stale info`, `what do you think?` — all resolved (PR #476 merged, Beacon confirmed approvals stale, no orphan directives). No agent distress. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (23:30Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon_telegram_sessions.json`: 0 sessions. No unresolved Larry directives in last 24h. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (session startup gitStatus). Local HEAD at `b581ec5 Pulse cycle 20260611T232854Z` — ahead of last-synced commit `22c6071` by cycle auto-commits. Expected state: sync push pending next tick. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T22:53:06Z (~40 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (23:27:19Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: warning (seconds_since_write=1671, queued_inboxes=1, standing — tied to Forge test-jail preflight). disk 6%, memory 18%. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime 20:56Z, ~2h37min old, PR #476 merged). Pipeline healer: no stalls. Beacon: `g-rule-dispatch-branch-cleanup-followup-001.json` in `.invalid/` (F24 empty-prompt). No valid inbox tasks for any agent. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert --alert-id dispatch-branch-cleanup:summary:L1309 ...` → Tier-4. Watermark 1308→1309. ✅
+2. `cycle_tier_state.py record --checks-clean false` → **tier-reset, consecutive_clean=0**, last_signal_at=23:33:40Z. ✅
+3. No DMs sent — L1309 is known-in-progress (Beacon bot routes as digest; no new dispatch needed while original G-rule chain is active).
+
+**New finding:**
+- **G-rule Pulse-envelope-format 2/3**: iter ~1532 follow-up envelope `g-rule-dispatch-branch-cleanup-followup-001.json` was rejected to Beacon `.invalid/` (F24 empty-prompt — only `{"task_id": "..."}`, no payload). 2nd occurrence of malformed Pulse G-rule envelope. At 3/3 → dispatch to Beacon for systemic fix of Pulse's G-rule-envelope writer.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3** (iter ~1532 empty envelope to Beacon invalid). [updated]
+- [blue] dispatch-branch-cleanup:summary G-rule: Beacon consumed original (iter ~1530 ✅). Follow-up iter ~1532 INVALID (F24). Beacon APPROVAL_REQUEST in trust-policy chain; alert-translations.json still empty. [carry/updated]
+- [blue] system-health.json `log_growth: warning` (queued_inboxes=1, Forge test-jail-pr4 preflight ~2h37min, pipeline healer nominal). [carry]
+- [blue] Forge inbox test-jail-pr4-acceptance-proof-001 phase=preflight (2h37min+, PR #476 merged, healer: no stalls). [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+
+**Watch items for iter ~1534:**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: 2h37min+ in preflight post-PR-#476-merge. Pipeline healer nominal. If stall detected at next check → escalate [yellow].
+- **system-health log_growth warning**: Tied to above. Resolves when task self-archives.
+- **dispatch-branch-cleanup G-rule Pulse-envelope-format 2/3**: At 3/3 → dispatch Beacon task to fix Pulse's G-rule-envelope writer (F24 empty-prompt bug).
+- **alert-translations.json dispatch-branch-cleanup:summary entry**: Still empty. Verify if Forge received/completed config task from Beacon's trust-policy-approved APPROVAL_REQUEST. If no Forge activity visible next cycle → re-evaluate dispatch path.
+- **Tier 1 de-escalation**: Need 3 consecutive clean iters from now.
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions≈793, systemic_fixes=25, ratio=31.92, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (tier-reset from Check 0 Tier-4).
+
+---
+
 ## Iteration ~1532 — 2026-06-11 23:27Z UTC (interactive, /loop /cycle, Tier 1, consecutive_clean 0→1)
 
 **Trigger:** Larry direct invocation (`/loop /cycle`).
