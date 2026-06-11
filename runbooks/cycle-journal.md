@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration ~1514 — 2026-06-11 19:24Z UTC (interactive, Tier 1→2, consecutive_clean 2→3 → de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal — all mandatory checks + additive checks clean. Forge marker-error retry 2/3 (PID 1828768) succeeded at 19:17:31Z (ack-proceed); Beacon dispatched build phase; Forge PID 1830242 running build (resumed session c4b4fc44, started 19:17:36Z). Mirror PID 1829403 reviewing PR #469. No new alerts. Tier 1→2 de-escalation (3 consecutive clean iters).
+
+**VERIFY-BEFORE-REASSERT (iter ~1513 watch items):**
+- **PR #469 Mirror PASS**: NOT YET. Mirror PID 1829403 active; regression test PID 1830742 running. Mirror review in progress. ✅ [blue] carry.
+- **Forge marker-error retry 2/3**: ✅ COMPLETED. routing-events.jsonl at 19:17:31Z: `forge-result → beacon` notify-test-jail-pr2-choke-guards-001 intent=ack-proceed. Beacon immediately dispatched build-test-jail-pr2-choke-guards-001.json. In-flight file: PID 1830242 started 19:17:36Z. Resolved.
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: STILL PRESENT (confirmed `ls ~/agent-worktrees/`). 116+ min post-PR#465 merge. No Larry response. [yellow] carry.
+- **Sync threshold 20:52:40Z**: NOT CROSSED. Current 19:24:38Z; 32 min elapsed since error at 18:52:40Z. ✅ Within 2h window. Self-healing.
+- **PR #470 systemd ReadWritePaths**: Drop-ins live since 18:59Z. PR merge bakes config for next reinstall. Nominal. ✅
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1296 lines (watermark L1296 unchanged). No new alerts since last iter. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl` unavailable from interactive session context (user bus: `No medium found`). Agent process health confirmed via pgrep (beacon, inbox_watcher, outbox_notifier, Forge, Mirror all alive). Alert stream clean (L1296 watermark unchanged). ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No new Larry directives in alert stream since L1296 (PR #470 unreviewed-merge at 19:10Z, last iter). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `RETRY_EXHAUSTED_SKIP task=test-jail-pr2-choke-guards-001 reason=superseded_session` (expected — build now in progress) + `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Forge: `build-test-jail-pr2-choke-guards-001.json` — build phase dispatched 19:17:31Z; in-flight PID 1830242 started 19:17:36Z (7 min at scan). ✅ In progress.
+- Mirror: `review-test-jail-pr2-choke-guards-001.json` — Mirror review PR #469 (dispatched 19:00:06Z; PID 1829403 active, regression test PID 1830742 running). ✅ In progress.
+- Beacon: EMPTY ✅ | Pulse: EMPTY ✅
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known. [blue] carry. ✅
+
+**Check A — Source repo:** Session gitStatus at conversation start: main, clean (wrapper committed iter ~1513 journal). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T18:52:40Z (status=error, push failed). Elapsed ~32 min. 2h threshold 20:52:40Z. ✅ Within window. Self-healing.
+
+**Check C — Agent liveness:** Beacon bot (PID 1828693), inbox_watcher (PID 1829291), outbox_notifier (PID 1829300) all running via pgrep. Forge (PID 1830242) active (build phase, 7 min). Mirror (PID 1829403) active (review, 24 min). ✅ Nominal.
+
+**Check E — PRs:**
+- **PR #469** (`fix(tests): test-jail PR-2 — production-side choke guards + chokepoint census gate`) — OPEN, UNKNOWN mergeable, reviewDecision="", autoMergeRequest=null. Mirror review in progress. [blue] watch. No stale PRs.
+
+**§5.0 bug-hunt gate:** Thursday — no-op. ✅
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sun/Mon/Wed/Fri) → skip. Check VIII/IX/X (Monday) → skip. Check III: next eligible 2026-06-25. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY ~72d — no 60d trigger. ✅
+
+**Actions taken:**
+1. Alert watermark: L1296 (unchanged — no new alerts). ✅
+2. Ledger: `iter_clean` row appended (iter 1514, tier 1, ts 19:27:12Z). ✅
+3. Tier state: consecutive_clean=2→3 → **Tier 1→2 de-escalation** (consecutive_clean reset to 0, last_updated 19:27:33Z). ✅
+4. No DMs sent — no new [yellow] or [red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] **Check III threshold proposals** — 2 high-attention (beacon Δ92%, forge Δ64%), 2 minor. `approve threshold-update-2026-06-11`. Pending Larry.
+- [yellow] **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`** — 116+ min post-PR#465 merge. Escalated iter ~1508. Pending Larry response.
+- [blue] **PR #469** — OPEN, Mirror review in progress (PID 1829403). Forge build phase in progress (PID 1830242, resumed session c4b4fc44). Watch for build completion + Mirror PASS + auto-merge.
+- [blue] alert-triage watermark L1296.
+- [blue] fix-build-background-poll-idiom-001 — not yet dispatched. Carry.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter ~1416. Carry.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing known.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470) — 16 total. Actor-exemption pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 2/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` — 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter ~1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending `go: actor-exemption-config`.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] F24b: JSON malformation in dispatch envelopes — 2/3 G-rule. Watch for 3rd.
+- [blue] Check III gate discrepancy — carry.
+- [blue] inbox_watcher fixture contamination (real-paid-001 / ../../../../etc/pwned) — 1/3 G-rule. Carry.
+- [blue] Sync push failure 18:52:40Z — self-healing. Threshold 20:52:40Z not yet crossed.
+
+**Watch items for iter ~1515:**
+- **PR #469**: Mirror PASS emitted? Once Mirror PASS + MERGEABLE + auto-merge not enabled → enable auto-merge (always-allowed).
+- **Forge build PID 1830242**: Completed? Marker emitted? (Note: PR #469 already opened in first session — watch for how build phase handles existing PR.)
+- **Orphaned worktree `wt-forge-ccd-s5-doctrine-and-handling-shapes`**: Larry responded? Still present?
+- **Sync**: Did 20:52:40Z threshold cross without success? Check agent-core-sync.json.
+
+**PRIME DIRECTIVE:** Nominal iter (all checks clean, Tier 1→2 de-escalation). Running total: interventions=793, systemic_fixes=23, verification_pending=10, iter_clean appended, ratio≈34.5, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0 (de-escalated from Tier 1 after 3 consecutive clean iters).
+
+---
+
 ## Iteration ~1513 — 2026-06-11 19:17Z UTC (interactive, Tier 1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
