@@ -917,6 +917,55 @@ def iter_journalctl(
 
 # -------------------- Supabase sink --------------------
 
+def _resolve_client_options_cls():
+    """Locate supabase-py's ClientOptions across version/layout drift.
+
+    Recent supabase-py (2.x) re-exports ClientOptions from the top-level
+    ``supabase`` package; older builds expose it only under
+    ``supabase.lib.client_options``. Try the cheap top-level import first, then
+    the lib path. Returns None if neither resolves (supabase-py absent, or a
+    layout we don't recognise) so callers can degrade to an un-pinned client
+    rather than crash the producer.
+    """
+    try:
+        from supabase import ClientOptions  # type: ignore
+        return ClientOptions
+    except (ImportError, AttributeError):
+        pass
+    try:
+        from supabase.lib.client_options import ClientOptions  # type: ignore
+        return ClientOptions
+    except (ImportError, AttributeError):
+        pass
+    return None
+
+
+def build_client_options(timeout_sec: int = SUPABASE_TIMEOUT_SEC) -> Optional[Any]:
+    """Build a supabase-py ClientOptions pinning the PostgREST request timeout.
+
+    Without an explicit timeout, supabase-py's PostgREST client uses its own
+    multi-tens-of-seconds default (~60s in 2.x). Every chain_events write in
+    this codebase is synchronous: here in the shipper's drain loop and — more
+    dangerously — at the push-emit sites that run inside the single-threaded
+    outbox-notifier ``process_outbox`` loop (POLL_INTERVAL_SECONDS=5). There a
+    single Supabase network black-hole blocks one emit for the whole default
+    window and serializes EVERY agent's notifications behind it. Pinning the
+    timeout to ``SUPABASE_TIMEOUT_SEC`` makes a black-hole fail fast so the
+    best-effort writers fall through to their WARN+drop / buffer paths.
+
+    Returns None when ClientOptions can't be located or doesn't accept the
+    ``postgrest_client_timeout`` kwarg (version drift); the caller then builds
+    the client without options, preserving prior behaviour rather than crashing.
+    """
+    options_cls = _resolve_client_options_cls()
+    if options_cls is None:
+        return None
+    try:
+        return options_cls(postgrest_client_timeout=timeout_sec)
+    except TypeError:
+        return None
+
+
 class SupabaseSink:
     """Wraps the supabase-py client with insert-or-buffer semantics.
 
@@ -945,7 +994,14 @@ class SupabaseSink:
                 'supabase-py is not installed. '
                 'pip3 install --user --break-system-packages supabase'
             ) from exc
-        self._client = create_client(url, key)
+        # Pin the PostgREST request timeout (SUPABASE_TIMEOUT_SEC) so a Supabase
+        # network black-hole fails fast instead of blocking each drain for
+        # supabase-py's multi-tens-of-seconds default — see build_client_options.
+        options = build_client_options()
+        if options is not None:
+            self._client = create_client(url, key, options=options)
+        else:
+            self._client = create_client(url, key)
 
     def insert_rows(self, rows: list[dict[str, Any]]) -> None:
         """INSERT a batch with PK conflict treated as no-op.
