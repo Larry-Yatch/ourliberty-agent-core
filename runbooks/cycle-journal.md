@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~1530 — 2026-06-11 22:51Z UTC (interactive, Tier 3→1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation (`/loop /cycle`).
+
+**Health:** ⚠️ Tier-reset. 4/4 bots alive. 0 open PRs. 1 new alert (L1308, Tier-4 → G-rule dispatched). G-rule 3/3 for dispatch-branch-cleanup:summary. **Tier reset 3→1** (Check 0 non-nominal).
+
+**VERIFY-BEFORE-REASSERT (iter ~1529 watch items):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: Still in preflight (phase=preflight, mtime 20:56Z UTC, now ~116 min old, PR #476 merged). Pipeline healer: no stalls (22:51Z). Chain self-recovering. [blue] carry. 
+- **system-health log_growth warning**: Still warning (queued_inboxes=1, seconds_since_write=4133). Tied to Forge preflight task. [blue] carry.
+- **unreviewed-merge:476**: L1308 was dispatch-branch-cleanup, not unreviewed-merge:476. Still not arrived.
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1308 lines. Watermark L1307 entering cycle. L1308 = `dispatch-branch-cleanup:summary` (source=dispatch-branch-cleanup, route=digest, severity=warning, ts=2026-06-11T22:27:03Z). `alert_triage_state.py` → **Tier-4** (novel: no registry template, no translation match). Severity [blue] — routine informational cleanup (healer pruned 1 local + 0 remote stale branch(es)). G-rule 3/3 threshold met. Action: G-rule dispatch to Beacon (`g-rule-dispatch-branch-cleanup-summary-silence-001.json`). Watermark 1307→1308. **Tier-reset triggered.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** `beacon-pending-approvals.json`: 1 pending (`unreg-approval-2dbbe7bb4d4b`, standing PR #457 escalation, created 11:15Z). 0 active sessions. ✅ Nominal (carry).
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (22:51Z). ✅ Nominal.
+
+**Check 4 — Pending directives:** No new unresolved Larry directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean. Most recent commit `22c6071 Pulse cycle 20260611T222536Z`. ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T21:52:57Z (~59 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (22:51:30Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: warning (queued_inboxes=1, seconds_since_write=4133, standing). disk 6%, memory 20%, other checks ok. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime 20:56Z UTC, ~116 min old, PR #476 merged). Pipeline healer: no stalls. Chain self-recovering. Beacon: `g-rule-dispatch-branch-cleanup-summary-silence-001.json` (just written). Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs. ✅ Nominal.
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Sunday only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `alert_triage_state.py triage-alert --alert-id summary` → Tier-4. Watermark advanced 1307→1308. ✅
+2. G-rule dispatch: wrote `~/agents/inboxes/beacon/g-rule-dispatch-branch-cleanup-summary-silence-001.json`. Proposes adding `dispatch-branch-cleanup:summary` as Tier-3 silence entry in `config/alert-translations.json` (route=digest informational pattern, 3rd occurrence). ✅
+3. `cycle_prime_ledger.py append --kind systemic_fix --tier 1 --template dispatch-branch-cleanup-g-rule` → systemic_fixes=25, ratio=31.92. ✅
+4. `cycle_tier_state.py record --checks-clean false` → **tier reset 3→1**, consecutive_clean=0. ✅
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] system-health.json `log_growth: warning` (queued_inboxes=1, Forge test-jail-pr4 preflight ~116 min old, pipeline healer nominal). [carry]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule Pulse-envelope-format — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, dispatch-branch-cleanup:summary **G-rule DISPATCHED** (iter ~1530 → Beacon), Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] ourliberty-agent-core-health.service failed (stale sync from 20:52Z — self-heals on next tick). [carry]
+
+**Watch items for iter ~1531:**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: 116+ min in preflight post-PR-#476-merge. Pipeline healer nominal but task not self-archiving. If stall detected at next check → escalate [yellow].
+- **system-health log_growth warning**: Tied to above. Resolves when task self-archives.
+- **G-rule g-rule-dispatch-branch-cleanup-summary-silence-001**: Written to Beacon inbox. Expect Beacon to consume and generate Forge config PR.
+- **Tier 1 cadence**: Three clean iters needed to de-escalate back to Tier 2.
+
+**PRIME DIRECTIVE:** 0 interventions, 1 systemic_fix (dispatch-branch-cleanup-g-rule). Running total: interventions≈793, systemic_fixes=25, ratio=31.92, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0 (tier-reset from Check 0 Tier-4).
+
+---
+
 ## Iteration ~1529 — 2026-06-11 22:20Z UTC (interactive, Tier 2→3, consecutive_clean 2→3→0)
 
 **Trigger:** Larry direct invocation (`/cycle`).
