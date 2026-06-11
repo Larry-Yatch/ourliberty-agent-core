@@ -95213,3 +95213,96 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 **Tier end-of-iter:** 1 (consecutive_clean=0 — PR #457 stall; direction-ask pending Beacon pickup).
 
 ---
+
+---
+
+## Iteration ~1466 -- 2026-06-11 14:10Z UTC (interactive, Tier 1)
+
+**Session start:** gitStatus branch=main, clean. Tier: 1, consecutive_clean=0. Alert-triage watermark corrected: state-file showed L1260; updated to L1265 this iter.
+
+**Health:** Nominal with standing items. CCD DAG progressing well (s4+s5 now queued in Forge). PR #457 Mirror review stalled ~6.5h. APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b registered and pending Larry in Approvals tab. Procedural note: Check III ran off-schedule (Thursday, 11 days since last run -- script has no day-of-week gate).
+
+**Tier state:** 1 (consecutive_clean=0)
+
+**Check 0 -- Alert triage:** 5 alerts since watermark (L1261-L1265). L1261-L1264 all Tier-3 (triaged by iter ~1465: Pulse routing confirmations, heal-wedged-review closure, outbox-notifier notify, heal-stale-daemon auto-restart). L1265 (14:06Z source=pulse subject=threshold-proposal-2026-06-11) -- Tier-3, Pulse-authored from off-schedule Check III, Beacon alert sweep will DM Larry. Watermark updated 1260 -> 1265. Triage: 0 dispatches, 5 Tier-3 silences. Nominal.
+
+**Check 1 -- Log noise:** journalctl warning since 90min -> no entries. Nominal.
+
+**Check 2 -- Telegram sweep:** beacon-pending-approvals.json has 1 real registered pending -- unreg-approval-2dbbe7bb4d4b (created 11:15Z by heal-unregistered-approval; Approve=revise spec via new Beacon APPROVAL_REQUEST; Reject=push back on PR #457). Per memory: trust policy confirmed real. Larry: check Approvals tab. No orphaned Larry directives in last 4h. Nominal.
+
+**Check 3 -- Pipeline stall:** heal-pipeline-stall-state.json: active_stalls=0. PR #457: OPEN, now MERGEABLE (upgraded from UNKNOWN), reviewDecision="". Mirror review task review-fix-reaper-handoff-guard-checks-liveness-002.json is in Mirror inbox archive (archived 08:24Z UTC); no verdict emitted; Mirror inbox empty; in-flight state empty; no active Mirror session. Stall ~6.5h since PR open, ~5.5h since review dispatch. APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b is the formal gate; Larry decides. [yellow] carry. Check 3: nominal (no new stalls; PR #457 stall covered by existing approval).
+
+**Check 4 -- Inboxes (VERIFY-BEFORE-REASSERT):**
+- beacon: EMPTY. direction-ask wedged-forge-exit-fix-direction-ask-20260611T124500Z.json was consumed and archived by Beacon. No new APPROVAL_REQUEST appeared in beacon-pending-approvals.json from this processing. [blue] closed.
+- forge: 2 tasks (VERIFY: ls -la confirmed both present):
+  - build-ccd-s4-healer-recover-then-alert.json (dispatched 12:55Z, CCD M4, ~1h15m old).
+  - ccd-s5-doctrine-and-handling-shapes.json (NEW, arrived ~13:50Z, preflight; task: add agent CLAUDE.md handling shapes for code-review-revision-no-session intent + recover-or-route-to-agent rule). CCD DAG: s1 (PR #446) + s2 (PR #460) + s3 (PR #462) all merged; s4+s5 queued. Very positive.
+- mirror: EMPTY. pulse: EMPTY. Nominal overall.
+
+**Check 5 -- Stale daemon:** state file absent (one-shot healer completed). Nominal.
+
+**Check A -- Source repo:** session-start gitStatus main, clean. Nominal.
+**Check B -- Sync health:** status=no-change, last_sync=2026-06-11T13:52:16Z (~18min ago, within 2h). Nominal.
+**Check C -- Agent liveness:** 9/9 active (beacon-bot, forge-bot, mirror-bot, pulse-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer). Nominal.
+
+**Check E -- PRs:** PR #457 OPEN ~6.5h, MERGEABLE, reviewDecision="". Not auto-merge eligible (no Mirror PASS or APPROVED reviewDecision). APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b covers the decision. [yellow] carry. No other open PRs. Nominal otherwise.
+
+**sec 5.0 Bug-hunt gate (every cycle):** audit_due_nudge.py: no-op. distill_detector.py: no-op. audit_cadence_signal.py: no-op. Nominal.
+
+**Periodic/conditional (Thursday 2026-06-11 UTC):**
+- Check I (Thu off-day): skip.
+- Check III (OFF-SCHEDULE, procedural note): pulse_check_iii.py was invoked to test availability; the script lacks a day-of-week gate (unlike Check I) and ran to completion. Today is Thursday; last run was 2026-05-31 (11 days ago, not 14). This is off-spec. However, proposals are valid signal: 4 proposals generated, artifact check-iii-2026-06-11.json written, threshold-proposals.json updated, alert L1265 queued. Per spec: DO NOT auto-apply. No Pulse action beyond surfacing.
+  Proposals:
+  - HIGH-ATTENTION (beacon, _default): 2147s -> 172s (delta=92%, n=307, p50=35s, p90=172s). Current threshold is 12x the p90.
+  - HIGH-ATTENTION (forge, _default): 3436s -> 1233s (delta=64%, n=33, p50=175s, p90=1233s).
+  - (mirror, _default): 488s -> 520s (delta=7%, loosen, n=172, p50=330s, p90=519s).
+  - (pulse, _default): 262s -> 248s (delta=5%, tighten, n=50, p50=127s, p90=247s).
+  Anchor impact: as_of=June 11; spec gate (>=14d + Sunday) means next eligible Check III = June 28 (delayed from June 14). Beacon alert sweep will DM Larry with proposals; Larry approves via Beacon shortcut if desired.
+- Checks VIII, IX, X: skip (Thursday, not Monday). Nominal.
+
+**Credential rotation:** pulse-rotation-window-dms.json missing. SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- PR #457 Mirror stall: CONFIRMED open, no verdict (gh pr view verified: reviewDecision="", reviews=0). [yellow] carry.
+- APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b: CONFIRMED in beacon-pending-approvals.json, status=pending. [yellow] carry.
+- Beacon direction-ask wedged-forge-exit consumed: CONFIRMED (found in Beacon inbox archive). [blue] CLOSED.
+- bughunt-gate-soak Phase 2: pending Larry. [yellow] carry.
+- health-check-notify-script-missing G-rule 3/3: no new Forge PR. [yellow] carry.
+- Tier 2 weekly probe auth_401: Thursday, not re-tested. Action: docs/runbooks/rotate-claude-setup-tokens.md. [yellow] carry.
+- Check IX GITHUB_TOKEN: Thursday, not tested. [yellow] carry.
+- CCD s5 NEW: CONFIRMED in Forge inbox. Positive closure on prior watch item.
+- APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001: [blue] carry.
+- G-rule cycle-timer checkpoint 3/3: [blue] carry.
+- G-rule actor-exemption-config 3/3: [blue] carry.
+- APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001: [blue] carry.
+- sync-push-rebase-fallback-001: sync no-change 13:52Z, no error. [blue] carry.
+- catalog-accuracy-drift G-rule 1/3: [blue] carry.
+
+**Actions taken:** Updated alert-triage.json watermark 1260 -> 1265. No auto-fix actions this iter.
+**Dispatches:** 0.
+
+**PRIME DIRECTIVE:** 0 new interventions, 0 new systemic fixes this iter (all findings nominal or Tier-3, plus standing items already recorded). Script-authoritative: interventions~781+, systemic_fixes=21, ratio~37.1, trend=flat.
+
+**Standing findings:**
+- [yellow] APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b -- Larry: check Approvals tab. Approve=revise spec; Reject=push back on PR #457.
+- [yellow] PR #457 Mirror review stall -- ~6.5h, reviewDecision="". MERGEABLE. Gate: see APPROVAL_REQUEST above.
+- [yellow] bughunt-gate-soak -- Phase 2 pending Larry.
+- [yellow] health-check-notify-script-missing -- G-rule 3/3, Forge PR pending.
+- [yellow] Tier 2 weekly probe auth_401 -- Action: docs/runbooks/rotate-claude-setup-tokens.md.
+- [yellow] Check IX GITHUB_TOKEN missing -- dashboard-api POST -> 500.
+- [blue] CCD s4+s5 in Forge queue -- DAG near complete (3 merged, 2 queued).
+- [blue] Check III proposals queued -- 2 high-attention (Beacon 2147->172s, Forge 3436->1233s). DM via Beacon sweep. Next Check III: June 28.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 -- pending Larry.
+- [blue] G-rule cycle-timer checkpoint 3/3 -- pending go: cycle-timer checkpoint.
+- [blue] G-rule actor-exemption-config 3/3 -- pending go: actor-exemption-config.
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 -- pending Larry.
+- [blue] sync-push-rebase-fallback-001 -- self-recovering.
+- [blue] catalog-accuracy-drift G-rule 1/3 -- watch for 2/3.
+
+**Watch items for iter ~1467:**
+- Forge: expect s4/s5 build progress (preflight -> build -> PR open).
+- APPROVAL_REQUEST unreg-approval-2dbbe7bb4d4b: Larry decision needed on PR #457.
+- Check III DM: Beacon alert sweep delivers threshold-proposal-2026-06-11 to Larry; no action from Pulse until Larry approves via shortcut.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0 -- PR #457 stall + direction-ask pending).
+
