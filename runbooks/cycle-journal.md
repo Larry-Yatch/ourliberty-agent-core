@@ -4,6 +4,118 @@
 
 ---
 
+## Iteration 1406 — 2026-06-11 05:52Z UTC (interactive, Tier 1, consecutive_clean 0)
+
+**Health:** ⚠️ fix-reaper -001 (superseded by -002) still in Forge inbox — archive attempted, blocked by interactive session write permissions. Escalated to Larry for manual archive command. All other checks nominal. 2 new alerts (L1465: missions-card-gc silence; L1466: unreviewed-merge:448, same actor-exemption G-rule). PRs #446 (CCD S1, merged 05:46Z) and #448 (docs/spec test jail, merged 05:47Z) both closed. PR #447 (install-drift) open, Mirror reviewing. Install-drift timer imminent: fires 06:00Z (~3min from scan). 2 new Forge preflight tasks: ccd-s2 and fix-test-bootstrap. **Tier 1, consecutive_clean=0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1405 watch items):**
+- install-drift timer fires 06:00Z June 11: **CONFIRMED** — LEFT=3min 15s at scan. ✅ Imminent.
+- fix-reaper -001/-002: -001 still in Forge inbox (archive attempt blocked by session permissions — see actions). -002 awaiting Forge slot. Carry (escalated to Larry).
+- PR #446 (CCD S1): **MERGED at 05:46Z.** ✅ marker-error-ccd-s1-envelope-builder-1.json retry may be stale; self-resolving.
+- PR #447 (install-drift): Mirror inbox has `review-post-merge-install-drift-trigger-001.json`. Mirror review in progress. ✅
+- Sync: last_sync=05:51:21Z (1 min old at scan) — pulled PR #445. ✅
+- Tier 1, consecutive_clean=0: non-clean iter (fix-reaper -001 finding) → consecutive_clean stays 0.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1466. Watermark was 1464 (iter 1405). 2 new lines.
+- **L1465** (05:47:31Z): `missions-card-gc` / summary — "retired 1 stale session card(s) ['desktop-8b27d515']". Standing pattern `silence-missions-card-gc-summary-alert-001`. **Tier-3** — silence. ✅
+- **L1466** (05:50:24Z): `heal-unreviewed-merge-detector` / unreviewed-merge:448 — PR #448 ("docs(spec): test jail — default-deny test isolation + audit evidence base") merged by Larry-Yatch at 05:47Z without Mirror review. Same recurring pattern as :434, :445. Actor-exemption-config G-rule 3/3 DISPATCHED iter ~1396; pending `go: actor-exemption-config`. **Tier-3** treatment. No DM.
+- **Watermark: advance to line 1466 / heal-unreviewed-merge-detector:unreviewed-merge:448 / 2026-06-11T05:50:24Z**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log — most recent relevant entry: fix-reaper-002 approved+dispatched at 05:14Z (Jun 10 23:14 MDT, prior iter). No new Larry directives or agent distress signals in last 60 minutes. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. All prior outbox tasks FORGE_NO_PR_SKIP (preflight_exit or pr_exists). ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern, unchanged. ✅
+
+**Check A — Source repo:** last_sync=2026-06-11T05:51:21Z (1 min old at scan), branch=main, status=success. ✅ Nominal.
+
+**Check B — Sync health:** 1 min old. Expires ~07:51Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service ✅. ✅ Nominal.
+
+**Check E — PRs:**
+- PR #447 (fix(install-drift): trigger unit install on sync, opened 05:37Z): 1 open PR, mergeable=UNKNOWN. Mirror inbox has review task. Normal lag. ✅
+- PR #446 (feat(chain): CCD S1): MERGED 05:46Z. ✅
+- PR #448 (docs(spec): test jail): MERGED 05:47Z by Larry-Yatch. No Mirror review (unreviewed-merge:448 alert). Same actor-exemption G-rule pattern.
+
+**Check H — Inboxes:**
+- Forge: 7 items.
+  - `build-fix-headless-approval-dedup-spawn-failure-wedge-002.json` — build phase, 04:45Z (~1h7min at scan). No stall per healer. Carry.
+  - `build-post-merge-install-drift-trigger-001.json` — build phase (PR #447 open 05:37Z). In-flight. ✅
+  - `ccd-s2-no-session-revision-route.json` — NEW preflight. CCD S2: route no-session code-review REVISIONs to Beacon for re-dispatch instead of broadcast alert. Dispatched by outbox-notifier (Beacon → Forge). New since iter 1405. ✅
+  - `fix-reaper-handoff-guard-checks-liveness.json` (-001) — preflight, SUPERSEDED by -002. **[yellow] FINDING** — archive attempted (always-fix allow-list), blocked by interactive session write permissions. Manual action required (see actions). ⚠️
+  - `fix-reaper-handoff-guard-checks-liveness-002.json` (-002, correct design) — preflight, awaiting Forge slot. ✅
+  - `fix-test-bootstrap-per-module-001.json` — NEW preflight. Root-cause fix for transcript-not-persisted spam: make scripts/tests sandbox engage under ANY test loader, not just package-import path. Third prong of the transcript-not-persisted fix (alongside PR #445 + PR #447). New since iter 1405. ✅
+  - `marker-error-ccd-s1-envelope-builder-1.json` — marker retry 1/3 for ccd-s1. PR #446 merged 05:46Z. Retry likely stale; self-resolving or Mirror handles gracefully. Carry.
+- Beacon: EMPTY ✅. Mirror: `review-post-merge-install-drift-trigger-001.json` (PR #447 review in progress) ✅. Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: `no committed audit baseline; no-op`. ✅
+- distill_detector.py: `no un-distilled audits; no-op`. ✅
+- audit_cadence_signal.py (review/distill/): `no post-seed decision-grade distill artifacts yet; no-op`. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: 0 overdue. Nearest: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (72d). ✅
+- install-drift timer: NEXT=06:00Z June 11, LEFT=3min 15s at scan. Imminent. ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new occurrences this iter (L1465-1466 are different alert types). **21 total occurrences** (lines 1438–1464). Install-drift timer fires ~06:00Z. PR #445 (test-side mock fix) merged. PR #447 (Forge permanent fix) open + Mirror reviewing. fix-test-bootstrap-per-module-001 (third prong) now in Forge inbox. Carry.
+- **`unreviewed-merge:448` (3rd occurrence: :434, :445, :448):** Actor-exemption-config G-rule 3/3 already dispatched. No new milestone.
+- **`heal-pipeline-stall retry-exhausted on shipped task` (1/3):** No new occurrence. Carry.
+- **`heal-stale-daemon-code:auto-restarted` (1/3):** No new occurrence. Carry.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+
+**Actions taken:**
+1. Attempted auto-fix (archive-duplicate-inbox-task): `mv ~/agents/inboxes/forge/fix-reaper-handoff-guard-checks-liveness.json ~/agents/inboxes/forge/.archive/` — BLOCKED by interactive session write permissions. **Manual action required — see escalation to Larry below.**
+2. Recorded PRIME DIRECTIVE intervention row: `archive-duplicate-inbox-task:fix-reaper-001-superseded` at 05:57:29Z via cycle_prime_ledger.py. ✅
+3. Recorded cycle tier: non-clean → Tier 1, consecutive_clean=0 via cycle_tier_state.py record --checks-clean false. ✅
+
+**PRIME DIRECTIVE:** 1 row this iter (intervention:archive-duplicate-inbox-task:fix-reaper-001-superseded). Running total: interventions≈772, systemic_fixes=20, verification_pending=9, ratio≈38.55, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] **fix-reaper -001 SUPERSEDED by -002 — manual archive needed:** `mv ~/agents/inboxes/forge/fix-reaper-handoff-guard-checks-liveness.json ~/agents/inboxes/forge/.archive/`. If Forge picks up -001 first it builds the wrong design (age as standalone release condition). Escalated iter 1405 + this iter. **Action: Larry runs the mv command above before next Forge cycle.**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (lines 1438–1464). Install-drift timer fires 06:00Z (~3min at scan). PR #445 merged. PR #447 open+under Mirror review. fix-test-bootstrap-per-module-001 in Forge inbox (third prong).
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] unreviewed-merge:448 same pattern as :434, :445. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted G-rule 1/3. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1407:**
+- install-drift timer: fires 06:00Z (~3min from scan). After firing, verify transcript-not-persisted alerts stop in larry-alerts.jsonl. Both PR #445 and PR #447 fixes should close the gap together.
+- **fix-reaper -001: PRIORITY** — archive before Forge picks it up. Manual: `mv ~/agents/inboxes/forge/fix-reaper-handoff-guard-checks-liveness.json ~/agents/inboxes/forge/.archive/`.
+- PR #447 (install-drift): Mirror review in progress. Watch for REVIEW_PASS + auto-merge.
+- ccd-s2-no-session-revision-route: new preflight. Should advance to build.
+- fix-test-bootstrap-per-module-001: new preflight. Third prong of transcript-not-persisted fix.
+- marker-error-ccd-s1-envelope-builder-1: stale after PR #446 merge. Watch for self-resolution.
+- fix-headless-002 build (in Forge queue): 1h7min+ old at scan; watch for PR.
+
+---
+
 ## Iteration 1404 — 2026-06-11 05:10Z UTC (interactive, Tier 3, consecutive_clean 2→3)
 
 **Health:** ✅ All checks nominal. 3 new alerts (lines 1456–1458): 2 Tier-3 informational (pipeline-stall false positive + medic confirmation), 1 Tier-3 standing pattern (unreviewed-merge:445, same actor-exemption G-rule). 0 open PRs. install-drift timer on schedule 06:00Z (~52min). PR #445 merged by Larry (test-side fix for transcript-not-persisted storm). Forge: 4 tasks — 2 in build phase (no stall), 1 preflight-exit (ccd-s1, cleanup pending), 1 fresh preflight (fix-reaper). **Tier 3, consecutive_clean 2→3 (floor tier — no further de-escalation).**
