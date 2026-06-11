@@ -440,6 +440,14 @@
       "recommended_action": "Run `python3 ~/agent-core/scripts/pulse_check_<id>.py` by hand and read the traceback; logs are under ~/agents/logs/pulse-check-*.log. Fix the underlying error so the check resumes emitting heartbeats."
     }
   },
+  "pulse": {
+    "beacon-erofs": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "Pulse detected the Beacon (or another claude-subprocess) bot returning [claude exit 1] because the claude CLI hit EROFS when writing /home/larry/.claude.json. Root cause: ProtectHome=read-only in the systemd unit whitelists the .claude/ directory but not the home-root .claude.json file. The CLI rewrites this file on some turns (startup-count bump, cache-TTL refresh, new project entry) — only those turns fail, making it intermittent. PR #470 (2026-06-11) added the file to ReadWritePaths on all 18 claude-invoking units; live drop-ins bridge the gap until those inline units are reinstalled.",
+      "recommended_action": "1) Verify drop-ins are in place: `ls /etc/systemd/system/ourliberty-{beacon,forge,mirror,pulse,cycle,ledger,*}-bot.service.d/claude-json-writable.conf` — if any are missing, re-apply via `sudo mkdir -p /etc/systemd/system/<unit>.service.d && printf '[Service]\\nReadWritePaths=/home/larry/.claude.json\\n' | sudo tee /etc/systemd/system/<unit>.service.d/claude-json-writable.conf && sudo systemctl daemon-reload && sudo systemctl restart <unit>`. 2) Verify PR #470 is in the installed units: `grep .claude.json /etc/systemd/system/ourliberty-cycle.service` — if absent the install-drift healer hasn't converged yet, keep the drop-ins. 3) Once inline units are installed (grep returns the path), clean up all drop-ins: `sudo rm /etc/systemd/system/ourliberty-*.service.d/claude-json-writable.conf && sudo systemctl daemon-reload && sudo systemctl restart ourliberty-beacon-bot ourliberty-forge-bot ourliberty-mirror-bot ourliberty-pulse-bot`. Runbook: see PR #470 and the claude-json-erofs-readwrite memory entry."
+    }
+  },
   "heal-unreviewed-merge-detector": {
     "unreviewed-merge": {
       "severity": "URGENT",
