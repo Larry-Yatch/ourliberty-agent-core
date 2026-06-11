@@ -18,6 +18,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import contextlib
 import json
 import os
 import sys
@@ -1189,10 +1190,16 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
             'task_id': 'end2end-stuck-001',
             'timestamp': datetime.now(timezone.utc).isoformat(),
         }]
+        # M4 recover-then-alert: Check 3 now attempts an auto-merge recovery
+        # FIRST. Force that recovery to fail so the alert path (the behavior
+        # this test asserts) is exercised. Without this stub the mocked
+        # subprocess.run (returncode=0) would make merge_pr succeed and the
+        # alert would be (correctly) suppressed.
         with patch.object(self.hps, '_all_open_prs', return_value=[pr]), \
              patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
              patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
              patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
+             patch.object(self.hps, '_recover_via_auto_merge', return_value=False), \
              patch('subprocess.run') as mock_sub, \
              patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
             mock_sub.return_value.returncode = 0
@@ -1240,10 +1247,14 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
                 'timestamp': datetime.now(timezone.utc).isoformat(),
             },
         ]
+        # M4: both Check-3 stalls attempt auto-merge recovery first; force
+        # both to fail so each falls through to its own DM (the per-key dedup
+        # contract this test verifies).
         with patch.object(self.hps, '_all_open_prs', return_value=prs), \
              patch.object(self.hps, '_all_merged_prs_recent', return_value=[]), \
              patch.object(self.hps, '_read_recent_log_lines', return_value=lines), \
              patch.object(self.hps, '_read_recent_routing_events', return_value=routing_events), \
+             patch.object(self.hps, '_recover_via_auto_merge', return_value=False), \
              patch('subprocess.run') as mock_sub, \
              patch.object(self.hps.larry_alerts, 'append_alert', return_value=True) as mock_alert:
             mock_sub.return_value.returncode = 0
@@ -1281,6 +1292,148 @@ class TestEndToEnd(_TempAgentsRootMixin, unittest.TestCase):
         call = mock_alert.call_args
         self.assertIn('forge-no-pr', call.kwargs['subject'])
         self.assertIn('e2e-watcher-source-001', call.kwargs['subject'])
+
+
+class TestRecoverableVsDetectiveClassification(_TempAgentsRootMixin,
+                                                unittest.TestCase):
+    """M4: recoverable checks attach a `recovery` callable to their alert
+    dicts; detective-only checks do not. This is the static contract the
+    run() loop relies on to decide recover-then-alert vs alert-only."""
+
+    def test_mirror_pass_unmerged_alert_is_recoverable(self) -> None:
+        lines = [f'[{_ts(45)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-pass-stuck-001.json)']
+        pr = {'number': 300, 'headRefName': 'forge/pass-stuck-001',
+              'title': 'fix: x', '_repo': 'Larry-Yatch/ourliberty-agent-core'}
+        alerts = self.hps.check_mirror_pass_unmerged(lines, [pr], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('recovery', alerts[0])
+        self.assertTrue(callable(alerts[0]['recovery']))
+
+    def test_pr_no_mirror_dispatch_alert_is_recoverable(self) -> None:
+        pr = {'number': 310, 'headRefName': 'forge/no-dispatch-001',
+              'title': 'docs: x', '_repo': 'Larry-Yatch/ourliberty-agent-core',
+              'createdAt': (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat()}
+        alerts = self.hps.check_pr_no_mirror_dispatch([], [pr], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('recovery', alerts[0])
+        self.assertTrue(callable(alerts[0]['recovery']))
+
+    def test_marker_invisible_alert_is_detective_only(self) -> None:
+        lines = [f'[{_ts(45)}] [notifier] [INFO] notified beacon <- mirror (mirror-result, depth=1, file=notify-shape-drift-001.json)']
+        alerts = self.hps.check_mirror_marker_invisible(lines, {})
+        self.assertEqual(len(alerts), 1)
+        self.assertNotIn('recovery', alerts[0])
+
+
+class TestRecoverThenAlert(_TempAgentsRootMixin, unittest.TestCase):
+    """M4 end-to-end: a recoverable stall attempts recovery before any alert;
+    a failed recovery alerts exactly once; a successful recovery suppresses
+    the alert and stamps the per-key cooldown so the next tick does not
+    re-attempt. Vehicle: Check 3 (Mirror-PASS-unmerged) → auto-merge."""
+
+    _PR = {
+        'number': 999, 'headRefName': 'forge/recover-001', 'title': 'fix: x',
+        '_repo': 'Larry-Yatch/ourliberty-agent-core',
+    }
+    _KEY = 'mirror_pass_unmerged:recover-001'
+    _LINES = [
+        # Satisfy Check 2 (review dispatched) so only Check 3 trips.
+        f'[{_ts(90)}] [notifier] [INFO] review-request dispatched mirror <- beacon (task=recover-001, file=r.json, pr=https://example/999)',
+        # Trigger Check 3.
+        f'[{_ts(60)}] [notifier] [INFO] marker-notified beacon <- mirror (mirror-result, intent=review-pass, file=notify-recover-001.json)',
+    ]
+
+    def _io_patches(self):
+        """The shared I/O stubs (one fresh set per call)."""
+        routing = [{'source_agent': 'beacon', 'target_agent_final': 'mirror',
+                    'phase': 'review', 'task_id': 'recover-001',
+                    'timestamp': datetime.now(timezone.utc).isoformat()}]
+        return contextlib.ExitStack(), [
+            patch.object(self.hps, '_all_open_prs', return_value=[self._PR]),
+            patch.object(self.hps, '_all_merged_prs_recent', return_value=[]),
+            patch.object(self.hps, '_read_recent_log_lines', return_value=list(self._LINES)),
+            patch.object(self.hps, '_read_recent_routing_events', return_value=routing),
+        ]
+
+    def test_recovery_attempted_before_alert_and_suppresses_it(self) -> None:
+        stack, io = self._io_patches()
+        with stack:
+            for p in io:
+                stack.enter_context(p)
+            mock_recover = stack.enter_context(
+                patch.object(self.hps, '_recover_via_auto_merge', return_value=True))
+            mock_sub = stack.enter_context(patch('subprocess.run'))
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            mock_alert = stack.enter_context(
+                patch.object(self.hps.larry_alerts, 'append_alert', return_value=True))
+            self.hps.run()
+        # Recovery ran with the right PR coordinates …
+        mock_recover.assert_called_once()
+        args = mock_recover.call_args.args
+        self.assertEqual(args[0], 'Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(args[1], 999)
+        # … and because it succeeded, NO Larry DM fired.
+        mock_alert.assert_not_called()
+        # The per-key cooldown was stamped so the next tick won't re-attempt.
+        self.assertIn(self._KEY, self.hps.load_state())
+
+    def test_failed_recovery_alerts_exactly_once_with_note(self) -> None:
+        stack, io = self._io_patches()
+        with stack:
+            for p in io:
+                stack.enter_context(p)
+            mock_recover = stack.enter_context(
+                patch.object(self.hps, '_recover_via_auto_merge', return_value=False))
+            mock_sub = stack.enter_context(patch('subprocess.run'))
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            mock_alert = stack.enter_context(
+                patch.object(self.hps.larry_alerts, 'append_alert', return_value=True))
+            self.hps.run()
+        mock_recover.assert_called_once()
+        self.assertEqual(mock_alert.call_count, 1)
+        msg = mock_alert.call_args.kwargs['message']
+        self.assertIn('PR #999', msg)
+        self.assertIn('attempted auto-recovery', msg)
+
+    def test_recovery_exception_falls_through_to_single_alert(self) -> None:
+        stack, io = self._io_patches()
+        with stack:
+            for p in io:
+                stack.enter_context(p)
+            stack.enter_context(
+                patch.object(self.hps, '_recover_via_auto_merge',
+                             side_effect=RuntimeError('boom')))
+            mock_sub = stack.enter_context(patch('subprocess.run'))
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            mock_alert = stack.enter_context(
+                patch.object(self.hps.larry_alerts, 'append_alert', return_value=True))
+            self.hps.run()
+        # A raising recovery is treated as failed — exactly one alert, no crash.
+        self.assertEqual(mock_alert.call_count, 1)
+
+    def test_no_double_alert_or_reattempt_after_success(self) -> None:
+        stack, io = self._io_patches()
+        with stack:
+            for p in io:
+                stack.enter_context(p)
+            mock_recover = stack.enter_context(
+                patch.object(self.hps, '_recover_via_auto_merge', return_value=True))
+            mock_sub = stack.enter_context(patch('subprocess.run'))
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = ''
+            mock_sub.return_value.stderr = ''
+            mock_alert = stack.enter_context(
+                patch.object(self.hps.larry_alerts, 'append_alert', return_value=True))
+            self.hps.run()  # tick 1: recovers + stamps cooldown
+            self.hps.run()  # tick 2: cooldown gate → no recovery, no alert
+        mock_recover.assert_called_once()  # not re-attempted within cooldown
+        mock_alert.assert_not_called()
 
 
 class TestCheckRevisionDispatchedWithNoSession(_TempAgentsRootMixin, unittest.TestCase):
