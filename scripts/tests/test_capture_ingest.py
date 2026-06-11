@@ -106,13 +106,16 @@ class CaptureIngestTest(unittest.TestCase):
         body = r.json()
         self.assertTrue(body['ok'])
         self.assertTrue(body['capture_id'].startswith('cap-resurface-stale-pr-comments-'))
-        # Persisted to captures.json with the frozen schema shape.
+        # Persisted to captures.json; a write bumps the registry to v2 (the
+        # schema that carries the first-class `label`).
         data = self._read_file()
-        self.assertEqual(data['schema_version'], 1)
+        self.assertEqual(data['schema_version'], 2)
         self.assertEqual(len(data['captures']), 1)
         cap = data['captures'][0]
         self.assertEqual(cap['id'], body['capture_id'])
         self.assertEqual(cap['state'], 'parked')
+        # Absent label → stored as None (back-compat with label-less clients).
+        self.assertIsNone(cap['label'])
         self.assertIsNone(cap['promoted_to'])
         self.assertEqual(cap['origin']['source'], 'desktop-chat')
         self.assertEqual(cap['origin']['session_id'], 's1')
@@ -142,6 +145,45 @@ class CaptureIngestTest(unittest.TestCase):
         r = self.client.post(ENDPOINT, headers=INGEST_AUTH,
                              json={'title': 'big', 'note': big})
         self.assertEqual(r.status_code, 413)
+
+    # ---- label (first-class, allowlisted) ----
+    def test_valid_label_stored(self):
+        r = self.client.post(ENDPOINT, headers=INGEST_AUTH, json={
+            'title': 'recurring pulse proposal',
+            'label': 'pulse-check-i',
+            'origin': {'source': 'agent'},
+        })
+        self.assertEqual(r.status_code, 202)
+        cap = self._read_file()['captures'][0]
+        self.assertEqual(cap['label'], 'pulse-check-i')
+
+    def test_unknown_label_400(self):
+        # A non-None label outside the allowlist is rejected on the write path —
+        # a leaked ingest token must only write known labels.
+        r = self.client.post(ENDPOINT, headers=INGEST_AUTH, json={
+            'title': 'bad label', 'label': 'totally-made-up'})
+        self.assertEqual(r.status_code, 400)
+        # Nothing was parked.
+        self.assertFalse(self.captures_path.exists()
+                         and self._read_file()['captures'])
+
+    def test_absent_label_back_compat_none(self):
+        # A label-less POST (desktop/telegram gesture) parks with label=None.
+        r = self.client.post(ENDPOINT, headers=INGEST_AUTH,
+                             json={'title': 'no label here'})
+        self.assertEqual(r.status_code, 202)
+        cap = self._read_file()['captures'][0]
+        self.assertIsNone(cap['label'])
+
+    def test_label_does_not_enter_idempotency_key(self):
+        # A re-POST with the same (title, session_id) collapses onto the same id
+        # even though it carries a label — label is not part of the dedup key.
+        payload = {'title': 'labelled dup', 'label': 'pulse-check-i',
+                   'origin': {'source': 'agent', 'session_id': 'sess-L'}}
+        r1 = self.client.post(ENDPOINT, headers=INGEST_AUTH, json=payload)
+        r2 = self.client.post(ENDPOINT, headers=INGEST_AUTH, json=payload)
+        self.assertEqual(r1.json()['capture_id'], r2.json()['capture_id'])
+        self.assertEqual(len(self._read_file()['captures']), 1)
 
     # ---- idempotency ----
     def test_idempotent_repost_collapses_onto_same_id(self):
