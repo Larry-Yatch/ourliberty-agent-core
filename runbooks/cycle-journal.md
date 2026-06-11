@@ -4,6 +4,102 @@
 
 ---
 
+## Iteration 1387 — 2026-06-11 00:02Z UTC (interactive, Tier 1)
+
+**Health:** ⚠️ Forge preflight `cycle-tier-record-wiring-001` confirmed lost in daemon-reload — re-dispatched to Forge inbox this iter. All 9 services active. PR #439 spec branch, 50 min old. No new alerts. Sync fresh.
+
+**VERIFY-BEFORE-REASSERT (iter 1386 watch items):**
+- `ourliberty-agent-core-health.service` next fire ~00:07Z: Timer shows next fire 18:07:43 MDT = 00:07:43 UTC (5 min from scan). Tree is clean; expected pass. ✅ Watch.
+- cycle-tier Forge dispatch `cycle-tier-record-wiring-001`: **CONFIRMED LOST**. Forge inbox EMPTY, Forge archive: no matching entry. Outbox-notifier log full scan: APPROVAL_REQUEST routing line absent — notifier archived Beacon result at 17:39Z (notified Pulse), received SIGTERM at 17:43Z, restarted 17:43:46Z; post-restart scan found nothing to dispatch (file already archived). Dispatch lost in daemon-reload window. **ACTION TAKEN this iter: re-dispatched `~/agents/inboxes/forge/cycle-tier-record-wiring-001.json`.**
+- Burn rate 80% at 23:45Z: larry-alerts.jsonl still 1426 lines. No 90%+ threshold alert. ✅ Nominal.
+- Transcript persistence post-23:43Z restart: no new `transcript-not-persisted` alerts (still at 1426 lines). ✅ Nominal.
+
+**Check 0 — Alert triage:**
+- larry-alerts.jsonl: **1426 lines** (UNCHANGED from iter 1386 watermark). No new alerts. ✅ Nominal.
+- **Watermark: line 1426 / heal-claude-max-burn-rate:claude_max_5h_burn_threshold_breached / 2026-06-10T23:45:16Z (carry unchanged)**
+
+**Check 1 — Log noise:**
+- `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- beacon-pending-approvals.json: ABSENT (= []). ✅ Nominal.
+- No new Larry directives. ✅
+
+**Check 3 — Pipeline stall:**
+- heal-pipeline-stall.heartbeat: 2026-06-10T23:46:57Z (15 min old at 00:02Z scan — within 30-min cadence). ✅ Nominal.
+
+**Check 4 — Pending directives:**
+- No new Larry messages. ✅
+
+**Check 5 — Stale daemon:**
+- heal-stale-daemon-code-state.json: MISSING → no stale daemons queued. ✅ Nominal.
+
+**Check A — Source repo:**
+- Branch: main ✅. Working tree: clean ✅. Up-to-date with origin/main ✅. Nominal.
+
+**Check B — Sync health:**
+- last_sync=2026-06-10T23:50:19Z (12 min old at 00:02Z scan), status=success. Expires ~01:50Z. ✅ Nominal.
+
+**Check C — Agent liveness:**
+- 9/9 ourliberty-*.service active: beacon-bot ✅, forge-bot ✅, mirror-bot ✅, pulse-bot ✅, inbox-watcher ✅, outbox-notifier ✅, chain-event-shipper ✅, dashboard-api ✅, cycle.service (current session) ✅.
+- ourliberty-agent-core-health.service: FAILED (23:37Z standing pattern — dirty-tree transient during iter 1384 write window). Next fire 00:07:43 UTC. Tree is clean; expect pass. ✅ Carry.
+
+**Check E — PRs:**
+- **ourliberty-agent-core:** 1 open PR — PR #439 "spec: park-the-nudge": OPEN, mergeable=UNKNOWN, reviewDecision="", age=50 min at 00:02Z. No automated Mirror review (spec branch). 72h threshold 2026-06-13 ~23:11Z. ✅ Watch.
+- **ourliberty-dashboard:** 0 open PRs. ✅
+
+**Check H — Inboxes:**
+- Forge inbox: 1 task just written (`cycle-tier-record-wiring-001.json`). Beacon inbox: EMPTY ✅. Mirror inbox: EMPTY ✅. Pulse inbox: EMPTY ✅.
+
+**Check I (Thursday 2026-06-11):** Weekday-gate skip (not Monday). ✅
+**Check III:** Next eligible 2026-06-14 (Sunday). ✅
+**Credential rotations:** 0 overdue. ✅
+**install-drift:** Next fire ~06:00Z June 11. ✅
+**ourliberty-cycle.timer:** Trigger: n/a — standing G-rule. Carry.
+
+**G-rule tracking:**
+- **cycle-tier.json `last_signal_at` stale (3/3 DISPATCHED iter 1384 → LOST daemon-reload → RE-DISPATCHED iter 1387):** `cycle-tier-record-wiring-001` Forge preflight written to inbox this iter. Chain now active. Watch for Forge preflight result.
+- **test-fixture-batch-in-bot-log (3/3 DISPATCHED iter 1378):** Carry pending Beacon/Forge processing.
+- **auto-restart-failed:* (1/3):** No new occurrence. Carry.
+- **wedged-review-silent-wt (2/3):** No new occurrence. Carry.
+- All other G-rule statuses: carry from iter 1386 unchanged.
+
+**Actions taken:**
+1. Re-dispatched Forge preflight `cycle-tier-record-wiring-001.json` to `~/agents/inboxes/forge/` — APPROVAL_REQUEST confirmed lost in daemon-reload at 23:43Z; absent from Forge inbox + archive. Action per iter 1386 watch item ("if still absent, re-dispatch needed").
+
+**PRIME DIRECTIVE:** 1 systemic_fix row appended (`cycle-tier-record-wiring:forge-preflight-redispatch`, iter 1387). Running total: interventions=766, systemic_fixes=19, ratio≈40.3, trend=flat.
+**Tier end-of-iter:** 1 (consecutive_clean=0 — Forge dispatch action taken).
+
+**Standing findings (carry with updates):**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge processing.
+- [blue] PR #439: Open, 50 min, spec branch, no Mirror review. 72h threshold 2026-06-13. Watch.
+- [blue] unreviewed-merge:434 DM'd. Actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] install-drift — next fire 06:00Z June 11.
+- [blue] ourliberty-cycle.timer stuck — G-rule 3/3; pending `go: cycle-timer checkpoint`.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- ~~[blue] cycle-tier.json stale — G-rule 3/3 DISPATCHED iter 1384; lost daemon-reload~~ → ✅ RE-DISPATCHED iter 1387.
+
+**Watch items for iter 1388:**
+- ourliberty-agent-core-health.service: timer fires 00:07:43Z — verify clean pass (tree clean post-wrapper commit).
+- Forge inbox: check if Forge picked up `cycle-tier-record-wiring-001.json` and emitted PROCEED/CLARIFY/REJECT marker.
+- PR #439: continues watching (no action until 72h threshold 2026-06-13 ~23:11Z).
+- Burn rate: verify no 90%+ alert since 23:45:16Z watermark.
+
+---
+
 ## Iteration 1386 — 2026-06-10 23:52Z UTC (interactive, Tier 1)
 
 **Health:** ⚠️ Burn-rate alert (80% of 5h token gate) — already surfaced by healer to alerts stream; no additional Pulse dispatch. All services 8/8 active. PR #439 open (spec branch, no automated review). Sync fresh (23:50:19Z). cycle-tier Forge dispatch status unclear post daemon-reload.
