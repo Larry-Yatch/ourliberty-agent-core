@@ -4,6 +4,112 @@
 
 ---
 
+## Iteration 1446 — 2026-06-11 11:43Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Health:** ⚠️ Drift (carry). PR #457 [yellow] standing — DM delivered 11:11:49Z, awaiting Larry. PR #461 NEW (fix-test-bootstrap-preserve, 11:35:08Z, MERGEABLE, ~8min old, not yet Mirror-reviewed). Forge PID 1612678 still running (post-PR #461 cleanup). All 6 mandatory + additive checks nominal. 9/9 bots active. Sync fresh. **Tier 1, consecutive_clean 0→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1445 watch items):**
+- PR #457 Larry response: **STILL PENDING** — re-queried: mergeable=UNKNOWN (transient), autoMergeRequest=null, reviewDecision="". Created 08:13:19Z (~3h30min at check). DM delivered 11:11:49Z. [yellow] carry.
+- fix-test-bootstrap-preserve-usersite-001 (PID 1612678): **PR #461 OPENED 11:35:08Z** — Forge completed the build. PID still running (post-PR cleanup ~26min elapsed). ✅
+- ccd-s3-derivable-context-backfill.json: **STILL QUEUED** — forge inbox. ✅
+- fix-build-background-task-output-visibility-001: **STILL QUEUED** — forge inbox (~9h15min). ✅
+- Sync: last_sync=2026-06-11T10:51:36Z, ~51min old at check. ✅ On track (next expected ~12:51Z).
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1256 (was 1254 at iter 1445, +2 new lines).
+- L1255 (11:35:03Z): medic notification `medic-diagnosis` for inbox-stall fix-build-background-task-output-visibility-001.json. **Tier-3 known pattern** (route=digest). Journal-only. ✅
+- L1256 (11:35:09Z): medic notification `medic-diagnosis` for inbox-stall build-ccd-s1-envelope-builder.json. **Tier-3 known pattern** (route=digest). Journal-only. ✅
+- `alert-triage.json last_claimed_line` MISSING — standing. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+- **0 new external alerts requiring action.** ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Last real Beacon log: 05:36:29-0600 (11:36:29Z) — medic-diagnosis notifications delivered. No Larry directives in last 4h. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives:** No orphaned directives in last 24h (carry from iter 1445). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing. ✅ Nominal.
+
+**Check A — Source repo:** branch=main, clean (session gitStatus). Latest commit: e0a9450 "Pulse cycle 20260611T113527Z". ✅ Nominal.
+
+**Check B — Sync health:** status=no-change, last_sync=2026-06-11T10:51:36Z, ~51min old at check. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active (beacon-bot, chain-event-shipper, cycle.service, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot). Forge PID 1612678 running post-PR #461 (~26min). ✅ Nominal.
+
+**Check E — PRs:** 2 open PRs.
+- **PR #461** (`fix(test-bootstrap): preserve user-site across jailed HOME so fastapi imports`, branch auto-assigned) — mergeable=MERGEABLE, autoMergeRequest=null, reviewDecision="". Created 11:35:08Z (~8min ago at check). **NEW** from fix-test-bootstrap Forge session. Not yet 30 min old → monitor for Mirror review + auto-merge eligibility (~12:05Z).
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`) — mergeable=UNKNOWN (transient), autoMergeRequest=null, reviewDecision="". Created 08:13:19Z (~3h30min). DM delivered 11:11:49Z. [yellow] carry.
+
+**Check H — Inboxes:**
+- Forge: **4 items**:
+  - `build-ccd-s1-envelope-builder.json` — FORGE_NO_PR_SKIP (pr=#446). Standing.
+  - `ccd-s3-derivable-context-backfill.json` — queued (source=beacon, 05:10Z).
+  - `fix-build-background-task-output-visibility-001.json` — 02:27Z (~9h15min). Queued behind in-flight.
+  - `fix-test-bootstrap-preserve-usersite-001.json` — 02:15Z mtime, still in inbox (PR #461 opened; pending archive, PID still running).
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:** audit_due_nudge / distill_detector / audit_cadence_signal → no-op (no committed baseline). ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: No entries in 60-day window. ✅ Nominal.
+
+**G-rule tracking:**
+- `sentinel-inbox-stall-ignores-inflight` → **2/3** — L1255/L1256 are medic-diagnosis downstream of prior sentinel fires, not new sentinel fires. Count unchanged. Monitor.
+- All other G-rules carry from iter 1445 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→0 via `scripts/cycle_tier_state.py record --checks-clean false` (PR #457 standing + PR #461 new, not yet auto-merge eligible). Tier 1. ✅
+2. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter. Running total (script-authoritative from iter 1445): interventions=781, systemic_fixes=21, verification_pending=9, ratio=37.19, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional in production. DM delivered 11:11:49Z. Larry's response needed.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] **PR #461 NEW** — fix-test-bootstrap-preserve-usersite, MERGEABLE, no auto-merge, not yet Mirror-reviewed. Created 11:35:08Z. Auto-merge eligible after 30 min (~12:05Z) if Mirror approves.
+- [blue] fix-test-bootstrap-preserve-usersite-001 — Forge session completed (PR #461 at 11:35:08Z). PID 1612678 post-PR cleanup running. Expect inbox archive shortly.
+- [blue] ccd-s3-derivable-context-backfill.json — queued (source=beacon, 05:10Z). After fix-test-bootstrap.
+- [blue] fix-build-background-task-output-visibility-001 — Forge inbox, 02:27Z (~9h15min). Queued.
+- [blue] build-ccd-s1-envelope-builder.json — FORGE_NO_PR_SKIP (pr=#446). Standing.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. route=digest. **1/3 G-rule.** Monitor.
+- [blue] alert-triage watermark discrepancy — alert-triage.json MISSING. APPROVAL_REQUEST `alert-triage-durable-watermark-001` carries.
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule. Carry.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460) — actor=Larry-Yatch, Tier-3 known pattern. G-rule actor-exemption-config 3/3 DISPATCHED. Carry.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy). Carry.
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Carry.
+- [blue] sentinel-inbox-stall-ignores-inflight — **2/3 G-rule** (L1250=1/3 iter 1444, L1253=2/3 iter 1445). No increment this iter. Carry.
+
+**Watch items for iter 1447:**
+- PR #461: auto-merge eligible at ~12:05Z if Mirror reviews and approves. Watch for Mirror dispatch.
+- PR #457: UNKNOWN (transient); watch for Larry response + mergeable re-settle.
+- Forge PID 1612678: expect inbox task archive + session end shortly.
+- ccd-s3-derivable-context-backfill.json + fix-build-background-task-output-visibility: next in Forge queue after current session closes.
+- Sync: next expected ~12:51Z.
+
+---
+
 ## Iteration 1445 — 2026-06-11 11:33Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Drift (carry). PR #457 [yellow] standing — DM delivered 11:11:49Z, awaiting Larry. fix-test-bootstrap-preserve Forge IN-FLIGHT (PID 1612678, 11:17:50Z, ~15min). 4 new alerts L1251–L1254: all Tier-3 false-positive sentinels or medic notifications (no action). All 6 mandatory + additive checks nominal. 9/9 bots active. Sync fresh. **Tier 1, consecutive_clean 0→0.**
