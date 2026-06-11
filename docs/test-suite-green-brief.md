@@ -17,10 +17,10 @@ sourcing the env — that instruction is retracted.
 If a test needs `beacon_telegram_bot` to import (it sys.exits without
 TELEGRAM_BOT_TOKEN_BEACON), give it DUMMY values:
 
-    cd ~/agent-core/scripts \
+    cd ~/agent-core \
       && AGENT=beacon TELEGRAM_BOT_TOKEN_BEACON=test-dummy \
          TELEGRAM_ALLOWED_CHAT_IDS=0 \
-         python3 -m unittest discover -s tests -t .
+         python3 -m unittest discover -s scripts/tests
 
 Tests that genuinely require a live credential are misdesigned — fix the test
 (dummy env in setUp), never the invocation.
@@ -68,8 +68,8 @@ it as a real safety regression re-opening the 2026-05-29 fixture-replay incident
 class.
 
 ## Acceptance
-- Full `python3 -m unittest discover -s tests -t .` (dummy env only, never live
-  credentials) is GREEN.
+- Full `python3 -m unittest discover -s scripts/tests` (from repo root; dummy env
+  only, never live credentials) is GREEN.
 - Bucket A: real isolation fixes; each passes in isolation AND under discover.
 - Bucket B: each test either updated with a one-line reason tying it to the
   specific commit, OR flagged (REJECT/CLARIFY) as a real regression. No silent
