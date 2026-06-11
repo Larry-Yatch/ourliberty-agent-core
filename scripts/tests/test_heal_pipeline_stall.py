@@ -223,6 +223,40 @@ class TestParseTs(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIsNone(self.hps._parse_ts(''))
 
 
+class TestReadRecentLogLines(_TempAgentsRootMixin, unittest.TestCase):
+    """The coarse LOG_LOOKBACK_HOURS pre-filter must bound BOTH log shapes
+    correctly: the notifier's naive host-local stamp AND inbox_watcher's aware
+    UTC stamp (`...+00:00`). The capture regex must keep the offset — stripping
+    it would make _parse_ts read the watcher's UTC digits as host-local (TZ is
+    pinned to America/Denver here) and shift a >24h-old line ~6h forward, so it
+    would slip back inside the window."""
+
+    def _write_log(self, *lines: str) -> Path:
+        p = self.agents_root / 'logs' / 'recent.log'
+        p.write_text('\n'.join(lines) + '\n')
+        return p
+
+    def test_notifier_naive_lines_bounded_by_window(self) -> None:
+        p = self._write_log(
+            f'[{_ts(60)}] [notifier] [INFO] fresh',
+            f'[{_ts(25 * 60)}] [notifier] [INFO] stale',
+        )
+        out = self.hps._read_recent_log_lines(p, self.hps.LOG_LOOKBACK_HOURS)
+        self.assertEqual(len(out), 1)
+        self.assertIn('fresh', out[0])
+
+    def test_watcher_aware_lines_bounded_by_window(self) -> None:
+        # 25h-ago aware line: correctly EXCLUDED. Under an offset-stripping
+        # capture it would parse as 25h-ago-Denver -> +6h -> 19h -> wrongly kept.
+        p = self._write_log(
+            f'[{_watcher_ts(60)}] inbox_watcher: [forge] done task=fresh-001 success=True',
+            f'[{_watcher_ts(25 * 60)}] inbox_watcher: [forge] done task=stale-001 success=True',
+        )
+        out = self.hps._read_recent_log_lines(p, self.hps.LOG_LOOKBACK_HOURS)
+        self.assertEqual(len(out), 1)
+        self.assertIn('fresh-001', out[0])
+
+
 class TestKillSwitch(_TempAgentsRootMixin, unittest.TestCase):
 
     def test_kill_switch_exits_immediately(self) -> None:

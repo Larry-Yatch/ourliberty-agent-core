@@ -356,7 +356,15 @@ def _read_recent_log_lines(log_path: Path, hours: int) -> list[str]:
     try:
         with open(log_path, errors='replace') as f:
             for line in f:
-                m = re.match(r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})', line)
+                # Capture the WHOLE bracketed timestamp incl. optional fractional
+                # seconds and tz offset. The notifier writes a naive local stamp
+                # (`2026-05-26 13:08:39`) but inbox_watcher writes an aware UTC one
+                # (`2026-05-26T04:46:20.823929+00:00`) — dropping the offset would
+                # make _parse_ts read the watcher's UTC digits as host-local and
+                # shift them, mis-bounding this coarse lookback window.
+                m = re.match(
+                    r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}'
+                    r'(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)', line)
                 if not m:
                     continue
                 ts = _parse_ts(m.group(1))
