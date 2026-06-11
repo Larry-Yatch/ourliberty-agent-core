@@ -15,8 +15,10 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import os
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +28,50 @@ if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
 import scope_usage_parser as sup  # noqa: E402
+
+
+class _DenverTZ(unittest.TestCase):
+    """Base for tests that parse log timestamps.
+
+    The bracketed `[YYYY-MM-DD HH:MM:SS]` prefix is naive HOST-LOCAL
+    (outbox_notifier writes it via datetime.now()); the droplet runs
+    America/Denver. _parse_ts now reads naive values in the system zone,
+    so pin TZ to keep naive→UTC deterministic across dev machines.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self._tz_orig = os.environ.get('TZ')
+        os.environ['TZ'] = 'America/Denver'
+        time.tzset()
+
+    def tearDown(self):
+        if self._tz_orig is None:
+            os.environ.pop('TZ', None)
+        else:
+            os.environ['TZ'] = self._tz_orig
+        time.tzset()
+        super().tearDown()
+
+
+class TestParseTs(_DenverTZ):
+    """_parse_ts reads the naive bracketed prefix as host-local, not UTC.
+
+    The regression assumed UTC, skewing each line ~6h into the past so
+    recent usage fell outside the cutoff window (under-count).
+    """
+
+    def test_naive_space_separated_ts_read_as_local(self):
+        # 00:00:23 MDT (-06:00) == 06:00:23 UTC.
+        dt = sup._parse_ts('[2026-06-11 00:00:23] gh pr merge 42 --squash')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_naive_t_separated_ts_read_as_local(self):
+        dt = sup._parse_ts('[2026-06-11T00:00:23] gh pr list --state open')
+        self.assertEqual(dt.isoformat(), '2026-06-11T06:00:23+00:00')
+
+    def test_no_timestamp_returns_none(self):
+        self.assertIsNone(sup._parse_ts('gh pr merge 42 (no bracket ts)'))
 
 
 class GhSubcommandMappingTest(unittest.TestCase):
@@ -53,8 +99,9 @@ class GhApiEndpointMappingTest(unittest.TestCase):
         self.assertIsNone(sup._scope_for_gh_api('rate_limit'))
 
 
-class GithubScopeAnalysisTest(unittest.TestCase):
+class GithubScopeAnalysisTest(_DenverTZ):
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.log = Path(self.tmp.name) / 'fake.log'
@@ -125,8 +172,9 @@ class GithubScopeAnalysisTest(unittest.TestCase):
         self.assertEqual(out, {})
 
 
-class WorkspaceMcpAnalysisTest(unittest.TestCase):
+class WorkspaceMcpAnalysisTest(_DenverTZ):
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.log = Path(self.tmp.name) / 'inbox.log'
@@ -166,7 +214,7 @@ class WorkspaceMcpAnalysisTest(unittest.TestCase):
         self.assertEqual(out, {})
 
 
-class AnalyzeScopeUsageDispatchTest(unittest.TestCase):
+class AnalyzeScopeUsageDispatchTest(_DenverTZ):
     """Public entry point dispatch."""
 
     def test_github_routes_to_gh_analyzer(self):

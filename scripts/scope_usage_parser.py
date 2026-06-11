@@ -95,11 +95,16 @@ def _parse_ts(line: str) -> Optional[datetime]:
     if not m:
         return None
     try:
-        return datetime.fromisoformat(
-            m.group(1).replace(' ', 'T')
-        ).replace(tzinfo=timezone.utc)
+        dt = datetime.fromisoformat(m.group(1).replace(' ', 'T'))
     except ValueError:
         return None
+    # The bracketed ts is naive HOST-LOCAL: outbox_notifier writes it via
+    # datetime.now() (no tz), and the droplet runs America/Denver. Stamping
+    # it as UTC skewed every line ~6h into the past, so recent usage got
+    # clipped by the cutoff window (under-count). astimezone() on a naive
+    # value interprets it in the system zone — the same host that wrote the
+    # log — then normalizes to UTC.
+    return dt.astimezone(timezone.utc)
 
 
 def _iter_lines_in_window(
