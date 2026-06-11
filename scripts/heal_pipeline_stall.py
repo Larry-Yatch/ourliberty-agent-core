@@ -319,8 +319,20 @@ def _within_scan_window(ts: Optional[datetime],
 
 
 def _parse_ts(ts_str: str) -> Optional[datetime]:
-    """Parse the timestamp shape outbox_notifier writes. Tolerates space-or-T,
-    optional microseconds, optional tz suffix."""
+    """Parse the timestamp shape outbox_notifier writes to an aware UTC
+    datetime. Tolerates space-or-T, optional microseconds, optional tz suffix.
+
+    A naive value comes from outbox_notifier.log() (datetime.now() — the
+    droplet's LOCAL clock, America/Denver); astimezone() interprets a naive
+    datetime as the system-local zone and converts to UTC, so it lines up with
+    aware (gh '...Z') timestamps and the aware-UTC `now` every Check compares
+    against. heal_pipeline_stall and the notifier run on the SAME host, so the
+    local zone matches the writer's. (Stamping naive as UTC instead — the prior
+    `dt.replace(tzinfo=timezone.utc)` — skewed every event ~6h into the past,
+    so a recent event could look stale: false stall trigger, or clipped scan
+    windows. See heal_pr_auto_merge._to_utc / chain_event_shipper._normalize_iso_ts
+    for the same 6h-skew incident.) An aware value passes through unchanged
+    (same instant, normalized to UTC)."""
     s = ts_str.strip().replace(' ', 'T')
     if s.endswith('Z'):
         s = s[:-1] + '+00:00'
@@ -331,9 +343,7 @@ def _parse_ts(ts_str: str) -> Optional[datetime]:
         dt = datetime.fromisoformat(s)
     except ValueError:
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt
+    return dt.astimezone(timezone.utc)
 
 
 def _read_recent_log_lines(log_path: Path, hours: int) -> list[str]:
@@ -346,7 +356,15 @@ def _read_recent_log_lines(log_path: Path, hours: int) -> list[str]:
     try:
         with open(log_path, errors='replace') as f:
             for line in f:
-                m = re.match(r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})', line)
+                # Capture the WHOLE bracketed timestamp incl. optional fractional
+                # seconds and tz offset. The notifier writes a naive local stamp
+                # (`2026-05-26 13:08:39`) but inbox_watcher writes an aware UTC one
+                # (`2026-05-26T04:46:20.823929+00:00`) — dropping the offset would
+                # make _parse_ts read the watcher's UTC digits as host-local and
+                # shift them, mis-bounding this coarse lookback window.
+                m = re.match(
+                    r'\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}'
+                    r'(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)', line)
                 if not m:
                     continue
                 ts = _parse_ts(m.group(1))
