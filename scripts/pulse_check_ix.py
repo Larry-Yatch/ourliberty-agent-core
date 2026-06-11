@@ -76,6 +76,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from atomic_io import atomic_write_json  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
+from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -174,33 +175,12 @@ _LOG_LINE_TS_RE = re.compile(r'^\[([0-9T:\- .+]+?)\]')
 
 
 def _parse_iso_or_log_ts(s: str) -> Optional[datetime]:
-    if not isinstance(s, str) or not s:
-        return None
-    raw = s.strip()
-    # Normalize -0600 (no colon) to -06:00 for fromisoformat.
-    no_colon = re.match(
-        r'(.*[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-])(\d{2})(\d{2})$', raw,
-    )
-    if no_colon:
-        raw = f'{no_colon.group(1)}{no_colon.group(2)}{no_colon.group(3)}:{no_colon.group(4)}'
-    if raw.endswith('Z'):
-        raw = raw[:-1] + '+00:00'
-    if ' ' in raw and 'T' not in raw:
-        # outbox-notifier shape: "2026-05-13 10:31:58" — naive HOST-LOCAL.
-        # outbox_notifier writes it via datetime.now() (no tz) and the
-        # droplet runs America/Denver; leave it naive so astimezone() below
-        # reads it in the system zone instead of assuming UTC (which skewed
-        # the trailing-7d window ~6h into the past).
-        raw = raw.replace(' ', 'T')
-    try:
-        dt = datetime.fromisoformat(raw)
-    except ValueError:
-        return None
-    # A naive value here is the outbox-notifier shape above: host-local, so
-    # astimezone() interprets it in the system zone (same host that wrote
-    # the log). Aware values (beacon-bot -0600, UTC alert/chain_event ts)
-    # are normalized to the same instant.
-    return dt.astimezone(timezone.utc)
+    # Beacon-bot lines carry an aware `-0600` offset and the alert / chain_event
+    # / row `ts` fields are aware UTC isoformat, while the outbox-notifier shape
+    # ("2026-05-13 10:31:58") is naive host-local. parse_log_ts resolves each to
+    # the correct UTC instant — reading a naive value in the system zone, not
+    # pinning it to UTC (which skewed the trailing-window math ~6h).
+    return parse_log_ts(s)
 
 
 def _extract_line_ts(line: str) -> Optional[datetime]:

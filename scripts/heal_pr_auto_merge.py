@@ -70,6 +70,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 from atomic_io import atomic_write_json  # noqa: E402
+from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
@@ -480,20 +481,12 @@ def merge_pr(repo: str, pr_number: int, title: str) -> tuple[str, str]:
 
 def _to_utc(s: Optional[str]) -> Optional[datetime]:
     """Parse an ISO-ish timestamp (log 'YYYY-MM-DD HH:MM:SS' or gh
-    'YYYY-MM-DDTHH:MM:SSZ') to an aware UTC datetime, or None if unparseable."""
-    if not s:
-        return None
-    try:
-        dt = datetime.fromisoformat(s.strip().replace(' ', 'T').replace('Z', '+00:00'))
-    except ValueError:
-        return None
-    # A naive value comes from outbox_notifier.log() (datetime.now() — the
-    # droplet's LOCAL clock); astimezone() on a naive datetime interprets it as
-    # the system-local zone and converts to UTC, so it lines up with gh's
-    # true-UTC committedDate. (heal + outbox run on the SAME host, so the local
-    # zone matches; stamping it as UTC instead skewed it ~6h and refused every
-    # merge.) An aware value ('...Z' -> +00:00) just normalizes to UTC.
-    return dt.astimezone(timezone.utc)
+    'YYYY-MM-DDTHH:MM:SSZ') to an aware UTC datetime via the shared
+    log_ts.parse_log_ts, or None if unparseable. A naive log value is
+    host-local (heal + outbox run on the same host); see log_ts for the 6h-skew
+    that a prior UTC pin caused here — it refused every merge. An aware gh
+    '...Z' value just normalizes to the same instant."""
+    return parse_log_ts(s)
 
 
 def _head_pushed_since_pass(repo: str, pr_num: int, passed_ts_iso: str) -> bool:
