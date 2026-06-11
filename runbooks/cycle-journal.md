@@ -4,6 +4,134 @@
 
 ---
 
+## Iteration ~1461 — 2026-06-11 12:34Z UTC (interactive, Tier 1, consecutive_clean 0→0)
+
+**Trigger:** Larry direct invocation.
+
+**Health:** ⚠️ Drift. PR #457 [yellow] standing (~4h21m). Forge PID 1646230 IN-FLIGHT on ccd-s3-derivable-context-backfill (started 12:17Z, ~17min). **F24 empty-prompt bug detected and repaired** — iter ~1460's direction-ask envelope was rejected by Beacon validator (0-char prompt); no Beacon DM was sent. Fixed: new proper envelope written to Beacon inbox this iter. 9/9 services active. Sync nominal. Tier 1, consecutive_clean 0→0.
+
+**VERIFY-BEFORE-REASSERT (iter ~1460 watch items):**
+- Beacon inbox pickup of direction-ask: **F24 FAILURE** — `pulse-wedged-forge-exit-fix-direction-ask-20260611T123000Z.json` rejected by Beacon validator (`prompt too short: 0 chars, min 100`). File is in `~/agents/inboxes/beacon/.invalid/`. The "Beacon will DM Larry" claim from iter ~1460 is **RETRACTED** — no DM was sent. Root cause: envelope was written with `summary` field instead of `prompt` (F24 empty-prompt bug). Fixed this iter (see Actions below).
+- PR #457 Larry response: **STILL PENDING** — confirmed, 1 open PR in list. UNKNOWN-mergeable, reviewDecision="", autoMergeRequest=null. Created 08:13:19Z (~4h21m at check). [yellow] carry.
+- ccd-s3-derivable-context-backfill PR: **IN-FLIGHT** — Forge PID 1646230 active (inbox_watcher PID 1646196 start 12:17:49Z, reusing wt-forge-ccd-s3-derivable-context-backfill). No PR yet (~17min, timeout 14400s). ✅ On track.
+- resume-fix-build-background-task-output-visibility-001-r1: **STILL QUEUED** — in Forge inbox (mtime 06:01 MDT = 12:01Z, ~33min at check). Will be picked up after ccd-s3. ✅
+
+**Check 0 — Alert triage:**
+- Total lines: 1261 (+1 since watermark L1260 from iter ~1460).
+- L1261 (12:34:52Z): `pulse` — NEW — filed this iter for F24 bug + direction-ask re-routing. route=escalate. ✅ Self-generated.
+- Watermark: L1260 (from iter ~1460); L1261 is self-filed this iter. No new external alerts requiring action. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log empty (no log file active). Previous auth 401 events at 02:47Z + 04:52Z MDT — standing Tier 2 weekly probe (action on Larry). Inbox_watcher log confirms `notify-g-rule-wedged-review-wt-dispatch-20260611` completed by pulse at 12:16:09Z. No orphaned Larry directives in last 4h. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `no stalls detected` (FORGE_NO_PR_SKIP for known tasks). `ccd-s3` and `resume-r1` both within stale threshold. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- Beacon: 1 item — `wedged-forge-exit-fix-direction-ask-20260611T124500Z.json` (written this iter, 1640-char prompt, proper `prompt` field, dedup_identity=`direction-ask:wedged-forge-exit-fix:20260611`). ✅ Will be picked up by inbox_watcher.
+- Forge: 2 items — `ccd-s3-derivable-context-backfill.json` (05:10Z, IN-FLIGHT PID 1646230) + `resume-fix-build-background-task-output-visibility-001-r1.json` (12:01Z, queued). ✅
+- Mirror, Pulse: EMPTY. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING (one-shot completed post-PR #460 per iter ~1460). ✅ Nominal (standing/known).
+
+**Check A — Source repo:** Session gitStatus: main, clean, HEAD=5021a89 "Pulse cycle 20260611T122145Z". ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T11:51:44Z (~43min ago at check, within 2h threshold). ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active. Forge PID 1646230 running (ccd-s3-derivable-context-backfill, started 12:17:49Z, inbox_watcher PID 1646196). Inbox_watcher restarted at 12:17:49Z (after 12:16:19Z SIGTERM of PID 1612645). ✅ Nominal.
+
+**Check E — PRs:** 1 open PR.
+- **PR #457** (`fix(reaper): release handoff guard on ownership/merged/worktree-deleted`) — UNKNOWN-mergeable (transient), reviewDecision="", autoMergeRequest=null. Created 08:13:19Z (~4h21m). DM delivered iter 1441 (11:09Z). `_candidate_owns_build_dispatch` non-functional in production (confirmed standing). [yellow] carry.
+- PR #461 MERGED ✅ (confirmed from `gh pr list`).
+
+**Conditional checks:** Thursday 2026-06-11 — Check I (Sunday), Check III (next eligible 2026-06-14 Sunday). Skip. ✅ Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**New finding — F24 empty-prompt bug (direction-ask routing failure):**
+Iter ~1460 wrote a Beacon inbox envelope with `summary` field instead of `prompt`. Beacon's validator requires `prompt` ≥100 chars; it rejected the envelope (logged: `prompt too short: 0 chars, min 100 — likely F24 empty-prompt bug`). The rejected file is in `~/agents/inboxes/beacon/.invalid/`. No DM to Larry; no APPROVAL_REQUEST registration.
+
+Root cause: the direction-ask template in iter ~1460 used the wrong field name. G-rule candidate: 1/3 for F24 empty-prompt envelope rejections. Dispatch to Beacon if hits 3/3 to update the direction-ask envelope template.
+
+**G-rule tracking:**
+- `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- `wedged-review-silent-wt` → 3/3 DISPATCHED iter 1448. Beacon PID 1637007 completed. Result documented iter 1450 + iter ~1460. Direction-ask routing repaired this iter. Monitor for Beacon DM.
+- `sentinel-inbox-stall-ignores-inflight` → 2/3. Carry.
+- `F24-empty-prompt-envelope-rejected` → **1/3 NEW** (this iter: direction-ask rejected 0-char prompt).
+- All other G-rules carry from iter ~1460 unchanged.
+
+**Actions taken:**
+1. **F24 fix — Beacon direction-ask re-routed:** Wrote `~/agents/inboxes/beacon/wedged-forge-exit-fix-direction-ask-20260611T124500Z.json` (1640-char `prompt` field, dedup_identity=`direction-ask:wedged-forge-exit-fix:20260611`, timeout=1800). Corrects the 0-char prompt failure from iter ~1460.
+2. **L1261 filed:** `larry_alerts.append_alert` route=escalate — "[yellow] iter ~1461 — Beacon direction-ask was never delivered (F24 bug). Fixed: new envelope written. Beacon will DM binary gate."
+3. **Tier state recorded:** `cycle_tier_state.py record --checks-clean false` — Tier 1, consecutive_clean=0. ✅
+4. **PRIME DIRECTIVE ledger:** 1 intervention row appended (F24 bug fix + re-routing). Script-authoritative: interventions=784, systemic_fixes=21, verification_pending=10, ratio≈37.3, trend=flat.
+
+**Standing findings (carry with updates):**
+- [yellow] **PR #457 Mirror escalation** — `_candidate_owns_build_dispatch` non-functional. DM delivered 11:09Z. Larry's response needed. ~4h21m standing.
+- [yellow] **wedged-forge-exit-fix-direction-20260611** — direction-ask NOW properly routed to Beacon inbox (envelope 20260611T124500Z, fixed). Beacon will DM Larry with binary gate. Do NOT carry as "pending approval" (Discipline 2); carry as "Beacon to DM, monitor."
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] bughunt-gate-soak — Phase 2 decision pending Larry.
+- [yellow] Check IX GITHUB_TOKEN missing — dashboard-api POST → 500.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] Forge PID 1646230 — ccd-s3-derivable-context-backfill in-flight (started 12:17Z). Watch for PR.
+- [blue] resume-fix-build-background-task-output-visibility-001-r1 — queued Forge inbox (12:01Z). Next after ccd-s3.
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry.
+- [blue] catalog-accuracy-drift — 5/34 shelf cards drifted. 1/3 G-rule.
+- [blue] alert-triage watermark MISSING (beacon-pending-approvals.json MISSING — standing).
+- [blue] sync-push-rebase-fallback-001 — 1/3 G-rule.
+- [blue] cycle.timer G-rule 3/3 dispatched; Beacon consumed. Carry.
+- [blue] heal-stale-daemon-code:auto-restarted — G-rule dispatched iter 1416.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing (known, post-PR #460 one-shot done).
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461) — Tier-3 known pattern. G-rule 3/3 DISPATCHED.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3.
+- [blue] G-rule completion-DM delivery failure — 1/3.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` — 1/3.
+- [blue] G-rule dispatch-branch-cleanup:summary — 1/3.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] `retry-exhausted-on-shipped-task` → 2/3. Carry.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251.
+- [blue] `sentinel-inbox-stall-ignores-inflight` — 2/3 G-rule.
+- [blue] G-rule `actor-exemption-config 3/3` — APPROVAL_REQUEST pending.
+- [blue] G-rule `cycle-timer checkpoint 3/3` — pending `go: cycle-timer checkpoint`.
+- [blue] **F24-empty-prompt-envelope-rejected** — 1/3 NEW G-rule. Watch for 2/3.
+
+**Post-action result (resolved within this session):** Beacon processed `wedged-forge-exit-fix-direction-ask-20260611T124500Z.json` in **95 seconds** (12:34:19Z → 12:35:54Z, $0.34). Beacon confirmed APPROVAL_REQUEST not in registry, formally registered it, and DM queued to Larry. Iter 1451 (result-notification, 12:45Z) documents this. APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611` is now registered. ✅
+
+**Watch items for iter ~1462:**
+- PR #457: Larry response (~5h+ at next iter). No new escalation this iter — standing [yellow] carry.
+- APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611`: Watch for Larry's DM response (APPROVE/REJECT). Gate open.
+- Forge PID 1646230: ccd-s3 completion + PR.
+- resume-fix-build-background-task-output-visibility-001-r1: Forge pickup after ccd-s3.
+
+**PRIME DIRECTIVE:** 1 intervention (F24 fix + re-routing → same-session resolution). Running total: interventions=784, systemic_fixes=21, verification_pending=10, ratio≈37.3, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
+## Iteration 1451 — 2026-06-11 12:45Z UTC (result-notification, Tier 1)
+
+**Trigger:** Inter-agent result notification from Beacon — task `wedged-forge-exit-fix-direction-ask-20260611T124500Z`, status=SUCCESS.
+
+**APPROVAL_REQUEST `wedged-forge-exit-fix-direction-20260611` — formally registered:**
+
+Beacon confirms the direction-ask is now formally registered via `approval_request` chain_event. Prior routing envelope was rejected (F24 0-char-prompt bug) — Beacon re-sent successfully on this pass. Bot will DM Larry with the binary:
+- **APPROVE** = Beacon specs + dispatches Forge for in-process terminal-marker reap in `agent_runner` (shared 4-agent hot-path; Mirror-gated). Beacon's lean: APPROVE.
+- **REJECT** = wedged-review healer remains the designed mitigation; no hot-path change.
+
+**Standing finding update — `wedged-review-silent-wt` G-rule chain:** 3/3 DISPATCHED (iter 1448) → Beacon investigated → Option A architecturally invalid → direction-ask authored → **APPROVAL_REQUEST formally registered, Larry DM sent**. Chain gated on Larry's response. ✅
+
+**F24 0-char-prompt routing failure:** First Beacon routing envelope for this direction-ask was rejected due to 0-char-prompt (F24). Beacon retried and succeeded. Noting as 1/3 new G-rule candidate for routing-envelope reliability — will need two more confirmed occurrences before dispatch.
+
+**Actions:** None. Result notification only.
+**PRIME DIRECTIVE:** No new ledger row (result notification, not a new intervention).
+
+---
+
 ## Iteration 1450 — 2026-06-11 12:14Z UTC (result-notification, Tier 1)
 
 **Trigger:** Inter-agent result notification from Beacon — task `g-rule-wedged-review-wt-dispatch-20260611`, status=SUCCESS.
