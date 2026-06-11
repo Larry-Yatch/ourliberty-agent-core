@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~1536 — 2026-06-11 23:49Z UTC (interactive, /cycle, Tier 1→2, consecutive_clean 2→3→de-escalate)
+
+**Trigger:** Larry direct invocation (`/cycle`).
+
+**Health:** ✅ Nominal. 4/4 bots alive. 0 open PRs. 0 new alerts. All mandatory checks clean. **Tier 1→2 promoted** (Tier 2 cadence now active — 15-min cycles).
+
+**VERIFY-BEFORE-REASSERT (iter ~1535 watch items):**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: Still phase=preflight (mtime 20:56Z, now ~2h51min). Pipeline healer: no stalls (23:46Z). [blue] carry.
+- **system-health log_growth warning**: BACK TO WARNING (seconds_since_write=892 at 23:42Z). Was transiently OK at 23:32Z (282s), warning 592s at 23:37Z, now 892s. Oscillation confirmed — the "RESOLVED" at iter ~1534 was a sampling artifact. Condition is continuous: inbox_watcher not writing while Forge test-jail-pr4 task sits in preflight (queued_inboxes=1). [blue] carry.
+- **G-rule Pulse-envelope-format 2/3**: No new malformed envelope. Beacon inbox EMPTY. Still 2/3. [blue] carry.
+- **Tier 1 → Tier 2**: consecutive_clean=2 entering → clean this iter → 3 → promoted to Tier 2 (consecutive_clean reset to 0). ✅
+
+**Check 0 — Alert triage:** `larry-alerts.jsonl`: 1309 lines (unchanged from L1309 watermark). 0 new alerts. ✅ Nominal.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "60 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon bot log: last Larry messages at 13:57–14:00 MDT (~10h ago), all resolved. beacon-pending-approvals.json: 1 stale pending (`unreg-approval-2dbbe7bb4d4b` for pr-457-mirror-escalation-3h-flag, created 11:15Z) — PR #457 MERGED 17:39Z, Beacon confirmed stale at 14:00Z. No new action needed; self-clears on heal-unregistered-approval sweep. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → `[INFO] no stalls detected` (23:46Z). Heartbeat 23:46:46Z. ✅ Nominal.
+
+**Check 4 — Pending directives:** No unresolved Larry directives in last 24h (last at 14:00 MDT — `fix-build-background-poll-idiom-001` dispatched, all resolved). ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing known, G-rule dispatched iter ~1416. [blue] carry.
+
+**Check A — Source repo:** main, clean (session startup gitStatus). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json` last_sync=2026-06-11T22:53:06Z (~56 min at check time), status=no-change. Within 2h threshold. ✅ Nominal.
+
+**Check C — Agent liveness:** `system-health.json` (23:42Z): 4/4 bots alive (beacon, forge, mirror, pulse). log_growth: warning (seconds_since_write=892, queued_inboxes=1, standing — tied to Forge test-jail preflight; confirmed oscillation artifact). disk 6%, memory 18%. ✅ Nominal.
+
+**Check D — Inboxes:** Forge: `test-jail-pr4-acceptance-proof-001.json` (phase=preflight, mtime 20:56Z, ~2h51min). Pipeline healer: no stalls. Beacon/Mirror/Pulse: EMPTY. ✅ Nominal.
+
+**Check E — PRs:** 0 open PRs (both ourliberty-agent-core + ourliberty-dashboard). ✅ Nominal.
+
+**§5.0 Bug-hunt gate:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op. audit_cadence_signal → no-op. ✅
+
+**Conditional checks (Thursday 2026-06-11 UTC):** Check I (Mon/Wed/Fri/Sun only) → skip. Check III (next eligible 2026-06-25) → skip. Checks VIII/IX/X (Monday) → skip. ✅
+
+**Credential rotation:** All 2027 except SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). Outside 60-day DM window. ✅
+
+**Actions taken:**
+1. `cycle_tier_state.py record --checks-clean true` → consecutive_clean 2→3 → **tier promoted 1→2**, consecutive_clean reset to 0. ✅
+2. No DMs sent — no new [yellow]/[red] findings.
+
+**Standing findings (updated):**
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens. Also blocks alert-translations.json Forge task (`alert-translations-tier2-skipped-001` archived). [carry]
+- [yellow] Check III threshold proposals — `approve threshold-update-2026-06-11`. 2 high-attention (beacon Δ92%, forge Δ64%). Pending Larry. [carry]
+- [blue] G-rule Pulse-envelope-format — **2/3** (iter ~1533: g-rule-dispatch-branch-cleanup-followup-001 empty-prompt; Beacon .invalid/). At 3/3 → dispatch Beacon task. [carry]
+- [blue] dispatch-branch-cleanup:summary G-rule: Beacon consumed original (iter ~1530 ✅). Follow-up INVALID (F24). alert-translations.json entry missing (blocked by Tier-2 auth_401). [carry]
+- [blue] system-health.json `log_growth: warning` (892s at 23:42Z, queued_inboxes=1, oscillation confirmed, Forge test-jail-pr4 preflight standing). [carry/updated]
+- [blue] Forge inbox test-jail-pr4-acceptance-proof-001 phase=preflight (~2h51min+, PR #476 merged, healer: no stalls). [carry/updated]
+- [blue] G-rule `approval_request_not_extracted_from_depth1_beacon_result` — 1/3. [carry]
+- [blue] G-rule `alert-triage-watermark-loss-on-write` — 1/3. [carry]
+- [blue] heal-stale-daemon-code-state.json MISSING — G-rule dispatched iter ~1416. [carry]
+- [blue] ccd-s1-envelope-builder PAUSED — APPROVAL_REQUEST ccd-s1-identity-resolution pending Larry. [carry]
+- [blue] catalog-accuracy-drift — 5/34 shelf cards. 1/3 G-rule. [carry]
+- [blue] cycle.timer G-rule 3/3 → Beacon consumed. [carry]
+- [blue] unreviewed-merge (454, 456, 453, 448, 458, 459, 460, 461, 462, 463, 464, 465, 467, 468, 466, 470, 471, 472, 473, 475, 476) — actor-exemption pending `go: actor-exemption-config`. [carry]
+- [blue] Various G-rule carries: silence-missions-card-gc 001, heal-pipeline-stall heartbeat 3/3 deferred, auto-restart-failed 1/3, completion-DM 1/3, auto-retry source=auto-retry 1/3, Check-C-launcher-liveness APPROVAL_REQUEST pending, alert-triage-durable-watermark-001 parked, retry-exhausted-on-shipped-task 2/3, retry_exhausted:post-merge-install-drift 1/3, sentinel-inbox-stall-ignores-inflight 2/3, F24b JSON malformation 2/3, bughunt-gate-soak Phase 2 pending, health-check-notify-script-missing G-rule 3/3 dispatched, Check IX GITHUB_TOKEN missing.
+- [blue] APPROVAL_REQUEST alert-translation-no-mirror-dispatch-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001 — pending Larry. [carry]
+- [blue] APPROVAL_REQUEST worktree-cleanup-merged-pr-reap-001 routing gap — 1/3 G-rule. [carry]
+- [blue] beacon-pending-approvals.json `unreg-approval-2dbbe7bb4d4b` (pr-457-mirror-escalation): PR #457 MERGED 17:39Z, stale confirmed. Self-clears. [carry/new]
+
+**Watch items for iter ~1537:**
+- **Forge inbox test-jail-pr4-acceptance-proof-001**: ~2h51min+ preflight. Pipeline healer nominal. If stall detected → escalate [yellow].
+- **Tier 2 cadence**: First iter at Tier 2. 3 clean iters needed to de-escalate to Tier 3.
+- **G-rule Pulse-envelope-format 2/3**: Watching for 3rd occurrence → Beacon dispatch.
+- **alert-translations.json entry**: Blocked by Tier-2 auth_401 (same root as [yellow] token-rotation).
+
+**PRIME DIRECTIVE:** 0 interventions, 0 systemic_fixes this iter. Running total: interventions=799, systemic_fixes=25, ratio=31.96, trend=flat.
+**Tier end-of-iter:** Tier 2, consecutive_clean=0.
+
+---
+
 ## Iteration ~1535 — 2026-06-11 23:42Z UTC (interactive, /cycle, Tier 1→1, consecutive_clean 1→2)
 
 **Trigger:** Larry direct invocation (`/cycle`).
