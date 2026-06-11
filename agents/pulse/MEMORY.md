@@ -6,9 +6,13 @@
 
 ---
 
-## Status snapshot — updated 2026-06-11 07:07Z UTC (Iter 1414)
+## Status snapshot — updated 2026-06-11 07:58Z UTC (Iter 1419, interactive)
 
-**Iter 1414 summary:** Alert watermark: 1476 / pipeline-stall:retry-exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002 / 2026-06-11T07:04:09Z. Tier 1, consecutive_clean=0. PR #450 MERGED 07:06:22Z (always-fix). PR #451 open ~20min, no Mirror review yet. PRIME DIRECTIVE: interventions=776, systemic_fixes=20, ratio=38.8, trend=flat. cycle.timer: Trigger:n/a (stuck, fix expected ~07:51Z sync). transcript-not-persisted: 21 total, PR #447 installs ~07:51Z. Forge: 2 tasks in build phase (ccd-s1-envelope-builder, fix-reaper-handoff-guard-checks-liveness-002). Next watch: PR #451 auto-merge threshold, cycle.timer post-sync, transcript-not-persisted post-sync.
+**Iter 1419 summary:** Alert watermark: 1486. Tier 1, consecutive_clean=0. PRIME DIRECTIVE: interventions=778, systemic_fixes=21, ratio=37.0. **CLOSURES:** ~~transcript-not-persisted~~ CLOSED ✅ (PR #447 merged). **KEY FINDINGS:** [yellow] PR #454 CONFLICTING (claude/tender-bohr-y1if1g, "Pin PostgREST timeout", 41min) — blocking PR #455 AUTO_MERGE_HELD (5-file overlap). [yellow] mirror_pass_unmerged:fix-test-bootstrap L1486 = TZ-bug false positive (healer reads MDT ts as UTC; PR #456 is the fix). [blue] PRs #455/#456 MERGEABLE, new. [blue] sync-push-rebase-fallback-001 (70th+ known, 07:51Z, self-healed). [blue] build-ccd-s1+fix-reaper-002 in Forge inbox ~7h build phase. [blue] marker-error-fix-test-bootstrap-per-module-001-1 in Forge inbox (stale retry, PR #455 already open). **Standins carry:** bughunt-gate-soak Phase 2 pending Larry, health-check-notify-script-missing (Forge PR pending), Tier-2-probe auth_401 (action Larry: rotate-claude-setup-tokens.md). **NOTE on TZ-bug false positive:** pipeline-stall healer `mirror_pass_unmerged` alerts should be verified against outbox-notifier.log (look for `classified mirror review_pass marker...` timestamp) to confirm elapsed time is real UTC, not an MDT-as-UTC misread. PR #456 fixes this.
+
+## Status snapshot — updated 2026-06-11 07:29Z UTC (Iter 1417)
+
+**Iter 1417 summary:** Alert watermark: 1483 / unreviewed-merge:453 / 2026-06-11T07:20:36Z. Tier 1, consecutive_clean=1. All checks nominal. PR #454 (PostgREST timeout) CONFLICTING, ~12min. Beacon inbox EMPTY (consumed G-rule stale-daemon dispatch from iter 1416). PRIME DIRECTIVE: interventions=777, systemic_fixes=21, ratio=37.0, trend=flat. cycle.timer: Trigger:n/a (stuck, G-rule Beacon consumed). transcript-not-persisted: 21 total (L1438–1466), PR #447 installs ~07:51Z. Forge: 4 tasks (2 build-phase: ccd-s1-envelope-builder + fix-reaper-handoff-guard-checks-liveness-002; 2 preflight: ccd-s2+fix-test-bootstrap). Next watch: PR #454 conflict resolution, cycle.timer post-sync ~07:51Z, transcript-not-persisted post-sync, G-rule stale-daemon Beacon spec.
 
 ## Status snapshot — updated 2026-06-11 06:47Z UTC (Iter 1412)
 

@@ -4,6 +4,535 @@
 
 ---
 
+## Iteration 1419 — 2026-06-11 07:58Z UTC (interactive, Tier 1, consecutive_clean 2→0)
+
+**Health:** ⚠️ Drift. Check E: PR #454 CONFLICTING (41min), blocking PR #455 auto-merge via `AUTO_MERGE_HELD`. Check B: sync-push-rebase-fallback-001 (70th+ known, self-heals). Check 0: 3 new alerts (3 Tier-3, including 1 TZ-bug false-positive). All 5 mandatory checks otherwise nominal. 9/9 bots active. **Tier 1, consecutive_clean 2→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1418 watch items):**
+- PR #454 (PostgREST timeout): **CONFIRMED CONFLICTING** — mergeable=CONFLICTING at check (07:54Z, ~41min). Passed 30-min threshold. NOW real signal: blocking #455 auto-merge.
+- PR #455 (fix(tests) sandbox per-module): **Mirror PASS logged at 07:53Z** (outbox-notifier confirmed). AUTO_MERGE_HELD by overlap with #454 (5 shared test files). PR MERGEABLE. Monitor.
+- PR #456 (heal pipeline-stall TZ fix): **NEW** — opened 07:40Z (~18min at check). MERGEABLE, no review. Under 30-min threshold. Monitor.
+- cycle.timer: **CONFIRMED still stuck** — `Trigger: n/a`. Standing, G-rule dispatched (Beacon consumed). No new action.
+- transcript-not-persisted: **RESOLVED** per iter 1418. 0 new alerts. Dropping from standing.
+- G-rule stale-daemon dispatch: Beacon consumed iter 1416. No Beacon-spec observed yet. Monitor.
+- Forge inbox: 4 items (build-ccd-s1, build-ccd-s2 [progressed from preflight], build-fix-reaper-002, marker-error-fix-test-bootstrap [stale retry — PR #455 already open]).
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1486. Watermark was 1483 (iter 1418). **3 new lines.**
+- **L1484** (07:46:59Z): `wedged-review-reaped:wt-forge-fix-test-bootstrap-per-module-001` (route=closure) — **Tier-3** known pattern. Journal note only, no DM. No tier-reset.
+- **L1485** (07:51:16Z): `sync-blocked:auto-commit-push-failed` (route=digest) — **Tier-3** per self-assessed "Self-heals on next sync tick." Journal note only. No tier-reset from this alert. Underlying Check B finding drives signal.
+- **L1486** (07:53:49Z): `pipeline-stall:mirror-pass-unmerged:PR#455` (route=escalate) — **TZ-bug false-positive** per PR #456 scope. Healer read MDT timestamp `01:53` as UTC and computed elapsed=360min; outbox-notifier confirms Mirror PASS was logged at 07:53Z (just prior). The `AUTO_MERGE_HELD` (#454 overlap) is real and noted under Check E. Classifying alert as Tier-3/suppressed with this note. No DM.
+- **Watermark: advance to 1486.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry sent 3 directives at 07:37Z, 07:44Z, 07:52Z (Forge stuck → wedged session reaped → self-healed). Beacon handled all three in-window. Larry's 07:52Z message ("How did he just self recover") answered by Beacon at 07:53Z. No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` fired `mirror_pass_unmerged:fix-test-bootstrap-per-module-001` (L1486). **TZ-bug false-positive** — confirmed above. Real signal from dry-run: `AUTO_MERGE_HELD task=fix-test-bootstrap-per-module-001 pr=#455 blocker=#454 (overlap on 5 test files)`. PR #454 conflict is the root cause; see Check E.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING. No orphaned Larry directives in 24h window (all tracked via Telegram + Beacon). ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus at start: branch=main, clean, recent commit=84e4ec7 "Pulse cycle 20260611T075233Z". Sync rollback restored to 2cd8bf65 (no uncommitted changes per sync design). ✅ Nominal.
+
+**Check B — Sync health:** `agent-core-sync.json`: `status=error, last_sync=2026-06-11T07:51:16Z, message="Auto-commit push failed; rolled back"`. Root cause: `_lib_push_with_rebase.sh` `/dev/stdout: No such device or address` — **known recurring pattern** (`sync-push-rebase-fallback-001`, 70th+ occurrence; APPROVAL_REQUEST parked). Rolled back to 2cd8bf65. Self-heals at next sync tick (~08:21Z). Alert L1485 route=digest. Tier-3 known, no escalation. ✅ (same posture as prior iters)
+
+**Check C — Agent liveness:** 9/9 bots active+running (beacon, chain-event-shipper, cycle, dashboard-api, forge, inbox-watcher, mirror, outbox-notifier, pulse). `ourliberty-sync.service` = failed (one-shot, sync.timer will restart at ~08:21Z). `ourliberty-cycle.timer`: `Trigger: n/a` — stuck (standing, G-rule 3/3 dispatched, Beacon consumed). ✅ Bots healthy.
+
+**Check E — PRs:** 3 open PRs.
+- **PR #454** (`Pin PostgREST request timeout`, branch `claude/tender-bohr-y1if1g`) — CONFLICTING, **41min old** — past 30-min threshold. **Real signal.** Blocking PR #455 auto-merge (5 overlapping test files per AUTO_MERGE_HELD log). Conflict must be resolved before #455 can ship.
+- **PR #455** (`fix(tests): arm sandbox per-module`, branch `forge/fix-test-bootstrap-per-module-001`) — MERGEABLE, Mirror PASS 07:53Z (~5min). AUTO_MERGE_HELD by #454. Under 30-min since Mirror PASS; no always-fix yet. Monitor — if #454 stays conflicting and #455 ages past 30min post-Mirror-PASS, escalate.
+- **PR #456** (`fix(heal): pipeline-stall reads naive notifier-log ts as host-local, not UTC`, branch `work/heal-pipeline-stall-tz-skew`) — MERGEABLE, ~18min, no review decision. Under 30-min threshold. Monitor.
+
+**Check H — Inboxes:**
+- Forge: **4 items**:
+  - `build-ccd-s1-envelope-builder.json` — 01:01 (~6.9h). Build phase.
+  - `build-ccd-s2-no-session-revision-route.json` — 01:52 (~6min). Build phase (progressed from preflight this cycle).
+  - `build-fix-reaper-handoff-guard-checks-liveness-002.json` — 01:01 (~6.9h). Build phase.
+  - `marker-error-fix-test-bootstrap-per-module-001-1.json` — 01:49. Retry-1-of-3. **Stale/superseded** — PR #455 already open for this task; Forge should REJECT on pickup.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`heal-stale-daemon-code:auto-restarted` (4/3, DISPATCHED iter 1416):** 0 new. Beacon consumed dispatch. Monitor for spec.
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED):** 0 new. Pattern standing; dispatch pending `go: actor-exemption-config`.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Still 1/3.
+- **`mirror_pass_unmerged:fix-test-bootstrap` (TZ-bug false positive, 1st occurrence):** Not a G-rule trigger (1/3, and root cause is known TZ bug per PR #456). Watch.
+- **`sync-blocked:auto-commit-push-failed` (1st occurrence):** 1/3. Not a G-rule trigger yet. Watch next sync (~08:21Z).
+- All other G-rules: carry from iter 1418 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 2→0 via `scripts/cycle_tier_state.py record --checks-clean false` at 07:58:34Z. Tier 1. ✅
+2. Alert watermark: advanced to 1486.
+3. No auto-fix allow-list actions executed (sync self-heals; PR #455 Mirror PASS <30min; PR #454 conflict is not in allow-list).
+
+**PRIME DIRECTIVE:** 1 new intervention row this iter (Check E PR #454 stall + AUTO_MERGE_HELD; sync error is known-pattern no-action). Running total: interventions=778, systemic_fixes=21, verification_pending=9, ratio=37.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [blue] sync-push-rebase-fallback-001 (70th+ occurrence, 07:51Z) — known pattern, self-heals. APPROVAL_REQUEST parked. No action.
+- [yellow] PR #454 CONFLICTING (41min) + blocking PR #455 auto-merge — needs conflict resolution.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] PR #455 (fix(tests) sandbox per-module) — MERGEABLE, Mirror PASS 07:53Z, AUTO_MERGE_HELD. Monitor 30-min window.
+- [blue] PR #456 (heal pipeline-stall TZ fix) — MERGEABLE, ~18min, no review. Monitor.
+- [blue] `mirror_pass_unmerged` TZ-bug false-positive: 1/3. Watch (PR #456 is the systemic fix already in review queue).
+- [blue] `sync-blocked:auto-commit-push-failed` — 1/3. Watch next sync.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Watch.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed. `Trigger: n/a`. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] unreviewed-merge:453 — actor=Larry-Yatch, Tier-3 known pattern.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1420:**
+- Sync.service next tick ~08:21Z: verify `status=success` in agent-core-sync.json. If still error → escalate [yellow] to Larry + route `/dev/stdout` pattern to Beacon for Forge fix.
+- PR #454: CONFLICTING. If still unresolved + Forge hasn't picked it up, escalate.
+- PR #455: AUTO_MERGE_HELD. If #454 conflict resolves and Mirror PASS is >30min, enable auto-merge per allow-list.
+- PR #456: new PR, MERGEABLE. Watch for Mirror review dispatch.
+- Forge build tasks (ccd-s1, fix-reaper-002): at ~7+h in build queue; watch for Forge to pick up.
+
+---
+
+## Iteration 1418 — 2026-06-11 07:35Z UTC (interactive, Tier 1, consecutive_clean 1→2)
+
+**Health:** ✅ Nominal. Check 0: 0 new alerts (watermark holds at 1483). All 5 mandatory checks clean. 9/9 services active. PR #454 still CONFLICTING (~17min). PR #455 NEW (MERGEABLE, ~3min old). PR #447 CONFIRMED MERGED — `transcript-not-persisted` fix deployed. **Tier 1, consecutive_clean 1→2.**
+
+**VERIFY-BEFORE-REASSERT (iter 1417 watch items):**
+- PR #454 (PostgREST timeout): **CONFIRMED still CONFLICTING** — mergeable=CONFLICTING at check (07:35Z, ~17min old). Under 30-min threshold. Monitor.
+- cycle.timer: **CONFIRMED still stuck** — `NextElapseUSecRealtime=` empty. G-rule Beacon dispatch (iter 1416) consumed; standing. No new action.
+- transcript-not-persisted: **0 new occurrences**. PR #447 **CONFIRMED MERGED** (state=MERGED, created 05:37Z). 0 new since L1466 across 17 subsequent alerts. **RESOLVED** — removing from [yellow] standing.
+- G-rule stale-daemon dispatch: Beacon inbox empty at this check. Beacon processed `g-rule-stale-daemon-auto-restart-dispatch-001.json`. Monitor for Beacon to produce spec.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1483. Watermark was 1483 (iter 1417). **0 new lines.**
+- ✅ Nominal. No DM. No tier-reset. Watermark unchanged.
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry directive at 07:08Z ("do we have another stuck?") answered by Beacon at 07:09Z. Tracked + resolved. TIER2_FALLBACK_FAILED at 07:19Z is the standing auth_401 pattern (Tier 2 weekly probe). No new untracked directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all Forge tasks FORGE_NO_PR_SKIP (pr_exists or preflight_exit). `no stalls detected`. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: branch=main, clean, recent commit=8cb96d0 "Pulse cycle 20260611T073139Z" (iter 1417). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T06:50:51Z, status=no-change (~44min at 07:35Z). Within 2h threshold. Next sync ~07:51Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. cycle.timer: `NextElapseUSecRealtime=` empty — stuck (standing), `LastTriggerUSec=01:31:41 MDT = 07:31Z` (updated to reflect this session's fire). G-rule dispatch consumed by Beacon. ✅ Services healthy; standing timer issue.
+
+**Check E — PRs:** 2 open PRs.
+- **PR #454** (`Pin PostgREST request timeout on chain-event Supabase clients`) — CONFLICTING, ~17min at check. Under 30-min threshold. Conflict must resolve before Mirror can review. Monitor.
+- **PR #455** (`fix(tests): arm sandbox per-module so it engages under unittest discover`) — **NEW** since iter 1417. Opened 07:32:48Z, ~3min at check. MERGEABLE, no review decision. Under 30-min threshold. Monitor.
+
+**Check H — Inboxes:**
+- Forge: **4 items** (unchanged from iter 1417):
+  - `build-ccd-s1-envelope-builder.json` — Jun 11 01:01 (~6.6h). Build phase.
+  - `build-fix-reaper-handoff-guard-checks-liveness-002.json` — Jun 11 01:01 (~6.6h). Build phase.
+  - `ccd-s2-no-session-revision-route.json` — Jun 10 23:50 (~7.8h). Preflight.
+  - `fix-test-bootstrap-per-module-001.json` — Jun 10 23:46 (~7.8h). Preflight.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** PR #447 MERGED. **0 new since L1466 (21 total, 17 subsequent alerts all unrelated).** RESOLVED this iter.
+- **`heal-stale-daemon-code:auto-restarted` (4/3, DISPATCHED iter 1416):** 0 new. Beacon consumed dispatch. Monitor for spec.
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED):** 0 new this iter. Pattern persists at L1479/L1483; dispatch standing.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Still 1/3.
+- All other G-rules: carry from iter 1417 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 1→2 via `scripts/cycle_tier_state.py record --checks-clean true` at 07:35:45Z. ✅
+2. Alert watermark: unchanged at 1483.
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter (all nominal). Running total: interventions=777, systemic_fixes=21, verification_pending=9, ratio=37.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=2.
+
+**Standing findings (carry with updates):**
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Cooldown suppressed. Watch.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched (iter 1416); Beacon consumed. `Trigger: n/a`. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] PR #454 (PostgREST timeout) — CONFLICTING, ~17min. Monitor.
+- [blue] PR #455 (fix(tests): sandbox per-module) — NEW, MERGEABLE, ~3min. Monitor.
+- [blue] unreviewed-merge:453 — actor=Larry-Yatch, Tier-3 known pattern. No action.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1419:**
+- PR #454 (PostgREST timeout): CONFLICTING. Monitor conflict resolution + Mirror review + 30-min auto-merge threshold.
+- PR #455 (fix(tests): sandbox per-module): MERGEABLE, ~3min. Monitor Mirror review dispatch + 30-min auto-merge threshold.
+- cycle.timer: watch for `NextElapseUSecRealtime` populated after ~07:51Z sync. Escalate [yellow] if still stuck post-sync.
+- transcript-not-persisted: monitor 0 new alerts post-sync (~07:51Z); if still 0, consider fully clearing from standing.
+- G-rule stale-daemon dispatch: watch for Beacon spec + Forge build.
+- Forge inbox: 4 tasks queued; watch for Forge to pick up build-phase tasks.
+
+---
+
+## Iteration 1417 — 2026-06-11 07:29Z UTC (interactive, Tier 1, consecutive_clean 0→1)
+
+**Health:** ✅ Nominal. Check 0: 2 new alerts (L1482–1483), both Tier-3. All 5 mandatory checks clean. 9/9 services active. PR #454 still CONFLICTING (~12min). Beacon inbox empty (G-rule stale-daemon dispatch from iter 1416 consumed). **Tier 1, consecutive_clean 0→1.**
+
+**VERIFY-BEFORE-REASSERT (iter 1416 watch items):**
+- PR #454 (PostgREST timeout): **CONFIRMED still CONFLICTING** — mergeable=CONFLICTING at check (07:27Z, ~10min old). Under 30-min threshold. Monitor.
+- cycle.timer: **CONFIRMED still stuck** — `Trigger: n/a`, Active since 06:00:19Z (install-drift healer reload). LastTriggerUSec=07:25:34Z (prior cycle). Standing.
+- transcript-not-persisted: **0 new occurrences** (L1482–1483 unrelated). Still 21 total (L1438–1466). Pre-07:51Z sync. Carry.
+- pulse-bot service: **CONFIRMED still active** — 9/9 services active, pulse-bot in list. ✅
+- G-rule stale-daemon dispatch: **BEACON CONSUMED** — Beacon inbox empty at 07:27Z. Beacon picked up `g-rule-stale-daemon-auto-restart-dispatch-001.json` between iter 1416 (07:23Z) and this check (07:27Z). Positive indicator.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1483. Watermark was 1481 (iter 1416). **2 new lines.**
+- **L1482** (07:18:48Z): `missions-card-gc` — summary; retired 0 stale cards, 0 parked captures. route=digest. Classification: **Tier-3** known-pattern. Journal note only, no DM. No tier-reset.
+- **L1483** (07:20:36Z): `heal-unreviewed-merge-detector` — PR #453 merged without Mirror review (actor=Larry-Yatch). route=escalate. Classification: **Tier-3** — same unreviewed-merge pattern; G-rule actor-exemption-config 3/3 already DISPATCHED. Journal note only, no DM. No tier-reset.
+- **Watermark: advance to 1483 / unreviewed-merge:453 / 2026-06-11T07:20:36Z.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Beacon-bot log shows no new Larry directives in last 30 minutes (last entry: bot startup line at 07:15Z). ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all Forge tasks FORGE_NO_PR_SKIP (pr_exists or preflight_exit). 1 cooldown suppression (retry_exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002). 0 new alerts. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus: branch=main, clean, recent commit=54edf02 "Pulse cycle 20260611T072532Z" (iter 1416). ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T06:50:51Z, status=no-change (~37min at 07:27Z). Within 2h threshold. Next sync ~07:51Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 9/9 ourliberty-*.service active+running: beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. cycle.timer: `Trigger: n/a` — stuck, LastTriggerUSec=07:25:34Z, Active since 06:00:19Z. G-rule dispatched (Beacon consumed). Standing. ✅ Services healthy.
+
+**Check E — PRs:** 1 open PR.
+- **PR #454** (`Pin PostgREST request timeout on chain-event Supabase clients`) — CONFLICTING, no review decision. Opened 07:17:35Z, ~12min at check. Under 30-min threshold. Conflict must resolve before merge can proceed. Monitor.
+
+**Check H — Inboxes:**
+- Forge: **4 items** (unchanged):
+  - `build-ccd-s1-envelope-builder.json` — Jun 11 01:01 (~6.5h). Build phase.
+  - `build-fix-reaper-handoff-guard-checks-liveness-002.json` — Jun 11 01:01 (~6.5h). Build phase.
+  - `ccd-s2-no-session-revision-route.json` — Jun 10 23:50 (~7.7h). Preflight.
+  - `fix-test-bootstrap-per-module-001.json` — Jun 10 23:46 (~7.7h). Preflight.
+- Beacon: **0 items** (consumed G-rule stale-daemon dispatch ~07:23–07:27Z). ✅
+- Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`heal-stale-daemon-code:auto-restarted` (4/3, DISPATCHED iter 1416):** 0 new. Beacon consumed dispatch ~07:23–07:27Z. Monitor for Beacon to produce spec.
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED):** L1483 adds PR #453 instance. Pattern persists; dispatch standing. No new dispatch.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Still 1/3.
+- All other G-rules: carry from iter 1416 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→1 via `scripts/cycle_tier_state.py record --checks-clean true` at 07:29:52Z. ✅
+2. Alert watermark advanced to 1483.
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter (all Tier-3/nominal). Running total: interventions=777, systemic_fixes=21, verification_pending=9, ratio=37.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Cooldown suppressed. Watch.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched; Beacon consumed dispatch ~07:25Z. `Trigger: n/a`. Standing.
+- [blue] heal-stale-daemon-code:auto-restarted — G-RULE DISPATCHED iter 1416, Beacon consumed. Monitor for spec.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing.
+- [blue] PR #454 (PostgREST timeout) — CONFLICTING, ~12min. Monitor conflict resolution.
+- [blue] unreviewed-merge:453 — actor=Larry-Yatch, Tier-3 known pattern. No action.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1418:**
+- PR #454 (PostgREST timeout): CONFLICTING at open. Monitor conflict resolution + Mirror review + 30-min auto-merge threshold.
+- cycle.timer: watch for `Trigger` populated after ~07:51Z sync. Escalate [yellow] if still stuck post-sync.
+- transcript-not-persisted: verify 0 new alerts post-sync (~07:51Z); expect G-rule resolution after PR #447 unit install.
+- G-rule stale-daemon dispatch: Beacon consumed → watch for Beacon to produce spec + Forge build.
+- Forge inbox: 4 tasks queued; watch for Forge to pick up build-phase tasks.
+
+---
+
+## Iteration 1416 — 2026-06-11 07:23Z UTC (interactive, Tier 1, consecutive_clean 1→0)
+
+**Health:** ⚡ G-rule dispatch. Check 0: 2 new alerts (L1480–1481), both Tier-3 digest (heal-stale-daemon-code auto-restarts). All 5 mandatory checks clean. 9 services active + 1 health-service oneshot failed (standing). PR #454 opened 07:17Z (CONFLICTING, under threshold). G-rule heal-stale-daemon-code:auto-restarted hit 4/3 → dispatched to Beacon. **Tier 1, consecutive_clean 1→0.**
+
+**VERIFY-BEFORE-REASSERT (iter 1415 watch items):**
+- PR #453 (~10min at iter 1415 end): **CONFIRMED MERGED** — in git log as `c13794b fix(shipper): revive the outbox-notifier.log chain-event source (dead since birth)`. ✅ CLOSED.
+- cycle.timer: **CONFIRMED still stuck** — `Trigger: n/a`. Pre-07:51Z sync window. Standing.
+- transcript-not-persisted: **0 new occurrences** in L1480–1481. Still 21 total (L1438–1466). PR #447 install expected ~07:51Z. Carry.
+- medic / PR #447 unit install: No new install-failure alerts. Expected ~07:51Z. Carry.
+- New: `ourliberty-pulse-bot.service` now appearing active+running in service list (was not in 8/8 count at iter 1415). Positive indicator — may reflect PR #447 unit install landed earlier than expected via health-check fast-forward at 07:10Z.
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1481. Watermark was 1479 (iter 1415). **2 new lines.**
+- **L1480** (07:15:20Z): `heal-stale-daemon-code` — auto-restarted ourliberty-chain-event-shipper.service (mtime delta 1125.8 min; commits since: `4da8c0d fix(queue)` PR #451). route=digest. Classification: **Tier-3** known-pattern. Journal note only, no DM. No tier-reset.
+- **L1481** (07:15:25Z): `heal-stale-daemon-code` — auto-restarted ourliberty-beacon-bot.service (mtime delta 323.6 min; same anchor). route=digest. Classification: **Tier-3** known-pattern. Journal note only, no DM. No tier-reset.
+- **Watermark: advance to 1481 / auto-restarted:ourliberty-beacon-bot.service / 2026-06-11T07:15:25Z.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** Larry asked "do we have another stuck?" at 07:08:16Z. Beacon replied at 07:09:56Z: "No — and it's actually the opposite of stuck. Chain is flowing and loop-enders are landing." Directive answered. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all tasks FORGE_NO_PR_SKIP (pr_exists or preflight_exit). 1 cooldown suppression (retry_exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002). 0 new alerts. ✅ Nominal.
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json MISSING/EMPTY. All Larry directives in last 24h have Beacon responses (07:08Z query answered 07:09Z). ✅ Nominal.
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json MISSING — standing pattern unchanged. The healer IS running (L1480–1481 confirm it fired at 07:15Z), but state file not written. ✅ Nominal (standing issue).
+
+**Check A — Source repo:** Session gitStatus clean, on main (`ac4a712 Pulse cycle 20260611T071626Z`). Health check at 07:10:04Z auto-fixed fast-forward. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T06:50:51Z (~26min at 07:17Z). Within 2h threshold. Sync commit `538dbde` predates `ac4a712` (wrapper-pushed post-iter 1415); next sync ~07:51Z will reconcile. ✅ Nominal.
+
+**Check C — Agent liveness:** 9 ourliberty-*.service active+running: beacon-bot, chain-event-shipper, cycle, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. **pulse-bot now in active set** (not in iter 1415's 8/8 — possibly PR #447 unit newly installed). Health service: `ourliberty-agent-core-health.service` FAILED at 07:10:04Z — clean_tree check detected dirty tree (Pulse cycle files pre-commit wrapper), notify script missing → exit 1. Standing pattern. cycle.timer: `Trigger: n/a` — stuck, G-rule dispatched, expected fix ~07:51Z. ✅ Services healthy; standing issues unchanged.
+
+**Check E — PRs:** 1 open PR.
+- **PR #454** (`Pin PostgREST request timeout on chain-event Supabase clients`, branch `claude/tender-bohr-y1if1g`) — opened 07:17:35Z (~6min at check). CONFLICTING (merge conflict), no review decision. Under 30-min threshold. Monitor. Note: conflict must resolve before Mirror can review.
+
+**Check H — Inboxes:**
+- Forge: **4 items** (unchanged from iter 1415):
+  - `build-ccd-s1-envelope-builder.json` — Jun 11 01:01 (~6.4h). Build phase active.
+  - `build-fix-reaper-handoff-guard-checks-liveness-002.json` — Jun 11 01:01 (~6.4h). Build phase.
+  - `ccd-s2-no-session-revision-route.json` — Jun 10 23:50 (~7.6h). Preflight. Carry.
+  - `fix-test-bootstrap-per-module-001.json` — Jun 10 23:46 (~7.6h). Preflight. Carry.
+- Beacon: 1 item — `g-rule-stale-daemon-auto-restart-dispatch-001.json` (just dispatched this iter).
+- Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+- audit_cadence_signal.py: no post-seed decision-grade distill artifacts; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`heal-stale-daemon-code:auto-restarted` (was 2/3 → now 4/3, DISPATCHED iter 1416):** L1480 + L1481 added this iter. Threshold 3/3 exceeded. Envelope `g-rule-stale-daemon-auto-restart-dispatch-001.json` dispatched to Beacon inbox 07:23Z. Pattern: deploys do not auto-restart services; healer fills the gap (~30min lag). Proposed fix: add post-sync/post-merge daemon restart step.
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Still 1/3.
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED):** No new unreviewed-merge alerts in L1480–1481. Pattern persists; dispatch standing.
+- All other G-rules: carry from iter 1415 unchanged.
+
+**Actions taken:**
+1. Dispatched Beacon envelope `g-rule-stale-daemon-auto-restart-dispatch-001.json` at 07:23Z (G-rule: heal-stale-daemon-code:auto-restarted pattern, 4/3 threshold). ✅
+2. PRIME DIRECTIVE ledger: kind=intervention + kind=systemic_fix, template=g-rule-dispatch, iter=1416. ✅
+3. Tier state: consecutive_clean 1→0 via `scripts/cycle_tier_state.py record --checks-clean false` at 07:23:04Z. ✅
+4. Alert watermark advanced to 1481.
+5. No allow-list auto-fix actions executed.
+
+**PRIME DIRECTIVE:** 2 new rows this iter (intervention + systemic_fix for G-rule dispatch). Running total: interventions=777, systemic_fixes=21, verification_pending=9, ratio=37.0, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry (health service FAILED 07:10:04Z, same standing root cause).
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Cooldown suppressed. Watch.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched. `Trigger: n/a`. Expected fix ~07:51Z sync.
+- [blue] heal-stale-daemon-code:auto-restarted — **G-RULE DISPATCHED iter 1416** (4/3). Beacon envelope queued.
+- [blue] heal-stale-daemon-code-state.json MISSING — standing (healer runs, no state file written).
+- [blue] PR #454 (Pin PostgREST request timeout on chain-event Supabase clients) — CONFLICTING, ~6min old. Monitor.
+- [blue] unreviewed-merge:451 — Tier-3 known pattern. No action.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+- [blue] pulse-bot service newly active — positive indicator; verify PR #447 unit install.
+
+**Watch items for iter 1417:**
+- PR #454 (PostgREST timeout): CONFLICTING at open. Monitor conflict resolution + Mirror review + 30-min auto-merge threshold.
+- cycle.timer: watch for `Trigger` populated after ~07:51Z sync. Escalate [yellow] if still stuck post-sync.
+- transcript-not-persisted: verify 0 new alerts post-sync (~07:51Z); expect G-rule resolution after PR #447 unit install.
+- pulse-bot service: confirm still active post-sync; if running, mark PR #447 unit install resolved.
+- G-rule stale-daemon dispatch: watch for Beacon to process `g-rule-stale-daemon-auto-restart-dispatch-001.json`.
+
+---
+
+## Iteration 1415 — 2026-06-11 07:13Z UTC (interactive, Tier 1, consecutive_clean 0→1)
+
+**Health:** ✅ Nominal. Check 0: 3 new alerts (L1477–1479), all Tier-3/closure. All 5 mandatory checks clean. 8/8 services active. PR #453 open ~10min (under threshold). **Tier 1, consecutive_clean 0→1.**
+
+**VERIFY-BEFORE-REASSERT (iter 1414 watch items):**
+- PR #451 (~20min at iter 1414 end): **RESOLVED** — PR #451 merged (session gitStatus `4da8c0d fix(queue)`) by Larry. ✅ CLOSED.
+- cycle.timer: **CONFIRMED still stuck** — `Trigger: n/a`. Pre-07:51Z sync window. G-rule dispatched. Standing.
+- transcript-not-persisted: **0 new occurrences** (L1477–1479 unrelated). Still 21 total (L1438–1466). Pre-07:51Z sync. Carry.
+- medic / PR #447 unit install: Pre-07:51Z sync. Expected resolution ~07:51Z. Carry.
+- unreviewed-merge:450: **no healer alert for PR #450** (Mirror reviewed it; Tier-3 exemption correct). unreviewed-merge:451 fired at L1479 (actor=Larry-Yatch, PR #451 merged without review). Known pattern, Tier-3. ✅
+
+**Check 0 — Alert triage (larry-alerts.jsonl):**
+- Total lines: 1479. Watermark was 1476 (iter 1414). **3 new lines.**
+- **L1477** (07:08:46Z): `medic` — diagnose-only for `pipeline-stall:mirror-pass-unmerged:PR#450`. Medic confirmed "PR #450 state MERGED. Alert is stale false positive." `route` omitted (diagnose-only). Classification: **Tier-3** closure — healer reconciliation in progress. Journal note only, no DM. No tier-reset.
+- **L1478** (07:08:51Z): `medic` — diagnose-only for `pipeline-stall:retry-exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002`. Medic diagnosis: second Forge run had abnormal termination; first run (04:42Z) appears to have completed work captured in PR #450. Diagnose-only. Classification: **Tier-3** informational — PR #450 merged, task moot. Journal note only, no DM. No tier-reset.
+- **L1479** (07:10:07Z): `heal-unreviewed-merge-detector` — PR #451 merged without Mirror review (actor=Larry-Yatch). Classification: **Tier-3** — same unreviewed-merge pattern; G-rule actor-exemption-config already 3/3 dispatched. Journal note only, no DM. No tier-reset.
+- **Watermark: advance to 1479 / unreviewed-merge:451 / 2026-06-11T07:10:07Z.**
+
+**Check 1 — Log noise:** `journalctl -u 'ourliberty-*.service' --priority warning --since "90 minutes ago"` → `-- No entries --`. ✅ Nominal.
+
+**Check 2 — Telegram sweep:** No Larry directives found in bot logs since iter 1414. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → all Forge tasks FORGE_NO_PR_SKIP (pr_exists or preflight_exit). 1 cooldown suppression (retry_exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002). 0 new alerts. ✅ Nominal.
+
+**Check 4 — Pending directives:** `beacon-pending-approvals.json` MISSING/EMPTY. No orphan directives. ✅ Nominal.
+
+**Check 5 — Stale daemon:** `heal-stale-daemon-code-state.json` MISSING — standing pattern unchanged. ✅ Nominal.
+
+**Check A — Source repo:** Session gitStatus clean, on main. ✅ Nominal.
+
+**Check B — Sync health:** last_sync=2026-06-11T06:50:51Z (~22min at 07:13Z). Within 2h threshold. Next sync ~07:51Z. ✅ Nominal.
+
+**Check C — Agent liveness:** 8/8 ourliberty-*.service active+running (beacon-bot, forge-bot, mirror-bot, inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle). cycle.timer: `Trigger: n/a` (stuck, standing pre-fix window). ✅ Services healthy.
+
+**Check E — PRs:** 1 open PR.
+- **PR #453** (`fix(shipper): revive the outbox-notifier.log chain-event source (dead since birth)`) — opened 07:03:29Z, ~10min at check. UNKNOWN mergeable, no review decision. Under 30-min threshold. Monitor.
+
+**Check H — Inboxes:**
+- Forge: **4 items** (marker-error-ccd-s1-envelope-builder-1.json consumed since iter 1414):
+  - `build-ccd-s1-envelope-builder.json` — Jun 11 01:01 (~6.2h). Build phase active.
+  - `build-fix-reaper-handoff-guard-checks-liveness-002.json` — Jun 11 01:01 (~6.2h). Build phase.
+  - `ccd-s2-no-session-revision-route.json` — Jun 10 23:50 (~7.4h). Preflight. Carry.
+  - `fix-test-bootstrap-per-module-001.json` — Jun 10 23:46 (~7.4h). Preflight. Carry.
+- Beacon/Mirror/Pulse: EMPTY ✅.
+
+**§5.0 bug-hunt gate:**
+- audit_due_nudge.py: no committed audit baseline; no-op. ✅
+- distill_detector.py: no un-distilled audits; no-op. ✅
+
+**Conditional checks:**
+- Check I (Thursday 2026-06-11): weekday-gate skip. ✅
+- Check III: next eligible 2026-06-14 (Sunday). Skip. ✅
+- Credential rotations: SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅
+
+**G-rule tracking:**
+- **`transcript-not-persisted` (3/3 DISPATCHED iter 1396):** 0 new. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- **`heal-stale-daemon-code:auto-restarted` (2/3):** 0 new. Still 2/3.
+- **`retry_exhausted:post-merge-install-drift-trigger-001` (1/3):** 0 new. Still 1/3.
+- **`unreviewed-merge` G-rule (3/3 DISPATCHED):** L1479 adds another instance (PR #451). Pattern persists; dispatch standing. No new dispatch.
+- All other G-rules: carry from iter 1414 unchanged.
+
+**Actions taken:**
+1. Tier state: consecutive_clean 0→1 via `scripts/cycle_tier_state.py record --checks-clean true` at 07:14:49Z. ✅
+2. Alert watermark advanced to 1479.
+3. No auto-fix allow-list actions executed.
+
+**PRIME DIRECTIVE:** 0 new rows this iter (all Tier-3/nominal; no Pulse attention consumed). Running total: interventions=776, systemic_fixes=20, verification_pending=9, ratio=38.8, trend=flat.
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+**Standing findings (carry with updates):**
+- [yellow] `transcript-not-persisted` regression: G-rule 3/3 DISPATCHED iter 1396. **21 total** (L1438–1466). PR #447 installs ~07:51Z. Monitor.
+- [yellow] APPROVAL_REQUEST `alert-translation-no-mirror-dispatch-001` — pending Larry.
+- [yellow] health-check-notify-script-missing — carry.
+- [yellow] Tier 2 weekly probe auth_401 — pending Larry: rotate-claude-setup-tokens.
+- [yellow] log-contamination / test-fixture G-rule: 3/3 DISPATCHED iter 1378. Carry pending Beacon/Forge.
+- [blue] `retry_exhausted:post-merge-install-drift-trigger-001` — 1/3. Cooldown suppressed. Watch for 2nd/3rd.
+- [blue] cycle.timer stuck — G-rule 3/3 dispatched. `Trigger: n/a`. Expected fix ~07:51Z sync.
+- [blue] heal-stale-daemon-code:auto-restarted — **2/3**. Watch for 3rd → G-rule dispatch.
+- [blue] PR #453 (`fix(shipper): revive outbox-notifier.log chain-event source`) — open ~10min. Under threshold. Monitor.
+- [blue] unreviewed-merge:451 — Tier-3 known pattern. L1479. No action.
+- [blue] unreviewed-merge:448 — actor-exemption-config G-rule 3/3 pending `go: actor-exemption-config`.
+- [blue] silence-missions-card-gc-summary-alert-001 — carry.
+- [blue] G-rule heal-pipeline-stall heartbeat threshold 3/3 — dispatch deferred (Forge queue busy).
+- [blue] G-rule `auto-restart-failed:*` — 1/3. Carry.
+- [blue] G-rule completion-DM delivery failure 1/3. Carry.
+- [blue] G-rule `auto-retry source=auto-retry drops build dispatch` 1/3. Carry.
+- [blue] G-rule dispatch-branch-cleanup:summary 1/3. Carry.
+- [blue] G-rule Check-C-launcher-liveness → APPROVAL_REQUEST `cycle-prompt-check-c-pgrep-liveness-001` pending Larry.
+- [blue] APPROVAL_REQUEST sync-push-rebase-fallback-001 — parked.
+- [blue] APPROVAL_REQUEST alert-triage-durable-watermark-001 — parked.
+- [blue] wedged-review-silent-wt 2/3. Carry.
+- [blue] alert-triage.json watermark MISSING — G-rule dispatched iter 1251. Carry.
+- [blue] G-rule `heal-pipeline-stall retry-exhausted on shipped task` — 1/3. Carry.
+
+**Watch items for iter 1416:**
+- PR #453: ~10min at iter end. Monitor for Mirror review dispatch + 30-min auto-merge threshold.
+- cycle.timer: watch for `Trigger` populated after ~07:51Z sync. Escalate [yellow] if still stuck post-sync.
+- transcript-not-persisted: verify 0 new alerts post-sync (~07:51Z) → G-rule resolution path.
+- medic / PR #447 post-merge unit install: verify systemd units installed after ~07:51Z sync.
+
+---
+
 ## Iteration 1414 — 2026-06-11 07:03Z UTC (interactive, Tier 1, consecutive_clean 0→0)
 
 **Health:** ⚠️ Action. Check 0: 2 new alerts (L1475–1476). L1475 `mirror-pass-unmerged:PR#450` → always-fix executed: PR #450 merged 07:06:22Z. L1476 `retry-exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002` → Tier-3 (PR #450 now merged; exhaustion moot). 8/8 services active. PR #451 open ~20min at iter end (under threshold, no Mirror review yet). **Tier 1, consecutive_clean 0→0.**
@@ -90082,3 +90611,108 @@ New watermark: **2026-06-10T17:05:59Z / pulse:ccd-s1-identity-resolution-2026061
 - **Beacon inbox** — cycle-finding-transcript-not-persisted dispatch; expect consumption + Forge brief within 30 min of Beacon's next run.
 
 **Tier end-of-iter:** 1 (consecutive_clean=1 — this iter clean; all findings Tier-3 or nominal).
+
+---
+
+## Iteration 1416 — 2026-06-11 07:44Z UTC (interactive, Tier 1)
+
+**Note:** Automated cycles 1398–1415 ran after iter 1397 (02:30Z), updating MEMORY.md only (no journal entries). Key automated actions: PR #449 merged iter 1412 (06:51:53Z), PR #450 merged iter 1414 (07:06:22Z). Session-start gitStatus: HEAD=2cd8bf6 "Pulse cycle 20260611T073705Z", branch=main, clean. Cycle-tier at start: consecutive_clean=2.
+
+**Health:** ⚠️ Attention — PR #454 CONFLICTING, Forge session reported stuck on dashboard (07:37Z, Beacon engaged), wt-forge-fix-reaper-handoff-guard-checks-liveness-002 long-running. Positives: install-drift healed 06:00Z ✅, transcript-not-persisted resolved ✅, all core services active ✅.
+**Tier state:** 1 (consecutive_clean=0; PR #454 CONFLICTING)
+
+**Check 0 — Alert triage (VERIFY-BEFORE-REASSERT):**
+- Prior watermark: MISSING (alert-triage.json last_claimed_line absent). Claiming trailing 100 lines (1384–1483) as catchup per spec.
+- Current count: **1483 lines** (+40 new since iter 1397 watermark at 1443)
+- Key new alerts (lines 1444–1483):
+  - transcript-not-persisted (L1444–L1464, through 05:36Z): **Tier 3** (install-gap known-pattern; all resolved post-06:00Z healer). ✅
+  - missions-card-gc (L1455, L1465, L1482): **Tier 3** digest. ✅
+  - pulse-park-and-silence retry-exhausted (L1456): **Tier 3** — medic (L1457) confirmed PR #444 MERGED 03:28:18Z; task completed. FALSE POSITIVE. ✅
+  - unreviewed-merge:#445/#448/#449/#451/#452/#453 (L1458, L1466, L1472–L1473, L1479, L1483): ongoing G-rule pattern (actor=Larry-Yatch). APPROVAL_REQUEST `actor-exemption-config` already queued. No new dispatch.
+  - heal-systemd-install-drift stuck-timer-healed:ourliberty-cycle.timer (L1467, 06:00:19Z): **Tier 3** — POSITIVE. Install-drift healer confirmed cycle.timer fixed. ✅
+  - heal-stale-daemon-code auto-restarts outbox-notifier/chain-event-shipper/beacon-bot (L1468, L1480–L1481): **Tier 3** known-pattern. ✅
+  - pulse dashboard-idle-explanation (L1469, 06:23Z): **Tier 3** stale — condition (cycle.timer stuck) already healed; cycles restored by 06:51Z. ✅
+  - post-merge-install-drift-trigger-001 retry-exhausted (L1470): **Tier 3** stale — install-drift healed at 06:00Z; trigger task obsoleted by healer. ✅
+  - heal-wedged-review-sessions reaped wt-forge-fix-headless-approval-dedup-spawn-failure-wedge-00 (L1474): **Tier 3** closure. ✅
+  - pipeline-stall:mirror-pass-unmerged:PR#450 (L1475): **Tier 3** — medic confirmed PR #450 MERGED 07:06:22Z. FALSE POSITIVE. ✅
+  - pipeline-stall:retry-exhausted:fix-headless-approval-dedup-spawn-failure-wedge-002 (L1476): **Tier 4 watch** — medic (L1478) found 2 Forge runs: first 04:42Z success=True 215s; second 06:24Z abnormal termination. First run may have captured the fix. No dead-letter. Monitor for PR.
+- Watermark updated to **1483**. Triage: 0 new dispatches. ✅ Nominal on new dispatches.
+
+**Check 1 — Log noise:** journalctl priority warning since 90 min → "-- No entries --". ✅ Nominal.
+
+**Check 2 — Telegram sweep:**
+- Larry 07:08Z UTC: "do we have another stuck?" → Beacon: "No, chain is flowing." ✅ Tracked.
+- Larry 07:37Z UTC: "On the dashboard it says Forge is stuck — exceeded session duration (threshold 15m 0s)" → Beacon 07:39Z: "Settled — genuinely different (and real) stuck, not a zombie. Worker alive and blocked wai..." Beacon handling. PR #456 (fix(heal): pipeline-stall tz-skew) created 07:40:42Z as systemic fix. [yellow] carry.
+- No orphaned directives. ✅ Nominal.
+
+**Check 3 — Pipeline stall:** heal-pipeline-stall-state.json: healer_ts=None, active_stalls=0. No active stalls. ✅ Nominal.
+
+**Check 4 — Pending directives / Inboxes:**
+- beacon: empty. ✅
+- forge: 4 items — 3 have active worktrees (ccd-s1-envelope-builder, fix-reaper-handoff-guard-checks-liveness-002, fix-test-bootstrap-per-module-001). 1 queued: `ccd-s2-no-session-revision-route` (age ~7.8h, no worktree). Forge demonstrably active (PR #455 created 07:32Z). [blue] monitor.
+- mirror: empty. ✅
+- pulse: empty. ✅
+
+**Check 5 — Stale daemon:** heal-stale-daemon-code-state.json ABSENT (one-shot completed). ✅ Nominal.
+
+**Check A — Source repo:** Session-start gitStatus: main, clean, HEAD=2cd8bf6. ✅ Nominal.
+
+**Check B — Sync health:** agent-core-sync.json: status=no-change, last_sync=06:50:51Z (~54min ago). ✅ Nominal.
+
+**Check C — Agent liveness (VERIFY-BEFORE-REASSERT):**
+- Core pipeline services: 5/5 active (inbox-watcher, outbox-notifier, chain-event-shipper, dashboard-api, cycle.timer). ✅
+- Telegram bots: systemctl shows "inactive" (launcher-type known-pattern per iter 1309). VERIFIED: beacon_telegram_bot.log shows bot responding to Larry at 07:37–07:39Z UTC. ✅ All nominal.
+
+**Check E — PRs (VERIFY-BEFORE-REASSERT):**
+- **PR #454** CONFLICTING — "Pin PostgREST request timeout" (branch claude/tender-bohr-y1if1g, created 07:17:35Z). Cannot auto-merge. [yellow] New finding.
+- **PR #455** MERGEABLE — "fix(tests): arm sandbox per-module" (forge/, created 07:32:48Z, age ~12min). Below 30-min threshold. Monitor.
+- **PR #456** MERGEABLE — "fix(heal): pipeline-stall tz-skew" (work/, created 07:40:42Z). Just created. Monitor.
+- ourliberty-dashboard: 0 open. ✅
+
+**Periodic/conditional (Thursday 2026-06-11 UTC):** Not Sunday, not Monday. Checks I, III, VIII, IX, X: skip. ✅
+
+**Credential rotation:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~72d). ✅ Nominal.
+
+**Verify-before-reassert on carried-forward standings:**
+- `transcript-not-persisted install-gap`: **CLOSED ✅** — no new occurrences after L1464 (05:36Z). Healer confirmed 06:00:19Z fix.
+- `install-drift-timer-gap verification OPEN (0/2)`: **CLOSED ✅** — L1467 stuck-timer-healed:ourliberty-cycle.timer at 06:00:19Z. Automated cycles restored.
+- `park-the-nudge PRs #441/#442/#443`: **CLOSED ✅** — PR #444 MERGED 03:28:18Z (confirmed via medic L1457).
+- `CCD DAG ccd-s1-envelope-builder paused`: CONFIRMED — wt present, last_touch=41min_ago. Active build ongoing.
+- `bughunt-gate-soak`: Phase 2 decision pending Larry. [yellow] carry.
+- `health-check-notify-script-missing G-rule 3/3`: Forge PR pending. [yellow] carry.
+- `Tier 2 weekly probe (auth_401)`: Beacon bot log 07:19Z UTC confirms STILL ACTIVE. [yellow] carry. Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- `Check IX GITHUB_TOKEN`: Not tested. [yellow] carry.
+- `sync-push-rebase-fallback-001`: No new occurrence. [blue] carry.
+- `G-rule cycle-timer checkpoint 3/3`: [blue] carry.
+- `G-rule actor-exemption-config 3/3`: [blue] carry.
+- `APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001`: [blue] carry.
+
+**Actions taken:** Updated alert-triage.json watermark to 1483. Recorded non-clean iter to cycle-tier.json. Appended intervention row to cycle-prime-ledger.jsonl.
+**Dispatches:** None.
+
+**PRIME DIRECTIVE:** +1 intervention (PR #454 CONFLICTING finding). Prior per MEMORY iter 1396: interventions=769, systemic_fixes=20, ratio≈38.45. This iter: interventions≈770.
+
+**Standing findings:**
+- [yellow] **PR #454 CONFLICTING** — "Pin PostgREST request timeout" (branch claude/tender-bohr-y1if1g). Needs rebase by author before it can merge.
+- [yellow] **Forge stuck on dashboard (Larry 07:37Z)** — Beacon engaged. PR #456 (healer tz-fix) created 07:40Z. Watch for Mirror review and merge.
+- [yellow] **fix-headless-approval-dedup-spawn-failure-wedge-002 abnormal termination** — first Forge run succeeded 04:42Z; second 06:24Z crashed. Verify if fix code captured in PR.
+- [yellow] **bughunt-gate-soak** — Phase 2 decision pending Larry.
+- [yellow] **health-check-notify-script-missing** — G-rule 3/3; Forge PR pending.
+- [yellow] **Tier 2 weekly probe (auth_401)** — Action on Larry: `docs/runbooks/rotate-claude-setup-tokens.md`.
+- [yellow] **Check IX GITHUB_TOKEN missing** — dashboard-api POST → 500.
+- [blue] **ccd-s2-no-session-revision-route in Forge inbox 7.8h** — queued; Forge has 3 active builds.
+- [blue] **PR #455, PR #456** — MERGEABLE, new. Watch for 30-min auto-merge threshold.
+- [blue] **G-rule cycle-timer checkpoint 3/3** — pending `go: cycle-timer checkpoint`.
+- [blue] **G-rule actor-exemption-config 3/3** — pending `go: actor-exemption-config`.
+- [blue] **APPROVAL_REQUEST cycle-prompt-check-c-pgrep-liveness-001** — pending Larry sign-off.
+- [blue] **sync-push-rebase-fallback-001** — self-recovering.
+
+**Watch items for next iter (1417):**
+- **PR #455** — expect 30-min auto-merge threshold ~08:03Z; watch for Mirror routing.
+- **PR #456** — new healer tz-fix; watch for Mirror review dispatch.
+- **PR #454** — CONFLICTING; won't self-resolve. Larry to rebase or close.
+- **fix-reaper-handoff-guard-checks-liveness-002 worktree** — long-running; watch for PR.
+- **ccd-s2-no-session-revision-route** — escalate if still inbox-only by next interactive iter.
+- **fix-headless-approval-dedup-spawn-failure-wedge-002** — confirm first-run fix captured in PR.
+
+**Tier end-of-iter:** 1 (consecutive_clean=0).

@@ -461,16 +461,24 @@ def make_event(
     cost_usd: Optional[float] = None,
     payload: Optional[dict[str, Any]] = None,
     source: str = '',
+    id_extra: Optional[str] = None,
 ) -> Optional[ChainEvent]:
     """Build a ChainEvent, validating event_type against KNOWN_EVENT_TYPES.
 
     Returns None if event_type is unknown — caller logs WARN; the row is
     never sent to Supabase. The weekly audit healer separately catches any
     unknown types that DO land (hot-patched code, drift, etc.).
+
+    ``id_extra`` feeds compute_event_id's disambiguator: log timestamps have
+    1-second resolution, so without it two distinct same-task lines in the
+    same second (AUTO_MERGE outcome=failed + retry outcome=merged) collide
+    on the PK and ON CONFLICT DO NOTHING silently drops the second — the
+    advancer's merge gate would then never see the merged row. Callers with
+    higher-resolution timestamps omit it and hash exactly as before.
     """
     if event_type not in KNOWN_EVENT_TYPES:
         return None
-    event_id = compute_event_id(task_id, event_type, ts)
+    event_id = compute_event_id(task_id, event_type, ts, extra=id_extra)
     return ChainEvent(
         event_id=event_id, ts=ts, agent=agent, task_id=task_id,
         event_type=event_type, pr_url=pr_url, cost_usd=cost_usd,
@@ -599,17 +607,21 @@ def _maybe_float(v: Any) -> Optional[float]:
         return None
 
 
-# outbox-notifier.log lines have the shape (see outbox_notifier.log() helper):
-#   [2026-05-25T19:42:13Z] [INFO] MARKER_EMIT agent=forge task=<id> verdict=PROCEED
-#   [2026-05-25T19:42:13Z] [INFO] AUTO_MERGE task=<id> pr=<url> outcome=merged ...
-#   [2026-05-25T19:42:13Z] [INFO] MARKER_ERROR agent=mirror task=<id> reason=...
-#   [2026-05-25T19:42:13Z] [INFO] COST_BUDGET task=<id> agent=forge cost_usd=1.23 limit_usd=5
-#   [2026-05-25T19:42:13Z] [INFO] REVIEW_REQUEST task=<id> pr=<url>
-#   [2026-05-25T19:42:13Z] [INFO] BUILD_DISPATCHED task=<id> agent=forge
-#   [2026-05-25T19:42:13Z] [INFO] HEALER_FIRE name=<healer> outcome=...
+# outbox-notifier.log lines are written by outbox_notifier.log() — REAL shape
+# (confirmed against the production log 2026-06-11):
+#   [2026-06-11 00:00:23] [notifier] [INFO] AUTO_MERGE task=<id> pr=<url> outcome=merged (--squash --delete-branch) agent=forge
+#   [2026-06-10 17:12:01] [notifier] [WARN] COST_BUDGET_EXHAUSTED task=<id> current=$5.12 cap=$5.00 dispatch=<label>; refusing dispatch agent=forge
+# Two traps, both of which kept this source at zero shipped events from its
+# birth until 2026-06-11:
+#   - a `[notifier]` tag sits between the timestamp and the level. The tag
+#     group below is OPTIONAL so the older `[ts] [LEVEL] KEYWORD ...` shape
+#     (drain-test fixtures, possible future writers) still parses.
+#   - the timestamp is NAIVE HOST-LOCAL time (`datetime.now()`), not UTC —
+#     see _normalize_iso_ts.
 
 _LOG_LINE_RE = re.compile(
     r'^\[(?P<ts>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]\s+'
+    r'(?:\[(?P<tag>[\w-]+)\]\s+)?'
     r'\[(?P<level>\w+)\]\s+(?P<rest>.*)$'
 )
 _KV_RE = re.compile(r"(\w+)=('([^']*)'|\"([^\"]*)\"|(\S+))")
@@ -618,14 +630,19 @@ _LOG_EVENT_KEYWORDS = {
     'MARKER_EMIT': 'marker_emit',
     'AUTO_MERGE': 'auto_merge',
     'MARKER_ERROR': 'marker_error',
-    'COST_BUDGET': 'cost_budget',
+    # Deliberately NOT plain 'COST_BUDGET': those lines are per-dispatch
+    # "(allowed)" trajectory logging, one per healthy dispatch. Shipping them
+    # as cost_budget rows would make every healthy task look terminally
+    # failed to dashboard_api._derive_done_today (cost_budget is in its
+    # _DONE_FAILURE_EVENT_TYPES). Only the cap-fire sentinel is a chain event.
+    'COST_BUDGET_EXHAUSTED': 'cost_budget',
     # SUPERSEDED (forge-queue-in-review-lane): review_request is now
     # push-emitted by outbox_notifier._emit_review_request_chain_event with
     # agent='forge' at the dispatch sites. Do NOT add a REVIEW_REQUEST log
-    # line on the producer side when fixing this parser — it would
-    # double-write the event (push ts != log ts, so the event_id PK can't
-    # dedup the pair) and the parsed copy would carry agent='notifier',
-    # which the dashboard's .eq('agent','forge') fetch ignores anyway.
+    # line on the producer side — it would double-write the event (push ts
+    # != log ts, so the event_id PK can't dedup the pair) and the parsed
+    # copy would carry agent='notifier', which the dashboard's
+    # .eq('agent','forge') fetch ignores anyway.
     'REVIEW_REQUEST': 'review_request',
     'BUILD_DISPATCHED': 'build_dispatched',
     'HEALER_FIRE': 'healer_fire',
@@ -652,7 +669,11 @@ def parse_log_line(line: str) -> Optional[ChainEvent]:
     rest = m.group('rest')
     keyword = None
     for kw in _LOG_EVENT_KEYWORDS:
-        if rest.startswith(kw):
+        # Word-boundary match, not bare startswith: the log also carries
+        # non-event lookalikes sharing these prefixes (AUTO_MERGE_HELD,
+        # AUTO_MERGE_WORKTREE_TEARDOWN, AUTO_MERGE_QUEUE_*, COST_BUDGET,
+        # COST_BUDGET_DM_WRITE_FAILED, ...) that must not ship.
+        if rest == kw or rest.startswith(kw + ' '):
             keyword = kw
             break
     if not keyword:
@@ -664,30 +685,43 @@ def parse_log_line(line: str) -> Optional[ChainEvent]:
     agent = kv.get('agent') or 'notifier'
     pr_url = kv.get('pr')
     cost = _maybe_float(kv.get('cost_usd'))
+    if cost is None:
+        # COST_BUDGET_EXHAUSTED carries `current=$1.23` rather than cost_usd.
+        cost = _maybe_float(kv.get('current', '').lstrip('$'))
     payload = {k: v for k, v in kv.items()
                if k not in ('task', 'task_id', 'agent', 'pr', 'cost_usd')}
     payload['raw_keyword'] = keyword
+    # id_extra=rest: re-reading the same line after a cursor rewind still
+    # dedups (identical rest → identical id), while two different lines for
+    # the same task in the same second (1s log resolution) stay distinct.
     return make_event(
         agent=agent, event_type=event_type, ts=ts, task_id=task_id,
         pr_url=pr_url, cost_usd=cost, payload=payload, source='outbox_log',
+        id_extra=rest,
     )
 
 
 def _normalize_iso_ts(raw: str) -> str:
-    """Normalize a log-line timestamp to ISO8601 UTC."""
+    """Normalize a log-line timestamp to ISO8601 UTC.
+
+    Naive timestamps are interpreted as HOST-LOCAL time, not UTC:
+    outbox_notifier.log() stamps `datetime.now()` and the production droplet
+    runs America/Denver, so reading naive as UTC shifted every event 6h into
+    the past — far enough that build_sequence_advancer.chain_event_says_merged
+    (`ts >= dispatched_at`) would discard a freshly-merged step. The shipper
+    always runs on the same host as the notifier, so the system zone is the
+    writer's zone.
+    """
     s = raw.replace(' ', 'T')
-    # Treat naive as UTC (outbox_notifier writes UTC isoformat)
-    if 'Z' not in s and '+' not in s and '-' not in s[-6:]:
-        s = s + '+00:00'
-    elif s.endswith('Z'):
+    if s.endswith('Z'):
         s = s[:-1] + '+00:00'
     try:
         dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc).isoformat()
     except ValueError:
         return datetime.now(timezone.utc).isoformat()
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # attaches the host-local zone
+    return dt.astimezone(timezone.utc).isoformat()
 
 
 # pulse-escalations.json is a snapshot rewritten by Pulse each cycle. We

@@ -198,6 +198,22 @@
       },
       "last_touched": "2026-06-11T06:19:53.430591+00:00",
       "promoted_to": null
+    },
+    {
+      "id": "cap-restart-shipper-notifier-on-droplet-to-activate-5b70",
+      "title": "Restart shipper+notifier on droplet to activate PR #453",
+      "note": "PR #453 (chain shipper outbox-log source revival + agent=forge producer lines) is MERGED but NOT live: both ourliberty-chain-event-shipper and ourliberty-outbox-notifier serve stale code until restarted. After droplet auto-pulls c13794b: sudo systemctl restart ourliberty-chain-event-shipper ourliberty-outbox-notifier \u2014 then verify auto_merge events ship on the next merge (grep outbox_log ~/agents/logs/chain-event-shipper.log).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-work",
+        "branch": "fix/known-event-types-spec-test",
+        "captured_at": "2026-06-11T07:17:28.294112+00:00"
+      },
+      "last_touched": "2026-06-11T07:17:28.294112+00:00",
+      "promoted_to": null
     }
   ]
 }
